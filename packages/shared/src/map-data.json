@@ -1,0 +1,7294 @@
+{
+  "visualHash": "6a05d246fa518a1de33fc7eb33bd514ef7f0c550697c3188f465b0ab3bb5638a",
+  "collisionHash": "b94ca106e007537dfd30db7d17289ce46d114690f2d0d1d210739906debabe5e",
+  "bounds": {
+    "minX": -26,
+    "maxX": 58,
+    "minZ": -52,
+    "maxZ": 26
+  },
+  "markers": {
+    "Spawn_Jogador": {
+      "x": 12,
+      "y": 0.15,
+      "z": 1.6
+    },
+    "Ponto_Balcao": {
+      "x": 16.4,
+      "y": 0.3,
+      "z": -7.5
+    },
+    "Ponto_Sinuca": {
+      "x": 10.3,
+      "y": 3.45,
+      "z": -9.6
+    },
+    "Ponto_Lounge": {
+      "x": 19.799999,
+      "y": 3.45,
+      "z": -7.4
+    },
+    "Ponto_Terraco": {
+      "x": 28,
+      "y": 3.45,
+      "z": -8.7
+    },
+    "Ponto_Palco": {
+      "x": 26.6,
+      "y": 0.3,
+      "z": -19.799999
+    },
+    "Ponto_Churrasqueira": {
+      "x": 4.5,
+      "y": 0.3,
+      "z": -23.9
+    },
+    "Ponto_Cozinha": {
+      "x": 28.5,
+      "y": 0.3,
+      "z": -3
+    },
+    "Ponto_Carga_Descarga": {
+      "x": 36.5,
+      "y": 0,
+      "z": -10.7
+    },
+    "Ponto_Portao_Quintal": {
+      "x": -1.5,
+      "y": 0.15,
+      "z": -21
+    }
+  },
+  "colliders": [
+    {
+      "id": "COL_Rua_Quadra",
+      "x": 16,
+      "z": -13,
+      "hx": 19,
+      "hz": 16,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.001",
+      "x": 16,
+      "z": 18.5,
+      "hx": 19,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.002",
+      "x": 16,
+      "z": -44.5,
+      "hx": 19,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.003",
+      "x": -18.5,
+      "z": -13,
+      "hx": 7.5,
+      "hz": 16,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.004",
+      "x": 50.5,
+      "z": -13,
+      "hx": 7.5,
+      "hz": 16,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.005",
+      "x": -18.5,
+      "z": 18.5,
+      "hx": 7.5,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.006",
+      "x": 50.5,
+      "z": 18.5,
+      "hx": 7.5,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.007",
+      "x": -18.5,
+      "z": -44.5,
+      "hx": 7.5,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Quadra.008",
+      "x": 50.5,
+      "z": -44.5,
+      "hx": 7.5,
+      "hz": 7.5,
+      "minY": 0,
+      "maxY": 0.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Leito",
+      "x": 16,
+      "z": -13,
+      "hx": 42,
+      "hz": 39,
+      "minY": -0.5,
+      "maxY": 0,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Limite",
+      "x": -26.5,
+      "z": -13,
+      "hx": 0.5,
+      "hz": 39,
+      "minY": 0,
+      "maxY": 6,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Limite.001",
+      "x": 58.5,
+      "z": -13,
+      "hx": 0.5,
+      "hz": 39,
+      "minY": 0,
+      "maxY": 6,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Limite.002",
+      "x": 16,
+      "z": 26.5,
+      "hx": 42,
+      "hz": 0.5,
+      "minY": 0,
+      "maxY": 6,
+      "ramp": false
+    },
+    {
+      "id": "COL_Rua_Limite.003",
+      "x": 16,
+      "z": -52.5,
+      "hx": 42,
+      "hz": 0.5,
+      "minY": 0,
+      "maxY": 6,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede",
+      "x": 4.25,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.001",
+      "x": 6.5,
+      "z": -3.6,
+      "hx": 1.5,
+      "hz": 0.1,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.002",
+      "x": 8.75,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.003",
+      "x": 11,
+      "z": -3.6,
+      "hx": 1.5,
+      "hz": 0.1,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.004",
+      "x": 13.25,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.005",
+      "x": 15.3,
+      "z": -3.6,
+      "hx": 1.3,
+      "hz": 0.1,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.006",
+      "x": 20.200001,
+      "z": -3.6,
+      "hx": 3.599999,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.007",
+      "x": 23.049999,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.008",
+      "x": 21.9,
+      "z": -14.9,
+      "hx": 0.4,
+      "hz": 0.1,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.009",
+      "x": 20.75,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.010",
+      "x": 18.75,
+      "z": -14.9,
+      "hx": 1.25,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 1.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.011",
+      "x": 18.75,
+      "z": -14.9,
+      "hx": 1.25,
+      "hz": 0.1,
+      "minY": 2.2,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.012",
+      "x": 15.25,
+      "z": -14.9,
+      "hx": 2.25,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.013",
+      "x": 12.2,
+      "z": -14.9,
+      "hx": 0.8,
+      "hz": 0.1,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.014",
+      "x": 11.212501,
+      "z": -14.9,
+      "hx": 0.1875,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.015",
+      "x": 10.3125,
+      "z": -14.9,
+      "hx": 0.7125,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.016",
+      "x": 9.299999,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.017",
+      "x": 9.299999,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 2.5,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.018",
+      "x": 7.299999,
+      "z": -14.9,
+      "hx": 1.7,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.019",
+      "x": 5.299999,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.020",
+      "x": 5.299999,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 2.5,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.021",
+      "x": 4.25,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.022",
+      "x": 3.6,
+      "z": -14.150001,
+      "hx": 0.1,
+      "hz": 0.65,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.023",
+      "x": 3.6,
+      "z": -13.200001,
+      "hx": 0.1,
+      "hz": 0.3,
+      "minY": 0.3,
+      "maxY": 2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.024",
+      "x": 3.6,
+      "z": -13.200001,
+      "hx": 0.1,
+      "hz": 0.3,
+      "minY": 2.5,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.025",
+      "x": 3.6,
+      "z": -12.2375,
+      "hx": 0.1,
+      "hz": 0.6625,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.026",
+      "x": 3.6,
+      "z": -9.787499,
+      "hx": 0.1,
+      "hz": 1.7875,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.027",
+      "x": 3.6,
+      "z": -6.5,
+      "hx": 0.1,
+      "hz": 1.5,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.028",
+      "x": 3.6,
+      "z": -4.35,
+      "hx": 0.1,
+      "hz": 0.65,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.029",
+      "x": 23.9,
+      "z": -1.85,
+      "hx": 0.1,
+      "hz": 1.65,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.030",
+      "x": 23.9,
+      "z": -5.6,
+      "hx": 0.1,
+      "hz": 2.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.031",
+      "x": 23.9,
+      "z": -8.1,
+      "hx": 0.1,
+      "hz": 0.4,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.032",
+      "x": 23.9,
+      "z": -8.7875,
+      "hx": 0.1,
+      "hz": 0.2875,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.033",
+      "x": 23.9,
+      "z": -10.325,
+      "hx": 0.1,
+      "hz": 1.25,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.034",
+      "x": 23.9,
+      "z": -12.0875,
+      "hx": 0.1,
+      "hz": 0.5125,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.035",
+      "x": 23.9,
+      "z": -13,
+      "hx": 0.1,
+      "hz": 0.4,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.036",
+      "x": 23.9,
+      "z": -14.1,
+      "hx": 0.1,
+      "hz": 0.7,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.037",
+      "x": 24.65,
+      "z": -0.1,
+      "hx": 0.85,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.038",
+      "x": 26.25,
+      "z": -0.1,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 1.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.039",
+      "x": 26.25,
+      "z": -0.1,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 2.6,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.040",
+      "x": 27.75,
+      "z": -0.1,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.041",
+      "x": 29.25,
+      "z": -0.1,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 1.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.042",
+      "x": 29.25,
+      "z": -0.1,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 2.6,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.043",
+      "x": 31,
+      "z": -0.1,
+      "hx": 1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.044",
+      "x": 31.9,
+      "z": -1.1,
+      "hx": 0.1,
+      "hz": 0.9,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.045",
+      "x": 31.9,
+      "z": -2.4,
+      "hx": 0.1,
+      "hz": 0.4,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.046",
+      "x": 31.9,
+      "z": -5.9375,
+      "hx": 0.100001,
+      "hz": 3.1375,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.047",
+      "x": 31.9,
+      "z": -9.3375,
+      "hx": 0.1,
+      "hz": 0.2625,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.048",
+      "x": 31.9,
+      "z": -10.7,
+      "hx": 0.1,
+      "hz": 1.1,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.049",
+      "x": 31.9,
+      "z": -13.3,
+      "hx": 0.1,
+      "hz": 1.5,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.050",
+      "x": 28.9,
+      "z": -14.9,
+      "hx": 3.1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.051",
+      "x": 25.4,
+      "z": -14.9,
+      "hx": 0.4,
+      "hz": 0.1,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.052",
+      "x": 24.4,
+      "z": -14.9,
+      "hx": 0.6,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.053",
+      "x": 27,
+      "z": -9.075,
+      "hx": 3,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.054",
+      "x": 30.4,
+      "z": -9.075,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.055",
+      "x": 31.299999,
+      "z": -9.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.056",
+      "x": 29.1,
+      "z": -12.06,
+      "hx": 0.5,
+      "hz": 0.06,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.057",
+      "x": 30,
+      "z": -12.06,
+      "hx": 0.4,
+      "hz": 0.06,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.058",
+      "x": 31.1,
+      "z": -12.06,
+      "hx": 0.699999,
+      "hz": 0.06,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.059",
+      "x": 28.66,
+      "z": -13.46,
+      "hx": 0.06,
+      "hz": 1.34,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.060",
+      "x": 4.35,
+      "z": -11.575,
+      "hx": 0.65,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.061",
+      "x": 5.4,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.062",
+      "x": 7.3,
+      "z": -11.575,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.063",
+      "x": 9.2,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.064",
+      "x": 10.35,
+      "z": -11.575,
+      "hx": 0.75,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.065",
+      "x": 12.1,
+      "z": -11.575,
+      "hx": 1,
+      "hz": 0.075,
+      "minY": 2.7,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.066",
+      "x": 13.175,
+      "z": -11.575,
+      "hx": 0.075,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.067",
+      "x": 17.975,
+      "z": -11.575,
+      "hx": 1.525,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.068",
+      "x": 19.9,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 2.4,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.069",
+      "x": 22.049999,
+      "z": -11.575,
+      "hx": 1.75,
+      "hz": 0.075,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.070",
+      "x": 7.325,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.071",
+      "x": 11.025001,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.072",
+      "x": 13.175,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede.073",
+      "x": 16.525,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 0.3,
+      "maxY": 3.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Escada_Parede",
+      "x": 14.85,
+      "z": -12.73,
+      "hx": 0.1,
+      "hz": 1.08,
+      "minY": 0.3,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2",
+      "x": 4.15,
+      "z": -3.6,
+      "hx": 0.65,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.001",
+      "x": 5.55,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.002",
+      "x": 5.55,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.003",
+      "x": 7,
+      "z": -3.6,
+      "hx": 0.7,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.004",
+      "x": 8.449999,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.005",
+      "x": 8.449999,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.006",
+      "x": 10.099999,
+      "z": -3.6,
+      "hx": 0.9,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.007",
+      "x": 11.999999,
+      "z": -3.6,
+      "hx": 1,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 3.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.008",
+      "x": 11.999999,
+      "z": -3.6,
+      "hx": 1,
+      "hz": 0.1,
+      "minY": 5.75,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.009",
+      "x": 13.749999,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.010",
+      "x": 15.249999,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.011",
+      "x": 15.249999,
+      "z": -3.6,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.012",
+      "x": 17.5,
+      "z": -3.6,
+      "hx": 1.5,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.013",
+      "x": 19.999998,
+      "z": -3.6,
+      "hx": 1,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 3.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.014",
+      "x": 19.999998,
+      "z": -3.6,
+      "hx": 1,
+      "hz": 0.1,
+      "minY": 5.75,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.015",
+      "x": 21.649998,
+      "z": -3.6,
+      "hx": 0.65,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.016",
+      "x": 22.899998,
+      "z": -3.6,
+      "hx": 0.6,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.017",
+      "x": 22.899998,
+      "z": -3.6,
+      "hx": 0.6,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.018",
+      "x": 23.749998,
+      "z": -3.6,
+      "hx": 0.25,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.019",
+      "x": 23.25,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.020",
+      "x": 21.75,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.021",
+      "x": 21.75,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.022",
+      "x": 20.25,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.023",
+      "x": 18.75,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.024",
+      "x": 18.75,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.025",
+      "x": 15.350001,
+      "z": -14.9,
+      "hx": 2.65,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.026",
+      "x": 12.100001,
+      "z": -14.9,
+      "hx": 0.6,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.027",
+      "x": 12.100001,
+      "z": -14.9,
+      "hx": 0.6,
+      "hz": 0.1,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.028",
+      "x": 10.550001,
+      "z": -14.9,
+      "hx": 0.95,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.029",
+      "x": 9.300001,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.030",
+      "x": 9.300001,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.031",
+      "x": 7.300001,
+      "z": -14.9,
+      "hx": 1.7,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.032",
+      "x": 5.300001,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 4.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.033",
+      "x": 5.300001,
+      "z": -14.9,
+      "hx": 0.3,
+      "hz": 0.1,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.034",
+      "x": 4.250002,
+      "z": -14.9,
+      "hx": 0.75,
+      "hz": 0.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.035",
+      "x": 3.6,
+      "z": -14.150001,
+      "hx": 0.1,
+      "hz": 0.65,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.036",
+      "x": 3.6,
+      "z": -13.200001,
+      "hx": 0.1,
+      "hz": 0.3,
+      "minY": 3.45,
+      "maxY": 4.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.037",
+      "x": 3.6,
+      "z": -13.200001,
+      "hx": 0.1,
+      "hz": 0.3,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.038",
+      "x": 3.6,
+      "z": -10.85,
+      "hx": 0.1,
+      "hz": 2.05,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.039",
+      "x": 3.6,
+      "z": -8.05,
+      "hx": 0.1,
+      "hz": 0.75,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.040",
+      "x": 3.6,
+      "z": -8.05,
+      "hx": 0.1,
+      "hz": 0.75,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.041",
+      "x": 3.6,
+      "z": -6.8,
+      "hx": 0.1,
+      "hz": 0.5,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.042",
+      "x": 3.6,
+      "z": -5.55,
+      "hx": 0.1,
+      "hz": 0.75,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.043",
+      "x": 3.6,
+      "z": -5.55,
+      "hx": 0.1,
+      "hz": 0.75,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.044",
+      "x": 3.6,
+      "z": -4.25,
+      "hx": 0.1,
+      "hz": 0.55,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.045",
+      "x": 23.9,
+      "z": -4.35,
+      "hx": 0.1,
+      "hz": 0.65,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.046",
+      "x": 23.9,
+      "z": -5.9,
+      "hx": 0.1,
+      "hz": 0.9,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.047",
+      "x": 23.9,
+      "z": -7.9,
+      "hx": 0.1,
+      "hz": 1.1,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.048",
+      "x": 23.9,
+      "z": -9.7,
+      "hx": 0.1,
+      "hz": 0.7,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.049",
+      "x": 23.9,
+      "z": -9.7,
+      "hx": 0.1,
+      "hz": 0.7,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.050",
+      "x": 23.9,
+      "z": -11.6,
+      "hx": 0.1,
+      "hz": 1.2,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.051",
+      "x": 23.9,
+      "z": -13.400001,
+      "hx": 0.1,
+      "hz": 0.6,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.052",
+      "x": 23.9,
+      "z": -13.400001,
+      "hx": 0.1,
+      "hz": 0.6,
+      "minY": 5.65,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.053",
+      "x": 23.9,
+      "z": -14.400001,
+      "hx": 0.1,
+      "hz": 0.4,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.054",
+      "x": 4.35,
+      "z": -11.575,
+      "hx": 0.65,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.055",
+      "x": 5.4,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.056",
+      "x": 7.3,
+      "z": -11.575,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.057",
+      "x": 9.2,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.058",
+      "x": 10.35,
+      "z": -11.575,
+      "hx": 0.75,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.059",
+      "x": 11.400001,
+      "z": -11.575,
+      "hx": 0.3,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.060",
+      "x": 12.1,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.061",
+      "x": 12.875,
+      "z": -11.575,
+      "hx": 0.375,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.062",
+      "x": 17.975,
+      "z": -11.575,
+      "hx": 1.525,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.063",
+      "x": 19.900002,
+      "z": -11.575,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 5.55,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.064",
+      "x": 22.049999,
+      "z": -11.575,
+      "hx": 1.749999,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.065",
+      "x": 7.325,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.066",
+      "x": 11.025001,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.067",
+      "x": 13.175,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Parede2.068",
+      "x": 16.525,
+      "z": -13.225,
+      "hx": 0.075,
+      "hz": 1.575,
+      "minY": 3.45,
+      "maxY": 6.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_GuardaCorpo",
+      "x": 14,
+      "z": -11.6,
+      "hx": 0.75,
+      "hz": 0.05,
+      "minY": 3.45,
+      "maxY": 4.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Terraco",
+      "x": 27.9,
+      "z": -0.075,
+      "hx": 4.1,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 4.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Terraco.001",
+      "x": 31.924999,
+      "z": -7.5,
+      "hx": 0.075001,
+      "hz": 7.35,
+      "minY": 3.45,
+      "maxY": 4.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Terraco.002",
+      "x": 28,
+      "z": -14.925,
+      "hx": 4,
+      "hz": 0.075,
+      "minY": 3.45,
+      "maxY": 4.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Terraco.003",
+      "x": 23.875,
+      "z": -1.825,
+      "hx": 0.075,
+      "hz": 1.675,
+      "minY": 3.45,
+      "maxY": 4.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Piso",
+      "x": 16,
+      "z": -13,
+      "hx": 16,
+      "hz": 13,
+      "minY": 0.15,
+      "maxY": 0.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje",
+      "x": 13.75,
+      "z": -7.575,
+      "hx": 10.25,
+      "hz": 4.075,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje.001",
+      "x": 8.375,
+      "z": -13.325,
+      "hx": 4.875,
+      "hz": 1.675,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje.002",
+      "x": 20.225,
+      "z": -13.325,
+      "hx": 3.775,
+      "hz": 1.675,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje.003",
+      "x": 14.85,
+      "z": -14.9,
+      "hx": 1.6,
+      "hz": 0.1,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje.004",
+      "x": 28,
+      "z": -7.5,
+      "hx": 4,
+      "hz": 7.5,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Laje.005",
+      "x": 23.9,
+      "z": -1.75,
+      "hx": 0.1,
+      "hz": 1.75,
+      "minY": 3.2,
+      "maxY": 3.45,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Cobertura",
+      "x": 13.75,
+      "z": -9.25,
+      "hx": 10.25,
+      "hz": 5.75,
+      "minY": 6.15,
+      "maxY": 6.35,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada",
+      "x": 12,
+      "z": -2.9,
+      "hx": 1.5,
+      "hz": 0.6,
+      "minY": 3.5,
+      "maxY": 3.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada.001",
+      "x": 20,
+      "z": -2.9,
+      "hx": 1.5,
+      "hz": 0.6,
+      "minY": 3.5,
+      "maxY": 3.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa",
+      "x": 14,
+      "z": -12.747675,
+      "hx": 0.75,
+      "hz": 1.097675,
+      "minY": 0.251519,
+      "maxY": 1.875,
+      "ramp": true
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa.001",
+      "x": 15.7,
+      "z": -12.747675,
+      "hx": 0.75,
+      "hz": 1.097676,
+      "minY": 1.875,
+      "maxY": 3.49848,
+      "ramp": true
+    },
+    {
+      "id": "COL_Predio_Escada_Patamar",
+      "x": 14.85,
+      "z": -14.305,
+      "hx": 1.6,
+      "hz": 0.495,
+      "minY": 0.3,
+      "maxY": 1.875,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar",
+      "x": 0.12,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.001",
+      "x": 2.8,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.002",
+      "x": 5.48,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.003",
+      "x": 8.16,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.004",
+      "x": 10.84,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.005",
+      "x": 13.52,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.006",
+      "x": 16.200001,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.007",
+      "x": 18.880001,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.008",
+      "x": 21.560001,
+      "z": -0.12,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.009",
+      "x": 0.12,
+      "z": -3.05,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.010",
+      "x": 0.12,
+      "z": -6,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.011",
+      "x": 0.12,
+      "z": -8.950001,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.012",
+      "x": 0.12,
+      "z": -11.9,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar.013",
+      "x": 0.12,
+      "z": -14.85,
+      "hx": 0.11,
+      "hz": 0.11,
+      "minY": 0.3,
+      "maxY": 2.55,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Churrasqueira",
+      "x": 3.12,
+      "z": -10.599999,
+      "hx": 0.38,
+      "hz": 0.66,
+      "minY": 0.3,
+      "maxY": 1.82,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Churrasqueira.001",
+      "x": 4.75,
+      "z": -25.369999,
+      "hx": 2.31,
+      "hz": 0.43,
+      "minY": 0.3,
+      "maxY": 1.82,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Muro",
+      "x": 0.1,
+      "z": -24.15,
+      "hx": 0.1,
+      "hz": 1.65,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Muro.001",
+      "x": 0.1,
+      "z": -17.25,
+      "hx": 0.1,
+      "hz": 2.249999,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Muro.002",
+      "x": 30.5,
+      "z": -25.9,
+      "hx": 1.5,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Muro.003",
+      "x": 13,
+      "z": -25.9,
+      "hx": 13,
+      "hz": 0.100001,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Muro.004",
+      "x": 31.9,
+      "z": -20.4,
+      "hx": 0.100001,
+      "hz": 5.399999,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Portao",
+      "x": 27.5,
+      "z": -25.9,
+      "hx": 1.5,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar_Portao",
+      "x": 0.12,
+      "z": -19.325001,
+      "hx": 0.2,
+      "hz": 0.175,
+      "minY": 0.3,
+      "maxY": 3.05,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pilar_Portao.001",
+      "x": 0.12,
+      "z": -22.674999,
+      "hx": 0.2,
+      "hz": 0.175,
+      "minY": 0.3,
+      "maxY": 3.05,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco",
+      "x": 26.65,
+      "z": -23.700001,
+      "hx": 5.15,
+      "hz": 2.099999,
+      "minY": 0.3,
+      "maxY": 0.9,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau",
+      "x": 21.200001,
+      "z": -22.799999,
+      "hx": 0.3,
+      "hz": 0.599999,
+      "minY": 0.3,
+      "maxY": 0.5,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau.001",
+      "x": 21.35,
+      "z": -22.799999,
+      "hx": 0.15,
+      "hz": 0.599999,
+      "minY": 0.5,
+      "maxY": 0.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Pilar",
+      "x": 21.700001,
+      "z": -21.799999,
+      "hx": 0.06,
+      "hz": 0.06,
+      "minY": 0.3,
+      "maxY": 4.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Pilar.001",
+      "x": 31.6,
+      "z": -21.799999,
+      "hx": 0.059999,
+      "hz": 0.06,
+      "minY": 0.3,
+      "maxY": 4.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Pilar.002",
+      "x": 21.700001,
+      "z": -25.6,
+      "hx": 0.06,
+      "hz": 0.059999,
+      "minY": 0.3,
+      "maxY": 4.62,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Palco_Pilar.003",
+      "x": 31.6,
+      "z": -25.6,
+      "hx": 0.059999,
+      "hz": 0.059999,
+      "minY": 0.3,
+      "maxY": 4.62,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado",
+      "x": 1.2,
+      "z": -16.200001,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.001",
+      "x": 1.2,
+      "z": -20,
+      "hx": 0.1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.002",
+      "x": 1.2,
+      "z": -23.799999,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.003",
+      "x": 5.6,
+      "z": -16.200001,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.004",
+      "x": 5.6,
+      "z": -20,
+      "hx": 0.1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.005",
+      "x": 5.6,
+      "z": -23.799999,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.006",
+      "x": 10,
+      "z": -16.200001,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.007",
+      "x": 10,
+      "z": -20,
+      "hx": 0.1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.008",
+      "x": 10,
+      "z": -23.799999,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.009",
+      "x": 14.4,
+      "z": -16.200001,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.010",
+      "x": 14.4,
+      "z": -20,
+      "hx": 0.1,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.011",
+      "x": 14.4,
+      "z": -23.799999,
+      "hx": 0.1,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.012",
+      "x": 18.799999,
+      "z": -16.200001,
+      "hx": 0.099999,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.013",
+      "x": 18.799999,
+      "z": -20,
+      "hx": 0.099999,
+      "hz": 0.1,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Pergolado.014",
+      "x": 18.799999,
+      "z": -23.799999,
+      "hx": 0.099999,
+      "hz": 0.099999,
+      "minY": 0.3,
+      "maxY": 2.8,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC",
+      "x": 10.52,
+      "z": -2.91,
+      "hx": 0.03,
+      "hz": 0.62,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC.001",
+      "x": 12,
+      "z": -2.32,
+      "hx": 1.509999,
+      "hz": 0.03,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC.002",
+      "x": 13.48,
+      "z": -2.91,
+      "hx": 0.03,
+      "hz": 0.62,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC.003",
+      "x": 18.52,
+      "z": -2.91,
+      "hx": 0.030001,
+      "hz": 0.62,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC.004",
+      "x": 20,
+      "z": -2.32,
+      "hx": 1.51,
+      "hz": 0.03,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Sacada_GC.005",
+      "x": 21.48,
+      "z": -2.91,
+      "hx": 0.030001,
+      "hz": 0.62,
+      "minY": 3.65,
+      "maxY": 4.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Exaustao",
+      "x": 26.35,
+      "z": -0.6,
+      "hx": 1.35,
+      "hz": 0.3,
+      "minY": 3.45,
+      "maxY": 4.81,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Balcao",
+      "x": 17.68,
+      "z": -7.3,
+      "hx": 0.38,
+      "hz": 2.78,
+      "minY": 0.3,
+      "maxY": 1.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Balcao.001",
+      "x": 20.9,
+      "z": -4.89,
+      "hx": 2.9,
+      "hz": 0.37,
+      "minY": 0.3,
+      "maxY": 1.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Cristaleira",
+      "x": 23.625,
+      "z": -6.425,
+      "hx": 0.174999,
+      "hz": 0.975,
+      "minY": 0.3,
+      "maxY": 2.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Expositor",
+      "x": 23.459999,
+      "z": -8.9,
+      "hx": 0.33,
+      "hz": 0.35,
+      "minY": 0.3,
+      "maxY": 2.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Expositor.001",
+      "x": 23.459999,
+      "z": -9.62,
+      "hx": 0.33,
+      "hz": 0.35,
+      "minY": 0.3,
+      "maxY": 2.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Expositor.002",
+      "x": 23.459999,
+      "z": -10.34,
+      "hx": 0.33,
+      "hz": 0.35,
+      "minY": 0.3,
+      "maxY": 2.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Freezer",
+      "x": 20.200001,
+      "z": -5.55,
+      "hx": 0.65,
+      "hz": 0.34,
+      "minY": 0.3,
+      "maxY": 1.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Freezer.001",
+      "x": 21.65,
+      "z": -5.55,
+      "hx": 0.65,
+      "hz": 0.34,
+      "minY": 0.3,
+      "maxY": 1.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pia_Cozinha",
+      "x": 22.299999,
+      "z": -11.19,
+      "hx": 0.77,
+      "hz": 0.32,
+      "minY": 0.3,
+      "maxY": 1.495,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico",
+      "x": 5.4,
+      "z": -5.3,
+      "hx": 0.363629,
+      "hz": 0.363629,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.001",
+      "x": 8,
+      "z": -5.3,
+      "hx": 0.353715,
+      "hz": 0.353715,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.002",
+      "x": 10.6,
+      "z": -5.3,
+      "hx": 0.369065,
+      "hz": 0.369065,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.003",
+      "x": 13.2,
+      "z": -5.3,
+      "hx": 0.364807,
+      "hz": 0.364807,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.004",
+      "x": 5.4,
+      "z": -7.6,
+      "hx": 0.370062,
+      "hz": 0.370062,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.005",
+      "x": 8,
+      "z": -7.6,
+      "hx": 0.37353,
+      "hz": 0.37353,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.006",
+      "x": 10.6,
+      "z": -7.6,
+      "hx": 0.365921,
+      "hz": 0.365921,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.007",
+      "x": 13.2,
+      "z": -7.6,
+      "hx": 0.355864,
+      "hz": 0.355864,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.008",
+      "x": 5.4,
+      "z": -9.9,
+      "hx": 0.353742,
+      "hz": 0.353742,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.009",
+      "x": 8,
+      "z": -9.9,
+      "hx": 0.366457,
+      "hz": 0.366457,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.010",
+      "x": 10.6,
+      "z": -9.9,
+      "hx": 0.361906,
+      "hz": 0.361906,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Lixeira",
+      "x": 3.95,
+      "z": -11.22,
+      "hx": 0.190211,
+      "hz": 0.2,
+      "minY": 0.3,
+      "maxY": 1.04,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso",
+      "x": 4.35,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 0.3,
+      "maxY": 1.115,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.001",
+      "x": 5.55,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 0.3,
+      "maxY": 1.115,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.002",
+      "x": 8,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 0.3,
+      "maxY": 1.115,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.003",
+      "x": 9.2,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 0.3,
+      "maxY": 1.115,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.004",
+      "x": 10.38,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 0.3,
+      "maxY": 1.115,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Inox",
+      "x": 18.75,
+      "z": -14.45,
+      "hx": 0.7,
+      "hz": 0.3,
+      "minY": 0.3,
+      "maxY": 1.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Freezer.002",
+      "x": 21.15,
+      "z": -11.990001,
+      "hx": 0.65,
+      "hz": 0.34,
+      "minY": 0.3,
+      "maxY": 1.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira",
+      "x": 17.299999,
+      "z": -11.87,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.001",
+      "x": 18.549999,
+      "z": -11.87,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha",
+      "x": 23.4,
+      "z": -11.95,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.46,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.001",
+      "x": 23.4,
+      "z": -14.01,
+      "hx": 0.18,
+      "hz": 0.32,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.002",
+      "x": 17,
+      "z": -14.5,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Barris",
+      "x": 22.75,
+      "z": -14.225,
+      "hx": 0.200001,
+      "hz": 0.425,
+      "minY": 0.3,
+      "maxY": 0.96,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Fogao",
+      "x": 25.4,
+      "z": -0.615,
+      "hx": 0.45,
+      "hz": 0.415,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Fogao.001",
+      "x": 26.35,
+      "z": -0.615,
+      "hx": 0.45,
+      "hz": 0.415,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Fogao.002",
+      "x": 27.299999,
+      "z": -0.615,
+      "hx": 0.45,
+      "hz": 0.415,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pia_Cozinha.001",
+      "x": 31.49,
+      "z": -5.6,
+      "hx": 0.32,
+      "hz": 0.77,
+      "minY": 0.3,
+      "maxY": 1.495,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Inox.001",
+      "x": 27.799999,
+      "z": -4.6,
+      "hx": 0.7,
+      "hz": 0.3,
+      "minY": 0.3,
+      "maxY": 1.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Inox.002",
+      "x": 27.799999,
+      "z": -5.22,
+      "hx": 0.7,
+      "hz": 0.3,
+      "minY": 0.3,
+      "maxY": 1.2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Cozinha",
+      "x": 26,
+      "z": -8.625,
+      "hx": 0.35,
+      "hz": 0.375,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Cozinha.001",
+      "x": 26.75,
+      "z": -8.625,
+      "hx": 0.35,
+      "hz": 0.375,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.002",
+      "x": 28.4,
+      "z": -8.8,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Freezer.003",
+      "x": 24.35,
+      "z": -5,
+      "hx": 0.34,
+      "hz": 0.65,
+      "minY": 0.3,
+      "maxY": 1.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.003",
+      "x": 24.219999,
+      "z": -10,
+      "hx": 0.215,
+      "hz": 0.615,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.004",
+      "x": 24.219999,
+      "z": -11.3,
+      "hx": 0.215,
+      "hz": 0.615,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.003",
+      "x": 26.380001,
+      "z": -10.16,
+      "hx": 0.36,
+      "hz": 0.32,
+      "minY": 0.3,
+      "maxY": 1.46,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.004",
+      "x": 26.380001,
+      "z": -12.4,
+      "hx": 0.36,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.005",
+      "x": 27.4,
+      "z": -14.4,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 0.88,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Barris.001",
+      "x": 28.075001,
+      "z": -13.2,
+      "hx": 0.425,
+      "hz": 0.2,
+      "minY": 0.3,
+      "maxY": 0.96,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.005",
+      "x": 30.200001,
+      "z": -14.55,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 0.3,
+      "maxY": 2.1,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.006",
+      "x": 29.200001,
+      "z": -12.66,
+      "hx": 0.179999,
+      "hz": 0.32,
+      "minY": 0.3,
+      "maxY": 1.46,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Sinuca",
+      "x": 6.3,
+      "z": -7.6,
+      "hx": 1.1,
+      "hz": 0.6,
+      "minY": 3.45,
+      "maxY": 4.312,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Sinuca.001",
+      "x": 10.3,
+      "z": -7.6,
+      "hx": 1.1,
+      "hz": 0.6,
+      "minY": 3.45,
+      "maxY": 4.312,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Sinuca.002",
+      "x": 14.3,
+      "z": -7.6,
+      "hx": 1.1,
+      "hz": 0.6,
+      "minY": 3.45,
+      "maxY": 4.312,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pebolim",
+      "x": 8.5,
+      "z": -4.75,
+      "hx": 0.6,
+      "hz": 0.58,
+      "minY": 3.45,
+      "maxY": 4.37,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pebolim.001",
+      "x": 15.6,
+      "z": -4.75,
+      "hx": 0.6,
+      "hz": 0.58,
+      "minY": 3.45,
+      "maxY": 4.37,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Sofa",
+      "x": 7.3,
+      "z": -11.1,
+      "hx": 0.9,
+      "hz": 0.4,
+      "minY": 3.45,
+      "maxY": 4.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Balcao.002",
+      "x": 21.279999,
+      "z": -9,
+      "hx": 0.38,
+      "hz": 1.68,
+      "minY": 3.45,
+      "maxY": 4.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Geladeira_Expositor.003",
+      "x": 23.459999,
+      "z": -8,
+      "hx": 0.33,
+      "hz": 0.35,
+      "minY": 3.45,
+      "maxY": 5.4,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Aparador",
+      "x": 23.615,
+      "z": -9.700001,
+      "hx": 0.184999,
+      "hz": 0.82,
+      "minY": 3.45,
+      "maxY": 4.43,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.011",
+      "x": 18.5,
+      "z": -5,
+      "hx": 0.365421,
+      "hz": 0.365421,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.012",
+      "x": 18.5,
+      "z": -9.6,
+      "hx": 0.354288,
+      "hz": 0.354288,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.005",
+      "x": 4.35,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 3.45,
+      "maxY": 4.265,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.006",
+      "x": 8,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 3.45,
+      "maxY": 4.265,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso.007",
+      "x": 9.4,
+      "z": -14.49926,
+      "hx": 0.19,
+      "hz": 0.300741,
+      "minY": 3.45,
+      "maxY": 4.265,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Escritorio",
+      "x": 12.15,
+      "z": -14.5,
+      "hx": 0.6,
+      "hz": 0.3,
+      "minY": 3.45,
+      "maxY": 4.57,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Estante",
+      "x": 11.28,
+      "z": -12.913838,
+      "hx": 0.175,
+      "hz": 0.463839,
+      "minY": 3.45,
+      "maxY": 5.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Cofre",
+      "x": 12.85,
+      "z": -12.04,
+      "hx": 0.25,
+      "hz": 0.26,
+      "minY": 3.45,
+      "maxY": 4.05,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.006",
+      "x": 17.299999,
+      "z": -11.87,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 3.45,
+      "maxY": 5.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Prateleira.007",
+      "x": 18.549999,
+      "z": -11.87,
+      "hx": 0.615,
+      "hz": 0.215,
+      "minY": 3.45,
+      "maxY": 5.25,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Cadeiras_Empilhadas",
+      "x": 20.9,
+      "z": -14.3,
+      "hx": 0.25,
+      "hz": 0.25,
+      "minY": 3.45,
+      "maxY": 4.85,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Cadeiras_Empilhadas.001",
+      "x": 21.6,
+      "z": -14.3,
+      "hx": 0.25,
+      "hz": 0.25,
+      "minY": 3.45,
+      "maxY": 4.85,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Cadeiras_Empilhadas.002",
+      "x": 22.299999,
+      "z": -14.3,
+      "hx": 0.25,
+      "hz": 0.25,
+      "minY": 3.45,
+      "maxY": 4.85,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.007",
+      "x": 23.4,
+      "z": -12.26,
+      "hx": 0.18,
+      "hz": 0.32,
+      "minY": 3.45,
+      "maxY": 4.32,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Barris.002",
+      "x": 17.424999,
+      "z": -14.4,
+      "hx": 0.425,
+      "hz": 0.2,
+      "minY": 3.45,
+      "maxY": 4.11,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.013",
+      "x": 12,
+      "z": -2.9,
+      "hx": 0.36139,
+      "hz": 0.36139,
+      "minY": 3.65,
+      "maxY": 4.37,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.014",
+      "x": 20,
+      "z": -2.9,
+      "hx": 0.371235,
+      "hz": 0.371235,
+      "minY": 3.65,
+      "maxY": 4.37,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.015",
+      "x": 26.299999,
+      "z": -2.6,
+      "hx": 0.357893,
+      "hz": 0.357893,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.016",
+      "x": 29.6,
+      "z": -2.6,
+      "hx": 0.359504,
+      "hz": 0.359504,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.017",
+      "x": 26.299999,
+      "z": -6.7,
+      "hx": 0.365562,
+      "hz": 0.365562,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.018",
+      "x": 29.6,
+      "z": -6.7,
+      "hx": 0.363683,
+      "hz": 0.363683,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.019",
+      "x": 26.299999,
+      "z": -10.8,
+      "hx": 0.364056,
+      "hz": 0.364056,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.020",
+      "x": 29.6,
+      "z": -10.8,
+      "hx": 0.355779,
+      "hz": 0.355779,
+      "minY": 3.45,
+      "maxY": 4.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta",
+      "x": 31.443069,
+      "z": -0.521369,
+      "hx": 0.506987,
+      "hz": 0.5072,
+      "minY": 3.45,
+      "maxY": 4.919688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.001",
+      "x": 31.427429,
+      "z": -14.431072,
+      "hx": 0.451018,
+      "hz": 0.450297,
+      "minY": 3.45,
+      "maxY": 4.919688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.002",
+      "x": 24.421915,
+      "z": -14.441112,
+      "hx": 0.397262,
+      "hz": 0.396302,
+      "minY": 3.45,
+      "maxY": 4.919688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.003",
+      "x": 31.46319,
+      "z": -8.626341,
+      "hx": 0.510299,
+      "hz": 0.510168,
+      "minY": 3.45,
+      "maxY": 4.919688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.004",
+      "x": 24.385271,
+      "z": -0.625511,
+      "hx": 0.401199,
+      "hz": 0.402141,
+      "minY": 3.45,
+      "maxY": 4.919688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira",
+      "x": 3.4,
+      "z": -18.1,
+      "hx": 0.902392,
+      "hz": 0.772798,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.001",
+      "x": 3.4,
+      "z": -21.9,
+      "hx": 0.920428,
+      "hz": 0.793979,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.002",
+      "x": 7.8,
+      "z": -18.1,
+      "hx": 0.904055,
+      "hz": 0.774744,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.003",
+      "x": 7.8,
+      "z": -21.9,
+      "hx": 0.911632,
+      "hz": 0.783629,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.004",
+      "x": 12.2,
+      "z": -18.1,
+      "hx": 0.906207,
+      "hz": 0.777265,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.005",
+      "x": 12.2,
+      "z": -21.9,
+      "hx": 0.905372,
+      "hz": 0.776286,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.006",
+      "x": 16.6,
+      "z": -18.1,
+      "hx": 0.918671,
+      "hz": 0.791908,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Madeira.007",
+      "x": 16.6,
+      "z": -21.9,
+      "hx": 0.910008,
+      "hz": 0.781722,
+      "minY": 0.3,
+      "maxY": 1.07,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.021",
+      "x": 24.799999,
+      "z": -17,
+      "hx": 0.368653,
+      "hz": 0.368653,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.022",
+      "x": 28,
+      "z": -17,
+      "hx": 0.364542,
+      "hz": 0.364542,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.023",
+      "x": 30.9,
+      "z": -17,
+      "hx": 0.368006,
+      "hz": 0.368006,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Arvore_Quintal",
+      "x": 21.200001,
+      "z": -18.299999,
+      "hx": 0.25,
+      "hz": 0.25,
+      "minY": 0.3,
+      "maxY": 3.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.005",
+      "x": 0.671744,
+      "z": -18.680126,
+      "hx": 0.478576,
+      "hz": 0.479114,
+      "minY": 0.3,
+      "maxY": 1.769688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.006",
+      "x": 0.637441,
+      "z": -23.326647,
+      "hx": 0.373363,
+      "hz": 0.374401,
+      "minY": 0.3,
+      "maxY": 1.769688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.007",
+      "x": 31.329426,
+      "z": -15.601374,
+      "hx": 0.466979,
+      "hz": 0.466353,
+      "minY": 0.3,
+      "maxY": 1.769688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Vaso_Planta.008",
+      "x": 19.378544,
+      "z": -25.320185,
+      "hx": 0.475901,
+      "hz": 0.47646,
+      "minY": 0.3,
+      "maxY": 1.769688,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.008",
+      "x": 20.65,
+      "z": -15.45,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Caixa_Som",
+      "x": 22.200001,
+      "z": -21.999001,
+      "hx": 0.3,
+      "hz": 0.251,
+      "minY": 0.9,
+      "maxY": 1.9,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Caixa_Som.001",
+      "x": 31.1,
+      "z": -21.999001,
+      "hx": 0.3,
+      "hz": 0.251,
+      "minY": 0.9,
+      "maxY": 1.9,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Bateria",
+      "x": 26.599998,
+      "z": -24.650002,
+      "hx": 0.8,
+      "hz": 0.55,
+      "minY": 0.9,
+      "maxY": 2,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Amplificador",
+      "x": 24.200001,
+      "z": -25.297499,
+      "hx": 0.3,
+      "hz": 0.1525,
+      "minY": 0.9,
+      "maxY": 1.4,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Amplificador.001",
+      "x": 29.4,
+      "z": -25.297499,
+      "hx": 0.3,
+      "hz": 0.1525,
+      "minY": 0.9,
+      "maxY": 1.4,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.024",
+      "x": 2.2,
+      "z": -1.75,
+      "hx": 0.352431,
+      "hz": 0.352431,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.025",
+      "x": 4,
+      "z": -1.75,
+      "hx": 0.350752,
+      "hz": 0.350752,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.026",
+      "x": 9.5,
+      "z": -1.75,
+      "hx": 0.357929,
+      "hz": 0.357929,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.027",
+      "x": 11.9,
+      "z": -1.75,
+      "hx": 0.366549,
+      "hz": 0.366549,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.028",
+      "x": 17.5,
+      "z": -1.75,
+      "hx": 0.370725,
+      "hz": 0.370725,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.029",
+      "x": 19.799999,
+      "z": -1.75,
+      "hx": 0.372675,
+      "hz": 0.372675,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.030",
+      "x": 22.1,
+      "z": -1.75,
+      "hx": 0.359702,
+      "hz": 0.359702,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.031",
+      "x": 1.7,
+      "z": -8.3,
+      "hx": 0.361277,
+      "hz": 0.361277,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Mesa_Plastico.032",
+      "x": 1.7,
+      "z": -12.9,
+      "hx": 0.350701,
+      "hz": 0.350701,
+      "minY": 0.3,
+      "maxY": 1.02,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.009",
+      "x": 3.15,
+      "z": -14.5,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.46,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Pilha.010",
+      "x": 2.77,
+      "z": -14.5,
+      "hx": 0.18,
+      "hz": 0.16,
+      "minY": 0.3,
+      "maxY": 1.17,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_Lixeira.001",
+      "x": 5.25,
+      "z": -0.45,
+      "hx": 0.190211,
+      "hz": 0.2,
+      "minY": 0.3,
+      "maxY": 1.04,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo",
+      "x": 1.46,
+      "z": -0.12,
+      "hx": 1.29,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.001",
+      "x": 4.14,
+      "z": -0.12,
+      "hx": 1.29,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.002",
+      "x": 9.5,
+      "z": -0.12,
+      "hx": 1.29,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.003",
+      "x": 12.18,
+      "z": -0.12,
+      "hx": 1.29,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.004",
+      "x": 17.540001,
+      "z": -0.12,
+      "hx": 1.29,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.005",
+      "x": 20.219999,
+      "z": -0.12,
+      "hx": 1.290001,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.006",
+      "x": 22.724998,
+      "z": -0.12,
+      "hx": 1.115001,
+      "hz": 0.04,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.007",
+      "x": 0.12,
+      "z": -1.585,
+      "hx": 0.04,
+      "hz": 1.415,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.008",
+      "x": 0.12,
+      "z": -7.475,
+      "hx": 0.04,
+      "hz": 1.425,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.009",
+      "x": 0.12,
+      "z": -10.424999,
+      "hx": 0.04,
+      "hz": 1.425,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Mob_GuardaCorpo.010",
+      "x": 0.12,
+      "z": -13.375,
+      "hx": 0.04,
+      "hz": 1.425,
+      "minY": 0.3,
+      "maxY": 1.3,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro",
+      "x": 7.7,
+      "z": 14.075,
+      "hx": 0.3,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.001",
+      "x": 3.7,
+      "z": 14.075,
+      "hx": 0.7,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.002",
+      "x": 1,
+      "z": 14.075,
+      "hx": 1,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao",
+      "x": 5.9,
+      "z": 14.075,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.001",
+      "x": 2.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa",
+      "x": 4,
+      "z": 20.25,
+      "hx": 3.5,
+      "hz": 3.75,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.003",
+      "x": 15,
+      "z": 14.075,
+      "hx": 2,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.004",
+      "x": 10,
+      "z": 14.075,
+      "hx": 2,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.002",
+      "x": 12.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.001",
+      "x": 12.5,
+      "z": 19.25,
+      "hx": 3.9,
+      "hz": 3.75,
+      "minY": 0.15,
+      "maxY": 5.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.005",
+      "x": 24.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.006",
+      "x": 20,
+      "z": 14.075,
+      "hx": 3,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.003",
+      "x": 23.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.002",
+      "x": 21,
+      "z": 20.1,
+      "hx": 3.4,
+      "hz": 3.9,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.007",
+      "x": 31.6,
+      "z": 14.075,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.008",
+      "x": 27.6,
+      "z": 14.075,
+      "hx": 0.6,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.009",
+      "x": 25.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.004",
+      "x": 29.700001,
+      "z": 14.075,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.005",
+      "x": 26.5,
+      "z": 14.075,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.003",
+      "x": 28.549999,
+      "z": 20,
+      "hx": 2.95,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.010",
+      "x": 0.5,
+      "z": -40.075001,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.011",
+      "x": 4.75,
+      "z": -40.075001,
+      "hx": 0.75,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.012",
+      "x": 7.25,
+      "z": -40.075001,
+      "hx": 0.75,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.006",
+      "x": 2.5,
+      "z": -40.075001,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.007",
+      "x": 6,
+      "z": -40.075001,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.004",
+      "x": 4,
+      "z": -46,
+      "hx": 3.4,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.013",
+      "x": 9.75,
+      "z": -40.075001,
+      "hx": 1.75,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.014",
+      "x": 14.25,
+      "z": -40.075001,
+      "hx": 1.75,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.008",
+      "x": 12,
+      "z": -40.075001,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.005",
+      "x": 12,
+      "z": -46.25,
+      "hx": 3.4,
+      "hz": 4.25,
+      "minY": 0.15,
+      "maxY": 5.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.015",
+      "x": 16.4,
+      "z": -40.075001,
+      "hx": 0.4,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.016",
+      "x": 20.4,
+      "z": -40.075001,
+      "hx": 0.6,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.017",
+      "x": 23,
+      "z": -40.075001,
+      "hx": 1,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.009",
+      "x": 18.299999,
+      "z": -40.075001,
+      "hx": 1.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.010",
+      "x": 21.5,
+      "z": -40.075001,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.006",
+      "x": 20,
+      "z": -45.75,
+      "hx": 3.4,
+      "hz": 3.75,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.018",
+      "x": 25,
+      "z": -40.075001,
+      "hx": 1,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.019",
+      "x": 29.5,
+      "z": -40.075001,
+      "hx": 2.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.011",
+      "x": 26.5,
+      "z": -40.075001,
+      "hx": 0.5,
+      "hz": 0.075,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.007",
+      "x": 28,
+      "z": -46,
+      "hx": 3.4,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.020",
+      "x": -14.075,
+      "z": -0.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.021",
+      "x": -14.075,
+      "z": -4.75,
+      "hx": 0.075,
+      "hz": 0.75,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.022",
+      "x": -14.075,
+      "z": -7.75,
+      "hx": 0.075,
+      "hz": 1.25,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.012",
+      "x": -14.075,
+      "z": -2.5,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.013",
+      "x": -14.075,
+      "z": -6,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.008",
+      "x": -20,
+      "z": -4.5,
+      "hx": 4,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.023",
+      "x": -14.075,
+      "z": -11,
+      "hx": 0.075,
+      "hz": 2,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.024",
+      "x": -14.075,
+      "z": -16,
+      "hx": 0.075,
+      "hz": 2,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.014",
+      "x": -14.075,
+      "z": -13.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.009",
+      "x": -20.700001,
+      "z": -13.5,
+      "hx": 4.3,
+      "hz": 3.9,
+      "minY": 0.15,
+      "maxY": 5.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.025",
+      "x": -14.075,
+      "z": -18.75,
+      "hx": 0.075,
+      "hz": 0.75,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.026",
+      "x": -14.075,
+      "z": -24.25,
+      "hx": 0.075,
+      "hz": 1.75,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.015",
+      "x": -14.075,
+      "z": -21,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.010",
+      "x": -20.25,
+      "z": -22.299999,
+      "hx": 3.75,
+      "hz": 3.7,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.027",
+      "x": 46.075001,
+      "z": -8.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.028",
+      "x": 46.075001,
+      "z": -5.75,
+      "hx": 0.075,
+      "hz": 1.25,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.029",
+      "x": 46.075001,
+      "z": -0.75,
+      "hx": 0.075,
+      "hz": 0.75,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.016",
+      "x": 46.075001,
+      "z": -7.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.017",
+      "x": 46.075001,
+      "z": -3,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.011",
+      "x": 52,
+      "z": -4.5,
+      "hx": 4,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.030",
+      "x": 46.075001,
+      "z": -16,
+      "hx": 0.075,
+      "hz": 2,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.031",
+      "x": 46.075001,
+      "z": -11,
+      "hx": 0.075,
+      "hz": 2,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.018",
+      "x": 46.075001,
+      "z": -13.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.012",
+      "x": 52.700001,
+      "z": -13.5,
+      "hx": 4.299999,
+      "hz": 3.9,
+      "minY": 0.15,
+      "maxY": 5.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.032",
+      "x": 46.075001,
+      "z": -25,
+      "hx": 0.075,
+      "hz": 1,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.033",
+      "x": 46.075001,
+      "z": -19.5,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.019",
+      "x": 46.075001,
+      "z": -22.5,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.013",
+      "x": 52,
+      "z": -22.299999,
+      "hx": 4,
+      "hz": 3.7,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.014",
+      "x": -19.299999,
+      "z": 19.299999,
+      "hx": 4.7,
+      "hz": 4.7,
+      "minY": 0.15,
+      "maxY": 3.75,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.015",
+      "x": 51.299999,
+      "z": 19.299999,
+      "hx": 4.700001,
+      "hz": 4.7,
+      "minY": 0.15,
+      "maxY": 3.75,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.034",
+      "x": -14.075,
+      "z": -41,
+      "hx": 0.075,
+      "hz": 1,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.035",
+      "x": -14.075,
+      "z": -44,
+      "hx": 0.075,
+      "hz": 1,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.036",
+      "x": -14.075,
+      "z": -50,
+      "hx": 0.075,
+      "hz": 2,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.020",
+      "x": -14.075,
+      "z": -42.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.021",
+      "x": -14.075,
+      "z": -46.5,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.016",
+      "x": -20,
+      "z": -45.5,
+      "hx": 4,
+      "hz": 4.5,
+      "minY": 0.15,
+      "maxY": 5.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.037",
+      "x": 46.075001,
+      "z": -50.5,
+      "hx": 0.075,
+      "hz": 1.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Muro.038",
+      "x": 46.075001,
+      "z": -44,
+      "hx": 0.075001,
+      "hz": 4,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Portao.022",
+      "x": 46.075001,
+      "z": -48.5,
+      "hx": 0.075,
+      "hz": 0.5,
+      "minY": 0.15,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Viz_Casa.017",
+      "x": 52,
+      "z": -45.5,
+      "hx": 4,
+      "hz": 4.5,
+      "minY": 0.15,
+      "maxY": 3.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore",
+      "x": 2.6,
+      "z": 2.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.001",
+      "x": 13.200001,
+      "z": 2.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.002",
+      "x": 20.799999,
+      "z": 2.1,
+      "hx": 0.150001,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.003",
+      "x": 28,
+      "z": 2.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.004",
+      "x": -2.1,
+      "z": -4.3,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.005",
+      "x": -2.1,
+      "z": -10.799999,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.006",
+      "x": -2.1,
+      "z": -17,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.007",
+      "x": -2.1,
+      "z": -25,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.008",
+      "x": 3.5,
+      "z": -28.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.009",
+      "x": 11,
+      "z": -28.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.010",
+      "x": 18.5,
+      "z": -28.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.011",
+      "x": 31,
+      "z": -28.1,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.012",
+      "x": 34.099998,
+      "z": -5.5,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.013",
+      "x": 34.099998,
+      "z": -16,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.014",
+      "x": 34.099998,
+      "z": -22.5,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.015",
+      "x": 4.5,
+      "z": 12.6,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.016",
+      "x": 20,
+      "z": 12.6,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.017",
+      "x": -12.6,
+      "z": -6,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.018",
+      "x": -12.6,
+      "z": -21,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.019",
+      "x": 44.599998,
+      "z": -6,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.020",
+      "x": 44.599998,
+      "z": -20,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.021",
+      "x": 6,
+      "z": -38.599998,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Arvore.022",
+      "x": 22,
+      "z": -38.599998,
+      "hx": 0.15,
+      "hz": 0.15,
+      "minY": 0.15,
+      "maxY": 2.65,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste",
+      "x": -1.9,
+      "z": 1.9,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.001",
+      "x": 12,
+      "z": 2.62,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.002",
+      "x": 23.5,
+      "z": 2.62,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.003",
+      "x": 33.900002,
+      "z": 1.9,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.004",
+      "x": 34.620003,
+      "z": -13,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.005",
+      "x": 33.900002,
+      "z": -27.9,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.006",
+      "x": 23.5,
+      "z": -28.620001,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.007",
+      "x": 12,
+      "z": -28.620001,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.008",
+      "x": -1.9,
+      "z": -27.9,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.009",
+      "x": -2.62,
+      "z": -13,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.010",
+      "x": 12,
+      "z": 11.38,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.011",
+      "x": -11.38,
+      "z": -13,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.012",
+      "x": 43.379997,
+      "z": -13,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Poste.013",
+      "x": 12,
+      "z": -37.379997,
+      "hx": 0.17,
+      "hz": 0.17,
+      "minY": 0.15,
+      "maxY": 10.15,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Carro_Prata",
+      "x": 18.5,
+      "z": 4,
+      "hx": 2,
+      "hz": 0.92,
+      "minY": 0,
+      "maxY": 1.42,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Carro_Vermelho",
+      "x": -4,
+      "z": -19.5,
+      "hx": 0.92,
+      "hz": 2,
+      "minY": 0,
+      "maxY": 1.42,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Carro_Prata.001",
+      "x": 36,
+      "z": -6,
+      "hx": 0.92,
+      "hz": 2,
+      "minY": 0,
+      "maxY": 1.42,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Carro_Vermelho.001",
+      "x": 14,
+      "z": -30,
+      "hx": 2,
+      "hz": 0.92,
+      "minY": 0,
+      "maxY": 1.42,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Carrinho_Churrasco",
+      "x": 8.552049,
+      "z": 1.520793,
+      "hx": 0.711388,
+      "hz": 0.43002,
+      "minY": 0.15,
+      "maxY": 1.4,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Lixeira",
+      "x": 16.5,
+      "z": 2.4,
+      "hx": 0.190211,
+      "hz": 0.2,
+      "minY": 0.15,
+      "maxY": 0.89,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ext_Lixeira.001",
+      "x": -2.4,
+      "z": -22.799999,
+      "hx": 0.190211,
+      "hz": 0.2,
+      "minY": 0.15,
+      "maxY": 0.89,
+      "ramp": false
+    },
+    {
+      "id": "Porta_WC_Masc",
+      "x": 5.005051,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_WC_Fem",
+      "x": 8.805051,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Deposito_Bar",
+      "x": 19.50505,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Cozinha",
+      "x": 24.248668,
+      "z": -7.70505,
+      "hx": 0.350193,
+      "hz": 0.062383,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Deposito_Anexo",
+      "x": 24.248668,
+      "z": -12.60505,
+      "hx": 0.350193,
+      "hz": 0.062383,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Cozinha_Deposito",
+      "x": 30.00505,
+      "z": -9.423668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Camara_Fria",
+      "x": 29.60505,
+      "z": -12.408669,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Servico_Cozinha",
+      "x": 31.551331,
+      "z": -2.00505,
+      "hx": 0.350193,
+      "hz": 0.062383,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Quintal_Deposito",
+      "x": 22.29495,
+      "z": -14.551331,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Quintal_Anexo",
+      "x": 25.79495,
+      "z": -14.551331,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Quintal_Corredor_E",
+      "x": 12.994949,
+      "z": -15.248668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Quintal_Corredor_D",
+      "x": 11.40505,
+      "z": -15.248668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 0.3,
+      "maxY": 2.38,
+      "ramp": false
+    },
+    {
+      "id": "Porta_WC_Masc_Sup",
+      "x": 5.005051,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 3.45,
+      "maxY": 5.53,
+      "ramp": false
+    },
+    {
+      "id": "Porta_WC_Fem_Sup",
+      "x": 8.805051,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 3.45,
+      "maxY": 5.53,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Escritorio",
+      "x": 11.70505,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 3.45,
+      "maxY": 5.53,
+      "ramp": false
+    },
+    {
+      "id": "Porta_Deposito_Sup",
+      "x": 19.505052,
+      "z": -11.923668,
+      "hx": 0.062383,
+      "hz": 0.350193,
+      "minY": 3.45,
+      "maxY": 5.53,
+      "ramp": false
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "COL_Rua_Quadra",
+      "points": [
+        [
+          35,
+          0.15,
+          -29
+        ],
+        [
+          -3,
+          0.15,
+          -29
+        ],
+        [
+          -3,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra",
+      "points": [
+        [
+          35,
+          0.15,
+          -29
+        ],
+        [
+          -3,
+          0.15,
+          3
+        ],
+        [
+          35,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.001",
+      "points": [
+        [
+          35,
+          0.15,
+          11
+        ],
+        [
+          -3,
+          0.15,
+          11
+        ],
+        [
+          -3,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.001",
+      "points": [
+        [
+          35,
+          0.15,
+          11
+        ],
+        [
+          -3,
+          0.15,
+          26
+        ],
+        [
+          35,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.002",
+      "points": [
+        [
+          35,
+          0.15,
+          -52
+        ],
+        [
+          -3,
+          0.15,
+          -52
+        ],
+        [
+          -3,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.002",
+      "points": [
+        [
+          35,
+          0.15,
+          -52
+        ],
+        [
+          -3,
+          0.15,
+          -37
+        ],
+        [
+          35,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.003",
+      "points": [
+        [
+          -11,
+          0.15,
+          -29
+        ],
+        [
+          -26,
+          0.15,
+          -29
+        ],
+        [
+          -26,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.003",
+      "points": [
+        [
+          -11,
+          0.15,
+          -29
+        ],
+        [
+          -26,
+          0.15,
+          3
+        ],
+        [
+          -11,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.004",
+      "points": [
+        [
+          58,
+          0.15,
+          -29
+        ],
+        [
+          43,
+          0.15,
+          -29
+        ],
+        [
+          43,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.004",
+      "points": [
+        [
+          58,
+          0.15,
+          -29
+        ],
+        [
+          43,
+          0.15,
+          3
+        ],
+        [
+          58,
+          0.15,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.005",
+      "points": [
+        [
+          -11,
+          0.15,
+          11
+        ],
+        [
+          -26,
+          0.15,
+          11
+        ],
+        [
+          -26,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.005",
+      "points": [
+        [
+          -11,
+          0.15,
+          11
+        ],
+        [
+          -26,
+          0.15,
+          26
+        ],
+        [
+          -11,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.006",
+      "points": [
+        [
+          58,
+          0.15,
+          11
+        ],
+        [
+          43,
+          0.15,
+          11
+        ],
+        [
+          43,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.006",
+      "points": [
+        [
+          58,
+          0.15,
+          11
+        ],
+        [
+          43,
+          0.15,
+          26
+        ],
+        [
+          58,
+          0.15,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.007",
+      "points": [
+        [
+          -11,
+          0.15,
+          -52
+        ],
+        [
+          -26,
+          0.15,
+          -52
+        ],
+        [
+          -26,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.007",
+      "points": [
+        [
+          -11,
+          0.15,
+          -52
+        ],
+        [
+          -26,
+          0.15,
+          -37
+        ],
+        [
+          -11,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.008",
+      "points": [
+        [
+          58,
+          0.15,
+          -52
+        ],
+        [
+          43,
+          0.15,
+          -52
+        ],
+        [
+          43,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Quadra.008",
+      "points": [
+        [
+          58,
+          0.15,
+          -52
+        ],
+        [
+          43,
+          0.15,
+          -37
+        ],
+        [
+          58,
+          0.15,
+          -37
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Leito",
+      "points": [
+        [
+          58,
+          0,
+          -52
+        ],
+        [
+          -26,
+          0,
+          -52
+        ],
+        [
+          -26,
+          0,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Rua_Leito",
+      "points": [
+        [
+          58,
+          0,
+          -52
+        ],
+        [
+          -26,
+          0,
+          26
+        ],
+        [
+          58,
+          0,
+          26
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Piso",
+      "points": [
+        [
+          32,
+          0.3,
+          -26
+        ],
+        [
+          0,
+          0.3,
+          -26
+        ],
+        [
+          0,
+          0.3,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Piso",
+      "points": [
+        [
+          32,
+          0.3,
+          -26
+        ],
+        [
+          0,
+          0.3,
+          0
+        ],
+        [
+          32,
+          0.3,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje",
+      "points": [
+        [
+          24,
+          3.45,
+          -11.65
+        ],
+        [
+          3.5,
+          3.45,
+          -11.65
+        ],
+        [
+          3.5,
+          3.45,
+          -3.5
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje",
+      "points": [
+        [
+          24,
+          3.45,
+          -11.65
+        ],
+        [
+          3.5,
+          3.45,
+          -3.5
+        ],
+        [
+          24,
+          3.45,
+          -3.5
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.001",
+      "points": [
+        [
+          13.25,
+          3.45,
+          -15
+        ],
+        [
+          3.5,
+          3.45,
+          -15
+        ],
+        [
+          3.5,
+          3.45,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.001",
+      "points": [
+        [
+          13.25,
+          3.45,
+          -15
+        ],
+        [
+          3.5,
+          3.45,
+          -11.65
+        ],
+        [
+          13.25,
+          3.45,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.002",
+      "points": [
+        [
+          24,
+          3.45,
+          -15
+        ],
+        [
+          16.450001,
+          3.45,
+          -15
+        ],
+        [
+          16.450001,
+          3.45,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.002",
+      "points": [
+        [
+          24,
+          3.45,
+          -15
+        ],
+        [
+          16.450001,
+          3.45,
+          -11.65
+        ],
+        [
+          24,
+          3.45,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.003",
+      "points": [
+        [
+          16.450001,
+          3.45,
+          -15
+        ],
+        [
+          13.25,
+          3.45,
+          -15
+        ],
+        [
+          13.25,
+          3.45,
+          -14.8
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.003",
+      "points": [
+        [
+          16.450001,
+          3.45,
+          -15
+        ],
+        [
+          13.25,
+          3.45,
+          -14.8
+        ],
+        [
+          16.450001,
+          3.45,
+          -14.8
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.004",
+      "points": [
+        [
+          32,
+          3.45,
+          -15
+        ],
+        [
+          24,
+          3.45,
+          -15
+        ],
+        [
+          24,
+          3.45,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.004",
+      "points": [
+        [
+          32,
+          3.45,
+          -15
+        ],
+        [
+          24,
+          3.45,
+          0
+        ],
+        [
+          32,
+          3.45,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.005",
+      "points": [
+        [
+          24,
+          3.45,
+          -3.5
+        ],
+        [
+          23.799999,
+          3.45,
+          -3.5
+        ],
+        [
+          23.799999,
+          3.45,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Laje.005",
+      "points": [
+        [
+          24,
+          3.45,
+          -3.5
+        ],
+        [
+          23.799999,
+          3.45,
+          0
+        ],
+        [
+          24,
+          3.45,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Sacada",
+      "points": [
+        [
+          13.5,
+          3.65,
+          -3.5
+        ],
+        [
+          10.5,
+          3.65,
+          -3.5
+        ],
+        [
+          10.5,
+          3.65,
+          -2.3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Sacada",
+      "points": [
+        [
+          13.5,
+          3.65,
+          -3.5
+        ],
+        [
+          10.5,
+          3.65,
+          -2.3
+        ],
+        [
+          13.5,
+          3.65,
+          -2.3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Sacada.001",
+      "points": [
+        [
+          21.5,
+          3.65,
+          -3.5
+        ],
+        [
+          18.5,
+          3.65,
+          -3.5
+        ],
+        [
+          18.5,
+          3.65,
+          -2.3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Sacada.001",
+      "points": [
+        [
+          21.5,
+          3.65,
+          -3.5
+        ],
+        [
+          18.5,
+          3.65,
+          -2.3
+        ],
+        [
+          21.5,
+          3.65,
+          -2.3
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa",
+      "points": [
+        [
+          13.25,
+          1.82652,
+          -13.84535
+        ],
+        [
+          13.25,
+          1.875,
+          -13.81
+        ],
+        [
+          14.75,
+          1.875,
+          -13.81
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa",
+      "points": [
+        [
+          13.25,
+          1.82652,
+          -13.84535
+        ],
+        [
+          14.75,
+          1.875,
+          -13.81
+        ],
+        [
+          14.75,
+          1.82652,
+          -13.84535
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa",
+      "points": [
+        [
+          14.75,
+          1.875,
+          -13.81
+        ],
+        [
+          13.25,
+          1.875,
+          -13.81
+        ],
+        [
+          13.25,
+          0.3,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa",
+      "points": [
+        [
+          14.75,
+          1.875,
+          -13.81
+        ],
+        [
+          13.25,
+          0.3,
+          -11.65
+        ],
+        [
+          14.75,
+          0.3,
+          -11.65
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa.001",
+      "points": [
+        [
+          14.95,
+          3.49848,
+          -11.68535
+        ],
+        [
+          14.95,
+          3.45,
+          -11.649999
+        ],
+        [
+          16.45,
+          3.45,
+          -11.649999
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa.001",
+      "points": [
+        [
+          14.95,
+          3.49848,
+          -11.68535
+        ],
+        [
+          16.45,
+          3.45,
+          -11.649999
+        ],
+        [
+          16.45,
+          3.49848,
+          -11.68535
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa.001",
+      "points": [
+        [
+          14.95,
+          3.49848,
+          -11.68535
+        ],
+        [
+          16.45,
+          3.49848,
+          -11.68535
+        ],
+        [
+          16.45,
+          1.92348,
+          -13.845351
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Rampa.001",
+      "points": [
+        [
+          14.95,
+          3.49848,
+          -11.68535
+        ],
+        [
+          16.45,
+          1.92348,
+          -13.845351
+        ],
+        [
+          14.95,
+          1.92348,
+          -13.845351
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Patamar",
+      "points": [
+        [
+          16.450001,
+          1.875,
+          -14.8
+        ],
+        [
+          13.25,
+          1.875,
+          -14.8
+        ],
+        [
+          13.25,
+          1.875,
+          -13.81
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Escada_Patamar",
+      "points": [
+        [
+          16.450001,
+          1.875,
+          -14.8
+        ],
+        [
+          13.25,
+          1.875,
+          -13.81
+        ],
+        [
+          16.450001,
+          1.875,
+          -13.81
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco",
+      "points": [
+        [
+          31.799999,
+          0.9,
+          -25.8
+        ],
+        [
+          21.5,
+          0.9,
+          -25.8
+        ],
+        [
+          21.5,
+          0.9,
+          -21.600001
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco",
+      "points": [
+        [
+          31.799999,
+          0.9,
+          -25.8
+        ],
+        [
+          21.5,
+          0.9,
+          -21.600001
+        ],
+        [
+          31.799999,
+          0.9,
+          -21.600001
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau",
+      "points": [
+        [
+          21.500001,
+          0.5,
+          -23.399999
+        ],
+        [
+          20.900001,
+          0.5,
+          -23.399999
+        ],
+        [
+          20.900001,
+          0.5,
+          -22.2
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau",
+      "points": [
+        [
+          21.500001,
+          0.5,
+          -23.399999
+        ],
+        [
+          20.900001,
+          0.5,
+          -22.2
+        ],
+        [
+          21.500001,
+          0.5,
+          -22.2
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau.001",
+      "points": [
+        [
+          21.5,
+          0.7,
+          -23.399999
+        ],
+        [
+          21.200001,
+          0.7,
+          -23.399999
+        ],
+        [
+          21.200001,
+          0.7,
+          -22.2
+        ]
+      ]
+    },
+    {
+      "id": "COL_Predio_Palco_Degrau.001",
+      "points": [
+        [
+          21.5,
+          0.7,
+          -23.399999
+        ],
+        [
+          21.200001,
+          0.7,
+          -22.2
+        ],
+        [
+          21.5,
+          0.7,
+          -22.2
+        ]
+      ]
+    }
+  ],
+  "cameraCeilings": [
+    {
+      "id": "veranda-front-ceiling",
+      "x": 11.615,
+      "z": -1.465,
+      "hx": 12.185,
+      "hz": 2.035,
+      "minY": 2.72,
+      "maxY": 2.8
+    },
+    {
+      "id": "veranda-side-ceiling",
+      "x": 1.465,
+      "z": -9.25,
+      "hx": 2.035,
+      "hz": 5.75,
+      "minY": 2.72,
+      "maxY": 2.8
+    }
+  ],
+  "seats": [
+    {
+      "id": "seat-1",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -4.68,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-2",
+      "x": 6.02,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-3",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -5.92,
+      "rotation": 0
+    },
+    {
+      "id": "seat-4",
+      "x": 4.78,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-5",
+      "x": 8,
+      "y": 0.3,
+      "z": -4.68,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-6",
+      "x": 8.62,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-7",
+      "x": 8,
+      "y": 0.3,
+      "z": -5.92,
+      "rotation": 0
+    },
+    {
+      "id": "seat-8",
+      "x": 7.38,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-9",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -4.68,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-10",
+      "x": 11.22,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-11",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -5.92,
+      "rotation": 0
+    },
+    {
+      "id": "seat-12",
+      "x": 9.98,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-13",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -4.68,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-14",
+      "x": 13.82,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-15",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -5.92,
+      "rotation": 0
+    },
+    {
+      "id": "seat-16",
+      "x": 12.58,
+      "y": 0.3,
+      "z": -5.3,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-17",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -6.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-18",
+      "x": 6.02,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-19",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -8.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-20",
+      "x": 4.78,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-21",
+      "x": 8,
+      "y": 0.3,
+      "z": -6.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-22",
+      "x": 8.62,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-23",
+      "x": 8,
+      "y": 0.3,
+      "z": -8.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-24",
+      "x": 7.38,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-25",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -6.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-26",
+      "x": 11.22,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-27",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -8.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-28",
+      "x": 9.98,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-29",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -6.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-30",
+      "x": 13.82,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-31",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -8.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-32",
+      "x": 12.58,
+      "y": 0.3,
+      "z": -7.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-33",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -9.28,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-34",
+      "x": 6.02,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-35",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -10.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-36",
+      "x": 4.78,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-37",
+      "x": 8,
+      "y": 0.3,
+      "z": -9.28,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-38",
+      "x": 8.62,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-39",
+      "x": 8,
+      "y": 0.3,
+      "z": -10.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-40",
+      "x": 7.38,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-41",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -9.28,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-42",
+      "x": 11.22,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-43",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -10.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-44",
+      "x": 9.98,
+      "y": 0.3,
+      "z": -9.9,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-45",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -4.38,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-46",
+      "x": 19.12,
+      "y": 3.45,
+      "z": -5,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-47",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -5.62,
+      "rotation": 0
+    },
+    {
+      "id": "seat-48",
+      "x": 17.88,
+      "y": 3.45,
+      "z": -5,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-49",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -8.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-50",
+      "x": 19.12,
+      "y": 3.45,
+      "z": -9.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-51",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -10.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-52",
+      "x": 17.88,
+      "y": 3.45,
+      "z": -9.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-53",
+      "x": 12,
+      "y": 3.65,
+      "z": -3.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-54",
+      "x": 11.38,
+      "y": 3.65,
+      "z": -2.9,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-57",
+      "x": 20,
+      "y": 3.65,
+      "z": -3.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-58",
+      "x": 19.38,
+      "y": 3.65,
+      "z": -2.9,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-61",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -1.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-62",
+      "x": 26.92,
+      "y": 3.45,
+      "z": -2.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-63",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -3.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-64",
+      "x": 25.68,
+      "y": 3.45,
+      "z": -2.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-65",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -1.98,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-66",
+      "x": 30.22,
+      "y": 3.45,
+      "z": -2.6,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-67",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -3.22,
+      "rotation": 0
+    },
+    {
+      "id": "seat-68",
+      "x": 28.98,
+      "y": 3.45,
+      "z": -2.6,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-69",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -6.08,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-70",
+      "x": 26.92,
+      "y": 3.45,
+      "z": -6.7,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-71",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -7.32,
+      "rotation": 0
+    },
+    {
+      "id": "seat-72",
+      "x": 25.68,
+      "y": 3.45,
+      "z": -6.7,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-73",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -6.08,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-74",
+      "x": 30.22,
+      "y": 3.45,
+      "z": -6.7,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-75",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -7.32,
+      "rotation": 0
+    },
+    {
+      "id": "seat-76",
+      "x": 28.98,
+      "y": 3.45,
+      "z": -6.7,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-77",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -10.18,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-78",
+      "x": 26.92,
+      "y": 3.45,
+      "z": -10.8,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-79",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -11.42,
+      "rotation": 0
+    },
+    {
+      "id": "seat-80",
+      "x": 25.68,
+      "y": 3.45,
+      "z": -10.8,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-81",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -10.18,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-82",
+      "x": 30.22,
+      "y": 3.45,
+      "z": -10.8,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-83",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -11.42,
+      "rotation": 0
+    },
+    {
+      "id": "seat-84",
+      "x": 28.98,
+      "y": 3.45,
+      "z": -10.8,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-85",
+      "x": 24.8,
+      "y": 0.3,
+      "z": -16.38,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-86",
+      "x": 25.42,
+      "y": 0.3,
+      "z": -17,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-87",
+      "x": 24.8,
+      "y": 0.3,
+      "z": -17.62,
+      "rotation": 0
+    },
+    {
+      "id": "seat-88",
+      "x": 24.18,
+      "y": 0.3,
+      "z": -17,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-89",
+      "x": 28,
+      "y": 0.3,
+      "z": -16.38,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-90",
+      "x": 28.62,
+      "y": 0.3,
+      "z": -17,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-91",
+      "x": 28,
+      "y": 0.3,
+      "z": -17.62,
+      "rotation": 0
+    },
+    {
+      "id": "seat-92",
+      "x": 27.38,
+      "y": 0.3,
+      "z": -17,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-93",
+      "x": 30.9,
+      "y": 0.3,
+      "z": -16.38,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-94",
+      "x": 31.52,
+      "y": 0.3,
+      "z": -17,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-95",
+      "x": 30.9,
+      "y": 0.3,
+      "z": -17.62,
+      "rotation": 0
+    },
+    {
+      "id": "seat-96",
+      "x": 30.28,
+      "y": 0.3,
+      "z": -17,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-97",
+      "x": 2.2,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-98",
+      "x": 2.82,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-99",
+      "x": 2.2,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-100",
+      "x": 1.58,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-101",
+      "x": 4,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-102",
+      "x": 4.62,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-103",
+      "x": 4,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-104",
+      "x": 3.38,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-105",
+      "x": 9.5,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-106",
+      "x": 10.12,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-107",
+      "x": 9.5,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-108",
+      "x": 8.88,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-109",
+      "x": 11.9,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-110",
+      "x": 12.52,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-111",
+      "x": 11.9,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-112",
+      "x": 11.28,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-113",
+      "x": 17.5,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-114",
+      "x": 18.12,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-115",
+      "x": 17.5,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-116",
+      "x": 16.88,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-117",
+      "x": 19.8,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-118",
+      "x": 20.42,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-119",
+      "x": 19.8,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-120",
+      "x": 19.18,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-121",
+      "x": 22.1,
+      "y": 0.3,
+      "z": -1.13,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-122",
+      "x": 22.72,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-123",
+      "x": 22.1,
+      "y": 0.3,
+      "z": -2.37,
+      "rotation": 0
+    },
+    {
+      "id": "seat-124",
+      "x": 21.48,
+      "y": 0.3,
+      "z": -1.75,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-125",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -7.68,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-126",
+      "x": 2.32,
+      "y": 0.3,
+      "z": -8.3,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-127",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -8.92,
+      "rotation": 0
+    },
+    {
+      "id": "seat-128",
+      "x": 1.08,
+      "y": 0.3,
+      "z": -8.3,
+      "rotation": 1.570796
+    },
+    {
+      "id": "seat-129",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -12.28,
+      "rotation": -3.141593
+    },
+    {
+      "id": "seat-130",
+      "x": 2.32,
+      "y": 0.3,
+      "z": -12.9,
+      "rotation": -1.570796
+    },
+    {
+      "id": "seat-131",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -13.52,
+      "rotation": 0
+    },
+    {
+      "id": "seat-132",
+      "x": 1.08,
+      "y": 0.3,
+      "z": -12.9,
+      "rotation": 1.570796
+    }
+  ],
+  "tables": [
+    {
+      "id": "map-table-1",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -5.3
+    },
+    {
+      "id": "map-table-2",
+      "x": 8,
+      "y": 0.3,
+      "z": -5.3
+    },
+    {
+      "id": "map-table-3",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -5.3
+    },
+    {
+      "id": "map-table-4",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -5.3
+    },
+    {
+      "id": "map-table-5",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -7.6
+    },
+    {
+      "id": "map-table-6",
+      "x": 8,
+      "y": 0.3,
+      "z": -7.6
+    },
+    {
+      "id": "map-table-7",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -7.6
+    },
+    {
+      "id": "map-table-8",
+      "x": 13.2,
+      "y": 0.3,
+      "z": -7.6
+    },
+    {
+      "id": "map-table-9",
+      "x": 5.4,
+      "y": 0.3,
+      "z": -9.9
+    },
+    {
+      "id": "map-table-10",
+      "x": 8,
+      "y": 0.3,
+      "z": -9.9
+    },
+    {
+      "id": "map-table-11",
+      "x": 10.6,
+      "y": 0.3,
+      "z": -9.9
+    },
+    {
+      "id": "map-table-12",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -5
+    },
+    {
+      "id": "map-table-13",
+      "x": 18.5,
+      "y": 3.45,
+      "z": -9.6
+    },
+    {
+      "id": "map-table-14",
+      "x": 12,
+      "y": 3.65,
+      "z": -2.9
+    },
+    {
+      "id": "map-table-15",
+      "x": 20,
+      "y": 3.65,
+      "z": -2.9
+    },
+    {
+      "id": "map-table-16",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -2.6
+    },
+    {
+      "id": "map-table-17",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -2.6
+    },
+    {
+      "id": "map-table-18",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -6.7
+    },
+    {
+      "id": "map-table-19",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -6.7
+    },
+    {
+      "id": "map-table-20",
+      "x": 26.3,
+      "y": 3.45,
+      "z": -10.8
+    },
+    {
+      "id": "map-table-21",
+      "x": 29.6,
+      "y": 3.45,
+      "z": -10.8
+    },
+    {
+      "id": "map-table-22",
+      "x": 24.8,
+      "y": 0.3,
+      "z": -17
+    },
+    {
+      "id": "map-table-23",
+      "x": 28,
+      "y": 0.3,
+      "z": -17
+    },
+    {
+      "id": "map-table-24",
+      "x": 30.9,
+      "y": 0.3,
+      "z": -17
+    },
+    {
+      "id": "map-table-25",
+      "x": 2.2,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-26",
+      "x": 4,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-27",
+      "x": 9.5,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-28",
+      "x": 11.9,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-29",
+      "x": 17.5,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-30",
+      "x": 19.8,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-31",
+      "x": 22.1,
+      "y": 0.3,
+      "z": -1.75
+    },
+    {
+      "id": "map-table-32",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -8.3
+    },
+    {
+      "id": "map-table-33",
+      "x": 1.7,
+      "y": 0.3,
+      "z": -12.9
+    }
+  ]
+}

@@ -11,6 +11,17 @@ export const users = pgTable('users', {
 export const profiles = pgTable('user_profiles', {
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   displayName: text('display_name').notNull(), avatarConfig: jsonb('avatar_config').notNull().default({ color: '#cf7549' }),
+  characterConfig: jsonb('character_config'), equippedSkin:text('equipped_skin').notNull().default('custom'),
+});
+export const wallets=pgTable('wallets',{
+  userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),balance:integer('balance').notNull().default(0),
+});
+export const skinInventory=pgTable('skin_inventory',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),skinId:text('skin_id').notNull(),acquiredAt:date('acquired_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.skinId]})]);
+export const currencyLedger=pgTable('currency_ledger',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  amount:integer('amount').notNull(),reason:text('reason').notNull(),createdAt:date('created_at').notNull().defaultNow(),
 });
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(), userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

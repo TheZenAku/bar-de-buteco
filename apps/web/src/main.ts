@@ -1,5 +1,9 @@
+import './assets/fonts/fonts.css';
 import './style.css';
-import {nearestInteraction,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
+import './boteco.css';
+import {nearestInteraction,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
+import {characterEditor} from './character-editor';
+import './character.css';
 import {BarScene} from './engine/BarScene';
 import {BarNetwork} from './networking';
 import {api,escape as e} from './api';
@@ -12,7 +16,7 @@ app.innerHTML=`
   <div id="labels" aria-hidden="true"></div>
   <div class="vignette"></div>
   <main id="lobby" class="lobby">
-    <header class="lobby-header"><a class="wordmark" href="/" aria-label="B.A.R. início">B.A.R<span>®</span></a><span class="edition">BAR DE BUTECO<br>ABERTO PARA O IMPREVISTO</span><span class="small-tag">MULTIPLAYER SOCIAL · 3D</span></header>
+    <header class="lobby-header"><a class="wordmark" href="/" aria-label="B.A.R. início">BOTECO<span>sem noção</span></a><span class="edition">BAR DE BUTECO<br>ABERTO PARA O IMPREVISTO</span><span class="small-tag">MULTIPLAYER SOCIAL · 3D</span></header>
     <div class="lobby-body">
       <section class="welcome"><div class="eyebrow"><i class="live-dot"></i> A NOITE COMEÇA AQUI</div><h1>Tem lugar<br>pra mais <em>um.</em></h1><p>Um balcão, boas histórias e uma dose de caos.<br>Entre, puxe uma cadeira e veja o que acontece.</p><div class="lobby-features"><span>01 <b>Encontre a galera</b></span><span>02 <b>Tente a sorte</b></span><span>03 <b>Espere o inesperado</b></span></div></section>
       <section class="entry-card" aria-label="Acesso à conta"><div class="card-kicker"><span>SEU CANTO NO BALCÃO</span><span>↙</span></div><div id="auth-content"></div><div class="card-foot"><span class="tiny-dot"></span> Sem instalação. Só chegar.</div></section>
@@ -20,12 +24,18 @@ app.innerHTML=`
     <footer class="lobby-footer"><span>CONVERSA LIVRE. HISTÓRIAS NEM TANTO.</span><div><span class="key">W A S D</span> para explorar <span class="separator">/</span> <span class="key">E</span> para interagir</div><span>B.A.R. · MVP 0.1</span></footer>
   </main>
 <main id="game" class="game hidden" aria-label="Interface do bar">
-    <header class="game-header"><div class="bar-brand"><b>B.A.R.</b><span><i class="live-dot"></i> BAR PRINCIPAL</span></div><div class="room-meta"><span id="occupancy">— / 32</span><small>no bar</small><span class="connection-dot"></span><span id="ping">— ms</span></div><nav class="game-tools" aria-label="Ferramentas"><button data-action="people" title="Pessoas" aria-label="Pessoas no bar">${icon('people')}</button><button data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música">♫<i class="muted-mark"></i></button><button data-action="help" title="Como jogar" aria-label="Como jogar">?</button><button data-action="admin" id="admin-button" class="hidden" title="Administração" aria-label="Administração">⚙</button><span class="tool-divider"></span><button data-action="account" class="avatar" id="avatar" title="Sua conta" aria-label="Sua conta">B</button></nav></header>
+    <header class="game-header">
+      <div class="boteco-logo"><b>BOTECO</b><span>sem noção</span></div>
+      <button class="player-badge sticker" data-action="account" aria-label="Sua conta"><span class="avatar" id="avatar">B</span><span><b id="hud-name">Chegando…</b><small id="hud-skin">Sua cadeira está aqui</small></span></button>
+      <div class="room-meta sticker"><div class="hud-stat"><span>🍻 NO BAR <b id="occupancy">— / 32</b></span><div class="hud-track"><i id="occupancy-fill"></i></div></div><div class="hud-stat"><span>📡 CONEXÃO <b id="ping">— ms</b></span><small id="hud-status">Conectando…</small></div><div class="hud-stat activity-stat"><span>🎩 NA RESENHA</span><b id="hud-activity">Chegando</b></div></div>
+      <nav class="game-tools sticker" aria-label="Ferramentas"><button data-action="people" title="Pessoas" aria-label="Pessoas no bar">${icon('people')}</button><button data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música">♫<i class="muted-mark"></i></button><button data-action="help" title="Como jogar" aria-label="Como jogar">?</button><button data-action="admin" id="admin-button" class="hidden" title="Administração" aria-label="Administração">⚙</button></nav>
+    </header>
     <div id="event-banner" class="event-banner hidden" role="status"></div>
     <div id="connection" class="connection hidden" role="status"></div>
-    <aside class="chat-panel"><div class="chat-heading"><span><i class="live-dot"></i> CONVERSA DE BALCÃO</span><small>por perto · 12 m</small><button data-action="chat-toggle" id="chat-toggle" aria-label="Recolher chat">−</button></div><div id="chat-body"><div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="Dê um oi… [Enter]" aria-label="Mensagem por proximidade"><button type="submit" aria-label="Enviar mensagem">↗</button></form></div></aside>
-    <div id="context" class="context hidden"><kbd>E</kbd><div><small>POR AQUI</small><b id="context-label"></b></div></div>
-    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span><button data-action="dance">G <small>dançar</small></button></div>
+    <aside class="chat-panel sticker"><div class="chat-heading"><span>💬 RESENHA</span><small>por perto · 12 m</small><button data-action="chat-toggle" id="chat-toggle" aria-label="Recolher chat" aria-expanded="true" aria-controls="chat-body">−</button></div><div id="chat-body"><div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="manda a braba…" aria-label="Mensagem por proximidade"><button type="submit" aria-label="Enviar mensagem">FALA</button></form></div></aside>
+    <button id="context" data-action="interact" class="context hidden"><kbd>E</kbd><span><small>CHEGA MAIS</small><b id="context-label"></b></span></button>
+    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span></div>
+    <nav class="action-bar" aria-label="Ações do personagem"><button data-action="drink"><span>🍺</span>Pedir gelada<kbd>E · balcão</kbd></button><button data-action="chat"><span>🗣️</span>Resenhar<kbd>Enter</kbd></button><button data-action="dance" id="dance-button" aria-pressed="false"><span>🕺</span>Dançar<kbd>G</kbd></button><button data-action="skins"><span>🎩</span>Meu visual<kbd>C</kbd></button><button data-action="kick" id="kick-button" class="hidden"><span>🥋</span>Karatê<kbd>X · Rafael</kbd></button></nav>
     <section id="blackjack" class="blackjack hidden" aria-label="Mesa de blackjack"></section>
     <div id="waiting" class="waiting hidden"><span class="spinner"></span><h2>Já estamos abrindo a porta.</h2><p id="waiting-message"></p><button data-action="leave" class="button secondary">Voltar à entrada</button></div>
   </main>
@@ -46,6 +56,10 @@ let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
 const chatHistory:ChatMessage[]=[];
+let editor:ReturnType<typeof characterEditor>|undefined;
+let wardrobe:Wardrobe|undefined;
+let modalGeneration=0;
+function savedSkin():string {return user?.equippedSkin??DEFAULT_SKIN;}
 
 function toast(message:string,error=false):void {
   const node=document.createElement('div');node.className=`toast ${error?'error':''}`;node.textContent=message;$('#toasts').append(node);setTimeout(()=>node.remove(),5500);
@@ -55,7 +69,7 @@ function setBusy(form:HTMLFormElement,busy:boolean):void {form.querySelectorAll<
 function renderAuth(message=''):void {
   const formField=(label:string,name:string,type:string,placeholder:string,extra='')=>`<label>${label}<input name="${name}" type="${type}" placeholder="${placeholder}" required ${extra}></label>`;
   let content='';
-  if(user){content=`<h2>Olha quem chegou.</h2><p class="auth-description">${e(user.displayName)}, sua cadeira está esperando.</p><div class="returning-user"><span class="profile-initial" style="--avatar:${e(user.color)}">${e(user.displayName.slice(0,1).toUpperCase())}</span><div><b>${e(user.displayName)}</b><small>${e(user.email)}</small></div></div><button data-action="enter" class="button primary full">Entrar no bar <span>↗</span></button>${!user.verified&&emailVerificationRequired?'<button data-action="resend" class="text-button full">Reenviar confirmação de e-mail</button>':''}<button data-action="logout" class="text-button full">Usar outra conta</button>`;}
+  if(user){content=`<h2>Olha quem chegou.</h2><p class="auth-description">${e(user.displayName)}, sua cadeira está esperando.</p><div class="returning-user"><span class="profile-initial" style="--avatar:${e(user.color)}">${e(user.displayName.slice(0,1).toUpperCase())}</span><div><b>${e(user.displayName)}</b><small>${e(user.email)}</small></div></div><button data-action="enter" class="button primary full">${user.character?'Entrar no bar':'Criar meu personagem'} <span>↗</span></button>${!user.verified&&emailVerificationRequired?'<button data-action="resend" class="text-button full">Reenviar confirmação de e-mail</button>':''}<button data-action="logout" class="text-button full">Usar outra conta</button>`;}
   else if(authMode==='login')content=`<h2>Boa noite, vizinho.</h2><p class="auth-description">Entre na sua conta. A casa é sua.</p><div class="auth-tabs"><button class="selected" data-action="auth-login">Entrar</button><button data-action="auth-register">Criar conta</button></div><form id="auth-form" data-mode="login">${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Sua senha','autocomplete="current-password"')}<button type="button" data-action="auth-forgot" class="forgot-link">Esqueci minha senha</button><button class="button primary full" type="submit">Entrar no bar <span>↗</span></button></form>`;
   else if(authMode==='register')content=`<h2>Chega mais.</h2><p class="auth-description">Uma conta, muitas histórias pra contar.</p><div class="auth-tabs"><button data-action="auth-login">Entrar</button><button class="selected" data-action="auth-register">Criar conta</button></div><form id="auth-form" data-mode="register"><div class="field-row">${formField('Seu nome','displayName','text','Como te chamam?','autocomplete="nickname" minlength="2" maxlength="24"')}${formField('Usuário','username','text','seu_apelido','autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" minlength="3" maxlength="24"')}</div>${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Pelo menos 10 caracteres','autocomplete="new-password" minlength="10" maxlength="128"')}<button class="button primary full" type="submit">Criar minha conta <span>↗</span></button><p class="fine-print">${emailVerificationRequired?'Confirme seu e-mail para entrar no bar.':'Sua conta será ativada automaticamente. Depois, é só entrar.'}</p></form>`;
   else if(authMode==='forgot')content=`<h2>Acontece nas melhores.</h2><p class="auth-description">Vamos mandar um link para você criar uma nova senha.</p><form id="auth-form" data-mode="forgot">${formField('E-mail da conta','email','email','voce@exemplo.com','autocomplete="email"')}<button class="button primary full" type="submit">Recuperar acesso <span>↗</span></button></form><button data-action="auth-login" class="text-button full">Voltar para entrar</button>`;
@@ -63,11 +77,30 @@ function renderAuth(message=''):void {
   $('#auth-content').innerHTML=content+`<div id="auth-message" class="form-message ${message?'':'hidden'}" role="status">${e(message)}</div>`;
 }
 function authMessage(message:string,error=false):void {const node=$('#auth-message');node.className=`form-message ${error?'error':''}`;node.textContent=message;}
-function showModal(title:string,content:string,type:string):void {lastFocus=document.activeElement as HTMLElement;activeModal=type;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
-function closeModal():void {activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function setChatOpen(open:boolean):void {
+  $('#chat-body').classList.toggle('hidden',!open);
+  $('#chat-toggle').textContent=open?'−':'+';
+  $('#chat-toggle').setAttribute('aria-expanded',String(open));
+  $('#chat-toggle').setAttribute('aria-label',open?'Recolher chat':'Abrir chat');
+}
+function focusChat():void {setChatOpen(true);$('#chat-input').focus();}
+function showModal(title:string,content:string,type:string):void {modalGeneration++;editor?.destroy();editor=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function closeModal():void {modalGeneration++;editor?.destroy();editor=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function createCharacter():void {
+  if(!user)return;const first=!user.character;
+  showModal(first?'Monte seu personagem':'Personalizar personagem','','character');
+  const generation=modalGeneration,owner=user.id;
+  editor=characterEditor($('#modal-content'),user.character??DEFAULT_CHARACTER,first,async character=>{
+    const result=await api<Wardrobe&{user:PublicUser}>('/character',character);if(user?.id!==owner)return;user=result.user;wardrobe=result;
+    network.send('player.appearance');renderAuth();if(modalGeneration!==generation)return;closeModal();
+    if(first&&!inGame){if(user.verified)await enterBar();else authMessage('Personagem salvo! Confirme seu e-mail antes de entrar no bar.');}
+    else toast('Personagem salvo. Todo mundo no bar vê seu novo visual.');
+  });
+}
 
 const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
+  skin:savedSkin,
   position:position=>scene?.setLocal(position),
   state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);renderWorld();},
   chat:message=>{chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();},
@@ -75,6 +108,7 @@ const network=new BarNetwork({
   ping:ms=>{$('#ping').textContent=`${ms} ms`;},
   status:(message,isConnected)=>{
     connected=isConnected;scene?.setEnabled(inGame&&connected&&!activeModal);
+    $('#hud-status').textContent=isConnected?'Na área!':'Reconectando…';
     $('#waiting-message').textContent=message;
     $('#waiting').classList.toggle('hidden',isConnected||!inGame);
     $('#connection').textContent=message;
@@ -85,9 +119,11 @@ const network=new BarNetwork({
 
 async function enterBar():Promise<void> {
   if(inGame)return;
+  if(user&&!user.character){createCharacter();return;}
+  if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
   if(!scene){toast('Seu navegador não conseguiu iniciar o cenário 3D. Ative a aceleração gráfica e recarregue.',true);return;}
   inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
-  try{const result=await api<{blocked:string[]}>('/blocks');blocked=new Set(result.blocked);await network.connect();}
+  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const result=await api<{blocked:string[]}>('/blocks');blocked=new Set(result.blocked);await network.connect();}
   catch(error){await leaveBar();toast(errorMessage(error),true);}
 }
 async function leaveBar():Promise<void> {
@@ -102,11 +138,19 @@ function renderChat():void {
 function renderWorld():void {
   if(!world||!user)return;
   $('#occupancy').textContent=`${world.occupancy} / ${world.capacity}`;
+  $('#occupancy-fill').style.width=`${Math.min(100,world.occupancy/world.capacity*100)}%`;
   const self=world.players[user.id];
+  $('#hud-name').textContent=user.displayName;
+  $('#hud-skin').textContent=`${self?.skin==='custom'?'Meu personagem':SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
+  const activities:Record<string,string>={idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas'};
+  const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
+  $('#hud-activity').textContent=self?.currentTableId?'No blackjack':ordering?'Esperando o Seu Zé':activities[self?.animationState||'idle'];
+  $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
+  $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
   const interaction=self?nearestInteraction(self):undefined;
   const context=$('#context');
-  context.classList.toggle('hidden',!self||(!self.interactionState&&!self.currentTableId&&!interaction));
-  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':self?.interactionState?'Levantar / encerrar':interaction?.label||'';
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!self.interactionState&&!self.currentTableId&&!interaction));
+  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':self?.interactionState?'Levantar / encerrar':interaction?.label||'';
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   if(event?.type&&event.id!==lastEvent){lastEvent=event.id;toast(eventName[event.type]);audio.setParty(event.type==='PARTY');}
@@ -121,7 +165,7 @@ function renderWorld():void {
 }
 function cardMarkup(card:Card):string {
   const symbols:Record<string,string>={hearts:'♥',diamonds:'♦',clubs:'♣',spades:'♠',H:'♥',D:'♦',C:'♣',S:'♠','♥':'♥','♦':'♦','♣':'♣','♠':'♠',h:'♥',d:'♦',c:'♣',s:'♠'};
-  if(card.rank==='?')return '<div class="playing-card face-down" aria-label="Carta oculta">B.</div>';
+  if(card.rank==='?')return '<div class="playing-card face-down" aria-label="Carta oculta">?</div>';
   const suit=symbols[card.suit]||card.suit;
   return `<div class="playing-card ${['♥','♦'].includes(suit)?'red':''}" aria-label="${e(card.rank)} ${e(suit)}"><b>${e(card.rank)}</b><span>${e(suit)}</span></div>`;
 }
@@ -129,7 +173,7 @@ function renderBlackjack(table:BlackjackTable):void {
   const me=table.seats.find(seat=>seat.playerId===user?.id),myTurn=table.turnPlayerId===user?.id;
   const phases={waiting:'Puxe uma cadeira',playing:myTurn?'Sua vez de jogar':'Uma carta pode mudar tudo',dealer:'A vez da casa',results:'A rodada fechou'};
   const resultNames:Record<string,string>={win:'Você ganhou!',loss:'Deu casa.',draw:'Empate!',blackjack:'Blackjack!',bust:'Estourou',stand:'Parou',playing:'Jogando',turn:'Sua vez',finished:'Rodada encerrada',waiting:'Pronto'};
-  $('#blackjack').innerHTML=`<div class="blackjack-heading"><span>♠ MESA 01</span><button data-action="table-leave" aria-label="Sair da mesa">×</button></div><h2>${phases[table.phase]}</h2><div class="dealer-row"><div><small>DEALER</small><b>${table.dealerTotal||'—'}</b></div><div class="cards">${table.dealerCards.map(cardMarkup).join('')||'<span class="empty-cards">Aguardando a próxima rodada</span>'}</div></div><div class="table-seats">${table.seats.map(seat=>`<div class="table-seat ${seat.playerId===table.turnPlayerId?'active':''} ${seat.playerId===user?.id?'you':''}"><div class="seat-name"><b>${e(seat.playerId===user?.id?'Você':seat.displayName)}</b><span>${seat.total||'—'}</span></div><div class="cards small">${seat.cards.map(cardMarkup).join('')}</div><small>${e(resultNames[seat.result]||resultNames[seat.status]||seat.status)}</small></div>`).join('')}</div><div class="table-actions">${table.phase==='waiting'||table.phase==='results'?`<button class="button primary" data-action="table-start">${table.phase==='results'?'Nova rodada':'Começar rodada'} ↗</button>`:`<button class="button primary" data-action="hit" ${!myTurn?'disabled':''}>Comprar carta</button><button class="button secondary" data-action="stand" ${!myTurn?'disabled':''}>Parar</button>`}</div><div class="table-footer"><span>${table.phase==='results'?e(resultNames[me?.result||'']||'Rodada concluída'):'Sem apostas. Só pela resenha.'}</span><span id="turn-timer">${table.deadline?Math.max(0,Math.ceil((table.deadline-serverNow())/1000))+'s':''}</span></div>`;
+  $('#blackjack').innerHTML=`<div class="blackjack-heading"><span>♠ 21 DO BAIANO</span><button data-action="table-leave" aria-label="Sair da mesa">×</button></div><h2>${phases[table.phase]}</h2><div class="dealer-row"><div><small>DEALER</small><b>${table.dealerTotal||'—'}</b></div><div class="cards">${table.dealerCards.map(cardMarkup).join('')||'<span class="empty-cards">Aguardando a próxima rodada</span>'}</div></div><div class="table-seats">${table.seats.map(seat=>`<div class="table-seat ${seat.playerId===table.turnPlayerId?'active':''} ${seat.playerId===user?.id?'you':''}"><div class="seat-name"><b>${e(seat.playerId===user?.id?'Você':seat.displayName)}</b><span>${seat.total||'—'}</span></div><div class="cards small">${seat.cards.map(cardMarkup).join('')}</div><small>${e(resultNames[seat.result]||resultNames[seat.status]||seat.status)}</small></div>`).join('')}</div><div class="table-actions">${table.phase==='waiting'||table.phase==='results'?`<button class="button primary" data-action="table-start">${table.phase==='results'?'Nova rodada':'Começar rodada'} ↗</button>`:`<button class="button primary" data-action="hit" ${!myTurn?'disabled':''}>Comprar carta</button><button class="button secondary" data-action="stand" ${!myTurn?'disabled':''}>Parar</button>`}</div><div class="table-footer"><span>${table.phase==='results'?e(resultNames[me?.result||'']||'Rodada concluída'):'Sem apostas. Só pela resenha.'}</span><span id="turn-timer">${table.deadline?Math.max(0,Math.ceil((table.deadline-serverNow())/1000))+'s':''}</span></div>`;
 }
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
@@ -139,12 +183,18 @@ function interact():void {
   const object=nearestInteraction(self);if(!object)return;
   if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});
 }
-function people():void {showModal('Quem está por perto','', 'people');renderPeopleContent();}
+function kick():void {
+  if(!connected||activeModal||!world||!user)return;
+  const self=world.players[user.id];
+  if(self?.skin!=='rafael'){toast('O golpe de karatê é exclusivo do Rafael.');return;}
+  network.send('player.emote',{emote:'kick'});
+}
+function people():void {peopleKey='';showModal('Quem está por perto','', 'people');renderPeopleContent();}
 function renderPeopleContent():void {
   const players=Object.values(world?.players||{}).filter(player=>player.id!==user?.id);
   const key=JSON.stringify([world?.occupancy,...players.map(p=>[p.id,p.displayName,p.connected,blocked.has(p.id)])]);
   if(key===peopleKey)return;peopleKey=key;
-  $('#modal-content').innerHTML=`<p class="modal-description">Você vê as pessoas próximas a você. O bar tem ${world?.occupancy||0} frequentador(es) agora.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?'No bar':'Reconectando…'}</small></div><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Bloquear oculta mensagens de chat. Denúncias são encaminhadas à administração.</p>`;
+  $('#modal-content').innerHTML=`<p class="modal-description">Você vê as pessoas próximas a você. O bar tem ${world?.occupancy||0} frequentador(es) agora.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?'No bar':'Ausente'}</small></div><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Bloquear oculta mensagens de chat. Denúncias são encaminhadas à administração.</p>`;
 }
 async function account():Promise<void> {
   showModal('Seu lugar no B.A.R.',`<div class="account-card"><span class="profile-initial" style="--avatar:${e(user?.color)}">${e(user?.displayName[0])}</span><h3>${e(user?.displayName)}</h3><p>${e(user?.email)}</p></div><div id="statistics" class="statistics">Carregando suas rodadas…</div><button class="button secondary full" data-action="leave">Voltar à entrada</button><button class="text-button full" data-action="logout">Sair da conta</button>`,'account');
@@ -171,7 +221,24 @@ async function admin():Promise<void> {
     $('#modal-content').innerHTML=`<h3>Dar uma agitada</h3><div class="admin-events"><button class="mini-button" data-action="event" data-type="BLACKOUT">☾ Apagão</button><button class="mini-button" data-action="event" data-type="DRUNK_NPC">♙ O inconveniente</button><button class="mini-button" data-action="event" data-type="PARTY">♫ Festa</button></div><h3>Frequentadores</h3><div class="admin-users">${data.users.map(person=>`<div class="admin-person"><div><b>${e(person.displayName)}</b><small>${e(person.email)} ${person.role==='admin'?'· admin':''}</small></div>${person.id!==user?.id?`<button class="mini-button" data-action="moderate" data-type="kick" data-id="${e(person.id)}">Expulsar</button><button class="mini-button" data-action="moderate" data-type="${person.banned?'unban':'ban'}" data-id="${e(person.id)}">${person.banned?'Desbanir':'Banir'}</button>`:''}</div>`).join('')}</div><h3>Denúncias (${data.reports.length})</h3><div class="audit-list">${data.reports.slice(0,20).map(report=>`<p>${e(JSON.stringify(report))}</p>`).join('')||'<p>Nenhuma denúncia.</p>'}</div><h3>Registro de ações</h3><div class="audit-list">${data.logs.slice(0,20).map(log=>`<p>${e(JSON.stringify(log))}</p>`).join('')||'<p>Nenhuma ação registrada.</p>'}</div><button class="text-button" data-action="admin">Atualizar painel</button>`;
   }catch(error){$('#modal-content').textContent=errorMessage(error);}
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+async function skins():Promise<void> {
+  showModal('Personagem e skins','<p>Carregando sua coleção…</p>','skins');
+  const generation=modalGeneration;
+  const result=await api<Wardrobe>('/wardrobe');if(activeModal!=='skins'||generation!==modalGeneration)return;wardrobe=result;
+  const current=world?.players[user?.id||'']?.skin||savedSkin();
+  $('#modal-content').innerHTML=`<div class="wallet"><span>Sua carteira</span><b>${result.balance.toLocaleString('pt-BR')} <small>moedas</small></b></div><p class="modal-description">Seu personagem é gratuito. Skins completas ficam na sua coleção após a compra. C abre ou fecha esta janela.</p><div class="custom-character-card"><div><b>Meu personagem</b><small>Corpo, cabelo, pele e olhos do seu jeito</small></div><button class="mini-button" data-action="skin" data-skin="custom" ${current==='custom'?'disabled':''}>${current==='custom'?'Em uso':'Vestir'}</button><button class="mini-button" data-action="character">Personalizar</button></div><h3>Skins da casa</h3><div class="skin-grid">${result.catalog.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''} ${skin.owned?'':'locked'}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':skin.owned?'Vestir':`${skin.price.toLocaleString('pt-BR')} moedas · Comprar`}</small></button>`).join('')}</div>${result.dailyReward>0?`<button class="button secondary full" data-action="daily" ${result.dailyClaimed?'disabled':''}>${result.dailyClaimed?'Bônus de hoje recebido':`Receber bônus diário: ${result.dailyReward} moedas`}</button>`:''}`;
+}
+async function wearSkin(id:string):Promise<void> {
+  if(world?.players[user?.id||'']?.animationState==='kick'){toast('Espere o golpe terminar para trocar o visual.');return;}
+  const skin=wardrobe?.catalog.find(option=>option.id===id);if(id!=='custom'&&!skin)return;
+  if(skin&&!skin.owned){
+    showModal(`Comprar ${skin.name}`,`<p>Esta skin custa <b>${skin.price.toLocaleString('pt-BR')} moedas</b>. Seu saldo é ${wardrobe!.balance.toLocaleString('pt-BR')} moedas.</p><p>A compra é permanente. Seu personagem personalizado fica guardado.</p><button class="button primary full" data-action="buy-skin" data-skin="${skin.id}" ${wardrobe!.balance<skin.price?'disabled':''}>${wardrobe!.balance<skin.price?'Moedas insuficientes':'Confirmar compra'}</button><button class="text-button full" data-action="skins">Voltar à coleção</button>`,'purchase');return;
+  }
+  const owner=user?.id,generation=modalGeneration;
+  const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
+  network.send('player.appearance');if(modalGeneration===generation)closeModal();toast(`Visual trocado: ${skin?.name??'Meu personagem'}.`);
+}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -186,17 +253,32 @@ app.addEventListener('click',event=>{
       case 'people':people();break;
       case 'account':await account();break;
       case 'help':help();break;
+      case 'interact':interact();break;
+      case 'drink':{
+        const self=world?.players[user?.id||''];
+        if(!connected||!self||activeModal)break;
+        if(nearestInteraction(self)?.type==='counter'&&!self.currentTableId&&!self.interactionState)interact();
+        else toast('Chegue ao balcão, no fundo à direita do térreo, e aperte E para pedir uma gelada.');
+        break;
+      }
+      case 'chat':focusChat();break;
+      case 'skins':await skins();break;
+      case 'character':createCharacter();break;
+      case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;toast('Skin comprada e adicionada à sua coleção.');if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
+      case 'daily':{const owner=user?.id,generation=modalGeneration;const result=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();break;}
+      case 'kick':kick();break;
+      case 'skin':await wearSkin(button.dataset.skin!);break;
       case 'audio':{const on=audio.toggle();$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-label',on?'Silenciar música':'Ativar música');toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
       case 'dance':network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
-      case 'chat-toggle':$('#chat-body').classList.toggle('hidden');$('#chat-toggle').textContent=$('#chat-body').classList.contains('hidden')?'+':'−';break;
+      case 'chat-toggle':setChatOpen($('#chat-body').classList.contains('hidden'));break;
       case 'table-leave':network.send('blackjack.leave');break;
       case 'table-start':network.send('blackjack.start',{tableId:world?.players[user!.id]?.currentTableId});break;
       case 'hit':case 'stand':network.send('blackjack.action',{action});break;
       case 'block':{const id=button.dataset.id!;if(blocked.has(id)){await api(`/blocks/${encodeURIComponent(id)}`,undefined,'DELETE');blocked.delete(id);}else{await api('/blocks',{playerId:id});blocked.add(id);}renderPeopleContent();renderChat();break;}
       case 'report':showModal('Denunciar jogador',`<p class="modal-description">Conte o que aconteceu. Sua denúncia será revisada pela administração.</p><form id="report-form" data-id="${e(button.dataset.id)}"><label>Motivo<textarea name="reason" required minlength="5" maxlength="500" placeholder="Descreva a situação"></textarea></label><button class="button primary" type="submit">Enviar denúncia</button></form>`,'report');break;
       case 'mail':await mailbox();break;
-      case 'verify-mail':await api('/auth/verify',{token:button.dataset.token});closeModal();authMode='login';renderAuth('E-mail confirmado! Entre para conhecer o bar.');break;
+      case 'verify-mail':await api('/auth/verify',{token:button.dataset.token});user=(await api<{user:PublicUser}>('/auth/me')).user;closeModal();authMode='login';renderAuth('E-mail confirmado! Entre para conhecer o bar.');break;
       case 'reset-mail':resetToken=button.dataset.token!;await leaveBar();user=undefined;authMode='reset';renderAuth();break;
       case 'admin':await admin();break;
       case 'event':await api('/admin/action',{action:'event',eventType:button.dataset.type});toast('Evento solicitado. O bar vai reagir em instantes.');break;
@@ -211,8 +293,8 @@ app.addEventListener('submit',event=>{
     setBusy(form,true);
     try{
       if(form.id==='auth-form'){
-        if(authMode==='login'){const result=await api<{user:PublicUser}>('/auth/login',data);user=result.user;renderAuth();if(user.verified)await enterBar();else authMessage(emailVerificationRequired?'Confirme seu e-mail antes de entrar. Você pode pedir um novo link abaixo.':'Sua conta ainda precisa ser ativada. Entre novamente após a ativação.');}
-        else if(authMode==='register'){const result=await api<{message:string;verificationRequired:boolean}>('/auth/register',data);emailVerificationRequired=result.verificationRequired;authMode='login';renderAuth(result.message);$<HTMLInputElement>('#auth-form input[name="email"]').value=data.email;$<HTMLInputElement>('#auth-form input[name="password"]').focus();}
+        if(authMode==='login'){const result=await api<{user:PublicUser}>('/auth/login',data);user=result.user;renderAuth();if(!user.character)createCharacter();else if(user.verified)await enterBar();else authMessage(emailVerificationRequired?'Confirme seu e-mail antes de entrar. Você pode pedir um novo link abaixo.':'Sua conta ainda precisa ser ativada. Entre novamente após a ativação.');}
+        else if(authMode==='register'){const result=await api<{user:PublicUser;message:string;verificationRequired:boolean}>('/auth/register',data);emailVerificationRequired=result.verificationRequired;user=result.user;authMode='login';renderAuth(result.message);createCharacter();}
         else if(authMode==='forgot'){await api('/auth/forgot',data);authMessage('Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.');}
         else {await api('/auth/reset',{token:resetToken,password:data.password});authMode='login';history.replaceState({},'',location.pathname);renderAuth('Senha atualizada. Entre novamente.');}
       }else if(form.id==='chat-form'){
@@ -225,24 +307,26 @@ app.addEventListener('submit',event=>{
 });
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
-  if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
-  if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();$('#chat-body').classList.remove('hidden');$('#chat-input').focus();}
+  // Closing must not reach the scene's own C handler on window, which would reopen the selector.
+  if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
+  if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
+  if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();focusChat();}
 });
 $('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
 renderAuth();renderChat();
 
 async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
-  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)$('#chat-input').focus();};scene.setEnabled(false);}
+  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)focusChat();};scene.onSkins=()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));};scene.onKick=kick;scene.setEnabled(false);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
   if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';renderAuth();return;}
-  try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;renderAuth();}catch{/* No active session: show login. */}
+  try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;renderAuth();if(!user.character)createCharacter();}catch{/* No active session: show login. */}
 }
 void start();
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance()}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry()}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

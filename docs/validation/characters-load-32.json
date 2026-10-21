@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-22T03:27:02.064Z",
+  "scenario": "API + PostgreSQL embutido + Colyseus + SDK no mesmo processo, loopback; sem renderização 3D",
+  "clients": 32,
+  "durationMs": 30000,
+  "joinedMs": 2337,
+  "patches": 8062,
+  "rttSamples": 928,
+  "rttMedianMs": 3,
+  "rttP95Ms": 108,
+  "rttMaxMs": 168,
+  "eventLoopP95Ms": 62.78,
+  "rssMiB": 522,
+  "hardware": {
+    "platform": "win32",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13400F",
+    "logicalCpus": 2,
+    "ramGiB": 8
+  },
+  "failures": []
+}

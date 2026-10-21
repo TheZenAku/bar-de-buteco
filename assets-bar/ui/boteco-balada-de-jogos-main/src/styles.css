@@ -1,0 +1,164 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.4rem;
+  /* BrBG palette */
+  --piche: oklch(0.29 0.06 60);      /* #4f2c05 */
+  --conhaque: oklch(0.45 0.11 60);   /* #8b4c0a */
+  --cerveja: oklch(0.63 0.13 65);    /* #c18231 */
+  --espuma: oklch(0.84 0.09 85);     /* #dfc283 */
+  --guardanapo: oklch(0.94 0.05 90); /* #f6e8c3 */
+  --vodka: oklch(0.92 0.03 180);     /* #c7eae5 */
+  --menta: oklch(0.81 0.07 180);     /* #80cdc1 */
+  --feltro: oklch(0.61 0.08 185);    /* #35978f */
+  --sinuca: oklch(0.45 0.07 190);    /* #01665e */
+  --garrafa: oklch(0.29 0.05 190);   /* #003c30 */
+
+  --background: oklch(0.18 0.035 180);
+  --foreground: var(--guardanapo);
+  --card: oklch(0.24 0.045 185);
+  --card-foreground: var(--guardanapo);
+  --popover: var(--card);
+  --popover-foreground: var(--guardanapo);
+  --primary: var(--cerveja);
+  --primary-foreground: var(--piche);
+  --secondary: var(--sinuca);
+  --secondary-foreground: var(--vodka);
+  --muted: oklch(0.27 0.04 185);
+  --muted-foreground: var(--menta);
+  --accent: var(--espuma);
+  --accent-foreground: var(--piche);
+  --destructive: oklch(0.6 0.2 30);
+  --destructive-foreground: var(--guardanapo);
+  --border: oklch(0.84 0.09 85 / 25%);
+  --input: oklch(0.84 0.09 85 / 25%);
+  --ring: var(--cerveja);
+
+  --shadow-sticker: 4px 4px 0 0 var(--piche);
+  --shadow-sticker-lg: 7px 7px 0 0 var(--piche);
+  --gradient-beer: linear-gradient(180deg, var(--espuma) 0%, var(--cerveja) 40%, var(--conhaque) 100%);
+  --gradient-felt: radial-gradient(ellipse at center, var(--feltro) 0%, var(--sinuca) 55%, var(--garrafa) 100%);
+  --font-display: "Bungee", system-ui, sans-serif;
+  --font-shade: "Bungee Shade", "Bungee", sans-serif;
+  --font-hand: "Permanent Marker", cursive;
+  --font-body: "Space Mono", ui-monospace, monospace;
+}
+
+@theme inline {
+  --color-piche: var(--piche);
+  --color-conhaque: var(--conhaque);
+  --color-cerveja: var(--cerveja);
+  --color-espuma: var(--espuma);
+  --color-guardanapo: var(--guardanapo);
+  --color-vodka: var(--vodka);
+  --color-menta: var(--menta);
+  --color-feltro: var(--feltro);
+  --color-sinuca: var(--sinuca);
+  --color-garrafa: var(--garrafa);
+  --font-display: var(--font-display);
+  --font-shade: var(--font-shade);
+  --font-hand: var(--font-hand);
+  --font-body: var(--font-body);
+  --shadow-sticker: var(--shadow-sticker);
+  --shadow-sticker-lg: var(--shadow-sticker-lg);
+}
+
+@utility sticker {
+  border: 3px solid var(--piche);
+  box-shadow: var(--shadow-sticker);
+  border-radius: var(--radius);
+}
+@utility btn-boteco {
+  font-family: var(--font-display);
+  border: 3px solid var(--piche);
+  box-shadow: var(--shadow-sticker);
+  transition: transform .12s, box-shadow .12s;
+  &:hover { transform: translate(-2px,-2px) rotate(-1deg); box-shadow: var(--shadow-sticker-lg); }
+  &:active { transform: translate(3px,3px); box-shadow: 0 0 0 0 var(--piche); }
+}
+@utility bg-beer { background: var(--gradient-beer); }
+@utility bg-felt { background: var(--gradient-felt); }
+@utility stain {
+  background-image:
+    radial-gradient(circle at 20% 30%, oklch(0.63 0.13 65 / 18%) 0 14%, transparent 15%),
+    radial-gradient(circle at 80% 70%, oklch(0.45 0.11 60 / 22%) 0 9%, transparent 10%),
+    radial-gradient(circle at 60% 15%, oklch(0.84 0.09 85 / 10%) 0 6%, transparent 7%);
+}
+@utility wobble { animation: wobble 3.5s ease-in-out infinite; }
+@utility bubble { animation: bubble 2.4s ease-in infinite; }
+
+@keyframes wobble { 0%,100% { transform: rotate(-2deg) } 50% { transform: rotate(2deg) translateY(-3px) } }
+@keyframes bubble { 0% { transform: translateY(0); opacity: 0 } 20% { opacity: .9 } 100% { transform: translateY(-60px); opacity: 0 } }
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-body);
+  }
+}

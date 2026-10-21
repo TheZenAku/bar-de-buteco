@@ -7,7 +7,8 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import type { PublicUser } from '@bar/shared';
+import {characterSchema,skinMessageSchema,type PublicUser} from '@bar/shared';
+import {WardrobeService} from './wardrobe.js';
 import { readConfig, type ApiConfig } from './config.js';
 import { connectDatabase, type Database } from './database/index.js';
 import * as tables from './database/schema.js';
@@ -36,6 +37,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const config = options.config ?? readConfig();
   const connection = options.database ? null : await connectDatabase({ url: config.databaseUrl, path: config.dataPath });
   const db = options.database ?? connection!.db;
+  const wardrobe=new WardrobeService(db);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
   const cookieSettings = { path: '/', httpOnly: true, secure: config.production, sameSite: 'lax' as const };
@@ -57,7 +59,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if ((origin && !allowedOrigins.has(origin) && !sameHost) || request.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origem da requisição não permitida.');
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ZodError) return reply.code(400).send({ error: error.issues[0]?.message ?? 'Dados inválidos.' });
+    if (error instanceof ZodError || error instanceof Error && error.name==='ZodError' && 'issues' in error) return reply.code(400).send({ error: (error as ZodError).issues[0]?.message ?? 'Dados inválidos.' });
     if (error instanceof HttpError) return reply.code(error.statusCode).send({ error: error.message });
     const status = error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
     if (status >= 500) request.log.error({ err: error }, 'Falha na API');
@@ -111,7 +113,9 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       throw error;
     }
     if (!config.autoVerifyEmail) await mailer.send(body.email, 'verify', token);
-    return reply.code(201).send({ verificationRequired: !config.autoVerifyEmail, message: config.autoVerifyEmail ? 'Conta criada e ativada! Entre para conhecer o bar.' : 'Conta criada. Confirme seu e-mail para entrar no bar.' });
+    const {token:sessionToken,expiresAt}=await createSession(db,userId);
+    reply.setCookie(cookieName,sessionToken,{...cookieSettings,maxAge:SESSION_DAYS*86_400,expires:expiresAt});
+    return reply.code(201).send({user:await getUser(db,userId), verificationRequired: !config.autoVerifyEmail, message: config.autoVerifyEmail ? 'Conta criada! Vamos montar seu personagem.' : 'Conta criada. Personalize seu personagem e confirme seu e-mail para entrar.' });
   });
   app.post('/api/auth/verify', authLimit, async (request) => {
     const { token } = z.object({ token: tokenSchema }).strict().parse(request.body);
@@ -185,9 +189,23 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/game-ticket', { preHandler: authenticated }, async (request) => {
     const { user, session } = request.auth!;
     if (!user.verified) throw new HttpError(403, 'Confirme seu e-mail antes de entrar no bar.');
+    if(!user.character)throw new HttpError(409,'Crie seu personagem antes de entrar no bar.');
     const ticket = signTicket({ userId: user.id, sessionId: session.id, displayName: user.displayName, color: user.color, role: user.role }, config.authSecret);
     return { ticket, user };
   });
+  app.get('/api/wardrobe',{preHandler:authenticated},request=>wardrobe.view(request.auth!.user));
+  app.post('/api/character',{preHandler:authenticated},async request=>{
+    const {character}= {character:characterSchema.parse(request.body)};
+    const result=await wardrobe.saveCharacter(request.auth!.user,character);
+    return {...result,user:await getUser(db,request.auth!.user.id)};
+  });
+  app.post('/api/wardrobe/equip',{preHandler:authenticated},async request=>{
+    const {skin}=skinMessageSchema.parse(request.body);
+    const result=await wardrobe.equip(request.auth!.user,skin);
+    return {...result,user:await getUser(db,request.auth!.user.id)};
+  });
+  app.post('/api/wardrobe/buy',{preHandler:authenticated},request=>wardrobe.buy(request.auth!.user,skinMessageSchema.parse(request.body).skin));
+  app.post('/api/wardrobe/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
   app.get('/api/stats', { preHandler: authenticated }, async (request) => {
     const [stats] = await db.select().from(tables.statistics).where(eq(tables.statistics.userId, request.auth!.user.id));
     return { gamesPlayed: stats?.gamesPlayed ?? 0, wins: stats?.blackjackWins ?? 0, losses: stats?.blackjackLosses ?? 0, draws: stats?.blackjackDraws ?? 0 };
@@ -243,7 +261,16 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session] = await db.select().from(tables.sessions).where(and(eq(tables.sessions.id, sessionId), eq(tables.sessions.userId, userId), gt(tables.sessions.expiresAt, new Date())));
     const user = session ? await getUser(db, userId) : null;
     const valid = !!user?.verified && !await isBanned(db, userId);
-    return { valid, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user' };
+    return { valid, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?await wardrobe.access(user):{}) };
+  });
+  app.post('/api/internal/equip',internalOptions,async request=>{
+    const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);
+    const skin=skinMessageSchema.parse({skin:requestedSkin}).skin;
+    const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,sessionId),eq(tables.sessions.userId,userId),gt(tables.sessions.expiresAt,new Date())));
+    const user=session?await getUser(db,userId):null;
+    if(!user?.verified||await isBanned(db,userId))throw new HttpError(401,'Sessão encerrada.');
+    await wardrobe.equip(user,skin);
+    return {valid:true,role:user.role,blocked:await blockedIds(db,userId),...await wardrobe.access({...user,equippedSkin:skin})};
   });
   app.get('/api/internal/controls', internalOptions, async () => {
     // DELETE RETURNING claims a queued command once, atomically, even if pollers overlap.

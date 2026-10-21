@@ -1,13 +1,18 @@
 import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
+import { DEFAULT_SKIN } from '@bar/shared';
 
 export class Player extends Schema {
   @type('string') id = '';
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
+  @type('string') skin: string = DEFAULT_SKIN;
+  @type('string') character = '';
   @type('float32') x = 0;
+  @type('float32') y = 0;
   @type('float32') z = 8;
   @type('float32') rotation = 0;
   @type('string') animationState = 'idle';
+  @type('number') animationStartedAt = 0;
   @type('string') interactionState = '';
   @type('string') currentTableId = '';
   @type('int32') lastProcessedInput = -1;
@@ -18,9 +23,11 @@ export class Npc extends Schema {
   @type('string') displayName = '';
   @type('string') color = '#ddaa66';
   @type('float32') x = 0;
+  @type('float32') y = 0;
   @type('float32') z = 0;
   @type('float32') rotation = 0;
   @type('string') animationState = 'idle';
+  @type('number') animationStartedAt = 0;
   @type('string') behavior = 'idle';
 }
 export class CardState extends Schema {

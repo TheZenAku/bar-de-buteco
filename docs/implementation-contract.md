@@ -23,3 +23,11 @@ Only apps/web/src/engine. Shared world bounds/colliders/interactables source of 
 
 ## Web/root
 All Portuguese product UI. Forms account verification/recovery, dev mailbox visible only dev; bar HUD, chat, people/block/report, blackjack overlay, admin controls, waiting/reconnect states. getInput 20Hz -> predict via movePlayer, queue pending input; ack server lastProcessedInput -> replay; server stationary interaction means no prediction. No fake multiplayer or fabricated occupancy. Tests browser two accounts, movement/chat, interactions blackjack events, auth persistence. Production Docker nginx client + API/game/Postgres + Mailpit dev profile, documented settings. Document remaining measured vs unmeasured targets truthfully.
+
+## Character creation and wardrobe
+
+Registration returns `{user,verificationRequired,message}` and establishes a cookie session. A new or existing account without `character` must save it through `POST /api/character` before receiving a game ticket. Unverified accounts may personalize; joining remains verified-only. PublicUser includes `character:CharacterConfig|null` and `equippedSkin`.
+
+`GET /api/wardrobe` returns the current user's character, selection, balance, owned catalog and configured prices. `POST /api/wardrobe/buy {skin}` performs a permanent, atomic inventory purchase using server prices and a locked wallet. `POST /api/wardrobe/equip {skin}` accepts `custom` or a premium skin owned by that account. Initial coins and daily income default to zero; future income rules remain undefined. See [character contracts and asset scope](characters.md).
+
+Internal validation additionally returns `{character,equippedSkin,ownedSkins}`. Secret-protected `POST /api/internal/equip {sessionId,userId,skin}` validates session and ownership before persistence. Join options cannot grant appearance or ownership. `player.appearance {}` requests a refresh from the API; `player.skin {skin}` uses the internal equip route. PlayerState publishes `skin` and serialized `character`, never wallet or inventory. `custom` resolves to its body model internally; base model IDs cannot be equipped directly. Rafael's `kick` remains exclusive. Appearance changes preserve gameplay state and the saved custom configuration.

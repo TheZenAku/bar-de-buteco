@@ -13,6 +13,7 @@ import * as schema from '../../apps/api/src/database/schema.js';
 import {createSession,hashPassword} from '../../apps/api/src/auth/service.js';
 import {BarRoom} from '../../apps/server/src/BarRoom.js';
 import {signTicket} from '@bar/shared/tickets';
+import {DEFAULT_CHARACTER} from '@bar/shared';
 
 const count=Math.max(2,Math.min(64,Number(process.env.LOAD_CLIENTS)||32));
 const durationMs=Math.max(5000,Number(process.env.LOAD_DURATION_MS)||30000);
@@ -36,7 +37,7 @@ try{
   for(let i=0;i<count;i++){
     const id=randomUUID();
     await db.insert(schema.users).values({id,email:`load-${id}@example.com`,username:`load_${id.slice(0,8)}`,passwordHash,verified:true});
-    await db.insert(schema.profiles).values({userId:id,displayName:`Teste ${i+1}`,avatarConfig:{color:'#ae884e'}});
+    await db.insert(schema.profiles).values({userId:id,displayName:`Teste ${i+1}`,avatarConfig:{color:'#ae884e'},characterConfig:DEFAULT_CHARACTER});
     const session=await createSession(db,id);
     const ticket=signTicket({userId:id,sessionId:session.session.id,displayName:`Teste ${i+1}`,color:'#ae884e',role:'user'},config.authSecret);
     const room=await client.joinOrCreate('bar',{ticket});

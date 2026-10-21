@@ -2,13 +2,17 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, CHAT_RADIUS, INTERACTABLES, PATCH_MS, TICK_MS, distance, inputSchema, movePlayer, type ChatMessage, type PlayerInput } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, Player, SeatState, TableState } from './state.js';
 import { BlackjackTable, type Result } from './minigames/blackjack.js';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
+import { BarService } from './world/bartender.js';
+
+// Interactions need the player to touch the object; the server tolerates a little drift from latency.
+const INTERACTION_SLACK = 0.3;
 
 interface Presence {
   ticket: GameTicket;
@@ -39,6 +43,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     Math.max(this.eventMinimum, Number(process.env.EVENT_MAX_MS) || 600_000),
   );
   private npcs = new NpcDirector();
+  private service = new BarService();
   private results = new Map<string, Map<string, 'win' | 'loss' | 'draw'>>();
   private maintenanceBusy = false;
   private lastTableJson = '';
@@ -62,7 +67,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.registerMessages();
   }
 
-  async onAuth(_client: Client, options: unknown): Promise<GameTicket & { blocked: string[] }> {
+  async onAuth(_client: Client, options: unknown): Promise<GameTicket & Access> {
     const { ticket: token } = z.object({ ticket: z.string().max(4096) }).parse(options);
     let ticket: GameTicket;
     try { ticket = verifyTicket(token); } catch { throw new ServerError(401, 'Sua entrada expirou. Entre novamente.'); }
@@ -71,20 +76,33 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.usedTickets.set(ticket.nonce, ticket.exp);
     const access = await validateAccess(ticket.sessionId, ticket.userId);
     if (!access.valid) throw new ServerError(401, 'Sessão encerrada ou conta suspensa.');
-    if (this.people.has(ticket.userId)) throw new ServerError(409, 'ALREADY_CONNECTED: Sua conta já está no bar em outra aba.');
-    return { ...ticket, role: access.role, blocked: access.blocked };
+    if(!access.character)throw new ServerError(409,'Crie seu personagem antes de entrar.');
+    return { ...ticket,...access };
   }
 
-  onJoin(client: Client, _options: unknown, auth: GameTicket & { blocked: string[] }): void {
-    if (this.people.has(auth.userId)) throw new ServerError(409, 'ALREADY_CONNECTED: Sua conta já está no bar.');
-    const index = this.people.size;
-    const player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, x: -2 + index % 8 * 0.6, z: 8 + Math.floor(index / 8) * 0.35 });
+  onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
+    // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
+    const previous = this.people.get(auth.userId);
+    if (previous) this.replaceSession(previous);
+    // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
+    const skin=auth.equippedSkin==='custom'||auth.ownedSkins?.includes(auth.equippedSkin??'')?auth.equippedSkin!:DEFAULT_SKIN;
+    const character=JSON.stringify(auth.character);
+    // Avatars stay in the bar after their player leaves; logging in again takes control of the same one.
+    let player = this.state.players.get(auth.userId);
+    if (player) {
+      this.park(player);
+      player.assign({ displayName: auth.displayName, color: auth.color, connected: true, lastProcessedInput: -1 });
+      player.skin=skin;player.character=character;
+    } else {
+      player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin, character,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
+      this.state.players.set(auth.userId, player);
+    }
     client.view = new StateView();
     this.people.set(auth.userId, { ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map() });
-    this.state.players.set(auth.userId, player);
     this.state.occupancy = this.people.size;
     this.refreshViews();
-    this.log('join', { playerId: auth.userId });
+    this.syncTable();
+    this.log(previous ? 'takeover' : 'join', { playerId: auth.userId, session: client.sessionId, old: previous?.client.sessionId });
   }
 
   onDrop(client: Client): void {
@@ -93,6 +111,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.state.players.get(presence.ticket.userId);
     if (player) { player.connected = false; if (!player.interactionState) player.animationState = 'idle'; }
     presence.queue.length = 0;
+    // A pending order is dropped with the connection, which would otherwise leave the player waiting forever.
+    this.service.cancel(presence.ticket.userId);
+    if (player?.interactionState === 'counter' && player.animationState !== 'drink') player.interactionState = '';
     const reservation = this.allowReconnection(client, 30);
     presence.rejectReconnect = () => reservation.reject();
   }
@@ -108,6 +129,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     presence.queue.length = 0;
     const player = this.state.players.get(presence.ticket.userId)!;
     player.connected = true;
+    this.applyAppearance(player,access);
     // Queued movement before a transport interruption must never replay afterward.
     player.lastProcessedInput = presence.lastReceived;
     this.refreshViews();
@@ -117,13 +139,34 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
-    this.blackjack.leave(userId);
     this.people.delete(userId);
-    this.state.players.delete(userId);
+    const player = this.state.players.get(userId);
+    // Expelled players are removed; everyone else leaves the avatar standing (or seated) where it was.
+    if (presence.revoked) { this.blackjack.leave(userId); this.service.cancel(userId); this.state.players.delete(userId); }
+    else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.people.size;
     this.refreshViews();
     this.syncTable();
-    this.log('leave', { playerId: userId });
+    this.log('leave', { playerId: userId, session: client.sessionId, stack: new Error().stack?.split(String.fromCharCode(10)).slice(2,7).join(' | ') });
+  }
+
+  /** Ends what needs a connected player (blackjack seat, orders, drinks, kicks); a chair stays taken. */
+  private park(player: Player): void {
+    this.blackjack.leave(player.id);
+    this.service.cancel(player.id);
+    if (player.currentTableId) Object.assign(player, standingPosition(player, player.rotation));
+    player.currentTableId = '';
+    if (player.animationState !== 'sit') { player.interactionState = ''; player.animationState = 'idle'; }
+  }
+
+  /** Closes an older session of the same account without touching its avatar, which the new one takes. */
+  private replaceSession(previous: Presence): void {
+    this.people.delete(previous.ticket.userId);
+    previous.rejectReconnect?.();
+    if (this.state.players.get(previous.ticket.userId)?.connected) {
+      previous.client.send('error', { message: 'Sua conta entrou no bar em outra janela.' });
+      previous.client.leave(4000);
+    }
   }
 
   onDispose(): void { if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; }
@@ -140,11 +183,34 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.queue.push(input);
     });
     this.handle('player.interact', z.object({ objectId: z.string().max(64) }).strict(), 5, (client, command) => this.interact(client, command.objectId));
-    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle']) }).strict(), 4, (client, { emote }) => {
+    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
       if (p.interactionState) throw new Error('Levante-se primeiro.');
+      if (emote === 'kick') {
+        if (p.skin !== 'rafael') throw new Error('O golpe de karatê é exclusivo do Rafael.');
+        const presence = this.forClient(client)!;
+        p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
+        presence.interactionEndsAt = p.animationStartedAt + KICK_DURATION_MS;
+        presence.queue.length = 0;
+        p.lastProcessedInput = presence.lastReceived;
+        return;
+      }
       p.animationState = emote === 'dance' ? 'dance' : 'idle';
       if (emote === 'wave') this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
+    });
+    this.handle('player.skin', skinMessageSchema, 2, async (client, { skin }) => {
+      const player = this.player(client);
+      if (player.animationState === 'kick') throw new Error('Espere o golpe terminar para trocar o visual.');
+      const presence=this.forClient(client)!;
+      const access=await internal<Access>('equip',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,skin});
+      if(this.forClient(client)===presence&&player.connected&&player.animationState!=='kick')this.applyAppearance(player,access);
+    });
+    this.handle('player.appearance',z.object({}).strict(),2,async client=>{
+      const presence=this.forClient(client)!;
+      const access=await validateAccess(presence.ticket.sessionId,presence.ticket.userId);
+      if(this.forClient(client)!==presence)return;
+      if(!access.valid){this.expel(presence.ticket.userId,'Sua sessão terminou.');return;}
+      this.applyAppearance(this.player(client),access);
     });
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
@@ -165,8 +231,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('ping', z.object({ at: z.number().finite() }).strict(), 3, (client, { at }) => client.send('pong', { at }));
   }
 
-  private handle<T>(name: string, schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } }, limit: number, handler: (client: Client, payload: T) => void): void {
-    this.onMessage(name, (client, message) => {
+  private handle<T>(name: string, schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } }, limit: number, handler: (client: Client, payload: T) => void|Promise<void>): void {
+    this.onMessage(name, async (client, message) => {
       const presence = this.forClient(client);
       if (!presence || presence.revoked || !this.state.players.get(presence.ticket.userId)?.connected) return;
       const now = Date.now();
@@ -176,7 +242,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       recent.push(now);
       const parsed = schema.safeParse(message);
       if (!parsed.success) { client.send('error', { message: 'Comando inválido.' }); return; }
-      try { handler(client, parsed.data); } catch (e) { client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
+      try { await handler(client, parsed.data); } catch (e) { client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
     });
   }
 
@@ -191,7 +257,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (input) {
         if (!player.interactionState) {
           const position = movePlayer(player, input);
-          player.x = position.x; player.z = position.z; player.rotation = input.rotation;
+          player.x = position.x; player.y = position.y!; player.z = position.z; player.rotation = input.rotation;
           if (input.dx || input.dz) player.animationState = input.running ? 'run' : 'walk';
           else if (player.animationState === 'walk' || player.animationState === 'run') player.animationState = 'idle';
         }
@@ -202,46 +268,63 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.syncTable();
     if (this.resultsResetAt && now >= this.resultsResetAt) { this.blackjack.resetRound(); this.resultsResetAt = 0; this.cleanTable(); this.syncTable(); }
     if (this.events.update(now, this.state.occupancy)) this.syncEvent(now);
+    this.serveDrinks(now);
     this.npcs.update(this.state.npcs.values(), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
     if (++this.tickCount % 2 === 0) this.refreshViews();
+  }
+
+  private serveDrinks(now: number): void {
+    const bartender = this.state.npcs.get('bartender');
+    if (!bartender) return;
+    const waiting = (id: string) => { const p = this.state.players.get(id); return p?.connected && p.interactionState === 'counter' ? p : undefined; };
+    const served = this.service.update(bartender, waiting, now);
+    const player = served ? waiting(served) : undefined, presence = served ? this.people.get(served) : undefined;
+    if (!player || !presence) return;
+    player.animationState = 'drink'; player.animationStartedAt = now; presence.interactionEndsAt = now + DRINK_DURATION_MS;
+    this.systemMessage(`O Seu Zé serviu ${player.displayName}. Saúde!`, player);
   }
 
   private interact(client: Client, objectId: string): void {
     const player = this.player(client), presence = this.forClient(client)!;
     if (objectId === 'stand') {
+      if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
       if (player.currentTableId) this.leaveTable(client);
-      else { player.interactionState = ''; player.animationState = 'idle'; presence.interactionEndsAt = undefined; }
+      else { this.service.cancel(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; presence.interactionEndsAt = undefined; }
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
-    if (!object || distance(player, object) >= 3.5) throw new Error('Chegue mais perto para interagir.');
+    if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
     if (object.type === 'seat') {
       if ([...this.state.players.values()].some(p => p.interactionState === object.id)) throw new Error('Esse lugar está ocupado.');
-      player.x = object.x; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.interactionState = object.id;
+      player.x = object.x; player.y = object.y ?? player.y; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.interactionState = object.id;
     } else if (object.type === 'counter') {
-      player.animationState = 'drink'; player.interactionState = object.id; presence.interactionEndsAt = Date.now() + 3000;
-      this.systemMessage(`${player.displayName} pediu a especialidade da casa. Saúde!`, player);
+      // The player waits at the counter; the drink starts when Seu Zé finishes preparing it (see serveDrinks).
+      player.animationState = 'idle'; player.interactionState = object.id; presence.interactionEndsAt = undefined;
+      this.service.order(player.id);
+      this.systemMessage(`${player.displayName} pediu a especialidade da casa ao Seu Zé.`, player);
     } else { player.animationState = 'dance'; this.systemMessage(`${player.displayName} escolheu uma música na jukebox.`, player); }
   }
 
   private joinTable(client: Client): void {
     const player = this.player(client);
     const object = INTERACTABLES.find(i => i.id === 'blackjack-1')!;
-    if (distance(player, object) >= 3.5) throw new Error('Chegue mais perto da mesa.');
+    if (!canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da mesa.');
     if (player.interactionState && !player.currentTableId) throw new Error('Levante-se primeiro.');
     this.cleanTable();
     this.blackjack.join(player.id, player.displayName);
-    const index = this.blackjack.seats.findIndex(s => s.playerId === player.id);
-    player.x = object.x - 1.5 + index; player.z = object.z + 1.6; player.rotation = Math.PI;
+    const seat = BLACKJACK_SEATS[this.blackjack.seats.findIndex(s => s.playerId === player.id)]!;
+    player.x = seat.x; player.y = seat.y ?? player.y; player.z = seat.z; player.rotation = seat.rotation;
     player.currentTableId = object.id; player.interactionState = object.id; player.animationState = 'sit';
     this.syncTable();
   }
 
   private leaveTable(client: Client): void {
     const player = this.player(client);
+    if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
     this.blackjack.leave(player.id);
+    Object.assign(player, standingPosition(player, player.rotation));
     player.currentTableId = ''; player.interactionState = ''; player.animationState = 'idle';
     this.cleanTable(); this.syncTable();
   }
@@ -268,6 +351,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     })));
     if (snapshot.phase === 'finished' && !this.resultsResetAt) this.resultsResetAt = Date.now() + 10_000;
     if (snapshot.phase !== 'finished') this.resultsResetAt = 0;
+    const dealer = this.state.npcs.get('dealer');
+    const animation = snapshot.phase === 'playing' ? 'deal' : snapshot.phase === 'finished' ? 'shuffle' : 'idle';
+    if (dealer && dealer.animationState !== animation) { dealer.animationState = animation; dealer.animationStartedAt = Date.now(); }
   }
 
   private syncEvent(now: number): void {
@@ -300,7 +386,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       const checks = await Promise.allSettled([...this.people].map(async ([id, p]) => {
         const access = await validateAccess(p.ticket.sessionId, id);
         if (!access.valid) this.expel(id, 'Sua sessão terminou ou a conta foi suspensa.');
-        else { p.blocked = new Set(access.blocked); p.ticket.role = access.role; }
+        else if(this.people.get(id)===p){ p.blocked = new Set(access.blocked); p.ticket.role = access.role;const player=this.state.players.get(id);if(player)this.applyAppearance(player,access); }
       }));
       if (checks.some(r => r.status === 'rejected')) this.log('auth_refresh_unavailable', {});
       const { controls } = await internal<{ controls: Control[] }>('controls');
@@ -320,6 +406,13 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
     } catch (e) { this.log('maintenance_retry', { message: e instanceof Error ? e.message : 'error' }); }
     finally { this.maintenanceBusy = false; }
+  }
+
+  private applyAppearance(player:Player,access:Access):void {
+    if(player.animationState==='kick'||!access.character)return;
+    const requested=access.equippedSkin??DEFAULT_SKIN;
+    player.skin=requested==='custom'||access.ownedSkins?.includes(requested)?requested:DEFAULT_SKIN;
+    player.character=JSON.stringify(access.character);
   }
 
   private recordResult(roundId: string, userId: string, result: Result): void {

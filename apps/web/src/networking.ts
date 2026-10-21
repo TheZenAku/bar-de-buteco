@@ -7,6 +7,8 @@ export interface NetworkHooks {
   chat:(message:ChatMessage)=>void; status:(message:string,connected:boolean)=>void;
   error:(message:string)=>void; ping:(ms:number)=>void;
   input:()=>Omit<PlayerInput,'seq'>;
+  /** Skin to wear on arrival, so the avatar never shows the default first. */
+  skin:()=>string;
 }
 export class BarNetwork {
   room?:Room;
@@ -31,7 +33,7 @@ export class BarNetwork {
     for(let attempt=0;!this.stopped&&generation===this.generation;attempt++){
       const {ticket,user}=await api<{ticket:string;user:PublicUser}>('/game-ticket',{});
       this.user=user;
-      try {const room=await this.client.joinOrCreate('bar',{ticket});if(this.stopped||generation!==this.generation){await room.leave();return;}this.attach(room);return;}
+      try {const room=await this.client.joinOrCreate('bar',{ticket,skin:this.hooks.skin()});if(this.stopped||generation!==this.generation){await room.leave();return;}this.attach(room);return;}
       catch(error){
         const message=error instanceof Error?error.message:String(error);
         if(/full|cheio|capacity|lotado|locked|4213/i.test(message)){
@@ -53,7 +55,7 @@ export class BarNetwork {
       if(self){
         this.seq=Math.max(this.seq,self.lastProcessedInput);
         this.pending=this.pending.filter(input=>input.seq>self.lastProcessedInput);
-        this.position={x:self.x,z:self.z};
+        this.position={x:self.x,y:self.y,z:self.z};
         if(!self.interactionState&&!self.currentTableId) for(const input of this.pending)this.position=movePlayer(this.position,input);
         this.hooks.position(this.position);
       }
@@ -80,7 +82,8 @@ export class BarNetwork {
     this.pending.push(input);this.position=movePlayer(this.position,input);this.hooks.position(this.position);this.send('player.input',input);
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
+  telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length};}
   private startTimers():void {this.stopTimers();this.tick=setInterval(()=>this.sendInput(),TICK_MS);this.heartbeat=setInterval(()=>this.send('ping',{at:Date.now()}),3000);}
   private stopTimers():void {clearInterval(this.tick);clearInterval(this.heartbeat);}
-  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];if(room)await room.leave();}
+  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
 }

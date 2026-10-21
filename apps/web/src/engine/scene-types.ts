@@ -4,13 +4,23 @@ export interface SceneActor {
   name?: string;
   displayName?: string;
   x: number;
+  y?: number;
   z: number;
   rotation?: number;
   animation?: string;
+  animationStartedAt?: number;
+  interactionState?: string;
+  currentTableId?: string;
+  cardResult?: string;
   state?: string;
   color?: string;
   avatarColor?: string;
   role?: string;
+  /** Player model id (see SKINS); NPCs keep the box avatar. */
+  skin?: string;
+  character?: string;
+  /** False for an avatar left in the bar by a player who logged out. */
+  connected?: boolean;
 }
 
 export interface SceneWorld {
