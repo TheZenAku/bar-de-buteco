@@ -1,0 +1,23 @@
+{
+  "name": "bar-de-buteco",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "dev": "concurrently -k -n API,MUNDO,WEB -c cyan,yellow,green \"npm run dev -w @bar/api\" \"npm run dev -w @bar/server\" \"npm run dev -w @bar/web\"",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.json",
+    "build": "npm run typecheck && npm run build -w @bar/web",
+    "test": "npm run test -w @bar/api && npm run test -w @bar/server && tsx --test tests/integration/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:load": "tsx --tsconfig tsconfig.base.json tests/load/room.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^24.0.0",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

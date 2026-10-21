@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.git
+.data
+.local
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+**/dist
+**/*.log
+apps/web/src/engine/artifacts

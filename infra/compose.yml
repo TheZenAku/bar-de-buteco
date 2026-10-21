@@ -1,0 +1,94 @@
+name: bar-de-buteco
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: bar
+      POSTGRES_USER: bar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+    volumes:
+      - bar-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bar -d bar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile
+      target: backend
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      TRUST_PROXY_HOPS: 1
+      DATABASE_URL: postgresql://bar:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/bar
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET aleatório com pelo menos 32 caracteres}
+      WEB_ORIGIN: ${WEB_ORIGIN:?Defina WEB_ORIGIN com HTTPS}
+      AUTO_VERIFY_EMAIL: ${AUTO_VERIFY_EMAIL:-false}
+      SMTP_HOST: ${SMTP_HOST:?Defina SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-B.A.R. <bar@example.com>}
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  game:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile
+      target: backend
+    command: ["npm", "run", "start", "-w", "@bar/server"]
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      GAME_PORT: 2567
+      API_INTERNAL_URL: http://api:3001
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET}
+      WEB_ORIGIN: ${WEB_ORIGIN:?Defina WEB_ORIGIN}
+      ROOM_CAPACITY: ${ROOM_CAPACITY:-32}
+      EVENT_MIN_MS: ${EVENT_MIN_MS:-300000}
+      EVENT_MAX_MS: ${EVENT_MAX_MS:-600000}
+      BLACKJACK_TURN_MS: ${BLACKJACK_TURN_MS:-25000}
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2567/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile
+      target: web
+      args:
+        VITE_GAME_URL: /game
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    depends_on:
+      api: { condition: service_healthy }
+      game: { condition: service_healthy }
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["mail"]
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+volumes:
+  bar-postgres:

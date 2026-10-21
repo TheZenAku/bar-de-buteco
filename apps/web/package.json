@@ -1,0 +1,6 @@
+{
+  "name":"@bar/web","version":"0.1.0","private":true,"type":"module",
+  "scripts":{"dev":"vite --host 127.0.0.1","build":"vite build","preview":"vite preview --host 127.0.0.1","typecheck":"tsc -p tsconfig.json"},
+  "dependencies":{"@bar/shared":"*","@colyseus/sdk":"0.18.5","playcanvas":"2.23.3"},
+  "devDependencies":{"vite":"8.3.5"}
+}
