@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {movePlayer,isWalkable,RUN_SPEED,TICK_MS,inputSchema} from '@bar/shared';
+import {movePlayer,isWalkable,RUN_SPEED,TICK_MS,inputSchema,COLLIDERS,PLAYER_RADIUS,WORLD,BLACKJACK_SEATS,INTERACTABLES} from '@bar/shared';
 import {signTicket,verifyTicket} from '@bar/shared/tickets';
 
 test('movement keeps diagonal speed bounded and prevents crossing walls or furniture',()=>{
@@ -8,10 +8,18 @@ test('movement keeps diagonal speed bounded and prevents crossing walls or furni
   assert.ok(Math.abs(Math.hypot(diagonal.x,diagonal.z)-RUN_SPEED*TICK_MS/1000)<0.00001);
   let position={x:0,z:0};
   for(let i=0;i<500;i++)position=movePlayer(position,{dx:1,dz:0,running:true});
-  assert.ok(isWalkable(position.x,position.z));assert.ok(position.x<14);
-  const blocked=movePlayer({x:5,z:-1.7},{dx:0,dz:-1,running:true});
-  assert.equal(blocked.z,-1.7);
+  assert.ok(isWalkable(position.x,position.z));assert.ok(position.x<WORLD.maxX);
+  const table=COLLIDERS.find(collider=>collider.id==='blackjack')!;
+  const front={x:table.x,z:table.z+table.hz+PLAYER_RADIUS+0.2};
+  const blocked=movePlayer(front,{dx:0,dz:-1,running:true});
+  assert.equal(blocked.z,front.z);
   assert.equal(inputSchema.safeParse({seq:1,dx:100,dz:0,running:true,rotation:0}).success,false);
+});
+
+test('every seat is inside the room and walkable, so a seated player can stand up and leave',()=>{
+  for(const seat of [...BLACKJACK_SEATS,...INTERACTABLES.filter(object=>object.type==='seat')]){
+    assert.ok(isWalkable(seat.x,seat.z),`seat at ${seat.x.toFixed(2)},${seat.z.toFixed(2)}`);
+  }
 });
 
 test('game admission tickets authenticate claims and reject tampering and wrong signing secret',()=>{

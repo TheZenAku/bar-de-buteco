@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Client as BrowserClient, type Room as ClientRoom } from '@colyseus/sdk';
+import { BLACKJACK_TABLE } from '@bar/shared';
 import { signTicket } from '@bar/shared/tickets';
 import { BarRoom } from '../src/BarRoom.js';
 
@@ -48,7 +49,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.onMessage('chat.message', () => {});
     await eventually(() => first.state?.players?.has('alice'));
     await assert.rejects(() => browser.joinOrCreate('bar', { ticket: ticket('alice') }), /ALREADY_CONNECTED/);
-    const second = await browser.joinOrCreate('bar', { ticket: ticket('bob') }); rooms.push(second);
+    const second = await browser.joinOrCreate('bar', { ticket: ticket('bob'), skin: 'leandro' }); rooms.push(second);
     second.onMessage('error', () => {});
     const received: string[] = [];
     second.onMessage('chat.message', m => received.push(m.text));
@@ -71,9 +72,18 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.send('chat.send', { text: 'Olá do teste real' });
     await eventually(() => received.includes('Olá do teste real'));
     const bob = authoritative!.state.players.get('bob')!;
+    // Skins: chosen on arrival, switched live and seen by others; unknown ones are refused.
+    assert.equal(player.skin, 'nathan');
+    assert.equal(bob.skin, 'leandro');
+    first.send('player.skin', { skin: 'rafael' });
+    await eventually(() => second.state.players.get('alice').skin === 'rafael');
+    first.send('player.skin', { skin: 'naoexiste' });
+    await eventually(() => errors.length === 2);
+    assert.equal(player.skin, 'rafael');
     player.x = -12; player.z = 8; bob.x = 12; bob.z = 8;
     await eventually(() => !second.state.players.has('alice') && !first.state.players.has('bob'));
-    player.x = 4; player.z = -1.4; bob.x = 6; bob.z = -1.4;
+    // In front of the blackjack table, within reach.
+    player.x = BLACKJACK_TABLE.x - 0.6; player.z = BLACKJACK_TABLE.z + 1.6; bob.x = BLACKJACK_TABLE.x + 0.6; bob.z = BLACKJACK_TABLE.z + 1.6;
     await eventually(() => second.state.players.has('alice'));
     first.send('blackjack.join', { tableId: 'blackjack-1' });
     await eventually(() => first.state.tables.get('blackjack-1').seats.length === 1);

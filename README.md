@@ -1,6 +1,6 @@
 # B.A.R. — Bar de Buteco
 
-MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, cenário e personagens procedurais com visual low-poly. Não há apostas, dinheiro real nem prêmios.
+MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, cenário procedural em escala real e jogadores com modelo 3D animado. Não há apostas, dinheiro real nem prêmios.
 
 ## Abrir o projeto
 
@@ -35,6 +35,7 @@ Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novo
 | Arrastar o mouse / roda | Girar a câmera / ajustar distância |
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
+| C | Escolher o visual (skin); todos veem a troca na hora |
 | Enter | Abrir o chat de proximidade (12 m) |
 | Esc | Fechar uma janela |
 
@@ -76,6 +77,6 @@ Consulte [resultados e limites da validação](docs/validation.md), [arquitetura
 
 ## Escopo da versão
 
-Os sistemas funcionais do MVP estão implementados para execução local. A arte e as animações são procedurais, sem arquivos Blender ou assets licenciados de terceiros. As sessões usam cookies HttpOnly; o servidor autoriza movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+Os sistemas funcionais do MVP estão implementados para execução local. O cenário (um salão de 20 × 14 m em escala real) e os NPCs são procedurais. Os jogadores escolhem entre três skins (`SKINS` em `packages/shared`), convertidas de `assets-bar` para `apps/web/public/models`: "Nathan", da Renderpeople, com caminhada própria e animação parada do Mixamo, "Leandro", gerado no Meshy AI sem esqueleto e ligado automaticamente ao esqueleto do Nathan para usar as mesmas animações, e "Rafael", com esqueleto próprio no padrão Character Creator / Unreal, para o qual as animações do Nathan foram redirecionadas a partir da T-pose do modelo. O jogo usa as animações da própria skin quando ela as traz, e as do Nathan nos demais casos. As miniaturas do seletor ficam em `apps/web/public/skins`. A escolha fica salva no navegador. Confira a licença desses assets antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.

@@ -7,6 +7,8 @@ export interface NetworkHooks {
   chat:(message:ChatMessage)=>void; status:(message:string,connected:boolean)=>void;
   error:(message:string)=>void; ping:(ms:number)=>void;
   input:()=>Omit<PlayerInput,'seq'>;
+  /** Skin to wear on arrival, so the avatar never shows the default first. */
+  skin:()=>string;
 }
 export class BarNetwork {
   room?:Room;
@@ -31,7 +33,7 @@ export class BarNetwork {
     for(let attempt=0;!this.stopped&&generation===this.generation;attempt++){
       const {ticket,user}=await api<{ticket:string;user:PublicUser}>('/game-ticket',{});
       this.user=user;
-      try {const room=await this.client.joinOrCreate('bar',{ticket});if(this.stopped||generation!==this.generation){await room.leave();return;}this.attach(room);return;}
+      try {const room=await this.client.joinOrCreate('bar',{ticket,skin:this.hooks.skin()});if(this.stopped||generation!==this.generation){await room.leave();return;}this.attach(room);return;}
       catch(error){
         const message=error instanceof Error?error.message:String(error);
         if(/full|cheio|capacity|lotado|locked|4213/i.test(message)){

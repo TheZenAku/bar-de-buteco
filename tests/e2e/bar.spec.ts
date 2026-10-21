@@ -111,7 +111,7 @@ test('keyboard movement reaches blackjack, a full round settles and admin events
     }
     throw new Error(`Could not reach ${x},${z}: ${JSON.stringify(await playerPosition())}`);
   }
-  await walkTo(1,1);await walkTo(5,-1);
+  await walkTo(1,1);await walkTo(4.5,-2.7);
   await expect(page.locator('#context-label')).toHaveText('Jogar blackjack');
   await page.keyboard.press('e');await expect(page.locator('#blackjack')).toBeVisible();
   await page.getByRole('button',{name:'Começar rodada'}).click();

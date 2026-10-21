@@ -2,13 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, CHAT_RADIUS, INTERACTABLES, PATCH_MS, TICK_MS, distance, inputSchema, movePlayer, type ChatMessage, type PlayerInput } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, INTERACTABLES, INTERACTION_RADIUS, PATCH_MS, TICK_MS, distance, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, Player, SeatState, TableState } from './state.js';
 import { BlackjackTable, type Result } from './minigames/blackjack.js';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
+
+// Interactions are offered within INTERACTION_RADIUS; the server tolerates a little drift from latency.
+const INTERACTION_REACH = INTERACTION_RADIUS + 0.5;
 
 interface Presence {
   ticket: GameTicket;
@@ -75,10 +78,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     return { ...ticket, role: access.role, blocked: access.blocked };
   }
 
-  onJoin(client: Client, _options: unknown, auth: GameTicket & { blocked: string[] }): void {
+  onJoin(client: Client, options: unknown, auth: GameTicket & { blocked: string[] }): void {
     if (this.people.has(auth.userId)) throw new ServerError(409, 'ALREADY_CONNECTED: Sua conta já está no bar.');
     const index = this.people.size;
-    const player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, x: -2 + index % 8 * 0.6, z: 8 + Math.floor(index / 8) * 0.35 });
+    // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
+    const requested = skinSchema.safeParse(typeof options === 'object' && options ? (options as { skin?: unknown }).skin : undefined);
+    const player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin: requested.success ? requested.data : DEFAULT_SKIN, x: -2.1 + index % 8 * 0.6, z: 5 + Math.floor(index / 8) * 0.35 });
     client.view = new StateView();
     this.people.set(auth.userId, { ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map() });
     this.state.players.set(auth.userId, player);
@@ -146,6 +151,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.animationState = emote === 'dance' ? 'dance' : 'idle';
       if (emote === 'wave') this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
     });
+    this.handle('player.skin', skinMessageSchema, 2, (client, { skin }) => { this.player(client).skin = skin; });
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
@@ -214,7 +220,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
-    if (!object || distance(player, object) >= 3.5) throw new Error('Chegue mais perto para interagir.');
+    if (!object || distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto para interagir.');
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
     if (object.type === 'seat') {
@@ -229,12 +235,12 @@ export class BarRoom extends Room<{ state: BarState }> {
   private joinTable(client: Client): void {
     const player = this.player(client);
     const object = INTERACTABLES.find(i => i.id === 'blackjack-1')!;
-    if (distance(player, object) >= 3.5) throw new Error('Chegue mais perto da mesa.');
+    if (distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto da mesa.');
     if (player.interactionState && !player.currentTableId) throw new Error('Levante-se primeiro.');
     this.cleanTable();
     this.blackjack.join(player.id, player.displayName);
-    const index = this.blackjack.seats.findIndex(s => s.playerId === player.id);
-    player.x = object.x - 1.5 + index; player.z = object.z + 1.6; player.rotation = Math.PI;
+    const seat = BLACKJACK_SEATS[this.blackjack.seats.findIndex(s => s.playerId === player.id)]!;
+    player.x = seat.x; player.z = seat.z; player.rotation = seat.rotation;
     player.currentTableId = object.id; player.interactionState = object.id; player.animationState = 'sit';
     this.syncTable();
   }

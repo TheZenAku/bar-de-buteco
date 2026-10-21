@@ -11,6 +11,8 @@ export interface SceneActor {
   color?: string;
   avatarColor?: string;
   role?: string;
+  /** Player model id (see SKINS); NPCs keep the box avatar. */
+  skin?: string;
 }
 
 export interface SceneWorld {

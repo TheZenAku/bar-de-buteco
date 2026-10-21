@@ -1,24 +1,77 @@
 import * as pc from 'playcanvas';
-import { COLLIDERS, INTERACTABLES, WORLD, type Position, type WorldState } from '@bar/shared';
+import { BLACKJACK_SEATS, BLACKJACK_TABLE, CAFE_TABLES, COLLIDERS, DEFAULT_SKIN, INTERACTABLES, PATCH_MS, SKINS, TICK_MS, WORLD, type Position, type WorldState } from '@bar/shared';
 import type { SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
+type Limbs = Record<'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg' | 'head', pc.Entity>;
+const SKIN_BONES = ['head', 'upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r', 'hand_r', 'middle_01_r',
+  'upperleg_l', 'lowerleg_l', 'upperleg_r', 'lowerleg_r'] as const;
+type SkinBone = typeof SKIN_BONES[number];
+// Skins with a Character Creator / Unreal skeleton name the leg bones differently.
+const BONE_ALIASES: Partial<Record<SkinBone, string>> = { upperleg_l: 'thigh_l', lowerleg_l: 'calf_l', upperleg_r: 'thigh_r', lowerleg_r: 'calf_r' };
+interface SkinnedRig {
+  model: pc.Entity;
+  bones: Record<SkinBone, pc.Entity>;
+  clip: string;
+  /** How far the body lowers to sit: from this skin's hip-joint height to just above a 0.47 m seat. */
+  sitDrop: number;
+}
 interface Avatar {
   root: pc.Entity;
   body: pc.Entity;
-  leftArm: pc.Entity;
-  rightArm: pc.Entity;
-  leftLeg: pc.Entity;
-  rightLeg: pc.Entity;
-  head: pc.Entity;
+  /** Procedural pivots: NPCs, and players while the player model loads. */
+  limbs?: Limbs;
+  /** Skeletal player model, and which skin it shows. */
+  skin?: SkinnedRig;
+  skinId?: string;
   cup: pc.Entity;
   ring: pc.Entity;
   actor: SceneActor;
   npc: boolean;
   phase: number;
   seatedBlend?: number;
+  /** The drawn position glides from here to actor.x/z, starting at `glideAt` and lasting `glide` seconds. */
+  glideFrom: pc.Vec3;
+  glideAt: number;
+  glide: number;
+  /** Drawn heading in degrees. Kept here because Euler angles read back from the engine fold past ±90°. */
+  yaw: number;
 }
+interface Pose {
+  t: number;
+  walking: boolean;
+  running: boolean;
+  seated: number;
+  dancing: boolean;
+  drinking: boolean;
+  waving: boolean;
+}
+
+/**
+ * Player skins are GLBs in public/models, built from assets-bar. The default (Renderpeople "Nathan")
+ * also carries the clips: in-place Walk, the Mixamo Idle from Idle.fbx, and a static Pose that the
+ * procedural gestures build on. The other skins are rigged to the same skeleton and reuse them.
+ */
+const skinUrl = (id: string): string => `${import.meta.env.BASE_URL}models/${id}.glb`;
+const SKIN_IDS = new Set<string>(SKINS.map(skin => skin.id));
+// The bar is built in real-world metres around this model at its natural 1.86 m.
+const PLAYER_MODEL_SCALE = 1;
+// The box avatars (NPCs, and players while the model loads) are drawn about 2 m tall and stocky;
+// this brings them to the player model's height and a slimmer build.
+const BOX_AVATAR_SCALE: V3 = [0.75, 0.9, 0.75];
+const WALL_HEIGHT = 3.2;
+// Name labels float just above head height.
+const LABEL_HEIGHT = 2.15;
+// The clip walks at 1.27 m/s. Matching WALK_SPEED/RUN_SPEED exactly would look frantic,
+// so the cadence is raised only part of the way.
+const WALK_CLIP_SPEED = 1.9;
+const RUN_CLIP_SPEED = 2.6;
+// Positions arrive in steps: local predictions every input tick, everyone else with each server patch.
+// Gliding a little longer than the interval keeps a constant speed despite timer jitter.
+const INPUT_GLIDE = TICK_MS / 1000 * 1.2;
+const PATCH_GLIDE = PATCH_MS / 1000 * 1.2;
+const SNAP_DISTANCE = 1.5;
 
 const TAU = Math.PI * 2;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -27,7 +80,7 @@ const lerp = (a: number, b: number, amount: number): number => a + (b - a) * amo
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 /**
- * The bar is procedural and ships without third-party artwork or physics binaries.
+ * The bar and its NPCs are procedural; players use the skeletal model above. There are no physics binaries.
  * The app supplies authoritative snapshots and predicted local positions. This
  * renderer never moves a player on the server or decides whether an action succeeds.
  */
@@ -36,6 +89,7 @@ export class BarScene {
   onInteract?: () => void;
   onEmote?: () => void;
   onChat?: () => void;
+  onSkins?: () => void;
   private readonly canvas: HTMLCanvasElement;
   private readonly camera: pc.Entity;
   private readonly callbacks: SceneCallbacks;
@@ -51,6 +105,13 @@ export class BarScene {
   private readonly cameraTarget = new pc.Vec3(0, 1.2, 3.5);
   private readonly tempScreen = new pc.Vec3();
   private readonly tempPosition = new pc.Vec3();
+  private readonly tempTurn = new pc.Quat();
+  private readonly axisRight = new pc.Vec3();
+  private readonly axisUp = new pc.Vec3();
+  private readonly axisFront = new pc.Vec3();
+  private readonly skinModels = new Map<string, pc.ContainerResource>();
+  /** Skins already requested, including failed ones, so a missing file is not fetched again. */
+  private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
   private readonly fan: pc.Entity;
   private localId = '';
@@ -59,7 +120,7 @@ export class BarScene {
   private elapsed = 0;
   private yaw = 0.15;
   private pitch = 0.55;
-  private distance = 7.6;
+  private distance = 6.4;
   private dragging = false;
   private lastRotation = Math.PI;
   private eventType = '';
@@ -88,8 +149,8 @@ export class BarScene {
       clearColor: color('#191c25'), fov: 57, nearClip: 0.12, farClip: 75,
     });
     this.app.root.addChild(this.camera);
-    this.camera.setPosition(14, 13, 18);
-    this.camera.lookAt(-1, 0.8, -3);
+    this.camera.setPosition(9.5, 8.5, 12.5);
+    this.camera.lookAt(-1, 0.8, -2.5);
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
     this.buildArchitecture();
@@ -104,6 +165,7 @@ export class BarScene {
     this.discoBall = this.buildDiscoBall();
     this.fan = this.buildFan();
     this.installControls();
+    this.loadSkin(DEFAULT_SKIN);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
     this.resize();
@@ -151,11 +213,17 @@ export class BarScene {
         if (!Number.isFinite(actor.x) || !Number.isFinite(actor.z)) continue;
         seen.add(actor.id);
         const existing = this.actors.get(actor.id);
+        const local = actor.id === localId;
         if (existing) {
-          existing.actor = { ...actor };
-          existing.ring.enabled = actor.id === localId;
+          const moved = actor.x !== existing.actor.x || actor.z !== existing.actor.z;
+          // The local position comes from prediction (updateLocal), not from the server snapshot.
+          existing.actor = local ? { ...actor, x: existing.actor.x, z: existing.actor.z } : { ...actor };
+          if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
+          existing.ring.enabled = local;
+          if (!npc && this.skinFor(existing.actor) !== existing.skinId) this.replaceAvatar(actor.id, existing);
         } else {
           this.actors.set(actor.id, this.makeAvatar(actor, npc));
+          if (local) this.lastRotation = actor.rotation ?? this.lastRotation;
         }
       }
     }
@@ -170,9 +238,20 @@ export class BarScene {
   updateLocal(position: { x: number; z: number; rotation?: number; animation?: string }): void {
     const avatar = this.actors.get(this.localId);
     if (!avatar || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return;
+    const moved = position.x !== avatar.actor.x || position.z !== avatar.actor.z;
     avatar.actor = { ...avatar.actor, ...position };
-    avatar.root.setPosition(position.x, 0, position.z);
+    if (moved) this.glideTo(avatar, INPUT_GLIDE);
     if (position.rotation !== undefined) this.lastRotation = position.rotation;
+  }
+
+  /** Glides at constant speed from where the avatar is drawn to its new position; long jumps snap. */
+  private glideTo(avatar: Avatar, seconds: number): void {
+    const { root, actor } = avatar;
+    const drawn = root.getPosition();
+    if (Math.hypot(actor.x - drawn.x, actor.z - drawn.z) > SNAP_DISTANCE) root.setPosition(actor.x, 0, actor.z);
+    avatar.glideFrom.copy(root.getPosition());
+    avatar.glideAt = this.elapsed;
+    avatar.glide = seconds;
   }
 
   setEnabled(enabled: boolean): void {
@@ -192,9 +271,9 @@ export class BarScene {
     const forward = this.camera.forward;
     for (const [id, avatar] of this.actors) {
       const p = avatar.root.getPosition();
-      this.tempPosition.set(p.x - eye.x, 2.3 - eye.y, p.z - eye.z);
+      this.tempPosition.set(p.x - eye.x, LABEL_HEIGHT - eye.y, p.z - eye.z);
       if (this.tempPosition.dot(forward) <= 0 || this.tempPosition.lengthSq() > 400) continue;
-      this.tempPosition.set(p.x, 2.3, p.z);
+      this.tempPosition.set(p.x, LABEL_HEIGHT, p.z);
       this.camera.camera.worldToScreen(this.tempPosition, this.tempScreen);
       const x = this.tempScreen.x;
       const y = this.tempScreen.y;
@@ -311,10 +390,12 @@ export class BarScene {
   }
 
   private buildArchitecture(): void {
-    const floor = this.textured((ctx, width) => {
+    const { minX, maxX, minZ, maxZ } = WORLD;
+    const width = maxX - minX, depth = maxZ - minZ;
+    const floor = this.textured((ctx, size) => {
       ctx.fillStyle = '#332d2b';
-      ctx.fillRect(0, 0, width, width);
-      const tile = width / 8;
+      ctx.fillRect(0, 0, size, size);
+      const tile = size / 8;
       for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
         ctx.fillStyle = (x + y) % 2 ? '#9c7560' : '#ccb38b';
         ctx.fillRect(x * tile + 2, y * tile + 2, tile - 4, tile - 4);
@@ -322,49 +403,53 @@ export class BarScene {
         ctx.strokeRect(x * tile + 5, y * tile + 5, tile - 10, tile - 10);
       }
     });
-    floor.diffuseMapTiling = new pc.Vec2(4, 3);
+    // 40 cm tiles; the texture holds 8 × 8 of them.
+    floor.diffuseMapTiling = new pc.Vec2(width / 3.2, depth / 3.2);
     floor.update();
-    this.box('Foundation', [0, -0.2, 0], [28.7, 0.4, 22.7], this.material('#282423'));
-    this.shape('Vintage ceramic floor', 'plane', [0, 0.015, 0], [28, 1, 22], floor);
+    this.box('Foundation', [0, -0.2, 0], [width + 0.7, 0.4, depth + 0.7], this.material('#282423'));
+    this.shape('Vintage ceramic floor', 'plane', [0, 0.015, 0], [width, 1, depth], floor);
 
-    const brick = this.textured((ctx, width, height) => {
-      ctx.fillStyle = '#5e4036';
-      ctx.fillRect(0, 0, width, height);
-      const palette = ['#a46b52', '#a66f55', '#996047', '#b27959', '#a2664c'];
-      for (let row = 0; row < 8; row++) for (let col = -1; col < 5; col++) {
-        ctx.fillStyle = palette[Math.abs(row * 7 + col * 3) % palette.length]!;
-        ctx.fillRect(col * 128 + (row % 2) * 64 + 3, row * 64 + 3, 122, 58);
-        ctx.fillStyle = '#ffffff0c';
-        ctx.fillRect(col * 128 + (row % 2) * 64 + 5, row * 64 + 5, 117, 3);
-      }
-    });
-    brick.diffuseMapTiling = new pc.Vec2(4, 1);
-    brick.update();
+    // Bricks of about 23 × 7.5 cm; the texture holds 4 × 8 of them.
+    const brick = (length: number): pc.StandardMaterial => {
+      const material = this.textured((ctx, w, h) => {
+        ctx.fillStyle = '#5e4036';
+        ctx.fillRect(0, 0, w, h);
+        const palette = ['#a46b52', '#a66f55', '#996047', '#b27959', '#a2664c'];
+        for (let row = 0; row < 8; row++) for (let col = -1; col < 5; col++) {
+          ctx.fillStyle = palette[Math.abs(row * 7 + col * 3) % palette.length]!;
+          ctx.fillRect(col * 128 + (row % 2) * 64 + 3, row * 64 + 3, 122, 58);
+          ctx.fillStyle = '#ffffff0c';
+          ctx.fillRect(col * 128 + (row % 2) * 64 + 5, row * 64 + 5, 117, 3);
+        }
+      });
+      material.diffuseMapTiling = new pc.Vec2(length / 0.92, WALL_HEIGHT / 0.6);
+      material.update();
+      return material;
+    };
     const darkWood = this.material('#39332d');
     const panel = this.material('#274039');
     const trim = this.material('#ab8550');
-    this.box('Back brick wall', [0, 3.2, -11], [28, 4, 0.45], brick);
-    this.box('Left brick wall', [-14, 3.2, 0], [0.45, 4, 22], brick);
-    this.box('Right brick wall', [14, 3.2, 0], [0.45, 4, 22], brick);
-    this.box('Back wainscoting', [0, 0.7, -10.72], [28, 1.4, 0.14], panel);
-    this.box('Left wainscoting', [-13.72, 0.7, 0], [0.14, 1.4, 22], panel);
-    this.box('Right wainscoting', [13.72, 0.7, 0], [0.14, 1.4, 22], panel);
-    for (const z of [-10.58]) this.box('Back brass rail', [0, 1.42, z], [28, 0.06, 0.08], trim);
-    for (const x of [-13.58, 13.58]) this.box('Side brass rail', [x, 1.42, 0], [0.08, 0.06, 22], trim);
-    for (let x = -13; x <= 13; x += 2) this.box('Wall panel batten', [x, 0.7, -10.58], [0.06, 1.3, 0.08], darkWood);
-    for (const x of [-13.6, 13.6]) for (let z = -10; z <= 10; z += 2) {
-      this.box('Side panel batten', [x, 0.7, z], [0.08, 1.3, 0.06], darkWood);
+    this.box('Back brick wall', [0, WALL_HEIGHT / 2, minZ - 0.15], [width + 0.6, WALL_HEIGHT, 0.3], brick(width));
+    const sideBrick = brick(depth);
+    for (const x of [minX - 0.15, maxX + 0.15]) this.box('Side brick wall', [x, WALL_HEIGHT / 2, -0.15], [0.3, WALL_HEIGHT, depth + 0.3], sideBrick);
+    this.box('Back wainscoting', [0, 0.55, minZ + 0.02], [width, 1.1, 0.04], panel);
+    this.box('Back chair rail', [0, 1.11, minZ + 0.04], [width, 0.05, 0.05], trim);
+    for (let x = minX + 0.5; x < maxX; x += 1) this.box('Wall panel batten', [x, 0.55, minZ + 0.05], [0.04, 1, 0.03], darkWood);
+    for (const x of [minX + 0.02, maxX - 0.02]) {
+      const inward = Math.sign(-x);
+      this.box('Side wainscoting', [x, 0.55, 0], [0.04, 1.1, depth], panel);
+      this.box('Side chair rail', [x + inward * 0.02, 1.11, 0], [0.05, 0.05, depth], trim);
+      for (let z = minZ + 0.5; z < maxZ; z += 1) this.box('Side panel batten', [x + inward * 0.03, 0.55, z], [0.03, 1, 0.04], darkWood);
     }
-    for (const x of [-13.4, -4.6, 4.6, 13.4]) {
-      this.box('Roof timber', [x, 5.25, 0], [0.28, 0.35, 22], darkWood);
-    }
-    for (const z of [-10.5, -2.5, 6]) this.box('Cross timber', [0, 5.12, z], [28, 0.25, 0.24], darkWood);
+    // No ceiling: the camera looks in from above, so a beam only caps the walls.
+    this.box('Back wall beam', [0, WALL_HEIGHT + 0.06, minZ - 0.1], [width + 0.7, 0.12, 0.42], darkWood);
+    for (const x of [minX - 0.1, maxX + 0.1]) this.box('Side wall beam', [x, WALL_HEIGHT + 0.06, -0.1], [0.42, 0.12, depth + 0.4], darkWood);
     // Open front is a deliberate cutaway; authoritative room bounds still apply.
-    this.box('Front threshold', [0, 0.05, 10.7], [28, 0.1, 0.4], darkWood);
-    this.box('Entrance mat', [0, 0.035, 8.3], [4.3, 0.04, 2.5], this.material('#423e35'));
-    this.sign('Welcome mat', [0, 0.065, 8.3], [3.6, 1.6], ['BEM-VINDO', 'puxe uma cadeira'], { rotation: [0, 0, 0], background: '#373b32', foreground: '#c7b893' });
-    this.makeWindow(-13.68, 3.25, 3, 90);
-    this.makeWindow(13.68, 3.25, 4.5, -90);
+    this.box('Front threshold', [0, 0.03, maxZ + 0.1], [width, 0.06, 0.2], darkWood);
+    this.box('Entrance mat', [0, 0.02, 6], [1.8, 0.02, 1], this.material('#423e35'));
+    this.sign('Welcome mat', [0, 0.032, 6], [1.6, 0.8], ['BEM-VINDO', 'puxe uma cadeira'], { rotation: [0, 0, 0], background: '#373b32', foreground: '#c7b893' });
+    this.makeWindow(minX + 0.04, 1.65, 2, 90);
+    this.makeWindow(maxX - 0.04, 1.65, 3.6, -90);
   }
 
   private makeWindow(x: number, y: number, z: number, rotation: number): void {
@@ -372,75 +457,85 @@ export class BarScene {
     frame.setLocalEulerAngles(0, rotation, 0);
     const wood = this.material('#29312e');
     const glass = this.material('#315365', '#183240');
-    this.box('Window glass', [0, 0, 0], [4.1, 2.4, 0.08], glass, frame);
-    for (const xx of [-2.13, 0, 2.13]) this.box('Window mullion', [xx, 0, 0.09], [0.13, 2.7, 0.16], wood, frame);
-    for (const yy of [-1.3, 0, 1.3]) this.box('Window frame', [0, yy, 0.09], [4.4, 0.13, 0.18], wood, frame);
-    const awning = this.material('#b79a65');
-    this.box('Window sill', [0, -1.4, 0.18], [4.6, 0.14, 0.48], awning, frame);
-    for (let i = 0; i < 7; i++) this.box('Night skyline', [-1.8 + i * 0.57, -0.8, 0.065], [0.35, 0.6 + (i % 3) * 0.3, 0.04], this.material(i % 2 ? '#233a48' : '#294550'), frame);
+    this.box('Window glass', [0, 0, 0], [1.8, 1.2, 0.03], glass, frame);
+    for (let i = 0; i < 7; i++) {
+      const height = 0.3 + (i % 3) * 0.12;
+      this.box('Night skyline', [-0.72 + i * 0.24, -0.6 + height / 2, 0.02], [0.16, height, 0.01], this.material(i % 2 ? '#233a48' : '#294550'), frame);
+    }
+    for (const xx of [-0.92, 0, 0.92]) this.box('Window mullion', [xx, 0, 0.04], [0.05, 1.3, 0.06], wood, frame);
+    for (const yy of [-0.63, 0, 0.63]) this.box('Window frame', [0, yy, 0.04], [1.9, 0.05, 0.07], wood, frame);
+    this.box('Window sill', [0, -0.68, 0.08], [2, 0.05, 0.18], this.material('#b79a65'), frame);
   }
 
   private buildCounter(): void {
-    const counter = COLLIDERS.find(collider => collider.id === 'bar')!;
+    const { x, z, hx, hz } = COLLIDERS.find(collider => collider.id === 'bar')!;
+    const front = z + hz, wall = WORLD.minZ, topY = 1.1;
     const wood = this.material('#663f29');
     const top = this.material('#a67340', undefined, 0.4);
     const dark = this.material('#312922');
     const brass = this.material('#b58e4d', undefined, 0.3);
     const green = this.material('#2a4439');
-    this.box('Main counter cabinet', [counter.x, 0.68, counter.z], [counter.hx * 2, 1.36, counter.hz * 2], wood);
-    this.box('Polished counter top', [counter.x, 1.43, counter.z], [counter.hx * 2 + 0.2, 0.18, counter.hz * 2 + 0.2], top);
-    this.box('Counter kickboard', [counter.x, 0.15, counter.z + counter.hz], [counter.hx * 2, 0.22, 0.1], dark);
-    this.box('Counter brass footrest', [counter.x, 0.32, counter.z + counter.hz + 0.18], [counter.hx * 2 - 0.4, 0.07, 0.07], brass);
-    for (let x = -10.2; x <= -3.5; x += 2.1) {
-      this.box('Counter green panel', [x, 0.78, -6.13], [1.83, 0.95, 0.06], green);
-      this.box('Counter panel trim', [x, 1.27, -6.09], [1.92, 0.035, 0.035], brass);
-      this.box('Footrest support', [x, 0.24, -6], [0.05, 0.3, 0.05], brass);
+    this.box('Main counter cabinet', [x, 0.52, z], [hx * 2, 1.04, hz * 2], wood);
+    this.box('Polished counter top', [x, topY - 0.03, z + 0.04], [hx * 2 + 0.1, 0.06, hz * 2 + 0.16], top);
+    this.box('Counter kickboard', [x, 0.08, front], [hx * 2, 0.16, 0.04], dark);
+    this.box('Counter brass footrest', [x, 0.22, front + 0.12], [hx * 2 - 0.2, 0.035, 0.035], brass);
+    for (let px = x - hx + 0.6; px < x + hx; px += 1.2) {
+      this.box('Counter green panel', [px, 0.6, front + 0.01], [1, 0.66, 0.02], green);
+      this.box('Counter panel trim', [px, 0.94, front + 0.02], [1.04, 0.02, 0.02], brass);
+      this.box('Footrest support', [px, 0.14, front + 0.07], [0.025, 0.16, 0.1], brass);
     }
-    for (const x of [-10, -4]) this.makeStool(x, -5, 0);
+    for (let i = 0; i < 6; i++) this.makeStool(x - hx + 0.8 + i * 1.15, front + 0.55, 0);
 
-    this.box('Back bar mirror surround', [-5.5, 2.85, -10.63], [12.8, 3.75, 0.3], dark);
-    this.box('Back bar mirror', [-5.5, 2.85, -10.42], [12.25, 3.4, 0.08], this.material('#38514b', '#10261e'));
-    for (const y of [1.8, 2.75, 3.7]) {
-      this.box('Bottle shelf', [-5.5, y, -10.08], [12.3, 0.09, 0.66], wood);
-      this.box('Shelf edge', [-5.5, y, -9.73], [12.3, 0.07, 0.04], brass);
-      for (let i = 0; i < 17; i++) {
-        if (y === 2.75 && i > 5 && i < 12) continue;
-        const bottle = this.makeBottle(-11.1 + i * 0.69, y + 0.06, -10.1, i % 4);
-        bottle.setLocalScale(0.85, 0.85 + (i % 3) * 0.13, 0.85);
+    // Back bar against the wall, behind the bartender.
+    this.box('Back bar cabinet', [x, 0.45, wall + 0.27], [hx * 2 - 0.4, 0.9, 0.5], wood);
+    this.box('Back bar worktop', [x, 0.92, wall + 0.27], [hx * 2 - 0.35, 0.04, 0.54], top);
+    this.box('Back bar mirror surround', [x, 1.85, wall + 0.04], [hx * 2 - 0.6, 1.5, 0.06], dark);
+    this.box('Back bar mirror', [x, 1.85, wall + 0.08], [hx * 2 - 0.8, 1.32, 0.02], this.material('#38514b', '#10261e'));
+    for (const y of [1.3, 1.72, 2.14]) {
+      this.box('Bottle shelf', [x, y, wall + 0.2], [hx * 2 - 0.7, 0.03, 0.24], wood);
+      this.box('Shelf edge', [x, y - 0.005, wall + 0.32], [hx * 2 - 0.7, 0.035, 0.015], brass);
+      for (let i = 0, bx = x - hx + 0.5; bx <= x + hx - 0.5; i++, bx += 0.26) {
+        const bottle = this.makeBottle(bx, y + 0.015, wall + 0.2, i % 4);
+        bottle.setLocalScale(1, 0.85 + (i % 3) * 0.15, 1);
       }
     }
-    this.sign('House signature', [-5.4, 3.03, -9.96], [4.7, 1.45], ['B.A.R.', 'BOM AMIGO REAPARECE'],
+    this.sign('House signature', [x, 2.86, wall + 0.06], [2.3, 0.5], ['B.A.R.', 'BOM AMIGO REAPARECE'],
       { background: '#193b30', foreground: '#ffde90', glow: true });
-    this.sign('House menu', [3.5, 3.0, -10.65], [3.25, 3.25], ['DA CASA', 'Café passado  ·  4', 'Caldo do dia  ·  12', 'Conversa fiada  ·  grátis', 'FIADO? SÓ AMANHÃ.'],
+    this.sign('House menu', [0.6, 1.75, wall + 0.03], [1.1, 1.3], ['DA CASA', 'Café passado  ·  4', 'Caldo do dia  ·  12', 'Conversa fiada  ·  grátis', 'FIADO? SÓ AMANHÃ.'],
       { background: '#253329', foreground: '#e5dcc1', accent: '#ac8952' });
-    this.makeBottle(-10.5, 1.54, -6.7, 0);
-    this.makeBottle(-7.2, 1.54, -6.8, 1);
-    this.makeCup(-4.5, 1.54, -6.3);
-    this.makeCup(-3, 1.54, -6.3);
-    this.box('Bar service towel', [-8.7, 1.54, -6.75], [1.2, 0.02, 0.6], this.material('#dbcead'));
-    const tap = this.group('Draft taps', [-3.2, 1.55, -7.1]);
-    this.shape('Tap column', 'cylinder', [0, 0.45, 0], [0.18, 0.9, 0.18], brass, tap);
-    this.box('Tap crossbar', [0, 0.7, 0], [1.1, 0.13, 0.13], brass, tap);
-    for (const x of [-0.35, 0.35]) {
-      this.box('Tap handle', [x, 0.89, 0.08], [0.14, 0.38, 0.16], dark, tap);
-      this.box('Tap nozzle', [x, 0.6, 0.17], [0.08, 0.12, 0.28], brass, tap);
+
+    this.makeBottle(x - hx + 0.9, topY, z - 0.1, 0);
+    this.makeBottle(x - hx + 1.15, topY, z - 0.05, 1);
+    this.makeCup(x + 1.6, topY, z + 0.15);
+    this.makeCup(x + 2.3, topY, z + 0.1);
+    this.box('Bar service towel', [x - 0.4, topY + 0.005, z - 0.05], [0.45, 0.01, 0.3], this.material('#dbcead'));
+    const tap = this.group('Draft taps', [x + 1, topY, z - 0.1]);
+    this.shape('Tap column', 'cylinder', [0, 0.18, 0], [0.06, 0.36, 0.06], brass, tap);
+    this.box('Tap crossbar', [0, 0.33, 0], [0.36, 0.05, 0.05], brass, tap);
+    for (const tx of [-0.12, 0.12]) {
+      this.box('Tap handle', [tx, 0.42, 0.03], [0.035, 0.14, 0.045], dark, tap);
+      this.box('Tap nozzle', [tx, 0.29, 0.06], [0.025, 0.05, 0.09], brass, tap);
     }
+    const register = this.group('Old cash register', [x - hx + 0.5, topY, z - 0.05]);
+    this.box('Register body', [0, 0.11, 0], [0.36, 0.22, 0.3], this.material('#657064'), register);
+    this.box('Register display', [0, 0.25, -0.06], [0.28, 0.1, 0.08], this.material('#27372c'), register);
+    this.box('Register drawer', [0, 0.02, 0.03], [0.4, 0.04, 0.36], this.material('#2d3930'), register);
   }
 
   private makeBottle(x: number, y: number, z: number, variant = 0, parent?: pc.Entity): pc.Entity {
     const bottle = this.group('Bottle', [x, y, z], parent);
     const glass = this.material(['#304e2b', '#73502a', '#2d594e', '#61372e'][variant % 4]!);
-    this.shape('Bottle body', 'cylinder', [0, 0.25, 0], [0.22, 0.5, 0.22], glass, bottle);
-    this.shape('Bottle neck', 'cylinder', [0, 0.58, 0], [0.09, 0.22, 0.09], glass, bottle);
-    this.shape('Bottle label', 'cylinder', [0, 0.27, 0], [0.225, 0.18, 0.225], this.material(variant % 2 ? '#e4c687' : '#d7ccad'), bottle);
-    this.shape('Bottle cap', 'cylinder', [0, 0.7, 0], [0.11, 0.045, 0.11], this.material('#a58d50'), bottle);
+    this.shape('Bottle body', 'cylinder', [0, 0.11, 0], [0.075, 0.22, 0.075], glass, bottle);
+    this.shape('Bottle neck', 'cylinder', [0, 0.255, 0], [0.03, 0.07, 0.03], glass, bottle);
+    this.shape('Bottle label', 'cylinder', [0, 0.12, 0], [0.077, 0.08, 0.077], this.material(variant % 2 ? '#e4c687' : '#d7ccad'), bottle);
+    this.shape('Bottle cap', 'cylinder', [0, 0.295, 0], [0.034, 0.012, 0.034], this.material('#a58d50'), bottle);
     return bottle;
   }
 
   private makeCup(x: number, y: number, z: number, parent?: pc.Entity): pc.Entity {
     const cup = this.group('Drink', [x, y, z], parent);
-    this.shape('Glass', 'cylinder', [0, 0.18, 0], [0.22, 0.36, 0.22], this.material('#d59c3c'), cup);
-    this.shape('Foam', 'cylinder', [0, 0.365, 0], [0.23, 0.045, 0.23], this.material('#f5e7bf'), cup);
+    this.shape('Glass', 'cylinder', [0, 0.06, 0], [0.08, 0.12, 0.08], this.material('#d59c3c'), cup);
+    this.shape('Foam', 'cylinder', [0, 0.125, 0], [0.082, 0.015, 0.082], this.material('#f5e7bf'), cup);
     return cup;
   }
 
@@ -448,22 +543,20 @@ export class BarScene {
     const stool = this.group('Bar stool', [x, 0, z]);
     stool.setLocalEulerAngles(0, rotation, 0);
     const metal = this.material('#383b33');
-    this.shape('Round velvet cushion', 'cylinder', [0, 0.96, 0], [0.78, 0.18, 0.78], this.material('#784536'), stool);
-    this.shape('Seat rim', 'cylinder', [0, 0.84, 0], [0.81, 0.08, 0.81], metal, stool);
-    this.shape('Stool stem', 'cylinder', [0, 0.44, 0], [0.11, 0.8, 0.11], metal, stool);
-    this.shape('Stool foot', 'cylinder', [0, 0.04, 0], [0.64, 0.07, 0.64], metal, stool);
-    this.box('Stool back', [0, 1.3, 0.32], [0.65, 0.45, 0.09], this.material('#744332'), stool);
-    for (const xx of [-0.25, 0.25]) this.box('Back support', [xx, 1.1, 0.32], [0.045, 0.55, 0.045], metal, stool);
+    this.shape('Round velvet cushion', 'cylinder', [0, 0.74, 0], [0.38, 0.06, 0.38], this.material('#784536'), stool);
+    this.shape('Seat rim', 'cylinder', [0, 0.7, 0], [0.4, 0.03, 0.4], metal, stool);
+    this.shape('Stool stem', 'cylinder', [0, 0.36, 0], [0.05, 0.68, 0.05], metal, stool);
+    this.shape('Stool footrest', 'cylinder', [0, 0.3, 0], [0.3, 0.02, 0.3], metal, stool);
+    this.shape('Stool foot', 'cylinder', [0, 0.015, 0], [0.36, 0.03, 0.36], metal, stool);
   }
 
   private buildBlackjack(): void {
-    const collider = COLLIDERS.find(collider => collider.id === 'blackjack')!;
-    const table = this.group('Blackjack table', [collider.x, 0, collider.z]);
-    table.setLocalScale(collider.hx * 2 / 4.2, 1, collider.hz * 2 / 3.15);
+    const { x, z, rx, rz } = BLACKJACK_TABLE;
+    const table = this.group('Blackjack table', [x, 0, z]);
     const wood = this.material('#533c2a');
-    this.shape('Table pedestal', 'cylinder', [0, 0.57, 0], [0.7, 1.14, 0.7], wood, table);
-    this.shape('Table pedestal base', 'cylinder', [0, 0.09, 0], [2.2, 0.15, 2.2], wood, table);
-    this.shape('Padded oval rail', 'cylinder', [0, 1.19, 0], [4.2, 0.23, 3.15], this.material('#4e2f27'), table);
+    this.shape('Table pedestal', 'cylinder', [0, 0.36, 0], [0.24, 0.72, 0.24], wood, table);
+    this.shape('Table pedestal base', 'cylinder', [0, 0.03, 0], [rx, 0.06, rz], wood, table);
+    this.shape('Padded oval rail', 'cylinder', [0, 0.75, 0], [rx * 2, 0.07, rz * 2], this.material('#4e2f27'), table);
     const felt = this.textured((ctx, width, height) => {
       ctx.fillStyle = '#235846'; ctx.fillRect(0, 0, width, height);
       ctx.strokeStyle = '#d2b76c'; ctx.lineWidth = 3;
@@ -474,56 +567,59 @@ export class BarScene {
       ctx.font = '52px Georgia'; ctx.fillText('♠   ♥   ♣   ♦', width / 2, height * 0.63);
       for (const x of [0.22, 0.4, 0.6, 0.78]) ctx.strokeRect(width * x - 26, height * 0.76, 52, 68);
     }, 1024, 768);
-    this.shape('Green felt playing surface', 'cylinder', [0, 1.32, 0], [3.85, 0.025, 2.8], this.material('#245c47'), table);
-    this.shape('Printed blackjack felt', 'plane', [0, 1.338, 0], [3.5, 1, 2.5], felt, table);
+    const feltRx = rx - 0.07, feltRz = rz - 0.07;
+    this.shape('Green felt playing surface', 'cylinder', [0, 0.787, 0], [feltRx * 2, 0.01, feltRz * 2], this.material('#245c47'), table);
+    // The printed rectangle is inscribed in the felt ellipse.
+    this.shape('Printed blackjack felt', 'plane', [0, 0.7935, 0], [feltRx * Math.SQRT2, 1, feltRz * Math.SQRT2], felt, table);
     const card = this.material('#f2e7cd');
-    for (let i = 0; i < 2; i++) this.box('Dealt card', [-0.28 + i * 0.4, 1.355, -0.65], [0.3, 0.016, 0.42], card, table, [0, i * 12 - 6, 0]);
+    for (let i = 0; i < 2; i++) this.box('Dealt card', [-0.05 + i * 0.08, 0.796, -0.24], [0.064, 0.003, 0.09], card, table, [0, i * 12 - 6, 0]);
     for (let i = 0; i < 4; i++) {
       const chip = this.material(['#b94e38', '#e3c879', '#405e76', '#b94e38'][i]!);
-      for (let j = 0; j < 3; j++) this.shape('House chip', 'cylinder', [0.75 + i * 0.22, 1.365 + j * 0.035, -0.68], [0.16, 0.03, 0.16], chip, table);
+      for (let j = 0; j < 3; j++) this.shape('House chip', 'cylinder', [0.2 + i * 0.05, 0.797 + j * 0.008, -0.3], [0.04, 0.008, 0.04], chip, table);
     }
-    for (const [x, z, r] of [[3.3, -1.6, 140], [4.45, -1.35, 165], [5.6, -1.35, 195], [6.75, -1.6, 220]]) this.makeChair(x!, z!, r!);
-    this.sign('Blackjack wall poster', [8, 3.1, -10.67], [3.3, 2.2], ['21', 'SORTE É SENTAR À MESA', 'BLACKJACK · FICHAS VIRTUAIS'], { background: '#733e31', foreground: '#f4deb0' });
+    for (const seat of BLACKJACK_SEATS) this.makeChair(seat.x, seat.z, seat.rotation * RAD_TO_DEG);
+    this.sign('Blackjack wall poster', [x, 1.85, WORLD.minZ + 0.03], [1.3, 0.86], ['21', 'SORTE É SENTAR À MESA', 'BLACKJACK · FICHAS VIRTUAIS'], { background: '#733e31', foreground: '#f4deb0' });
   }
 
+  /** Seat top at 0.47 m; the chair faces `rotation` (degrees, zero = +Z) with its back behind the sitter. */
   private makeChair(x: number, z: number, rotation: number): void {
     const chair = this.group('Wooden chair', [x, 0, z]);
     chair.setLocalEulerAngles(0, rotation, 0);
     const wood = this.material('#825a34');
     const seat = this.material('#a2733c');
-    this.box('Chair seat', [0, 0.55, 0], [0.8, 0.11, 0.8], seat, chair);
-    for (const xx of [-0.3, 0.3]) for (const zz of [-0.3, 0.3]) this.box('Chair leg', [xx, 0.28, zz], [0.08, 0.56, 0.08], wood, chair);
-    for (const xx of [-0.31, 0.31]) this.box('Chair back upright', [xx, 1.03, -0.32], [0.08, 0.92, 0.08], wood, chair);
-    for (const yy of [1, 1.28]) this.box('Chair back slat', [0, yy, -0.33], [0.7, 0.18, 0.08], seat, chair);
+    this.box('Chair seat', [0, 0.45, 0], [0.44, 0.04, 0.42], seat, chair);
+    for (const xx of [-0.19, 0.19]) for (const zz of [-0.18, 0.18]) this.box('Chair leg', [xx, 0.215, zz], [0.035, 0.43, 0.035], wood, chair);
+    for (const xx of [-0.19, 0.19]) this.box('Chair back upright', [xx, 0.7, -0.19], [0.035, 0.46, 0.035], wood, chair);
+    for (const yy of [0.66, 0.84]) this.box('Chair back slat', [0, yy, -0.195], [0.38, 0.08, 0.02], seat, chair);
   }
 
   private buildSeating(): void {
     const wood = this.material('#9a683a');
     const dark = this.material('#4f3928');
     for (const { x, z, hx, hz } of COLLIDERS.filter(collider => collider.id.startsWith('table-'))) {
-      this.box('Cafe table top', [x, 0.98, z], [hx * 2, 0.13, hz * 2], wood);
-      this.shape('Cafe table stem', 'cylinder', [x!, 0.49, z!], [0.2, 0.95, 0.2], dark);
-      this.box('Cafe table foot', [x!, 0.08, z!], [1.4, 0.1, 0.14], dark);
-      this.box('Cafe table cross foot', [x!, 0.08, z!], [0.14, 0.1, 1.4], dark);
-      this.makeCup(x! + 0.4, 1.055, z! + 0.18);
-      this.makeBottle(x! - 0.2, 1.055, z! - 0.3, 1);
-      this.box('Folded napkins', [x! - 0.4, 1.067, z! + 0.35], [0.32, 0.035, 0.3], this.material('#e2cda4'));
+      this.box('Cafe table top', [x, 0.74, z], [hx * 2, 0.04, hz * 2], wood);
+      this.shape('Cafe table stem', 'cylinder', [x, 0.37, z], [0.07, 0.72, 0.07], dark);
+      this.box('Cafe table foot', [x, 0.02, z], [0.56, 0.04, 0.06], dark);
+      this.box('Cafe table cross foot', [x, 0.02, z], [0.06, 0.04, 0.56], dark);
+      this.makeCup(x + 0.16, 0.76, z + 0.12);
+      this.makeBottle(x - 0.1, 0.76, z - 0.14, 1);
+      this.box('Folded napkins', [x - 0.2, 0.765, z + 0.18], [0.12, 0.01, 0.12], this.material('#e2cda4'));
     }
     for (const seat of INTERACTABLES.filter(object => object.type === 'seat')) {
       this.makeChair(seat.x, seat.z, (seat.rotation ?? 0) * RAD_TO_DEG);
     }
-    const bench = this.material('#704234');
-    for (const x of [-12.8, 12.8]) {
-      this.box('Wall bench', [x, 0.52, 8], [1.3, 0.24, 4], bench);
-      this.box('Wall bench back', [x + Math.sign(x) * 0.46, 1.13, 8], [0.2, 1.15, 4], bench);
-      for (const z of [6.5, 9.5]) this.box('Bench leg', [x, 0.22, z], [0.75, 0.4, 0.12], dark);
-    }
+    const bench = COLLIDERS.find(collider => collider.id === 'bench')!;
+    const cushion = this.material('#704234');
+    this.box('Wall bench seat', [bench.x, 0.42, bench.z], [bench.hx * 2, 0.08, bench.hz * 2], cushion);
+    this.box('Wall bench back', [bench.x - bench.hx + 0.05, 0.72, bench.z], [0.08, 0.55, bench.hz * 2], cushion);
+    for (const dz of [-bench.hz + 0.15, bench.hz - 0.15]) this.box('Bench leg', [bench.x, 0.19, bench.z + dz], [bench.hx * 2 - 0.05, 0.38, 0.06], dark);
   }
 
   private buildJukebox(): void {
     const collider = COLLIDERS.find(collider => collider.id === 'jukebox')!;
     const juke = this.group('Jukebox', [collider.x, 0, collider.z]);
-    juke.setLocalScale(collider.hx * 2 / 1.8, 1, collider.hz * 2 / 1.15);
+    // Modelled at 1.8 × 2.44 × 1.15 and scaled to a 1.55 m cabinet on the collider footprint.
+    juke.setLocalScale(collider.hx * 2 / 1.8, 1.55 / 2.44, collider.hz * 2 / 1.15);
     const shell = this.material('#774430');
     const dark = this.material('#202a27');
     const brass = this.material('#dba85a');
@@ -538,49 +634,45 @@ export class BarScene {
     this.box('Jukebox illuminated cap', [0, 2.48, 0.62], [1.63, 0.1, 0.12], teal, juke);
     for (let i = 0; i < 8; i++) this.box('Speaker gold grille', [-0.52 + i * 0.15, 0.85, 0.66], [0.03, 1.2, 0.04], brass, juke);
     for (let i = 0; i < 6; i++) this.box('Jukebox track button', [-0.5 + i * 0.2, 1.76, 0.67], [0.12, 0.08, 0.06], dark, juke);
-    this.sign('Jukebox marquee', [collider.x, 2.05, collider.z + 0.6], [0.92, 0.35], ['RÁDIO BOTECO'], { background: '#bba871', foreground: '#373e30' });
-    this.sign('Music wall poster', [11.5, 3.8, -10.6], [2.3, 1.4], ['SOM NA CAIXA', 'a noite é nossa'], { background: '#234746', foreground: '#ead298' });
-    this.box('Dance floor rug', [8.2, 0.04, -5.7], [3.2, 0.035, 3.2], this.material('#574937'));
+    this.sign('Jukebox marquee', [collider.x, 1.24, collider.z + collider.hz + 0.05], [0.46, 0.18], ['RÁDIO BOTECO'], { background: '#bba871', foreground: '#373e30' });
+    this.sign('Music wall poster', [WORLD.maxX - 0.03, 1.8, -4.4], [1, 0.62], ['SOM NA CAIXA', 'a noite é nossa'], { rotation: [90, -90, 0], background: '#234746', foreground: '#ead298' });
+    this.box('Dance floor rug', [8, 0.02, -4.7], [2.6, 0.02, 2.6], this.material('#574937'));
   }
 
   private buildDecor(): void {
-    this.sign('House rules print', [-13.64, 3, -4.5], [2.7, 2.8], ['BOTECO', 'desde sempre.', 'Gente boa.', 'História ruim.', 'Noite comprida.'], { rotation: [90, 90, 0], background: '#bc9a61', foreground: '#4b3a2a', accent: '#59422b' });
-    this.sign('House small print', [13.64, 3, -1], [2.7, 2.8], ['DEVAGAR', 'Aqui o tempo', 'passa na', 'segunda rodada.'], { rotation: [90, -90, 0], background: '#734f3a', foreground: '#e8d4a9' });
-    this.makePlant(-12.5, 0, 9.4);
-    this.makePlant(12.5, 0, -9.7);
-    this.makePlant(-12.7, 0, -9.3);
+    this.sign('House rules print', [WORLD.minX + 0.03, 1.85, -1], [1, 1.05], ['BOTECO', 'desde sempre.', 'Gente boa.', 'História ruim.', 'Noite comprida.'], { rotation: [90, 90, 0], background: '#bc9a61', foreground: '#4b3a2a', accent: '#59422b' });
+    this.sign('House small print', [WORLD.maxX - 0.03, 1.85, 1.2], [1, 1.05], ['DEVAGAR', 'Aqui o tempo', 'passa na', 'segunda rodada.'], { rotation: [90, -90, 0], background: '#734f3a', foreground: '#e8d4a9' });
+    this.makePlant(-9.45, 0, 6.45);
+    this.makePlant(9.45, 0, 6.45);
+    this.makePlant(-9.45, 0, -2.9);
+    this.makePlant(9.45, 0, -1.8);
     const cable = this.material('#262923');
     const bulb = this.material('#f4cd79', '#efb94e');
-    // Low strands and tiny lamps make the cutaway read as a lived-in room.
-    for (let i = 0; i < 17; i++) {
-      const x = -12 + i * 1.5;
-      const y = 4.7 - Math.sin((i / 16) * Math.PI) * 0.65;
-      this.shape('Festoon bulb', 'sphere', [x, y - 0.11, -3.5], [0.15, 0.19, 0.15], bulb);
-      this.box('Festoon cable', [x, y, -3.5], [1.55, 0.025, 0.025], cable, undefined, [0, 0, (i - 8) * 1.5]);
+    // A festoon strand across the room makes the cutaway read as a lived-in space.
+    for (let i = 0; i < 13; i++) {
+      const x = -9 + i * 1.5;
+      const y = 3 - Math.sin((i / 12) * Math.PI) * 0.35;
+      this.shape('Festoon bulb', 'sphere', [x, y - 0.06, -1.6], [0.07, 0.09, 0.07], bulb);
+      this.box('Festoon cable', [x, y, -1.6], [1.52, 0.012, 0.012], cable, undefined, [0, 0, (i - 6) * 0.6]);
     }
-    // A small radio, register, and bottles supply recognizable silhouettes.
-    const register = this.group('Old cash register', [-10.4, 1.54, -7.6]);
-    this.box('Register body', [0, 0.25, 0], [0.75, 0.5, 0.65], this.material('#657064'), register);
-    this.box('Register display', [0, 0.48, -0.1], [0.6, 0.22, 0.2], this.material('#27372c'), register);
-    this.box('Register drawer', [0, 0.04, 0.05], [0.82, 0.09, 0.78], this.material('#2d3930'), register);
   }
 
   private makePlant(x: number, y: number, z: number): void {
     const plant = this.group('Potted plant', [x, y, z]);
-    this.shape('Terracotta pot', 'cylinder', [0, 0.35, 0], [0.8, 0.7, 0.8], this.material('#a16749'), plant);
-    this.shape('Pot rim', 'cylinder', [0, 0.68, 0], [0.87, 0.12, 0.87], this.material('#b47a56'), plant);
-    this.shape('Pot soil', 'cylinder', [0, 0.75, 0], [0.7, 0.03, 0.7], this.material('#342f25'), plant);
+    this.shape('Terracotta pot', 'cylinder', [0, 0.21, 0], [0.42, 0.42, 0.42], this.material('#a16749'), plant);
+    this.shape('Pot rim', 'cylinder', [0, 0.41, 0], [0.46, 0.06, 0.46], this.material('#b47a56'), plant);
+    this.shape('Pot soil', 'cylinder', [0, 0.445, 0], [0.38, 0.02, 0.38], this.material('#342f25'), plant);
     const leaf = this.material('#41654b');
     for (let i = 0; i < 8; i++) {
       const angle = i / 8 * TAU;
-      this.shape('Angular plant leaf', 'cone', [Math.cos(angle) * 0.24, 1.25 + (i % 3) * 0.12, Math.sin(angle) * 0.24], [0.24, 1.3, 0.35], leaf, plant, [Math.cos(angle) * 25, i * 45, Math.sin(angle) * 25]);
+      this.shape('Angular plant leaf', 'cone', [Math.cos(angle) * 0.12, 0.75 + (i % 3) * 0.07, Math.sin(angle) * 0.12], [0.13, 0.7, 0.19], leaf, plant, [Math.cos(angle) * 25, i * 45, Math.sin(angle) * 25]);
     }
   }
 
   private buildLighting(): void {
     const sun = new pc.Entity('Warm key light');
     sun.addComponent('light', { type: 'directional', color: color('#ffe0af'), intensity: 0.95,
-      castShadows: true, shadowDistance: 30, shadowResolution: 1024, shadowBias: 0.3,
+      castShadows: true, shadowDistance: 25, shadowResolution: 1024, shadowBias: 0.3,
       normalOffsetBias: 0.07 });
     sun.setEulerAngles(52, -28, 0);
     this.app.root.addChild(sun);
@@ -588,56 +680,139 @@ export class BarScene {
     const lampMaterial = this.material('#274239');
     const brass = this.material('#a98247');
     const glow = this.material('#ffe5b2', '#ffd38b');
-    for (const [x, z] of [[-7, -6], [6, -1], [-6, 4]]) {
-      const lamp = this.group('Hanging enamel lamp', [x!, 4.1, z!]);
-      this.shape('Lamp cord', 'cylinder', [0, 0.7, 0], [0.035, 1.4, 0.035], brass, lamp);
-      this.shape('Enamel shade', 'cone', [0, 0, 0], [1.3, 0.58, 1.3], lampMaterial, lamp);
-      this.shape('Lamp glowing diffuser', 'cylinder', [0, -0.3, 0], [1.17, 0.035, 1.17], glow, lamp);
+    const counter = COLLIDERS.find(collider => collider.id === 'bar')!;
+    const lamps: V3[] = [
+      [counter.x - 1.6, 2.3, counter.z], [counter.x + 1.6, 2.3, counter.z],
+      [BLACKJACK_TABLE.x, 2.15, BLACKJACK_TABLE.z],
+      ...CAFE_TABLES.map(({ x, z }): V3 => [x, 2, z]),
+    ];
+    for (const [x, y, z] of lamps) {
+      const lamp = this.group('Hanging enamel lamp', [x, y, z]);
+      this.shape('Lamp cord', 'cylinder', [0, (WALL_HEIGHT - y) / 2, 0], [0.012, WALL_HEIGHT - y, 0.012], brass, lamp);
+      this.shape('Enamel shade', 'cone', [0, 0, 0], [0.42, 0.22, 0.42], lampMaterial, lamp);
+      this.shape('Lamp glowing diffuser', 'cylinder', [0, -0.11, 0], [0.38, 0.01, 0.38], glow, lamp);
+    }
+    // One light per area rather than per lamp keeps the light count low.
+    for (const [x, y, z, range] of [[counter.x, 2.1, counter.z, 6], [BLACKJACK_TABLE.x, 2, BLACKJACK_TABLE.z, 5.5], [-5.4, 1.9, 1.5, 6.5], [5.6, 1.9, 1.5, 6.5]] as const) {
       const light = new pc.Entity('Amber hanging light');
-      light.addComponent('light', { type: 'omni', color: color('#ffd09a'), intensity: 1.5, range: 10,
-        castShadows: false });
-      light.setPosition(x!, 3.6, z!);
+      light.addComponent('light', { type: 'omni', color: color('#ffd09a'), intensity: 1.5, range, castShadows: false });
+      light.setPosition(x, y, z);
       this.app.root.addChild(light);
       this.warmLights.push(light);
     }
-    for (const [x, hex] of [[-8, '#cf5275'], [8, '#41afaa']] as const) {
+    for (const [x, hex] of [[-5, '#cf5275'], [5, '#41afaa']] as const) {
       const light = new pc.Entity('Party wash');
-      light.addComponent('light', { type: 'omni', color: color(hex), intensity: 0, range: 17, castShadows: false });
-      light.setPosition(x, 3.8, -1);
+      light.addComponent('light', { type: 'omni', color: color(hex), intensity: 0, range: 12, castShadows: false });
+      light.setPosition(x, 2.8, -1.5);
       this.app.root.addChild(light);
       this.partyLights.push(light);
     }
   }
 
   private buildDiscoBall(): pc.Entity {
-    const disco = this.group('Disco ball', [4.6, 4.4, -4]);
-    this.shape('Mirror ball', 'sphere', [0, 0, 0], [0.65, 0.65, 0.65], this.material('#9cb2a6', '#193c39', 0.2), disco);
+    const disco = this.group('Disco ball', [8, 2.75, -4.7]);
+    this.shape('Mirror ball', 'sphere', [0, 0, 0], [0.32, 0.32, 0.32], this.material('#9cb2a6', '#193c39', 0.2), disco);
     const tile = this.material('#d3dfcb', '#384f41');
     for (let i = 0; i < 10; i++) {
       const angle = i / 10 * TAU;
-      this.box('Disco mirror', [Math.cos(angle) * 0.33, 0, Math.sin(angle) * 0.33], [0.12, 0.12, 0.025], tile, disco, [0, -i * 36 + 90, 0]);
+      this.box('Disco mirror', [Math.cos(angle) * 0.16, 0, Math.sin(angle) * 0.16], [0.06, 0.06, 0.012], tile, disco, [0, -i * 36 + 90, 0]);
     }
     return disco;
   }
 
   private buildFan(): pc.Entity {
-    const fan = this.group('Ceiling fan', [-2, 4.86, 2]);
+    const fan = this.group('Ceiling fan', [-1.2, 2.95, 0.6]);
     const wood = this.material('#45372c');
-    this.shape('Fan spindle', 'cylinder', [0, 0.12, 0], [0.16, 0.4, 0.16], wood, fan);
-    this.shape('Fan motor', 'cylinder', [0, -0.1, 0], [0.55, 0.22, 0.55], this.material('#746747'), fan);
+    this.shape('Fan spindle', 'cylinder', [0, 0.13, 0], [0.04, 0.26, 0.04], wood, fan);
+    this.shape('Fan motor', 'cylinder', [0, -0.03, 0], [0.2, 0.1, 0.2], this.material('#746747'), fan);
     for (let i = 0; i < 4; i++) {
-      const blade = this.group('Fan blade pivot', [0, -0.13, 0], fan);
+      const blade = this.group('Fan blade pivot', [0, -0.05, 0], fan);
       blade.setLocalEulerAngles(0, i * 90, 0);
-      this.box('Fan blade', [0.92, 0, 0], [1.7, 0.05, 0.34], wood, blade, [0, 0, 6]);
+      this.box('Fan blade', [0.36, 0, 0], [0.6, 0.012, 0.12], wood, blade, [0, 0, 6]);
     }
     return fan;
+  }
+
+  /** Starts downloading every skin, e.g. when the skin selector opens, so a switch is instant. */
+  preloadSkins(): void {
+    for (const { id } of SKINS) this.loadSkin(id);
+  }
+
+  private loadSkin(id: string): void {
+    if (this.skinRequests.has(id)) return;
+    this.skinRequests.add(id);
+    this.app.assets.loadFromUrl(skinUrl(id), 'container', (error, asset) => {
+      if (this.destroyed) return;
+      if (error || !asset) { console.warn(`Skin "${id}" indisponível; usando outro visual.`, error); return; }
+      this.skinModels.set(id, asset.resource as pc.ContainerResource);
+      // Players waiting for this skin (or for any model, on the box avatar) switch to it in place.
+      for (const [actorId, avatar] of this.actors) {
+        if (!avatar.npc && this.skinFor(avatar.actor) !== avatar.skinId) this.replaceAvatar(actorId, avatar);
+      }
+    });
+  }
+
+  /**
+   * The skin to draw for a player: the chosen one once loaded, meanwhile the default one, and the box
+   * avatar until the default (which carries the animations) has arrived. Asks for missing skins.
+   */
+  private skinFor(actor: SceneActor): string | undefined {
+    const wanted = actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
+    if (!this.skinModels.has(wanted)) this.loadSkin(wanted);
+    if (!this.skinModels.has(DEFAULT_SKIN)) return undefined;
+    return this.skinModels.has(wanted) ? wanted : DEFAULT_SKIN;
+  }
+
+  /** Rebuilds an avatar (e.g. with another skin) where the old one stood, keeping its motion and pose. */
+  private replaceAvatar(id: string, avatar: Avatar): void {
+    const replacement = this.makeAvatar(avatar.actor, avatar.npc);
+    replacement.root.setPosition(avatar.root.getPosition());
+    replacement.root.setEulerAngles(0, avatar.yaw, 0);
+    replacement.yaw = avatar.yaw;
+    replacement.glideFrom.copy(avatar.glideFrom);
+    replacement.glideAt = avatar.glideAt;
+    replacement.glide = avatar.glide;
+    replacement.seatedBlend = avatar.seatedBlend;
+    avatar.root.destroy();
+    this.actors.set(id, replacement);
+  }
+
+  private makeSkin(body: pc.Entity, model: pc.ContainerResource): SkinnedRig {
+    const entity = model.instantiateRenderEntity({ castShadows: true, receiveShadows: true });
+    entity.setLocalScale(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE);
+    body.addChild(entity);
+    entity.addComponent('anim', { activate: true });
+    // Skins rigged to Nathan's skeleton reuse its clips; skins with their own skeleton ship retargeted ones.
+    const clips = model.animations.length ? model : this.skinModels.get(DEFAULT_SKIN)!;
+    const tracks = clips.animations.map(asset => asset.resource as pc.AnimTrack);
+    // The first clip assigned becomes the default state.
+    for (const name of ['Idle', 'Walk', 'Pose']) {
+      const track = tracks.find(candidate => candidate.name === name);
+      if (track) entity.anim!.assignAnimation(name, track);
+    }
+    const bones = Object.fromEntries(SKIN_BONES.map(name => [name, entity.findByName(name) ?? entity.findByName(BONE_ALIASES[name] ?? name)])) as Record<SkinBone, pc.Entity>;
+    // Measured in the bind pose, before any clip runs; the thighs are level at about 0.56 m when seated.
+    const hipHeight = bones.upperleg_l.getPosition().y - entity.getPosition().y;
+    // No clip yet: the first pose is applied without a cross-fade (e.g. a skin swap while seated).
+    return { model: entity, bones, clip: '', sitDrop: hipHeight - 0.56 };
   }
 
   private makeAvatar(actor: SceneActor, npc: boolean): Avatar {
     const root = this.group(`Avatar ${actor.id}`, [actor.x, 0, actor.z]);
     const body = this.group('Animated rig', [0, 0, 0], root);
+    const skinId = npc ? undefined : this.skinFor(actor);
+    if (!skinId) body.setLocalScale(...BOX_AVATAR_SCALE);
     const isBartender = actor.role === 'bartender' || (actor.displayName ?? actor.name)?.toLowerCase().includes('zé');
     const hash = [...actor.id].reduce((value, letter) => value + letter.charCodeAt(0), 0);
+    const ring = this.shape('Local player marker', 'cylinder', [0, 0.027, 0], [0.83, 0.018, 0.83], this.material('#b1a067', '#514322'), root);
+    ring.enabled = actor.id === this.localId;
+    const motion = { glideFrom: new pc.Vec3(actor.x, 0, actor.z), glideAt: 0, glide: PATCH_GLIDE, yaw: (actor.rotation ?? 0) * RAD_TO_DEG };
+    root.setEulerAngles(0, motion.yaw, 0);
+    if (skinId) {
+      const cup = this.makeCup(0, 0, 0, root);
+      cup.enabled = false;
+      return { root, body, skin: this.makeSkin(body, this.skinModels.get(skinId)!), skinId, cup, ring, actor: { ...actor }, npc, phase: hash % 12, ...motion };
+    }
     const skin = this.material(['#b98059', '#dcac7c', '#86583e', '#c48d66'][hash % 4]!);
     const palette = ['#49756b', '#ba7545', '#7a6b8d', '#a95a4b', '#bc9a58', '#53758b'];
     const clothing = this.material(actor.avatarColor ?? actor.color ?? (isBartender ? '#e6d8b9' : palette[hash % palette.length]!));
@@ -678,33 +853,45 @@ export class BarScene {
     }
     const cup = this.makeCup(0, -0.65, 0.06, rightArm);
     cup.enabled = false;
-    const ring = this.shape('Local player marker', 'cylinder', [0, 0.027, 0], [0.83, 0.018, 0.83], this.material('#b1a067', '#514322'), root);
-    ring.enabled = actor.id === this.localId;
-    return { root, body, leftArm, rightArm, leftLeg, rightLeg, head, cup, ring,
-      actor: { ...actor }, npc, phase: hash % 12 };
+    return { root, body, limbs: { leftArm, rightArm, leftLeg, rightLeg, head }, cup, ring,
+      actor: { ...actor }, npc, phase: hash % 12, ...motion };
   }
 
   private animateAvatar(avatar: Avatar, dt: number): void {
-    const { actor, body, root, leftArm, rightArm, leftLeg, rightLeg, head, cup } = avatar;
+    const { actor, root, glideFrom } = avatar;
     const local = actor.id === this.localId;
     const current = root.getPosition();
     const moving = Math.hypot(actor.x - current.x, actor.z - current.z) > 0.025;
-    const smoothing = 1 - Math.exp(-(local ? 35 : 13) * dt);
-    root.setPosition(lerp(current.x, actor.x, smoothing), 0, lerp(current.z, actor.z, smoothing));
-    const rotation = (actor.rotation ?? 0) * RAD_TO_DEG;
-    const nowRotation = root.getEulerAngles().y;
-    const delta = ((rotation - nowRotation + 540) % 360) - 180;
-    root.setEulerAngles(0, nowRotation + delta * (1 - Math.exp(-16 * dt)), 0);
+    const progress = clamp((this.elapsed - avatar.glideAt) / avatar.glide, 0, 1);
+    root.setPosition(lerp(glideFrom.x, actor.x, progress), 0, lerp(glideFrom.z, actor.z, progress));
     let animation = (actor.animation ?? actor.state ?? 'idle').toLowerCase();
     if (moving && animation === 'idle') animation = 'walk';
-    const t = this.elapsed + avatar.phase;
-    const walking = animation.includes('walk') || animation.includes('run') || animation.includes('wander');
-    const running = animation.includes('run');
     const seated = animation.includes('sit') || animation.includes('seat') || animation.includes('blackjack');
-    const dancing = animation.includes('dance') || (avatar.npc && this.eventType === 'PARTY');
-    const drinking = animation.includes('drink') || (avatar.npc && animation.includes('drunk'));
+    // The local player faces the predicted travel direction; the server's lags behind it.
+    // Seats set the facing on the server, so seated players keep that one.
+    if (local && seated) this.lastRotation = actor.rotation ?? this.lastRotation;
+    const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
+    const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
+    avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
+    root.setEulerAngles(0, avatar.yaw, 0);
+    const pose: Pose = {
+      t: this.elapsed + avatar.phase,
+      walking: animation.includes('walk') || animation.includes('run') || animation.includes('wander'),
+      running: animation.includes('run'),
+      seated: avatar.seatedBlend = lerp(avatar.seatedBlend ?? 0, seated ? 1 : 0, 1 - Math.exp(-12 * dt)),
+      dancing: animation.includes('dance') || (avatar.npc && this.eventType === 'PARTY'),
+      drinking: animation.includes('drink') || (avatar.npc && animation.includes('drunk')),
+      waving: animation.includes('wave'),
+    };
+    avatar.cup.enabled = pose.drinking;
+    if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose);
+    else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
+  }
+
+  private poseLimbs({ actor, body, npc }: Avatar, limbs: Limbs, pose: Pose): void {
+    const { leftArm, rightArm, leftLeg, rightLeg, head } = limbs;
+    const { t, walking, running, dancing, drinking, seated: seatedBlend } = pose;
     const stride = walking ? Math.sin(t * (running ? 13 : 8)) * (running ? 45 : 30) : 0;
-    const seatedBlend = avatar.seatedBlend = lerp(avatar.seatedBlend ?? 0, seated ? 1 : 0, 1 - Math.exp(-12 * dt));
     body.setLocalPosition(0, -0.18 * seatedBlend + (1 - seatedBlend) * (walking ? Math.abs(Math.sin(t * 8)) * 0.045 : Math.sin(t * 2) * 0.015), 0);
     body.setLocalEulerAngles(running ? 8 : 0, 0, 0);
     leftArm.setLocalEulerAngles(stride * 0.8, 0, 3);
@@ -712,7 +899,6 @@ export class BarScene {
     leftLeg.setLocalEulerAngles(-stride, 0, 0);
     rightLeg.setLocalEulerAngles(stride, 0, 0);
     head.setLocalEulerAngles(0, Math.sin(t * 0.65) * 3, 0);
-    cup.enabled = drinking;
     if (seatedBlend > 0.01) {
       leftLeg.setLocalEulerAngles(-75 * seatedBlend - stride * (1 - seatedBlend), 0, -4 * seatedBlend);
       rightLeg.setLocalEulerAngles(-75 * seatedBlend + stride * (1 - seatedBlend), 0, 4 * seatedBlend);
@@ -732,10 +918,80 @@ export class BarScene {
       rightArm.setLocalEulerAngles(-95 - raise * 30, 0, -10);
       head.setLocalEulerAngles(-raise * 14, 0, Math.sin(t * 1.4) * 5);
     }
-    if (avatar.npc && this.eventType === 'DRUNK_NPC' && actor.id === 'tonico') {
+    if (npc && this.eventType === 'DRUNK_NPC' && actor.id === 'tonico') {
       body.setLocalEulerAngles(Math.sin(t * 2) * 7, 0, Math.sin(t * 2.7) * 11);
     }
-    if (animation.includes('wave')) rightArm.setLocalEulerAngles(0, Math.sin(t * 12) * 20, 155);
+    if (pose.waving) rightArm.setLocalEulerAngles(0, Math.sin(t * 12) * 20, 155);
+  }
+
+  /**
+   * The clip sets the base pose; gestures are extra joint turns about the body's own axes,
+   * which keeps them independent of each bone's local frame. The model faces +Z, its left on +X.
+   */
+  private poseSkin({ body, cup }: Avatar, skin: SkinnedRig, pose: Pose): void {
+    const { t, seated, dancing, drinking, waving } = pose;
+    const { bones } = skin;
+    const anim = skin.model.anim!;
+    // Gestures are built on the static Pose; plain standing uses the animated Idle.
+    const gesture = seated > 0.01 || dancing || drinking || waving;
+    const clip = pose.walking && seated < 0.5 ? 'Walk' : gesture ? 'Pose' : 'Idle';
+    if (skin.clip !== clip) {
+      anim.baseLayer?.transition(clip, skin.clip ? 0.25 : 0);
+      skin.clip = clip;
+    }
+    anim.speed = clip === 'Walk' ? (pose.running ? RUN_CLIP_SPEED : WALK_CLIP_SPEED) : 1;
+    // Walk and Idle carry their own motion; the static Pose gets a little breathing. Sitting lowers the hips.
+    body.setLocalPosition(0, -skin.sitDrop * seated + (clip === 'Pose' ? Math.sin(t * 2) * 0.008 : 0), 0);
+    body.setLocalEulerAngles(pose.running ? 8 : 0, 0, 0);
+    if (dancing) {
+      body.setLocalPosition(0, Math.abs(Math.sin(t * 6)) * 0.1, 0);
+      body.setLocalEulerAngles(0, Math.sin(t * 3) * 15, Math.sin(t * 6) * 6);
+    }
+    const right = this.axisRight.copy(body.right);
+    const up = this.axisUp.copy(body.up);
+    const front = this.axisFront.copy(body.forward).mulScalar(-1);
+    if (clip === 'Pose') this.turn(bones.head, up, Math.sin(t * 0.65) * 4);
+    if (seated > 0.01) {
+      for (const side of ['l', 'r'] as const) {
+        this.turn(bones[`upperleg_${side}`], right, -88 * seated);
+        this.turn(bones[`lowerleg_${side}`], right, 88 * seated);
+        this.turn(bones[`upperarm_${side}`], right, -25 * seated);
+        this.turn(bones[`lowerarm_${side}`], right, -40 * seated);
+      }
+    }
+    const rightArmBusy = drinking || waving;
+    if (dancing) {
+      const beat = Math.sin(t * 6);
+      this.turn(bones.upperarm_l, front, 65 + beat * 20);
+      this.turn(bones.upperarm_l, right, beat * 30);
+      this.turn(bones.lowerarm_l, front, 55);
+      if (!rightArmBusy) {
+        this.turn(bones.upperarm_r, front, -65 + Math.sin(t * 6 + 1) * 20);
+        this.turn(bones.upperarm_r, right, -beat * 30);
+        this.turn(bones.lowerarm_r, front, -55);
+      }
+      this.turn(bones.upperleg_l, right, beat * 12);
+      this.turn(bones.upperleg_r, right, -beat * 12);
+    }
+    if (drinking) {
+      const raise = Math.max(0, Math.sin(t * 1.7));
+      this.turn(bones.upperarm_r, right, -20 - raise * 15);
+      this.turn(bones.lowerarm_r, right, -100 - raise * 30);
+      this.turn(bones.head, right, -raise * 14);
+      const grip = this.tempPosition.lerp(bones.hand_r.getPosition(), bones.middle_01_r.getPosition(), 0.6);
+      cup.setPosition(grip.x - up.x * 0.05, grip.y - up.y * 0.05, grip.z - up.z * 0.05);
+      cup.setRotation(body.getRotation());
+    }
+    if (waving) {
+      this.turn(bones.upperarm_r, front, -150);
+      this.turn(bones.lowerarm_r, front, Math.sin(t * 12) * 25);
+    }
+  }
+
+  /** Rotates a bone by `degrees` about a world-space axis, on top of its current pose. */
+  private turn(bone: pc.Entity, axis: pc.Vec3, degrees: number): void {
+    if (Math.abs(degrees) < 0.01) return;
+    bone.setRotation(this.tempTurn.setFromAxisAngle(axis, degrees).mul(bone.getRotation()));
   }
 
   private update(dt: number): void {
@@ -759,20 +1015,19 @@ export class BarScene {
       let dx = Math.sin(this.yaw) * horizontal;
       let dz = Math.cos(this.yaw) * horizontal;
       let dy = Math.sin(this.pitch) * this.distance;
-      // Shorten the whole boom at walls, preserving the orbit direction.
-      // Interior objects are below the sight line; no rigidbody runtime is required.
+      // Shorten the whole boom at walls, preserving the orbit direction. The front (+Z) is the open
+      // cutaway, so the camera may pass it. Interior objects are below the sight line; no rigidbody runtime is required.
       let ratio = 1;
       if (dx > 0) ratio = Math.min(ratio, (WORLD.maxX - 0.5 - this.cameraTarget.x) / dx);
       if (dx < 0) ratio = Math.min(ratio, (WORLD.minX + 0.5 - this.cameraTarget.x) / dx);
-      if (dz > 0) ratio = Math.min(ratio, (WORLD.maxZ - 0.5 - this.cameraTarget.z) / dz);
       if (dz < 0) ratio = Math.min(ratio, (WORLD.minZ + 0.5 - this.cameraTarget.z) / dz);
       ratio = clamp(ratio, 0.12, 1);
       dx *= ratio; dz *= ratio; dy *= ratio;
       this.camera.setPosition(this.cameraTarget.x + dx, this.cameraTarget.y + dy, this.cameraTarget.z + dz);
       this.camera.lookAt(this.cameraTarget);
     } else if (!player) {
-      this.camera.setPosition(13 + Math.sin(this.elapsed * 0.035) * 1.8, 11.8, 17.5);
-      this.camera.lookAt(-1.5, 1, -3.6);
+      this.camera.setPosition(9 + Math.sin(this.elapsed * 0.035) * 1.2, 8.2, 12.5);
+      this.camera.lookAt(-1, 0.9, -2.4);
     }
     const blackout = this.eventType === 'BLACKOUT';
     const party = this.eventType === 'PARTY';
@@ -787,6 +1042,12 @@ export class BarScene {
     }
     this.discoBall.rotate(0, dt * (party ? 70 : 8), 0);
     if (!blackout) this.fan.rotate(0, dt * 90, 0);
+    // The fan hangs at the height the camera boom passes through; hide it while it is near the line of
+    // sight from the camera to the player, rather than let its blades fill the view.
+    const eye = this.camera.getPosition(), hub = this.fan.getPosition(), target = this.cameraTarget;
+    const sx = target.x - eye.x, sy = target.y - eye.y, sz = target.z - eye.z;
+    const along = clamp(((hub.x - eye.x) * sx + (hub.y - eye.y) * sy + (hub.z - eye.z) * sz) / (sx * sx + sy * sy + sz * sz || 1), 0, 1);
+    this.fan.enabled = Math.hypot(eye.x + sx * along - hub.x, eye.y + sy * along - hub.y, eye.z + sz * along - hub.z) > 1;
   }
 
   private inputHasFocus(): boolean {
@@ -809,6 +1070,7 @@ export class BarScene {
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); this.onInteract?.(); }
       if (!event.repeat && event.code === 'KeyG') { this.callbacks.onEmote?.('dance'); this.onEmote?.(); }
       if (!event.repeat && event.code === 'KeyV') this.callbacks.onEmote?.('wave');
+      if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.onSkins?.(); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.onChat?.(); }
     });
     listen(window, 'keyup', event => this.keys.delete(event.code));
@@ -829,7 +1091,7 @@ export class BarScene {
     listen(this.canvas, 'wheel', event => {
       if (!this.enabled) return;
       event.preventDefault();
-      this.distance = clamp(this.distance + event.deltaY * 0.008, 3, 11);
+      this.distance = clamp(this.distance + event.deltaY * 0.008, 2.5, 9);
     }, { passive: false });
   }
 

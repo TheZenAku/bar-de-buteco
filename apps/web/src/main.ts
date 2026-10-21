@@ -1,5 +1,5 @@
 import './style.css';
-import {nearestInteraction,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
+import {nearestInteraction,DEFAULT_SKIN,SKINS,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
 import {BarScene} from './engine/BarScene';
 import {BarNetwork} from './networking';
 import {api,escape as e} from './api';
@@ -25,7 +25,7 @@ app.innerHTML=`
     <div id="connection" class="connection hidden" role="status"></div>
     <aside class="chat-panel"><div class="chat-heading"><span><i class="live-dot"></i> CONVERSA DE BALCÃO</span><small>por perto · 12 m</small><button data-action="chat-toggle" id="chat-toggle" aria-label="Recolher chat">−</button></div><div id="chat-body"><div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="Dê um oi… [Enter]" aria-label="Mensagem por proximidade"><button type="submit" aria-label="Enviar mensagem">↗</button></form></div></aside>
     <div id="context" class="context hidden"><kbd>E</kbd><div><small>POR AQUI</small><b id="context-label"></b></div></div>
-    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span><button data-action="dance">G <small>dançar</small></button></div>
+    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span><button data-action="dance">G <small>dançar</small></button><button data-action="skins">C <small>visual</small></button></div>
     <section id="blackjack" class="blackjack hidden" aria-label="Mesa de blackjack"></section>
     <div id="waiting" class="waiting hidden"><span class="spinner"></span><h2>Já estamos abrindo a porta.</h2><p id="waiting-message"></p><button data-action="leave" class="button secondary">Voltar à entrada</button></div>
   </main>
@@ -46,6 +46,9 @@ let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
 const chatHistory:ChatMessage[]=[];
+// The chosen skin is remembered per browser and sent when entering the bar.
+const SKIN_KEY='bar.skin';
+function savedSkin():string {try{const skin=localStorage.getItem(SKIN_KEY);if(SKINS.some(option=>option.id===skin))return skin!;}catch{/* Storage may be unavailable. */}return DEFAULT_SKIN;}
 
 function toast(message:string,error=false):void {
   const node=document.createElement('div');node.className=`toast ${error?'error':''}`;node.textContent=message;$('#toasts').append(node);setTimeout(()=>node.remove(),5500);
@@ -68,6 +71,7 @@ function closeModal():void {activeModal='';$('#modal').classList.add('hidden');s
 
 const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
+  skin:savedSkin,
   position:position=>scene?.setLocal(position),
   state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);renderWorld();},
   chat:message=>{chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();},
@@ -171,7 +175,18 @@ async function admin():Promise<void> {
     $('#modal-content').innerHTML=`<h3>Dar uma agitada</h3><div class="admin-events"><button class="mini-button" data-action="event" data-type="BLACKOUT">☾ Apagão</button><button class="mini-button" data-action="event" data-type="DRUNK_NPC">♙ O inconveniente</button><button class="mini-button" data-action="event" data-type="PARTY">♫ Festa</button></div><h3>Frequentadores</h3><div class="admin-users">${data.users.map(person=>`<div class="admin-person"><div><b>${e(person.displayName)}</b><small>${e(person.email)} ${person.role==='admin'?'· admin':''}</small></div>${person.id!==user?.id?`<button class="mini-button" data-action="moderate" data-type="kick" data-id="${e(person.id)}">Expulsar</button><button class="mini-button" data-action="moderate" data-type="${person.banned?'unban':'ban'}" data-id="${e(person.id)}">${person.banned?'Desbanir':'Banir'}</button>`:''}</div>`).join('')}</div><h3>Denúncias (${data.reports.length})</h3><div class="audit-list">${data.reports.slice(0,20).map(report=>`<p>${e(JSON.stringify(report))}</p>`).join('')||'<p>Nenhuma denúncia.</p>'}</div><h3>Registro de ações</h3><div class="audit-list">${data.logs.slice(0,20).map(log=>`<p>${e(JSON.stringify(log))}</p>`).join('')||'<p>Nenhuma ação registrada.</p>'}</div><button class="text-button" data-action="admin">Atualizar painel</button>`;
   }catch(error){$('#modal-content').textContent=errorMessage(error);}
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function skins():void {
+  scene?.preloadSkins();
+  const current=world?.players[user?.id||'']?.skin||savedSkin();
+  showModal('Escolha seu visual',`<p class="modal-description">A troca é na hora, e todo mundo no bar vê. Aperte C para abrir ou fechar.</p><div class="skin-grid">${SKINS.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':'Vestir'}</small></button>`).join('')}</div>`,'skins');
+}
+function wearSkin(id:string):void {
+  const skin=SKINS.find(option=>option.id===id);if(!skin)return;
+  network.send('player.skin',{skin:skin.id});
+  try{localStorage.setItem(SKIN_KEY,skin.id);}catch{/* Still worn for this visit. */}
+  closeModal();toast(`Visual trocado: ${skin.name}.`);
+}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -186,6 +201,8 @@ app.addEventListener('click',event=>{
       case 'people':people();break;
       case 'account':await account();break;
       case 'help':help();break;
+      case 'skins':skins();break;
+      case 'skin':wearSkin(button.dataset.skin!);break;
       case 'audio':{const on=audio.toggle();$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-label',on?'Silenciar música':'Ativar música');toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
       case 'dance':network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
@@ -225,6 +242,8 @@ app.addEventListener('submit',event=>{
 });
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
+  // Closing must not reach the scene's own C handler on window, which would reopen the selector.
+  if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
   if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();$('#chat-body').classList.remove('hidden');$('#chat-input').focus();}
 });
@@ -233,7 +252,7 @@ renderAuth();renderChat();
 
 async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
-  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)$('#chat-input').focus();};scene.setEnabled(false);}
+  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)$('#chat-input').focus();};scene.onSkins=()=>{if(inGame&&!activeModal)skins();};scene.setEnabled(false);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}

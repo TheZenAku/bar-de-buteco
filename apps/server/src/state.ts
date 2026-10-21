@@ -1,9 +1,11 @@
 import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
+import { DEFAULT_SKIN } from '@bar/shared';
 
 export class Player extends Schema {
   @type('string') id = '';
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
+  @type('string') skin: string = DEFAULT_SKIN;
   @type('float32') x = 0;
   @type('float32') z = 8;
   @type('float32') rotation = 0;
