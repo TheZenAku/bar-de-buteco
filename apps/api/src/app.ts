@@ -41,7 +41,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const cookieSettings = { path: '/', httpOnly: true, secure: config.production, sameSite: 'lax' as const };
   const allowedOrigins = new Set([config.webOrigin]);
   if (!config.production) { allowedOrigins.add('http://localhost:5173'); allowedOrigins.add('http://127.0.0.1:5173'); }
-  const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : false, logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false });
+  // In development the Vite proxy (loopback) forwards the browser address, so LAN clients are not treated as local.
+  const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : config.production ? false : 'loopback', logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false });
   app.decorateRequest('auth', null);
   await app.register(cookie);
   await app.register(cors, { origin: [...allowedOrigins], credentials: true, methods: ['GET', 'POST', 'DELETE', 'OPTIONS'] });
@@ -51,7 +52,9 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     reply.header('Cache-Control', 'no-store');
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method) || request.url.startsWith('/api/internal/')) return;
     const origin = request.headers.origin;
-    if ((origin && !allowedOrigins.has(origin)) || request.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origem da requisição não permitida.');
+    // Development also accepts the page's own address, such as the LAN IP served by Vite.
+    const sameHost = !config.production && origin === `http://${request.headers.host}`;
+    if ((origin && !allowedOrigins.has(origin) && !sameHost) || request.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origem da requisição não permitida.');
   });
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) return reply.code(400).send({ error: error.issues[0]?.message ?? 'Dados inválidos.' });
