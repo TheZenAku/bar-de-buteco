@@ -6,10 +6,8 @@ export class Player extends Schema {
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
   @type('string') skin: string = DEFAULT_SKIN;
-<<<<<<< HEAD
   @type('string') character = '';
-=======
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
+  @type('boolean') oldWalk = false;
   @type('float32') x = 0;
   @type('float32') y = 0;
   @type('float32') z = 8;
@@ -61,10 +59,21 @@ export class EventState extends Schema {
   @type('number') startedAt = 0;
   @type('number') durationMs = 0;
 }
+export class Jukebox extends Schema {
+  @type('string') id='';
+  @type('string') tvId='';
+  @type('string') videoId='';
+  @type('string') status='off';
+  @type('number') position=0;
+  @type('number') updatedAt=0;
+  @type('string') updatedBy='';
+  @type('number') revision=0;
+}
 export class BarState extends Schema {
   @view() @type({ map: Player }) players = new MapSchema<Player>();
   @view() @type({ map: Npc }) npcs = new MapSchema<Npc>();
   @type({ map: TableState }) tables = new MapSchema<TableState>();
+  @type({ map: Jukebox }) jukeboxes = new MapSchema<Jukebox>();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

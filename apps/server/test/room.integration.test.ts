@@ -5,11 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Client as BrowserClient, type Room as ClientRoom } from '@colyseus/sdk';
-<<<<<<< HEAD
-import { BLACKJACK_TABLE,DEFAULT_CHARACTER,SKINS } from '@bar/shared';
-=======
-import { BLACKJACK_TABLE } from '@bar/shared';
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
+import { BLACKJACK_TABLE,DEFAULT_CHARACTER,SKINS,OLD_CANE_SPEED,TICK_MS } from '@bar/shared';
 import { signTicket } from '@bar/shared/tickets';
 import { BarRoom } from '../src/BarRoom.js';
 
@@ -58,15 +54,9 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.onMessage('error', m => errors.push(m.message));
     first.onMessage('chat.message', () => {});
     await eventually(() => first.state?.players?.has('alice'));
-<<<<<<< HEAD
     const second = await browser.joinOrCreate('bar', { ticket: ticket('bob'), skin: 'rafael',character:{body:'forged'} }); rooms.push(second);
     const secondErrors: string[] = [];
     second.onMessage('error', m => secondErrors.push(m.message));
-=======
-    await assert.rejects(() => browser.joinOrCreate('bar', { ticket: ticket('alice') }), /ALREADY_CONNECTED/);
-    const second = await browser.joinOrCreate('bar', { ticket: ticket('bob'), skin: 'leandro' }); rooms.push(second);
-    second.onMessage('error', () => {});
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     const received: string[] = [];
     second.onMessage('chat.message', m => received.push(m.text));
     await eventually(() => second.state?.players?.size === 2 && first.state.players.size === 2);
@@ -88,22 +78,28 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.send('chat.send', { text: 'Olá do teste real' });
     await eventually(() => received.includes('Olá do teste real'));
     const bob = authoritative!.state.players.get('bob')!;
+    const savedAppearance={skin:bob.skin,character:bob.character};
+    second.send('chat.send',{text:'/velho'});
+    await eventually(()=>first.state.players.get('bob').oldWalk===true);
+    assert.equal(bob.skin,savedAppearance.skin);assert.equal(bob.character,savedAppearance.character);
+    const slowX=bob.x;second.send('player.input',{seq:0,dx:1,dz:0,running:true,rotation:0});
+    await eventually(()=>bob.lastProcessedInput===0);
+    assert.ok(Math.abs(bob.x-slowX-OLD_CANE_SPEED*TICK_MS/1000)<1e-5);
+    assert.equal(bob.animationState,'walk','Shift must not select running during the cane gait');
+    assert.ok(!received.includes('/velho'),'Slash commands are interpreted by the server, not broadcast as chat text');
+    second.send('chat.send',{text:'/velho'});await eventually(()=>first.state.players.get('bob').oldWalk===false);
     // Skins: chosen on arrival, switched live and seen by others; unknown ones are refused.
     assert.equal(player.skin, 'nathan');
     assert.equal(bob.skin, 'leandro');
-<<<<<<< HEAD
     assert.equal(bob.character,JSON.stringify(DEFAULT_CHARACTER),'Arrival options cannot forge a character or a paid skin');
     second.send('player.skin',{skin:'rafael'});
     await eventually(()=>secondErrors.length>0);
     assert.equal(bob.skin,'leandro','The server rejects skins absent from the account inventory');
-=======
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     first.send('player.skin', { skin: 'rafael' });
     await eventually(() => second.state.players.get('alice').skin === 'rafael');
     first.send('player.skin', { skin: 'naoexiste' });
     await eventually(() => errors.length === 2);
     assert.equal(player.skin, 'rafael');
-<<<<<<< HEAD
     second.send('player.emote', { emote: 'kick' });
     await eventually(() => secondErrors.includes('O golpe de karatê é exclusivo do Rafael.'));
     assert.notEqual(bob.animationState, 'kick');
@@ -133,12 +129,6 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     await eventually(() => !second.state.players.has('alice') && !first.state.players.has('bob'));
     // Touching the front of the blackjack table.
     player.x = BLACKJACK_TABLE.x - 0.6; player.y=BLACKJACK_TABLE.y;player.z = BLACKJACK_TABLE.z + 0.85; bob.x = BLACKJACK_TABLE.x + 0.6;bob.y=BLACKJACK_TABLE.y;bob.z = BLACKJACK_TABLE.z + 0.85;
-=======
-    player.x = -12; player.z = 8; bob.x = 12; bob.z = 8;
-    await eventually(() => !second.state.players.has('alice') && !first.state.players.has('bob'));
-    // In front of the blackjack table, within reach.
-    player.x = BLACKJACK_TABLE.x - 0.6; player.z = BLACKJACK_TABLE.z + 1.6; bob.x = BLACKJACK_TABLE.x + 0.6; bob.z = BLACKJACK_TABLE.z + 1.6;
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     await eventually(() => second.state.players.has('alice'));
     first.send('blackjack.join', { tableId: 'blackjack-1' });
     await eventually(() => first.state.tables.get('blackjack-1').seats.length === 1);

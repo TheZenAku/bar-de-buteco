@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {DEFAULT_CHARACTER,readCharacter,type CharacterConfig} from '@bar/shared';
+import {DEFAULT_CHARACTER,readCharacter,MALE_CLOTHING,CLOTHING_COLOR_FIELDS,type CharacterConfig} from '@bar/shared';
 
 export function characterFromJson(value?:string):CharacterConfig{try{return readCharacter(value?JSON.parse(value):DEFAULT_CHARACTER);}catch{return {...DEFAULT_CHARACTER};}}
 const materials=new WeakMap<pc.Entity,{key:string;clones:pc.StandardMaterial[]}>();
@@ -38,10 +38,13 @@ export function applyCharacter(entity:pc.Entity,config:CharacterConfig):void{
     }
     clones=[...cache.values()];
   }
-  for(const material of clones){material.diffuse.fromString(material.name==='CharacterSkin'?config.skinTone:material.name==='CharacterEyes'?config.eyeColor:config.hairColor);if(material.name==='CharacterSkin'){const color=new pc.Color().fromString(config.outfitColor).linear();material.setParameter('barClothingColor',new Float32Array([color.r,color.g,color.b]));}material.update();}
+  const clothingColors:Record<string,string>=Object.fromEntries(MALE_CLOTHING.map(item=>[`CharacterClothing-${item.id}`,config[CLOTHING_COLOR_FIELDS[item.slot]]]));
+  for(const material of clones){if(!material.name.startsWith('CharacterLens-'))material.diffuse.fromString(clothingColors[material.name]??(material.name==='CharacterSkin'?config.skinTone:material.name==='CharacterEyes'?config.eyeColor:config.hairColor));if(material.name==='CharacterSkin'){const color=new pc.Color().fromString(config.outfitColor).linear();material.setParameter('barClothingColor',new Float32Array([color.r,color.g,color.b]));}material.update();}
   const parts:Record<string,boolean>={beard:config.beard,'brows-regular':config.eyebrows==='regular','brows-female':config.eyebrows==='female'};
   for(const hair of ['buzzed','buzzed-female','simple-parted','long','buns'])parts[hair]=hair===config.hair;
+  for(const item of MALE_CLOTHING)parts[item.id]=config.body==='male'&&config[item.slot]===item.id;
   for(const [name,enabled] of Object.entries(parts)){const part=entity.findByName(`part-${name}`) as pc.Entity|null;if(part)part.enabled=enabled;}
+  for(const render of entity.findComponents('render') as pc.RenderComponent[]){const name=render.entity.name;if(name.startsWith('body-coverage-'))render.entity.enabled=!name.slice('body-coverage-'.length).split('+').some(id=>parts[id]);}
   materials.set(entity,{key,clones});
 }
 export function disposeCharacter(entity?:pc.Entity):void{if(!entity)return;for(const material of materials.get(entity)?.clones??[])material.destroy();materials.delete(entity);}

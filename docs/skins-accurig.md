@@ -20,7 +20,7 @@ A geometria mantém os atributos de skin e os vértices coincidentes com atribut
 
 `Material_001_Diffuse.jpg` e `Material_001_Normal.jpg`, referenciadas pelo novo material, são incorporadas no GLB. Os UVs são convertidos para a convenção de imagens glTF. O modelo final é `apps/web/public/models/leandro.glb` (aproximadamente 8,33 MiB), maior que a versão anterior por preservar a nova geometria e suas texturas.
 
-Idle, Walk e Pose são adaptados do Nathan usando as rotações globais das poses de bind. As ações recebem retarget separado em `apps/web/public/animations/leandro.glb`, calibrado pela Pose do novo modelo. O renderizador carrega esse banco para Leandro; não aplica mais diretamente o banco do Nathan. O quadril mantém a altura proporcional ao novo corpo e as poses sentadas usam o alinhamento existente às cadeiras. O chute continua exclusivo do Rafael.
+Idle, Walk, Pose e as ações usam a mesma [calibração pelas direções dos membros](native-rigs.md), com tratamento dos ossos auxiliares e respeito às poses de origem diferentes. As ações ficam em `apps/web/public/animations/leandro.glb`; o renderizador carrega esse banco para Leandro. O quadril mantém a altura proporcional ao novo corpo e as poses sentadas usam o alinhamento existente às cadeiras. O chute continua exclusivo do Rafael.
 
 A importação foi verificada no PlayCanvas com Idle, Walk, dança, bebida e pose de blackjack. O teste de integração verifica juntas, nomes de origem, pesos normalizados, materiais incorporados e validade das rotações de todos os bancos. O teste de navegador verifica o novo Leandro em dois clientes, incluindo escala, caminhada, dança e retorno a Idle.
 

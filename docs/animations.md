@@ -15,7 +15,7 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | `Bartending.fbx` | Seu Zé (skin Magrão) trabalhando atrás do balcão; exclusivo dele. |
 | `karate-kick.fbx` | Tecla X, exclusiva do Rafael; uma execução de dois segundos, sem dano ou deslocamento. |
 
-Os FBXs de ações usam o esqueleto do Nathan. Leandro, Read e Magrão mantêm os rigs AccuRig de suas pastas em `assets-bar`, com pesos e matrizes de bind originais e animações retargeted próprias. Para essas skins e para o Rafael, o conversor adapta rotações globais usando os clipes `Pose` presentes nos modelos como calibração, mapeia os nomes dos ossos e ajusta a altura do quadril. Cada skin carrega seu próprio banco `animations/<skin>.glb`. Os clipes sentados são alinhados à altura das cadeiras; o movimento da raiz não altera a posição autoritativa.
+Os FBXs de ações usam o esqueleto do Nathan. Cada skin mantém seu próprio rig, pesos e matrizes de bind. O conversor calibra virtualmente as diferentes poses de origem pelas direções reais dos membros, adapta as rotações globais e trata os auxiliares de torção, cotovelo e joelho. A mesma calibração atende os clipes básicos, as ações e `/velho`; veja [esqueletos nativos](native-rigs.md). Cada skin carrega seu próprio banco `animations/<skin>.glb`. Os clipes sentados são alinhados à altura das cadeiras; o movimento da raiz não altera a posição autoritativa.
 
 `npm run assets:skins` reimporta os FBXs AccuRig, incorpora as texturas e adapta Idle, Walk e Pose a cada esqueleto; em seguida regenera os bancos de ações. Veja [skins AccuRig](skins-accurig.md).
 

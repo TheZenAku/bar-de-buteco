@@ -1,3 +1,6 @@
 @echo off
-rem Acompanha o log do servidor em tempo real (Ctrl+C para sair).
+setlocal
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0bar.ps1" logs
+set "BAR_EXIT_CODE=%ERRORLEVEL%"
+if not "%BAR_EXIT_CODE%"=="0" if /I not "%~1"=="--sem-pausa" pause
+exit /b %BAR_EXIT_CODE%

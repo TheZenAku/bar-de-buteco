@@ -20,11 +20,11 @@ $PidFile = Join-Path $Estado 'bar.pid'
 $LogFile = Join-Path $Estado 'bar.log'
 $GrupoFirewall = 'B.A.R. - Bar de Buteco'
 # O navegador acessa o site e o mundo; a API fica em loopback, atrás do proxy do site.
-# O mundo é verificado só pela porta: o /health dele também passa pelo roteador do Colyseus e derruba o processo.
+# O /health do mundo agora usa o roteador do Colyseus e pode ser consultado normalmente.
 $Servicos = @(
-  @{ Nome = 'API';   Porta = 3001; Saude = 'http://127.0.0.1:3001/api/health'; Externa = $false },
-  @{ Nome = 'Mundo'; Porta = 2567; Saude = $null;                              Externa = $true },
-  @{ Nome = 'Site';  Porta = 5173; Saude = 'http://127.0.0.1:5173/';           Externa = $true }
+  @{ Nome = 'API';   Porta = 3001; Saude = 'http://127.0.0.1:3001/api/health'; Identidade = 'bar-api'; Extras = @(); Externa = $false },
+  @{ Nome = 'Mundo'; Porta = 2567; Saude = 'http://localhost:2567/health'; Identidade = 'game'; Extras = @(); Externa = $true },
+  @{ Nome = 'Site';  Porta = 5173; Saude = 'http://127.0.0.1:5173/'; Identidade = ''; Extras = @('http://127.0.0.1:5173/src/main.ts', 'http://127.0.0.1:5173/src/boteco.css'); Externa = $true }
 )
 
 function Escrever([string]$Texto = '', [ConsoleColor]$Cor = 'Gray') {
@@ -55,16 +55,39 @@ function Test-PortasOcupadas {
 
 function Test-Saude($Servico) {
   try {
-    if (-not $Servico.Saude) {
-      $conexao = New-Object Net.Sockets.TcpClient
-      try { return $conexao.ConnectAsync('127.0.0.1', $Servico.Porta).Wait(3000) } finally { $conexao.Close() }
+    foreach ($url in (@($Servico.Saude) + @($Servico.Extras))) {
+      $resposta = $null
+      try {
+        $requisicao = [Net.WebRequest]::Create($url)
+        $requisicao.Proxy = $null
+        $requisicao.Timeout = 3000
+        $resposta = $requisicao.GetResponse()
+        if ($url -eq $Servico.Saude -and $Servico.Identidade) {
+          $leitor = New-Object IO.StreamReader($resposta.GetResponseStream())
+          try { $dados = $leitor.ReadToEnd() | ConvertFrom-Json } finally { $leitor.Dispose() }
+          if ($dados.ok -ne $true -or $dados.service -ne $Servico.Identidade) { return $false }
+        }
+      } finally { if ($resposta) { $resposta.Close() } }
     }
-    $requisicao = [Net.WebRequest]::Create($Servico.Saude)
-    $requisicao.Proxy = $null
-    $requisicao.Timeout = 3000
-    $requisicao.GetResponse().Close()
     return $true
   } catch { return $false }
+}
+
+function Test-PreRequisitos {
+  if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { throw 'Node.js não encontrado. Instale o Node.js 24 e tente novamente.' }
+  if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) { throw 'npm.cmd não encontrado. Reinstale o Node.js 24 e abra novamente o iniciador.' }
+  $versao = (& node.exe --version).Trim()
+  if ($LASTEXITCODE -ne 0 -or [int]($versao.TrimStart('v').Split('.')[0]) -lt 22) { throw "Node.js incompatível ($versao). Instale o Node.js 24." }
+  # Conflitos podem ter sido salvos em um commit e, nesse caso, git status aparece limpo.
+  $fontes = @('apps\api\src', 'apps\server\src', 'apps\web\src', 'packages\shared\src') |
+    ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $Raiz $_) -Recurse -File } |
+    Where-Object { $_.Extension -in '.ts', '.tsx', '.js', '.mjs', '.css', '.json' }
+  $conflitos = @($fontes | Select-String -Pattern '^(<<<<<<<(?: |$)|=======$|>>>>>>>(?: |$))' -List -Encoding UTF8)
+  if ($conflitos.Count) {
+    Escrever 'Há conflitos de merge nos arquivos abaixo:' Red
+    foreach ($conflito in $conflitos) { Escrever ('  {0}:{1}' -f $conflito.Path, $conflito.LineNumber) Yellow }
+    throw 'Resolva os marcadores de merge antes de iniciar. O servidor não foi aberto.'
+  }
 }
 
 function Get-InfoProcesso([int]$Id) {
@@ -80,14 +103,23 @@ function Get-TopoDoProjeto($Info) {
   $atual = $Info
   for ($i = 0; $i -lt 16; $i++) {
     $pai = Get-InfoProcesso ([int]$atual.ParentProcessId)
-    if (-not $pai -or -not (Test-DoProjeto $pai) -or $pai.CreationDate -gt $atual.CreationDate) { break }
+    if (-not $pai -or $pai.Name -notin 'cmd.exe', 'node.exe' -or -not (Test-DoProjeto $pai) -or $pai.CreationDate -gt $atual.CreationDate) { break }
     $atual = $pai
   }
   return [int]$atual.ProcessId
 }
 
 function Encerrar-Arvore([int]$Id) {
-  & $env:ComSpec /d /c "taskkill /PID $Id /T /F >nul 2>&1"
+  if (Get-Process -Id $Id -ErrorAction SilentlyContinue) {
+    # Ctrl+C can finish the parent between the existence check and taskkill.
+    $preferenciaAnterior = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Continue'
+      & "$env:SystemRoot\System32\taskkill.exe" /PID $Id /T /F > $null 2>&1
+      $codigo = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $preferenciaAnterior }
+    if ($codigo -ne 0 -and (Get-Process -Id $Id -ErrorAction SilentlyContinue)) { throw "Não foi possível encerrar o processo $Id do B.A.R.." }
+  }
 }
 
 # Envia Ctrl+C ao console oculto do servidor, como ao fechar o npm run dev num terminal.
@@ -146,13 +178,20 @@ function Mostrar-Status {
 }
 
 function Iniciar {
-  if ((Get-ProcessoPrincipal) -or (Test-PortasOcupadas)) {
-    Escrever 'O B.A.R. já está em execução (ou alguma das portas está ocupada).' Yellow
+  Test-PreRequisitos
+  $principal = Get-ProcessoPrincipal
+  if ($principal -or (Test-PortasOcupadas)) {
+    $prontos = @($Servicos | Where-Object { Test-Saude $_ }).Count
+    if ($prontos -eq $Servicos.Count) {
+      Escrever 'O B.A.R. já está em execução.' Green
+      Mostrar-Status
+      return
+    }
+    Escrever 'A execução está incompleta ou alguma porta está ocupada.' Yellow
     Mostrar-Status
-    return
+    throw 'Use reiniciar.bat para recuperar os serviços do projeto. Portas de outros programas precisam ser liberadas por eles.'
   }
-  if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { throw 'Node.js não encontrado. Instale o Node.js 24 (https://nodejs.org) e tente novamente.' }
-  if (-not (Test-Path (Join-Path $Raiz 'node_modules'))) {
+  if (-not (Test-Path (Join-Path $Raiz 'node_modules\.bin\tsx.cmd')) -or -not (Test-Path (Join-Path $Raiz 'node_modules\.bin\concurrently.cmd'))) {
     Escrever 'Instalando as dependências (npm install); isso só acontece na primeira vez...' Cyan
     Push-Location $Raiz
     try { & npm.cmd install } finally { Pop-Location }
@@ -262,5 +301,6 @@ try {
   exit 0
 } catch {
   Escrever "ERRO: $($_.Exception.Message)" Red
+  if ($Comando -in 'iniciar', 'reiniciar' -and (Test-Path -LiteralPath $LogFile)) { Escrever 'Acompanhe os detalhes com logs.bat. O log anterior fica em .local\tools\bar.anterior.log.' DarkGray }
   exit 1
 }

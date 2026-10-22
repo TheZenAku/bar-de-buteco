@@ -14,12 +14,13 @@
     "dev": "concurrently -k -n API,MUNDO,WEB -c cyan,yellow,green \"npm run dev -w @bar/api\" \"npm run dev -w @bar/server\" \"npm run dev -w @bar/web\"",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.json",
     "build": "npm run typecheck && npm run build -w @bar/web",
-    "test": "npm run test -w @bar/api && npm run test -w @bar/server && tsx --test tests/integration/*.test.ts",
+    "test": "npm run test -w @bar/api && npm run test -w @bar/server && tsx --test tests/integration/*.test.ts && node --test tests/tools/*.test.mjs",
     "test:e2e": "playwright test",
     "test:load": "tsx --tsconfig tsconfig.base.json tests/load/room.ts",
     "assets:animations": "node tools/convert-animations.mjs",
-    "assets:skins": "node tools/import-skins.mjs && node tools/convert-animations.mjs",
-    "assets:characters": "node tools/import-characters.mjs && node tools/convert-animations.mjs base-male base-female",
+    "assets:retarget": "node tools/retarget-skins.mjs && node tools/convert-animations.mjs",
+    "assets:skins": "node tools/import-skins.mjs && node tools/retarget-skins.mjs rafael && node tools/convert-animations.mjs",
+    "assets:characters": "node tools/roupas/importar.mjs",
     "assets:map": "node tools/import-map.mjs"
   },
   "devDependencies": {

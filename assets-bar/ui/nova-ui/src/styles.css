@@ -1,0 +1,272 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --font-display: "Lilita One", system-ui, sans-serif;
+  --font-sans: "Nunito", system-ui, sans-serif;
+  --color-neon-teal: var(--neon-teal);
+  --color-neon-green: var(--neon-green);
+  --shadow-panel: var(--shadow-panel);
+  --shadow-glow-amber: var(--glow-amber);
+  --shadow-glow-pink: var(--glow-pink);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 1rem;
+  --background: oklch(0.18 0.03 40);
+  --foreground: oklch(0.96 0.03 80);
+  --card: oklch(0.24 0.045 40 / 0.88);
+  --card-foreground: oklch(0.96 0.03 80);
+  --popover: oklch(0.24 0.045 40);
+  --popover-foreground: oklch(0.96 0.03 80);
+  --primary: oklch(0.8 0.16 75);
+  --primary-foreground: oklch(0.2 0.04 40);
+  --secondary: oklch(0.32 0.05 40);
+  --secondary-foreground: oklch(0.96 0.03 80);
+  --muted: oklch(0.3 0.04 40);
+  --muted-foreground: oklch(0.78 0.04 70);
+  --accent: oklch(0.7 0.22 350);
+  --accent-foreground: oklch(0.98 0.01 80);
+  --neon-teal: oklch(0.82 0.13 190);
+  --neon-green: oklch(0.8 0.18 145);
+  --neon-red: oklch(0.78 0.15 22);
+
+  --destructive: oklch(0.65 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.45 0.07 50);
+  --input: oklch(0.35 0.05 40);
+  --ring: oklch(0.8 0.16 75);
+  --chart-1: oklch(0.8 0.16 75);
+  --chart-2: oklch(0.7 0.22 350);
+  --chart-3: oklch(0.82 0.13 190);
+  --chart-4: oklch(0.8 0.18 145);
+  --chart-5: oklch(0.65 0.22 27);
+  --sidebar: oklch(0.24 0.045 40);
+  --sidebar-foreground: oklch(0.96 0.03 80);
+  --sidebar-primary: oklch(0.8 0.16 75);
+  --sidebar-primary-foreground: oklch(0.2 0.04 40);
+  --sidebar-accent: oklch(0.32 0.05 40);
+  --sidebar-accent-foreground: oklch(0.96 0.03 80);
+  --sidebar-border: oklch(0.45 0.07 50);
+  --sidebar-ring: oklch(0.8 0.16 75);
+  --shadow-panel: 0 10px 0 -2px oklch(0.12 0.03 40 / 0.7), 0 20px 40px -10px oklch(0 0 0 / 0.6);
+  --glow-amber: 0 0 18px oklch(0.8 0.16 75 / 0.55);
+  --glow-pink: 0 0 18px oklch(0.7 0.22 350 / 0.6);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
+
+@layer base {
+  body { font-family: var(--font-sans); overflow: hidden; }
+}
+
+@utility hud-panel {
+  background: var(--card);
+  backdrop-filter: blur(10px);
+  border: 3px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility neon-text {
+  color: var(--primary);
+  text-shadow: 0 0 10px oklch(0.8 0.16 75 / 0.7);
+}
+
+@utility hud-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--secondary); color: var(--secondary-foreground);
+  border: 2px solid var(--border);
+  box-shadow: 0 4px 0 oklch(0.12 0.03 40);
+  transition: transform .12s, box-shadow .12s, background .15s;
+  &:hover { background: var(--muted); transform: translateY(-1px); }
+  &:active { transform: translateY(3px); box-shadow: 0 1px 0 oklch(0.12 0.03 40); }
+}
+
+@keyframes wobble { 0%,100% { transform: rotate(-2deg) } 50% { transform: rotate(2deg) } }
+@utility animate-wobble { animation: wobble 2.4s ease-in-out infinite; }
+
+/* ============ Comanda (toast) ============
+   A notice looks like a bar ticket: perforated stub, colored spine down the
+   left, display-font title and a timer bar that drains while you read it.
+   The color comes from --comanda, set per variant (or per chat sender). */
+@layer base {
+  [data-sonner-toaster] { --width: min(92vw, 380px); --gap: 10px; --y-offset: 74px; --toaster-z-index: 1000; }
+  [data-sonner-toaster] .comanda-wrap {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+  }
+}
+
+.comanda {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  padding: 1.15rem .7rem .95rem 1.15rem;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--card) 94%, transparent);
+  backdrop-filter: blur(12px);
+  border: 3px solid color-mix(in oklab, var(--comanda) 55%, var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel), 0 0 22px color-mix(in oklab, var(--comanda) 32%, transparent);
+  animation: comanda-in .42s cubic-bezier(.2, 1.5, .45, 1) both;
+}
+.comanda::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: .52rem;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--comanda) 80%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+  opacity: .85;
+}
+
+.comanda__stub {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: .45rem;
+  background: var(--comanda);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--comanda) 60%, transparent);
+}
+.comanda__badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--comanda) 16%, var(--secondary));
+  border: 2px solid color-mix(in oklab, var(--comanda) 55%, transparent);
+  color: var(--comanda);
+}
+.comanda__initials { font-family: var(--font-display); font-size: 1.2rem; line-height: 1; }
+.comanda__body { flex: 1; min-width: 0; }
+.comanda__eyebrow {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--comanda) 70%, var(--foreground));
+}
+.comanda__title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1.15;
+  color: var(--comanda);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--comanda) 45%, transparent);
+}
+.comanda__text {
+  margin-top: .18rem;
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--card-foreground);
+}
+.comanda__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  transition: background .15s, color .15s;
+}
+.comanda__close:hover { background: var(--muted); color: var(--foreground); }
+.comanda__timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--comanda);
+  transform-origin: left center;
+  animation: comanda-run linear both;
+  animation-duration: var(--comanda-run, 4200ms);
+}
+.comanda-wrap:hover .comanda__timer { animation-play-state: paused; }
+
+@keyframes comanda-in {
+  from { opacity: 0; transform: translateY(-18px) rotate(-1.5deg) scale(.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes comanda-run {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+

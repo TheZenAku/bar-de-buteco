@@ -1,18 +1,22 @@
 import * as pc from 'playcanvas';
-import type {CharacterConfig} from '@bar/shared';
+import {MALE_CLOTHING,CLOTHING_COLOR_FIELDS,type CharacterConfig} from '@bar/shared';
 import {applyCharacter,disposeCharacter} from './character-materials';
+
+export type ClothingPreviews=Record<string,string>;
 
 export class CharacterPreview {
   private app:pc.Application;
   private camera:pc.Entity;
   private model?:pc.Entity;
+  private clothingModel?:pc.Entity;
+  private clothingImages=new Map<string,{color:string;url:string}>();
   private containers=new Map<string,Promise<pc.ContainerResource>>();
   private observer:ResizeObserver;
   private generation=0;
   private destroyed=false;
   private yaw=0;
   private dragging=false;
-  constructor(private canvas:HTMLCanvasElement){
+  constructor(private canvas:HTMLCanvasElement,private onClothingPreviews?:(images:ClothingPreviews)=>void){
     this.app=new pc.Application(canvas,{graphicsDeviceOptions:{alpha:false,antialias:true,preserveDrawingBuffer:true}});
     this.app.graphicsDevice.maxPixelRatio=Math.min(devicePixelRatio,1.5);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
@@ -20,7 +24,7 @@ export class CharacterPreview {
     // CSS owns the display size; resize only the drawing buffer when the layout changes.
     canvas.style.width='';canvas.style.height='';
     this.app.scene.ambientLight=new pc.Color(.65,.68,.7);
-    this.camera=new pc.Entity('Character portrait');this.camera.addComponent('camera',{clearColor:new pc.Color(.025,.115,.105),fov:33,nearClip:.1,farClip:20});
+    this.camera=new pc.Entity('Character portrait');this.camera.addComponent('camera',{clearColor:new pc.Color(.12,.065,.04),fov:33,nearClip:.1,farClip:20});
     this.camera.setPosition(0,1.05,3.8);this.camera.lookAt(0,.95,0);this.app.root.addChild(this.camera);
     const light=new pc.Entity('Portrait key');light.addComponent('light',{type:'directional',color:new pc.Color(1,.92,.8),intensity:1.6});light.setEulerAngles(35,-30,0);this.app.root.addChild(light);
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas);this.resize();
@@ -45,6 +49,56 @@ export class CharacterPreview {
       this.model.setLocalEulerAngles(0,this.yaw,0);this.app.root.addChild(this.model);
     }
     applyCharacter(this.model,config);
+    if(config.body==='male'&&this.onClothingPreviews)this.captureClothing(container,config);
   }
-  destroy(){if(this.destroyed)return;this.destroyed=true;this.generation++;this.observer.disconnect();this.canvas.removeEventListener('pointerdown',this.pointerDown);this.canvas.removeEventListener('pointermove',this.pointerMove);this.canvas.removeEventListener('pointerup',this.pointerUp);this.canvas.removeEventListener('pointercancel',this.pointerUp);disposeCharacter(this.model);this.app.destroy();}
+  private captureClothing(container:pc.ContainerResource,config:CharacterConfig){
+    const pieces=MALE_CLOTHING.map(item=>[item.id,config[CLOTHING_COLOR_FIELDS[item.slot]]] as const);
+    if(pieces.some(([id,color])=>this.clothingImages.get(id)?.color!==color)){
+      if(!this.clothingModel){
+        this.clothingModel=container.instantiateRenderEntity({castShadows:false,receiveShadows:false});
+        this.clothingModel.name='Clothing thumbnails';this.clothingModel.setLocalEulerAngles(0,30,0);
+        this.clothingModel.enabled=false;this.app.root.addChild(this.clothingModel);
+      }
+      const model=this.clothingModel,camera=this.camera.camera!,position=this.camera.getPosition().clone(),rotation=this.camera.getRotation().clone();
+      const projection=camera.projection,orthoHeight=camera.orthoHeight,visible=this.model!.enabled;
+      // Render the actual installed meshes in the existing preview context. Capture
+      // synchronously and restore the portrait before the browser paints the canvas.
+      try{
+        this.model!.enabled=false;model.enabled=true;applyCharacter(model,config);
+        this.app.setCanvasResolution(pc.RESOLUTION_FIXED,256,256);camera.projection=pc.PROJECTION_ORTHOGRAPHIC;
+        const renders=model.findComponents('render') as pc.RenderComponent[];
+        for(const [id,color] of pieces){
+          if(this.clothingImages.get(id)?.color===color)continue;
+          for(const render of renders)render.entity.enabled=false;
+          const part=model.findByName(`part-${id}`) as pc.Entity|null;
+          if(!part?.render?.meshInstances.length)throw new Error('Não foi possível carregar as prévias das roupas.');
+          part.enabled=true;
+          const bounds=new pc.BoundingBox();let first=true;
+          for(const instance of part.render.meshInstances){
+            if(!instance.mesh)continue;
+            const box=new pc.BoundingBox();box.setFromTransformedAabb(instance.mesh.aabb,instance.node.getWorldTransform());
+            if(first){bounds.copy(box);first=false;}else bounds.add(box);
+          }
+          if(first)throw new Error('Não foi possível enquadrar a prévia da roupa.');
+          camera.orthoHeight=Math.max(bounds.halfExtents.x,bounds.halfExtents.y)*1.2;
+          this.camera.setPosition(bounds.center.x,bounds.center.y,bounds.center.z+3);this.camera.lookAt(bounds.center);
+          this.app.render();this.clothingImages.set(id,{color,url:this.canvas.toDataURL('image/webp',.9)});
+        }
+      }finally{
+        model.enabled=false;this.model!.enabled=visible;camera.projection=projection;camera.orthoHeight=orthoHeight;
+        this.camera.setPosition(position);this.camera.setRotation(rotation);
+        this.app.setCanvasResolution(pc.RESOLUTION_AUTO,this.canvas.clientWidth,this.canvas.clientHeight);this.app.render();
+      }
+    }
+    this.onClothingPreviews?.(Object.fromEntries(pieces.map(([id])=>[id,this.clothingImages.get(id)!.url])) as ClothingPreviews);
+  }
+  destroy(){
+    if(this.destroyed)return;this.destroyed=true;this.generation++;this.observer.disconnect();
+    this.canvas.removeEventListener('pointerdown',this.pointerDown);this.canvas.removeEventListener('pointermove',this.pointerMove);this.canvas.removeEventListener('pointerup',this.pointerUp);this.canvas.removeEventListener('pointercancel',this.pointerUp);
+    disposeCharacter(this.model);disposeCharacter(this.clothingModel);
+    this.app.autoRender=false;this.app.renderNextFrame=false;
+    // A GLB may still be loading external textures. Its parser needs the asset
+    // registry until the container callback finishes, even after the dialog closes.
+    void Promise.allSettled([...this.containers.values()]).then(()=>{this.app.destroy();this.containers.clear();});
+  }
 }

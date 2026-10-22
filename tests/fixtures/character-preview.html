@@ -1,0 +1,10 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head><body><script type="module">
+import {CharacterPreview} from '../../apps/web/src/engine/CharacterPreview.ts';
+import {DEFAULT_CHARACTER} from '../../packages/shared/src/character.ts';
+window.fixture={async closeDuringLoad(){
+  const canvas=document.createElement('canvas');canvas.style.cssText='width:320px;height:390px';document.body.append(canvas);
+  const preview=new CharacterPreview(canvas);
+  const requests=[preview.update({...DEFAULT_CHARACTER,body:'male'}),preview.update({...DEFAULT_CHARACTER,body:'female'})];
+  preview.destroy();preview.destroy();canvas.remove();await Promise.all(requests);
+}};
+</script></body></html>

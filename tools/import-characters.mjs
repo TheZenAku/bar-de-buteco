@@ -3,8 +3,11 @@ import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} fro
 import {Matrix4,Quaternion,Vector3} from 'three';
 import {chromium} from '@playwright/test';
 import {objects,readGlb,retargetBase,topological,writeGlb} from './lib/character-gltf.mjs';
+import {importMaleClothing} from './lib/character-clothing.mjs';
+import {discoverClothing} from './roupas/catalogo.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),source=path.join(root,'assets-bar/Universal Base Characters[Standard]');
-const output=path.join(root,'apps/web/public/characters');fs.mkdirSync(output,{recursive:true});
+const catalog=discoverClothing(root);
+const output=process.env.BAR_CHARACTER_OUTPUT??path.join(root,'apps/web/public/characters');fs.mkdirSync(output,{recursive:true});
 const textures=path.join(output,'textures');fs.mkdirSync(textures,{recursive:true});
 const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined)});
 const page=await browser.newPage();
@@ -62,9 +65,10 @@ for(const body of ['male','female']){
     const node=json.nodes.push({name:`part-${id}`,mesh,translation:p.toArray(),rotation:q.toArray(),scale:s.toArray()})-1;
     (json.nodes[headIndex].children??=[]).push(node);
   }
+  const geometry=body==='male'?importMaleClothing(json,Buffer.concat(chunks),source,catalog):Buffer.concat(chunks);
   // The source body geometry is already in metres/Y-up. Keep a unit instance root for PlayCanvas.
   const wrapper=json.nodes.push({name:`Custom_${body}`,children:json.scenes[0].nodes})-1;json.scenes[0].nodes=[wrapper];
   topological(json);json.asset={version:'2.0',generator:'B.A.R. Quaternius Standard importer',extras:{body,source:'Universal Base Characters[Standard]',license:'CC0'}};
-  const result=retargetBase({json,bin:Buffer.concat(chunks)},readGlb(path.join(root,'apps/web/public/models/nathan.glb')));
-  const destination=path.join(output,`base-${body}.glb`);writeGlb(destination,result.json,result.bin);console.log(`${body}: ${json.skins[0].joints.length} joints, ${parts.length} modular parts, ${(fs.statSync(destination).size/1048576).toFixed(2)} MiB`);
+  const result=retargetBase({json,bin:geometry},readGlb(path.join(root,'apps/web/public/models/nathan.glb')));
+  const destination=path.join(output,`base-${body}.glb`);writeGlb(destination,result.json,result.bin);console.log(`${body}: ${json.skins[0].joints.length} joints, ${parts.length+(body==='male'?catalog.length:0)} modular parts, ${(fs.statSync(destination).size/1048576).toFixed(2)} MiB`);
 }

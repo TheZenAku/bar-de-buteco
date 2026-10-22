@@ -4,10 +4,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AnimationMixer, Object3D, Quaternion, Texture, TextureLoader, Vector3 } from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import {appendOldCane} from './lib/old-cane.mjs';
+import {createRetarget} from './lib/animation-retarget.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const models = path.join(root, 'apps/web/public/models');
-const output = path.join(root, 'apps/web/public/animations');
+const output = process.env.BAR_ANIMATION_OUTPUT??path.join(root, 'apps/web/public/animations');
 const prefix = 'rp_nathan_animated_003_walking_';
 const clips = {
   Drink: 'bebendo', Fallen: 'bebado-caido', Deal: 'carta-distribui',
@@ -25,42 +27,30 @@ const trims = { Sit: { from: 4.5, to: 7.2, blend: 0.6, faceForward: true } };
 TextureLoader.prototype.load = () => new Texture();
 
 function readModel(id) {
-  const file = fs.readFileSync(path.join(id.startsWith('base-')?path.join(root,'apps/web/public/characters'):models, `${id}.glb`));
+  const file = fs.readFileSync(path.join(id.startsWith('base-')?(process.env.BAR_CHARACTER_OUTPUT??path.join(root,'apps/web/public/characters')):models, `${id}.glb`));
   const length = file.readUInt32LE(12);
   const json = JSON.parse(file.subarray(20, 20 + length));
-  const bin = file.subarray(28 + length);
   const nodes = json.nodes.map(n => {
     const object = new Object3D(); object.name = n.name;
     object.position.fromArray(n.translation ?? [0, 0, 0]);
     object.quaternion.fromArray(n.rotation ?? [0, 0, 0, 1]);
     object.scale.fromArray(n.scale ?? [1, 1, 1]);
+    object.userData.retargetMesh=n.mesh!==undefined;
     return object;
   });
   json.nodes.forEach((n, i) => n.children?.forEach(c => nodes[i].add(nodes[c])));
-  // Existing Pose clips already calibrate Rafael's different bone axes to Nathan.
-  for (const channel of json.animations?.find(a => a.name === 'Pose')?.channels ?? []) {
-    const animation = json.animations.find(a => a.name === 'Pose');
-    const accessor = json.accessors[animation.samplers[channel.sampler].output];
-    const view = json.bufferViews[accessor.bufferView];
-    const size = channel.target.path === 'rotation' ? 4 : 3;
-    const values = new Float32Array(bin.buffer, bin.byteOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0), size);
-    const node = nodes[channel.target.node];
-    (channel.target.path === 'rotation' ? node.quaternion : channel.target.path === 'translation' ? node.position : node.scale).fromArray(values);
-  }
   nodes[0].updateMatrixWorld(true);
   return { json, nodes, byName: new Map(nodes.map(n => [n.name, n])) };
 }
 
 const reference = readModel('nathan');
-const rafaelMap = { pelvis: 'hip', spine_01: 'spine_01', spine_03: 'spine_02', spine_05: 'spine_03', neck_01: 'neck',
-  clavicle_l: 'shoulder_l', clavicle_r: 'shoulder_r', thigh_l: 'upperleg_l', thigh_r: 'upperleg_r',
-  calf_l: 'lowerleg_l', calf_r: 'lowerleg_r', ball_l: 'toe_l', ball_r: 'toe_r' };
 fs.mkdirSync(output, { recursive: true });
 const manifest = fs.existsSync(path.join(output,'durations.json'))?JSON.parse(fs.readFileSync(path.join(output,'durations.json'),'utf8')):{};
 const requested=process.argv.slice(2);
 for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','base-female'].filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);
   const retargeted = id !== 'nathan';
+  const rig=createRetarget(model.nodes,reference.nodes);
   const hipName = id === 'rafael' ? 'pelvis' : 'hip';
   const json = { asset: { version: '2.0', generator: 'B.A.R. animation converter' },
     scene: 0, scenes: [{ nodes: model.json.scenes[model.json.scene ?? 0].nodes }],
@@ -68,6 +58,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
   const chunks = []; let offset = 0;
   function accessor(values, size) {
     const array = Float32Array.from(values);
+    if(!array.every(Number.isFinite))throw new Error(`${id}: non-finite animation data`);
     const buffer = Buffer.from(array.buffer);
     const view = json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: buffer.length }) - 1;
     chunks.push(buffer); offset += buffer.length;
@@ -96,8 +87,6 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     const input = accessor(times, 1);
     const rotations = model.nodes.map(() => []), translations = model.nodes.map(() => []);
     const basePositions = model.nodes.map(n => n.position.clone()), baseRotations = model.nodes.map(n => n.quaternion.clone());
-    const desired = model.nodes.map(() => new Quaternion());
-    const parentIndices = model.nodes.map(n => model.nodes.indexOf(n.parent));
     const scale = model.byName.get(hipName).getWorldPosition(new Vector3()).y / 0.956;
     let firstHip, seatedOffset = 0;
     for (const time of times) {
@@ -108,24 +97,19 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
         firstHip = sourceHip.clone();
         if (seatedClips.has(name)) seatedOffset = 0.56 - (retargeted ? model.byName.get(hipName).getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
       }
+      const nativePose=retargeted?rig.pose(new Map([...sourceBones].map(([name,bone])=>[name,bone.getWorldQuaternion(new Quaternion())]))):undefined;
       model.nodes.forEach((node, index) => {
         let local = baseRotations[index].clone();
         let position = basePositions[index].clone();
-        const sourceName = id === 'rafael' ? (rafaelMap[node.name] ?? node.name) : node.name;
+        const sourceName = rig.names[index];
         const bone = sourceBones.get(sourceName);
         // The root of Rafael is a static Z-up conversion; pelvis incorporates FBX root motion.
-        if (retargeted && node.name !== 'root' && bone && reference.byName.has(sourceName)) {
-          const world = bone.getWorldQuaternion(new Quaternion())
-            .multiply(reference.byName.get(sourceName).getWorldQuaternion(new Quaternion()).invert())
-            .multiply(node.getWorldQuaternion(new Quaternion()));
-          const parent = parentIndices[index];
-          local = (parent >= 0 ? desired[parent].clone().invert() : new Quaternion()).multiply(world).normalize();
+        if (retargeted) {
+          local=nativePose[index];
         } else if (id === 'nathan' && bone) {
           // The root's parent is the FBX group, which faceForward may turn.
           local = node.name === 'root' ? bone.getWorldQuaternion(new Quaternion()) : bone.quaternion.clone();
         }
-        const parent = parentIndices[index];
-        desired[index] = (parent >= 0 ? desired[parent].clone() : new Quaternion()).multiply(local);
         if (id === 'nathan' && node.name === 'root') {
           sourceBones.get('root').getWorldPosition(position).multiplyScalar(0.01);
           position.x -= firstHip.x; position.z -= firstHip.z; position.y += seatedOffset;
@@ -164,6 +148,8 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     console.log(`${id}: ${name}, ${duration.toFixed(2)}s`);
     mixer.stopAllAction(); mixer.uncacheRoot(source);
   }
+  appendOldCane({root,id,model,reference,json,accessor,props:process.env.BAR_PROP_OUTPUT??path.join(root,'apps/web/public/props')});
+  manifest.OldCaneWalk=1600;
   const bin = Buffer.concat(chunks); json.buffers[0].byteLength = bin.length;
   const raw = Buffer.from(JSON.stringify(json));
   const headerJson = Buffer.concat([raw, Buffer.alloc((4 - raw.length % 4) % 4, 0x20)]);

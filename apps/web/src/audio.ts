@@ -4,6 +4,8 @@ export class BarAudio {
   enabled=false;
   private party=false;
   private beat=0;
+  private suppressed=false;
+  setSuppressed(value:boolean):void {this.suppressed=value;}
   toggle():boolean {
     this.enabled=!this.enabled;
     if(this.enabled){this.context??=new AudioContext();void this.context.resume();this.timer=setInterval(()=>this.playBeat(),280);}
@@ -12,7 +14,7 @@ export class BarAudio {
   }
   setParty(value:boolean):void {this.party=value;}
   private playBeat():void {
-    if(!this.context||!this.enabled)return;
+    if(!this.context||!this.enabled||this.suppressed)return;
     const notes=this.party?[130.81,164.81,196,261.63,196,164.81,146.83,196]:[110,0,130.81,0,146.83,0,130.81,0];
     const frequency=notes[this.beat++%notes.length];
     if(!frequency)return;

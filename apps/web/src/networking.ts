@@ -9,6 +9,7 @@ export interface NetworkHooks {
   input:()=>Omit<PlayerInput,'seq'>;
   /** Skin to wear on arrival, so the avatar never shows the default first. */
   skin:()=>string;
+  jukebox?:(id:string)=>void;
 }
 export class BarNetwork {
   room?:Room;
@@ -56,11 +57,13 @@ export class BarNetwork {
         this.seq=Math.max(this.seq,self.lastProcessedInput);
         this.pending=this.pending.filter(input=>input.seq>self.lastProcessedInput);
         this.position={x:self.x,y:self.y,z:self.z};
-        if(!self.interactionState&&!self.currentTableId) for(const input of this.pending)this.position=movePlayer(this.position,input);
+        if(!self.interactionState&&!self.currentTableId) for(const input of this.pending)this.position=movePlayer(this.position,input,TICK_MS/1000,self.oldWalk);
         this.hooks.position(this.position);
       }
     });
     room.onMessage('chat.message',(message:ChatMessage)=>this.hooks.chat(message));
+    room.onMessage('jukebox.open',(message:{id:string})=>this.hooks.jukebox?.(message.id));
+    room.onMessage('jukebox.result',()=>{});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));
     room.onError((_code:number,message?:string)=>this.hooks.error(message||'A conexão encontrou um problema.'));
@@ -79,7 +82,7 @@ export class BarNetwork {
     if(!moving&&!this.wasMoving)return;
     this.wasMoving=moving;
     const input={...intention,seq:++this.seq};
-    this.pending.push(input);this.position=movePlayer(this.position,input);this.hooks.position(this.position);this.send('player.input',input);
+    this.pending.push(input);this.position=movePlayer(this.position,input,TICK_MS/1000,self.oldWalk);this.hooks.position(this.position);this.send('player.input',input);
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length};}

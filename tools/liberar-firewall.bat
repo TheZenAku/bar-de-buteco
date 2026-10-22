@@ -1,4 +1,6 @@
 @echo off
-rem Libera as portas 5173 e 2567 no Firewall do Windows (pede administrador).
+setlocal
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0bar.ps1" firewall
-pause
+set "BAR_EXIT_CODE=%ERRORLEVEL%"
+if /I not "%~1"=="--sem-pausa" pause
+exit /b %BAR_EXIT_CODE%

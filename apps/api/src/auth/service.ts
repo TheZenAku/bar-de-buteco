@@ -4,6 +4,7 @@ import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import {readCharacter,type PublicUser} from '@bar/shared';
 import type { Database } from '../database/index.js';
 import { users, profiles, sessions, moderationActions, blocks } from '../database/schema.js';
+import {isOwnerEmail} from '../admin-policy.js';
 
 export const SESSION_DAYS = 7;
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -15,7 +16,7 @@ export async function getUser(db: Database, id: string): Promise<PublicUser | nu
   if (!row) return null;
   const avatar = row.profile.avatarConfig as { color?: string };
   return { id: row.user.id, username: row.user.username, email: row.user.email, displayName: row.profile.displayName,
-    verified: row.user.verified, role: row.user.role === 'admin' ? 'admin' : 'user', color: avatar.color ?? '#cf7549',
+    verified: row.user.verified, role: row.user.role === 'admin' ? 'admin' : 'user', isOwner:row.user.verified&&row.user.role==='admin'&&isOwnerEmail(row.user.email), color: avatar.color ?? '#cf7549',
     character:row.profile.characterConfig?readCharacter(row.profile.characterConfig):null,equippedSkin:row.profile.equippedSkin };
 }
 export async function isBanned(db: Database, userId: string) {

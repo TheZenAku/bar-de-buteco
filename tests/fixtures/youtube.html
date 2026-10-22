@@ -1,0 +1,8 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Official YouTube playback probe</title><body style="background:#221711;color:white"><button id="play">Reproduzir vídeo oficial</button><div id="player"></div><pre id="status">Aguardando clique</pre><script type="module">
+import {loadYoutubeApi} from '/src/youtube-player.ts';
+let player;window.probe={state:'idle',errors:[],time:0,duration:0};
+document.querySelector('#play').onclick=async()=>{
+ try {const api=await loadYoutubeApi();player=new api.Player(document.querySelector('#player'),{width:640,height:360,host:'https://www.youtube.com',playerVars:{origin:location.origin,playsinline:1,controls:1,autoplay:0},events:{onReady:({target})=>{target.getIframe().referrerPolicy='strict-origin-when-cross-origin';target.loadVideoById({videoId:'M7lc1UVf-VE',startSeconds:0});},onStateChange:({data})=>window.probe.state=data,onError:({data})=>window.probe.errors.push(data),onAutoplayBlocked:()=>window.probe.state='blocked'}});}catch(e){window.probe.errors.push(e.message);}
+};
+setInterval(()=>{if(player?.getCurrentTime){window.probe.time=player.getCurrentTime();window.probe.duration=player.getDuration();}document.querySelector('#status').textContent=JSON.stringify(window.probe,null,2);},500);
+</script></body></html>

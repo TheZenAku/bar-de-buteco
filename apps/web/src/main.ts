@@ -1,60 +1,30 @@
-import './assets/fonts/fonts.css';
-import './style.css';
-<<<<<<< HEAD
-import './boteco.css';
-import {nearestInteraction,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
+import {adminPanel} from './admin-panel';
+import './assets/fonts/nova-ui.css';
+import './nova-ui.css';
+import {gameUi} from './game-ui';
+import {createHudPanels} from './hud-panels';
+import {createNotifications} from './notifications';
+import {createLiveHud} from './live-hud';
+import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
 import {characterEditor} from './character-editor';
 import './character.css';
-=======
-import {nearestInteraction,DEFAULT_SKIN,SKINS,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
+import './admin.css';
 import {BarScene} from './engine/BarScene';
 import {BarNetwork} from './networking';
-import {api,escape as e} from './api';
+import {api,ApiError,escape as e} from './api';
 import {BarAudio} from './audio';
+import {JukeboxController} from './jukebox';
+import {JUKEBOX_SYSTEMS,distance} from '@bar/shared';
+import './jukebox.css';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
-const icon=(name:string)=>({people:'♙',sound:'♫',help:'?',close:'×',arrow:'↗',cards:'♠',moon:'☾'}[name]||name);
-app.innerHTML=`
-  <canvas id="world" aria-label="Cenário tridimensional do B.A.R."></canvas>
-  <div id="labels" aria-hidden="true"></div>
-  <div class="vignette"></div>
-  <main id="lobby" class="lobby">
-    <header class="lobby-header"><a class="wordmark" href="/" aria-label="B.A.R. início">BOTECO<span>sem noção</span></a><span class="edition">BAR DE BUTECO<br>ABERTO PARA O IMPREVISTO</span><span class="small-tag">MULTIPLAYER SOCIAL · 3D</span></header>
-    <div class="lobby-body">
-      <section class="welcome"><div class="eyebrow"><i class="live-dot"></i> A NOITE COMEÇA AQUI</div><h1>Tem lugar<br>pra mais <em>um.</em></h1><p>Um balcão, boas histórias e uma dose de caos.<br>Entre, puxe uma cadeira e veja o que acontece.</p><div class="lobby-features"><span>01 <b>Encontre a galera</b></span><span>02 <b>Tente a sorte</b></span><span>03 <b>Espere o inesperado</b></span></div></section>
-      <section class="entry-card" aria-label="Acesso à conta"><div class="card-kicker"><span>SEU CANTO NO BALCÃO</span><span>↙</span></div><div id="auth-content"></div><div class="card-foot"><span class="tiny-dot"></span> Sem instalação. Só chegar.</div></section>
-    </div>
-    <footer class="lobby-footer"><span>CONVERSA LIVRE. HISTÓRIAS NEM TANTO.</span><div><span class="key">W A S D</span> para explorar <span class="separator">/</span> <span class="key">E</span> para interagir</div><span>B.A.R. · MVP 0.1</span></footer>
-  </main>
-<main id="game" class="game hidden" aria-label="Interface do bar">
-    <header class="game-header">
-      <div class="boteco-logo"><b>BOTECO</b><span>sem noção</span></div>
-      <button class="player-badge sticker" data-action="account" aria-label="Sua conta"><span class="avatar" id="avatar">B</span><span><b id="hud-name">Chegando…</b><small id="hud-skin">Sua cadeira está aqui</small></span></button>
-      <div class="room-meta sticker"><div class="hud-stat"><span>🍻 NO BAR <b id="occupancy">— / 32</b></span><div class="hud-track"><i id="occupancy-fill"></i></div></div><div class="hud-stat"><span>📡 CONEXÃO <b id="ping">— ms</b></span><small id="hud-status">Conectando…</small></div><div class="hud-stat activity-stat"><span>🎩 NA RESENHA</span><b id="hud-activity">Chegando</b></div></div>
-      <nav class="game-tools sticker" aria-label="Ferramentas"><button data-action="people" title="Pessoas" aria-label="Pessoas no bar">${icon('people')}</button><button data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música">♫<i class="muted-mark"></i></button><button data-action="help" title="Como jogar" aria-label="Como jogar">?</button><button data-action="admin" id="admin-button" class="hidden" title="Administração" aria-label="Administração">⚙</button></nav>
-    </header>
-    <div id="event-banner" class="event-banner hidden" role="status"></div>
-    <div id="connection" class="connection hidden" role="status"></div>
-<<<<<<< HEAD
-    <aside class="chat-panel sticker"><div class="chat-heading"><span>💬 RESENHA</span><small>por perto · 12 m</small><button data-action="chat-toggle" id="chat-toggle" aria-label="Recolher chat" aria-expanded="true" aria-controls="chat-body">−</button></div><div id="chat-body"><div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="manda a braba…" aria-label="Mensagem por proximidade"><button type="submit" aria-label="Enviar mensagem">FALA</button></form></div></aside>
-    <button id="context" data-action="interact" class="context hidden"><kbd>E</kbd><span><small>CHEGA MAIS</small><b id="context-label"></b></span></button>
-    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span></div>
-    <nav class="action-bar" aria-label="Ações do personagem"><button data-action="drink"><span>🍺</span>Pedir gelada<kbd>E · balcão</kbd></button><button data-action="chat"><span>🗣️</span>Resenhar<kbd>Enter</kbd></button><button data-action="dance" id="dance-button" aria-pressed="false"><span>🕺</span>Dançar<kbd>G</kbd></button><button data-action="skins"><span>🎩</span>Meu visual<kbd>C</kbd></button><button data-action="kick" id="kick-button" class="hidden"><span>🥋</span>Karatê<kbd>X · Rafael</kbd></button></nav>
-=======
-    <aside class="chat-panel"><div class="chat-heading"><span><i class="live-dot"></i> CONVERSA DE BALCÃO</span><small>por perto · 12 m</small><button data-action="chat-toggle" id="chat-toggle" aria-label="Recolher chat">−</button></div><div id="chat-body"><div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="Dê um oi… [Enter]" aria-label="Mensagem por proximidade"><button type="submit" aria-label="Enviar mensagem">↗</button></form></div></aside>
-    <div id="context" class="context hidden"><kbd>E</kbd><div><small>POR AQUI</small><b id="context-label"></b></div></div>
-    <div class="world-hint"><span>W A S D <small>mover</small></span><span>SHIFT <small>correr</small></span><span>ARRASTE <small>câmera</small></span><button data-action="dance">G <small>dançar</small></button><button data-action="skins">C <small>visual</small></button></div>
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
-    <section id="blackjack" class="blackjack hidden" aria-label="Mesa de blackjack"></section>
-    <div id="waiting" class="waiting hidden"><span class="spinner"></span><h2>Já estamos abrindo a porta.</h2><p id="waiting-message"></p><button data-action="leave" class="button secondary">Voltar à entrada</button></div>
-  </main>
-  <div id="modal" class="modal-backdrop hidden"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button data-action="close-modal" aria-label="Fechar janela">×</button></div><div id="modal-content"></div></section></div>
-  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
-  ${import.meta.env.DEV?'<button class="dev-mail" data-action="mail">✉ Caixa de e-mail local</button>':''}
-`;
+app.innerHTML=gameUi();
 
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
+const hud=createHudPanels($('#game'));
+const notices=createNotifications($('#toasts'));
+const liveHud=createLiveHud($('#game'));
+let previousAction='',previousResult='';
 let user:PublicUser|undefined;
 let world:WorldState|undefined;
 let serverClockOffset=0;
@@ -66,20 +36,31 @@ let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
 const chatHistory:ChatMessage[]=[];
-<<<<<<< HEAD
 let editor:ReturnType<typeof characterEditor>|undefined;
+let administration:ReturnType<typeof adminPanel>|undefined;
+let refreshingAdministration=false;
 let wardrobe:Wardrobe|undefined;
 let modalGeneration=0;
-function savedSkin():string {return user?.equippedSkin??DEFAULT_SKIN;}
-=======
-// The chosen skin is remembered per browser and sent when entering the bar.
-const SKIN_KEY='bar.skin';
-function savedSkin():string {try{const skin=localStorage.getItem(SKIN_KEY);if(SKINS.some(option=>option.id===skin))return skin!;}catch{/* Storage may be unavailable. */}return DEFAULT_SKIN;}
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
-
-function toast(message:string,error=false):void {
-  const node=document.createElement('div');node.className=`toast ${error?'error':''}`;node.textContent=message;$('#toasts').append(node);setTimeout(()=>node.remove(),5500);
+let watchingTv=false;
+const jukebox=new JukeboxController({send:(type,payload)=>network.send(type,payload),now:serverNow,
+  project:id=>{
+    if(activeModal)return null;const points=scene?.televisionProjection(id);if(!points)return null;
+    if(!watchingTv){
+      const left=Math.min(...points.map(p=>p.x)),right=Math.max(...points.map(p=>p.x)),top=Math.min(...points.map(p=>p.y)),bottom=Math.max(...points.map(p=>p.y));
+      if([...document.querySelectorAll<HTMLElement>('#game .hud-panel,#game .game-header,#blackjack:not(.hidden)')].some(element=>{const rect=element.getBoundingClientRect();return rect.width>0&&rect.height>0&&rect.left<right&&rect.right>left&&rect.top<bottom&&rect.bottom>top;}))return null;
+    }
+    return points;
+  },
+  screen:(id,visible)=>scene?.showTelevision(id,visible),notice:toast,ambient:value=>audio.setSuppressed(value)});
+const tvBack=document.createElement('button');tvBack.id='leave-tv';tvBack.className='button secondary';tvBack.textContent='Voltar ao jogo · Esc';tvBack.hidden=true;tvBack.onclick=()=>stopWatchingTv();app.append(tvBack);
+function stopWatchingTv():void {watchingTv=false;document.body.classList.remove('watching-tv');tvBack.hidden=true;scene?.watchTelevision();scene?.setEnabled(inGame&&connected&&!activeModal);}
+function openJukebox(id:string):void {
+  if(!inGame||!connected||!world?.jukeboxes?.[id])return;
+  stopWatchingTv();showModal('JUKEBOX',jukebox.panelHtml(id),'jukebox');jukebox.attachPanel($('#modal-content'));
 }
+function savedSkin():string {return user?.equippedSkin??DEFAULT_SKIN;}
+
+function toast(message:string,error=false):void {notices.show({variant:error?'aviso':'acao',title:error?'Não foi possível':'No Boteco',text:message});}
 function errorMessage(error:unknown):string{return error instanceof Error?error.message:'Algo deu errado. Tente novamente.';}
 function setBusy(form:HTMLFormElement,busy:boolean):void {form.querySelectorAll<HTMLButtonElement>('button').forEach(button=>button.disabled=busy);}
 function renderAuth(message=''):void {
@@ -93,15 +74,10 @@ function renderAuth(message=''):void {
   $('#auth-content').innerHTML=content+`<div id="auth-message" class="form-message ${message?'':'hidden'}" role="status">${e(message)}</div>`;
 }
 function authMessage(message:string,error=false):void {const node=$('#auth-message');node.className=`form-message ${error?'error':''}`;node.textContent=message;}
-function setChatOpen(open:boolean):void {
-  $('#chat-body').classList.toggle('hidden',!open);
-  $('#chat-toggle').textContent=open?'−':'+';
-  $('#chat-toggle').setAttribute('aria-expanded',String(open));
-  $('#chat-toggle').setAttribute('aria-label',open?'Recolher chat':'Abrir chat');
-}
+function setChatOpen(open:boolean):void {if(open)hud.open('chat');else hud.collapse('chat',true);}
 function focusChat():void {setChatOpen(true);$('#chat-input').focus();}
-function showModal(title:string,content:string,type:string):void {modalGeneration++;editor?.destroy();editor=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
-function closeModal():void {modalGeneration++;editor?.destroy();editor=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function showModal(title:string,content:string,type:string):void {modalGeneration++;jukebox.detachPanel();if(watchingTv)stopWatchingTv();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('.modal').classList.toggle('admin-modal',type==='admin');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function closeModal():void {modalGeneration++;jukebox.detachPanel();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 function createCharacter():void {
   if(!user)return;const first=!user.character;
   showModal(first?'Monte seu personagem':'Personalizar personagem','','character');
@@ -118,12 +94,14 @@ const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
   skin:savedSkin,
   position:position=>scene?.setLocal(position),
-  state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);renderWorld();},
-  chat:message=>{chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();},
-  error:message=>toast(message,true),
+  state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);jukebox.setWorld(state,user!.id,connected);renderWorld();},
+  jukebox:openJukebox,
+  chat:message=>{if(!inGame||!user)return;chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();if(!blocked.has(message.playerId)&&(message.system||message.playerId!==user.id))notices.show({variant:message.system?'acao':'mensagem',title:message.displayName,text:message.text,initials:message.system?undefined:message.displayName[0],id:message.id});},
+  error:message=>{jukebox.reject(message);toast(message,true);},
   ping:ms=>{$('#ping').textContent=`${ms} ms`;},
   status:(message,isConnected)=>{
     connected=isConnected;scene?.setEnabled(inGame&&connected&&!activeModal);
+    if(!isConnected&&watchingTv)stopWatchingTv();jukebox.setWorld(world,user?.id??'',connected);
     $('#hud-status').textContent=isConnected?'Na área!':'Reconectando…';
     $('#waiting-message').textContent=message;
     $('#waiting').classList.toggle('hidden',isConnected||!inGame);
@@ -138,12 +116,13 @@ async function enterBar():Promise<void> {
   if(user&&!user.character){createCharacter();return;}
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
   if(!scene){toast('Seu navegador não conseguiu iniciar o cenário 3D. Ative a aceleração gráfica e recarregue.',true);return;}
-  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
-  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const result=await api<{blocked:string[]}>('/blocks');blocked=new Set(result.blocked);await network.connect();}
+  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
+  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe')]);blocked=new Set(result.blocked);wardrobe=collection;await network.connect();}
   catch(error){await leaveBar();toast(errorMessage(error),true);}
 }
 async function leaveBar():Promise<void> {
-  inGame=false;connected=false;await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  stopWatchingTv();jukebox.reset();
+  inGame=false;connected=false;notices.clear();liveHud.reset();wardrobe=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';lastEvent='';audio.setParty(false);closeModal();renderAuth();
 }
 function renderChat():void {
@@ -156,11 +135,15 @@ function renderWorld():void {
   $('#occupancy').textContent=`${world.occupancy} / ${world.capacity}`;
   $('#occupancy-fill').style.width=`${Math.min(100,world.occupancy/world.capacity*100)}%`;
   const self=world.players[user.id];
+  liveHud.update(world,user,wardrobe,blocked);
+  const actionKey=self?`${self.id}:${self.animationState}`:'';
+  if(previousAction&&actionKey!==previousAction&&self){const titles:Record<string,string>={dance:'No passinho!',drink:'Saúde! Sua gelada chegou.',kick:'Golpe de karatê!'};if(titles[self.animationState])notices.show({title:titles[self.animationState],id:`action:${self.id}:${self.animationStartedAt}:${self.animationState}`,duration:3400});}
+  previousAction=actionKey;
   $('#hud-name').textContent=user.displayName;
   $('#hud-skin').textContent=`${self?.skin==='custom'?'Meu personagem':SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
   const activities:Record<string,string>={idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas'};
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
-  $('#hud-activity').textContent=self?.currentTableId?'No blackjack':ordering?'Esperando o Seu Zé':activities[self?.animationState||'idle'];
+  $('#hud-activity').textContent=self?.currentTableId?'No blackjack':ordering?'Esperando o Seu Zé':self?.oldWalk&&self.animationState==='walk'?'No passo da bengala':activities[self?.animationState||'idle'];
   $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
   $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
   const interaction=self?nearestInteraction(self):undefined;
@@ -175,7 +158,7 @@ function renderWorld():void {
   else audio.setParty(false);
   const table=self?.currentTableId?world.tables[self.currentTableId]:undefined;
   $('#blackjack').classList.toggle('hidden',!table);
-  if(table){const key=JSON.stringify(table);if(key!==tableKey){tableKey=key;renderBlackjack(table);}}
+  if(table){if(table.phase==='results'&&table.roundId!==previousResult){previousResult=table.roundId;const result=table.seats.find(s=>s.playerId===user!.id)?.result;if(result)notices.show({variant:result==='win'||result==='blackjack'?'conquista':'acao',title:result==='win'||result==='blackjack'?'Você ganhou!':result==='draw'?'Empate!':'A rodada fechou',text:'Confira as cartas na mesa.',id:`round:${table.roundId}`});}const key=JSON.stringify(table);if(key!==tableKey){tableKey=key;renderBlackjack(table);}}
   else tableKey='';
   if(activeModal==='people')renderPeopleContent();
 }
@@ -230,42 +213,47 @@ async function mailbox():Promise<void> {
   }catch(error){$('#modal-content').textContent=errorMessage(error);}
 }
 async function admin():Promise<void> {
-  showModal('Administração do bar','<p>Carregando…</p>','admin');
-  try{
-    const data=await api<{users:Array<{id:string;displayName:string;email:string;role:string;banned:boolean}>;reports:Array<Record<string,unknown>>;logs:Array<Record<string,unknown>>}>('/admin/overview');
-    if(activeModal!=='admin')return;
-    $('#modal-content').innerHTML=`<h3>Dar uma agitada</h3><div class="admin-events"><button class="mini-button" data-action="event" data-type="BLACKOUT">☾ Apagão</button><button class="mini-button" data-action="event" data-type="DRUNK_NPC">♙ O inconveniente</button><button class="mini-button" data-action="event" data-type="PARTY">♫ Festa</button></div><h3>Frequentadores</h3><div class="admin-users">${data.users.map(person=>`<div class="admin-person"><div><b>${e(person.displayName)}</b><small>${e(person.email)} ${person.role==='admin'?'· admin':''}</small></div>${person.id!==user?.id?`<button class="mini-button" data-action="moderate" data-type="kick" data-id="${e(person.id)}">Expulsar</button><button class="mini-button" data-action="moderate" data-type="${person.banned?'unban':'ban'}" data-id="${e(person.id)}">${person.banned?'Desbanir':'Banir'}</button>`:''}</div>`).join('')}</div><h3>Denúncias (${data.reports.length})</h3><div class="audit-list">${data.reports.slice(0,20).map(report=>`<p>${e(JSON.stringify(report))}</p>`).join('')||'<p>Nenhuma denúncia.</p>'}</div><h3>Registro de ações</h3><div class="audit-list">${data.logs.slice(0,20).map(log=>`<p>${e(JSON.stringify(log))}</p>`).join('')||'<p>Nenhuma ação registrada.</p>'}</div><button class="text-button" data-action="admin">Atualizar painel</button>`;
-  }catch(error){$('#modal-content').textContent=errorMessage(error);}
+  if(user?.role!=='admin'){toast('Acesso exclusivo da administração.',true);return;}
+  showModal('Administração do bar','','admin');
+  administration=adminPanel($('#modal-content'),{notify:message=>toast(message),changedWallet:()=>{wardrobe=undefined;void refreshAdministration();},denied:()=>{void refreshAdministration();}});
 }
-<<<<<<< HEAD
+async function refreshAdministration():Promise<void>{
+  if(refreshingAdministration||!inGame||!connected||!user)return;
+  const owner=user.id;refreshingAdministration=true;
+  try{
+    const accountResult=await api<{user:PublicUser}>('/auth/me');if(user?.id!==owner||!inGame)return;
+    const changed=user.role!==accountResult.user.role;user={...user,role:accountResult.user.role,isOwner:accountResult.user.isOwner};
+    $('#admin-button').classList.toggle('hidden',user.role!=='admin');
+    if(user.role!=='admin'&&activeModal==='admin')closeModal();
+    if(changed)toast(user.role==='admin'?'Você recebeu acesso à administração.':'Sua permissão administrativa foi removida.');
+    const result=await api<Wardrobe>('/wardrobe');if(user?.id!==owner||!inGame)return;wardrobe=result;liveHud.update(world,user,wardrobe,blocked);
+    if(activeModal==='skins'||activeModal==='purchase'){
+      const balance=document.querySelector('#wallet-balance');if(balance)balance.innerHTML=result.balance.toLocaleString('pt-BR')+' <small>moedas</small>';
+      const purchase=document.querySelector('#purchase-balance');if(purchase)purchase.textContent=result.balance.toLocaleString('pt-BR');
+      const buy=document.querySelector<HTMLButtonElement>('[data-action="buy-skin"]'),skin=result.catalog.find(s=>s.id===buy?.dataset.skin);
+      if(buy&&skin){buy.disabled=result.balance<skin.price;buy.textContent=buy.disabled?'Moedas insuficientes':'Confirmar compra';}
+    }
+  }catch(error){if(error instanceof ApiError&&error.status===401&&user?.id===owner){user={...user,role:'user',isOwner:false};$('#admin-button').classList.add('hidden');if(activeModal==='admin')closeModal();}}
+  finally{refreshingAdministration=false;}
+}
+setInterval(()=>{void refreshAdministration();},5000);
+
 async function skins():Promise<void> {
   showModal('Personagem e skins','<p>Carregando sua coleção…</p>','skins');
   const generation=modalGeneration;
   const result=await api<Wardrobe>('/wardrobe');if(activeModal!=='skins'||generation!==modalGeneration)return;wardrobe=result;
   const current=world?.players[user?.id||'']?.skin||savedSkin();
-  $('#modal-content').innerHTML=`<div class="wallet"><span>Sua carteira</span><b>${result.balance.toLocaleString('pt-BR')} <small>moedas</small></b></div><p class="modal-description">Seu personagem é gratuito. Skins completas ficam na sua coleção após a compra. C abre ou fecha esta janela.</p><div class="custom-character-card"><div><b>Meu personagem</b><small>Corpo, cabelo, pele e olhos do seu jeito</small></div><button class="mini-button" data-action="skin" data-skin="custom" ${current==='custom'?'disabled':''}>${current==='custom'?'Em uso':'Vestir'}</button><button class="mini-button" data-action="character">Personalizar</button></div><h3>Skins da casa</h3><div class="skin-grid">${result.catalog.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''} ${skin.owned?'':'locked'}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':skin.owned?'Vestir':`${skin.price.toLocaleString('pt-BR')} moedas · Comprar`}</small></button>`).join('')}</div>${result.dailyReward>0?`<button class="button secondary full" data-action="daily" ${result.dailyClaimed?'disabled':''}>${result.dailyClaimed?'Bônus de hoje recebido':`Receber bônus diário: ${result.dailyReward} moedas`}</button>`:''}`;
+  $('#modal-content').innerHTML=`<div class="wallet"><span>Sua carteira</span><b id="wallet-balance">${result.balance.toLocaleString('pt-BR')} <small>moedas</small></b></div><p class="modal-description">Seu personagem é gratuito. Skins completas ficam na sua coleção após a compra. C abre ou fecha esta janela.</p><div class="custom-character-card"><div><b>Meu personagem</b><small>Corpo, cabelo, pele e olhos do seu jeito</small></div><button class="mini-button" data-action="skin" data-skin="custom" ${current==='custom'?'disabled':''}>${current==='custom'?'Em uso':'Vestir'}</button><button class="mini-button" data-action="character">Personalizar</button></div><h3>Skins da casa</h3><div class="skin-grid">${result.catalog.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''} ${skin.owned?'':'locked'}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':skin.owned?'Vestir':`${skin.price.toLocaleString('pt-BR')} moedas · Comprar`}</small></button>`).join('')}</div>${result.dailyReward>0?`<button class="button secondary full" data-action="daily" ${result.dailyClaimed?'disabled':''}>${result.dailyClaimed?'Bônus de hoje recebido':`Receber bônus diário: ${result.dailyReward} moedas`}</button>`:''}`;
 }
 async function wearSkin(id:string):Promise<void> {
   if(world?.players[user?.id||'']?.animationState==='kick'){toast('Espere o golpe terminar para trocar o visual.');return;}
   const skin=wardrobe?.catalog.find(option=>option.id===id);if(id!=='custom'&&!skin)return;
   if(skin&&!skin.owned){
-    showModal(`Comprar ${skin.name}`,`<p>Esta skin custa <b>${skin.price.toLocaleString('pt-BR')} moedas</b>. Seu saldo é ${wardrobe!.balance.toLocaleString('pt-BR')} moedas.</p><p>A compra é permanente. Seu personagem personalizado fica guardado.</p><button class="button primary full" data-action="buy-skin" data-skin="${skin.id}" ${wardrobe!.balance<skin.price?'disabled':''}>${wardrobe!.balance<skin.price?'Moedas insuficientes':'Confirmar compra'}</button><button class="text-button full" data-action="skins">Voltar à coleção</button>`,'purchase');return;
+    showModal(`Comprar ${skin.name}`,`<p>Esta skin custa <b>${skin.price.toLocaleString('pt-BR')} moedas</b>. Seu saldo é <span id="purchase-balance">${wardrobe!.balance.toLocaleString('pt-BR')}</span> moedas.</p><p>A compra é permanente. Seu personagem personalizado fica guardado.</p><button class="button primary full" data-action="buy-skin" data-skin="${skin.id}" ${wardrobe!.balance<skin.price?'disabled':''}>${wardrobe!.balance<skin.price?'Moedas insuficientes':'Confirmar compra'}</button><button class="text-button full" data-action="skins">Voltar à coleção</button>`,'purchase');return;
   }
   const owner=user?.id,generation=modalGeneration;
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();toast(`Visual trocado: ${skin?.name??'Meu personagem'}.`);
-=======
-function skins():void {
-  scene?.preloadSkins();
-  const current=world?.players[user?.id||'']?.skin||savedSkin();
-  showModal('Escolha seu visual',`<p class="modal-description">A troca é na hora, e todo mundo no bar vê. Aperte C para abrir ou fechar.</p><div class="skin-grid">${SKINS.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':'Vestir'}</small></button>`).join('')}</div>`,'skins');
-}
-function wearSkin(id:string):void {
-  const skin=SKINS.find(option=>option.id===id);if(!skin)return;
-  network.send('player.skin',{skin:skin.id});
-  try{localStorage.setItem(SKIN_KEY,skin.id);}catch{/* Still worn for this visit. */}
-  closeModal();toast(`Visual trocado: ${skin.name}.`);
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 }
 function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
@@ -282,8 +270,8 @@ app.addEventListener('click',event=>{
       case 'people':people();break;
       case 'account':await account();break;
       case 'help':help();break;
-<<<<<<< HEAD
       case 'interact':interact();break;
+      case 'watch-tv':{const system=JUKEBOX_SYSTEMS[0],self=world?.players[user?.id??''];if(!self||distance(self,system.source)>8){toast('Chegue mais perto da TV do salão.');break;}closeModal();watchingTv=true;document.body.classList.add('watching-tv');tvBack.hidden=false;scene?.watchTelevision(system.tvId);tvBack.focus();break;}
       case 'drink':{
         const self=world?.players[user?.id||''];
         if(!connected||!self||activeModal)break;
@@ -291,21 +279,19 @@ app.addEventListener('click',event=>{
         else toast('Chegue ao balcão, no fundo à direita do térreo, e aperte E para pedir uma gelada.');
         break;
       }
+      case 'scene-use':{const self=world?.players[user?.id??''],object=INTERACTABLES.find(p=>p.id===button.dataset.object);if(!connected||!self||!object||activeModal)break;if(!canInteract(object,self)){toast('Chegue mais perto para usar '+object.label.toLowerCase()+'.');break;}if(self.currentTableId||self.interactionState){toast('Encerre a interação atual com E antes de usar outro lugar.');break;}if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});break;}
+      case 'wave':if(connected&&!activeModal)network.send('player.emote',{emote:'wave'});break;
       case 'chat':focusChat();break;
       case 'skins':await skins();break;
       case 'character':createCharacter();break;
-      case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;toast('Skin comprada e adicionada à sua coleção.');if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
+      case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;notices.show({variant:'conquista',title:'Nova skin na coleção!',text:'Skin comprada e adicionada à sua coleção.'});if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
       case 'daily':{const owner=user?.id,generation=modalGeneration;const result=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();break;}
       case 'kick':kick();break;
       case 'skin':await wearSkin(button.dataset.skin!);break;
-=======
-      case 'skins':skins();break;
-      case 'skin':wearSkin(button.dataset.skin!);break;
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
-      case 'audio':{const on=audio.toggle();$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-label',on?'Silenciar música':'Ativar música');toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
+      case 'audio':{const on=!(audio.enabled||jukebox.soundEnabled);if(audio.enabled!==on)audio.toggle();jukebox.setMuted(!on);toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
       case 'dance':network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
-      case 'chat-toggle':setChatOpen($('#chat-body').classList.contains('hidden'));break;
+      case 'chat-toggle':setChatOpen(hud.isCollapsed('chat'));break;
       case 'table-leave':network.send('blackjack.leave');break;
       case 'table-start':network.send('blackjack.start',{tableId:world?.players[user!.id]?.currentTableId});break;
       case 'hit':case 'stand':network.send('blackjack.action',{action});break;
@@ -340,36 +326,28 @@ app.addEventListener('submit',event=>{
   })();
 });
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'){closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
+  if(event.key==='Escape'){if(watchingTv)stopWatchingTv();else closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
   // Closing must not reach the scene's own C handler on window, which would reopen the selector.
   if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
-<<<<<<< HEAD
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
   if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();focusChat();}
-=======
-  if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
-  if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();$('#chat-body').classList.remove('hidden');$('#chat-input').focus();}
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 });
 $('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
 renderAuth();renderChat();
 
 async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
-<<<<<<< HEAD
   try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)focusChat();};scene.onSkins=()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));};scene.onKick=kick;scene.setEnabled(false);}
-=======
-  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=()=>network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)$('#chat-input').focus();};scene.onSkins=()=>{if(inGame&&!activeModal)skins();};scene.setEnabled(false);}
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
   if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';renderAuth();return;}
   try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;renderAuth();if(!user.character)createCharacter();}catch{/* No active session: show login. */}
 }
-void start();
+let displayedSound:boolean|undefined;
+void start().then(()=>{if(scene)scene.onMediaFrame=()=>{jukebox.frame();const on=audio.enabled||jukebox.soundEnabled;if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar música':'Ativar música');}};});
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry()}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry()}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

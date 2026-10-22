@@ -1,12 +1,10 @@
 # B.A.R. — Bar de Buteco
 
-<<<<<<< HEAD
 MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, mapa BarBoteco com rua, varanda, dois andares e escada, e jogadores com modelo 3D animado. Não há apostas, dinheiro real nem prêmios.
-=======
-MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, cenário procedural em escala real e jogadores com modelo 3D animado. Não há apostas, dinheiro real nem prêmios.
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 
 ## Abrir o projeto
+
+No Windows, também é possível abrir **`tools/iniciar.bat`** com dois cliques. Use `tools/reiniciar.bat`, `tools/parar.bat` e `tools/status.bat` para controlar os serviços. Consulte [os iniciadores do Windows](tools/README.md) para logs e diagnóstico.
 
 Requer **Node.js 24** e npm. Na raiz:
 
@@ -34,6 +32,8 @@ Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novo
 
 Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. A loja está preparada, com saldo inicial zero e ganhos desativados até a definição da economia. Veja [criação de personagens, loja e integração](docs/characters.md).
 
+O corpo masculino também pode vestir **camiseta, suéter, calça, calça social, tênis, sapato Derby e óculos**, com seleção e cor independentes por categoria no criador. Salvar atualiza a aparência para os outros jogadores e guarda a escolha na conta. Para adicionar novos FBX compatíveis, execute **`tools/roupas/importar.bat`**; veja [os scripts de importação de roupas](tools/roupas/README.md).
+
 | Controle | Ação |
 | --- | --- |
 | WASD | Caminhar, em relação à câmera |
@@ -42,20 +42,24 @@ Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Q
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
 | C | Escolher o visual (skin); todos veem a troca na hora |
-<<<<<<< HEAD
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
-=======
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 | Enter | Abrir o chat de proximidade (12 m) |
+| `/velho` no chat | Alternar bengala e caminhada lenta (0,475 m/s); repita para voltar ao normal |
 | Esc | Fechar uma janela |
 
 Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interação. Na mesa, **Começar rodada** inicia blackjack para até quatro pessoas; **Comprar carta** e **Parar** são validados no servidor. O dealer para em 17, incluindo soft 17. Cada turno tem limite de 25 segundos. As estatísticas persistem na conta.
+
+Na **jukebox**, pressione **E**, cole um link do YouTube e clique em **Tocar**. Um único player controla imagem e som, com pausa/retomada compartilhadas e volume individual por distância. **Assistir na TV** mostra o vídeo na tela do modelo do salão. Fechar os controles mantém a reprodução; quando a TV estiver fora da visão ou pequena demais, o player permanece em um painel visível. Consulte [jukebox, TV, limitações do YouTube e testes](docs/jukebox.md).
+
+O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/old-cane.md).
 
 Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de engrenagem. Eventos não alteram as regras nem cancelam rodadas.
 
 O painel de pessoas permite bloquear mensagens e denunciar jogadores. A administração consulta denúncias e histórico, expulsa e bane contas. Banimento e redefinição de senha revogam sessões.
 
-A interface segue o visual **Boteco Sem Noção**, fornecido em `assets-bar/ui/boteco-balada-de-jogos-main`: placas de cerveja e feltro, chat à direita e barra de ações na base, ligados ao estado real da partida. Veja [interface e integração dos controles](docs/interface.md).
+O menu **⚙ Administração** também permite buscar jogadores e adicionar, remover ou definir moedas para testes. A conta principal `rafaelrodrigues-2017@hotmail.com` pode conceder e remover administradores pelo próprio jogo. Veja [permissões, carteiras e moderação](docs/admin.md).
+
+A interface segue a nova referência **Boteco Social**, em `assets-bar/ui/nova-ui`: seis painéis móveis, recolhíveis e ocultáveis, layout salvo por conta neste navegador, cores neon e notificações em formato de comanda. Carteira, coleção, pessoas, chat e interações usam os dados reais do jogo. Veja [interface e integração dos controles](docs/interface.md).
 
 ## Estrutura e execução
 
@@ -89,15 +93,13 @@ Consulte [resultados e limites da validação](docs/validation.md), [arquitetura
 
 As animações de `assets-bar/anim`, seus usos e a conversão para os modelos estão descritos em [animações](docs/animations.md). Para regenerar os bancos GLB, execute `npm run assets:animations`.
 
+Cada skin mantém seu esqueleto nativo, com calibração própria de pose e ossos auxiliares. Para recalibrar os modelos existentes e regenerar todos os clipes, execute `npm run assets:retarget`. Veja [esqueletos nativos e adaptação de animações](docs/native-rigs.md).
+
 O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
 
 ## Escopo da versão
 
-<<<<<<< HEAD
 Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e Seu Zé usam modelos animados. Os jogadores começam com um personagem Quaternius personalizado e podem adquirir Nathan, Leandro, Rafael e Read na loja (`SKINS` em `packages/shared`). Leandro, Read e Magrão preservam os rigs AccuRig; Rafael preserva seu rig Character Creator / Unreal. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; o personagem, a coleção e o visual equipado ficam salvos na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
-=======
-Os sistemas funcionais do MVP estão implementados para execução local. O cenário (um salão de 20 × 14 m em escala real) e os NPCs são procedurais. Os jogadores escolhem entre três skins (`SKINS` em `packages/shared`), convertidas de `assets-bar` para `apps/web/public/models`: "Nathan", da Renderpeople, com caminhada própria e animação parada do Mixamo, "Leandro", gerado no Meshy AI sem esqueleto e ligado automaticamente ao esqueleto do Nathan para usar as mesmas animações, e "Rafael", com esqueleto próprio no padrão Character Creator / Unreal, para o qual as animações do Nathan foram redirecionadas a partir da T-pose do modelo. O jogo usa as animações da própria skin quando ela as traz, e as do Nathan nos demais casos. As miniaturas do seletor ficam em `apps/web/public/skins`. A escolha fica salva no navegador. Confira a licença desses assets antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 

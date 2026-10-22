@@ -1,10 +1,10 @@
 // Preserve each authored AccuRig skeleton, weights and bind matrices; retarget Nathan's base clips.
 // usage: node tools/import-skins.mjs [skin...]  (default: every skin below)
 import fs from 'node:fs';
+import {readGlb,retargetBase,writeGlb} from './lib/character-gltf.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AnimationClip, AnimationMixer, Box3, Group, MeshStandardMaterial, Object3D, Quaternion,
-  QuaternionKeyframeTrack, Texture, TextureLoader, Vector3, VectorKeyframeTrack } from 'three';
+import { Box3, Group, MeshStandardMaterial, Texture, TextureLoader, Vector3 } from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -39,9 +39,9 @@ for (const [side, suffix] of [['L','l'], ['R','r']]) {
     for (let i=1;i<=3;i++) aliases[`CC_Base_${side}_${from}${i}`] = `${to}_0${i}_${suffix}`;
   }
 }
-let meshCount = 0;
+let meshCount = 0, boneCount = 0;
 fbx.traverse(node => {
-  if (node.isBone) { node.userData.sourceBone = node.name; node.name = aliases[node.name] ?? node.name; }
+  if (node.isBone) { boneCount++; node.userData.sourceBone = node.name; node.name = aliases[node.name] ?? node.name; }
   if (!node.isMesh) return;
   if (!node.isSkinnedMesh) throw new Error(`Unskinned mesh in new character: ${node.name}`);
   meshCount++;
@@ -63,72 +63,7 @@ model.updateMatrixWorld(true);
 const floor = new Box3().setFromObject(model).min.y;
 fbx.position.y -= floor; model.updateMatrixWorld(true);
 
-const refBytes = fs.readFileSync(path.join(root,'apps/web/public/models/nathan.glb'));
-const jsonLength = refBytes.readUInt32LE(12);
-const ref = JSON.parse(refBytes.subarray(20,20+jsonLength));
-const bin = refBytes.subarray(28+jsonLength);
-const sourceNodes = ref.nodes.map(n => {
-  const node = new Object3D(); node.name=n.name;
-  node.position.fromArray(n.translation??[0,0,0]); node.quaternion.fromArray(n.rotation??[0,0,0,1]);
-  node.scale.fromArray(n.scale??[1,1,1]); return node;
-});
-ref.nodes.forEach((n,i) => n.children?.forEach(child => sourceNodes[i].add(sourceNodes[child])));
-sourceNodes[0].updateMatrixWorld(true);
-const sourceByName = new Map(sourceNodes.map(n => [n.name,n]));
-const sourceBind = new Map(sourceNodes.map(n => [n.name,n.getWorldQuaternion(new Quaternion())]));
-const targetNodes=[]; model.traverse(n=>targetNodes.push(n));
-const targetBind = new Map(targetNodes.map(n=>[n,n.getWorldQuaternion(new Quaternion())]));
-const hip = model.getObjectByName('hip');
-const baseHip = hip.getWorldPosition(new Vector3());
-const heightRatio = baseHip.y / .956;
-function values(index) {
-  const a=ref.accessors[index], v=ref.bufferViews[a.bufferView];
-  const size=a.type==='VEC4'?4:a.type==='VEC3'?3:1;
-  const start=(v.byteOffset??0)+(a.byteOffset??0);
-  return Float32Array.from({length:a.count*size},(_,i)=>bin.readFloatLE(start+i*4));
-}
-const animations=[];
-for (const name of ['Idle','Walk','Pose']) {
-  const raw=ref.animations.find(a=>a.name===name);
-  if(!raw) throw new Error(`Missing reference clip: ${name}`);
-  const tracks=raw.channels.map(ch=>{
-    const sampler=raw.samplers[ch.sampler], node=sourceNodes[ch.target.node];
-    const type=ch.target.path==='rotation'?QuaternionKeyframeTrack:VectorKeyframeTrack;
-    return new type(`${node.name}.${ch.target.path==='rotation'?'quaternion':ch.target.path==='translation'?'position':'scale'}`,values(sampler.input),values(sampler.output));
-  });
-  const clip=new AnimationClip(name,-1,tracks), mixer=new AnimationMixer(sourceNodes[0]);
-  mixer.clipAction(clip).play();
-  const times=clip.duration>0?Array.from({length:Math.ceil(clip.duration*30)+1},(_,i)=>Math.min(i/30,clip.duration)):[0];
-  const rotations=new Map(targetNodes.filter(n=>n.isBone).map(n=>[n,[]]));
-  const translations=[];
-  for(const time of times){
-    mixer.setTime(Math.min(time,Math.max(0,clip.duration-1e-6)));sourceNodes[0].updateMatrixWorld(true);
-    const desired=new Map();
-    for(const node of targetNodes){
-      const source=sourceByName.get(node.name);
-      const parent=desired.get(node.parent)??new Quaternion();
-      let local=node.quaternion.clone();
-      if(node.isBone&&source&&node.name!=='root'){
-        const world=source.getWorldQuaternion(new Quaternion()).multiply(sourceBind.get(node.name).clone().invert()).multiply(targetBind.get(node));
-        local=parent.clone().invert().multiply(world).normalize();
-      }
-      desired.set(node,parent.clone().multiply(local));
-      rotations.get(node)?.push(...local.toArray());
-    }
-    const sourceHip=sourceByName.get('hip').getWorldPosition(new Vector3());
-    const position=baseHip.clone();position.y+=(sourceHip.y-.956)*heightRatio;
-    translations.push(...hip.parent.worldToLocal(position).toArray());
-  }
-  const result=[];
-  for(const [node,data] of rotations) result.push(new QuaternionKeyframeTrack(`${node.name}.quaternion`,times,data));
-  result.push(new VectorKeyframeTrack('hip.position',times,translations));
-  animations.push(new AnimationClip(name,clip.duration,result));
-  mixer.stopAllAction();mixer.uncacheRoot(sourceNodes[0]);
-  // Restore the source bind pose before the next clip (some clips omit channels).
-  sourceNodes.forEach((node,i)=>{node.position.fromArray(ref.nodes[i].translation??[0,0,0]);node.quaternion.fromArray(ref.nodes[i].rotation??[0,0,0,1]);});
-  console.log(`${displayName}: ${name}, ${times.length} frames`);
-}
-const exported=Buffer.from(await new GLTFExporter().parseAsync(model,{binary:true,animations,onlyVisible:false}));
+const exported=Buffer.from(await new GLTFExporter().parseAsync(model,{binary:true,trs:true,onlyVisible:false}));
 const length=exported.readUInt32LE(12), gltf=JSON.parse(exported.subarray(20,20+length));
 const chunks=[exported.subarray(28+length)]; let offset=chunks[0].length;
 gltf.images=[];gltf.textures=[];gltf.samplers=[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}];
@@ -150,5 +85,7 @@ const raw=Buffer.from(JSON.stringify(gltf)), headerJson=Buffer.concat([raw,Buffe
 const header=Buffer.alloc(20);header.writeUInt32LE(0x46546c67);header.writeUInt32LE(2,4);header.writeUInt32LE(28+headerJson.length+data.length,8);header.writeUInt32LE(headerJson.length,12);header.writeUInt32LE(0x4e4f534a,16);
 const binaryHeader=Buffer.alloc(8);binaryHeader.writeUInt32LE(data.length);binaryHeader.writeUInt32LE(0x004e4942,4);
 fs.writeFileSync(output,Buffer.concat([header,headerJson,binaryHeader,data]));
-console.log(`${displayName}: imported ${meshCount} mesh(es), ${targetNodes.filter(n=>n.isBone).length} authored bones, ${(fs.statSync(output).size/1024/1024).toFixed(2)} MiB`);
+const adapted=retargetBase(readGlb(output),readGlb(path.join(root,'apps/web/public/models/nathan.glb')));
+writeGlb(output,adapted.json,adapted.bin);
+console.log(`${displayName}: imported ${meshCount} mesh(es), ${boneCount} authored bones, ${(fs.statSync(output).size/1024/1024).toFixed(2)} MiB`);
 }

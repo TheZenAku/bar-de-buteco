@@ -1,4 +1,6 @@
 @echo off
-rem Liga o B.A.R. (API, mundo multiplayer e site) em segundo plano.
+setlocal
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0bar.ps1" iniciar
-pause
+set "BAR_EXIT_CODE=%ERRORLEVEL%"
+if /I not "%~1"=="--sem-pausa" pause
+exit /b %BAR_EXIT_CODE%

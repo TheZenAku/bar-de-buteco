@@ -6,5 +6,8 @@
   "CardsSit": 4800,
   "AngrySit": 2750,
   "Dance": 8083,
-  "Sit": 2700
+  "Sit": 2700,
+  "OldCaneWalk": 1600,
+  "Kick": 2000,
+  "Bartend": 13567
 }

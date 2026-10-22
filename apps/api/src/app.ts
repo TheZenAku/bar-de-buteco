@@ -7,8 +7,10 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {characterSchema,skinMessageSchema,type PublicUser} from '@bar/shared';
+import {characterSchema,skinMessageSchema,MAX_COIN_BALANCE,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
+import {AdminService} from './admin-service.js';
+import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import { readConfig, type ApiConfig } from './config.js';
 import { connectDatabase, type Database } from './database/index.js';
 import * as tables from './database/schema.js';
@@ -38,6 +40,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const connection = options.database ? null : await connectDatabase({ url: config.databaseUrl, path: config.dataPath });
   const db = options.database ?? connection!.db;
   const wardrobe=new WardrobeService(db);
+  const administration=new AdminService(db,wardrobe);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
   const cookieSettings = { path: '/', httpOnly: true, secure: config.production, sameSite: 'lax' as const };
@@ -77,13 +80,16 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     app.log.info({ activatedCount }, 'Automatic account activation enabled');
   }
 
+  const owner=await ensureOwnerAdministrator(db);
+  app.log.info({ownerAccountPresent:owner.present,ownerAdministrator:owner.enabled,ownerPromoted:owner.promoted},'Primary administrator ready');
+
   async function authenticated(request: FastifyRequest) {
     request.auth = await readSession(db, request.cookies[cookieName]);
     if (!request.auth) throw new HttpError(401, 'Entre na sua conta para continuar.');
   }
   async function administrator(request: FastifyRequest) {
     await authenticated(request);
-    if (request.auth!.user.role !== 'admin') throw new HttpError(403, 'Acesso exclusivo da administração.');
+    if (!request.auth!.user.verified || request.auth!.user.role !== 'admin') throw new HttpError(403, 'Acesso exclusivo da administração.');
   }
   async function internal(request: FastifyRequest) {
     if (!equalSecret(request.headers['x-internal-secret'], config.authSecret)) throw new HttpError(401, 'Acesso interno inválido.');
@@ -112,6 +118,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       if ((error as { cause?: { code?: string }; code?: string }).cause?.code === '23505' || (error as { code?: string }).code === '23505') throw new HttpError(409, 'E-mail ou nome de usuário indisponível.');
       throw error;
     }
+    if(isOwnerEmail(body.email))await ensureOwnerAdministrator(db);
     if (!config.autoVerifyEmail) await mailer.send(body.email, 'verify', token);
     const {token:sessionToken,expiresAt}=await createSession(db,userId);
     reply.setCookie(cookieName,sessionToken,{...cookieSettings,maxAge:SESSION_DAYS*86_400,expires:expiresAt});
@@ -125,6 +132,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       await tx.update(tables.users).set({ verified: true }).where(eq(tables.users.id, verification.userId));
       await tx.delete(tables.emailVerifications).where(eq(tables.emailVerifications.userId, verification.userId));
     });
+    await ensureOwnerAdministrator(db);
     return { message: 'E-mail confirmado. Sua mesa está esperando.' };
   });
   app.post('/api/auth/resend', recoverLimit, async (request) => {
@@ -230,31 +238,26 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await db.insert(tables.reports).values({ id: randomUUID(), reporterId: request.auth!.user.id, userId: playerId, reason });
     return reply.code(201).send({ message: 'Denúncia recebida pela administração.' });
   });
-  app.get('/api/admin/overview', { preHandler: administrator }, async () => {
-    const [accounts, reports, logs] = await Promise.all([
-      db.select({ id: tables.users.id, displayName: tables.profiles.displayName, email: tables.users.email, role: tables.users.role, verified: tables.users.verified }).from(tables.users).innerJoin(tables.profiles, eq(tables.profiles.userId, tables.users.id)).orderBy(desc(tables.users.createdAt)).limit(200),
-      db.select().from(tables.reports).orderBy(desc(tables.reports.createdAt)).limit(100),
-      db.select().from(tables.moderationActions).orderBy(desc(tables.moderationActions.createdAt)).limit(100),
-    ]);
-    return { users: await Promise.all(accounts.map(async (user) => ({ ...user, role: user.role === 'admin' ? 'admin' : 'user', banned: await isBanned(db, user.id) }))), reports, logs };
+  app.get('/api/admin/overview', { preHandler: administrator }, request => {
+    const query=z.object({search:z.string().trim().max(100).default(''),offset:z.coerce.number().int().min(0).max(1000000).default(0),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict().parse(request.query);
+    return administration.overview(request.auth!.user,query);
   });
-  app.post('/api/admin/action', { preHandler: administrator }, async (request) => {
-    const body = z.object({ action: z.enum(['kick', 'ban', 'unban', 'event']), playerId: uuidSchema.optional(), reason: reasonSchema.optional(), eventType: z.enum(['BLACKOUT','DRUNK_NPC','PARTY']).optional() }).strict().parse(request.body);
-    if (body.action === 'event' && !body.eventType) throw new HttpError(400, 'Escolha um evento.');
-    if (body.action !== 'event') {
-      if (!body.playerId || !await getUser(db, body.playerId)) throw new HttpError(404, 'Jogador não encontrado.');
-      if (body.playerId === request.auth!.user.id) throw new HttpError(400, 'Você não pode moderar sua própria conta.');
-      if (!body.reason) throw new HttpError(400, 'Informe o motivo da ação.');
-    }
-    const id = randomUUID();
-    await db.transaction(async (tx) => {
-      await tx.insert(tables.moderationActions).values({ id, actorId: request.auth!.user.id, userId: body.playerId ?? null, action: body.action, reason: body.reason ?? `Evento ${body.eventType}` });
-      if (body.action === 'unban') await tx.update(tables.moderationActions).set({ revokedAt: new Date() }).where(and(eq(tables.moderationActions.userId, body.playerId!), eq(tables.moderationActions.action, 'ban'), isNull(tables.moderationActions.revokedAt)));
-      if (body.action === 'ban') await tx.delete(tables.sessions).where(eq(tables.sessions.userId, body.playerId!));
-      if (body.action !== 'unban') await tx.insert(tables.controls).values({ id, payload: { id, ...body } });
-    });
-    request.log.info({ actorId: request.auth!.user.id, action: body.action, playerId: body.playerId }, 'Ação administrativa');
-    return { message: 'Ação registrada e enviada ao bar.' };
+  app.post('/api/admin/wallet',{preHandler:administrator},request=>{
+    const body=z.object({playerId:uuidSchema,operation:z.enum(['add','remove','set']),amount:z.number().int().min(0).max(MAX_COIN_BALANCE),reason:reasonSchema,
+      requestId:uuidSchema.toLowerCase(),expectedBalance:z.number().int().min(0).max(MAX_COIN_BALANCE).optional()}).strict()
+      .refine(b=>b.operation==='set'||b.amount>0,{message:'Informe uma quantidade maior que zero.'})
+      .refine(b=>b.operation!=='set'||b.expectedBalance!==undefined,{message:'Consulte o saldo atual antes de definir um novo valor.'}).parse(request.body);
+    return administration.adjustWallet(request.auth!.user.id,body);
+  });
+  app.post('/api/admin/role',{preHandler:administrator},request=>{
+    const body=z.object({playerId:uuidSchema,role:z.enum(['admin','user']),reason:reasonSchema}).strict().parse(request.body);
+    return administration.changeRole(request.auth!.user.id,body);
+  });
+  app.post('/api/admin/action',{preHandler:administrator},async request=>{
+    const body=z.object({action:z.enum(['kick','ban','unban','event']),playerId:uuidSchema.optional(),reason:reasonSchema.optional(),eventType:z.enum(['BLACKOUT','DRUNK_NPC','PARTY']).optional()}).strict().parse(request.body);
+    const result=await administration.moderate(request.auth!.user.id,body);
+    request.log.info({actorId:request.auth!.user.id,action:body.action,playerId:body.playerId},'Ação administrativa');
+    return result;
   });
   app.post('/api/internal/validate', internalOptions, async (request) => {
     const { sessionId, userId } = z.object({ sessionId: uuidSchema, userId: uuidSchema }).strict().parse(request.body);

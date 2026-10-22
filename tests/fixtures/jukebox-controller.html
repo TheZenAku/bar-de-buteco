@@ -1,0 +1,12 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Jukebox controller fixture</title><div id="app"><canvas id="world"></canvas><main id="panel"></main></div><script type="module">
+import '/src/assets/fonts/nova-ui.css';import '/src/nova-ui.css';import '/src/jukebox.css';
+import {JukeboxController} from '/src/jukebox.ts';
+import {initialJukebox,commandJukebox} from '../../packages/shared/src/jukebox.ts';
+const state=initialJukebox('jukebox','tv-hall');const world={players:{alice:{id:'alice',x:12.3,y:.3,z:-9.61}},jukeboxes:{jukebox:state}};
+let connected=true,projection=null;const sent=[];const notices=[];
+const controller=new JukeboxController({now:()=>Date.now(),send:(type,payload)=>{sent.push({type,payload});if(type==='jukebox.command'){world.jukeboxes.jukebox=commandJukebox(world.jukeboxes.jukebox,payload,'alice',Date.now());controller.setWorld(world,'alice',connected);}},project:()=>projection,screen:()=>{},notice:(text,error)=>notices.push({text,error}),ambient:()=>{}});
+const panel=document.querySelector('#panel');panel.style.cssText='position:fixed;inset:0 380px 0 0;overflow:auto;padding:20px;z-index:4';
+const open=()=>{panel.innerHTML=controller.panelHtml('jukebox');controller.attachPanel(panel);};open();controller.setWorld(world,'alice',true);
+const timer=setInterval(()=>controller.frame(),50);
+window.fixture={controller,world,sent,notices,open,close:()=>{controller.detachPanel();panel.replaceChildren();},position:(x,y,z)=>{world.players.alice={id:'alice',x,y,z};controller.setWorld(world,'alice',connected);},connection:value=>{connected=value;controller.setWorld(world,'alice',connected);},projection:value=>projection=value,teardown:()=>{clearInterval(timer);controller.destroy();}};
+</script></html>

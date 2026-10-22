@@ -1,0 +1,44 @@
+[
+  {
+    "id": "glasses",
+    "name": "Óculos",
+    "slot": "accessory",
+    "source": "Acc_Male_Face_Glasses.fbx"
+  },
+  {
+    "id": "pants",
+    "name": "Calça",
+    "slot": "bottom",
+    "source": "Cloth_Male_Bottom_Pants.fbx"
+  },
+  {
+    "id": "trousers",
+    "name": "Calça social",
+    "slot": "bottom",
+    "source": "Cloth_Male_Bottom_Trousers.fbx"
+  },
+  {
+    "id": "derby",
+    "name": "Sapato Derby",
+    "slot": "footwear",
+    "source": "Cloth_Male_Feet_Derby.fbx"
+  },
+  {
+    "id": "sneakers",
+    "name": "Tênis",
+    "slot": "footwear",
+    "source": "Cloth_Male_Feet_Sneakers.fbx"
+  },
+  {
+    "id": "sweater",
+    "name": "Suéter",
+    "slot": "top",
+    "source": "Cloth_Male_Top_Sweater.fbx"
+  },
+  {
+    "id": "tee",
+    "name": "Camiseta",
+    "slot": "top",
+    "source": "Cloth_Male_Top_Tee.fbx"
+  }
+]

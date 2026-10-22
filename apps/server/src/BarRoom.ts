@@ -2,11 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-<<<<<<< HEAD
 import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
-=======
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, INTERACTABLES, INTERACTION_RADIUS, PATCH_MS, TICK_MS, distance, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, Player, SeatState, TableState } from './state.js';
@@ -14,12 +10,11 @@ import { BlackjackTable, type Result } from './minigames/blackjack.js';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
 import { BarService } from './world/bartender.js';
+import {JUKEBOX_SYSTEMS,initialJukebox,jukeboxCommandSchema,commandJukebox,jukeboxTime,type JukeboxState} from '@bar/shared';
+import {Jukebox} from './state.js';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
-
-// Interactions are offered within INTERACTION_RADIUS; the server tolerates a little drift from latency.
-const INTERACTION_REACH = INTERACTION_RADIUS + 0.5;
 
 interface Presence {
   ticket: GameTicket;
@@ -68,6 +63,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.state.capacity = this.maxClients;
     this.setPatchRate(PATCH_MS);
     this.state.tables.set('blackjack-1', new TableState());
+    for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id,system.tvId)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
     this.setFixedTimestep(() => this.step(), 1000 / TICK_MS);
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
@@ -87,7 +83,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     return { ...ticket,...access };
   }
 
-<<<<<<< HEAD
   onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
     const previous = this.people.get(auth.userId);
@@ -105,14 +100,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin, character,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
       this.state.players.set(auth.userId, player);
     }
-=======
-  onJoin(client: Client, options: unknown, auth: GameTicket & { blocked: string[] }): void {
-    if (this.people.has(auth.userId)) throw new ServerError(409, 'ALREADY_CONNECTED: Sua conta já está no bar.');
-    const index = this.people.size;
-    // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
-    const requested = skinSchema.safeParse(typeof options === 'object' && options ? (options as { skin?: unknown }).skin : undefined);
-    const player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin: requested.success ? requested.data : DEFAULT_SKIN, x: -2.1 + index % 8 * 0.6, z: 5 + Math.floor(index / 8) * 0.35 });
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     client.view = new StateView();
     this.people.set(auth.userId, { ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map() });
     this.state.occupancy = this.people.size;
@@ -199,6 +186,19 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.queue.push(input);
     });
     this.handle('player.interact', z.object({ objectId: z.string().max(64) }).strict(), 5, (client, command) => this.interact(client, command.objectId));
+    this.handle('jukebox.command',jukeboxCommandSchema,4,(client,command)=>{
+      this.requireJukebox(client,command.id);
+      const state=this.state.jukeboxes.get(command.id)!;
+      state.assign(commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now()));
+      client.send('jukebox.result',{id:command.id,revision:state.revision});
+    });
+    // End notifications cannot overwrite a newer selection or another controller.
+    this.handle('jukebox.ended',z.object({id:z.string().max(64),revision:z.number().int().min(0),videoId:z.string().length(11),duration:z.number().finite().positive().max(86400)}).strict(),2,(client,report)=>{
+      const state=this.state.jukeboxes.get(report.id);
+      if(!state||state.updatedBy!==this.player(client).id||state.revision!==report.revision||state.videoId!==report.videoId||state.status!=='playing')return;
+      if(Math.abs(jukeboxTime(state as unknown as JukeboxState,Date.now())-report.duration)>8)return;
+      state.assign({status:'ended',position:report.duration,updatedAt:Date.now(),revision:state.revision+1});
+    });
     this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
       if (p.interactionState) throw new Error('Levante-se primeiro.');
@@ -214,7 +214,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.animationState = emote === 'dance' ? 'dance' : 'idle';
       if (emote === 'wave') this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
     });
-<<<<<<< HEAD
     this.handle('player.skin', skinMessageSchema, 2, async (client, { skin }) => {
       const player = this.player(client);
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar para trocar o visual.');
@@ -229,12 +228,15 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(!access.valid){this.expel(presence.ticket.userId,'Sua sessão terminou.');return;}
       this.applyAppearance(this.player(client),access);
     });
-=======
-    this.handle('player.skin', skinMessageSchema, 2, (client, { skin }) => { this.player(client).skin = skin; });
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
+      if(text.toLowerCase()==='/velho'){
+        player.oldWalk=!player.oldWalk;
+        if(player.animationState==='run'&&player.oldWalk)player.animationState='walk';
+        client.send('chat.message',{id:randomUUID(),playerId:'system',displayName:'B.A.R.',system:true,sentAt:Date.now(),text:player.oldWalk?'Bengala equipada. Caminhada a 0,475 m/s. Digite /velho novamente para voltar ao normal.':'Bengala guardada. Caminhada normal restaurada.'} satisfies ChatMessage);
+        return;
+      }
       const message: ChatMessage = { id: randomUUID(), playerId: player.id, displayName: player.displayName, text: text.replace(/[\u0000-\u001f\u007f]/g, ' '), sentAt: Date.now() };
       for (const [id, target] of this.people) {
         if (target.revoked || target.blocked.has(player.id) || sender.blocked.has(id)) continue;
@@ -276,9 +278,9 @@ export class BarRoom extends Room<{ state: BarState }> {
       const input = presence.queue.shift();
       if (input) {
         if (!player.interactionState) {
-          const position = movePlayer(player, input);
+          const position = movePlayer(player, input,TICK_MS/1000,player.oldWalk);
           player.x = position.x; player.y = position.y!; player.z = position.z; player.rotation = input.rotation;
-          if (input.dx || input.dz) player.animationState = input.running ? 'run' : 'walk';
+          if (input.dx || input.dz) player.animationState = input.running&&!player.oldWalk ? 'run' : 'walk';
           else if (player.animationState === 'walk' || player.animationState === 'run') player.animationState = 'idle';
         }
         player.lastProcessedInput = input.seq;
@@ -313,11 +315,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
-<<<<<<< HEAD
     if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
-=======
-    if (!object || distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto para interagir.');
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
     if (object.type === 'seat') {
@@ -328,26 +326,24 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.animationState = 'idle'; player.interactionState = object.id; presence.interactionEndsAt = undefined;
       this.service.order(player.id);
       this.systemMessage(`${player.displayName} pediu a especialidade da casa ao Seu Zé.`, player);
-    } else { player.animationState = 'dance'; this.systemMessage(`${player.displayName} escolheu uma música na jukebox.`, player); }
+    } else { this.requireJukebox(client,object.id);client.send('jukebox.open',{id:object.id}); }
+  }
+
+  private requireJukebox(client:Client,id:string):void {
+    const object=INTERACTABLES.find(o=>o.id===id&&o.type==='jukebox'),player=this.player(client);
+    if(!object||!this.state.jukeboxes.has(id)||!canInteract(object,player,INTERACTION_SLACK))throw new Error('Chegue mais perto da jukebox.');
+    if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a interação atual antes de usar a jukebox.');
   }
 
   private joinTable(client: Client): void {
     const player = this.player(client);
     const object = INTERACTABLES.find(i => i.id === 'blackjack-1')!;
-<<<<<<< HEAD
     if (!canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da mesa.');
-=======
-    if (distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto da mesa.');
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     if (player.interactionState && !player.currentTableId) throw new Error('Levante-se primeiro.');
     this.cleanTable();
     this.blackjack.join(player.id, player.displayName);
     const seat = BLACKJACK_SEATS[this.blackjack.seats.findIndex(s => s.playerId === player.id)]!;
-<<<<<<< HEAD
     player.x = seat.x; player.y = seat.y ?? player.y; player.z = seat.z; player.rotation = seat.rotation;
-=======
-    player.x = seat.x; player.z = seat.z; player.rotation = seat.rotation;
->>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     player.currentTableId = object.id; player.interactionState = object.id; player.animationState = 'sit';
     this.syncTable();
   }

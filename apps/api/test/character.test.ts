@@ -42,4 +42,15 @@ test('creator, ownership and purchases persist; duplicate/racing requests cannot
   await post('/api/auth/logout',{});
   const login=await api.app.inject({method:'POST',url:'/api/auth/login',payload:{email:account.email,password:account.password}});
   assert.deepEqual(login.json().user.character,character);assert.equal(login.json().user.equippedSkin,'custom');
+  const newCookie=`${login.cookies[0].name}=${login.cookies[0].value}`;
+  const dressed={...DEFAULT_CHARACTER,top:'sweater',bottom:'trousers',footwear:'derby',accessory:'glasses',topColor:'#873e37',bottomColor:'#111820',footwearColor:'#d7d5d0'};
+  assert.equal((await api.app.inject({method:'POST',url:'/api/character',headers:{cookie:newCookie},payload:{...dressed,top:'not-installed'}})).statusCode,400);
+  assert.equal((await api.app.inject({method:'POST',url:'/api/character',headers:{cookie:newCookie},payload:dressed})).statusCode,200);
+  for(const skin of ['nathan','custom']){
+    assert.equal((await api.app.inject({method:'POST',url:'/api/wardrobe/equip',headers:{cookie:newCookie},payload:{skin}})).statusCode,200);
+    const wardrobe=await api.app.inject({url:'/api/wardrobe',headers:{cookie:newCookie}});assert.deepEqual(wardrobe.json().character,dressed);
+  }
+  await api.app.inject({method:'POST',url:'/api/auth/logout',headers:{cookie:newCookie},payload:{}});
+  const dressedLogin=await api.app.inject({method:'POST',url:'/api/auth/login',payload:{email:account.email,password:account.password}});
+  assert.deepEqual(dressedLogin.json().user.character,dressed,'garment slots and independent colors survive logging in again');
 });

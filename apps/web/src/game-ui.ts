@@ -1,0 +1,43 @@
+import {uiIcon as icon} from './ui-icons';
+export const HUD_PANELS=[
+  {id:'status',title:'Seu Estado',icon:'activity',width:270},
+  {id:'actions',title:'Ações',icon:'sparkles',width:340},
+  {id:'chat',title:'Papo no Balcão',icon:'chat',width:320},
+  {id:'friends',title:'Galera no Bar',icon:'users',width:270},
+  {id:'inventory',title:'Bolso',icon:'bag',width:290},
+  {id:'scene',title:'Pelo Bar',icon:'map',width:270},
+] as const;
+export type PanelId=typeof HUD_PANELS[number]['id'];
+function panel(id:PanelId,content:string):string{
+  const p=HUD_PANELS.find(p=>p.id===id)!;
+  return `<section class="hud-panel" data-panel="${id}" aria-label="${p.title}"><header class="panel-heading" tabindex="0" aria-label="Mover painel ${p.title}" aria-describedby="panel-instructions"><span class="panel-grip">${icon('grip')}</span>${icon(p.icon)}<h2>${p.title}</h2><button type="button" ${id==='chat'?'id="chat-toggle" data-action="chat-toggle"':'data-hud-collapse="'+id+'"'} aria-label="${id==='chat'?'Recolher chat':'Recolher '+p.title}" aria-expanded="true" aria-controls="${id}-body">${icon('chevron')}</button></header><div class="hud-content" id="${id}-body">${content}</div></section>`;
+}
+export function gameUi():string{return `
+  <canvas id="world" aria-label="Cenário tridimensional do B.A.R."></canvas><div id="labels" aria-hidden="true"></div><div class="vignette"></div>
+  <main id="lobby" class="lobby">
+    <header class="lobby-header"><a class="wordmark neon-text" href="/" aria-label="B.A.R. início">Boteco<span>Social</span></a><span class="small-tag">O SEU BAR. A SUA GALERA.</span></header>
+    <div class="lobby-body"><section class="welcome"><div class="eyebrow"><i class="live-dot"></i> ABERTO PRA RESENHA</div><h1>Mais uma rodada<br>de <em>boas histórias.</em></h1><p>Entre no bar, encontre a galera e faça a noite acontecer.<br>Seu personagem, seu canto, seu jeito de jogar.</p><div class="lobby-features"><span>${icon('users')} Encontre a galera</span><span>${icon('cards')} Jogue uma partida</span><span>${icon('music')} Entre no ritmo</span></div></section>
+    <section class="entry-card hud-panel" aria-label="Acesso à conta"><div class="card-kicker">PUXE UMA CADEIRA ${icon('beer')}</div><div id="auth-content"></div><div class="card-foot"><i class="live-dot"></i> Sem instalação. Só chegar.</div></section></div>
+    <footer class="lobby-footer"><span>B.A.R. · Boteco Social</span><span>Converse, explore e jogue junto.</span></footer>
+  </main>
+  <main id="game" class="game hidden" aria-label="Interface do bar">
+    <header class="game-header"><h1 class="boteco-logo neon-text">Boteco <span>Social</span></h1><button class="player-badge" data-action="account" aria-label="Sua conta"><span class="avatar" id="avatar">B</span><span><b id="hud-name">Chegando…</b><small id="hud-skin">Sua cadeira está aqui</small></span></button>
+    <nav class="game-tools" aria-label="Ferramentas"><button class="hud-btn" data-hud-lock aria-label="Travar painéis" aria-pressed="false">${icon('unlock')}<span class="tool-label" id="layout-lock-label">Livre</span></button><button class="hud-btn" data-hud-menu aria-label="Painéis" aria-expanded="false" aria-controls="panel-menu">${icon('panels')}<span class="tool-label">Painéis</span></button><button class="hud-btn" data-action="people" title="Pessoas no bar" aria-label="Pessoas no bar">${icon('users')}</button><button class="hud-btn" data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música" aria-pressed="false">${icon('music')}<i class="muted-mark"></i></button><button class="hud-btn" data-action="help" title="Como jogar" aria-label="Como jogar">${icon('help')}</button><button class="hud-btn hidden" data-action="admin" id="admin-button" title="Administração" aria-label="Administração">${icon('settings')}</button></nav>
+    <div id="panel-menu" class="hud-panel panel-menu hidden" aria-label="Organizar painéis"><p>Seu bar, do seu jeito</p>${HUD_PANELS.map(p=>`<button data-hud-visible="${p.id}" aria-pressed="true">${icon(p.icon)}<span>${p.title}</span>${icon('eye')}</button>`).join('')}<button class="hud-btn" data-hud-reset>${icon('reset')} Restaurar layout</button></div></header>
+    <p id="panel-instructions" class="sr-only">Arraste o cabeçalho para mover. Com ele em foco, use as setas. As posições são salvas neste navegador.</p>
+    ${panel('status',`<div class="status-row"><span>${icon('users')} No bar</span><b id="occupancy">— / 32</b></div><div class="hud-track"><i id="occupancy-fill"></i></div><div class="status-row connection-stat"><span><i class="live-dot"></i><b id="hud-status">Conectando…</b></span><small id="ping">— ms</small></div><div class="activity-card">${icon('activity')}<span>Agora <b id="hud-activity">Chegando</b></span></div><div class="hud-wallet">${icon('coins')}<span>Carteira</span><b id="hud-balance">…</b><small>moedas</small></div>`)}
+    ${panel('actions',`<nav class="action-bar" aria-label="Ações do personagem"><button class="hud-btn" data-action="drink">${icon('beer')}<span>Pedir gelada</span><kbd>E · balcão</kbd></button><button class="hud-btn" data-action="dance" id="dance-button" aria-pressed="false">${icon('music')}<span>Dançar</span><kbd>G</kbd></button><button class="hud-btn" data-action="wave">${icon('hand')}<span>Acenar</span><kbd>Olá!</kbd></button><button class="hud-btn" data-action="chat">${icon('chat')}<span>Resenhar</span><kbd>Enter</kbd></button><button class="hud-btn" data-action="skins">${icon('shirt')}<span>Meu visual</span><kbd>C</kbd></button><button class="hud-btn" data-action="interact">${icon('sparkles')}<span>Interagir</span><kbd>E</kbd></button><button class="hud-btn" data-action="audio" aria-label="Alternar som">${icon('music')}<span>Música</span><kbd>Som</kbd></button><button class="hud-btn hidden" data-action="kick" id="kick-button">${icon('kick')}<span>Karatê</span><kbd>X · Rafael</kbd></button></nav>`)}
+    ${panel('chat',`<div id="messages" class="messages" role="log" aria-label="Mensagens por proximidade"></div><form id="chat-form"><input id="chat-input" name="message" autocomplete="off" maxlength="240" placeholder="Fala aí…" aria-label="Mensagem por proximidade"><button class="hud-btn" type="submit" aria-label="Enviar mensagem">${icon('send')}</button></form><small class="panel-footnote">Papo por perto · até 12 metros</small>`)}
+    ${panel('friends','<div id="hud-people" class="hud-people"></div><button class="text-button full" data-action="people">Gerenciar pessoas e bloqueios</button>')}
+    ${panel('inventory','<p class="panel-footnote">Seus visuais da coleção</p><div id="hud-inventory" class="hud-inventory"></div><button class="hud-btn full" data-action="skins">Abrir coleção e loja</button>')}
+    ${panel('scene','<div id="hud-scene" class="hud-scene"></div><p class="panel-footnote">Aproxime-se para interagir.</p>')}
+    <div id="event-banner" class="event-banner hidden" role="status"></div><div id="connection" class="connection hidden" role="status"></div>
+    <button id="context" data-action="interact" class="context hidden"><kbd>E</kbd><span><small>CHEGA MAIS</small><b id="context-label"></b></span></button>
+    <div class="world-hint"><span><kbd>W A S D</kbd> mover</span><span><kbd>SHIFT</kbd> correr</span><span>Arraste para olhar · role para aproximar</span></div>
+    <section id="blackjack" class="blackjack hud-panel hidden" aria-label="Mesa de blackjack"></section>
+    <div id="waiting" class="waiting hidden"><span class="spinner"></span><h2>Já estamos abrindo a porta.</h2><p id="waiting-message"></p><button data-action="leave" class="button secondary">Voltar à entrada</button></div>
+  </main>
+  <div id="modal" class="modal-backdrop hidden"><section class="modal hud-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button data-action="close-modal" aria-label="Fechar janela">${icon('close')}</button></div><div id="modal-content"></div></section></div>
+  <div id="toasts" class="toasts" aria-label="Notificações"></div>
+  ${import.meta.env.DEV?'<button class="dev-mail" data-action="mail">✉ Caixa de e-mail local</button>':''}
+`;}

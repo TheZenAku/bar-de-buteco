@@ -1,8 +1,10 @@
 import map from './map-data.json';
 import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } from './index.js';
+import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT} from './jukebox.js';
 
 export const WALK_SPEED = 3.5;
 export const RUN_SPEED = 6;
+export const OLD_CANE_SPEED = .475;
 export const PLAYER_RADIUS = 0.34;
 export const PLAYER_HEIGHT = 1.86;
 export const WORLD = map.bounds;
@@ -13,7 +15,7 @@ export const CAFE_TABLES = map.tables;
 // Game props the map leaves room for: blackjack in the upstairs games hall, between the last pool table
 // and the lounge; the jukebox in the empty fourth slot of the ground-floor hall's back row, clear of the stairs.
 export const BLACKJACK_TABLE = {x:17.4,y:3.45,z:-7.4,rx:0.95,rz:0.55};
-export const JUKEBOX = {x:12.3,y:.3,z:-10.3,hx:.45,hz:.3};
+export const JUKEBOX = JUKEBOX_PLACEMENT;
 export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
   const a=degrees*Math.PI/180,dx=(BLACKJACK_TABLE.rx+0.43)*Math.sin(a),dz=(BLACKJACK_TABLE.rz+0.42)*Math.cos(a);
   return {x:BLACKJACK_TABLE.x+dx,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z+dz,rotation:Math.atan2(-dx,-dz)};
@@ -76,9 +78,9 @@ export function isWalkable(x:number,z:number,y?:number):boolean {
   return supported!==undefined&&(y===undefined||Math.abs(supported-y)<.08)&&!obstructed(x,z,supported);
 }
 
-export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05):Required<Position> {
+export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false):Required<Position> {
   const magnitude=Math.hypot(input.dx,input.dz);
-  const scale=(input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
+  const scale=(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
   for(let step=0;step<steps;step++){
@@ -127,7 +129,7 @@ export function canInteract(object:Interactable,position:Position,slack=0):boole
   const y=position.y??.3;
   if(Math.abs((object.y??y)-y)>.6)return false;
   const reach=interactionReach(object,position);
-  if(reach.gap>TOUCH_GAP+slack)return false;
+  if(reach.gap>TOUCH_GAP+slack+(object.type==='jukebox'?JUKEBOX_INTERACTION_SLACK:0))return false;
   const eye=y+1.3;
   return !COLLIDERS.some(c=>!c.ramp&&!object.footprint?.some(f=>f.id===c.id)&&(c.minY??-Infinity)<eye&&(c.maxY??Infinity)>eye
     &&segmentCrossesBox(position.x,position.z,reach.x,reach.z,c));
