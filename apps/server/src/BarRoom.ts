@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
+<<<<<<< HEAD
 import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
+=======
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, INTERACTABLES, INTERACTION_RADIUS, PATCH_MS, TICK_MS, distance, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput } from '@bar/shared';
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, Player, SeatState, TableState } from './state.js';
@@ -13,6 +17,9 @@ import { BarService } from './world/bartender.js';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
+
+// Interactions are offered within INTERACTION_RADIUS; the server tolerates a little drift from latency.
+const INTERACTION_REACH = INTERACTION_RADIUS + 0.5;
 
 interface Presence {
   ticket: GameTicket;
@@ -80,6 +87,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     return { ...ticket,...access };
   }
 
+<<<<<<< HEAD
   onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
     const previous = this.people.get(auth.userId);
@@ -97,6 +105,14 @@ export class BarRoom extends Room<{ state: BarState }> {
       player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin, character,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
       this.state.players.set(auth.userId, player);
     }
+=======
+  onJoin(client: Client, options: unknown, auth: GameTicket & { blocked: string[] }): void {
+    if (this.people.has(auth.userId)) throw new ServerError(409, 'ALREADY_CONNECTED: Sua conta já está no bar.');
+    const index = this.people.size;
+    // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
+    const requested = skinSchema.safeParse(typeof options === 'object' && options ? (options as { skin?: unknown }).skin : undefined);
+    const player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin: requested.success ? requested.data : DEFAULT_SKIN, x: -2.1 + index % 8 * 0.6, z: 5 + Math.floor(index / 8) * 0.35 });
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     client.view = new StateView();
     this.people.set(auth.userId, { ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map() });
     this.state.occupancy = this.people.size;
@@ -198,6 +214,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.animationState = emote === 'dance' ? 'dance' : 'idle';
       if (emote === 'wave') this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
     });
+<<<<<<< HEAD
     this.handle('player.skin', skinMessageSchema, 2, async (client, { skin }) => {
       const player = this.player(client);
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar para trocar o visual.');
@@ -212,6 +229,9 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(!access.valid){this.expel(presence.ticket.userId,'Sua sessão terminou.');return;}
       this.applyAppearance(this.player(client),access);
     });
+=======
+    this.handle('player.skin', skinMessageSchema, 2, (client, { skin }) => { this.player(client).skin = skin; });
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
@@ -293,7 +313,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
+<<<<<<< HEAD
     if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
+=======
+    if (!object || distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto para interagir.');
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
     if (object.type === 'seat') {
@@ -310,12 +334,20 @@ export class BarRoom extends Room<{ state: BarState }> {
   private joinTable(client: Client): void {
     const player = this.player(client);
     const object = INTERACTABLES.find(i => i.id === 'blackjack-1')!;
+<<<<<<< HEAD
     if (!canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da mesa.');
+=======
+    if (distance(player, object) >= INTERACTION_REACH) throw new Error('Chegue mais perto da mesa.');
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     if (player.interactionState && !player.currentTableId) throw new Error('Levante-se primeiro.');
     this.cleanTable();
     this.blackjack.join(player.id, player.displayName);
     const seat = BLACKJACK_SEATS[this.blackjack.seats.findIndex(s => s.playerId === player.id)]!;
+<<<<<<< HEAD
     player.x = seat.x; player.y = seat.y ?? player.y; player.z = seat.z; player.rotation = seat.rotation;
+=======
+    player.x = seat.x; player.z = seat.z; player.rotation = seat.rotation;
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
     player.currentTableId = object.id; player.interactionState = object.id; player.animationState = 'sit';
     this.syncTable();
   }

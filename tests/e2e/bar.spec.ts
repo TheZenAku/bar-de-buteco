@@ -329,9 +329,26 @@ test('keyboard movement reaches blackjack, a full round settles and admin events
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await gameReady(page);
   await expect(page.locator('#admin-button')).toBeVisible();
+<<<<<<< HEAD
   for(const [x,z] of [...TO_UPSTAIRS,[15.85,-7.4],[16.28,-7.4]])await walkTo(page,x,z,.12);
   // Movement arrives in fixed ticks; touch the table edge instead of oscillating around a sub-tick target.
   await page.keyboard.press('d',{delay:150});
+=======
+  // Read copies of development telemetry; every movement/action still uses keyboard and UI.
+  const playerPosition=()=>page.evaluate(()=>{const {world,localId}=(window as any).barDebug.snapshot();return world?.players[localId] as {x:number;z:number}|undefined;});
+  await expect.poll(playerPosition).toBeTruthy();
+  async function walkTo(x:number,z:number){
+    for(let step=0;step<100;step++){
+      const position=(await playerPosition())!;const dx=x-position.x,dz=z-position.z;
+      if(Math.hypot(dx,dz)<0.55)return;
+      const horizontal=dx*Math.cos(.15)-dz*Math.sin(.15),forward=-dx*Math.sin(.15)-dz*Math.cos(.15);
+      const key=Math.abs(horizontal)>Math.abs(forward)?horizontal>0?'d':'a':forward>0?'w':'s';
+      await page.keyboard.down(key);await page.waitForTimeout(150);await page.keyboard.up(key);
+    }
+    throw new Error(`Could not reach ${x},${z}: ${JSON.stringify(await playerPosition())}`);
+  }
+  await walkTo(1,1);await walkTo(4.5,-2.7);
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   await expect(page.locator('#context-label')).toHaveText('Jogar blackjack');
   await page.keyboard.press('e');await expect(page.locator('#blackjack')).toBeVisible();
   await page.getByRole('button',{name:'Começar rodada'}).click();

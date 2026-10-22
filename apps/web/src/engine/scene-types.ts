@@ -18,9 +18,12 @@ export interface SceneActor {
   role?: string;
   /** Player model id (see SKINS); NPCs keep the box avatar. */
   skin?: string;
+<<<<<<< HEAD
   character?: string;
   /** False for an avatar left in the bar by a player who logged out. */
   connected?: boolean;
+=======
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 }
 
 export interface SceneWorld {

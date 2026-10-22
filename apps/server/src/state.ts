@@ -6,7 +6,10 @@ export class Player extends Schema {
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
   @type('string') skin: string = DEFAULT_SKIN;
+<<<<<<< HEAD
   @type('string') character = '';
+=======
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   @type('float32') x = 0;
   @type('float32') y = 0;
   @type('float32') z = 8;

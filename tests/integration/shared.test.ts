@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+<<<<<<< HEAD
 import {movePlayer,isWalkable,RUN_SPEED,TICK_MS,inputSchema,COLLIDERS,PLAYER_RADIUS,WORLD,BLACKJACK_SEATS,INTERACTABLES,standingPosition} from '@bar/shared';
+=======
+import {movePlayer,isWalkable,RUN_SPEED,TICK_MS,inputSchema,COLLIDERS,PLAYER_RADIUS,WORLD,BLACKJACK_SEATS,INTERACTABLES} from '@bar/shared';
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 import {signTicket,verifyTicket} from '@bar/shared/tickets';
 
 test('movement keeps diagonal speed bounded and prevents crossing walls or furniture',()=>{
@@ -10,16 +14,26 @@ test('movement keeps diagonal speed bounded and prevents crossing walls or furni
   for(let i=0;i<500;i++)position=movePlayer(position,{dx:1,dz:0,running:true});
   assert.ok(isWalkable(position.x,position.z));assert.ok(position.x<WORLD.maxX);
   const table=COLLIDERS.find(collider=>collider.id==='blackjack')!;
+<<<<<<< HEAD
   const front={x:table.x,y:.3,z:table.z+table.hz+PLAYER_RADIUS+0.02};
+=======
+  const front={x:table.x,z:table.z+table.hz+PLAYER_RADIUS+0.2};
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   const blocked=movePlayer(front,{dx:0,dz:-1,running:true});
   assert.equal(blocked.z,front.z);
   assert.equal(inputSchema.safeParse({seq:1,dx:100,dz:0,running:true,rotation:0}).success,false);
 });
 
+<<<<<<< HEAD
 test('every authored seat has a clear standing position on its floor',()=>{
   for(const seat of [...BLACKJACK_SEATS,...INTERACTABLES.filter(object=>object.type==='seat')]){
     const exit=standingPosition(seat,seat.rotation);
     assert.ok(isWalkable(exit.x,exit.z,exit.y),`exit from seat at ${seat.x.toFixed(2)},${seat.z.toFixed(2)}`);
+=======
+test('every seat is inside the room and walkable, so a seated player can stand up and leave',()=>{
+  for(const seat of [...BLACKJACK_SEATS,...INTERACTABLES.filter(object=>object.type==='seat')]){
+    assert.ok(isWalkable(seat.x,seat.z),`seat at ${seat.x.toFixed(2)},${seat.z.toFixed(2)}`);
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   }
 });
 

@@ -1,6 +1,10 @@
 # B.A.R. — Bar de Buteco
 
+<<<<<<< HEAD
 MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, mapa BarBoteco com rua, varanda, dois andares e escada, e jogadores com modelo 3D animado. Não há apostas, dinheiro real nem prêmios.
+=======
+MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, conversa por proximidade, interações, blackjack, NPCs, três eventos e moderação. Interface em português, cenário procedural em escala real e jogadores com modelo 3D animado. Não há apostas, dinheiro real nem prêmios.
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 
 ## Abrir o projeto
 
@@ -38,7 +42,10 @@ Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Q
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
 | C | Escolher o visual (skin); todos veem a troca na hora |
+<<<<<<< HEAD
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
+=======
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 | Enter | Abrir o chat de proximidade (12 m) |
 | Esc | Fechar uma janela |
 
@@ -86,7 +93,11 @@ O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atua
 
 ## Escopo da versão
 
+<<<<<<< HEAD
 Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e Seu Zé usam modelos animados. Os jogadores começam com um personagem Quaternius personalizado e podem adquirir Nathan, Leandro, Rafael e Read na loja (`SKINS` em `packages/shared`). Leandro, Read e Magrão preservam os rigs AccuRig; Rafael preserva seu rig Character Creator / Unreal. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; o personagem, a coleção e o visual equipado ficam salvos na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+=======
+Os sistemas funcionais do MVP estão implementados para execução local. O cenário (um salão de 20 × 14 m em escala real) e os NPCs são procedurais. Os jogadores escolhem entre três skins (`SKINS` em `packages/shared`), convertidas de `assets-bar` para `apps/web/public/models`: "Nathan", da Renderpeople, com caminhada própria e animação parada do Mixamo, "Leandro", gerado no Meshy AI sem esqueleto e ligado automaticamente ao esqueleto do Nathan para usar as mesmas animações, e "Rafael", com esqueleto próprio no padrão Character Creator / Unreal, para o qual as animações do Nathan foram redirecionadas a partir da T-pose do modelo. O jogo usa as animações da própria skin quando ela as traz, e as do Nathan nos demais casos. As miniaturas do seletor ficam em `apps/web/public/skins`. A escolha fica salva no navegador. Confira a licença desses assets antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 

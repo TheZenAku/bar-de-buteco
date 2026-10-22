@@ -2,6 +2,7 @@ import { BLACKJACK_TABLE, movePlayer, type Position } from '@bar/shared';
 import { Npc } from '../state.js';
 
 const routes: Record<string, Position[]> = {
+<<<<<<< HEAD
   // Veranda, through the hall's east doorway, down the aisle along the counter to the stairs and back.
   tonico: [{x:15.3,y:.3,z:-2.6},{x:15.3,y:.3,z:-10.9},{x:14,y:.3,z:-10.9},{x:15.3,y:.3,z:-6}],
   // Backyard, in front of the stage.
@@ -14,6 +15,17 @@ export function createNpcs(): Npc[] {
     new Npc().assign({ id: 'tonico', displayName: 'Tonico', color: '#b75c46', ...routes.tonico[0] }),
     new Npc().assign({ id: 'lurdinha', displayName: 'Dona Lurdinha', color: '#709e98', ...routes.lurdinha[0] }),
     new Npc().assign({ id: 'dealer', displayName: 'Dealer', color: '#efe0b5', x: BLACKJACK_TABLE.x,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z-0.95,behavior:'dealer' }),
+=======
+  // Straight legs between waypoints clear the tables, counter and blackjack table.
+  tonico: [{ x: -0.8, z: 0.4 }, { x: 1.6, z: -1.8 }, { x: 5.6, z: -1.6 }, { x: 2.2, z: 0.6 }, { x: 0.8, z: 4.2 }],
+  lurdinha: [{ x: -8.8, z: 3 }, { x: -8.8, z: -1.8 }, { x: -1.6, z: -1.8 }, { x: -1.6, z: 4 }],
+};
+export function createNpcs(): Npc[] {
+  return [
+    new Npc().assign({ id: 'bartender', displayName: 'Seu Zé · bartender', color: '#efe0b5', x: -6, z: -5.6, behavior: 'serving' }),
+    new Npc().assign({ id: 'tonico', displayName: 'Tonico', color: '#b75c46', x: -0.8, z: 0.4 }),
+    new Npc().assign({ id: 'lurdinha', displayName: 'Dona Lurdinha', color: '#709e98', x: -8.8, z: 3 }),
+>>>>>>> 980e69a1f1f3166d1ad9aaacfccb84c5a3b52ec1
   ];
 }
 export class NpcDirector {
