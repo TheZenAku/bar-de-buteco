@@ -12,6 +12,8 @@ export interface SceneActor {
   interactionState?: string;
   currentTableId?: string;
   cardResult?: string;
+  /** Number of public cards in this player's blackjack hand (only used to draw held props). */
+  cardCount?:number;
   state?: string;
   color?: string;
   avatarColor?: string;

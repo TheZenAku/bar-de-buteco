@@ -16,6 +16,6 @@
   "DrunkWalk": 3000,
   "Wave": 1467,
   "Use": 2000,
-  "Toilet": 11400,
-  "Recover": 5000
+  "Recover": 5000,
+  "Wait": 4000
 }

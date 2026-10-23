@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { KICK_DURATION_MS, DRINK_DURATION_MS } from '@bar/shared';
+import { KICK_DURATION_MS, DRINK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS } from '@bar/shared';
 
 function glb(file: string) {
   const bytes = readFileSync(new URL(`../../apps/web/public/${file}`, import.meta.url));
@@ -18,7 +18,7 @@ test('generated animations bind to existing skins and contain valid skeletal rot
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
     assert.equal(json.meshes, undefined, 'Animation banks must not duplicate character geometry');
     const names = json.animations.map((animation: any) => animation.name);
-    for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Dance', 'Sit']) assert.ok(names.includes(clip));
+    for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Dance', 'Sit', 'Wave', 'Use', 'Wait', 'Recover']) assert.ok(names.includes(clip));
     assert.equal(names.includes('Kick'), skin === 'rafael');
     assert.equal(names.includes('Bartend'), skin === 'magrao', 'Bartending belongs to Seu Zé (Magrão)');
     for (const animation of json.animations) {
@@ -28,14 +28,17 @@ test('generated animations bind to existing skins and contain valid skeletal rot
         const input = json.accessors[sampler.input];
         if (animation.name === 'Kick') assert.equal(Math.round(input.max[0] * 1000), KICK_DURATION_MS);
         if (animation.name === 'Drink') assert.equal(Math.round(input.max[0] * 1000), DRINK_DURATION_MS);
-        if (animation.name === 'Sit') assert.equal(Math.round(input.max[0] * 1000), 2700, 'Only the calm seated part of Sitting Drinking');
+        if (animation.name === 'Sit') assert.equal(Math.round(input.max[0] * 1000), 4167, 'The neutral seated loop, without an invisible drink');
+        if (animation.name === 'Wave') assert.equal(Math.round(input.max[0] * 1000), WAVE_DURATION_MS);
+        if (animation.name === 'Use') assert.equal(Math.round(input.max[0] * 1000), USE_DURATION_MS);
+        if (animation.name === 'Recover') assert.equal(Math.round(input.max[0] * 1000), RECOVER_DURATION_MS);
         const accessor = json.accessors[sampler.output], view = json.bufferViews[accessor.bufferView];
         assert.equal(accessor.count, input.count);
         if (channel.target.path !== 'rotation') continue;
-        if (animation.name === 'Sit') {
+        if (['Walk','Run','DrunkIdle','DrunkWalk','Dance','Sit','Wait'].includes(animation.name)) {
           const at = (frame: number) => Array.from({ length: 4 }, (_, c) => bin.readFloatLE((view.byteOffset ?? 0) + (accessor.byteOffset ?? 0) + frame * 16 + c * 4));
           const [first, last] = [at(0), at(accessor.count - 1)];
-          assert.ok(Math.abs(first.reduce((sum, value, c) => sum + value * last[c]!, 0)) > 0.9999, `${skin}/Sit must loop without a seam`);
+          assert.ok(Math.abs(first.reduce((sum, value, c) => sum + value * last[c]!, 0)) > 0.999, `${skin}/${animation.name} must loop without a seam`);
         }
         for (let frame = 0; frame < accessor.count; frame++) {
           const offset = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0) + frame * 16;

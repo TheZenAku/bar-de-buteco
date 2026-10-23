@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, DoorState, Player, SeatState, TableState } from './state.js';
@@ -30,6 +30,9 @@ interface Presence {
   revoked: boolean;
   rejectReconnect?: () => void;
   interactionEndsAt?: number;
+  /** A short non-blocking gesture (wave/use/recovery) and the state it may safely restore. */
+  gestureEndsAt?:number;
+  gestureState?:AnimationState;
   rates: Map<string, number[]>;
   /** After an alcohol faint: when the fallen body is taken to the recovery point (once). */
   recoveryMoveAt?: number;
@@ -249,8 +252,12 @@ export class BarRoom extends Room<{ state: BarState }> {
         p.lastProcessedInput = presence.lastReceived;
         return;
       }
-      p.animationState = emote === 'dance' ? 'dance' : 'idle';
-      if (emote === 'wave') this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
+      if(emote==='wave'){
+        this.playTemporary(p,this.forClient(client)!,'wave',WAVE_DURATION_MS);
+        this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
+      }else{
+        p.animationState=emote==='dance'?'dance':'idle';p.animationStartedAt=Date.now();
+      }
     });
     this.handle('player.skin', skinMessageSchema, 2, async (client, { skin }) => {
       const player = this.player(client);
@@ -314,6 +321,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const [id, presence] of this.people) {
       const player = this.state.players.get(id)!;
       if (!player.connected || presence.revoked) continue;
+      if(presence.gestureEndsAt&&now>=presence.gestureEndsAt){
+        if(player.animationState===presence.gestureState)player.animationState='idle';
+        presence.gestureEndsAt=undefined;presence.gestureState=undefined;
+      }
       // The drink is finished and leaves the hand together with the interaction.
       if (presence.interactionEndsAt && now >= presence.interactionEndsAt) this.finishInteraction(player, presence, now);
       const input = presence.queue.shift();
@@ -366,22 +377,25 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
+    if(object.type!=='seat'){
+      const target=interactionReach(object,player);
+      if(Math.hypot(target.x-player.x,target.z-player.z)>.01)player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
+    }
     if (object.type === 'seat') {
       if ([...this.state.players.values()].some(p => p.interactionState === object.id)) throw new Error('Esse lugar está ocupado.');
       player.x = object.x; player.y = object.y ?? player.y; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.interactionState = object.id;
     } else if (object.type === 'counter') {
       // The player waits at the counter; the drink starts when Seu Zé finishes preparing it (see serveDrinks).
-      player.animationState = 'idle'; player.interactionState = object.id; presence.interactionEndsAt = undefined;
+      player.animationState = 'wait'; player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = undefined;
       player.drinkItem = item;
       this.service.order(player.id);
       this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo americano' : 'uma long neck'} ao Seu Zé.`, player);
     } else if (object.type === 'toilet') {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
-      player.rotation = Math.atan2(object.x - player.x, object.z - player.z);
-      player.animationState = 'idle'; player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
-    } else if (object.type === 'door') this.toggleDoor(player, object.id);
-    else if (object.type === 'television') { this.requireMedia('tv',client,object.id);client.send('tv.open',{id:object.id}); }
-    else { this.requireMedia('jukebox',client,object.id);client.send('jukebox.open',{id:object.id}); }
+      player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
+    } else if (object.type === 'door') {this.toggleDoor(player, object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);}
+    else if (object.type === 'television') { this.requireMedia('tv',client,object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('tv.open',{id:object.id}); }
+    else { this.requireMedia('jukebox',client,object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('jukebox.open',{id:object.id}); }
   }
 
   /** A drink or a toilet visit ran its full time. */
@@ -408,7 +422,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (event.type === 'faint' || event.type === 'stumble') {
       this.knockDown(player, presence);
       player.interactionState = event.type === 'faint' ? 'fainted' : 'stumbling';
-      player.animationState = 'fallen'; player.animationStartedAt = now;
+      player.animationState = event.type==='faint'?'fallen':'stumble'; player.animationStartedAt = now;
     }
     if (event.type === 'faint') {
       this.log('faint', { playerId: player.id, cause: event.cause });
@@ -421,8 +435,16 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
     }
     if ((event.type === 'woke' && player.interactionState === 'fainted') || (event.type === 'steady' && player.interactionState === 'stumbling')) {
-      player.interactionState = ''; player.animationState = 'idle';
+      player.interactionState = '';
+      if(event.type==='woke')this.playTemporary(player,presence,'recover',RECOVER_DURATION_MS);
+      else player.animationState = 'idle';
     }
+  }
+
+  /** Plays a synced gesture without claiming a chair/object. Movement may cancel it and is never reset later. */
+  private playTemporary(player:Player,presence:Presence,state:AnimationState,duration:number):void {
+    player.animationState=state;player.animationStartedAt=Date.now();
+    presence.gestureState=state;presence.gestureEndsAt=player.animationStartedAt+duration;
   }
   /** Once per alcohol faint, after the fall: the body is taken to free floor around the recovery marker. */
   private moveToRecovery(player: Player, presence: Presence): void {

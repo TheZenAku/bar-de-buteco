@@ -48,6 +48,7 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     player.assign({x:toilet.x,y:toilet.y,z:toilet.z+.7});other.assign({x:toilet.x,y:toilet.y,z:toilet.z+.7});
     await pause(150);
     a.send('player.interact',{objectId:'toilet-1'});await until(()=>player.interactionState==='toilet-1');
+    assert.equal(player.animationState,'toilet','The restroom has a neutral dedicated action instead of an unrelated idle');
     const bErrors:string[]=[];b.onMessage('error',m=>bErrors.push(m.message));
     b.send('player.interact',{objectId:'toilet-1'});await until(()=>bErrors.some(e=>e.includes('Ocupado')));
     await until(()=>seen()?.bladder===0,NEEDS.bladder.toiletSeconds*1000+2000);
@@ -64,7 +65,7 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     assert.deepEqual({x:player.x,z:player.z},at,'A fainted body does not move');
     assert.deepEqual(lost,[],'NO_INVENTORY: nothing to lose and nothing breaks');
     needs.conditionUntil=Date.now()+200;
-    await until(()=>seen()?.condition==='recovering'&&seen()?.animationState==='idle');
+    await until(()=>seen()?.condition==='recovering'&&seen()?.animationState==='recover');
     assert.equal(seen()?.hp,NEEDS.hp.recoverTo);
     needs.conditionUntil=Date.now();await until(()=>seen()?.condition==='normal');
 

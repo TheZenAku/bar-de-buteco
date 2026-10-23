@@ -49,6 +49,8 @@ interface Avatar {
   cup: pc.Entity;
   /** The bottle or glass in hand, created on first use. */
   drinks?: Partial<Record<DrinkItem, pc.Entity>>;
+  /** A small fan of real geometry shown between both hands at the blackjack table. */
+  cards?:pc.Entity;
   /** How close the drink is to the lips, 0–1 (telemetry). */
   sip?: number;
   ring: pc.Entity;
@@ -91,7 +93,6 @@ const LABEL_HEIGHT = 2.15;
 // The clip walks at 1.27 m/s. Matching WALK_SPEED/RUN_SPEED exactly would look frantic,
 // so the cadence is raised only part of the way.
 const WALK_CLIP_SPEED = 1.9;
-const RUN_CLIP_SPEED = 2.6;
 // Positions arrive in steps: local predictions every input tick, everyone else with each server patch.
 // Gliding a little longer than the interval keeps a constant speed despite timer jitter.
 const INPUT_GLIDE = TICK_MS / 1000 * 1.2;
@@ -113,7 +114,7 @@ export class BarScene {
   readonly app: pc.Application;
   readonly ready: Promise<void>;
   onInteract?: () => void;
-  onEmote?: () => void;
+  onEmote?: (emote:'dance'|'wave') => void;
   onChat?: () => void;
   onSkins?: () => void;
   onKick?: () => void;
@@ -230,6 +231,28 @@ export class BarScene {
     return prop;
   }
 
+  /** The seated card pose expects cards in both hands; build them once instead of pantomiming an invisible prop. */
+  private cardFan(avatar:Avatar):pc.Entity {
+    if(avatar.cards)return avatar.cards;
+    const fan=this.group('Blackjack hand',[0,0,0],avatar.root),paper=this.material('#f4ead6'),back=this.material('#7b2525');
+    for(const [x,yaw] of [[-.06,-16],[-.03,-8],[0,0],[.03,8],[.06,16]] as const){
+      const card=this.group('Held card',[x,0,0],fan);card.setLocalEulerAngles(0,yaw,0);
+      this.box('Playing card',[0,0,0],[.068,.002,.096],paper,card);
+      this.box('Card back',[0,-.0015,0],[.058,.001,.086],back,card);
+    }
+    fan.enabled=false;avatar.cards=fan;return fan;
+  }
+
+  private holdCards(avatar:Avatar,skin:SkinnedRig,count:number):void {
+    const fan=this.cardFan(avatar),left=skin.bones.hand_l.getPosition(),right=skin.bones.hand_r.getPosition();
+    fan.children.forEach((card,index)=>card.enabled=index<Math.min(5,count));
+    const across=this.axisRight.sub2(right,left).normalize(),up=this.axisUp.copy(avatar.body.up).normalize();
+    const front=this.axisFront.copy(avatar.body.forward).mulScalar(-1).normalize();
+    const centre=this.tempPosition.lerp(left,right,.5).add(up.clone().mulScalar(.035)).add(front.clone().mulScalar(.055));
+    const m=new pc.Mat4(),d=m.data;d[0]=across.x;d[1]=across.y;d[2]=across.z;d[4]=up.x;d[5]=up.y;d[6]=up.z;d[8]=front.x;d[9]=front.y;d[10]=front.z;
+    fan.setPosition(centre);fan.setRotation(new pc.Quat().setFromMat4(m));fan.enabled=true;
+  }
+
   private loadMap(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}maps/bar_boteco.glb`, 'container', (error, asset) => {
@@ -299,8 +322,10 @@ export class BarScene {
       if(target!==door.target||state.changedAt!==door.changedAt){door.from=door.openness;door.target=target;door.changedAt=state.changedAt;}
     }
     this.updateState({
-      players: Object.values(world.players).map(player => ({ ...player, animation: player.animationState,
-        cardResult: world.tables[player.currentTableId]?.seats.find(seat => seat.playerId === player.id)?.result })),
+      players: Object.values(world.players).map(player => {
+        const seat=world.tables[player.currentTableId]?.seats.find(seat => seat.playerId === player.id);
+        return { ...player, animation: player.animationState,cardResult:seat?.result,cardCount:seat?.cards.length??0 };
+      }),
       npcs: Object.values(world.npcs).map(npc => ({ ...npc, animation: npc.animationState, role: npc.behavior })),
       event: world.event,
     }, localId);
@@ -427,11 +452,11 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[]; clothing?:Record<string,{enabled:boolean;skinned:boolean;color?:string}> }> {
+  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[]; clothing?:Record<string,{enabled:boolean;skinned:boolean;color?:string}> }> {
     return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
       height: avatar.skin ? avatar.skin.bones.head.getPosition().y - avatar.root.getPosition().y : undefined,
       time: avatar.skin?.model.anim?.baseLayer?.activeStateCurrentTime, tracks: [...(avatar.skin?.tracks ?? [])],
-      speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined,
+      speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cards:avatar.cards?.enabled?avatar.cards.children.filter(card=>card.enabled).length:undefined,cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined,
       clothing:avatar.skinId==='base-male'?Object.fromEntries(MALE_CLOTHING.map(({id:name})=>{
         const part=avatar.skin?.model.findByName(`part-${name}`) as pc.Entity|undefined;
         const instances=(part?.findComponents('render') as pc.RenderComponent[]|undefined)?.flatMap(r=>r.meshInstances)??[];
@@ -663,7 +688,7 @@ export class BarScene {
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
     for (const asset of bank.animations) {
       const track = asset.resource as pc.AnimTrack;
-      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend'].includes(track.name);
+      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover'].includes(track.name);
       skin.model.anim!.assignAnimation(track.name, track, undefined, 1, loop);
       skin.tracks.add(track.name);
     }
@@ -815,8 +840,9 @@ export class BarScene {
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
     avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
-    // Drunk: the whole body sways, more with each stage (no extra clip needed; works on every rig).
-    const sway = actor.animation === 'fallen' || seated ? 0 : DRUNK_BODY_SWAY[drunkStage(actor.drunk ?? 0)]!;
+    // Skinned avatars have dedicated drunk clips; the procedural sway remains as fallback for box avatars.
+    const stage=drunkStage(actor.drunk??0),dedicatedDrunk=!!avatar.skin?.tracks.has('DrunkIdle')&&stage>=2;
+    const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
     root.setEulerAngles(sway * Math.sin((this.elapsed + avatar.phase) * 1.3), avatar.yaw, sway * Math.sin((this.elapsed + avatar.phase) * 0.9 + 1));
     const pose: Pose = {
       t: this.elapsed + avatar.phase,
@@ -829,6 +855,7 @@ export class BarScene {
     };
     avatar.cup.enabled = pose.drinking;
     if (!pose.drinking) for (const entity of Object.values(avatar.drinks ?? {})) entity.enabled = false;
+    if(avatar.cards)avatar.cards.enabled=false;
     if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose);
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
   }
@@ -883,9 +910,12 @@ export class BarScene {
     // Gestures are built on the static Pose; plain standing uses the animated Idle.
     const gesture = seated > 0.01 || dancing || drinking || waving;
     const action = actor.animation;
-    const requested = action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
+    const stage=drunkStage(actor.drunk??0);
+    const requested = action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use'
+      : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
-      : dancing ? 'Dance' : '';
+      : dancing ? 'Dance' : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk&&stage>=2?'DrunkIdle':'';
     const actionImported = !!requested && skin.tracks.has(requested);
     const oldGait=!!actor.oldWalk&&!gesture&&skin.tracks.has('OldCaneWalk')&&skin.tracks.has('OldCaneHold');
     const imported=actionImported||oldGait;
@@ -898,10 +928,10 @@ export class BarScene {
       if (actionImported && actor.animationStartedAt && anim.baseLayer) {
         const age = Math.max(0, (Date.now() + this.serverClockOffset - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
-        anim.baseLayer.activeStateCurrentTime = ['Deal', 'Dance', ...SEATED_CLIPS].includes(clip) ? age % duration : Math.min(age, duration);
+        anim.baseLayer.activeStateCurrentTime = ['Deal', 'Dance', 'Wait', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) ? age % duration : Math.min(age, duration);
       }
     }
-    anim.speed = clip==='OldCaneWalk'?(skin.oldCaneRate??1):clip === 'Walk' ? (pose.running ? RUN_CLIP_SPEED : WALK_CLIP_SPEED) : 1;
+    anim.speed = clip==='OldCaneWalk'?(skin.oldCaneRate??1):clip==='Walk'?WALK_CLIP_SPEED:clip==='Run'?1.15:1;
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
       if (SEATED_CLIPS.includes(clip)) {
@@ -909,6 +939,7 @@ export class BarScene {
         const hipY = (bones.upperleg_l.getPosition().y + bones.upperleg_r.getPosition().y) / 2;
         body.setLocalPosition(0,(actor.y??0)+0.56-hipY,0);
       }
+      if(clip==='CardsSit'&&(actor.cardCount??0)>0)this.holdCards(avatar,skin,actor.cardCount!);
       // The drinking clip raises the drink with the left hand: the ordered bottle or glass (NPCs: a bottle).
       const item:DrinkItem|undefined=drinking?(actor.drinkItem==='copo'?'copo':'garrafa'):undefined;
       const prop=item&&clip==='Drink'&&skin.drinkHand?this.drink(avatar,item):undefined;
@@ -1052,8 +1083,8 @@ export class BarScene {
         event.preventDefault(); this.keys.add(event.code);
       }
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); this.onInteract?.(); }
-      if (!event.repeat && event.code === 'KeyG') { this.callbacks.onEmote?.('dance'); this.onEmote?.(); }
-      if (!event.repeat && event.code === 'KeyV') this.callbacks.onEmote?.('wave');
+      if (!event.repeat && event.code === 'KeyG') { this.callbacks.onEmote?.('dance'); this.onEmote?.('dance'); }
+      if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); this.onEmote?.('wave'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.onSkins?.(); }
       if (!event.repeat && event.code === 'KeyX') { event.preventDefault(); this.onKick?.(); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.onChat?.(); }

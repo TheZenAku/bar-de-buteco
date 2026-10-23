@@ -39,9 +39,9 @@ As necessidades avançam dentro do `step()` de 20 Hz que já existia. O sistema 
   Há alertas a partir de 70 e de 90. A bexiga não causa desmaio; cheia, apenas reduz o fôlego.
 - **Embriaguez.** É independente da bexiga e cai `soberPerMinute` por minuto. Os estágios são definidos em `drunk.stages`:
   1. tela com vinheta quente e câmera levemente inclinada;
-  2. o andar desvia de forma determinística (`swayInput`, igual no servidor e na predição), e corpo e câmera balançam;
-  3. sem corrida e com tropeços ao andar: queda de `stumbleSeconds`, no máximo uma a cada `stumbleCooldownSeconds`;
-  4. desmaio por álcool: depois de `moveAfterSeconds`, o corpo é levado **uma vez** ao ponto `faint.alcoholRecoveryMarker`, a calçada do `Spawn_Jogador`, em chão livre. A pessoa acorda com no máximo `soberAfterFaintTo` de embriaguez, abaixo do estágio 3, então não entra em um novo ciclo.
+  2. o andar desvia de forma determinística (`swayInput`, igual no servidor e na predição), a câmera balança e o personagem ganha um repouso embriagado próprio;
+  3. sem corrida, com caminhada bêbada e tropeços de `stumbleSeconds`, no máximo um a cada `stumbleCooldownSeconds`;
+  4. desmaio por álcool: depois de `moveAfterSeconds`, o corpo é levado **uma vez** ao ponto `faint.alcoholRecoveryMarker`, a calçada do `Spawn_Jogador`, em chão livre. A pessoa acorda com no máximo `soberAfterFaintTo` de embriaguez, levanta durante os cinco segundos de recuperação e não entra em um novo ciclo.
 
 Estados possíveis em `condition`:
 
@@ -91,7 +91,7 @@ interface InventoryPort {
 
 | O que falta | Como o jogo resolve hoje |
 | --- | --- |
-| Animações próprias de levantar, cansaço, tropeço e uso do banheiro | Desmaio e tropeço usam o clipe `Fallen`, presente em todos os bancos de animação. A volta é uma transição para `Idle`. No banheiro, o personagem fica parado, de frente para o vaso. |
+| Animação própria de exaustão | A falta de fôlego impede a corrida e mantém a caminhada normal; ainda não há um clipe separado de cansaço. Levantar, tropeçar, embriaguez e uso do banheiro já têm estados e clipes próprios. |
 | Comidas e água | A estrutura está pronta, mas a fome e a sede só se recuperam com a cerveja (sede) até haver itens. |
 | Inventário | Veja a seção acima. |
 

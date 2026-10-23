@@ -23,6 +23,7 @@ test('doors: synced swing, nobody is crushed, the user steps back, and the order
     assert.equal(inDoorSweep(door,player,PLAYER_RADIUS),false);
     a.send('player.interact',{objectId:door.id});
     await until(()=>b.state.doors.get(door.id).open===false);
+    assert.equal(player.animationState,'use','Opening a door has a synced hand action');
     assert.ok(b.state.doors.get(door.id).changedAt>0);
     assert.equal(isDoorOpen(door.id),false,'The server physics follows the door state');
     assert.equal(b.state.doors.get('Porta_WC_Fem').open,true,'Other doors are untouched');

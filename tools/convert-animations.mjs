@@ -21,14 +21,19 @@ const clips = {
   Walk: misc('Standard Walk.fbx'), Run: misc('Run.fbx'), DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Dance: misc('Samba Dancing.fbx'), Sit: misc('Seated Idle.fbx'),
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
-  Toilet: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
+  Wait: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
 };
 // Clips that only one skin uses: Rafael's karate, Seu Zé's (Magrão) work behind the counter.
 const exclusive = { Kick: 'rafael', Bartend: 'magrao' };
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
 // Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,
 // matching the five-second gameplay recovery instead of freezing on the source's trailing frames.
-const trims = { Use: {from:.45,to:2.45}, Recover: {from:0,to:5} };
+const trims = {
+  Use: {from:.45,to:2.45}, Recover: {from:0,to:5},
+  // Four seconds preserve the relaxed weight shifts while avoiding an 11.4 s idle in every skin bank.
+  // Blend the tail into the opening pose so the shorter loop remains visually seamless.
+  Wait: {from:0,to:4,blend:.5},
+};
 
 const mixamoNames = new Map([
   ['Hips','hip'],['Spine','spine_01'],['Spine1','spine_02'],['Spine2','spine_03'],['Neck','neck'],['Head','head'],
@@ -65,7 +70,9 @@ function readModel(id) {
 
 const reference = readModel('nathan');
 fs.mkdirSync(output, { recursive: true });
-const manifest = fs.existsSync(path.join(output,'durations.json'))?JSON.parse(fs.readFileSync(path.join(output,'durations.json'),'utf8')):{};
+const previousManifest = fs.existsSync(path.join(output,'durations.json'))?JSON.parse(fs.readFileSync(path.join(output,'durations.json'),'utf8')):{};
+const knownClips=new Set([...Object.keys(clips),'OldCaneWalk','OldCaneHold']);
+const manifest=Object.fromEntries(Object.entries(previousManifest).filter(([name])=>knownClips.has(name)));
 const requested=process.argv.slice(2);
 for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','base-female'].filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);

@@ -45,6 +45,7 @@ O corpo masculino também pode vestir **camiseta, suéter, calça, calça social
 | Arrastar o mouse / roda | Girar a câmera / ajustar distância |
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
+| V | Acenar para o pessoal |
 | C | Escolher o visual (skin); todos veem a troca na hora |
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
 | Enter | Abrir o chat de proximidade (12 m) |
@@ -55,9 +56,9 @@ Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interaç
 
 A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. A TV mostra o vídeo na própria tela do cenário (**Assistir na TV** aproxima a câmera). A jukebox toca no card do player. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/jukebox.md).
 
-As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha. Veja [portas](docs/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem bebe com o objeto real na mão. Veja [cerveja](docs/drinks.md).
+As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/drinks.md).
 
-O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais cambaleia e apaga, e a galera leva para tomar um ar na calçada. Veja [necessidades](docs/needs.md).
+O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/needs.md).
 
 O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/old-cane.md).
 

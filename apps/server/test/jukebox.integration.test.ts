@@ -19,7 +19,7 @@ test('real room: proximity, late join, shared controls, conflicting revisions an
     a.send('jukebox.command',command);await until(()=>errors.some(e=>e.includes('perto')));assert.equal(a.state.jukeboxes.get('jukebox').status,'off');
     const player=authoritative!.state.players.get('music-a')!,point=INTERACTABLES.find(i=>i.id==='jukebox')!;
     player.assign({x:point.x,y:point.y,z:point.z});
-    a.send('player.interact',{objectId:'jukebox'});await until(()=>opens.length===1);assert.notEqual(player.animationState,'dance');assert.equal(player.interactionState,'');
+    a.send('player.interact',{objectId:'jukebox'});await until(()=>opens.length===1);assert.equal(player.animationState,'use');assert.equal(player.interactionState,'');
     a.send('jukebox.command',command);await until(()=>a.state.jukeboxes.get('jukebox').revision===1);
     const b=await join('music-b'),otherErrors:string[]=[];b.onMessage('error',m=>otherErrors.push(m.message));
     await until(()=>b.state?.jukeboxes?.get('jukebox')?.revision===1);

@@ -88,6 +88,10 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(bob.animationState,'walk','Shift must not select running during the cane gait');
     assert.ok(!received.includes('/velho'),'Slash commands are interpreted by the server, not broadcast as chat text');
     second.send('chat.send',{text:'/velho'});await eventually(()=>first.state.players.get('bob').oldWalk===false);
+    second.send('player.emote',{emote:'wave'});
+    await eventually(()=>first.state.players.get('bob').animationState==='wave');
+    assert.ok(bob.animationStartedAt>0,'The wave is visible and time-synchronized for other players');
+    await eventually(()=>bob.animationState==='idle',2500);
     // Skins: chosen on arrival, switched live and seen by others; unknown ones are refused.
     assert.equal(player.skin, 'nathan');
     assert.equal(bob.skin, 'leandro');

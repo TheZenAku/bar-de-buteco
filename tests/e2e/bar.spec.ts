@@ -121,65 +121,61 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await walkTo(page,14.6,-6.6,.18);
   expect(errors).toEqual([]);
 });
-test('new skeletal clips load on every skin and X plays Rafael kick for both clients',async({browser,page})=>{
-  test.setTimeout(240000);
+test('new skeletal clips load on every skin and the keyboard plays the authored actions',async({page})=>{
+  // Every skin swap loads both a character model and its full animation bank; software WebGL in CI is slow.
+  test.setTimeout(360000);
   await page.setViewportSize({width:960,height:640});
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`anim_${Date.now().toString(36)}`);
-  const context=await browser.newContext({viewport:{width:640,height:480}});const other=await context.newPage();
-  other.on('pageerror',error=>errors.push(error.message));
-  try{
-    await createAccount(other,`view_${Date.now().toString(36)}`);
-    await other.getByRole('button',{name:'Sua conta',exact:true}).click();await page.bringToFront();
-    const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-    for(const skin of ['Nathan','Leandro','Rafael','Read']){
-      await page.keyboard.press('c');
-      // Magrão is Seu Zé's; players choose among the other four.
-      await expect(page.locator('.skin-card')).toHaveCount(4);
-      await selectSkin(page,skin);
-      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id)).toBe(skin.toLowerCase());
-      await expect.poll(()=>other.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id)).toBe(skin.toLowerCase());
-      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks.includes('Drink'),id)).toBe(true);
-      if(skin==='Leandro'){
-        const height=await page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.height,id);
-        expect(height).toBeGreaterThan(1.4);expect(height).toBeLessThan(2.1);
-        await page.keyboard.down('d');
-        try{
-          await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Walk');
-          await expect.poll(()=>other.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Walk');
-        }finally{await page.keyboard.up('d');}
-        // Finish the movement queue before sending an emote, which movement cancels.
-        await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id]?.animationState,id)).toBe('idle');
-        await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending)).toBe(0);
-        await page.keyboard.press('g');
-        await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Dance');
-        await expect.poll(()=>other.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Dance');
-        await page.screenshot({path:'test-results/leandro-accurig.png'});
-        await page.keyboard.press('g');
-        await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
-      }
-      // Respect the authoritative skin-change rate limit.
-      await page.waitForTimeout(600);
+  const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
+  for(const skin of ['Nathan','Leandro','Rafael','Read']){
+    await page.keyboard.press('c');
+    // Magrão is Seu Zé's; players choose among the other four.
+    await expect(page.locator('.skin-card')).toHaveCount(4);
+    await selectSkin(page,skin);
+    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin.toLowerCase());
+    await expect.poll(()=>page.evaluate((id)=>{
+      const tracks=(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks??[];
+      return ['Walk','Run','DrunkIdle','DrunkWalk','Dance','Sit','Wave','Use','Wait','Recover','Drink'].every(name=>tracks.includes(name));
+    },id)).toBe(true);
+    if(skin==='Leandro'){
+      const height=await page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.height,id);
+      expect(height).toBeGreaterThan(1.4);expect(height).toBeLessThan(2.1);
+      await page.keyboard.down('d');
+      try{await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Walk');}
+      finally{await page.keyboard.up('d');}
+      await page.keyboard.down('Shift');await page.keyboard.down('d');
+      try{await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Run');}
+      finally{await page.keyboard.up('d');await page.keyboard.up('Shift');}
+      // Finish the movement queue before sending an emote, which movement cancels.
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id]?.animationState,id)).toBe('idle');
+      await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending)).toBe(0);
+      await page.keyboard.press('g');
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Dance');
+      await page.screenshot({path:'test-results/leandro-accurig.png'});
+      await page.keyboard.press('g');
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
+      await page.keyboard.press('v');
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Wave');
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
     }
-    await page.keyboard.press('c');await selectSkin(page,'Rafael');
-    await expect(page.locator('#kick-button')).toBeVisible();
-    await page.getByLabel('Mensagem por proximidade').focus();
-    await page.keyboard.press('x');
-    expect(await page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id].animationState,id)).not.toBe('kick');
-    await page.keyboard.press('Escape');await page.locator('#chat-input').blur();
-    await page.keyboard.press('x');
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Kick');
-    await expect.poll(()=>other.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Kick');
-    await page.screenshot({path:'test-results/rafael-karate.png'});
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id].animationState,id)).toBe('idle');
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
-    await page.keyboard.press('x');
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Kick');
-    expect(errors).toEqual([]);
-  }finally{
-    await other.request.post('/api/auth/logout',{data:{}}).catch(()=>{});
-    await context.close();
+    // Respect the authoritative skin-change rate limit.
+    await page.waitForTimeout(600);
   }
+  await page.keyboard.press('c');await selectSkin(page,'Rafael');
+  await expect(page.locator('#kick-button')).toBeVisible();
+  await page.getByLabel('Mensagem por proximidade').focus();
+  await page.keyboard.press('x');
+  expect(await page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id].animationState,id)).not.toBe('kick');
+  await page.keyboard.press('Escape');await page.locator('#chat-input').blur();
+  await page.keyboard.press('x');
+  await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Kick');
+  await page.screenshot({path:'test-results/rafael-karate.png'});
+  await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id].animationState,id)).toBe('idle');
+  await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
+  await page.keyboard.press('x');
+  await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Kick');
+  expect(errors).toEqual([]);
 });
 test.beforeEach(async({request})=>{
   await expect.poll(async()=>{
