@@ -20,9 +20,11 @@ test('sun rises in the east, lights from above, sets in the west and never shine
 test('lighting, sky and fog change continuously including the midnight seam',()=>{
   for(let hour=0;hour<24;hour+=.05){
     const a=daylightAt(at(hour)),b=daylightAt(at(hour+.001));
-    for(const key of ['sunIntensity','moonIntensity','night','fogStart','fogEnd','exposure'] as const)assert.ok(Math.abs(a[key]-b[key])<.02);
+    for(const key of ['sunIntensity','moonIntensity','night','exposure'] as const)assert.ok(Math.abs(a[key]-b[key])<.02);
+    // Distances are hundreds of metres on the expanded map; continuity is measured at that scale.
+    for(const key of ['fogStart','fogEnd'] as const)assert.ok(Math.abs(a[key]-b[key])<.25);
     for(const key of ['top','horizon','ambient','sunColor'] as const)for(let i=0;i<3;i++)assert.ok(Math.abs(a[key][i]-b[key][i])<.01);
-    assert.ok(a.fogEnd>a.fogStart&&a.fogStart>=20&&a.fogEnd<60);
+    assert.ok(a.fogEnd>a.fogStart&&a.fogStart>=60&&a.fogEnd>=430&&a.fogEnd<=520);
   }
   assert.deepEqual(daylightAt(at(0)),daylightAt(at(24)));
 });

@@ -63,8 +63,10 @@ async function walkTo(page:Page,x:number,z:number,tolerance=.22):Promise<void>{
     const dx=x-position.x,dz=z-position.z;if(Math.hypot(dx,dz)<tolerance)return;
     const horizontal=dx*Math.cos(.15)-dz*Math.sin(.15),forward=-dx*Math.sin(.15)-dz*Math.cos(.15);
     const key=Math.abs(horizontal)>Math.abs(forward)?horizontal>0?'d':'a':forward>0?'w':'s';
-    await page.keyboard.press(key,{delay:45});
-    await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending),{intervals:[25,50,100],timeout:3000}).toBe(0);
+    // The expanded GLB is intentionally tested with software WebGL. Slightly longer keyboard pulses keep the
+    // route representative while avoiding hundreds of network round trips that can starve its heartbeat.
+    await page.keyboard.press(key,{delay:90});
+    await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending),{intervals:[25,50,100],timeout:5000}).toBe(0);
   }
   throw new Error(`Could not reach ${x},${z}: ${JSON.stringify(await page.evaluate(()=>(window as any).barDebug.snapshot()))}`);
 }
@@ -77,7 +79,7 @@ async function gameReady(page:Page):Promise<void>{
 }
 
 test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns and uses the counter and seats',async({page})=>{
-  test.setTimeout(240000);await page.setViewportSize({width:960,height:640});
+  test.setTimeout(300000);await page.setViewportSize({width:960,height:640});
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/');
   await page.getByLabel('E-mail',{exact:true}).fill('jogador1@bar.local');
@@ -112,7 +114,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.drink?.item;})).toBe('garrafa');
   expect((await bartender())?.clip).not.toBe('Bartend');
   await page.keyboard.press('e');
-  await walkTo(page,14.3,-7.6,.12);
+  await walkTo(page,14.45,-7.6,.12);
   await expect(page.locator('#context-label')).toHaveText('Sentar');await page.keyboard.press('e');
   await expect(page.locator('#context-label')).toHaveText('Levantar / encerrar');
   // Common chairs play plain sitting (no glass until there is an inventory).

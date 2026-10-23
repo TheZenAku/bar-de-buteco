@@ -21,9 +21,10 @@ test('every door leaf turns about its exported hinge between the closed and the 
     assert.deepEqual([leaf.x,leaf.y,leaf.z].map(v=>+v.toFixed(4)),node.translation.map((v:number)=>+v.toFixed(4)),`${leaf.id}: hinge is the node origin`);
     assert.equal(leaf.closedYaw,node.extras.angulo_fechada_graus);
     assert.ok(Math.abs(Math.abs(doorSwing(leaf))-95)<1e-4,`${leaf.id}: swings 95° as built in 04_predio.py`);
-    // Closed, the leaf lies along a wall axis and spans 0.70 m from the hinge.
+    // Closed, the leaf lies along a wall axis and keeps the dimensions authored in the exported mesh.
     const closed=leafBox(leaf,leaf.closedYaw);
-    assert.ok(Math.abs(Math.max(closed.hx,closed.hz)-.35)<1e-6&&Math.min(closed.hx,closed.hz)<=.05+1e-6,`${leaf.id}: closed leaf box`);
+    assert.ok(Math.abs(Math.max(closed.hx,closed.hz)-(leaf.max[0]!-leaf.min[0]!)/2)<1e-6
+      &&Math.abs(Math.min(closed.hx,closed.hz)-(leaf.max[2]!-leaf.min[2]!)/2)<1e-6,`${leaf.id}: closed leaf box`);
   }
 });
 
@@ -61,7 +62,7 @@ test('every open door can be crossed both ways, even off-centre: the body turns 
       crossings++;
     }
   }
-  assert.ok(crossings>=28,`${crossings} crossings`);
+  assert.ok(crossings>=DOORS.length*2-3,`${crossings} crossings`);
   // Closed, the same push stops at the leaf.
   setDoorStates([['Porta_WC_Masc',false]]);
   assert.ok(push({x:5.3,y:.3,z:-10.95},0,-1,40).z>-11.2);

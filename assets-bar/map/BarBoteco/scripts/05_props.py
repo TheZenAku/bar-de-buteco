@@ -53,9 +53,9 @@ for nm, col in (("P_Engradado_Amarelo", "Plastico_Amarelo"), ("P_Engradado_Verme
 
 for nm, col in (("P_Garrafa_Verde", "Garrafa_Verde"), ("P_Garrafa_Ambar", "Garrafa_Ambar"), ("P_Garrafa_Clara", "Garrafa_Clara")):
     m = B.Mesh(nm)
-    m.cyl(0.035, 0.19, col, segs=6, caps=(False, False))
-    m.cyl(0.035, 0.05, col, segs=6, r2=0.013, M=R((0, 0, 0.19)), caps=(False, False))
-    m.cyl(0.013, 0.07, col, segs=6, M=R((0, 0, 0.24)), caps=(False, True))
+    m.cyl(0.035, 0.19, col, segs=10, caps=(False, False))
+    m.cyl(0.035, 0.05, col, segs=10, r2=0.013, M=R((0, 0, 0.19)), caps=(False, False))
+    m.cyl(0.013, 0.07, col, segs=8, M=R((0, 0, 0.24)), caps=(False, True))
     done(m)
 
 m = B.Mesh("P_Geladeira_Expositor")
@@ -317,22 +317,28 @@ for y in (-0.34, 0.28):
 done(m)
 
 
-def arvore(name, seed):
+def arvore(name, seed, folha="Folhas", escala=1.0):
+    """Arvore com tronco ramificado e copa de varios volumes (mais cheia que a versao anterior)."""
     rnd = random.Random(seed)
     a = B.Mesh(name)
-    pts = [(0, 0, -0.05), (0.08, 0.03, 1.0), (0.02, 0.1, 1.9), (-0.05, 0.05, 2.6)]
-    for i, rr in enumerate((0.13, 0.11, 0.09)):
-        a.tube(pts[i], pts[i + 1], rr, "Casca", segs=6)
-    a.tube((0.02, 0.1, 1.9), (0.65, 0.3, 2.65), 0.05, "Casca", segs=5)
-    a.tube((0.02, 0.1, 1.9), (-0.55, -0.25, 2.75), 0.05, "Casca", segs=5)
-    for k, (c, s) in enumerate((((0, 0.05, 3.15), (1.6, 1.6, 1.15)), ((0.6, 0.3, 2.9), (1.05, 1.0, 0.85)),
-                                ((-0.6, -0.3, 2.95), (1.0, 1.05, 0.85)), ((0.05, -0.05, 3.75), (0.95, 0.95, 0.6)))):
-        a.sphere("Folhas", R(c, scale=s), subdiv=2 if k == 0 else 1, jitter=0.10, rng=rnd)
+    s_ = escala
+    pts = [(0, 0, -0.05), (0.08, 0.03, 1.0 * s_), (0.02, 0.1, 1.9 * s_), (-0.05, 0.05, 2.6 * s_)]
+    for i, rr in enumerate((0.14, 0.115, 0.09)):
+        a.tube(pts[i], pts[i + 1], rr * s_, "Casca", segs=8)
+    for (dx, dy, dz) in ((0.7, 0.3, 0.8), (-0.6, -0.3, 0.9), (0.1, -0.7, 0.85), (-0.2, 0.65, 0.95)):
+        a.tube((0.02, 0.1, 1.9 * s_), (dx * s_, dy * s_, (1.9 + dz) * s_), 0.055 * s_, "Casca", segs=5)
+    vols = [((0, 0.05, 3.2), (1.65, 1.6, 1.15), 2), ((0.75, 0.35, 2.95), (1.0, 0.95, 0.8), 2),
+            ((-0.7, -0.3, 3.0), (1.0, 1.05, 0.8), 1), ((0.15, -0.75, 3.05), (0.9, 0.85, 0.75), 1),
+            ((-0.2, 0.7, 3.1), (0.9, 0.9, 0.75), 1), ((0.05, -0.05, 3.85), (1.0, 1.0, 0.6), 1)]
+    for (c, sc, sd) in vols:
+        cc = (c[0] * s_ + rnd.uniform(-0.1, 0.1), c[1] * s_ + rnd.uniform(-0.1, 0.1), c[2] * s_)
+        a.sphere(folha, R(cc, rz_deg=rnd.uniform(0, 360), scale=tuple(v * s_ for v in sc)), subdiv=sd, jitter=0.10 * s_, rng=rnd)
     done(a)
 
 
 arvore("P_Arvore_A", 11)
-arvore("P_Arvore_B", 23)
+arvore("P_Arvore_B", 23, escala=1.12)
+arvore("P_Arvore_Ipe", 37, folha="Folhas_Ipe", escala=1.05)
 
 m = B.Mesh("P_Canteiro")
 m.face([(-0.5, -0.5, 0.004), (0.5, -0.5, 0.004), (0.5, 0.5, 0.004), (-0.5, 0.5, 0.004)], "Terra", facing=(0, 0, 1))
@@ -343,7 +349,7 @@ done(m)
 
 def poste(name, luz=False, trafo=False):
     p = B.Mesh(name)
-    p.cyl(0.17, 10.0, "Concreto", segs=8, r2=0.09, caps=(False, True))
+    p.cyl(0.17, 10.0, "Concreto", segs=12, r2=0.09, caps=(False, True))
     p.box((-0.06, -0.95, 9.25), (0.06, 0.95, 9.37), "Concreto")
     for y in (-0.8, 0.0, 0.8):
         p.cyl(0.035, 0.12, "Louca_Branca", segs=6, M=R((0, y, 9.37)))
@@ -362,33 +368,162 @@ poste("P_Poste_Luz", luz=True)
 poste("P_Poste_Trafo", luz=True, trafo=True)
 
 
-def carro(name, paint):
+def carro(name, paint, sedan=False):
+    """Carro com perfil mais arredondado, caixa de roda, retrovisores, para-choques e rodas de 14 lados."""
     c = B.Mesh(name)
-    Wd = 0.82
-    prof = [(-1.9, 0.32), (1.9, 0.32), (1.95, 0.55), (1.88, 0.80), (0.85, 0.93), (0.05, 1.40), (-1.45, 1.42),
-            (-1.86, 1.0), (-1.93, 0.60)]
-    c.face([(x, -Wd, z) for x, z in prof], paint, facing=(0, -1, 0))
-    c.face([(x, Wd, z) for x, z in prof], paint, facing=(0, 1, 0))
+    Wd, Wt = 0.84, 0.70                      # meia largura da carroceria / do teto (tumblehome)
+    if sedan:
+        low = [(-2.25, 0.34), (2.2, 0.34), (2.27, 0.48), (2.24, 0.66), (2.1, 0.80), (1.15, 0.92)]
+        top = [(0.55, 1.34), (0.25, 1.40), (-0.95, 1.40), (-1.35, 1.30)]
+        back = [(-1.75, 0.98), (-2.2, 0.95), (-2.28, 0.78), (-2.3, 0.55)]
+        win = [(0.98, 0.98), (0.5, 1.30), (-0.95, 1.32), (-1.30, 1.0)]
+    else:
+        low = [(-1.9, 0.34), (1.85, 0.34), (1.95, 0.50), (1.93, 0.66), (1.8, 0.82), (0.9, 0.94)]
+        top = [(0.3, 1.33), (0.0, 1.41), (-1.2, 1.42), (-1.55, 1.36)]
+        back = [(-1.83, 1.05), (-1.92, 0.80), (-1.94, 0.58)]
+        win = [(0.78, 0.99), (0.22, 1.30), (-1.35, 1.34), (-1.68, 1.02)]
+    prof = low + top + back
+    nlow = len(low)
+    for sy in (-1, 1):                       # lateral da carroceria (abaixo da linha de cintura)
+        c.face([(x, sy * Wd, z) for x, z in low] + [(x, sy * Wd, z) for x, z in back], paint, facing=(0, sy, 0))
     for i in range(len(prof)):
         (x0, z0), (x1, z1) = prof[i], prof[(i + 1) % len(prof)]
-        mat = "Janela_Escura" if i in (4, 6) else ("Borracha_Preta" if i == 0 else paint)
-        c.face([(x0, -Wd, z0), (x1, -Wd, z1), (x1, Wd, z1), (x0, Wd, z0)], mat, away=(0, 0, 0.85))
+        in_top0, in_top1 = nlow <= i < nlow + len(top), nlow <= (i + 1) % len(prof) < nlow + len(top)
+        w0, w1 = (Wt if in_top0 else Wd), (Wt if in_top1 else Wd)
+        mat = paint
+        if i == 0:
+            mat = "Borracha_Preta"
+        elif i == nlow - 1 or i == nlow + len(top) - 1:
+            mat = "Janela_Escura"
+        c.face([(x0, -w0, z0), (x1, -w1, z1), (x1, w1, z1), (x0, w0, z0)], mat, away=(0, 0, 0.85))
     for sy in (-1, 1):
-        y = sy * (Wd + 0.004)
-        c.face([(0.78, y, 0.98), (0.05, y, 1.34), (-1.40, y, 1.36), (-1.78, y, 1.0)], "Janela_Escura", facing=(0, sy, 0))
-        c.box((1.84, sy * 0.52 - 0.13, 0.63), (1.93, sy * 0.52 + 0.13, 0.73), "Farol")
-        c.box((-1.95, sy * 0.62 - 0.1, 0.76), (-1.88, sy * 0.62 + 0.1, 0.92), V)
-        for x in (1.25, -1.25):
+        ys = sy * Wd
+        # estufa lateral (vidros) inclinada
+        g = [(win[0][0], ys * 0.995, win[0][1]), (win[1][0], sy * (Wt + 0.005), win[1][1]),
+             (win[2][0], sy * (Wt + 0.005), win[2][1]), (win[3][0], ys * 0.995, win[3][1])]
+        c.face(g, "Janela_Escura", facing=(0, sy, 0.3))
+        c.face([(low[-1][0], ys, low[-1][1])] + [(x, sy * Wt, z) for (x, z) in top] + [(back[0][0], ys, back[0][1])],
+               paint, facing=(0, sy, 0.3))                                   # estufa segue a curva do teto (sem frestas)
+        c.box((low[2][0] - 0.1, sy * 0.52 - 0.15, 0.60), (low[2][0] - 0.01, sy * 0.52 + 0.15, 0.72), "Farol")
+        c.box((back[-1][0] - 0.01, sy * 0.60 - 0.12, 0.70), (back[-1][0] + 0.07, sy * 0.60 + 0.12, 0.86), V)
+        c.box((win[0][0] - 0.12, sy * Wd, 0.98), (win[0][0] - 0.02, sy * (Wd + 0.14), 1.06), "Borracha_Preta")   # retrovisor
+        c.box((-0.7, sy * (Wd + 0.002), 0.78), (-0.55, sy * (Wd + 0.012), 0.81), "Inox")                          # macaneta
+        for x in ((1.38, -1.45) if sedan else (1.22, -1.22)):
             y0 = -0.92 if sy < 0 else 0.72
-            c.cyl(0.30, 0.20, "Borracha_Preta", segs=10, M=Matrix.Translation((x, y0, 0.30)) @ Matrix.Rotation(-math.pi / 2, 4, 'X'),
+            c.cyl(0.31, 0.20, "Borracha_Preta", segs=14, M=Matrix.Translation((x, y0, 0.31)) @ Matrix.Rotation(-math.pi / 2, 4, 'X'),
                   cap_mat="Inox", smooth=True)
-    c.box((1.92, -0.7, 0.36), (2.0, 0.7, 0.5), "Borracha_Preta")
-    c.box((-2.0, -0.7, 0.36), (-1.91, 0.7, 0.5), "Borracha_Preta")
+            c.box((x - 0.42, sy * Wd - 0.02, 0.34), (x + 0.42, sy * Wd + 0.01, 0.62), "Borracha_Preta", skip=('nz',))  # caixa de roda
+    xf, xb = low[2][0], back[-1][0]
+    c.box((xf - 0.02, -0.80, 0.36), (xf + 0.07, 0.80, 0.52), "Borracha_Preta")                                     # para-choques
+    c.box((xb - 0.07, -0.80, 0.36), (xb + 0.02, 0.80, 0.52), "Borracha_Preta")
+    c.box((xf + 0.07, -0.25, 0.40), (xf + 0.08, 0.25, 0.50), "Plastico_Branco")                                    # placas
+    c.box((xb - 0.08, -0.25, 0.55), (xb - 0.07, 0.25, 0.65), "Plastico_Branco")
+    c.face([(xf - 0.2, -0.75, 0.33), (xb + 0.2, -0.75, 0.33), (xb + 0.2, 0.75, 0.33), (xf - 0.2, 0.75, 0.33)],
+           "Borracha_Preta", facing=(0, 0, -1))
     done(c)
 
 
-carro("P_Carro_Prata", "Carro_Prata")
-carro("P_Carro_Vermelho", "Carro_Vermelho")
+for cor in ("Prata", "Vermelho", "Branco", "Azul", "Preto"):
+    carro("P_Carro_" + cor, "Carro_" + cor)
+for cor in ("Prata", "Branco", "Preto"):
+    carro("P_Sedan_" + cor, "Carro_" + cor, sedan=True)
+
+# ---------------------------------------------------------------- mobiliario urbano do bairro
+MD = "Madeira"
+
+
+m = B.Mesh("P_Banco_Praca")                            # banco de praca (ripas de madeira e pes de ferro)
+for k in range(4):
+    m.box((-0.9, -0.22 + k * 0.11, 0.42), (0.9, -0.14 + k * 0.11, 0.46), MD)
+for k in range(3):
+    m.box((-0.9, 0.20, 0.55 + k * 0.12), (0.9, 0.24, 0.63 + k * 0.12), MD, M=R((0, 0, 0), rx_deg=-8))
+for x in (-0.75, 0.75):
+    m.box((x - 0.03, -0.24, 0), (x + 0.03, 0.22, 0.42), "Metal_Escuro", skip=('nz',))
+    m.box((x - 0.03, 0.18, 0.42), (x + 0.03, 0.26, 0.92), "Metal_Escuro", M=R((0, 0, 0), rx_deg=-8))
+done(m)
+
+m = B.Mesh("P_Banca_Jornal")                           # banca de jornal com toldo
+m.box((-1.4, -1.0, 0), (1.4, 1.0, 2.5), "Metal_Escuro", mats={'ny': "Metal_Ondulado"}, skip=('nz',))
+m.box((-1.5, -1.6, 2.5), (1.5, 1.1, 2.6), "Plastico_Amarelo")
+m.box((-1.2, -1.02, 2.6), (1.2, -0.99, 3.1), "Plastico_Amarelo", mats={'ny': "Atlas_Bairro"}, uvrects={'ny': B.arect(512, 896, 768, 1024)})
+for x in (-1.45, 1.45):
+    m.tube((x, -1.55, 0), (x, -1.55, 2.5), 0.03, "Metal_Escuro", segs=5)
+done(m)
+
+m = B.Mesh("P_Ponto_Onibus")                           # abrigo de onibus
+for x in (-1.6, 1.6):
+    m.box((x - 0.05, 0.35, 0), (x + 0.05, 0.45, 2.4), "Metal_Escuro", skip=('nz',))
+m.box((-1.8, -0.4, 2.4), (1.8, 0.6, 2.5), "Metal_Escuro")
+m.face([(-1.55, 0.42, 0.3), (1.55, 0.42, 0.3), (1.55, 0.42, 2.3), (-1.55, 0.42, 2.3)], "Vidro")
+m.box((-1.4, 0.05, 0.42), (1.4, 0.35, 0.47), MD)
+for x in (-1.2, 1.2):
+    m.box((x - 0.03, 0.15, 0), (x + 0.03, 0.25, 0.42), "Metal_Escuro", skip=('nz',))
+m.tube((1.85, -0.2, 0), (1.85, -0.2, 2.7), 0.035, "Metal_Escuro", segs=6)
+m.box((1.85 - 0.02, -0.5, 2.3), (1.85 + 0.02, 0.1, 2.75), "Metal_Escuro", mats={'nx': "Atlas_Bairro", 'px': "Atlas_Bairro"},
+      uvrects={'nx': B.arect(0, 896, 256, 1024), 'px': B.arect(0, 896, 256, 1024)})
+done(m)
+
+m = B.Mesh("P_Orelhao")                                # telefone publico (orelhao)
+m.tube((0, 0, 0), (0, 0, 1.6), 0.04, "Metal_Escuro", segs=6)
+m.sphere("Plastico_Laranja", R((0, -0.1, 1.75), scale=(0.42, 0.40, 0.50)), subdiv=2)
+m.box((-0.12, -0.15, 1.35), (0.12, -0.05, 1.7), "Caixa_Agua")
+done(m)
+
+for k, (nm, reg) in enumerate((("P_Placa_Rua_A", ((512, 768, 768, 832), (512, 832, 768, 896))),
+                                ("P_Placa_Rua_B", ((768, 768, 1024, 832), (768, 832, 1024, 896))))):
+    m = B.Mesh(nm)
+    m.tube((0, 0, 0), (0, 0, 2.9), 0.03, "Metal_Escuro", segs=6)
+    m.box((-0.02, -0.5, 2.55), (0.02, 0.5, 2.8), "Metal_Escuro", mats={'nx': "Atlas_Bairro", 'px': "Atlas_Bairro"},
+          uvrects={'nx': B.arect(*reg[0]), 'px': B.arect(*reg[0])})
+    m.box((-0.5, -0.02, 2.25), (0.5, 0.02, 2.5), "Metal_Escuro", mats={'ny': "Atlas_Bairro", 'py': "Atlas_Bairro"},
+          uvrects={'ny': B.arect(*reg[1]), 'py': B.arect(*reg[1])})
+    done(m)
+
+m = B.Mesh("P_Cavalete")                               # cavalete de obra (fecha as saidas do mapa)
+m.box((-1.0, -0.03, 0.55), (1.0, 0.03, 0.85), "Atlas_Bairro", uvrects={'ny': B.arect(256, 896, 512, 1024), 'py': B.arect(256, 896, 512, 1024)})
+m.box((-1.0, -0.03, 0.15), (1.0, 0.03, 0.35), "Atlas_Bairro", uvrects={'ny': B.arect(256, 896, 512, 1024), 'py': B.arect(256, 896, 512, 1024)})
+for x in (-0.85, 0.85):
+    for sy in (-1, 1):
+        m.tube((x, sy * 0.25, 0), (x, 0, 0.9), 0.03, "Metal_Branco", segs=4)
+done(m)
+
+m = B.Mesh("P_Cone")
+m.cyl(0.18, 0.7, "Plastico_Laranja", segs=10, r2=0.03, caps=(False, False))
+m.box((-0.2, -0.2, 0), (0.2, 0.2, 0.03), "Borracha_Preta", skip=('nz',))
+m.cyl(0.115, 0.08, "Metal_Branco", segs=10, r2=0.09, M=R((0, 0, 0.30)), caps=(False, False))
+done(m)
+
+m = B.Mesh("P_Trave")                                  # trave de futebol (gol)
+for y in (-1.5, 1.5):
+    m.tube((0, y, 0), (0, y, 2.0), 0.05, "Metal_Branco", segs=8)
+m.tube((0, -1.5, 2.0), (0, 1.5, 2.0), 0.05, "Metal_Branco", segs=8)
+for y in (-1.5, 1.5):
+    m.tube((0, y, 2.0), (0.9, y, 0.0), 0.025, "Metal_Branco", segs=5)
+m.tube((0.9, -1.5, 0.02), (0.9, 1.5, 0.02), 0.025, "Metal_Branco", segs=5)
+done(m)
+
+m = B.Mesh("P_AC")                                     # ar-condicionado de janela/split na fachada
+m.box((-0.42, -0.30, 0), (0.42, 0.0, 0.32), "Plastico_Branco", mats={'ny': "Metal_Ondulado"}, skip=('py',))
+m.box((-0.38, -0.32, -0.04), (0.38, -0.02, 0.0), "Metal_Escuro")
+done(m)
+
+m = B.Mesh("P_Antena")                                 # antena parabolica
+m.tube((0, 0, 0), (0, 0, 0.8), 0.025, "Metal_Escuro", segs=5)
+m.cyl(0.40, 0.14, "Plastico_Branco", segs=12, r2=0.05, M=Matrix.Translation((0, -0.05, 0.9)) @ Matrix.Rotation(math.radians(-60), 4, 'X'),
+      caps=(True, False), smooth=True)
+done(m)
+
+m = B.Mesh("P_Caixa_Agua_Casa")
+m.cyl(0.55, 0.75, "Caixa_Agua", segs=14, caps=(False, False))
+m.cyl(0.58, 0.12, "Caixa_Agua", segs=14, r2=0.4, M=R((0, 0, 0.75)))
+done(m)
+
+m = B.Mesh("P_Bueiro")                                 # boca de lobo (grelha junto ao meio-fio)
+m.face([(-0.45, -0.18, 0.004), (0.45, -0.18, 0.004), (0.45, 0.18, 0.004), (-0.45, 0.18, 0.004)], "Metal_Escuro", facing=(0, 0, 1))
+for k in range(7):
+    x = -0.39 + k * 0.13
+    m.face([(x, -0.15, 0.006), (x + 0.06, -0.15, 0.006), (x + 0.06, 0.15, 0.006), (x, 0.15, 0.006)], "Borracha_Preta", facing=(0, 0, 1))
+done(m)
 
 
 # ---------------------------------------------------------------- quintal / palco / jogos / terraco
@@ -439,7 +574,8 @@ m.cyl(0.04, 0.08, "Metal_Branco", segs=6, M=R((0, 0, 2.48)))
 done(m)
 
 m = B.Mesh("P_Vaso_Planta")
-m.cyl(0.22, 0.45, "Reboco_Vermelho", segs=8, r2=0.28, caps=(False, False))
+B.material("Ceramica_Vaso", color=(0.62, 0.24, 0.14), rough=0.8, double=True)
+m.cyl(0.22, 0.45, "Ceramica_Vaso", segs=10, r2=0.28, caps=(False, False))
 m.face([(0.27 * math.cos(2 * math.pi * i / 8), 0.27 * math.sin(2 * math.pi * i / 8), 0.42) for i in range(8)], "Terra", facing=(0, 0, 1))
 rp = random.Random(9)
 m.sphere("Folhas", R((0, 0, 0.82), scale=(0.40, 0.40, 0.45)), subdiv=1, jitter=0.05, rng=rp)

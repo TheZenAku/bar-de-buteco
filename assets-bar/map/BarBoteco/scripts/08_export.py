@@ -1,21 +1,28 @@
-# Exporta o mapa para o jogo web:
-#   export/bar_boteco.glb          -> visual otimizado (geometria estatica fundida por area/material)
-#   export/bar_boteco_draco.glb    -> mesmo conteudo com compressao Draco (requer DRACOLoader)
-#   export/bar_boteco_colisao.glb  -> so caixas de colisao (nos COL_* com escala = tamanho da caixa)
-import os, json, struct
+# Export para o jogo web:
+#   export/bar_boteco.glb          visual: geometria estatica fundida por area/material + pedacos (chunks) do bairro
+#                                  + objetos repetidos via EXT_mesh_gpu_instancing (cadeiras, mesas, copos, arvores...)
+#   export/bar_boteco_draco.glb    o mesmo com compressao Draco (requer DRACOLoader)
+#   export/bar_boteco_colisao.glb  caixas de colisao (COL_*: escala = tamanho) + pivos das portas (COLPORTA_*)
+import os, json, struct, math
 import bpy
+from mathutils import Matrix
 import barlib as B
 
 os.makedirs(B.EXPORT_DIR, exist_ok=True)
 scn = bpy.context.scene
-GRUPOS = {
-    "Mapa_Exterior": ["Exterior_Rua", "Exterior_Vizinhanca", "Exterior_Mobiliario"],
+vl = bpy.context.view_layer
+GRUPOS_BAR = {
     "Bar_Estrutura": ["Predio_Estrutura"],
-    "Bar_Terreo_Mobilia": ["Interior_Terreo", "Varanda_Mobiliario"],
-    "Bar_Superior_Mobilia": ["Interior_Superior", "Terraco_Mobiliario"],
-    "Bar_Quintal_Mobilia": ["Quintal_Mobiliario"],
+    "Bar_Mobilia": ["Interior_Terreo", "Varanda_Mobiliario", "Interior_Superior", "Terraco_Mobiliario", "Quintal_Mobiliario"],
 }
-LINKAR = ["Portas", "Iluminacao", "Marcadores"]      # exportados como nos separados (sem fundir)
+EXTERIOR = ["Exterior_Rua", "Exterior_Vizinhanca", "Exterior_Mobiliario"]
+DISTANTE = ["Exterior_Distante"]
+LINKAR = ["Portas", "Iluminacao", "Marcadores", "Interativos", "Interativos_Bar"]   # nos separados (o jogo acha pelo nome)
+INST_MIN = 6                                   # malhas usadas >= 6 vezes viram instancias de GPU...
+INST_PREFIXOS = ("A_", "P_Arvore", "P_Canteiro")  # ...so as pesadas/numerosas; o resto vai pro lote estatico
+CHUNKS = 1                                     # 1 = bairro num lote so (menos draw calls); 3 = pedacos 3x3 p/ frustum culling
+q = B.quadra
+X0, X1, Y0, Y1 = q(-3, 0)[0], q(3, 0)[1], q(0, -3)[2], q(0, 3)[3]
 
 
 def tmp_coll(name):
@@ -35,7 +42,7 @@ def drop_coll(c, delete_objects):
         if delete_objects:
             me = o.data
             bpy.data.objects.remove(o, do_unlink=True)
-            if me is not None and me.users == 0:
+            if me is not None and getattr(me, "users", 1) == 0 and isinstance(me, bpy.types.Mesh):
                 bpy.data.meshes.remove(me)
         else:
             c.objects.unlink(o)
@@ -50,16 +57,16 @@ def set_active(c):
             r = find(ch)
             if r:
                 return r
-    bpy.context.view_layer.active_layer_collection = find(bpy.context.view_layer.layer_collection)
+    vl.active_layer_collection = find(vl.layer_collection)
 
 
 def gltf(path, **kw):
     props = bpy.ops.export_scene.gltf.get_rna_type().properties.keys()
-    opts = dict(filepath=path, export_format='GLB', use_active_collection=True, export_apply=True,
-                export_yup=True, export_texcoord=True, export_normals=True, export_tangents=False,
-                export_materials='EXPORT', export_image_format='AUTO', export_cameras=False,
-                export_lights=True, export_extras=True, export_animations=False, export_skins=False,
-                export_morph=False, export_attributes=False, will_save_settings=False)
+    opts = dict(filepath=path, export_format='GLB', use_active_collection=True, use_active_collection_with_nested=True,
+                export_apply=True, export_yup=True, export_texcoord=True, export_normals=True, export_tangents=False,
+                export_materials='EXPORT', export_image_format='AUTO', export_cameras=False, export_lights=True,
+                export_extras=True, export_animations=False, export_skins=False, export_morph=False,
+                export_attributes=False, export_gpu_instances=True, will_save_settings=False)
     opts.update(kw)
     bpy.ops.export_scene.gltf(**{k: v for k, v in opts.items() if k in props})
 
@@ -68,72 +75,145 @@ def resumo_glb(path):
     with open(path, 'rb') as f:
         data = f.read()
     ln = struct.unpack_from('<I', data, 12)[0]
-    js = json.loads(data[20:20 + ln])
-    prims = sum(len(m['primitives']) for m in js.get('meshes', []))
-    return js, prims
+    return json.loads(data[20:20 + ln])
 
 
-# ------------------------------------------------------------------ 1) visual otimizado
-bpy.ops.object.mode_set(mode='OBJECT') if bpy.context.object and bpy.context.object.mode != 'OBJECT' else None
-exp = tmp_coll("_EXPORT")
-stats = {}
-for gname, cols in GRUPOS.items():
-    copies = []
+def objs_de(cols):
+    out = []
     for cn in cols:
-        for o in bpy.data.collections[cn].all_objects:
-            if o.type != 'MESH' or not o.data.polygons:
-                continue
-            me = o.data.copy()
-            me.transform(o.matrix_world)
-            c = bpy.data.objects.new(gname + "_tmp", me)
-            exp.objects.link(c)
-            copies.append(c)
-    with bpy.context.temp_override(active_object=copies[0], object=copies[0],
-                                   selected_objects=copies, selected_editable_objects=copies):
+        c = bpy.data.collections.get(cn)
+        if c:
+            out += [o for o in c.all_objects if o.type == 'MESH' and o.data.polygons]
+    return out
+
+
+def juntar(nome, objs, destino):
+    copias = []
+    for o in objs:
+        me = o.data.copy()
+        me.transform(o.matrix_world)
+        c = bpy.data.objects.new(nome + "_tmp", me)
+        destino.objects.link(c)
+        copias.append(c)
+    if not copias:
+        return None
+    with bpy.context.temp_override(active_object=copias[0], object=copias[0], selected_objects=copias,
+                                   selected_editable_objects=copias):
         bpy.ops.object.join()
-    j = copies[0]
-    j.name = gname
-    j.data.name = gname
-    j.data.calc_loop_triangles()
-    used = {p.material_index for p in j.data.polygons}
-    stats[gname] = (len(j.data.loop_triangles), len(used))
+    j = copias[0]
+    j.name = nome
+    j.data.name = nome
+    return j
+
+
+# ------------------------------------------------------------------ 1) visual
+if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+    bpy.ops.object.mode_set(mode='OBJECT')
+vl.update()
+exp = tmp_coll("_EXPORT")
+todos = {}
+for g, cols in GRUPOS_BAR.items():
+    for o in objs_de(cols):
+        todos[o.name] = (o, g)
+from mathutils import Vector
+for o in objs_de(EXTERIOR):
+    if CHUNKS <= 1:
+        todos[o.name] = (o, "Mapa_Bairro")
+        continue
+    bb = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    mx = sum(v.x for v in bb) / 8; my = sum(v.y for v in bb) / 8
+    ix = min(CHUNKS - 1, max(0, int((mx - X0) / ((X1 - X0) / CHUNKS))))
+    iy = min(CHUNKS - 1, max(0, int((my - Y0) / ((Y1 - Y0) / CHUNKS))))
+    todos[o.name] = (o, "Mapa_Pedaco_%d_%d" % (ix, iy))
+for o in objs_de(DISTANTE):
+    todos[o.name] = (o, "Fundo_Distante")
+usos = {}
+for (o, g) in todos.values():
+    usos[o.data.name] = usos.get(o.data.name, 0) + 1
+instanciar = {m for m, n in usos.items() if n >= INST_MIN and m.startswith(INST_PREFIXOS)}
+grupos = {}
+n_inst = {}
+raiz_inst = {}
+for (o, g) in todos.values():
+    if o.data.name in instanciar:
+        e = raiz_inst.get(o.data.name)
+        if e is None:
+            e = bpy.data.objects.new("INST_" + o.data.name, None)
+            exp.objects.link(e)
+            raiz_inst[o.data.name] = e
+        c = bpy.data.objects.new(o.data.name + "_%d" % n_inst.get(o.data.name, 0), o.data)
+        n_inst[o.data.name] = n_inst.get(o.data.name, 0) + 1
+        exp.objects.link(c)
+        c.parent = e
+        c.matrix_world = o.matrix_world.copy()
+    else:
+        grupos.setdefault(g, []).append(o)
+stats = {}
+for g, objs in sorted(grupos.items()):
+    j = juntar(g, objs, exp)
+    if j:
+        j.data.calc_loop_triangles()
+        stats[g] = (len(j.data.loop_triangles), len({p.material_index for p in j.data.polygons}))
 for cn in LINKAR:
     for o in bpy.data.collections[cn].objects:
         exp.objects.link(o)
 set_active(exp)
+vl.update()
+extras_addon = {k: scn[k] for k in list(scn.keys()) if k.startswith("blendermcp")}       # nao vazar props do addon no glTF
+for k in extras_addon:
+    del scn[k]
 out = os.path.join(B.EXPORT_DIR, "bar_boteco.glb")
-gltf(out)
-gltf(os.path.join(B.EXPORT_DIR, "bar_boteco_draco.glb"), export_draco_mesh_compression_enable=True,
-     export_draco_mesh_compression_level=6)
+try:
+    gltf(out)
+    gltf(os.path.join(B.EXPORT_DIR, "bar_boteco_draco.glb"), export_draco_mesh_compression_enable=True,
+         export_draco_mesh_compression_level=6, export_image_format='WEBP', export_image_quality=82)
+finally:
+    for k, v in extras_addon.items():
+        scn[k] = v
 for cn in LINKAR:
     for o in bpy.data.collections[cn].objects:
         exp.objects.unlink(o)
+for o in list(exp.objects):
+    if o.name.startswith(("INST_",)) or o.parent is not None:
+        bpy.data.objects.remove(o, do_unlink=True)
 drop_coll(exp, delete_objects=True)
 
 # ------------------------------------------------------------------ 2) colisao
 colc = bpy.data.collections["Colisores"]
 colc.hide_viewport = False
+vl.update()
 ce = tmp_coll("_EXPORT_COL")
 for o in colc.objects:
     ce.objects.link(o)
 set_active(ce)
 outc = os.path.join(B.EXPORT_DIR, "bar_boteco_colisao.glb")
-gltf(outc, export_materials='NONE', export_lights=False, export_normals=False, export_texcoord=False)
+for k in extras_addon:
+    del scn[k]
+try:
+    gltf(outc, export_materials='NONE', export_lights=False, export_normals=False, export_texcoord=False, export_gpu_instances=False)
+finally:
+    for k, v in extras_addon.items():
+        scn[k] = v
 drop_coll(ce, delete_objects=False)
 colc.hide_viewport = True
 set_active(bpy.data.collections["Bar_Boteco"])
 
 # ------------------------------------------------------------------ 3) relatorio
-js, prims = resumo_glb(out)
-tris = sum(t for t, _ in stats.values())
-print("GRUPOS (triangulos, materiais):", stats)
-print("total triangulos: %d | primitivas (draw calls estaticos+portas): %d | materiais: %d | texturas: %d | nos: %d | luzes: %d"
-      % (tris, prims, len(js.get('materials', [])), len(js.get('images', [])), len(js.get('nodes', [])),
-         len(js.get('extensions', {}).get('KHR_lights_punctual', {}).get('lights', []))))
-print("extensoes:", js.get('extensionsUsed'), "| obrigatorias:", js.get('extensionsRequired'))
-print("imagens:", sorted({(i.get('name'), i.get('mimeType')) for i in js.get('images', [])}))
-for m in js['materials']:
-    if m['name'] in ("Reboco_Ocre", "Vidro", "Lampada", "Tela_TV"):
-        print("  mat", m['name'], {k: v for k, v in m.items() if k != 'name'})
+js = resumo_glb(out)
+jc = resumo_glb(outc)
+prims = sum(len(m['primitives']) for m in js.get('meshes', []))
+tri_inst = 0
+for mname, n in n_inst.items():
+    me = bpy.data.meshes[mname]
+    me.calc_loop_triangles()
+    tri_inst += len(me.loop_triangles) * n
+tri_static = sum(t for t, _ in stats.values())
+print("ESTATICO (tris, materiais):", stats)
+print("INSTANCIADO: %d malhas, %d instancias, %d tris desenhados" % (len(n_inst), sum(n_inst.values()), tri_inst))
+print("tris estaticos %d | tris total desenhado %d | primitivas %d | materiais %d | imagens %d | nos %d"
+      % (tri_static, tri_static + tri_inst, prims, len(js.get('materials', [])), len(js.get('images', [])), len(js.get('nodes', []))))
+print("extensoes usadas:", js.get('extensionsUsed'), "| obrigatorias:", js.get('extensionsRequired'))
+print("cena extras:", js['scenes'][0].get('extras'))
+print("colisao: nos %d | portas com pivo %d" % (len(jc.get('nodes', [])), sum(1 for n in jc['nodes'] if n.get('name', '').startswith('COLPORTA_'))))
 for f in sorted(os.listdir(B.EXPORT_DIR)):
     print("  %-28s %7.2f MB" % (f, os.path.getsize(os.path.join(B.EXPORT_DIR, f)) / 1e6))

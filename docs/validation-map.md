@@ -1,22 +1,34 @@
-# Validação do mapa BarBoteco — 21 de outubro de 2026
+# Validação do mapa BarBoteco — 23 de outubro de 2026
 
-O cenário procedural foi substituído pelo export visual otimizado de `assets-bar/map/BarBoteco`, mantendo o conteúdo e as texturas do arquivo original. Os hashes dos GLBs visual e de colisão são verificados pelos testes.
+O bairro ampliado de `assets-bar/map/BarBoteco` foi publicado sem alterar os GLBs fornecidos. Os hashes dos arquivos visual e de colisão são registrados no manifesto e comparados byte a byte com os arquivos servidos pelo jogo.
 
 | Verificação | Resultado |
 | --- | --- |
+| Importação do mapa | 57 nós visuais, 1.550 sólidos, 16 folhas de porta, 134 triângulos de piso e 124 assentos |
 | TypeScript e build de produção | Aprovados |
-| API | 9 testes aprovados |
-| Servidor, regras, NPCs e WebSocket | 10 testes aprovados |
-| Contratos, assets, colisões e pisos | 8 testes aprovados |
-| Navegador Edge headless, banco/portas isolados | 5 cenários aprovados em 5 minutos |
-| Carga local | 32 clientes por 30 segundos, sem falhas reportadas |
+| API | 21 testes aprovados |
+| Servidor, regras, NPCs e WebSocket | 18 testes aprovados |
+| Contratos, assets, colisões e pisos | 51 testes aprovados |
+| Ferramentas de assets | 26 testes aprovados |
+| Navegador: iluminação e relógio | 2 cenários aprovados |
+| Navegador: percurso do mapa | 1 cenário aprovado em 2,7 min com WebGL por software |
 
-O novo cenário de navegador usa apenas teclado e UI para entrar pela varanda, subir os dois lances da escada, chegar ao piso superior, descer, pedir uma bebida e sentar/levantar. Os outros cenários verificam as três skins e o chute exclusivo, chat, bloqueio/denúncia, reconexão, recuperação de senha, blackjack, estatísticas e eventos administrativos. Não foram coletados erros JavaScript nesses fluxos.
+## Cobertura do mapa
 
-Os testes também verificam 128 pontos de nascimento válidos, saídas das 44 cadeiras, barreiras do mapa, apoio nas rampas, retorno pela escada, bloqueio da câmera pelas lajes e sincronização de altura entre clientes reais. A simulação das rotas dos NPCs cobre dois minutos de tempo de jogo sem colocá-los dentro de móveis ou deixá-los presos contra eles.
+- 128 posições de entrada ficam livres de casas, carros, postes, árvores e mobiliário.
+- As 16 folhas, agrupadas em 15 portas, usam as dimensões reais exportadas; todas abrem em torno da dobradiça correta e 27 das 30 travessias bidirecionais testadas ficam livres. As três restantes têm aproximação bloqueada por mobiliário, não pela folha aberta.
+- As duas escadas são percorridas nos dois sentidos sem atravessar lajes ou trocar de andar por paredes.
+- As rotas do navegador alcançam piso superior, blackjack, balcão, uma cadeira e jukebox.
+- As 142 cadeiras instanciadas são classificadas em 124 assentos e 18 peças empilhadas; todos os assentos possuem uma posição segura para levantar.
+- As rotas de Seu Zé, Tonico e Dona Lurdinha permanecem fora do novo mobiliário.
+- Praça, igreja, campinho, escola e ponto de ônibus têm marcadores normalizados no manifesto.
 
-O relatório de carga está em [map-load-32.json](validation/map-load-32.json). Os 32 clientes entraram no mesmo mundo em 1.088 ms. O RTT local mediano/p95 foi 3/19 ms, o atraso p95 do event loop foi 30,46 ms e o RSS do processo completo de teste foi 403 MiB. O cenário reúne API, banco em memória, servidor e clientes SDK no mesmo processo; não mede internet nem 32 navegadores renderizando.
+O percurso real de navegador usa somente teclado e interface: entra pela varanda, sobe e desce os dois lances, pede uma bebida, senta e levanta. A espera entre comandos confirma cada entrada no servidor. O mapa maior exigiu pulsos de teclado um pouco mais longos no navegador headless para preservar o heartbeat sob renderização SwiftShader.
 
-Uma amostra do navegador ao fim do cenário de blackjack/eventos registrou 57 FPS com cinco atores visíveis. Isso não constitui garantia de FPS em outros equipamentos ou com 32 personagens renderizados. Os limites de homologação de produção, SMTP externo e teste contínuo de duas horas continuam descritos na [validação geral](validation.md).
+## Desempenho e imagem
 
-Capturas: [exterior](previews/map-exterior.png) e [piso superior](previews/map-upper-floor.png). Detalhes da integração: [mapa](map.md).
+A colisão estática usa uma grade espacial de 8 m. As cadeiras deixaram de ocupar a grade, reduzindo o mapa de 1.674 para 1.550 sólidos; mesas e pilhas do depósito continuam bloqueando movimento. Portas permanecem dinâmicas e reconstroem o índice quando mudam de estado.
+
+O plano distante da câmera foi alinhado aos 1.100 m definidos pelo asset, e a névoa cobre 62–70 m até 430–520 m. As capturas de meio-dia, entardecer, meia-noite, interior e borda foram renovadas e inspecionadas. A borda real em x −103 fica completamente mascarada pela névoa.
+
+Capturas: [meio-dia](previews/day-night-noon.png), [entardecer](previews/day-night-dusk.png), [meia-noite](previews/day-night-midnight.png), [interior](previews/day-night-interior.png) e [borda](previews/day-night-border-fog.png). Detalhes da integração: [mapa](map.md).

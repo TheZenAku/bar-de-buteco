@@ -24,7 +24,19 @@ LOTE_X, LOTE_Y = 32.0, 26.0                 # o bar ocupa o quarteirao inteiro (
 TE, TI = 0.20, 0.15                         # espessura parede externa / interna
 ROOF_HI, SLOPE, EAVE = 3.80, 0.25, -0.6     # telhado da varanda
 FORRO = 2.75                                # forro de madeira da varanda
-MAP_X0, MAP_X1, MAP_Y0, MAP_Y1 = -26.0, 58.0, -26.0, 52.0
+MAP_X0, MAP_X1, MAP_Y0, MAP_Y1 = -26.0, 58.0, -26.0, 52.0   # (03_rua redefine com a grade de quadras)
+PORTA_W, PORTA_H = 1.10, 2.30               # vao de porta simples (folha = vao - 0.10)
+PORTA_DUPLA_W = 1.90                        # vao de porta dupla (corredor do quintal)
+# grade do bairro: quadras de 38 x 32 m (com calcada) separadas por ruas de 8 m
+QUADRA_W, QUADRA_H, RUA_W = 38.0, 32.0, 8.0
+GRADE = range(-2, 3)                        # 5 x 5 quadras jogaveis; anel externo (+-3) so decorativo
+
+
+def quadra(i, j):
+    """Retangulo externo (com calcada) da quadra (i, j). A quadra (0,0) e a do bar."""
+    x0 = -3.0 + i * (QUADRA_W + RUA_W)
+    y0 = -3.0 + j * (QUADRA_H + RUA_W)
+    return x0, x0 + QUADRA_W, y0, y0 + QUADRA_H
 
 
 def roof_z(d):
@@ -55,7 +67,7 @@ def clear(*names):
         for o in list(c.objects):
             data = o.data
             bpy.data.objects.remove(o, do_unlink=True)
-            if data is not None and data.users == 0 and not data.name.startswith("P_"):
+            if data is not None and data.users == 0 and not data.name.startswith(("P_", "A_")):
                 if isinstance(data, bpy.types.Mesh):
                     bpy.data.meshes.remove(data)
                 elif isinstance(data, bpy.types.Light):
@@ -91,6 +103,38 @@ def _mix_mul(nt, color_socket, factor):
     nt.links.new(color_socket, rgba[0])
     rgba[1].default_value = (factor[0], factor[1], factor[2], 1.0)
     return [s for s in mix.outputs if s.type == 'RGBA'][0]
+
+
+def set_blend(m):
+    """Transparencia com mistura (Blender 4.0 usa blend_method; 4.2+ usa surface_render_method)."""
+    if hasattr(m, "surface_render_method"):
+        m.surface_render_method = 'BLENDED'
+    else:
+        m.blend_method = 'BLEND'
+        m.shadow_method = 'NONE'
+
+
+def material_unlit(name, tex=None, color=(1, 1, 1), tile=(1.0, 1.0)):
+    """Material sem iluminacao (ceu/panorama): Emission pura -> KHR_materials_unlit no glTF."""
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); out.location = (400, 0)
+    em = nt.nodes.new("ShaderNodeEmission"); em.location = (150, 0)
+    em.inputs["Strength"].default_value = 1.0
+    nt.links.new(em.outputs[0], out.inputs["Surface"])
+    if tex:
+        ti = nt.nodes.new("ShaderNodeTexImage"); ti.location = (-300, 0)
+        ti.image = load_image(tex)
+        ti.extension = 'EXTEND'
+        nt.links.new(ti.outputs["Color"], em.inputs["Color"])
+    else:
+        em.inputs["Color"].default_value = (color[0], color[1], color[2], 1.0)
+    m.use_backface_culling = False
+    m["tile_u"], m["tile_v"] = float(tile[0]), float(tile[1])
+    m.diffuse_color = (color[0], color[1], color[2], 1.0)
+    return m
 
 
 def material(name, color=(0.8, 0.8, 0.8), tex=None, tile=(1.0, 1.0), rough=0.8, metal=0.0,
@@ -130,7 +174,7 @@ def material(name, color=(0.8, 0.8, 0.8), tex=None, tile=(1.0, 1.0), rough=0.8, 
         nt.links.new(nm.outputs["Normal"], bs.inputs["Normal"])
     if alpha is not None:
         bs.inputs["Alpha"].default_value = alpha
-        m.surface_render_method = 'BLENDED'
+        set_blend(m)
     m.use_backface_culling = not double
     m["tile_u"], m["tile_v"] = float(tile[0]), float(tile[1])
     m.diffuse_color = (color[0], color[1], color[2], 1.0 if alpha is None else alpha)
@@ -236,7 +280,9 @@ class Mesh:
         return f
 
     def box(self, mn, mx, mat, mats=None, skip=(), M=None, uvrects=None):
-        mn = Vector(mn); mx = Vector(mx)
+        a, b = Vector(mn), Vector(mx)
+        mn = Vector((min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)))      # limites em qualquer ordem (evita caixa ao avesso)
+        mx = Vector((max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)))
         pts = []
         for c in CORNERS:
             p = Vector((mx.x if c[0] else mn.x, mx.y if c[1] else mn.y, mx.z if c[2] else mn.z))

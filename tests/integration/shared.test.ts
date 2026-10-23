@@ -26,9 +26,11 @@ test('movement keeps diagonal speed bounded and prevents crossing walls or furni
 });
 
 test('every authored seat has a clear standing position on its floor',()=>{
-  for(const seat of [...BLACKJACK_SEATS,...INTERACTABLES.filter(object=>object.type==='seat')]){
+  const seats=[...BLACKJACK_SEATS,...INTERACTABLES.filter(object=>object.type==='seat')];
+  for(const [index,seat] of seats.entries()){
     const exit=standingPosition(seat,seat.rotation);
     assert.ok(isWalkable(exit.x,exit.z,exit.y),`exit from seat at ${seat.x.toFixed(2)},${seat.z.toFixed(2)}`);
+    if(index>=BLACKJACK_SEATS.length)assert.ok(Math.hypot(exit.x-seat.x,exit.z-seat.z)>=.19,`exit remains inside chair at ${seat.x.toFixed(2)},${seat.z.toFixed(2)}`);
   }
 });
 

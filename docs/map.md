@@ -1,39 +1,43 @@
 # Mapa BarBoteco
 
-O cenário ativo é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: todas as texturas estão embutidas e não há dependência de um decodificador ou de imagens externas. Os arquivos originais são copiados integralmente para `apps/web/public/maps`.
+O cenário ativo é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois arquivos são publicados integralmente em `apps/web/public/maps`.
 
-Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json`. Esse arquivo alimenta a movimentação autoritativa, a previsão do cliente, as colisões da câmera, o nascimento e as interações. O GLB de colisão não é desenhado sobre o cenário.
+Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json`. Esse arquivo alimenta a movimentação autoritativa, a previsão do cliente, as colisões da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
 
 ## Layout
 
-O complexo ocupa x 0–32 e z 0 a −26 (o z do jogo é o y do Blender com sinal trocado):
+O bar continua no quarteirão central, agora cercado por um bairro de 5 × 5 quadras jogáveis e um anel externo de cenário em LOD. Os limites autoritativos vão de x −103 a 135 e de z −117 a 91 (o z do jogo é o y do Blender com sinal trocado).
 
-- **Térreo (0,30 m):** varanda na frente e na lateral oeste; salão com 11 mesas; balcão em L com geladeiras, garrafeiro e chopeira; cozinha, câmara fria, depósitos e banheiros ao fundo.
-- **Superior (3,45 m):** salão de jogos com três sinucas e dois pebolins, lounge com balcão próprio, escritório, depósito e duas sacadas (3,65 m). A escada fica em x 13,25–16,45, z −11,65 a −14,8, com patamar a 1,88 m.
-- **Terraço (3,45 m)** sobre o anexo, com seis mesas.
-- **Quintal (0,30 m)** com pergolado, mesas de madeira, churrasqueira e **palco** (0,90 m, degraus de 0,50 e 0,70 m). Acesso pelo portão social aberto no muro oeste (z −19,5 a −22,5) e pelas portas do corredor do prédio.
-- **Rua e calçada** em volta; os limites do mundo vêm dos muros `COL_Rua_Limite` (x −26 a 58, z −52 a 26).
+- **Bar térreo (0,30 m):** varandas, salão, balcão em L, cozinha, câmara fria, depósitos e banheiros.
+- **Piso superior (3,45 m):** salão de jogos, lounge, escritório, depósito e sacadas. A escada fica em x 13,25–16,45 e z −11,65 a −14,8, com patamar a 1,88 m.
+- **Terraço (3,45 m):** área sobre o anexo com mesas.
+- **Quintal (0,30 m):** pergolado, churrasqueira e palco a 0,90 m, com degraus de 0,50 e 0,70 m.
+- **Bairro:** ruas, calçadas, casas, lojas, praça com coreto, igreja, escola, campinho, ponto de ônibus, carros, postes, árvores, fiação, prédios distantes, morros e panorama.
 
-## Colisões
+Os novos marcadores `Ponto_Praca`, `Ponto_Igreja`, `Ponto_Campinho`, `Ponto_Escola` e `Ponto_Onibus` também são importados e ficam disponíveis para futuras rotas e atividades.
 
-O export fornece 487 caixas de colisão. As 16 folhas de portas não são colisores fixos: o importador exporta dobradiça e ângulos de cada uma (`doors`), e a colisão acompanha o estado aberto/fechado de cada porta (veja [portas](doors.md)). Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos e escadas preservam posições e dimensões. Há 54 triângulos de apoio: rua, calçadas, pisos, lajes, sacadas, rampas, patamar, palco e degraus. As caixas inclinadas das escadas são avaliadas por suas faces superiores, evitando transformar uma rampa em parede.
+## Colisões e interações
 
-O jogador é um cilindro de 0,34 m de raio e 1,86 m de altura que sobe degraus de até 0,26 m. Abaixo da altura do joelho (obstáculo até 0,5 m acima do piso), só os pés colidem, com raio de 0,15 m; é isso que permite subir os degraus de 30 cm do palco. Subpassos impedem atravessar paredes finas correndo, e apoios inacessíveis não permitem saltar entre andares nem cair pelo vazio da escada.
+O export fornece 1.550 volumes sólidos e 134 triângulos de apoio. Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos, ruas, rampas, palco e escadas preservam as posições e dimensões exportadas.
 
-As 33 mesas de plástico e suas 128 cadeiras seguem o layout de `scripts/06_interior.py`. Como as cadeiras não têm colisor no export, o importador mantém a lista das mesas e **falha** se ela deixar de bater com os colisores `COL_Mob_Mesa_Plastico`; se o mobiliário for reorganizado no Blender, atualize a lista em `tools/import-map.mjs`. Ao levantar, o servidor procura uma saída livre sem atravessar obstáculos, o que permite sentar junto às mesas sem ficar preso.
+As 16 folhas de porta são dinâmicas. O importador ignora apenas seus pivôs vazios `COLPORTA_*`, lê a geometria real de cada folha e exporta dobradiça, largura e ângulos. A colisão acompanha individualmente o estado aberto ou fechado; veja [portas](doors.md).
+
+O jogador é um cilindro de 0,34 m de raio e 1,86 m de altura que sobe degraus de até 0,26 m. Obstáculos baixos usam um raio reduzido nos pés, subpassos impedem atravessar paredes finas e apoios inacessíveis não permitem trocar de andar pelo vazio.
+
+As 31 mesas vermelhas mantêm colisores compactos. As cadeiras são instâncias de GPU atravessáveis para permitir circulação entre conjuntos apertados. O importador lê as 142 transformações de `EXT_mesh_gpu_instancing`, associa 124 cadeiras às mesas e valida separadamente as 18 cadeiras empilhadas do depósito. Não existe lista manual para manter sincronizada: mover, adicionar ou remover conjuntos no Blender atualiza o jogo ao executar a importação. Ao levantar, o servidor sempre desloca o personagem para uma saída livre atrás ou nas diagonais da cadeira, evitando deixá-lo em pé dentro da malha visual.
 
 ## Pontos do jogo
 
-O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais próximo, mantendo distância das pessoas já presentes. O balcão usa `Ponto_Balcao`, com o Seu Zé atrás do balcão em L. Blackjack e jukebox, ausentes no asset, são objetos do jogo: o blackjack fica no salão de jogos do andar superior, entre a última sinuca e o lounge, e a jukebox no térreo, no espaço vazio da última fileira do salão, longe da entrada da escada (`BLACKJACK_TABLE` e `JUKEBOX` em `packages/shared/src/world.ts`). Tonico circula entre a varanda e o salão pelo corredor do balcão; Dona Lurdinha, pelo quintal em frente ao palco.
+O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais próximo, mantendo distância das pessoas presentes. `Ponto_Balcao` posiciona o atendimento do Seu Zé. Blackjack e jukebox continuam sendo objetos do jogo: o blackjack fica no salão de jogos superior e a jukebox no salão térreo (`BLACKJACK_TABLE` e `JUKEBOX` em `packages/shared/src/world.ts`). As rotas de Tonico, Dona Lurdinha e Seu Zé são verificadas contra os novos colisores.
 
 ## Câmera e iluminação
 
-A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes, móveis e o forro da varanda, gerado pelo importador a partir das medidas de `04_predio.py`. Objetos finos (postes, troncos, pilares) não encurtam a câmera; o marcador de nascimento fica diante de um poste.
+A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes, móveis e o forro da varanda. O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
 
-O importador glTF do PlayCanvas cria as luzes desligadas e limita a intensidade a 2. O [ciclo de dia e noite](day-night.md) separa o sol das 13 luminárias, preservando suas posições, cores e potências relativas a partir da luminância original. Luminárias e postes usam focos voltados para baixo com sombras, evitando luz através de paredes e lajes. Céu, sol, lua, ambiente e névoa variam em um ciclo completo de 40 minutos; iluminação externa acende ao anoitecer. Festa e apagão controlam o circuito elétrico. A névoa de distância e a máscara nas bordas ocultam o fim do cenário sem modificar colisões.
+O importador glTF separa o sol das 13 luminárias do bar, preservando posições, cores e potências relativas. O ciclo completo de dia e noite dura 40 minutos; céu, lua, ambiente, névoa, luzes externas, festa e apagão permanecem integrados. Para limitar custo de GPU, doze focos externos com sombras atendem o entorno imediato do bar, enquanto o restante do bairro usa materiais emissivos, luz ambiente, lua e névoa.
 
 ## Testes
 
-`tests/integration/map.test.ts` verifica a integridade dos arquivos publicados, as contagens, 128 posições de nascimento, a subida e descida da escada, a interação restrita ao andar, as rotas usadas pelo teste de navegador (salão de jogos, blackjack, balcão, assento e jukebox), a subida ao palco, paredes, forro e guarda-corpo. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs, e o teste de navegador percorre o mapa pelo teclado.
+`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e câmera. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
 
-Veja os [resultados da validação do mapa](validation-map.md), incluindo os cenários completos de navegador e a carga local de 32 clientes.
+Veja os [resultados da validação do mapa](validation-map.md).

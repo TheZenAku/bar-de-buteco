@@ -183,7 +183,9 @@ export class BarScene {
 
     this.camera = new pc.Entity('Third-person camera');
     this.camera.addComponent('camera', {
-      clearColor: color('#9dafbd'), fov: 57, nearClip: 0.08, farClip: 150,
+      // BarBoteco's expanded neighbourhood includes distant buildings, hills and a panorama. The Blender
+      // source declares camera_far_minimo_m=1100; the previous 150 m plane clipped most of that scenery.
+      clearColor: color('#9dafbd'), fov: 57, nearClip: 0.08, farClip: 1100,
     });
     this.app.root.addChild(this.camera);
     this.camera.setPosition(18, 9, 16);

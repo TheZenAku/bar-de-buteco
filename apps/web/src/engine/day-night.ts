@@ -35,7 +35,9 @@ export function daylightAt(serverTime:number){
     sunDirection,moonDirection:sunDirection.map(v=>-v) as [number,number,number],
     sunIntensity:1.15*smooth(0,.35,sunDirection[1]),moonIntensity:.18*smooth(0,.3,-sunDirection[1]),night,
     top:mix('top'),horizon:mix('horizon'),ambient:mix('ambient'),sunColor:mix('sun'),
-    fogStart:28-night*5,fogEnd:58-night*9,exposure:1.08+night*.04};
+    // The expanded export authors distance fog from 70 to 520 m. Keep the night slightly denser without
+    // reducing visibility to the old single-block map's range.
+    fogStart:70-night*8,fogEnd:520-night*90,exposure:1.08+night*.04};
 }
 
 /** Visibility near the world rim, independent of camera distance. */

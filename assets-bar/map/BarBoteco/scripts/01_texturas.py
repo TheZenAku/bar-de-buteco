@@ -449,9 +449,263 @@ def tex_atlas():
     save("atlas_placas.jpg", A, 92)
 
 
+def save_png(name, rgba):
+    """RGBA (top-down) -> PNG com alfa."""
+    h, w = rgba.shape[:2]
+    a = np.ascontiguousarray(np.clip(rgba, 0, 1)[::-1]).astype(F)
+    old = bpy.data.images.get(name)
+    if old is not None:
+        old.name = name + "_old"
+    tmp = bpy.data.images.new(name + "_gen", w, h, alpha=True)
+    tmp.pixels.foreach_set(a.ravel())
+    path = os.path.join(B.TEX_DIR, name)
+    tmp.filepath_raw = path
+    tmp.file_format = 'PNG'
+    tmp.save()
+    bpy.data.images.remove(tmp)
+    img = bpy.data.images.load(path)
+    img.name = name
+    img.alpha_mode = 'STRAIGHT'
+    if old is not None:
+        old.user_remap(img)
+        bpy.data.images.remove(old)
+    return img
+
+
+def vnoise_wrapx(h, w, cy, cx):
+    return vnoise(h, w, cy, cx)        # ja e periodico nas duas direcoes
+
+
+# ---------------------------------------------------------------- grama / terra batida / ipe
+def tex_grama():
+    S = 512
+    n1 = fbm(S, S, 8, 8, 5); n2 = rng.random((S, S)).astype(F)
+    blades = 0.5 + 0.5 * np.sin(np.mgrid[0:S, 0:S][1] * 0.9 + fbm(S, S, 64, 16, 2) * 9)
+    t = np.clip(0.45 * n1 + 0.25 * n2 + 0.3 * blades, 0, 1)
+    rgb = lerp((0.16, 0.30, 0.07), (0.36, 0.52, 0.16), t)
+    rgb = rgb * (0.85 + 0.25 * fbm(S, S, 3, 3, 4))[..., None]
+    rgb = np.where((fbm(S, S, 6, 6, 4) > 0.68)[..., None], rgb * 0.75 + np.array((0.12, 0.1, 0.05), F), rgb)
+    save("grama.jpg", rgb)
+
+
+def tex_terra():
+    S = 512
+    n = fbm(S, S, 4, 4, 6); p = rng.random((S, S)).astype(F)
+    rgb = lerp((0.42, 0.28, 0.17), (0.62, 0.45, 0.30), np.clip(n * 0.8 + p * 0.2, 0, 1))
+    rgb = np.where((p > 0.985)[..., None], rgb * 0.6, rgb)
+    save("terra_batida.jpg", rgb)
+
+
+def tex_ipe():
+    S = 512
+    d1, d2, idx, jit, cs = voronoi(S, 48, 0.9)
+    tone = rng.random(48 * 48).astype(F)[idx]
+    flor = lerp((0.62, 0.20, 0.45), (0.92, 0.48, 0.72), tone)
+    folha = lerp((0.10, 0.22, 0.07), (0.25, 0.40, 0.12), tone)
+    rgb = np.where((rng.random(48 * 48)[idx] < 0.18)[..., None], folha, flor)
+    shade = np.clip(1.0 - d1 / (cs * 0.9), 0, 1)
+    rgb = rgb * (0.55 + 0.55 * shade)[..., None]
+    rgb = np.where(((d2 - d1) < 1.2)[..., None], rgb * 0.4, rgb)
+    save("folhas_ipe.jpg", rgb * (0.8 + 0.3 * fbm(S, S, 4, 4, 4))[..., None])
+
+
+# ---------------------------------------------------------------- brasas (emissivo do carrinho de espeto)
+def tex_brasa():
+    S = 256
+    d1, d2, idx, jit, cs = voronoi(S, 14, 0.9)
+    calor = rng.random(14 * 14).astype(F)[idx]
+    centro = np.clip(1.0 - d1 / (cs * 0.75), 0, 1)
+    t = np.clip(calor * 0.7 + centro * 0.5, 0, 1)
+    rgb = lerp((0.25, 0.03, 0.0), (1.0, 0.55, 0.12), t ** 1.4)
+    rgb = np.where(((d2 - d1) < 1.6)[..., None], np.array((0.04, 0.02, 0.02), F), rgb)        # carvao entre as brasas
+    save("brasa.jpg", rgb * (0.8 + 0.3 * fbm(S, S, 4, 4, 3))[..., None])
+
+
+# ---------------------------------------------------------------- sombra de contato (blob + faixa de AO)
+def tex_sombra():
+    W, H = 256, 128
+    yy, xx = np.mgrid[0:H, 0:W].astype(F)
+    rgba = np.zeros((H, W, 4), F)
+    rgba[..., :3] = 1.0
+    r = np.hypot((xx[:, :128] - 64) / 62, (yy[:, :128] - 64) / 62)
+    rgba[:, :128, 3] = np.clip(1 - r, 0, 1) ** 1.6 * 0.85
+    t = (xx[:, 128:] - 128) / 127
+    rgba[:, 128:, 3] = (1 - np.clip(t, 0, 1)) ** 2.2 * 0.6
+    save_png("sombra_contato.png", rgba)
+
+
+# ---------------------------------------------------------------- favela/casario (para morros e panorama)
+def casario(h, w, dens, haze, seed=0):
+    rr = np.random.default_rng(seed)
+    out = np.zeros((h, w, 3), F)
+    mask = np.zeros((h, w), F)
+    cores = np.array([(0.85, 0.80, 0.72), (0.80, 0.52, 0.36), (0.88, 0.70, 0.55), (0.70, 0.72, 0.75),
+                      (0.90, 0.88, 0.82), (0.72, 0.42, 0.30), (0.78, 0.66, 0.50)], F)
+    for _ in range(int(dens * w * h / 60)):
+        x, y = rr.integers(0, w), rr.integers(0, h)
+        bw, bh = rr.integers(3, 9), rr.integers(3, 7)
+        c = cores[rr.integers(0, len(cores))] * rr.uniform(0.75, 1.05)
+        out[y:y + bh, x:x + bw] = c
+        out[y:y + 1, x:x + bw] = c * 0.6
+        if rr.random() < 0.5:
+            out[y + 1:y + 2, x + 1:x + 2] = (0.12, 0.12, 0.14)
+        mask[y:y + bh, x:x + bw] = 1.0
+    return out * (1 - haze) + haze * np.array((0.75, 0.80, 0.86), F), mask
+
+
+def tex_morro():
+    H, W = 512, 1024
+    base = lerp((0.24, 0.34, 0.20), (0.40, 0.48, 0.30), fbm(H, W, 4, 8, 5))
+    cas, m = casario(H, W, 1.1, 0.18, seed=4)
+    dens = np.clip((fbm(H, W, 3, 6, 4) - 0.35) * 3, 0, 1)
+    rgb = base * (1 - m * dens)[..., None] + cas * (m * dens)[..., None]
+    haze = np.array((0.70, 0.77, 0.84), F)
+    save("morro.jpg", rgb * 0.72 + haze * 0.28)
+
+
+def tex_predios_dist():
+    S = 512
+    rgb = lerp((0.62, 0.64, 0.66), (0.78, 0.78, 0.77), fbm(S, S, 2, 2, 3))
+    yy, xx = np.mgrid[0:S, 0:S]
+    win = ((xx % 32) > 8) & ((xx % 32) < 26) & ((yy % 32) > 10) & ((yy % 32) < 24)
+    tone = rng.random((S // 32 + 1, S // 32 + 1)).astype(F)[yy // 32, xx // 32]
+    wcol = lerp((0.22, 0.28, 0.36), (0.55, 0.62, 0.70), tone)
+    rgb = np.where(win[..., None], wcol, rgb)
+    rgb = np.where(((yy % 128) < 4)[..., None], rgb * 0.8, rgb)
+    haze = np.array((0.72, 0.78, 0.86), F)
+    save("predios_distantes.jpg", rgb * 0.7 + haze * 0.3)
+
+
+# ---------------------------------------------------------------- panorama 360 (ceu + nuvens + montanhas + morros + cidade)
+def tex_panorama():
+    H, W = 1024, 4096
+    HR = 842                                         # linha do horizonte (altura do olho)
+    yy, xx = np.mgrid[0:H, 0:W].astype(F)
+    t = np.clip(yy / HR, 0, 1)
+    ceu = lerp((0.30, 0.52, 0.84), (0.80, 0.86, 0.93), t ** 1.6)
+    chao = np.array((0.60, 0.62, 0.60), F)
+    img = np.where((yy < HR)[..., None], ceu, chao)
+    # nuvens (mais achatadas perto do horizonte)
+    nv = fbm(H, W, 6, 24, 6)
+    nv2 = fbm(H, W, 3, 12, 4)
+    banda = np.clip(1 - np.abs(yy - 430) / 360, 0, 1)
+    c = np.clip((nv * 0.65 + nv2 * 0.35 - 0.52) * 4.0, 0, 1) * banda
+    sombra_n = np.clip((np.roll(nv, -6, 0) - nv) * 6, 0, 1)
+    cor_n = lerp((1.0, 1.0, 1.0), (0.78, 0.80, 0.86), sombra_n)
+    img = img * (1 - c[..., None]) + cor_n * c[..., None]
+    # perfis (periodicos em x)
+    def perfil(cx, amp, base_, seed):
+        r1 = np.random.default_rng(seed).random(cx)
+        x = np.arange(W) * cx / W
+        i0 = np.floor(x).astype(int) % cx; i1 = (i0 + 1) % cx; f = x - np.floor(x)
+        f = f * f * (3 - 2 * f)
+        return base_ + amp * (r1[i0] * (1 - f) + r1[i1] * f)
+    m1 = perfil(14, 120, 50, 1) + perfil(60, 25, 0, 2)
+    m2 = perfil(26, 70, 20, 3) + perfil(110, 12, 0, 4)
+    serra = (yy > (HR - m1)[None, :]) & (yy < HR)
+    img = np.where(serra[..., None], lerp((0.55, 0.64, 0.76), (0.66, 0.73, 0.82), (yy - (HR - m1)) / 120.0) * np.ones(1, F), img)
+    cas, mk = casario(H, W, 1.4, 0.35, seed=8)
+    morro = (yy > (HR - m2)[None, :]) & (yy < HR)
+    verde = lerp((0.42, 0.52, 0.50), (0.55, 0.62, 0.62), fbm(H, W, 8, 32, 4))
+    dens = np.clip((fbm(H, W, 4, 16, 3) - 0.3) * 3, 0, 1) * mk
+    mor = verde * (1 - dens[..., None]) + cas * dens[..., None]
+    img = np.where(morro[..., None], mor * 0.78 + np.array((0.72, 0.78, 0.85), F) * 0.22, img)
+    # cidade no horizonte
+    rr = np.random.default_rng(12)
+    x = 0
+    while x < W:
+        bw = int(rr.integers(10, 46)); bh = int(rr.integers(8, 70) * (1.6 if rr.random() < 0.08 else 1.0))
+        col = np.array((0.60, 0.64, 0.70), F) * rr.uniform(0.85, 1.08)
+        img[HR - bh:HR, x:x + bw] = col
+        for wy in range(HR - bh + 3, HR - 2, 5):
+            img[wy:wy + 2, x + 2:x + bw - 2:4] = col * 0.82
+        x += bw + int(rr.integers(0, 6))
+    neb = np.clip(1 - np.abs(yy - HR) / 140, 0, 1) ** 2 * 0.45                     # neblina no horizonte
+    img = img * (1 - neb[..., None]) + np.array((0.82, 0.86, 0.90), F) * neb[..., None]
+    save("panorama.jpg", img, 88)
+
+
+# ---------------------------------------------------------------- atlas do bairro (janelas, portas, placas de comercio e de rua)
+def tex_atlas_bairro():
+    S = 1024
+    A = np.zeros((S, S, 3), F)
+    yy, xx = np.mgrid[0:S, 0:S].astype(F)
+    Y, W_, K = [], [], []
+    # janelas 128x128
+    for k in range(4):
+        x0 = k * 128
+        R = A[0:128, x0:x0 + 128]
+        fr = (0.92, 0.92, 0.9) if k != 2 else (0.35, 0.22, 0.12)
+        R[:] = fr
+        gl = lerp((0.30, 0.42, 0.52), (0.62, 0.72, 0.80), 1 - yy[0:128, 0:128] / 128)
+        refl = ((xx[0:128, 0:128] + yy[0:128, 0:128] * 0.7) % 90) < 22
+        gl = np.where(refl[..., None], gl * 0.8 + 0.2, gl)
+        R[10:118, 10:118] = gl[10:118, 10:118]
+        R[10:118, 62:66] = fr
+        if k == 1:                                   # cortina
+            R[14:114, 14:50] = lerp((0.85, 0.75, 0.55), (0.95, 0.88, 0.70), (xx[14:114, 14:50] % 8) / 8)
+        if k == 3:                                   # grade de ferro
+            for gx in range(18, 118, 14):
+                R[10:118, gx:gx + 3] = (0.12, 0.12, 0.12)
+            R[60:63, 10:118] = (0.12, 0.12, 0.12)
+    # porta de madeira 128x256 e porta de ferro/vidro
+    R = A[0:256, 512:640]
+    R[:] = lerp((0.42, 0.24, 0.12), (0.30, 0.16, 0.08), fbm(256, 128, 8, 2, 3))
+    for (a, b_) in ((20, 110), (130, 236)):
+        R[a:b_, 16:112] = R[a:b_, 16:112] * 0.8
+    R[120:132, 96:108] = (0.8, 0.7, 0.3)
+    R = A[0:256, 640:768]
+    R[:] = (0.18, 0.20, 0.22)
+    R[12:244, 12:116] = lerp((0.35, 0.45, 0.55), (0.6, 0.68, 0.75), 1 - yy[0:232, 0:104] / 232)
+    for gx in range(20, 116, 12):
+        R[12:244, gx:gx + 2] = (0.1, 0.1, 0.1)
+    # portao de garagem 256x256
+    R = A[0:256, 768:1024]
+    R[:] = (0.20, 0.30, 0.24)
+    for gx in range(0, 256, 16):
+        R[:, gx:gx + 4] = (0.12, 0.2, 0.15)
+    R[120:128, :] = (0.1, 0.15, 0.12)
+    # placas de comercio 512x128
+    placas = [((0, 256), "PADARIA PÃO QUENTE", (0.75, 0.40, 0.08), Y), ((512, 256), "FARMÁCIA POPULAR", (0.05, 0.50, 0.25), W_),
+              ((0, 384), "MERCADINHO DO BAIRRO", (0.10, 0.25, 0.60), Y), ((512, 384), "AÇOUGUE BOI GORDO", (0.65, 0.06, 0.06), W_),
+              ((0, 512), "OFICINA MECÂNICA", (0.95, 0.75, 0.05), K), ((512, 512), "LAVA-RÁPIDO", (0.05, 0.55, 0.70), W_),
+              ((0, 768), "BAR DO ZÉ", (0.15, 0.15, 0.15), Y)]
+    for (x0, y0), txt, cor, lst in placas:
+        A[y0:y0 + 128, x0:x0 + 512] = np.asarray(cor, F) * (0.9 + 0.1 * fbm(128, 512, 2, 8, 2))[..., None]
+        A[y0:y0 + 6, x0:x0 + 512] = (0.95, 0.95, 0.92); A[y0 + 122:y0 + 128, x0:x0 + 512] = (0.95, 0.95, 0.92)
+        lst.append((txt, x0 + 256, y0 + 64, 56, True, 'C', 480))
+    A[640:768, 0:1024] = (0.10, 0.28, 0.62)
+    A[640:648, :] = (1, 1, 1); A[760:768, :] = (1, 1, 1)
+    W_.append(("ESCOLA ESTADUAL PROF. ANTÔNIO CARLOS", 512, 704, 58, True, 'C', 980))
+    # placas de rua 256x64
+    for (x0, y0), nm in (((512, 768), "R. DAS FLORES"), ((768, 768), "R. SÃO JOSÉ"), ((512, 832), "AV. BRASIL"), ((768, 832), "R. DA PAZ")):
+        A[y0:y0 + 64, x0:x0 + 256] = (0.08, 0.22, 0.55)
+        A[y0 + 4:y0 + 6, x0 + 4:x0 + 252] = (1, 1, 1); A[y0 + 58:y0 + 60, x0 + 4:x0 + 252] = (1, 1, 1)
+        W_.append((nm, x0 + 128, y0 + 32, 28, True, 'C', 236))
+    A[896:1024, 0:256] = (0.05, 0.30, 0.65)
+    W_.append(("ÔNIBUS", 128, 960, 46, True, 'C', 230))
+    d = ((xx[896:1024, 256:512] + yy[896:1024, 256:512]) // 32) % 2
+    A[896:1024, 256:512] = np.where(d[..., None] == 0, np.array((0.85, 0.08, 0.06), F), np.array((0.95, 0.95, 0.95), F))
+    A[896:1024, 512:768] = (0.90, 0.75, 0.10)
+    K.append(("BANCA", 640, 940, 44, True, 'C', 230)); K.append(("JORNAIS • REVISTAS", 640, 990, 20, True, 'C', 230))
+    A[896:1024, 768:1024] = (0.32, 0.24, 0.16)
+    Y.append(("PRAÇA DA", 896, 935, 30, True, 'C', 230)); Y.append(("MATRIZ", 896, 985, 44, True, 'C', 230))
+    paint(A, render_text(S, Y), (1.0, 0.85, 0.2))
+    paint(A, render_text(S, W_), (0.97, 0.97, 0.95))
+    paint(A, render_text(S, K), (0.08, 0.08, 0.08))
+    save("atlas_bairro.jpg", A, 92)
+
+
+import sys
+SO_NOVAS = globals().get("SO_NOVAS", False)
 import time
 t0 = time.time()
-for fn in (tex_tijolo, tex_telha, tex_reboco, tex_concreto, tex_madeira, tex_forro, tex_pedra,
-           tex_asfalto, tex_piso, tex_azulejo, tex_folhas, tex_metal, tex_atlas):
+base = [] if SO_NOVAS else [tex_tijolo, tex_telha, tex_reboco, tex_concreto, tex_madeira, tex_forro, tex_pedra,
+                            tex_asfalto, tex_piso, tex_azulejo, tex_folhas, tex_metal, tex_atlas]
+novas = [tex_grama, tex_terra, tex_ipe, tex_sombra, tex_morro, tex_predios_dist, tex_panorama, tex_atlas_bairro, tex_brasa]
+SO_TEX = globals().get("SO_TEX")                      # opcional: gerar so algumas (ex.: {"tex_brasa"})
+for fn in base + novas:
+    if SO_TEX and fn.__name__ not in SO_TEX:
+        continue
     fn()
 print("texturas ok em %.1fs:" % (time.time() - t0), sorted(os.listdir(B.TEX_DIR)))

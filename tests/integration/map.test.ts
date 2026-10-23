@@ -31,12 +31,13 @@ test('published map and collision export match the supplied BarBoteco assets exa
     assert.equal(createHash('sha256').update(published).digest('hex'),hash);
     assert.ok(source.equals(published),'Import must preserve all supplied geometry and embedded textures');
   }
-  // 487 exported volumes; the 16 door leaves are dynamic (doors.test.ts).
-  assert.equal(map.colliders.length,487);
+  // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts).
+  assert.equal(map.colliders.length,1550);
   assert.equal(map.doors.length,16);
-  assert.equal(map.tables.length,33);
-  assert.equal(map.seats.length,128);
-  assert.deepEqual(map.bounds,{minX:-26,maxX:58,minZ:-52,maxZ:26});
+  assert.equal(map.tables.length,31);
+  assert.equal(map.seats.length,124);
+  assert.deepEqual(map.bounds,{minX:-103,maxX:135,minZ:-117,maxZ:91});
+  assert.deepEqual(['Ponto_Praca','Ponto_Igreja','Ponto_Campinho','Ponto_Escola','Ponto_Onibus'].map(id=>id in map.markers),[true,true,true,true,true]);
 });
 
 test('capacity spawn positions avoid street furniture and every authored solid',()=>{
@@ -69,7 +70,7 @@ test('the browser routes reach upstairs, the blackjack table, the counter, a sea
   const atCounter=walk(inAisle,[[16.9,-7.5]]);
   assert.ok(Math.abs(atCounter.y!-.3)<.02);
   assert.equal(nearestInteraction(atCounter)?.id,'counter');
-  assert.equal(nearestInteraction(walk(atCounter,[[14.3,-7.6]]))?.type,'seat');
+  assert.equal(nearestInteraction(walk(atCounter,[[14.45,-7.6]]))?.type,'seat');
   const jukebox=INTERACTABLES.find(i=>i.id==='jukebox')!;
   assert.equal(nearestInteraction(walk(atCounter,[[14.3,-9.3],[jukebox.x,jukebox.z]]))?.id,'jukebox');
 });

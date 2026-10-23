@@ -29,10 +29,36 @@ export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLID
 // Doors start open, as authored in the map.
 const openDoors=new Map(DOORS.map(door=>[door.id,true]));
 let solids:readonly Collider[]=[];
+const COLLISION_CELL=8;
+const solidGrid=new Map<string,Collider[]>();
+type MapSurface=(typeof MAP_SURFACES)[number];
+const surfaceGrid=new Map<string,MapSurface[]>();
+const cell=(value:number)=>Math.floor(value/COLLISION_CELL);
+const cellKey=(x:number,z:number)=>`${x}:${z}`;
+function indexArea<T>(grid:Map<string,T[]>,item:T,minX:number,maxX:number,minZ:number,maxZ:number):void {
+  for(let x=cell(minX);x<=cell(maxX);x++)for(let z=cell(minZ);z<=cell(maxZ);z++){
+    const key=cellKey(x,z),items=grid.get(key);
+    if(items)items.push(item);else grid.set(key,[item]);
+  }
+}
+for(const surface of MAP_SURFACES){
+  const xs=surface.points.map(point=>point[0]!),zs=surface.points.map(point=>point[2]!);
+  indexArea(surfaceGrid,surface,Math.min(...xs),Math.max(...xs),Math.min(...zs),Math.max(...zs));
+}
 function rebuildSolids():void {
   solids=[...COLLIDERS,...DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw))];
+  solidGrid.clear();
+  for(const collider of solids)indexArea(solidGrid,collider,collider.x-collider.hx-PLAYER_RADIUS,collider.x+collider.hx+PLAYER_RADIUS,
+    collider.z-collider.hz-PLAYER_RADIUS,collider.z+collider.hz+PLAYER_RADIUS);
 }
 rebuildSolids();
+const solidsAt=(x:number,z:number):readonly Collider[]=>solidGrid.get(cellKey(cell(x),cell(z)))??[];
+function solidsBetween(ax:number,az:number,bx:number,bz:number):readonly Collider[] {
+  const found=new Set<Collider>();
+  for(let x=cell(Math.min(ax,bx));x<=cell(Math.max(ax,bx));x++)for(let z=cell(Math.min(az,bz));z<=cell(Math.max(az,bz));z++)
+    for(const collider of solidGrid.get(cellKey(x,z))??[])found.add(collider);
+  return [...found];
+}
 /** Every solid volume right now, including each door leaf where its door state puts it. */
 export function solidColliders():readonly Collider[] {return solids;}
 export function isDoorOpen(id:string):boolean {return openDoors.get(id)??true;}
@@ -73,7 +99,7 @@ function triangleHeight(points:number[][],x:number,z:number):number|undefined {
 /** Highest support reachable by a normal step; no teleport between floors or off ledges. */
 export function floorHeight(x:number,z:number,reference=.3):number|undefined {
   let highest:number|undefined;
-  for(const surface of MAP_SURFACES){
+  for(const surface of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
     const y=triangleHeight(surface.points,x,z);
     if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest))highest=y;
   }
@@ -93,7 +119,7 @@ function inOpenDoorway(x:number,z:number,y:number):boolean {
 function obstructed(x:number,z:number,y:number,ignored?:Set<string>):boolean {
   const body=inOpenDoorway(x,z,y)?DOORWAY_RADIUS:PLAYER_RADIUS;
   if(x<WORLD.minX+PLAYER_RADIUS||x>WORLD.maxX-PLAYER_RADIUS||z<WORLD.minZ+PLAYER_RADIUS||z>WORLD.maxZ-PLAYER_RADIUS)return true;
-  for(const c of solids){
+  for(const c of solidsAt(x,z)){
     if(c.ramp||ignored?.has(c.id))continue;
     if((c.maxY??Infinity)<=y+.26||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
     // Below knee height only the feet collide, so the body may lean over a step edge (the stage's 30 cm treads).
@@ -101,7 +127,7 @@ function obstructed(x:number,z:number,y:number,ignored?:Set<string>):boolean {
     if(Math.abs(x-c.x)<c.hx+radius-.00001&&Math.abs(z-c.z)<c.hz+radius-.00001)return true;
   }
   // Sloped collision boxes are sampled on their real upper face, not their enclosing AABB.
-  for(const s of MAP_SURFACES){
+  for(const s of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
     if(!s.id.includes('Escada_Rampa'))continue;
     const rampY=triangleHeight(s.points,x,z);
     if(rampY!==undefined&&rampY>y+.05&&rampY<y+PLAYER_HEIGHT-.04)return true;
@@ -223,10 +249,17 @@ export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Positi
 }
 
 export function standingPosition(position:Position,rotation=0):Position {
-  if(isWalkable(position.x,position.z,position.y))return {...position};
+  // Chairs are visual GPU instances and intentionally have no collision. A seated character is therefore
+  // technically walkable, but must still step away instead of standing inside the chair mesh.
+  const onSeat=map.seats.some(seat=>Math.abs(seat.y-(position.y??seat.y))<.08&&Math.hypot(seat.x-position.x,seat.z-position.z)<.08);
+  if(!onSeat&&isWalkable(position.x,position.z,position.y))return {...position};
   const ignored=new Set(solids.filter(c=>(c.maxY??Infinity)>(position.y??.3)+.035&&(c.minY??-Infinity)<(position.y??.3)+PLAYER_HEIGHT&&Math.abs(position.x-c.x)<c.hx+PLAYER_RADIUS&&Math.abs(position.z-c.z)<c.hz+PLAYER_RADIUS).map(c=>c.id));
-  const directions=[rotation,rotation+Math.PI/2,rotation-Math.PI/2,rotation+Math.PI];
-  for(const direction of directions)for(const offset of [.2,.35,.5,.7,.85]){
+  // The optimized red-chair sets are tighter than the old procedural furniture. Prefer stepping behind
+  // the chair, then fan out diagonally before trying the table side; the path still may ignore only the
+  // collider occupied by the seated body, never neighbouring chairs or tables.
+  const directions=[rotation,rotation+Math.PI/4,rotation-Math.PI/4,rotation+Math.PI/2,rotation-Math.PI/2,
+    rotation+Math.PI*3/4,rotation-Math.PI*3/4,rotation+Math.PI];
+  for(const direction of directions)for(const offset of [.2,.35,.5,.7,.85,1,1.2,1.4]){
     const x=position.x-Math.sin(direction)*offset,z=position.z-Math.cos(direction)*offset;
     const y=floorHeight(x,z,position.y??.3);
     if(y!==undefined&&isWalkable(x,z,y)){
@@ -241,7 +274,8 @@ export function standingPosition(position:Position,rotation=0):Position {
 /** Ray/box camera boom clipping, including the veranda ceiling absent from player colliders. */
 export function cameraFraction(start:Required<Position>,end:Required<Position>):number {
   let ratio=1;
-  for(const c of [...solids,...(map.cameraCeilings as Collider[])]){
+  const candidates=[...solidsBetween(start.x,start.z,end.x,end.z),...(map.cameraCeilings as Collider[])];
+  for(const c of candidates){
     // Posts, trunks and pillars are too thin to hide the player; letting the boom pass them avoids the
     // camera snapping onto the avatar (the spawn marker stands in front of a street lamp).
     if(c.ramp||(c.hx<.2&&c.hz<.2))continue;

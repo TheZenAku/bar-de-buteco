@@ -12,14 +12,15 @@ COL = "Predio_Estrutura"
 B.coll(COL)
 B.clear(COL, "Portas")
 B.clear_colliders("Predio")
+B.clear_colliders("Porta_")
 
 ZP, T1, ZP2, T2, L2, PL = B.Z_PISO, B.Z_TETO1, B.Z_PISO2, B.Z_TETO2, B.Z_LAJE2, B.Z_PLAT
 ZC = B.Z_CALCADA
 TE, TI = B.TE, B.TI
 OC, CR, AZ, BR, TJ = "Reboco_Ocre", "Reboco_Creme", "Azulejo", "Reboco_Branco", "Tijolo"
 D_TOP = 2.70
-P_TOP = ZP + 2.10
-P2_TOP = ZP2 + 2.10
+P_TOP = ZP + B.PORTA_H                     # portas mais altas (2,30 m) e mais largas (vao 1,10 m)
+P2_TOP = ZP2 + B.PORTA_H
 E = 0.65
 HI = B.ROOF_HI
 zE = HI - (3.5 + E) * B.SLOPE
@@ -39,45 +40,46 @@ P = "Predio_Parede"
 Ms = w.wall((3.5, 3.5), (VX, 3.5), ZP, T1, TE, OC, CR, mat_e=OC, cut_ends=(False, True), skip_top=True, name=P,
             openings=[(1.5, 4.5, ZP, D_TOP), (6.0, 9.0, ZP, D_TOP), (10.5, 13.1, ZP, D_TOP)])
 Mn1 = w.wall((VX, 15.0), (11.025, 15.0), ZP, T1, TE, OC, CR, mat_e=OC, cut_ends=True, skip_top=True, name=P,
-             openings=[(1.5, 2.3, ZP, P_TOP), (3.8, 6.3, 1.2, 2.2), (10.8, 12.4, ZP, P_TOP)])
+             openings=[(1.3, 2.4, ZP, P_TOP), (3.8, 6.3, 1.2, 2.2), (10.75, 12.65, ZP, P_TOP)])
 Mn2 = w.wall((11.025, 15.0), (3.5, 15.0), ZP, T1, TE, OC, AZ, mat_e=OC, cut_ends=(True, False), skip_top=True, name=P,
              openings=[(1.425, 2.025, 2.0, 2.5), (5.425, 6.025, 2.0, 2.5)])
 Mw1 = w.wall((3.5, 14.8), (3.5, 11.575), ZP, T1, TE, OC, AZ, mat_e=OC, skip_top=True, name=P, openings=[(1.3, 1.9, 2.0, 2.5)])
 Mw2 = w.wall((3.5, 11.575), (3.5, 3.7), ZP, T1, TE, OC, CR, mat_e=OC, skip_top=True, name=P, openings=[(3.575, 6.575, ZP, D_TOP)])
 # parede A/B (x 23.8..24.0): face +x = anexo, face -x = varanda / predio A
 w.wall((24.0, 0.2), (24.0, 3.5), ZP, T1, TE, AZ, OC, skip_top=True, name=P)
-Mab2 = w.wall((24.0, 3.5), (24.0, 9.075), ZP, T1, TE, AZ, CR, skip_top=True, name=P, openings=[(4.2, 5.0, ZP, P_TOP)])
+Mab2 = w.wall((24.0, 3.5), (24.0, 9.075), ZP, T1, TE, AZ, CR, skip_top=True, name=P, openings=[(4.1, 5.2, ZP, P_TOP)])
 w.wall((24.0, 9.075), (24.0, 11.575), ZP, T1, TE, CR, CR, skip_top=True, name=P)
-Mab4 = w.wall((24.0, 11.575), (24.0, 14.8), ZP, T1, TE, CR, CR, skip_top=True, name=P, openings=[(1.025, 1.825, ZP, P_TOP)])
+Mab4 = w.wall((24.0, 11.575), (24.0, 14.8), ZP, T1, TE, CR, CR, skip_top=True, name=P, openings=[(0.9, 2.0, ZP, P_TOP)])
 # anexo B: fachadas
 Mbs = w.wall((VX, 0.0), (32.0, 0.0), ZP, T1, TE, OC, AZ, mat_e=OC, cut_ends=False, skip_top=True, name=P,
              openings=[(1.7, 3.2, 1.8, 2.6), (4.7, 6.2, 1.8, 2.6)])
-Mbe1 = w.wall((32.0, 0.2), (32.0, 9.075), ZP, T1, TE, OC, AZ, mat_e=OC, skip_top=True, name=P, openings=[(1.8, 2.6, ZP, P_TOP)])
+Mbe1 = w.wall((32.0, 0.2), (32.0, 9.075), ZP, T1, TE, OC, AZ, mat_e=OC, skip_top=True, name=P, openings=[(1.6, 2.7, ZP, P_TOP)])
 Mbe2 = w.wall((32.0, 9.075), (32.0, 14.8), ZP, T1, TE, OC, CR, mat_e=OC, skip_top=True, name=P, openings=[(0.525, 2.725, ZP, D_TOP)])
 Mbn = w.wall((32.0, 15.0), (VX, 15.0), ZP, T1, TE, OC, CR, mat_e=OC, cut_ends=(False, True), skip_top=True, name=P,
-             openings=[(6.2, 7.0, ZP, P_TOP)])
-Mbp = w.wall((24.0, 9.0), (31.8, 9.0), ZP, T1, TI, AZ, CR, mat_e=CR, skip_top=True, name=P, openings=[(6.0, 6.8, ZP, P_TOP)])
+             openings=[(6.1, 7.2, ZP, P_TOP)])
+Mbp = w.wall((24.0, 9.0), (31.8, 9.0), ZP, T1, TI, AZ, CR, mat_e=CR, skip_top=True, name=P, openings=[(5.8, 6.9, ZP, P_TOP)])
 Mcf = w.wall((28.6, 12.0), (31.8, 12.0), ZP, T1, 0.12, "Inox", "Plastico_Branco", mat_e="Inox", cut_ends=(False, True),
-             skip_top=True, name=P, openings=[(1.0, 1.8, ZP, P_TOP)])
+             skip_top=True, name=P, openings=[(0.9, 2.0, ZP, P_TOP)])
 w.wall((28.6, 14.8), (28.6, 12.12), ZP, T1, 0.12, "Inox", "Plastico_Branco", skip_top=True, name=P)
 # divisorias do predio A (fundos: banheiros / corredor / escada / deposito)
 Mp1 = w.wall((3.7, 11.5), (11.1, 11.5), ZP, T1, TI, CR, AZ, mat_e=CR, skip_top=True, name=P,
-             openings=[(1.3, 2.1, ZP, P_TOP), (5.1, 5.9, ZP, P_TOP)])
+             openings=[(1.1, 2.2, ZP, P_TOP), (4.9, 6.0, ZP, P_TOP)])
 Mp2 = w.wall((11.1, 11.5), (VX, 11.5), ZP, T1, TI, CR, CR, mat_e=CR, skip_top=True, name=P,
-             openings=[(0.0, 2.0, ZP, 2.7), (2.15, 5.35, ZP, T1), (8.4, 9.2, ZP, P_TOP)])
+             openings=[(0.0, 2.0, ZP, 2.7), (2.15, 5.35, ZP, T1), (8.3, 9.4, ZP, P_TOP)])
 for (x, ma, mb) in ((7.4, AZ, AZ), (11.1, CR, AZ), (13.25, CR, CR), (16.6, CR, CR)):
     w.wall((x, 11.65), (x, 14.8), ZP, T1, TI, ma, mb, skip_top=True, name=P)
 w.box((SX + 1.5, SY, ZP), (SX + 1.7, SY + 2.16, ZP2 + 1.0), CR, skip=('nz',))
 B.add_collider("Predio_Escada_Parede", (SX + 1.5, SY, ZP), (SX + 1.7, SY + 2.16, ZP2 + 1.0))
 for x in (4.93, 8.58, 9.76):                                    # divisorias das cabines dos banheiros
     w.box((x, 13.4, ZP), (x + 0.04, 14.8, ZP + 2.0), "Plastico_Branco", skip=('nz', 'py'))
+    B.add_collider("Predio_Divisoria_Cabine", (x, 13.4, ZP), (x + 0.04, 14.8, ZP + 2.0))
 w.build(COL)
-portas += [("Porta_WC_Masc", Mp1, 1.3, 2.1, ZP, TI, 'b', False), ("Porta_WC_Fem", Mp1, 5.1, 5.9, ZP, TI, 'b', False),
-           ("Porta_Deposito_Bar", Mp2, 8.4, 9.2, ZP, TI, 'b', False), ("Porta_Cozinha", Mab2, 4.2, 5.0, ZP, TE, 'a', False),
-           ("Porta_Deposito_Anexo", Mab4, 1.025, 1.825, ZP, TE, 'a', False),
-           ("Porta_Cozinha_Deposito", Mbp, 6.0, 6.8, ZP, TI, 'b', False), ("Porta_Camara_Fria", Mcf, 1.0, 1.8, ZP, 0.12, 'b', False),
-           ("Porta_Servico_Cozinha", Mbe1, 1.8, 2.6, ZP, TE, 'b', False), ("Porta_Quintal_Deposito", Mn1, 1.5, 2.3, ZP, TE, 'b', False),
-           ("Porta_Quintal_Anexo", Mbn, 6.2, 7.0, ZP, TE, 'b', False), ("Porta_Quintal_Corredor", Mn1, 10.8, 12.4, ZP, TE, 'a', True)]
+portas += [("Porta_WC_Masc", Mp1, 1.1, 2.2, ZP, TI, 'b', False), ("Porta_WC_Fem", Mp1, 4.9, 6.0, ZP, TI, 'b', False),
+           ("Porta_Deposito_Bar", Mp2, 8.3, 9.4, ZP, TI, 'b', False), ("Porta_Cozinha", Mab2, 4.1, 5.2, ZP, TE, 'a', False),
+           ("Porta_Deposito_Anexo", Mab4, 0.9, 2.0, ZP, TE, 'a', False),
+           ("Porta_Cozinha_Deposito", Mbp, 5.8, 6.9, ZP, TI, 'b', False), ("Porta_Camara_Fria", Mcf, 0.9, 2.0, ZP, 0.12, 'b', False),
+           ("Porta_Servico_Cozinha", Mbe1, 1.6, 2.7, ZP, TE, 'b', False), ("Porta_Quintal_Deposito", Mn1, 1.3, 2.4, ZP, TE, 'b', False),
+           ("Porta_Quintal_Anexo", Mbn, 6.1, 7.2, ZP, TE, 'b', False), ("Porta_Quintal_Corredor", Mn1, 10.75, 12.65, ZP, TE, 'a', True)]
 
 # =====================================================================  SUPERIOR + TERRACO
 u = B.Mesh("Predio_Paredes_Superior")
@@ -93,11 +95,11 @@ Mu_w = u.wall((3.5, 14.8), (3.5, 3.7), ZP2, T2, TE, TJ, BR, mat_e=BR, skip_top=T
 Mu_e = u.wall((24.0, 3.7), (24.0, 14.8), ZP2, T2, TE, TJ, BR, mat_e=BR, skip_top=True, name=P,
               openings=[(1.3, 3.1, ZP2, 5.55), (5.3, 6.7, 4.45, 5.65), (9.1, 10.3, 4.45, 5.65)])
 Mq1 = u.wall((3.7, 11.5), (11.1, 11.5), ZP2, T2, TI, BR, AZ, mat_e=BR, skip_top=True, name=P,
-             openings=[(1.3, 2.1, ZP2, P2_TOP), (5.1, 5.9, ZP2, P2_TOP)])
+             openings=[(1.1, 2.2, ZP2, P2_TOP), (4.9, 6.0, ZP2, P2_TOP)])
 Mq2 = u.wall((11.1, 11.5), (SX, 11.5), ZP2, T2, TI, BR, BR, cut_ends=(True, False), skip_top=True, name=P,
-             openings=[(0.6, 1.4, ZP2, P2_TOP)])
+             openings=[(0.5, 1.6, ZP2, P2_TOP)])
 Mq3 = u.wall((SX + 3.2, 11.5), (VX, 11.5), ZP2, T2, TI, BR, BR, cut_ends=(False, True), skip_top=True, name=P,
-             openings=[(3.05, 3.85, ZP2, P2_TOP)])
+             openings=[(2.95, 4.05, ZP2, P2_TOP)])
 for (x, ma, mb) in ((7.4, AZ, AZ), (11.1, BR, AZ), (13.25, BR, BR), (16.6, BR, BR)):
     u.wall((x, 11.65), (x, 14.8), ZP2, T2, TI, ma, mb, skip_top=True, name=P)
 for i in range(11):                                             # guarda-corpo do vazio da escada
@@ -120,8 +122,8 @@ for (mn, mx) in (((VX - 0.04, -0.04, T1), (32.04, 0.0, ZP2)), ((32.0, 0.0, T1), 
                  ((24.0, 15.0, T1), (32.0, 15.04, ZP2)), ((VX - 0.04, 0.0, T1), (VX, 3.5, ZP2))):
     u.box(mn, mx, "Reboco_Marrom")
 u.build(COL)
-portas += [("Porta_WC_Masc_Sup", Mq1, 1.3, 2.1, ZP2, TI, 'b', False), ("Porta_WC_Fem_Sup", Mq1, 5.1, 5.9, ZP2, TI, 'b', False),
-           ("Porta_Escritorio", Mq2, 0.6, 1.4, ZP2, TI, 'b', False), ("Porta_Deposito_Sup", Mq3, 3.05, 3.85, ZP2, TI, 'b', False)]
+portas += [("Porta_WC_Masc_Sup", Mq1, 1.1, 2.2, ZP2, TI, 'b', False), ("Porta_WC_Fem_Sup", Mq1, 4.9, 6.0, ZP2, TI, 'b', False),
+           ("Porta_Escritorio", Mq2, 0.5, 1.6, ZP2, TI, 'b', False), ("Porta_Deposito_Sup", Mq3, 2.95, 4.05, ZP2, TI, 'b', False)]
 
 # =====================================================================  LAJES E PISOS
 s = B.Mesh("Predio_Lajes")
@@ -163,6 +165,12 @@ for (y0, z0, y1, z1, x0, x1) in ((SY, ZP, SY + 2.16, ZP + 9 * R, SX, SX + 1.5), 
     M = Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Rotation(math.atan2(z1 - z0, y1 - y0), 4, 'X')
     B.add_collider("Predio_Escada_Rampa", (-(x1 - x0) / 2, -L / 2, -0.06), ((x1 - x0) / 2, L / 2, 0.0), M)
 B.add_collider("Predio_Escada_Patamar", (SX, SY + 2.16, ZP), (SX + 3.2, 14.8, ZP + 9 * R))
+# volume macico embaixo do 2o lance (antes dava para entrar por baixo da rampa)
+B.add_collider("Predio_Escada_Base", (SX + 1.7, SY, ZP), (SX + 3.2, SY + 2.16, ZP + 9 * R))
+for j in range(8):
+    ya, yb = SY + 2.16 - (j + 1) * T, SY + 2.16 - j * T
+    z_rampa = ZP + 9 * R + (SY + 2.16 - yb) / 2.16 * (ZP2 - ZP - 9 * R)
+    B.add_collider("Predio_Escada_Base", (SX + 1.7, ya, ZP + 9 * R), (SX + 3.2, yb, z_rampa - 0.03))
 
 # =====================================================================  VARANDA
 v = B.Mesh("Predio_Varanda")
@@ -174,10 +182,10 @@ for (x, y) in [(x, 0.12) for x in south_x] + [(0.12, y) for y in west_y]:
     B.add_collider("Predio_Pilar", (x - 0.11, y - 0.11, ZP), (x + 0.11, y + 0.11, 2.55))
 v.box((0.045, 0.045, 2.55), (VX, 0.195, 2.75), "Madeira", skip=('pz',))
 v.box((0.045, 0.195, 2.55), (0.195, 15.0, 2.75), "Madeira", skip=('pz',))
-for x in south_x[1:]:
-    v.box((x - 0.05, 0.195, 2.60), (x + 0.05, 3.5, 2.75), "Madeira", skip=('pz', 'py'))
+for x in south_x[1:]:                     # a ponta so encosta em parede onde ela existe (x >= 3.5)
+    v.box((x - 0.05, 0.195, 2.60), (x + 0.05, 3.5, 2.75), "Madeira", skip=('pz', 'py') if x - 0.05 >= 3.5 else ('pz',))
 for y in west_y:
-    v.box((0.195, y - 0.05, 2.60), (3.5, y + 0.05, 2.75), "Madeira", skip=('pz', 'px'))
+    v.box((0.195, y - 0.05, 2.60), (3.5, y + 0.05, 2.75), "Madeira", skip=('pz', 'px') if y - 0.05 >= 3.5 else ('pz',))
 v.face([(-0.57, -0.57, B.FORRO), (VX, -0.57, B.FORRO), (VX, 3.5, B.FORRO), (3.5, 3.5, B.FORRO),
         (3.5, 15, B.FORRO), (-0.57, 15, B.FORRO)], "Forro", facing=(0, 0, -1))
 v.box((-0.6, -0.6, 2.60), (VX, -0.57, 2.76), "Madeira")
@@ -200,8 +208,35 @@ v.build(COL)
 
 # =====================================================================  TELHADO COLONIAL DA VARANDA
 r = B.Mesh("Predio_Telhado")
-r.roof_face([(-E, -E, zE), (VX, -E, zE), (VX, 3.5, HI), (3.5, 3.5, HI)], "Telha", (1, 0, 0))
+SAC = [(10.5, 13.5), (18.5, 21.5)]          # sacadas: o telhado e recortado embaixo delas
+YS = 2.3                                    # borda externa das sacadas
+z23 = roof_y(YS)
+r.roof_face([(-E, -E, zE), (VX, -E, zE), (VX, YS, z23), (YS, YS, z23)], "Telha", (1, 0, 0))
+xs = [YS] + [v for ab in SAC for v in ab] + [VX]
+for k in range(0, len(xs), 2):
+    xa, xb = xs[k], xs[k + 1]
+    pa = (3.5, 3.5, HI) if xa == YS else (xa, 3.5, HI)
+    r.roof_face([(xa, YS, z23), (xb, YS, z23), (xb, 3.5, HI), pa], "Telha", (1, 0, 0))
 r.roof_face([(-E, -E, zE), (3.5, 3.5, HI), (3.5, 15.0, HI), (-E, 15.0, zE)], "Telha", (0, 1, 0))
+for (x0, x1) in SAC:                        # muretas laterais das sacadas (escondem o corte do telhado)
+    for (a, b_) in ((x0 - 0.12, x0), (x1, x1 + 0.12)):
+        r.box((a, YS, ZP2), (b_, 3.5, 3.92), TJ, mats={'pz': "Concreto"}, skip=('py',))
+        B.add_collider("Predio_Sacada_Mureta", (a, YS, ZP2), (b_, 3.5, 3.92))
+th = math.atan(B.SLOPE)
+cs, sn = math.cos(th), math.sin(th)
+
+
+def col_telhado_sul(xa, xb, ya, yb):
+    o = Vector((xa, ya, roof_y(ya)))
+    M = Matrix(((1, 0, 0, o.x), (0, cs, -sn, o.y), (0, sn, cs, o.z), (0, 0, 0, 1)))
+    B.add_collider("Predio_Telhado", (0, 0, -0.12), (xb - xa, (yb - ya) / cs, 0.0), M)
+
+
+col_telhado_sul(-E, VX, -E, YS)
+for (xa, xb) in ((3.5, SAC[0][0] - 0.12), (SAC[0][1] + 0.12, SAC[1][0] - 0.12), (SAC[1][1] + 0.12, VX)):
+    col_telhado_sul(xa, xb, YS, 3.5)
+Mo = Matrix(((cs, 0, -sn, -E), (0, 1, 0, -E), (sn, 0, cs, zE), (0, 0, 0, 1)))
+B.add_collider("Predio_Telhado", (0, 0, -0.12), ((3.5 + E) / cs, 15.0 + E, 0.0), Mo)
 r.face([(-E, -E, zE - 0.05), (VX, -E, zE - 0.05), (VX, -E, zE), (-E, -E, zE)], "Telha", facing=(0, -1, 0))
 r.face([(-E, -E, zE - 0.05), (-E, 15.0, zE - 0.05), (-E, 15.0, zE), (-E, -E, zE)], "Telha", facing=(-1, 0, 0))
 r.face([(-E, 15.0, zE - 0.05), (3.5, 15.0, HI - 0.05), (3.5, 15.0, HI), (-E, 15.0, zE)], "Telha", facing=(0, 1, 0))
@@ -213,7 +248,8 @@ Ar, Br = A + Vector((0, 0, 0.07)), Bp + Vector((0, 0, 0.07))
 r.face([As, Bs, Br, Ar], "Telha", facing=(0.3, -0.3, 1))
 r.face([Ar, Br, Bw, Aw], "Telha", facing=(-0.3, 0.3, 1))
 r.face([Aw, As, Ar], "Telha", facing=(-1, -1, 0))
-r.box((3.38, 3.38, HI - 0.03), (VX, 3.5, HI + 0.06), "Concreto", skip=('py', 'nz'))
+for (xa, xb) in ((3.38, SAC[0][0] - 0.12), (SAC[0][1] + 0.12, SAC[1][0] - 0.12), (SAC[1][1] + 0.12, VX)):
+    r.box((xa, 3.38, HI - 0.03), (xb, 3.5, HI + 0.06), "Concreto", skip=('py', 'nz'))
 r.box((3.38, 3.5, HI - 0.03), (3.5, 15.0, HI + 0.06), "Concreto", skip=('px', 'nz'))
 r.build(COL)
 
@@ -242,7 +278,7 @@ def churrasqueira(M, w, d, ztop, extra=0.0, nome="Predio_Churrasqueira"):
     ctr = W_((w / 2, -d / 2, 2.0))
     for (i, j) in ((0, 1), (1, 2), (3, 0)):
         c.face([W_(b0[i]), W_(b0[j]), W_(t0[j]), W_(t0[i])], TJ, away=ctr)
-    bx((cw0, -cd, 2.35), (cw1, 0, ztop), TJ, skip=('py', 'nz'))
+    bx((cw0, -cd, 2.35), (cw1, 0, ztop), TJ, skip=('nz',))           # fundo visivel acima do muro
     bx((cw0 - 0.05, -cd - 0.05, ztop), (cw1 + 0.05, 0.05, ztop + 0.06), "Concreto")
     for (x, y) in ((cw0 + 0.02, -cd + 0.02), (cw1 - 0.02, -cd + 0.02), (cw0 + 0.02, -0.02), (cw1 - 0.02, -0.02)):
         bx((x - 0.04, y - 0.04, ztop + 0.06), (x + 0.04, y + 0.04, ztop + 0.25), TJ, skip=('nz', 'pz'))
@@ -353,8 +389,9 @@ g.build(COL)
 q = B.Mesh("Predio_Esquadrias")
 
 
-def janela(M, s0, s1, z0, z1, t, divs=2, sill=True, glass=True, frame="Aluminio_Bronze"):
+def janela(M, s0, s1, z0, z1, t, divs=2, sill=True, glass=True, frame="Aluminio_Bronze", vidro="Vidro"):
     f, yc, d = 0.05, t / 2, 0.03
+    B.add_collider("Predio_Janela", (s0, 0.0, z0), (s1, t, z1), M)          # janela bloqueia a passagem
     q.box((s0, yc - d, z0), (s0 + f, yc + d, z1), frame, M=M)
     q.box((s1 - f, yc - d, z0), (s1, yc + d, z1), frame, M=M)
     q.box((s0 + f, yc - d, z0), (s1 - f, yc + d, z0 + f), frame, M=M)
@@ -363,7 +400,7 @@ def janela(M, s0, s1, z0, z1, t, divs=2, sill=True, glass=True, frame="Aluminio_
         sm = s0 + (s1 - s0) * i / divs
         q.box((sm - 0.02, yc - d, z0 + f), (sm + 0.02, yc + d, z1 - f), frame, M=M)
     if glass:
-        q.face([M @ Vector(p) for p in ((s0 + f, yc, z0 + f), (s1 - f, yc, z0 + f), (s1 - f, yc, z1 - f), (s0 + f, yc, z1 - f))], "Vidro")
+        q.face([M @ Vector(p) for p in ((s0 + f, yc, z0 + f), (s1 - f, yc, z0 + f), (s1 - f, yc, z1 - f), (s0 + f, yc, z1 - f))], vidro)
     if sill:
         q.box((s0 - 0.05, -0.05, z0 - 0.04), (s1 + 0.05, 0.03, z0), "Concreto", M=M)
 
@@ -375,6 +412,7 @@ def porta_correr(M, s0, s1, z0, z1, t):
         q.box((a, yc - 0.04, z0), (b_, yc + 0.04, z1), "Aluminio_Bronze", M=M)
     q.box((s0, yc - 0.04, z1 - f), (s1, yc + 0.04, z1), "Aluminio_Bronze", M=M)
     hm = (s0 + s1) / 2
+    B.add_collider("Predio_Vidro_Fixo", (s0, 0.0, z0), (hm + 0.07, t, z1), M)   # metade fixa bloqueia
     for (a, b_, yo) in ((s0 + f, hm + 0.03, -0.015), (s0 + f + 0.04, hm + 0.07, 0.015)):
         q.box((a, yc + yo - 0.012, z0), (b_, yc + yo + 0.012, z0 + 0.04), "Aluminio_Bronze", M=M)
         q.box((a, yc + yo - 0.012, z1 - f - 0.04), (b_, yc + yo + 0.012, z1 - f), "Aluminio_Bronze", M=M)
@@ -387,22 +425,25 @@ def batente(M, s0, s1, z0, z1, t):
     q.box((s0, -0.01, z0), (s0 + 0.05, t + 0.01, z1), "Madeira", M=M, skip=('nz',))
     q.box((s1 - 0.05, -0.01, z0), (s1, t + 0.01, z1), "Madeira", M=M, skip=('nz',))
     q.box((s0, -0.01, z1 - 0.05), (s1, t + 0.01, z1), "Madeira", M=M)
+    for (a, b_) in ((s0, s0 + 0.05), (s1 - 0.05, s1)):
+        B.add_collider("Predio_Batente", (a, -0.01, z0), (b_, t + 0.01, z1), M)
 
 
 for (a, b_) in ((1.3, 2.8), (4.2, 5.7), (11.0, 12.5), (18.8, 20.0)):
     janela(Mu_s, a, b_, 4.45, 5.65, TE, divs=2 if b_ - a > 1.3 else 1)
 for (a, b_) in ((1.5, 3.0), (4.5, 6.0), (11.3, 12.5)):
     janela(Mu_n, a, b_, 4.45, 5.65, TE, divs=2 if b_ - a > 1.3 else 1)
+JT = "Vidro_Jateado"                        # banheiros: vidro jateado (nao parece buraco e da privacidade)
 for (a, b_) in ((14.4, 15.0), (18.4, 19.0)):
-    janela(Mu_n, a, b_, 4.95, 5.55, TE, divs=1)
-janela(Mu_w, 1.3, 1.9, 4.95, 5.55, TE, divs=1)
+    janela(Mu_n, a, b_, 4.95, 5.55, TE, divs=1, vidro=JT)
+janela(Mu_w, 1.3, 1.9, 4.95, 5.55, TE, divs=1, vidro=JT)
 for (a, b_) in ((6.0, 7.5), (8.5, 10.0)):
     janela(Mu_w, a, b_, 4.45, 5.65, TE)
 for (a, b_) in ((5.3, 6.7), (9.1, 10.3)):
     janela(Mu_e, a, b_, 4.45, 5.65, TE, divs=2 if b_ - a > 1.3 else 1)
-janela(Mw1, 1.3, 1.9, 2.0, 2.5, TE, divs=1)
+janela(Mw1, 1.3, 1.9, 2.0, 2.5, TE, divs=1, vidro=JT)
 for (a, b_) in ((1.425, 2.025), (5.425, 6.025)):
-    janela(Mn2, a, b_, 2.0, 2.5, TE, divs=1)
+    janela(Mn2, a, b_, 2.0, 2.5, TE, divs=1, vidro=JT)
 for (a, b_) in ((1.7, 3.2), (4.7, 6.2)):
     janela(Mbs, a, b_, 1.8, 2.6, TE)
 janela(Mn1, 3.8, 6.3, 1.2, 2.2, TE, divs=1, sill=False, glass=False)                    # janela de atendimento
@@ -410,7 +451,7 @@ for (a, b_) in ((7.5, 9.5), (15.5, 17.5)):
     porta_correr(Mu_s, a, b_, 3.65, 5.75, TE)                                            # sacadas
 porta_correr(Mu_e, 1.3, 3.1, ZP2, 5.55, TE)                                              # saida para o terraco
 for (nm, M, s0, s1, z0, t, side, dupla) in portas:
-    batente(M, s0, s1, z0, z0 + 2.10, t)
+    batente(M, s0, s1, z0, z0 + B.PORTA_H, t)
 q.box((17.4, 14.98, 1.15), (20.1, 15.0, 1.2), "Granito_Preto")
 q.build(COL)
 
@@ -438,34 +479,72 @@ def placa_parede(x, y, z, key, wdt, hgt, face='ny'):
                mats={'nx': "Atlas_Placas"}, skip=('px',))
 
 
-for (x, z) in ((5.4, 2.55), (5.4, ZP2 + 2.25)):
-    placa_parede(x, 11.5, z, 'wc_m', 0.44, 0.22)
-for (x, z) in ((9.2, 2.55), (9.2, ZP2 + 2.25)):
-    placa_parede(x, 11.5, z, 'wc_f', 0.44, 0.22)
-placa_parede(19.9, 11.5, 2.55, 'deposito', 0.48, 0.12)
-placa_parede(12.1, 11.5, ZP2 + 2.25, 'escritorio', 0.48, 0.12)
-placa_parede(19.9, 11.5, ZP2 + 2.25, 'deposito', 0.48, 0.12)
-placa_parede(VX, 8.1, 2.55, 'cozinha', 0.48, 0.12, face='nx')
+ZPL1, ZPL2 = P_TOP + 0.10, P2_TOP + 0.10                                  # placas acima das portas
+for z in (ZPL1, ZPL2):
+    placa_parede(5.35, 11.5, z, 'wc_m', 0.44, 0.22)
+    placa_parede(9.15, 11.5, z, 'wc_f', 0.44, 0.22)
+placa_parede(19.95, 11.5, ZPL1, 'deposito', 0.48, 0.12)
+placa_parede(12.15, 11.5, ZPL2, 'escritorio', 0.48, 0.12)
+placa_parede(19.95, 11.5, ZPL2, 'deposito', 0.48, 0.12)
+placa_parede(VX, 8.15, ZPL1, 'cozinha', 0.48, 0.12, face='nx')
 pl.build(COL)
 
 # =====================================================================  FOLHAS DAS PORTAS (objetos separados, pivo na dobradica)
-b = B.Mesh("P_Porta")
-b.box((0.0, -0.0175, 0.0), (0.70, 0.0175, 2.08), "Madeira")
-for sy in (-1, 1):
-    b.box((0.60, sy * 0.0175, 0.98), (0.66, sy * 0.05, 1.02), "Inox")
-me = b.mesh()
+HF = B.PORTA_H - 0.05                       # altura da folha (vao - travessa do batente)
+_folhas = {}
+
+
+def folha(wf):
+    """Malha da folha com largura exata (cm); macaneta perto da borda livre."""
+    key = int(round(wf * 100))
+    if key in _folhas:
+        return _folhas[key]
+    b = B.Mesh("P_Porta_%03d" % key)
+    b.box((0.0, -0.0175, 0.0), (wf, 0.0175, HF), "Madeira")
+    for z0 in (0.25, 1.25):                                              # almofadas da porta
+        b.box((0.12, -0.022, z0), (wf - 0.12, -0.0175, z0 + 0.75), "Madeira_Escura", skip=('py',))
+        b.box((0.12, 0.0175, z0), (wf - 0.12, 0.022, z0 + 0.75), "Madeira_Escura", skip=('ny',))
+    for sy in (-1, 1):
+        b.box((wf - 0.11, sy * 0.0175, 1.03), (wf - 0.05, sy * 0.055, 1.07), "Inox")
+    _folhas[key] = b.mesh()
+    return _folhas[key]
+
+
 B.coll("Portas")
+colp = B.coll("Colisores")
+for o in [o for o in colp.objects if o.name.startswith("COLPORTA_")]:
+    bpy.data.objects.remove(o, do_unlink=True)
+
+
+def porta_obj(nome, me, wf, pos, rot_fechada, rot_aberta):
+    o = B.inst(me, nome, "Portas", pos, rot=rot_aberta)
+    o["porta"] = True
+    o["angulo_fechada_graus"] = round(rot_fechada % 360.0, 1)
+    o["angulo_aberta_graus"] = round(rot_aberta % 360.0, 1)
+    o["largura_m"] = round(wf, 3)
+    # colisor da folha: filho de um pivo com o mesmo transform da porta (o jogo gira o pivo junto com a porta)
+    piv = bpy.data.objects.new("COLPORTA_" + nome, None)
+    piv.empty_display_type = 'SINGLE_ARROW'
+    piv.matrix_world = o.matrix_world.copy()
+    colp.objects.link(piv)
+    piv["porta"] = nome
+    c = B.add_collider("Porta_" + nome, (0.0, -0.025, 0.0), (wf, 0.025, HF), o.matrix_world.copy())
+    c.parent = piv
+    c.matrix_parent_inverse = piv.matrix_world.inverted()
+    return o
+
+
 for (nm, M, s0, s1, z0, t, side, dupla) in portas:
     d = Vector((M[0][0], M[1][0], 0.0))
     ang = math.degrees(math.atan2(d.y, d.x))
     sgn = 95.0 if side == 'b' else -95.0
+    luz = (s1 - s0) - 0.10                                               # vao livre entre batentes
     h = M @ Vector((s0 + 0.05, t / 2, z0))
-    o = B.inst(me, nm if not dupla else nm + "_E", "Portas", (h.x, h.y, z0), rot=ang + sgn)
-    o["porta"] = True
-    o["angulo_fechada_graus"] = round(ang, 1)
-    if dupla:
+    if not dupla:
+        porta_obj(nm, folha(luz), luz, (h.x, h.y, z0), ang, ang + sgn)
+    else:
+        wf = luz / 2.0                                                   # duas folhas = vao exato (sem fresta)
+        porta_obj(nm + "_E", folha(wf), wf, (h.x, h.y, z0), ang, ang + sgn)
         h2 = M @ Vector((s1 - 0.05, t / 2, z0))
-        o2 = B.inst(me, nm + "_D", "Portas", (h2.x, h2.y, z0), rot=ang + 180.0 - sgn)
-        o2["porta"] = True
-        o2["angulo_fechada_graus"] = round(ang + 180.0, 1)
+        porta_obj(nm + "_D", folha(wf), wf, (h2.x, h2.y, z0), ang + 180.0, ang + 180.0 - sgn)
 print("predio ok:", {o.name: len(o.data.polygons) for o in B.coll(COL).objects}, "| portas:", len(B.coll("Portas").objects))

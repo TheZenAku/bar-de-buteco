@@ -11,6 +11,8 @@ test-results/
 playwright-report/
 *.log
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 
 # Source animation archive is already extracted under assets-bar/anim/misc.
 assets-bar/anim/ANIMS.zip

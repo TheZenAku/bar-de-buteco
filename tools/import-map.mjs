@@ -30,26 +30,30 @@ function matrices(json) {
   return get;
 }
 const transform = matrices(collision.json), visualTransform = matrices(visual.json);
-function values(accessorIndex) {
-  const a = collision.json.accessors[accessorIndex], view = collision.json.bufferViews[a.bufferView];
-  const size = a.type === 'VEC3' ? 3 : 1;
+function values(resource,accessorIndex) {
+  const a = resource.json.accessors[accessorIndex], view = resource.json.bufferViews[a.bufferView];
+  const size = {SCALAR:1,VEC2:2,VEC3:3,VEC4:4}[a.type];
+  if(!size)throw new Error(`Unsupported accessor type ${a.type}`);
   const component = {5123: 2, 5125: 4, 5126: 4}[a.componentType];
   const read = {5123: 'readUInt16LE', 5125: 'readUInt32LE', 5126: 'readFloatLE'}[a.componentType];
-  if (!read) throw new Error('Unsupported collision accessor');
-  return Array.from({length: a.count}, (_, i) => Array.from({length: size}, (_, c) => collision.bin[read]((view.byteOffset ?? 0) + (a.byteOffset ?? 0) + i * (view.byteStride ?? component * size) + c * component)));
+  if (!read) throw new Error('Unsupported accessor component');
+  return Array.from({length: a.count}, (_, i) => Array.from({length: size}, (_, c) => resource.bin[read]((view.byteOffset ?? 0) + (a.byteOffset ?? 0) + i * (view.byteStride ?? component * size) + c * component)));
 }
 const colliders = [], surfaces = [];
 for (let i = 0; i < collision.json.nodes.length; i++) {
   const node = collision.json.nodes[i];
+  // Blender exports each movable door collider below an empty COLPORTA_* pivot. Door collision is
+  // reconstructed from the visual door leaf at runtime; the empty is hierarchy, not a solid volume.
+  if (node.name?.startsWith('COLPORTA_') && node.mesh === undefined) continue;
   if (!node.name?.startsWith('COL_') || node.mesh === undefined) throw new Error('Unexpected collision node');
   const box = new Box3(), isRamp = node.name.includes('Escada_Rampa');
   // Volumes people stand on: streets, floors and slabs, stairs, balconies, and the stage with its steps.
   const support = /^COL_Rua_(Quadra|Leito)/.test(node.name) || /^COL_Predio_(Piso|Laje|Escada_Rampa|Escada_Patamar|Sacada(?:\.|$)|Palco(?:\.|$)|Palco_Degrau)/.test(node.name);
   for (const primitive of collision.json.meshes[node.mesh].primitives) {
-    const points = values(primitive.attributes.POSITION).map(p => new Vector3(...p).applyMatrix4(transform(i)));
+    const points = values(collision,primitive.attributes.POSITION).map(p => new Vector3(...p).applyMatrix4(transform(i)));
     points.forEach(p => box.expandByPoint(p));
     if (support) {
-      const indices = values(primitive.indices).flat();
+      const indices = values(collision,primitive.indices).flat();
       for (let k = 0; k < indices.length; k += 3) {
         const triangle = indices.slice(k, k + 3).map(index => points[index]);
         const normal = new Vector3().subVectors(triangle[1], triangle[0]).cross(new Vector3().subVectors(triangle[2], triangle[0])).normalize();
@@ -60,34 +64,47 @@ for (let i = 0; i < collision.json.nodes.length; i++) {
   const centre = box.getCenter(new Vector3()), half = box.getSize(new Vector3()).multiplyScalar(0.5);
   colliders.push({id: node.name, x: round(centre.x), z: round(centre.z), hx: round(half.x), hz: round(half.z), minY: round(box.min.y), maxY: round(box.max.y), ramp: isRamp});
 }
-const markers = Object.fromEntries(visual.json.nodes.flatMap((n, i) => n.name.startsWith('Ponto_') || n.name === 'Spawn_Jogador' ? [[n.name, Object.fromEntries(['x','y','z'].map((axis,k) => [axis, round(new Vector3().setFromMatrixPosition(visualTransform(i)).getComponent(k))]))]] : []));
-// Plastic table sets ("conjunto") from 06_interior.py, as [x, z, floor y, chairs, rotation] in glTF axes
-// (Blender y becomes -z). Chairs are not exported as colliders, so their layout is mirrored here and checked
-// against the exported table colliders below.
-const ZP = .3, ZP2 = 3.45;
-const tables = [
-  // ground-floor hall
-  ...[[5.4,5.3],[8,5.3],[10.6,5.3],[13.2,5.3],[5.4,7.6],[8,7.6],[10.6,7.6],[13.2,7.6],[5.4,9.9],[8,9.9],[10.6,9.9]].map(([x,y]) => [x,-y,ZP,4,0]),
-  // upper lounge and the two balconies
-  [18.5,-5,ZP2,4,0], [18.5,-9.6,ZP2,4,0], [12,-2.9,3.65,2,90], [20,-2.9,3.65,2,90],
-  // roof terrace
-  ...[[26.3,2.6],[29.6,2.6],[26.3,6.7],[29.6,6.7],[26.3,10.8],[29.6,10.8]].map(([x,y]) => [x,-y,ZP2,4,0]),
-  // backyard
-  ...[24.8,28,30.9].map(x => [x,-17,ZP,4,0]),
-  // veranda
-  ...[2.2,4,9.5,11.9,17.5,19.8,22.1].map(x => [x,-1.75,ZP,4,0]), [1.7,-8.3,ZP,4,0], [1.7,-12.9,ZP,4,0],
-];
-{
-  const exported = colliders.filter(c => c.id.startsWith('COL_Mob_Mesa_Plastico'));
-  const unmatched = tables.filter(([x,z]) => !exported.some(c => Math.hypot(c.x - x, c.z - z) < .15));
-  if (unmatched.length || exported.length !== tables.length)
-    throw new Error(`Table sets no longer match the collision export (${exported.length} exported, ${tables.length} listed, unmatched ${JSON.stringify(unmatched)}). Update the list from 06_interior.py.`);
+const markerEntries=visual.json.nodes.flatMap((node,index)=>{
+  if(!node.name.startsWith('Ponto_')&&node.name!=='Spawn_Jogador')return [];
+  // Blender appends .001/.002 when a visual prop already owns the intended marker name (the bus-stop
+  // asset does this). Gameplay marker IDs are semantic, so remove only that automatic numeric suffix.
+  const name=node.name.replace(/\.\d{3}$/,'');
+  const position=new Vector3().setFromMatrixPosition(visualTransform(index));
+  return [[name,Object.fromEntries(['x','y','z'].map((axis,k)=>[axis,round(position.getComponent(k))]))]];
+});
+if(new Set(markerEntries.map(([name])=>name)).size!==markerEntries.length)throw new Error('Duplicate gameplay marker after Blender suffix normalization');
+const markers=Object.fromEntries(markerEntries);
+// Red tables keep compact collision volumes, while chairs are deliberately pass-through GPU instances so
+// people can circulate between them. Derive seat positions from EXT_mesh_gpu_instancing and validate that
+// every unused chair belongs to one of the three authored stacks in the upper-floor storage room.
+const tables = colliders.filter(c => /^COL_Mob_Mesa(?:\.\d+)?$/i.test(c.id));
+const chairNodeIndex=visual.json.nodes.findIndex(node=>node.name==='INST_A_cadeira-vermelha');
+const chairNode=visual.json.nodes[chairNodeIndex],instanceAttributes=chairNode?.extensions?.EXT_mesh_gpu_instancing?.attributes;
+if(!tables.length||!instanceAttributes?.TRANSLATION)throw new Error(`Expected authored café tables and instanced chairs (${tables.length} tables)`);
+const chairParent=visualTransform(chairNodeIndex);
+const chairs=values(visual,instanceAttributes.TRANSLATION).map((translation,index)=>{
+  const position=new Vector3(...translation).applyMatrix4(chairParent);
+  return {id:`visual-chair-${index+1}`,x:round(position.x),y:round(position.y),z:round(position.z)};
+});
+const chairsByTable = tables.map(() => []);
+const unusedChairs=[];
+for (const chair of chairs) {
+  const candidates = tables.map((table,index)=>({index,distance:Math.hypot(chair.x-table.x,chair.z-table.z),height:Math.abs(chair.y-table.minY)}))
+    .filter(candidate=>candidate.height<.12).sort((a,b)=>a.distance-b.distance);
+  if (!candidates[0] || candidates[0].distance>.9){unusedChairs.push(chair);continue;}
+  chairsByTable[candidates[0].index].push(chair);
 }
-const seats = tables.flatMap(([x,z,y,count,rotation], table) => Array.from({length:count}, (_, k) => {
-  const a = (rotation + 90 * k + (count === 2 ? 90 : 0)) * Math.PI / 180;
-  const dx = .62 * Math.sin(a), dz = .62 * Math.cos(a);
-  return {id:`seat-${table * 4 + k + 1}`, x:round(x+dx), y, z:round(z+dz), rotation:round(Math.atan2(-dx,-dz))};
-}));
+const chairStacks=colliders.filter(c=>/^COL_Mob_Cadeiras_Empilhadas(?:\.|$)/.test(c.id));
+const unexpected=unusedChairs.filter(chair=>!chairStacks.some(stack=>Math.abs(chair.x-stack.x)<=stack.hx+.05&&Math.abs(chair.z-stack.z)<=stack.hz+.05
+  &&chair.y>=stack.minY-.05&&chair.y<=stack.maxY+.05));
+if(unexpected.length)throw new Error(`Instanced chairs belong neither to a café table nor a storage stack: ${JSON.stringify(unexpected)}`);
+const badSets=chairsByTable.map((set,index)=>({table:tables[index].id,chairs:set.length})).filter(set=>set.chairs<2||set.chairs>4);
+if(badSets.length)throw new Error(`Invalid café table sets: ${JSON.stringify(badSets)}`);
+let seatNumber=0;
+const seats=tables.flatMap((table,index)=>chairsByTable[index]
+  .sort((a,b)=>Math.atan2(a.z-table.z,a.x-table.x)-Math.atan2(b.z-table.z,b.x-table.x))
+  .map(chair=>({id:`seat-${++seatNumber}`,x:chair.x,y:chair.y,z:chair.z,
+    rotation:round(Math.atan2(table.x-chair.x,table.z-chair.z))})));
 // Door leaves (04_predio.py) are separate nodes whose origin is the hinge. They were exported open; the
 // closed heading is the custom property angulo_fechada_graus. Both angles turn about +Y, as in Blender's Z.
 // Their collision is not static: the game places it from the door state (packages/shared/src/doors.ts).
@@ -123,7 +140,8 @@ const cameraCeilings = [
   {id:'veranda-front-ceiling', x:(-.57 + 23.8) / 2, z:(-3.5 + .57) / 2, hx:(23.8 + .57) / 2, hz:(3.5 + .57) / 2, minY:2.72, maxY:2.8},
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
-const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, colliders, surfaces, cameraCeilings, doors, seats, tables:tables.map(([x,z,y],i)=>({id:`map-table-${i+1}`,x,y,z})) };
+const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, colliders, surfaces, cameraCeilings, doors, seats,
+  tables:tables.map((table,i)=>({id:`map-table-${i+1}`,x:table.x,y:table.minY,z:table.z})) };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));
