@@ -13,11 +13,15 @@ export const PATCH_MS = 100;
 export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
 export { WALK_SPEED, RUN_SPEED, OLD_CANE_SPEED, PLAYER_RADIUS, PLAYER_HEIGHT, WORLD, MAP_MARKERS, MAP_COLLIDERS, MAP_SURFACES, CAFE_TABLES, BLACKJACK_TABLE, BLACKJACK_SEATS, JUKEBOX, COLLIDERS, INTERACTABLES, COUNTER_FOOTPRINT, TV_SPOTS, solidColliders, isDoorOpen, setDoorStates, floorHeight, isWalkable, movePlayer, distance, nearestInteraction, canInteract, interactionReach, findSpawn, standingPosition, cameraFraction } from './world.js';
-export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'drink' | 'kick' | 'fallen' | 'deal' | 'shuffle' | 'bartend';
+export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
+  | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend';
 // Durations of the source FBX clips (tools/convert-animations.mjs).
 export const KICK_DURATION_MS = 2000;
 export const DRINK_DURATION_MS = 8867;
 export const BARTEND_DURATION_MS = 13567;
+export const WAVE_DURATION_MS = 1467;
+export const USE_DURATION_MS = 2000;
+export const RECOVER_DURATION_MS = 5000;
 /** What Seu Zé serves: a long neck bottle or a copo americano (apps/web/public/props). */
 export const DRINK_ITEMS = ['garrafa', 'copo'] as const;
 export type DrinkItem = typeof DRINK_ITEMS[number];

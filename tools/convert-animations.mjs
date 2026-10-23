@@ -11,18 +11,38 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const models = path.join(root, 'apps/web/public/models');
 const output = process.env.BAR_ANIMATION_OUTPUT??path.join(root, 'apps/web/public/animations');
 const prefix = 'rp_nathan_animated_003_walking_';
+const misc = filename => ({filename:path.join('misc',filename),mixamo:true});
 const clips = {
-  Drink: 'bebendo', Fallen: 'bebado-caido', Deal: 'carta-distribui',
-  Shuffle: 'carta-recomeco', CardsSit: 'carta-sentado', AngrySit: 'sit-angry', Kick: 'karate-kick',
-  Dance: 'Dancing', Sit: 'Sitting Drinking', Bartend: 'Bartending',
+  // Existing authored actions keep their native Nathan skeleton. The new locomotion and social clips
+  // come from the Mixamo package in misc and are retargeted from its taller reference skeleton.
+  Drink: {filename:'bebendo'}, Fallen: {filename:'bebado-caido'}, Deal: {filename:'carta-distribui'},
+  Shuffle: {filename:'carta-recomeco'}, CardsSit: {filename:'carta-sentado'}, AngrySit: {filename:'sit-angry'},
+  Kick: {filename:'karate-kick'}, Bartend: {filename:'Bartending'},
+  Walk: misc('Standard Walk.fbx'), Run: misc('Run.fbx'), DrunkIdle: misc('Drunk Idle Variation.fbx'),
+  DrunkWalk: misc('Drunk Walk.fbx'), Dance: misc('Samba Dancing.fbx'), Sit: misc('Seated Idle.fbx'),
+  Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
+  Toilet: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
 };
 // Clips that only one skin uses: Rafael's karate, Seu Zé's (Magrão) work behind the counter.
 const exclusive = { Kick: 'rafael', Bartend: 'magrao' };
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
-// Sitting Drinking walks ~3 m to the chair, turns round and sits, then drinks from 7.5 s. Plain sitting
-// keeps only the calm stretch before the drink, turned to face forward, with its last moments blended
-// back into the first frame so the loop has no seam.
-const trims = { Sit: { from: 4.5, to: 7.2, blend: 0.6, faceForward: true } };
+// Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,
+// matching the five-second gameplay recovery instead of freezing on the source's trailing frames.
+const trims = { Use: {from:.45,to:2.45}, Recover: {from:0,to:5} };
+
+const mixamoNames = new Map([
+  ['Hips','hip'],['Spine','spine_01'],['Spine1','spine_02'],['Spine2','spine_03'],['Neck','neck'],['Head','head'],
+  ['LeftShoulder','shoulder_l'],['LeftArm','upperarm_l'],['LeftForeArm','lowerarm_l'],['LeftHand','hand_l'],
+  ['RightShoulder','shoulder_r'],['RightArm','upperarm_r'],['RightForeArm','lowerarm_r'],['RightHand','hand_r'],
+  ['LeftUpLeg','upperleg_l'],['LeftLeg','lowerleg_l'],['LeftFoot','foot_l'],['LeftToeBase','toe_l'],
+  ['RightUpLeg','upperleg_r'],['RightLeg','lowerleg_r'],['RightFoot','foot_r'],['RightToeBase','toe_r'],
+]);
+for(const side of ['Left','Right'])for(const finger of ['Thumb','Index','Middle','Ring','Pinky'])for(let joint=1;joint<=3;joint++)
+  mixamoNames.set(`${side}Hand${finger}${joint}`,`${finger.toLowerCase()}_0${joint}_${side==='Left'?'l':'r'}`);
+const canonicalSourceName = name => {
+  if(name.startsWith(prefix))return name.slice(prefix.length);
+  return mixamoNames.get(name.replace(/^mixamorig/,''))??name;
+};
 // No meshes/textures are exported; do not require browser image APIs for FBX materials.
 TextureLoader.prototype.load = () => new Texture();
 
@@ -66,13 +86,22 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     if (size === 1) { a.min = [array[0]]; a.max = [array.at(-1)]; }
     return json.accessors.push(a) - 1;
   }
-  for (const [name, filename] of Object.entries(clips)) {
+  for (const [name, definition] of Object.entries(clips)) {
     if (exclusive[name] && exclusive[name] !== id) continue;
-    const file = fs.readFileSync(path.join(root, 'assets-bar/anim', `${filename}.fbx`));
+    const filename=definition.filename.endsWith('.fbx')?definition.filename:`${definition.filename}.fbx`;
+    const file = fs.readFileSync(path.join(root, 'assets-bar/anim', filename));
     const source = new FBXLoader().parse(file.buffer.slice(file.byteOffset, file.byteOffset + file.length), '');
     const clip = source.animations[0];
     if (!clip?.duration) throw new Error(`Missing animation: ${filename}`);
-    const sourceBones = new Map(); source.traverse(n => { if (n.isBone) sourceBones.set(n.name.replace(prefix, ''), n); });
+    const sourceBones = new Map(); source.traverse(n => { if (n.isBone) sourceBones.set(canonicalSourceName(n.name), n); });
+    const sourceHip=sourceBones.get('hip');
+    if(!sourceHip)throw new Error(`${filename}: hip bone not found`);
+    source.updateMatrixWorld(true);
+    // Both source packs use centimetres, but the misc Mixamo reference is unusually tall. Normalize its
+    // bind hip to Nathan's 0.956 m before transferring translations; rotations use the actual bone axes.
+    const sourceUnit=.956/sourceHip.getWorldPosition(new Vector3()).y;
+    const sourceRig=definition.mixamo?createRetarget(model.nodes,[...sourceBones.values()],node=>canonicalSourceName(node.name)):rig;
+    const adapted=retargeted||!!definition.mixamo;
     const mixer = new AnimationMixer(source); mixer.clipAction(clip).play();
     const from = trims[name]?.from ?? 0, duration = (trims[name]?.to ?? clip.duration) - from;
     if (trims[name]?.faceForward) {
@@ -92,29 +121,29 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     for (const time of times) {
       // Avoid AnimationMixer wrapping the final frame back to zero.
       mixer.setTime(Math.min(from + time, clip.duration - 1e-6)); source.updateMatrixWorld(true);
-      const sourceHip = sourceBones.get('hip').getWorldPosition(new Vector3()).multiplyScalar(0.01);
+      const sourceHip = sourceBones.get('hip').getWorldPosition(new Vector3()).multiplyScalar(sourceUnit);
       if (!firstHip) {
         firstHip = sourceHip.clone();
-        if (seatedClips.has(name)) seatedOffset = 0.56 - (retargeted ? model.byName.get(hipName).getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
+        if (seatedClips.has(name)) seatedOffset = 0.56 - (adapted ? model.byName.get(hipName).getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
       }
-      const nativePose=retargeted?rig.pose(new Map([...sourceBones].map(([name,bone])=>[name,bone.getWorldQuaternion(new Quaternion())]))):undefined;
+      const nativePose=adapted?sourceRig.pose(new Map([...sourceBones].map(([name,bone])=>[name,bone.getWorldQuaternion(new Quaternion())]))):undefined;
       model.nodes.forEach((node, index) => {
         let local = baseRotations[index].clone();
         let position = basePositions[index].clone();
         const sourceName = rig.names[index];
         const bone = sourceBones.get(sourceName);
         // The root of Rafael is a static Z-up conversion; pelvis incorporates FBX root motion.
-        if (retargeted) {
+        if (adapted) {
           local=nativePose[index];
         } else if (id === 'nathan' && bone) {
           // The root's parent is the FBX group, which faceForward may turn.
           local = node.name === 'root' ? bone.getWorldQuaternion(new Quaternion()) : bone.quaternion.clone();
         }
-        if (id === 'nathan' && node.name === 'root') {
-          sourceBones.get('root').getWorldPosition(position).multiplyScalar(0.01);
+        if (!adapted && id === 'nathan' && node.name === 'root') {
+          sourceBones.get('root').getWorldPosition(position).multiplyScalar(sourceUnit);
           position.x -= firstHip.x; position.z -= firstHip.z; position.y += seatedOffset;
         }
-        if (retargeted && node.name === hipName) {
+        if (adapted && node.name === hipName) {
           const target = node.getWorldPosition(new Vector3());
           target.x += (sourceHip.x - firstHip.x) * scale;
           target.z += (sourceHip.z - firstHip.z) * scale;
@@ -138,7 +167,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     model.nodes.forEach((node, index) => {
       if (model.json.nodes[index].mesh !== undefined) return;
       for (const [property, data, size] of [['rotation', rotations[index], 4], ['translation', translations[index], 3]]) {
-        if (property === 'translation' && node.name !== (retargeted ? hipName : 'root')) continue;
+        if (property === 'translation' && node.name !== (adapted ? hipName : 'root')) continue;
         const output = accessor(data, size);
         const sampler = animation.samplers.push({ input, output, interpolation: 'LINEAR' }) - 1;
         animation.channels.push({ sampler, target: { node: index, path: property } });

@@ -14,11 +14,11 @@ const position = node => node.getWorldPosition(new Vector3());
 
 /** Calibrate native A/T poses by actual bone directions, rather than assuming identical bind poses.
  * The calibration is virtual: the authored skeleton and its bind pose remain untouched. */
-export function createRetarget(nodes, referenceNodes) {
+export function createRetarget(nodes, referenceNodes, referenceName = node => node.name) {
   const isRafael=nodes.some(n=>n.name==='spine_05');
   const names=nodes.map(n=>isRafael?(rafael[n.name]??(['spine_02','spine_04'].includes(n.name)?'':n.name)):n.name);
   const byName=new Map(names.map((name,i)=>[name,i]));
-  const reference=new Map(referenceNodes.map(n=>[n.name,n]));
+  const reference=new Map(referenceNodes.map(n=>[referenceName(n),n]));
   const parents=nodes.map(n=>nodes.indexOf(n.parent));
   const rest=nodes.map(rotation),local=nodes.map(n=>n.quaternion.clone());
   const bind=[],correction=[];
@@ -43,7 +43,7 @@ export function createRetarget(nodes, referenceNodes) {
     bind[i]=correction[i].clone().multiply(rest[i]).normalize();
   };
   nodes.forEach((_,i)=>calibrate(i));
-  const sourceBind=new Map(referenceNodes.map(n=>[n.name,rotation(n)]));
+  const sourceBind=new Map(referenceNodes.map(n=>[referenceName(n),rotation(n)]));
   const helpers=nodes.map((node,i)=>{
     const match=/^cc_base_([lr])_(forearm|upperarm|calf|thigh)twist0([12])$/i.exec(node.name);
     const standard=/^(upperarm|lowerarm|upperleg|lowerleg)_twist_([lr])$/.exec(node.name);

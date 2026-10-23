@@ -5,9 +5,17 @@
   "Shuffle": 9000,
   "CardsSit": 4800,
   "AngrySit": 2750,
-  "Dance": 8083,
-  "Sit": 2700,
+  "Dance": 19800,
+  "Sit": 4167,
   "OldCaneWalk": 1600,
   "Kick": 2000,
-  "Bartend": 13567
+  "Bartend": 13567,
+  "Walk": 1167,
+  "Run": 733,
+  "DrunkIdle": 3967,
+  "DrunkWalk": 3000,
+  "Wave": 1467,
+  "Use": 2000,
+  "Toilet": 11400,
+  "Recover": 5000
 }
