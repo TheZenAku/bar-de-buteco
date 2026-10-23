@@ -1,9 +1,12 @@
 import * as pc from 'playcanvas';
-import { BLACKJACK_SEATS, BLACKJACK_TABLE, COLLIDERS, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, MALE_CLOTHING, cameraFraction, type Position, type WorldState } from '@bar/shared';
+import { BLACKJACK_SEATS, BLACKJACK_TABLE, COLLIDERS, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, MALE_CLOTHING, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
+import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,DRINK_ITEMS,type DoorLeaf,type DrinkItem} from '@bar/shared';
+import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
 import type { SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
 import {applyCharacter,characterFromJson,disposeCharacter} from './character-materials';
 import {TelevisionSurface} from './television-surface';
-import {TELEVISIONS,JUKEBOX_SYSTEMS} from '@bar/shared';
+import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
+import {EnvironmentLighting} from './environment-lighting';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -17,6 +20,9 @@ const BONE_ALIASES: Partial<Record<SkinBone, string>> = { upperleg_l: 'thigh_l',
   middle_01_l: 'index_01_l', middle_01_r: 'index_01_r' };
 // Looping clips that sit the hips on a chair (anchored to the 0.56 m seat height).
 const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
+// Degrees by drunk stage (0-4): body sway of every avatar and camera roll of the local player.
+const DRUNK_BODY_SWAY = [0, 0, 3, 6, 6];
+const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
 // NPCs with their own skin, not offered in the selector: Seu Zé is Magrão.
 const NPC_SKINS: Record<string, string> = { bartender: 'magrao' };
 interface SkinnedRig {
@@ -29,6 +35,8 @@ interface SkinnedRig {
   tracks: Set<string>;
   /** How far the body lowers to sit: from this skin's hip-joint height to just above a 0.47 m seat. */
   sitDrop: number;
+  /** The drinking hand (the Drink clip lifts with the left), found in the bind pose. */
+  drinkHand?: HandRig;
 }
 interface Avatar {
   root: pc.Entity;
@@ -39,6 +47,10 @@ interface Avatar {
   skin?: SkinnedRig;
   skinId?: string;
   cup: pc.Entity;
+  /** The bottle or glass in hand, created on first use. */
+  drinks?: Partial<Record<DrinkItem, pc.Entity>>;
+  /** How close the drink is to the lips, 0–1 (telemetry). */
+  sip?: number;
   ring: pc.Entity;
   actor: SceneActor;
   npc: boolean;
@@ -119,6 +131,7 @@ export class BarScene {
   private readonly textures: pc.Texture[] = [];
   private readonly warmLights: pc.Entity[] = [];
   private readonly partyLights: pc.Entity[] = [];
+  private readonly environment:EnvironmentLighting;
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
@@ -139,7 +152,10 @@ export class BarScene {
   private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
   private mapEntity?: pc.Entity;
-  private readonly baseLightIntensity = new Map<pc.Entity, number>();
+  private readonly drinkModels=new Map<DrinkItem,pc.ContainerResource>();
+  /** Each map door leaf, turned about its own hinge (the node origin) by its door's synced state. */
+  private readonly doorLeaves:Array<{leaf:DoorLeaf;entity?:pc.Entity;openness:number;from:number;target:number;changedAt:number}>=
+    DOOR_LEAVES.map(leaf=>({leaf,openness:1,from:1,target:1,changedAt:0}));
   private localId = '';
   private enabled = false;
   private destroyed = false;
@@ -163,12 +179,6 @@ export class BarScene {
     });
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
-    this.app.scene.ambientLight = color('#7e6e62');
-    this.app.scene.fog.type = pc.FOG_LINEAR;
-    this.app.scene.fog.color = color('#9dafbd');
-    this.app.scene.fog.start = 65;
-    this.app.scene.fog.end = 125;
-    this.app.scene.exposure = 1.15;
 
     this.camera = new pc.Entity('Third-person camera');
     this.camera.addComponent('camera', {
@@ -177,16 +187,20 @@ export class BarScene {
     this.app.root.addChild(this.camera);
     this.camera.setPosition(18, 9, 16);
     this.camera.lookAt(14, 1.8, -6);
+    this.environment=new EnvironmentLighting(this.app,this.camera);
+    this.environment.update(Date.now(),0,'');
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
     this.buildBlackjack();
     this.buildJukebox();
     this.buildPartyLighting();
+    this.environment.addPartyShadows(this.partyLights);
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
-    for(const definition of TELEVISIONS.filter(tv=>JUKEBOX_SYSTEMS.some(system=>system.tvId===tv.id)))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
+    for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.tvId===tv.id)))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
     this.discoBall = this.buildDiscoBall();
     this.ready = this.loadMap();
+    this.loadDrinks();
     void this.ready.catch(() => {}); // The UI reports loading failures before admission.
     this.installControls();
     this.loadSkin('base-male');this.loadSkin(DEFAULT_MODEL);
@@ -195,6 +209,25 @@ export class BarScene {
     this.resize();
     this.app.on('update', this.update, this);
     this.app.start();
+  }
+
+/** The bottle and the glass (tools/import-drinks.mjs). Without them, the old procedural cup stays in use. */
+  private loadDrinks(): void {
+    for(const item of DRINK_ITEMS)this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}${DRINK_PROPS[item].url}`,'container',(error,asset)=>{
+      if(this.destroyed)return;
+      if(error||!asset){console.warn(`Objeto de bebida "${item}" indisponível; usando o copo simples.`,error);return;}
+      this.drinkModels.set(item,asset.resource as pc.ContainerResource);
+    });
+  }
+
+  /** The avatar's bottle or glass, created once and reused; undefined until the model has loaded. */
+  private drink(avatar:Avatar,item:DrinkItem):pc.Entity|undefined {
+    const existing=avatar.drinks?.[item];if(existing)return existing;
+    const model=this.drinkModels.get(item);if(!model)return;
+    const prop=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
+    prop.name=`Drink ${item}`;prop.enabled=false;avatar.root.addChild(prop);
+    (avatar.drinks??={})[item]=prop;
+    return prop;
   }
 
   private loadMap(): Promise<void> {
@@ -206,26 +239,13 @@ export class BarScene {
         const map = resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
         map.name = 'BarBoteco imported map';
         this.app.root.addChild(map); this.mapEntity = map;
-        const lights = map.findComponents('light') as pc.LightComponent[];
-        // PlayCanvas imports glTF lights switched off, with intensity clamped to 2 and the authored strength
-        // kept only as luminance. Switch them on and keep each lamp's colour and strength relative to the
-        // median lamp (brighter lamps also reach further), with a gentle linear falloff.
-        const lampPower = lights.filter(light => light.type !== 'directional').map(light => light.luminance).sort((a, b) => a - b);
-        const median = lampPower[lampPower.length >> 1] || 1;
-        for (const component of lights) {
-          const entity = component.entity;
-          component.enabled = true;
-          if (component.type === 'directional') component.intensity = 1.1;
-          else {
-            const relative = component.luminance / median || 1;
-            component.falloffMode = pc.LIGHTFALLOFF_LINEAR;
-            component.intensity = 1.9 * Math.pow(relative, .6);
-            component.range = clamp(5.5 + 3 * relative, 5, 10);
-          }
-          component.castShadows = component.type === 'directional';
-          if (component.type === 'directional') { component.shadowDistance = 70; component.shadowResolution = 2048; component.normalOffsetBias = .05; }
-          this.warmLights.push(entity); this.baseLightIntensity.set(entity, component.intensity);
+        for(const door of this.doorLeaves){
+          door.entity=(map.findByName(door.leaf.id) as pc.Entity|null)??undefined;
+          if(!door.entity)console.warn(`Folha de porta "${door.leaf.id}" ausente no mapa; ela não será animada.`);
         }
+        const lights = map.findComponents('light') as pc.LightComponent[];
+        this.warmLights.push(...lights.map(light=>light.entity));
+        this.environment.configureMap(map);
         resolve();
       });
     });
@@ -235,14 +255,24 @@ export class BarScene {
     // Party washes: the ground-floor hall, the upstairs games hall and the backyard stage.
     for (const [x,y,z,hex] of [[6.5,2.7,-7.6,'#cf5275'],[12.5,2.7,-7.6,'#41afaa'],[10.3,5.8,-7.6,'#af75e5'],[26.6,3.6,-23.4,'#cf5275']] as const) {
       const light = new pc.Entity('Party wash');
-      light.addComponent('light',{type:'omni',color:color(hex),intensity:0,range:8,castShadows:false});
+      light.addComponent('light',{type:'spot',enabled:false,color:color(hex),intensity:0,range:8,innerConeAngle:35,outerConeAngle:75,
+        castShadows:true,shadowResolution:512,shadowType:pc.SHADOW_PCF3_32F,shadowBias:.3,normalOffsetBias:.04});
       light.setPosition(x,y,z);this.app.root.addChild(light);this.partyLights.push(light);
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;renders:number;lights:number} {
-    return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;lights:number} {
+    return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
       renders:this.mapEntity?.findComponents('render').length??0,lights:this.warmLights.length};
+  }
+  getEnvironmentStatus(){return this.environment.telemetry();}
+
+  /** Where the local player hears from: the avatar's position and the camera's heading (radians). */
+  getListener(): (Position & { yaw: number }) | undefined {
+    const avatar = this.actors.get(this.localId);
+    if (!avatar) return undefined;
+    const p = avatar.root.getPosition();
+    return { x: p.x, y: p.y, z: p.z, yaw: this.yaw };
   }
 
   getInput(): SceneInput {
@@ -261,13 +291,30 @@ export class BarScene {
   }
 
   setWorld(world: WorldState, localId: string): void {
-    this.serverClockOffset = world.serverTime - Date.now();
+    // The empty snapshot used when leaving the bar has serverTime=0; keep the clock running.
+    if(Number.isFinite(world.serverTime)&&world.serverTime>0)this.serverClockOffset = world.serverTime - Date.now();
+    for(const door of this.doorLeaves){
+      const state=world.doors?.[door.leaf.group];if(!state)continue;
+      const target=state.open?1:0;
+      if(target!==door.target||state.changedAt!==door.changedAt){door.from=door.openness;door.target=target;door.changedAt=state.changedAt;}
+    }
     this.updateState({
       players: Object.values(world.players).map(player => ({ ...player, animation: player.animationState,
         cardResult: world.tables[player.currentTableId]?.seats.find(seat => seat.playerId === player.id)?.result })),
       npcs: Object.values(world.npcs).map(npc => ({ ...npc, animation: npc.animationState, role: npc.behavior })),
       event: world.event,
     }, localId);
+  }
+
+  /** Smooth swing toward each door's state; a late arrival sees doors already where they are. */
+  private swingDoors():void {
+    const now=Date.now()+this.serverClockOffset;
+    for(const door of this.doorLeaves){
+      if(door.openness===door.target||!door.entity)continue;
+      const t=door.changedAt?Math.min(1,Math.max(0,(now-door.changedAt)/(DOOR_SWING_SECONDS*1000))):1,eased=t*t*(3-2*t);
+      door.openness=t>=1?door.target:door.from+(door.target-door.from)*eased;
+      door.entity.setLocalEulerAngles(0,door.leaf.closedYaw+doorSwing(door.leaf)*door.openness,0);
+    }
   }
 
   setLocal(position: Position & { rotation?: number; animation?: string }): void {
@@ -380,11 +427,11 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[]; clothing?:Record<string,{enabled:boolean;skinned:boolean;color?:string}> }> {
+  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[]; clothing?:Record<string,{enabled:boolean;skinned:boolean;color?:string}> }> {
     return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
       height: avatar.skin ? avatar.skin.bones.head.getPosition().y - avatar.root.getPosition().y : undefined,
       time: avatar.skin?.model.anim?.baseLayer?.activeStateCurrentTime, tracks: [...(avatar.skin?.tracks ?? [])],
-      speed:avatar.skin?.model.anim?.speed,cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined,
+      speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined,
       clothing:avatar.skinId==='base-male'?Object.fromEntries(MALE_CLOTHING.map(({id:name})=>{
         const part=avatar.skin?.model.findByName(`part-${name}`) as pc.Entity|undefined;
         const instances=(part?.findComponents('render') as pc.RenderComponent[]|undefined)?.flatMap(r=>r.meshInstances)??[];
@@ -396,13 +443,14 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
+    this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
     this.app.off('update', this.update, this);
     for(const avatar of this.actors.values())disposeCharacter(avatar.skin?.model);
-    this.app.destroy();
     this.materials.forEach(material => material.destroy());
     this.textures.forEach(texture => texture.destroy());
+    this.app.destroy();
     this.actors.clear();
   }
 
@@ -685,6 +733,7 @@ export class BarScene {
     const bank = this.animationBanks.get(id ?? DEFAULT_MODEL);
     if (bank) this.assignClips(skin, bank);
     if(id)this.attachCane(skin,id);
+    skin.drinkHand=findHand(entity,'l');
     return skin;
   }
 
@@ -766,7 +815,9 @@ export class BarScene {
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
     avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
-    root.setEulerAngles(0, avatar.yaw, 0);
+    // Drunk: the whole body sways, more with each stage (no extra clip needed; works on every rig).
+    const sway = actor.animation === 'fallen' || seated ? 0 : DRUNK_BODY_SWAY[drunkStage(actor.drunk ?? 0)]!;
+    root.setEulerAngles(sway * Math.sin((this.elapsed + avatar.phase) * 1.3), avatar.yaw, sway * Math.sin((this.elapsed + avatar.phase) * 0.9 + 1));
     const pose: Pose = {
       t: this.elapsed + avatar.phase,
       walking: animation.includes('walk') || animation.includes('run') || animation.includes('wander'),
@@ -777,6 +828,7 @@ export class BarScene {
       waving: animation.includes('wave'),
     };
     avatar.cup.enabled = pose.drinking;
+    if (!pose.drinking) for (const entity of Object.values(avatar.drinks ?? {})) entity.enabled = false;
     if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose);
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
   }
@@ -815,13 +867,16 @@ export class BarScene {
       body.setLocalEulerAngles(Math.sin(t * 2) * 7, 0, Math.sin(t * 2.7) * 11);
     }
     if (pose.waving) rightArm.setLocalEulerAngles(0, Math.sin(t * 12) * 20, 155);
+    // Box avatars have no Fallen clip: lie down.
+    if (actor.animation === 'fallen') { body.setLocalPosition(0, 0.22, 0); body.setLocalEulerAngles(-88, 0, 0); }
   }
 
   /**
    * The clip sets the base pose; gestures are extra joint turns about the body's own axes,
    * which keeps them independent of each bone's local frame. The model faces +Z, its left on +X.
    */
-  private poseSkin({ body, cup, actor, skinId }: Avatar, skin: SkinnedRig, pose: Pose): void {
+  private poseSkin(avatar: Avatar, skin: SkinnedRig, pose: Pose): void {
+    const { body, cup, actor, skinId } = avatar;
     const { t, seated, dancing, drinking, waving } = pose;
     const { bones } = skin;
     const anim = skin.model.anim!;
@@ -854,8 +909,16 @@ export class BarScene {
         const hipY = (bones.upperleg_l.getPosition().y + bones.upperleg_r.getPosition().y) / 2;
         body.setLocalPosition(0,(actor.y??0)+0.56-hipY,0);
       }
-      if (drinking) {
-        // The drinking clip raises the glass with the left hand.
+      // The drinking clip raises the drink with the left hand: the ordered bottle or glass (NPCs: a bottle).
+      const item:DrinkItem|undefined=drinking?(actor.drinkItem==='copo'?'copo':'garrafa'):undefined;
+      const prop=item&&clip==='Drink'&&skin.drinkHand?this.drink(avatar,item):undefined;
+      for(const [name,entity] of Object.entries(avatar.drinks??{}))entity.enabled=!!prop&&name===item;
+      avatar.sip=0;
+      if (prop&&item) {
+        cup.enabled = false;
+        const up=this.axisUp.copy(body.up),front=this.axisFront.copy(body.forward).mulScalar(-1);
+        avatar.sip=holdDrink(skin.drinkHand!,prop,DRINK_PROPS[item],bones.head,up,front,RIG_GRIP[skinId??'']);
+      } else if (drinking) {
         const grip = this.tempPosition.lerp(bones.hand_l.getPosition(), bones.middle_01_l.getPosition(), 0.6);
         cup.setPosition(grip.x, grip.y - 0.05, grip.z); cup.setRotation(body.getRotation());
       }
@@ -922,6 +985,7 @@ export class BarScene {
 
   private update(dt: number): void {
     this.frameSeconds += dt;
+    this.swingDoors();
     dt = Math.min(dt, 0.1);
     this.elapsed += dt;
     this.frames++;
@@ -950,24 +1014,21 @@ export class BarScene {
       dx *= ratio; dz *= ratio; dy *= ratio;
       this.camera.setPosition(this.cameraTarget.x + dx, this.cameraTarget.y + dy, this.cameraTarget.z + dz);
       this.camera.lookAt(this.cameraTarget);
+      // Drunk view: the camera rolls slowly (more with each stage).
+      const roll = DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!;
+      if (roll) this.camera.rotateLocal(Math.sin(this.elapsed * 0.7) * roll * 0.3, 0, Math.sin(this.elapsed * 0.45) * roll);
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
       this.camera.setPosition(18+Math.sin(this.elapsed*.035)*2,9,16);
       this.camera.lookAt(14,1.8,-6);
     }
-    const blackout = this.eventType === 'BLACKOUT';
-    const party = this.eventType === 'PARTY';
-    for (let i = 0; i < this.warmLights.length; i++) {
-      const light = this.warmLights[i]!.light;
-      if(light)light.intensity=(this.baseLightIntensity.get(this.warmLights[i])??1)*(blackout ? .025 : party ? .75 : 1);
-    }
-    // Daylight ambient stays below the lamps so interiors read by their warm pools of light.
-    this.app.scene.ambientLight=color(blackout?'#171e2a':party?'#5c4753':'#5f646c');
+    this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
+    const party = this.environment.partyStrength;
     for (let i = 0; i < this.partyLights.length; i++) {
       const light = this.partyLights[i]!.light;
-      if (light) light.intensity = party ? 2 + Math.sin(this.elapsed * 3 + i * Math.PI) : 0;
+      if (light){light.intensity = party * (2 + Math.sin(this.elapsed * 3 + i * Math.PI));light.enabled=light.intensity>.015;}
     }
-    this.discoBall.rotate(0, dt * (party ? 70 : 8), 0);
+    this.discoBall.rotate(0, dt * (8+party*62), 0);
     this.onMediaFrame?.();
   }
 

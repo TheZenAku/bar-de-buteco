@@ -21,12 +21,15 @@
     "assets:retarget": "node tools/retarget-skins.mjs && node tools/convert-animations.mjs",
     "assets:skins": "node tools/import-skins.mjs && node tools/retarget-skins.mjs rafael && node tools/convert-animations.mjs",
     "assets:characters": "node tools/roupas/importar.mjs",
-    "assets:map": "node tools/import-map.mjs"
+    "assets:map": "node tools/import-map.mjs",
+    "assets:drinks": "node tools/import-drinks.mjs",
+    "assets:ambient": "node tools/import-ambient.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.0.0",
     "concurrently": "^9.2.1",
+    "meshoptimizer": "1.3.0",
     "three": "0.180.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

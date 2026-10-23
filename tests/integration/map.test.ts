@@ -31,7 +31,9 @@ test('published map and collision export match the supplied BarBoteco assets exa
     assert.equal(createHash('sha256').update(published).digest('hex'),hash);
     assert.ok(source.equals(published),'Import must preserve all supplied geometry and embedded textures');
   }
-  assert.equal(map.colliders.length,503);
+  // 487 exported volumes; the 16 door leaves are dynamic (doors.test.ts).
+  assert.equal(map.colliders.length,487);
+  assert.equal(map.doors.length,16);
   assert.equal(map.tables.length,33);
   assert.equal(map.seats.length,128);
   assert.deepEqual(map.bounds,{minX:-26,maxX:58,minZ:-52,maxZ:26});

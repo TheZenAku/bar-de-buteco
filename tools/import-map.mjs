@@ -88,17 +88,25 @@ const seats = tables.flatMap(([x,z,y,count,rotation], table) => Array.from({leng
   const dx = .62 * Math.sin(a), dz = .62 * Math.cos(a);
   return {id:`seat-${table * 4 + k + 1}`, x:round(x+dx), y, z:round(z+dz), rotation:round(Math.atan2(-dx,-dz))};
 }));
-// Keep the authored open door leaves solid, while leaving their doorways accessible.
+// Door leaves (04_predio.py) are separate nodes whose origin is the hinge. They were exported open; the
+// closed heading is the custom property angulo_fechada_graus. Both angles turn about +Y, as in Blender's Z.
+// Their collision is not static: the game places it from the door state (packages/shared/src/doors.ts).
+const doors = [];
 for (let i = 0; i < visual.json.nodes.length; i++) {
   const node = visual.json.nodes[i];
   if (!node.extras?.porta) continue;
-  const box = new Box3();
+  const q = new Quaternion(...(node.rotation ?? [0,0,0,1]));
+  if (Math.abs(q.x) > 1e-4 || Math.abs(q.z) > 1e-4 || node.scale || visual.json.nodes.some(n => n.children?.includes(i))) throw new Error(`Door ${node.name} must be a root node turned only about its vertical hinge`);
+  const local = new Box3();
   for (const primitive of visual.json.meshes[node.mesh].primitives) {
     const a = visual.json.accessors[primitive.attributes.POSITION];
-    box.union(new Box3(new Vector3(...a.min),new Vector3(...a.max)).applyMatrix4(visualTransform(i)));
+    local.union(new Box3(new Vector3(...a.min), new Vector3(...a.max)));
   }
-  const c=box.getCenter(new Vector3()), h=box.getSize(new Vector3()).multiplyScalar(.5);
-  colliders.push({id:node.name,x:round(c.x),z:round(c.z),hx:round(h.x),hz:round(h.z),minY:round(box.min.y),maxY:round(box.max.y),ramp:false});
+  const hinge = new Vector3(...(node.translation ?? [0,0,0]));
+  const openYaw = 2 * Math.atan2(q.y, q.w) * 180 / Math.PI, closedYaw = Number(node.extras.angulo_fechada_graus);
+  if (!Number.isFinite(closedYaw)) throw new Error(`Door ${node.name} has no angulo_fechada_graus`);
+  doors.push({id:node.name, group:node.name.replace(/_[ED]$/, ''), x:round(hinge.x), y:round(hinge.y), z:round(hinge.z),
+    closedYaw:round(closedYaw), openYaw:round(openYaw), min:local.min.toArray().map(round), max:local.max.toArray().map(round)});
 }
 // Playable bounds: the inner faces of the four street boundary walls.
 const limits = colliders.filter(c => c.id.startsWith('COL_Rua_Limite'));
@@ -115,9 +123,9 @@ const cameraCeilings = [
   {id:'veranda-front-ceiling', x:(-.57 + 23.8) / 2, z:(-3.5 + .57) / 2, hx:(23.8 + .57) / 2, hz:(3.5 + .57) / 2, minY:2.72, maxY:2.8},
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
-const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, colliders, surfaces, cameraCeilings, seats, tables:tables.map(([x,z,y],i)=>({id:`map-table-${i+1}`,x,y,z})) };
+const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, colliders, surfaces, cameraCeilings, doors, seats, tables:tables.map(([x,z,y],i)=>({id:`map-table-${i+1}`,x,y,z})) };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));
 fs.writeFileSync(path.join(root,'packages/shared/src/map-data.json'),`${JSON.stringify(data,null,2)}\n`);
-console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${colliders.length} solid volumes, ${surfaces.length} floor triangles, ${seats.length} seats; all textures embedded.`);
+console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats; all textures embedded.`);

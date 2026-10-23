@@ -11,3 +11,6 @@ test-results/
 playwright-report/
 *.log
 *.tsbuildinfo
+
+# Source animation archive is already extracted under assets-bar/anim/misc.
+assets-bar/anim/ANIMS.zip

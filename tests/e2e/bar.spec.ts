@@ -100,12 +100,16 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   const bartender=()=>page.evaluate(()=>(window as any).barDebug.animations().find((a:any)=>a.id==='bartender'));
   await expect.poll(async()=>(await bartender())?.skin).toBe('magrao');
   await page.keyboard.press('e');
+  // Bottle or glass: the choice travels with the order and shows in the hand.
+  await expect(page.locator('#modal-title')).toHaveText('PEDIR AO SEU ZÉ');
+  await page.getByRole('button',{name:/Long neck/}).click();
   // He prepares the order facing the player; the drink comes only when he is done.
   await expect(page.locator('#context-label')).toHaveText('Cancelar pedido');
   await expect.poll(async()=>(await bartender())?.clip,{timeout:15000}).toBe('Bartend');
   const ownClip=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.clip;});
   expect(await ownClip()).not.toBe('Drink');
   await expect.poll(ownClip,{timeout:30000}).toBe('Drink');
+  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.drink?.item;})).toBe('garrafa');
   expect((await bartender())?.clip).not.toBe('Bartend');
   await page.keyboard.press('e');
   await walkTo(page,14.3,-7.6,.12);
@@ -267,6 +271,8 @@ test('new accounts create a persistent custom character; previews, premium skins
 });
 
 test('two independent accounts register, share a 3D bar, chat, block/report and reconnect',async({browser,page})=>{
+  // Two character creators and two map loads on software WebGL take most of the default 90 s.
+  test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',err=>errors.push(err.message));
   const unique=Date.now().toString(36),name1=`ana_${unique}`,name2=`bia_${unique}`;
   await page.goto('/');await page.screenshot({path:'test-results/lobby.png'});

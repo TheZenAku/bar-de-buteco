@@ -19,12 +19,24 @@ $Estado = Join-Path $Raiz '.local\tools'
 $PidFile = Join-Path $Estado 'bar.pid'
 $LogFile = Join-Path $Estado 'bar.log'
 $GrupoFirewall = 'B.A.R. - Bar de Buteco'
+# O site usa HTTPS (certificado próprio) para o navegador liberar o microfone do chat de voz; BAR_HTTPS=0 volta ao HTTP.
+$Esquema = if ($env:BAR_HTTPS -eq '0') { 'http' } else { 'https' }
+# Aceita o certificado autoassinado só nas verificações locais deste script.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+if (-not ('BarCertificadoLocal' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System.Net.Security;
+public static class BarCertificadoLocal {
+  public static readonly RemoteCertificateValidationCallback Aceitar = (remetente, certificado, cadeia, erros) => true;
+}
+'@
+}
 # O navegador acessa o site e o mundo; a API fica em loopback, atrás do proxy do site.
 # O /health do mundo agora usa o roteador do Colyseus e pode ser consultado normalmente.
 $Servicos = @(
   @{ Nome = 'API';   Porta = 3001; Saude = 'http://127.0.0.1:3001/api/health'; Identidade = 'bar-api'; Extras = @(); Externa = $false },
   @{ Nome = 'Mundo'; Porta = 2567; Saude = 'http://localhost:2567/health'; Identidade = 'game'; Extras = @(); Externa = $true },
-  @{ Nome = 'Site';  Porta = 5173; Saude = 'http://127.0.0.1:5173/'; Identidade = ''; Extras = @('http://127.0.0.1:5173/src/main.ts', 'http://127.0.0.1:5173/src/boteco.css'); Externa = $true }
+  @{ Nome = 'Site';  Porta = 5173; Saude = "${Esquema}://127.0.0.1:5173/"; Identidade = ''; Extras = @("${Esquema}://127.0.0.1:5173/src/main.ts", "${Esquema}://127.0.0.1:5173/src/boteco.css"); Externa = $true }
 )
 
 function Escrever([string]$Texto = '', [ConsoleColor]$Cor = 'Gray') {
@@ -61,6 +73,7 @@ function Test-Saude($Servico) {
         $requisicao = [Net.WebRequest]::Create($url)
         $requisicao.Proxy = $null
         $requisicao.Timeout = 3000
+        if ($requisicao -is [Net.HttpWebRequest]) { $requisicao.ServerCertificateValidationCallback = [BarCertificadoLocal]::Aceitar }
         $resposta = $requisicao.GetResponse()
         if ($url -eq $Servico.Saude -and $Servico.Identidade) {
           $leitor = New-Object IO.StreamReader($resposta.GetResponseStream())
@@ -169,8 +182,9 @@ function Mostrar-Status {
   if ($noAr -eq $Servicos.Count) {
     Escrever ''
     Escrever 'Acesse:' Cyan
-    Escrever '  Neste computador:  http://localhost:5173'
-    foreach ($ip in Get-EnderecosRede) { Escrever "  Pela rede:         http://${ip}:5173" }
+    Escrever "  Neste computador:  ${Esquema}://localhost:5173"
+    foreach ($ip in Get-EnderecosRede) { Escrever "  Pela rede:         ${Esquema}://${ip}:5173" }
+    if ($Esquema -eq 'https') { Escrever '  Na primeira visita o navegador avisa que o certificado não é confiável: clique em Avançado e continue. O HTTPS libera o microfone do chat de voz.' DarkGray }
     Escrever '  Se outro computador não conseguir abrir, execute liberar-firewall.bat uma vez.' DarkGray
   }
   Escrever ''

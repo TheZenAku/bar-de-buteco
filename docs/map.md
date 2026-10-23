@@ -16,7 +16,7 @@ O complexo ocupa x 0–32 e z 0 a −26 (o z do jogo é o y do Blender com sinal
 
 ## Colisões
 
-O export fornece 487 caixas de colisão; o importador acrescenta as 16 folhas de portas já abertas, mantendo os vãos livres. Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos e escadas preservam posições e dimensões. Há 54 triângulos de apoio: rua, calçadas, pisos, lajes, sacadas, rampas, patamar, palco e degraus. As caixas inclinadas das escadas são avaliadas por suas faces superiores, evitando transformar uma rampa em parede.
+O export fornece 487 caixas de colisão. As 16 folhas de portas não são colisores fixos: o importador exporta dobradiça e ângulos de cada uma (`doors`), e a colisão acompanha o estado aberto/fechado de cada porta (veja [portas](doors.md)). Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos e escadas preservam posições e dimensões. Há 54 triângulos de apoio: rua, calçadas, pisos, lajes, sacadas, rampas, patamar, palco e degraus. As caixas inclinadas das escadas são avaliadas por suas faces superiores, evitando transformar uma rampa em parede.
 
 O jogador é um cilindro de 0,34 m de raio e 1,86 m de altura que sobe degraus de até 0,26 m. Abaixo da altura do joelho (obstáculo até 0,5 m acima do piso), só os pés colidem, com raio de 0,15 m; é isso que permite subir os degraus de 30 cm do palco. Subpassos impedem atravessar paredes finas correndo, e apoios inacessíveis não permitem saltar entre andares nem cair pelo vazio da escada.
 
@@ -30,7 +30,7 @@ O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais
 
 A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes, móveis e o forro da varanda, gerado pelo importador a partir das medidas de `04_predio.py`. Objetos finos (postes, troncos, pilares) não encurtam a câmera; o marcador de nascimento fica diante de um poste.
 
-O importador glTF do PlayCanvas cria as luzes desligadas e limita a intensidade a 2. O jogo liga as 14 luzes do mapa (sol e luminárias) em suas posições e cores originais e mantém a força relativa de cada luminária em relação à mediana, com alcance proporcional e queda linear. O sol projeta sombras. A luz ambiente diurna fica abaixo das luminárias, para os interiores serem lidos pelos focos de luz quente. Apagão e festa continuam controlando a iluminação; as luzes de festa ficam no salão, no salão de jogos e no palco.
+O importador glTF do PlayCanvas cria as luzes desligadas e limita a intensidade a 2. O [ciclo de dia e noite](day-night.md) separa o sol das 13 luminárias, preservando suas posições, cores e potências relativas a partir da luminância original. Luminárias e postes usam focos voltados para baixo com sombras, evitando luz através de paredes e lajes. Céu, sol, lua, ambiente e névoa variam em um ciclo completo de 40 minutos; iluminação externa acende ao anoitecer. Festa e apagão controlam o circuito elétrico. A névoa de distância e a máscara nas bordas ocultam o fim do cenário sem modificar colisões.
 
 ## Testes
 

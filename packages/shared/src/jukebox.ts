@@ -9,8 +9,17 @@ export const TELEVISIONS = [
   {id:'tv-upstairs',x:17.5,y:5.38,z:-3.753,width:1.06,height:.6,yaw:180},
 ] as const;
 export const JUKEBOX_PLACEMENT={x:12.3,y:.3,z:-10.3,hx:.45,hz:.3};
-export const JUKEBOX_SYSTEMS = [{id:'jukebox',tvId:'tv-hall',source:JUKEBOX_PLACEMENT}] as const;
 export const JUKEBOX_AUDIO = {fullDistance:5,quietDistance:15,maxDistance:20,smoothingSeconds:.25};
+// A TV is quieter than the jukebox: its sound fades out sooner around its own screen.
+export const TV_AUDIO = {fullDistance:3,quietDistance:9,maxDistance:14,smoothingSeconds:.25};
+/**
+ * Independent YouTube sources. The jukebox plays music with its own player card; each TV shows its own
+ * video on its screen. They share helpers, never state: separate maps, messages, players and volumes.
+ */
+export interface MediaSystem {readonly id:string;readonly kind:'jukebox'|'tv';readonly label:string;readonly tvId:string;readonly source:Position;readonly audio:typeof JUKEBOX_AUDIO}
+export const JUKEBOX_SYSTEMS:readonly MediaSystem[] = [{id:'jukebox',kind:'jukebox',label:'Jukebox',tvId:'',source:JUKEBOX_PLACEMENT,audio:JUKEBOX_AUDIO}];
+const TV_LABELS:Record<string,string> = {'tv-hall':'TV do salão','tv-left':'TV da parede lateral','tv-counter':'TV do balcão','tv-upstairs':'TV do andar de cima'};
+export const TV_SYSTEMS:readonly MediaSystem[] = TELEVISIONS.map(tv=>({id:tv.id,kind:'tv' as const,label:TV_LABELS[tv.id]??'TV',tvId:tv.id,source:{x:tv.x,y:tv.y,z:tv.z},audio:TV_AUDIO}));
 // Additional distance beyond the existing touching interaction, on client and server.
 export const JUKEBOX_INTERACTION_SLACK = .2;
 export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -38,8 +47,8 @@ export function jukeboxTime(state:JukeboxState,now:number):number {
 }
 /** Synchronous compare-and-swap: two clients cannot overwrite the same revision. */
 export function commandJukebox(state:JukeboxState,command:JukeboxCommand,userId:string,now:number):JukeboxState {
-  if(command.id!==state.id)throw new Error('Jukebox desconhecida.');
-  if(command.revision!==state.revision)throw new Error('Outra pessoa alterou a jukebox. Confira o estado e tente novamente.');
+  if(command.id!==state.id)throw new Error('Aparelho desconhecido.');
+  if(command.revision!==state.revision)throw new Error('Outra pessoa alterou a reprodução. Confira o estado e tente novamente.');
   const next={...state,position:jukeboxTime(state,now),updatedAt:now,updatedBy:userId,revision:state.revision+1};
   if(command.action==='play'){
     const id=youtubeVideoId(command.url?.trim()??'');if(!id)throw new Error('Cole um link válido de vídeo do YouTube.');
@@ -47,7 +56,7 @@ export function commandJukebox(state:JukeboxState,command:JukeboxCommand,userId:
   } else if(command.action==='off'){next.videoId='';next.position=0;next.status='off';}
   else {
     if(!state.videoId)throw new Error('Escolha um vídeo primeiro.');
-    if(command.action==='pause'){if(state.status!=='playing')throw new Error('A jukebox não está reproduzindo.');next.status='paused';}
+    if(command.action==='pause'){if(state.status!=='playing')throw new Error('Nada está tocando agora.');next.status='paused';}
     else if(command.action==='resume'){next.status='playing';if(state.status==='ended')next.position=0;}
     else {next.position=0;next.status='stopped';}
   }

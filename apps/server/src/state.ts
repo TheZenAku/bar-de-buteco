@@ -18,6 +18,24 @@ export class Player extends Schema {
   @type('string') currentTableId = '';
   @type('int32') lastProcessedInput = -1;
   @type('boolean') connected = true;
+  /** Microphone on, so others can show who may speak. */
+  @type('boolean') voice = false;
+  /** The drink ordered at the counter, shown in hand while drinking ('' otherwise). */
+  @type('string') drinkItem = '';
+  // Needs, as whole points (precise values live in NeedsDirector). Everyone sees drunkenness and the
+  // condition; the HUD shows the rest to the player.
+  @type('uint8') hp = 100;
+  @type('uint8') hpMax = 100;
+  @type('uint8') stamina = 100;
+  @type('uint8') hunger = 100;
+  @type('uint8') thirst = 100;
+  @type('uint8') bladder = 0;
+  @type('uint8') drunk = 0;
+  @type('boolean') exhausted = false;
+  /** normal, stumbling, fainted or recovering. */
+  @type('string') condition = 'normal';
+  @type('number') conditionUntil = 0;
+  @type('string') faintCause = '';
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -59,6 +77,7 @@ export class EventState extends Schema {
   @type('number') startedAt = 0;
   @type('number') durationMs = 0;
 }
+/** Playback of one YouTube source: the jukebox, or one TV (separate maps in BarState). */
 export class Jukebox extends Schema {
   @type('string') id='';
   @type('string') tvId='';
@@ -69,11 +88,19 @@ export class Jukebox extends Schema {
   @type('string') updatedBy='';
   @type('number') revision=0;
 }
+/** A hinged door (one or two leaves), open or closed; clients animate the swing from changedAt. */
+export class DoorState extends Schema {
+  @type('string') id = '';
+  @type('boolean') open = true;
+  @type('number') changedAt = 0;
+}
 export class BarState extends Schema {
   @view() @type({ map: Player }) players = new MapSchema<Player>();
   @view() @type({ map: Npc }) npcs = new MapSchema<Npc>();
   @type({ map: TableState }) tables = new MapSchema<TableState>();
   @type({ map: Jukebox }) jukeboxes = new MapSchema<Jukebox>();
+  @type({ map: Jukebox }) televisions = new MapSchema<Jukebox>();
+  @type({ map: DoorState }) doors = new MapSchema<DoorState>();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

@@ -4929,166 +4929,6 @@
       "minY": 0.15,
       "maxY": 0.89,
       "ramp": false
-    },
-    {
-      "id": "Porta_WC_Masc",
-      "x": 5.005051,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_WC_Fem",
-      "x": 8.805051,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Deposito_Bar",
-      "x": 19.50505,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Cozinha",
-      "x": 24.248668,
-      "z": -7.70505,
-      "hx": 0.350193,
-      "hz": 0.062383,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Deposito_Anexo",
-      "x": 24.248668,
-      "z": -12.60505,
-      "hx": 0.350193,
-      "hz": 0.062383,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Cozinha_Deposito",
-      "x": 30.00505,
-      "z": -9.423668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Camara_Fria",
-      "x": 29.60505,
-      "z": -12.408669,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Servico_Cozinha",
-      "x": 31.551331,
-      "z": -2.00505,
-      "hx": 0.350193,
-      "hz": 0.062383,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Quintal_Deposito",
-      "x": 22.29495,
-      "z": -14.551331,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Quintal_Anexo",
-      "x": 25.79495,
-      "z": -14.551331,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Quintal_Corredor_E",
-      "x": 12.994949,
-      "z": -15.248668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Quintal_Corredor_D",
-      "x": 11.40505,
-      "z": -15.248668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 0.3,
-      "maxY": 2.38,
-      "ramp": false
-    },
-    {
-      "id": "Porta_WC_Masc_Sup",
-      "x": 5.005051,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 3.45,
-      "maxY": 5.53,
-      "ramp": false
-    },
-    {
-      "id": "Porta_WC_Fem_Sup",
-      "x": 8.805051,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 3.45,
-      "maxY": 5.53,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Escritorio",
-      "x": 11.70505,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 3.45,
-      "maxY": 5.53,
-      "ramp": false
-    },
-    {
-      "id": "Porta_Deposito_Sup",
-      "x": 19.505052,
-      "z": -11.923668,
-      "hx": 0.062383,
-      "hz": 0.350193,
-      "minY": 3.45,
-      "maxY": 5.53,
-      "ramp": false
     }
   ],
   "surfaces": [
@@ -6191,6 +6031,312 @@
       "hz": 5.75,
       "minY": 2.72,
       "maxY": 2.8
+    }
+  ],
+  "doors": [
+    {
+      "id": "Porta_WC_Masc",
+      "group": "Porta_WC_Masc",
+      "x": 5.05,
+      "y": 0.3,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_WC_Fem",
+      "group": "Porta_WC_Fem",
+      "x": 8.85,
+      "y": 0.3,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Deposito_Bar",
+      "group": "Porta_Deposito_Bar",
+      "x": 19.549999,
+      "y": 0.3,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Cozinha",
+      "group": "Porta_Cozinha",
+      "x": 23.9,
+      "y": 0.3,
+      "z": -7.75,
+      "closedYaw": 90,
+      "openYaw": -5,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Deposito_Anexo",
+      "group": "Porta_Deposito_Anexo",
+      "x": 23.9,
+      "y": 0.3,
+      "z": -12.65,
+      "closedYaw": 90,
+      "openYaw": -5,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Cozinha_Deposito",
+      "group": "Porta_Cozinha_Deposito",
+      "x": 30.049999,
+      "y": 0.3,
+      "z": -9.075,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Camara_Fria",
+      "group": "Porta_Camara_Fria",
+      "x": 29.65,
+      "y": 0.3,
+      "z": -12.06,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Servico_Cozinha",
+      "group": "Porta_Servico_Cozinha",
+      "x": 31.9,
+      "y": 0.3,
+      "z": -2.05,
+      "closedYaw": 90,
+      "openYaw": -174.999996,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Quintal_Deposito",
+      "group": "Porta_Quintal_Deposito",
+      "x": 22.25,
+      "y": 0.3,
+      "z": -14.9,
+      "closedYaw": 180,
+      "openYaw": -85.000001,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Quintal_Anexo",
+      "group": "Porta_Quintal_Anexo",
+      "x": 25.75,
+      "y": 0.3,
+      "z": -14.9,
+      "closedYaw": 180,
+      "openYaw": -85.000001,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Quintal_Corredor_E",
+      "group": "Porta_Quintal_Corredor",
+      "x": 12.95,
+      "y": 0.3,
+      "z": -14.9,
+      "closedYaw": 180,
+      "openYaw": 84.999992,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Quintal_Corredor_D",
+      "group": "Porta_Quintal_Corredor",
+      "x": 11.45,
+      "y": 0.3,
+      "z": -14.9,
+      "closedYaw": 360,
+      "openYaw": 94.999989,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_WC_Masc_Sup",
+      "group": "Porta_WC_Masc_Sup",
+      "x": 5.05,
+      "y": 3.45,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_WC_Fem_Sup",
+      "group": "Porta_WC_Fem_Sup",
+      "x": 8.85,
+      "y": 3.45,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Escritorio",
+      "group": "Porta_Escritorio",
+      "x": 11.75,
+      "y": 3.45,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
+    },
+    {
+      "id": "Porta_Deposito_Sup",
+      "group": "Porta_Deposito_Sup",
+      "x": 19.550001,
+      "y": 3.45,
+      "z": -11.575,
+      "closedYaw": 0,
+      "openYaw": 95.000008,
+      "min": [
+        0,
+        0,
+        -0.05
+      ],
+      "max": [
+        0.7,
+        2.08,
+        0.05
+      ]
     }
   ],
   "seats": [

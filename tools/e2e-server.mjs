@@ -1,9 +1,11 @@
 // Browser tests have their own services, database and explicit fixture funds. Never use live accounts.
 import {spawn,execFileSync} from 'node:child_process';import path from 'node:path';import {fileURLToPath} from 'node:url';
-import {createServer} from '../apps/web/node_modules/vite/dist/node/index.js';
+import {createRequire} from 'node:module';import {pathToFileURL} from 'node:url';
+// The web app's Vite, wherever npm placed it (apps/web/node_modules or hoisted to the root).
+const {createServer}=await import(pathToFileURL(path.join(path.dirname(createRequire(new URL('../apps/web/package.json',import.meta.url)).resolve('vite/package.json')),'dist/node/index.js')).href);
 const root=fileURLToPath(new URL('../',import.meta.url));
 const env={...process.env,NODE_ENV:'test',API_PORT:'3111',GAME_PORT:'2677',WEB_ORIGIN:'http://localhost:5273',API_INTERNAL_URL:'http://127.0.0.1:3111',
-  DATA_PATH:path.join(root,'.local/character-e2e/postgres'),DATABASE_URL:'',VITE_GAME_URL:'/game',SMTP_HOST:'',AUTO_VERIFY_EMAIL:'true',CHARACTER_INITIAL_COINS:'5000',CHARACTER_DAILY_COINS:'0'};
+  DATA_PATH:path.join(root,'.local/character-e2e/postgres'),BAR_HTTPS:'0',DATABASE_URL:'',VITE_GAME_URL:'/game',SMTP_HOST:'',AUTO_VERIFY_EMAIL:'true',CHARACTER_INITIAL_COINS:'5000',CHARACTER_DAILY_COINS:'0'};
 execFileSync(process.execPath,['--import','tsx','apps/api/src/seed.ts'],{env,cwd:root,stdio:'inherit',windowsHide:true});
 const children=['api','server'].map(app=>spawn(process.execPath,['--import','tsx',`apps/${app}/src/index.ts`],{env:{...env,TSX_TSCONFIG_PATH:path.join(root,`apps/${app}/tsconfig.json`)},cwd:root,stdio:'inherit',windowsHide:true}));
 Object.assign(process.env,env);

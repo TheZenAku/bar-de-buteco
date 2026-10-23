@@ -7,7 +7,7 @@ import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 import {OWNER_EMAIL,ensureOwnerAdministrator} from '../src/admin-policy.js';
 import {connectDatabase} from '../src/database/index.js';
-import {users,wallets,currencyLedger,moderationActions} from '../src/database/schema.js';
+import {users,wallets,currencyLedger,moderationActions,controls} from '../src/database/schema.js';
 
 const password='AdminTestsOnly2026!';
 test('primary account manages administrators, wallets and moderation with persistent authorization',async t=>{
@@ -30,6 +30,7 @@ test('primary account manages administrators, wallets and moderation with persis
     assert.equal((await get('/api/admin/overview')).statusCode,401);
     assert.equal((await get('/api/admin/overview',player.cookie)).statusCode,403);
     assert.equal((await post('/api/admin/role',{playerId:player.user.id,role:'admin',reason:'Self grant'},player.cookie)).statusCode,403);
+    assert.equal((await post('/api/admin/revert',{actionId:'forged',reason:'Self undo'},player.cookie)).statusCode,403);
     assert.equal((await post('/api/admin/wallet',{playerId:player.user.id,operation:'add',amount:1,reason:'Self funds',requestId:randomUUID()},player.cookie)).statusCode,403);
     assert.equal((await post('/api/auth/register',{username:'forged',email:'forged@admin.test',displayName:'Forged',password,role:'admin',isOwner:true})).statusCode,400);
   });
@@ -85,6 +86,79 @@ test('primary account manages administrators, wallets and moderation with persis
     assert.equal((await post('/api/admin/action',{action:'event',eventType:'PARTY'},staff.cookie)).statusCode,403);
     const audit=(await get('/api/admin/overview',owner.cookie)).json().logs;
     assert.ok(audit.some((a:{action:string;actorName:string;targetName:string})=>a.action==='admin-revoke'&&a.actorName==='owner'&&a.targetName==='staff'));
+  });
+});
+
+test('administrative reversals compensate once, preserve newer actions and cancel pending moderation',async t=>{
+  const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
+  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
+  const post=(url:string,payload:object,cookie:string)=>service.app.inject({method:'POST',url,payload,headers:{cookie}});
+  async function register(username:string,email=`${username}@reverse.test`){
+    const r=await service.app.inject({method:'POST',url:'/api/auth/register',payload:{username,email,displayName:username,password}});
+    assert.equal(r.statusCode,201,r.body);return {id:r.json().user.id,cookie:`${r.cookies[0].name}=${r.cookies[0].value}`};
+  }
+  const owner=await register('reverseowner',OWNER_EMAIL),player=await register('reverseplayer'),staff=await register('reversestaff');
+  const overview=async()=>(await service.app.inject({url:'/api/admin/overview',headers:{cookie:owner.cookie}})).json();
+  const balance=async()=>Number((await service.db.select().from(wallets).where(eq(wallets.userId,player.id)))[0]?.balance??0);
+  const adjust=async(operation:'add'|'remove'|'set',amount:number)=>{
+    const requestId=randomUUID(),before=await balance();const r=await post('/api/admin/wallet',{playerId:player.id,operation,amount,reason:'Ajuste reversível',requestId,...(operation==='set'?{expectedBalance:before}:{})},owner.cookie);
+    assert.equal(r.statusCode,200,r.body);return `admin-wallet:${requestId}`;
+  };
+  const revert=(actionId:string,cookie=owner.cookie)=>post('/api/admin/revert',{actionId,reason:'Reverter ação de teste'},cookie);
+  const moderate=async(action:string,reason:string,playerId=player.id)=>{
+    const r=await post('/api/admin/action',{action,playerId,reason},owner.cookie);assert.equal(r.statusCode,200,r.body);
+    return (await overview()).logs.find((log:any)=>log.reason===reason).id as string;
+  };
+  const role=async(value:'admin'|'user')=>{
+    const reason=`Permissão ${randomUUID()}`;const r=await post('/api/admin/role',{playerId:staff.id,role:value,reason},owner.cookie);assert.equal(r.statusCode,200,r.body);
+    return (await overview()).logs.find((log:any)=>log.reason===reason).id as string;
+  };
+  await t.test('wallet reversal is an inverse ledger entry, bounded and idempotent under simultaneous retries',async()=>{
+    const original=await adjust('add',300);await adjust('add',50);
+    const replies=await Promise.all([revert(original),revert(original),revert(original)]);assert.ok(replies.every(r=>r.statusCode===200),replies.map(r=>r.body).join('\n'));
+    assert.equal(await balance(),50);
+    const entries=await service.db.select().from(currencyLedger).where(eq(currencyLedger.id,`undo:${original}`));assert.equal(entries.length,1);assert.equal(entries[0].amount,-300);
+    const removal=await adjust('remove',20);assert.equal((await revert(removal)).statusCode,200);assert.equal(await balance(),50);
+    const set=await adjust('set',200);await adjust('add',10);assert.equal((await revert(set)).statusCode,200);assert.equal(await balance(),60);
+    await adjust('set',0);const spent=await adjust('add',100);await adjust('remove',100);
+    assert.equal((await revert(spent)).statusCode,409);assert.equal(await balance(),0);
+    assert.equal((await overview()).logs.find((log:any)=>log.id===spent).revokedAt,null);
+    assert.equal((await revert(original,player.cookie)).statusCode,403);
+    const view=await overview(),audit=view.logs.find((log:any)=>log.id===original);assert.equal(audit.canRevert,false);assert.ok(audit.revokedAt);
+    assert.ok(view.logs.some((log:any)=>log.id===`undo:${original}`&&log.actorId===owner.id));
+  });
+  await t.test('permission reversal respects the owner and never overwrites a newer grant',async()=>{
+    const grant=await role('admin');assert.equal((await revert(grant,staff.cookie)).statusCode,403);
+    assert.equal((await revert(grant)).statusCode,200);assert.equal((await service.db.select().from(users).where(eq(users.id,staff.id)))[0].role,'player');
+    const old=await role('admin');await role('user');await role('admin');assert.equal((await revert(old)).statusCode,409);
+    const removal=await role('user');assert.equal((await revert(removal)).statusCode,200);assert.equal((await service.db.select().from(users).where(eq(users.id,staff.id)))[0].role,'admin');
+    const own=await post('/api/admin/wallet',{playerId:owner.id,operation:'add',amount:1,reason:'Carteira principal',requestId:randomUUID()},owner.cookie);assert.equal(own.statusCode,200);
+    const protectedLog=(await overview()).logs.find((log:any)=>log.reason.startsWith('Carteira principal'));
+    assert.equal((await revert(protectedLog.id,staff.cookie)).statusCode,403);
+  });
+  await t.test('kick never blocks authentication; cancellation removes queued kicks, but cannot remove bans',async()=>{
+    const kicked=await moderate('kick','Expulsão para cancelar');
+    assert.equal((await service.app.inject({url:'/api/auth/me',headers:{cookie:player.cookie}})).statusCode,200);
+    assert.equal((await overview()).users.find((user:any)=>user.id===player.id).kickId,kicked);
+    assert.equal((await revert(kicked)).statusCode,200);
+    assert.equal((await service.db.select().from(controls).where(eq(controls.id,kicked))).length,0);
+    const first=await moderate('ban','Primeiro banimento'),second=await moderate('ban','Segundo banimento');
+    assert.equal((await revert(first)).statusCode,200);assert.equal((await overview()).users.find((user:any)=>user.id===player.id).banned,true);
+    await moderate('kick','Outra expulsão');await moderate('unkick','Liberar expulsões');
+    const account=(await overview()).users.find((user:any)=>user.id===player.id);assert.equal(account.kickId,null);assert.equal(account.banned,true);
+    assert.equal((await revert(first)).statusCode,200);assert.equal((await overview()).users.find((user:any)=>user.id===player.id).banned,true);
+    await moderate('unban','Liberar conta');assert.equal((await overview()).users.find((user:any)=>user.id===player.id).banned,false);
+    assert.equal((await service.db.select().from(controls).where(eq(controls.id,second))).length,0);
+    assert.equal((await post('/api/auth/login',{email:'reverseplayer@reverse.test',password},player.cookie)).statusCode,200);
+  });
+  await t.test('event reversal queues a stop restricted to the original event command',async()=>{
+    const before=(await overview()).logs.map((log:any)=>log.id);
+    assert.equal((await post('/api/admin/action',{action:'event',eventType:'PARTY'},owner.cookie)).statusCode,200);
+    const event=(await overview()).logs.find((log:any)=>!before.includes(log.id));assert.equal((await revert(event.id)).statusCode,200);
+    const [queued]=await service.db.select().from(controls).where(eq(controls.id,`undo:${event.id}`));
+    assert.equal((queued.payload as any).expectedControlId,event.id);assert.equal((queued.payload as any).eventType,'STOP');
+    assert.equal((await service.db.select().from(controls).where(eq(controls.id,event.id))).length,0);
+    assert.equal((await revert(`undo:${event.id}`)).statusCode,403);
   });
 });
 

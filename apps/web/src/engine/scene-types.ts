@@ -20,8 +20,12 @@ export interface SceneActor {
   skin?: string;
   character?: string;
   oldWalk?: boolean;
+  /** Ordered drink ('garrafa' or 'copo'), held while drinking. */
+  drinkItem?: string;
   /** False for an avatar left in the bar by a player who logged out. */
   connected?: boolean;
+  /** Drunkenness 0-100 (packages/shared/src/needs.ts): the body sways by stage. */
+  drunk?: number;
 }
 
 export interface SceneWorld {

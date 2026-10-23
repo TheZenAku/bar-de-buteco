@@ -1,11 +1,12 @@
-import {MAX_COIN_BALANCE,type AdminAccount,type AdminOverview} from '@bar/shared';
+import {MAX_COIN_BALANCE,type AdminAccount,type AdminAudit,type AdminOverview} from '@bar/shared';
 import {api,ApiError,escape as e} from './api';
 
 const coins=(value:number)=>value.toLocaleString('pt-BR');
-const labels:Record<string,string>={kick:'Expulsão',ban:'Banimento',unban:'Banimento removido',event:'Evento',
+const labels:Record<string,string>={kick:'Expulsão',unkick:'Expulsão desfeita',ban:'Banimento',unban:'Banimento removido',event:'Evento',
   'admin-grant':'Administrador concedido','admin-revoke':'Administrador removido','owner-bootstrap':'Conta principal habilitada',
   'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido'};
 const date=(value:string)=>new Date(value).toLocaleString('pt-BR');
+const actionLabel=(action:string)=>action.startsWith('undo-')?`Reversão: ${labels[action.slice(5)]??action.slice(5)}`:labels[action]??action;
 // randomUUID requires HTTPS/localhost; getRandomValues also works on the game's HTTP LAN address.
 function requestId(){
   if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
@@ -16,6 +17,7 @@ function requestId(){
 
 export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=>void;changedWallet:()=>void;denied:()=>void}){
   let data:AdminOverview|undefined,selectedId='',search='',offset=0,mode='',busy=false,disposed=false,generation=0;
+  let reversingId='',historyOpen=false;
   let pending:{signature:string;id:string}|undefined;
   const disabled=new Map<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement|HTMLButtonElement,boolean>();
   const selected=()=>data?.users.find(u=>u.id===selectedId);
@@ -36,26 +38,34 @@ export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=
   }
   function confirmation(target:AdminAccount){
     if(!mode)return '';
-    const role=mode==='role',title=role?(target.role==='admin'?'Remover administrador':'Conceder administrador'):mode==='kick'?'Expulsar jogador':mode==='ban'?'Banir jogador':'Remover banimento';
+    const role=mode==='role',title=role?(target.role==='admin'?'Remover administrador':'Conceder administrador'):mode==='kick'?'Expulsar jogador':mode==='ban'?'Banir jogador':mode==='unkick'?'Desfazer expulsão':'Remover banimento';
     const explanation=role?(target.role==='admin'?'A conta perderá acesso ao painel, mantendo seu personagem, moedas e compras.':'A conta poderá ajustar moedas, moderar jogadores e iniciar eventos. A gestão de administradores fica com a conta principal.'):
-      mode==='kick'?'Encerra a participação atual. O jogador poderá entrar novamente.':mode==='ban'?'Encerra as sessões e impede novas entradas até a remoção do banimento.':'Permite que o jogador entre novamente com sua conta.';
+      mode==='kick'?'Encerra somente a participação atual. A conta continua liberada e o jogador pode entrar novamente.':mode==='ban'?'Encerra as sessões e impede novas entradas até a remoção do banimento.':mode==='unkick'?'Cancela as expulsões pendentes e marca os registros como desfeitos. Quem já foi expulso pode entrar novamente. Esta ação não remove banimentos.':'Remove todos os banimentos ativos. O jogador pode entrar novamente com seu login.';
     return `<form data-admin-form="${e(mode)}" class="admin-confirmation"><h4>${title}</h4><p>${explanation}</p><label>Motivo da ação<textarea name="reason" aria-label="Motivo da ação" required minlength="3" maxlength="500"></textarea></label><div class="admin-confirm-buttons"><button class="button primary" type="submit">${title}</button><button class="mini-button" data-admin="cancel" type="button">Cancelar ação</button></div></form>`;
+  }
+  function reversalForm(log:AdminAudit){
+    const effect=log.action.startsWith('coins-')?'Compensa o valor deste ajuste sobre o saldo atual, preservando compras e outras alterações. A reversão será recusada se ultrapassar os limites da carteira.':
+      log.action==='ban'?'Remove somente este banimento. Outros banimentos ativos continuam valendo; o botão Desbanir no cadastro remove todos.':
+      log.action==='kick'?'Cancela esta expulsão se ainda estiver pendente e marca o registro como desfeito. A expulsão não impede novas entradas; esta reversão não remove banimentos.':
+      log.action==='event'?'Encerra este evento se ele ainda estiver ativo. Um evento mais recente não será interrompido.':'Restaura a permissão anterior, desde que não exista uma alteração mais recente.';
+    return `<form data-admin-form="revert" class="admin-confirmation admin-reversal"><h4>${e(log.revertLabel)}${log.targetName?` · ${e(log.targetName)}`:''}</h4><p>${effect}</p><label>Motivo da reversão<textarea name="reason" aria-label="Motivo da reversão" required minlength="3" maxlength="500"></textarea></label><div class="admin-confirm-buttons"><button class="button primary" type="submit">Confirmar reversão</button><button class="mini-button" data-admin="cancel-revert" type="button">Cancelar reversão</button></div></form>`;
   }
   function render(){
     if(disposed||!data)return;
+    historyOpen=container.querySelector<HTMLDetailsElement>('.admin-actions-history')?.open??historyOpen;
     if(!selected())selectedId=data.users[0]?.id??'';
     const target=selected();
     container.innerHTML=`<div class="admin-panel"><p class="modal-description">${data.canManageAdmins?'Conta principal · gerencie jogadores, carteiras e administradores.':'Administração · gerencie carteiras, moderação e eventos.'} Os ajustes ficam registrados no histórico.</p>
       <div class="admin-events"><button class="mini-button" data-admin="event" data-type="BLACKOUT">☾ Apagão</button><button class="mini-button" data-admin="event" data-type="DRUNK_NPC">♙ O inconveniente</button><button class="mini-button" data-admin="event" data-type="PARTY">♫ Festa</button></div>
       <form data-admin-form="search" class="admin-search"><label>Buscar jogador<input name="search" aria-label="Buscar jogador" maxlength="100" value="${e(search)}" placeholder="Nome, usuário ou e-mail"></label><button class="button secondary" type="submit">Buscar</button><button class="mini-button" data-admin="refresh" type="button">Atualizar painel</button></form>
-      <p class="admin-feedback" role="status"></p><div class="admin-layout"><section class="admin-accounts" aria-label="Contas cadastradas"><h3>Jogadores <span>${data.total}</span></h3><div class="admin-account-list">${data.users.map(person=>`<button type="button" class="admin-account-card ${person.id===selectedId?'selected':''}" data-admin="select" data-id="${e(person.id)}" aria-pressed="${person.id===selectedId}"><b>${e(person.displayName)}</b><small>${e(person.email)}</small><span>${person.owner?'Conta principal':person.role==='admin'?'Administrador':'Jogador'}${person.banned?' · Banido':''}</span><strong>${coins(person.balance)} moedas</strong></button>`).join('')||'<p class="empty-state">Nenhuma conta encontrada.</p>'}</div>
+      <p class="admin-feedback" role="status"></p><div class="admin-layout"><section class="admin-accounts" aria-label="Contas cadastradas"><h3>Jogadores <span>${data.total}</span></h3><div class="admin-account-list">${data.users.map(person=>`<button type="button" class="admin-account-card ${person.id===selectedId?'selected':''}" data-admin="select" data-id="${e(person.id)}" aria-pressed="${person.id===selectedId}"><b>${e(person.displayName)}</b><small>${e(person.email)}</small><span>${person.owner?'Conta principal':person.role==='admin'?'Administrador':'Jogador'}${person.banned?' · Banido':''}${person.kickId?' · Expulsão registrada':''}</span><strong>${coins(person.balance)} moedas</strong></button>`).join('')||'<p class="empty-state">Nenhuma conta encontrada.</p>'}</div>
       <div class="admin-pagination"><button class="mini-button" data-admin="previous" ${offset===0?'disabled':''}>Anterior</button><small>${data.total?offset+1:0}–${Math.min(offset+data.users.length,data.total)} de ${data.total}</small><button class="mini-button" data-admin="next" ${offset+data.limit>=data.total?'disabled':''}>Próxima</button></div></section>
       <section class="admin-player-detail" aria-label="Gerenciar jogador">${target?`<h3>${e(target.displayName)}</h3><p class="admin-player-email">${e(target.email)}<br>@${e(target.username)} · ${target.verified?'E-mail confirmado':'E-mail pendente'}${target.banned?' · Conta banida':''}</p>
       <div class="admin-current-balance"><span>Saldo atual</span><b>${coins(target.balance)} <small>moedas</small></b></div>${walletForm(target)}
-      <div class="admin-player-actions">${target.canModerate?`<button class="mini-button" data-admin="kick">Expulsar</button><button class="mini-button" data-admin="${target.banned?'unban':'ban'}">${target.banned?'Desbanir':'Banir'}</button>`:''}
+      <div class="admin-player-actions">${target.canModerate?`<button class="mini-button" data-admin="kick">Expulsar</button>${target.kickId?'<button class="mini-button" data-admin="unkick">Desfazer expulsão</button>':''}<button class="mini-button" data-admin="${target.banned?'unban':'ban'}">${target.banned?'Desbanir':'Banir'}</button>`:''}
       ${target.canChangeRole?`<button class="mini-button" data-admin="role">${target.role==='admin'?'Remover administrador':'Dar administrador'}</button>`:''}</div>
-      ${target.owner?'<p class="fine-print">Conta principal protegida contra banimento e remoção de administrador.</p>':''}${confirmation(target)}`:'<p>Selecione uma conta para gerenciar.</p>'}</section></div>
-      <details class="admin-history"><summary>Histórico de ações (${data.logs.length})</summary>${data.logs.slice(0,30).map(log=>`<article><b>${e(labels[log.action]??log.action)}</b><small>${e(date(log.createdAt))} · ${e(log.actorName??'Administrador')}${log.targetName?` → ${e(log.targetName)}`:''}</small><p>${e(log.reason)}</p></article>`).join('')||'<p>Nenhuma ação registrada.</p>'}</details>
+      ${target.owner?'<p class="fine-print">Conta principal protegida contra banimento e remoção de administrador.</p>':''}${target.kickId?'<p class="fine-print">Há uma expulsão registrada. Expulsão encerra uma participação e não bloqueia a conta. Banimento é uma restrição separada.</p>':''}${confirmation(target)}`:'<p>Selecione uma conta para gerenciar.</p>'}</section></div>
+      <details class="admin-history admin-actions-history" ${historyOpen||reversingId?'open':''}><summary>Histórico de ações (${data.logs.length})</summary>${data.logs.slice(0,100).map(log=>`<article data-audit-id="${e(log.id)}"><b>${e(actionLabel(log.action))}</b><small>${e(date(log.createdAt))} · ${e(log.actorName??'Administrador')}${log.targetName?` → ${e(log.targetName)}`:''}</small><p>${e(log.reason)}</p>${log.revokedAt?`<small class="admin-reverted">Desfeita em ${e(date(log.revokedAt))}</small>`:log.canRevert?`<button class="mini-button admin-revert-button" data-admin="revert" data-id="${e(log.id)}">${e(log.revertLabel)}</button>`:`<small>${e(log.revertReason)}</small>`}${reversingId===log.id&&log.canRevert?reversalForm(log):''}</article>`).join('')||'<p>Nenhuma ação registrada.</p>'}</details>
       <details class="admin-history"><summary>Denúncias (${data.reports.length})</summary>${data.reports.slice(0,30).map(report=>`<article><b>${e(report.reporterName??'Jogador')} → ${e(report.targetName??'Jogador')}</b><small>${e(date(report.createdAt))}</small><p>${e(report.reason)}</p></article>`).join('')||'<p>Nenhuma denúncia.</p>'}</details></div>`;
     if(busy)setBusy(true);
   }
@@ -70,17 +80,19 @@ export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=
   }
   async function mutate(job:()=>Promise<unknown>,success:string,wallet=false){
     if(busy||disposed)return;busy=true;setBusy(true);message('Aplicando alteração…');
-    try{await job();if(disposed)return;if(wallet)hooks.changedWallet();mode='';pending=undefined;await load();if(!disposed){message(success);hooks.notify(success);}}
+    try{await job();if(disposed)return;if(wallet)hooks.changedWallet();mode='';reversingId='';pending=undefined;await load();if(!disposed){message(success);hooks.notify(success);}}
     catch(error){if(disposed)return;if(error instanceof ApiError&&error.status===403)hooks.denied();message(error instanceof Error?error.message:'Não foi possível concluir a ação.',true);}
     finally{busy=false;if(!disposed)setBusy(false);}
   }
   const click=(event:MouseEvent)=>{
     const button=(event.target as HTMLElement).closest<HTMLElement>('[data-admin]');if(!button)return;event.stopPropagation();if(busy)return;
     const action=button.dataset.admin;
-    if(action==='select'){selectedId=button.dataset.id!;mode='';pending=undefined;render();}
+    if(action==='select'){selectedId=button.dataset.id!;mode='';reversingId='';pending=undefined;render();}
     else if(action==='refresh')void load();
     else if(action==='previous'||action==='next'){offset=Math.max(0,offset+(action==='next'?20:-20));mode='';void load();}
     else if(action==='cancel'){mode='';render();}
+    else if(action==='cancel-revert'){reversingId='';render();}
+    else if(action==='revert'){const log=data?.logs.find(log=>log.id===button.dataset.id);if(!log?.canRevert)return;reversingId=log.id;mode='';render();container.querySelector<HTMLTextAreaElement>('.admin-reversal textarea')?.focus();}
     else if(action==='event')void mutate(()=>api('/admin/action',{action:'event',eventType:button.dataset.type}),'Evento solicitado.');
     else {mode=action??'';render();container.querySelector<HTMLTextAreaElement>('.admin-confirmation textarea')?.focus();}
   };
@@ -93,7 +105,12 @@ export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=
   const submit=(event:SubmitEvent)=>{
     const form=event.target as HTMLFormElement;if(!form.dataset.adminForm)return;event.preventDefault();event.stopPropagation();if(busy)return;
     const values=Object.fromEntries(new FormData(form)),target=selected(),kind=form.dataset.adminForm;
-    if(kind==='search'){search=String(values.search).trim();offset=0;mode='';void load();return;}if(!target)return;
+    if(kind==='search'){search=String(values.search).trim();offset=0;mode='';reversingId='';void load();return;}
+    if(kind==='revert'){
+      const log=data?.logs.find(log=>log.id===reversingId);if(!log?.canRevert)return;
+      void mutate(()=>api('/admin/revert',{actionId:log.id,reason:String(values.reason).trim()}),'Ação desfeita e reversão registrada.',log.action.startsWith('coins-'));return;
+    }
+    if(!target)return;
     const reason=String(values.reason).trim();
     if(kind==='wallet'){
       const operation=String(values.operation),amount=Number(values.amount),payload={playerId:target.id,operation,amount,reason,...(operation==='set'?{expectedBalance:target.balance}:{})};

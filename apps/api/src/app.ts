@@ -45,7 +45,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
   const cookieSettings = { path: '/', httpOnly: true, secure: config.production, sameSite: 'lax' as const };
   const allowedOrigins = new Set([config.webOrigin]);
-  if (!config.production) { allowedOrigins.add('http://localhost:5173'); allowedOrigins.add('http://127.0.0.1:5173'); }
+  if (!config.production) for (const scheme of ['http', 'https']) { allowedOrigins.add(`${scheme}://localhost:5173`); allowedOrigins.add(`${scheme}://127.0.0.1:5173`); }
   // In development the Vite proxy (loopback) forwards the browser address, so LAN clients are not treated as local.
   const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : config.production ? false : 'loopback', logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false });
   app.decorateRequest('auth', null);
@@ -57,8 +57,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     reply.header('Cache-Control', 'no-store');
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method) || request.url.startsWith('/api/internal/')) return;
     const origin = request.headers.origin;
-    // Development also accepts the page's own address, such as the LAN IP served by Vite.
-    const sameHost = !config.production && origin === `http://${request.headers.host}`;
+    // Development also accepts the page's own address, such as the LAN IP served by Vite (HTTPS by default).
+    const sameHost = !config.production && (origin === `http://${request.headers.host}` || origin === `https://${request.headers.host}`);
     if ((origin && !allowedOrigins.has(origin) && !sameHost) || request.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origem da requisição não permitida.');
   });
   app.setErrorHandler((error, request, reply) => {
@@ -254,17 +254,21 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return administration.changeRole(request.auth!.user.id,body);
   });
   app.post('/api/admin/action',{preHandler:administrator},async request=>{
-    const body=z.object({action:z.enum(['kick','ban','unban','event']),playerId:uuidSchema.optional(),reason:reasonSchema.optional(),eventType:z.enum(['BLACKOUT','DRUNK_NPC','PARTY']).optional()}).strict().parse(request.body);
+    const body=z.object({action:z.enum(['kick','ban','unban','unkick','event']),playerId:uuidSchema.optional(),reason:reasonSchema.optional(),eventType:z.enum(['BLACKOUT','DRUNK_NPC','PARTY']).optional()}).strict().parse(request.body);
     const result=await administration.moderate(request.auth!.user.id,body);
     request.log.info({actorId:request.auth!.user.id,action:body.action,playerId:body.playerId},'Ação administrativa');
     return result;
+  });
+  app.post('/api/admin/revert',{preHandler:administrator},request=>{
+    const body=z.object({actionId:z.string().min(1).max(128),reason:reasonSchema}).strict().parse(request.body);
+    return administration.revert(request.auth!.user.id,body);
   });
   app.post('/api/internal/validate', internalOptions, async (request) => {
     const { sessionId, userId } = z.object({ sessionId: uuidSchema, userId: uuidSchema }).strict().parse(request.body);
     const [session] = await db.select().from(tables.sessions).where(and(eq(tables.sessions.id, sessionId), eq(tables.sessions.userId, userId), gt(tables.sessions.expiresAt, new Date())));
     const user = session ? await getUser(db, userId) : null;
-    const valid = !!user?.verified && !await isBanned(db, userId);
-    return { valid, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?await wardrobe.access(user):{}) };
+    const banned=await isBanned(db,userId),valid = !!user?.verified && !banned;
+    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?await wardrobe.access(user):{}) };
   });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);

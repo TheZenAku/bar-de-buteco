@@ -4,6 +4,7 @@ export interface YoutubePlayer {
   cueVideoById(options:{videoId:string;startSeconds:number}):void;
   playVideo():void;pauseVideo():void;stopVideo():void;seekTo(seconds:number,allowSeekAhead:boolean):void;
   getCurrentTime():number;getDuration():number;getPlayerState():number;
+  isMuted?():boolean;getVolume?():number;
   getVideoData?():{title?:string;video_id?:string};
   getIframe():HTMLIFrameElement;setVolume(volume:number):void;mute():void;unMute():void;destroy():void;
 }

@@ -13,9 +13,16 @@ import {BarScene} from './engine/BarScene';
 import {BarNetwork} from './networking';
 import {api,ApiError,escape as e} from './api';
 import {BarAudio} from './audio';
-import {JukeboxController} from './jukebox';
-import {JUKEBOX_SYSTEMS,distance} from '@bar/shared';
+import {JukeboxController,TelevisionController} from './jukebox';
+import {distance} from '@bar/shared';
 import './jukebox.css';
+import {createSettings,type GameSettings} from './settings';
+import {VoiceChat} from './voice';
+import {uiIcon} from './ui-icons';
+import {VOICE} from '@bar/shared';
+import './voice.css';
+import './needs.css';
+import {createNeedsHud} from './needs-hud';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
@@ -24,6 +31,7 @@ const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySele
 const hud=createHudPanels($('#game'));
 const notices=createNotifications($('#toasts'));
 const liveHud=createLiveHud($('#game'));
+const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 let previousAction='',previousResult='';
 let user:PublicUser|undefined;
 let world:WorldState|undefined;
@@ -31,10 +39,13 @@ let serverClockOffset=0;
 const serverNow=()=>Date.now()+serverClockOffset;
 let inGame=false,connected=false,authMode:'login'|'register'|'forgot'|'reset'='login';
 let emailVerificationRequired=true;
+let checkingSession=true;
 let resetToken='',activeModal='',tableKey='',lastEvent='',peopleKey='',blocked=new Set<string>();
 let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
+const settings=createSettings();
+const voice=new VoiceChat({sendPacket:packet=>network.sendBytes('voice',packet),sendState:state=>network.send('voice.state',state),notice:(text,error)=>toast(text,error),changed:()=>renderVoice()},settings);
 const chatHistory:ChatMessage[]=[];
 let editor:ReturnType<typeof characterEditor>|undefined;
 let administration:ReturnType<typeof adminPanel>|undefined;
@@ -42,7 +53,13 @@ let refreshingAdministration=false;
 let wardrobe:Wardrobe|undefined;
 let modalGeneration=0;
 let watchingTv=false;
+// The jukebox and the TVs are independent: separate controllers, players, panels and volumes.
+// Either one in use quiets the ambient sound.
+const mediaInUse={jukebox:false,tv:false};
+const ambientFor=(kind:keyof typeof mediaInUse)=>(value:boolean)=>{mediaInUse[kind]=value;audio.setSuppressed(mediaInUse.jukebox||mediaInUse.tv);};
 const jukebox=new JukeboxController({send:(type,payload)=>network.send(type,payload),now:serverNow,
+  project:()=>null,screen:()=>{},notice:toast,ambient:ambientFor('jukebox')});
+const television=new TelevisionController({send:(type,payload)=>network.send(type,payload),now:serverNow,
   project:id=>{
     if(activeModal)return null;const points=scene?.televisionProjection(id);if(!points)return null;
     if(!watchingTv){
@@ -51,12 +68,17 @@ const jukebox=new JukeboxController({send:(type,payload)=>network.send(type,payl
     }
     return points;
   },
-  screen:(id,visible)=>scene?.showTelevision(id,visible),notice:toast,ambient:value=>audio.setSuppressed(value)});
+  screen:(id,visible)=>scene?.showTelevision(id,visible),notice:toast,ambient:ambientFor('tv')});
+const media=[jukebox,television];
 const tvBack=document.createElement('button');tvBack.id='leave-tv';tvBack.className='button secondary';tvBack.textContent='Voltar ao jogo · Esc';tvBack.hidden=true;tvBack.onclick=()=>stopWatchingTv();app.append(tvBack);
 function stopWatchingTv():void {watchingTv=false;document.body.classList.remove('watching-tv');tvBack.hidden=true;scene?.watchTelevision();scene?.setEnabled(inGame&&connected&&!activeModal);}
 function openJukebox(id:string):void {
   if(!inGame||!connected||!world?.jukeboxes?.[id])return;
   stopWatchingTv();showModal('JUKEBOX',jukebox.panelHtml(id),'jukebox');jukebox.attachPanel($('#modal-content'));
+}
+function openTelevision(id:string):void {
+  if(!inGame||!connected||!world?.televisions?.[id])return;
+  stopWatchingTv();showModal(television.selectedSystemLabel(id),television.panelHtml(id),'television');television.attachPanel($('#modal-content'));
 }
 function savedSkin():string {return user?.equippedSkin??DEFAULT_SKIN;}
 
@@ -72,12 +94,14 @@ function renderAuth(message=''):void {
   else if(authMode==='forgot')content=`<h2>Acontece nas melhores.</h2><p class="auth-description">Vamos mandar um link para você criar uma nova senha.</p><form id="auth-form" data-mode="forgot">${formField('E-mail da conta','email','email','voce@exemplo.com','autocomplete="email"')}<button class="button primary full" type="submit">Recuperar acesso <span>↗</span></button></form><button data-action="auth-login" class="text-button full">Voltar para entrar</button>`;
   else content=`<h2>Um novo começo.</h2><p class="auth-description">Escolha uma nova senha para sua conta.</p><form id="auth-form" data-mode="reset">${formField('Nova senha','password','password','Pelo menos 10 caracteres','autocomplete="new-password" minlength="10" maxlength="128"')}<button class="button primary full" type="submit">Salvar nova senha <span>↗</span></button></form>`;
   $('#auth-content').innerHTML=content+`<div id="auth-message" class="form-message ${message?'':'hidden'}" role="status">${e(message)}</div>`;
+  $('#auth-content').setAttribute('aria-busy',String(checkingSession));
+  if(checkingSession){$('#auth-content').querySelectorAll<HTMLInputElement|HTMLButtonElement>('input,button').forEach(control=>control.disabled=true);if(!message)authMessage('Verificando sua conta…');}
 }
 function authMessage(message:string,error=false):void {const node=$('#auth-message');node.className=`form-message ${error?'error':''}`;node.textContent=message;}
 function setChatOpen(open:boolean):void {if(open)hud.open('chat');else hud.collapse('chat',true);}
 function focusChat():void {setChatOpen(true);$('#chat-input').focus();}
-function showModal(title:string,content:string,type:string):void {modalGeneration++;jukebox.detachPanel();if(watchingTv)stopWatchingTv();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('.modal').classList.toggle('admin-modal',type==='admin');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
-function closeModal():void {modalGeneration++;jukebox.detachPanel();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function showModal(title:string,content:string,type:string):void {modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('.modal').classList.toggle('admin-modal',type==='admin');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function closeModal():void {modalGeneration++;media.forEach(m=>m.detachPanel());editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 function createCharacter():void {
   if(!user)return;const first=!user.character;
   showModal(first?'Monte seu personagem':'Personalizar personagem','','character');
@@ -94,20 +118,27 @@ const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
   skin:savedSkin,
   position:position=>scene?.setLocal(position),
-  state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);jukebox.setWorld(state,user!.id,connected);renderWorld();},
+  state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);media.forEach(m=>m.setWorld(state,user!.id,connected));renderWorld();},
   jukebox:openJukebox,
+  television:openTelevision,
+  voice:frame=>voice.receive(frame),
+  itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${item}.`}),
+  removed:(kind,reason)=>{void leaveBar().then(()=>{
+    if(kind==='ban'){user=undefined;renderAuth();authMessage(`Conta banida. ${reason} Peça a um administrador para remover o banimento.`,true);}
+    else authMessage(`Você foi expulso desta participação. ${reason} Sua conta não está banida; pode entrar novamente.`,true);
+  });},
   chat:message=>{if(!inGame||!user)return;chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();if(!blocked.has(message.playerId)&&(message.system||message.playerId!==user.id))notices.show({variant:message.system?'acao':'mensagem',title:message.displayName,text:message.text,initials:message.system?undefined:message.displayName[0],id:message.id});},
-  error:message=>{jukebox.reject(message);toast(message,true);},
+  error:message=>{media.forEach(m=>m.reject(message));toast(message,true);},
   ping:ms=>{$('#ping').textContent=`${ms} ms`;},
   status:(message,isConnected)=>{
-    connected=isConnected;scene?.setEnabled(inGame&&connected&&!activeModal);
-    if(!isConnected&&watchingTv)stopWatchingTv();jukebox.setWorld(world,user?.id??'',connected);
+    connected=isConnected;scene?.setEnabled(inGame&&connected&&!activeModal);audio.setActive(inGame&&connected);
+    if(!isConnected&&watchingTv)stopWatchingTv();media.forEach(m=>m.setWorld(world,user?.id??'',connected));
     $('#hud-status').textContent=isConnected?'Na área!':'Reconectando…';
     $('#waiting-message').textContent=message;
     $('#waiting').classList.toggle('hidden',isConnected||!inGame);
     $('#connection').textContent=message;
     $('#connection').classList.toggle('hidden',isConnected||!inGame);
-    if(isConnected){toast('Chegou! Fique à vontade.');$('#avatar').textContent=user?.displayName.slice(0,1).toUpperCase()||'B';}
+    if(isConnected){voice.syncState();toast('Chegou! Fique à vontade.');$('#avatar').textContent=user?.displayName.slice(0,1).toUpperCase()||'B';}
   }
 });
 
@@ -116,14 +147,16 @@ async function enterBar():Promise<void> {
   if(user&&!user.character){createCharacter();return;}
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
   if(!scene){toast('Seu navegador não conseguiu iniciar o cenário 3D. Ative a aceleração gráfica e recarregue.',true);return;}
+  // Entering is a click: the browser lets this page play voices from now on.
+  voice.unlock();audio.unlock();
   inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
-  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe')]);blocked=new Set(result.blocked);wardrobe=collection;await network.connect();}
+  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe')]);blocked=new Set(result.blocked);wardrobe=collection;await network.connect();await voice.enter();}
   catch(error){await leaveBar();toast(errorMessage(error),true);}
 }
 async function leaveBar():Promise<void> {
-  stopWatchingTv();jukebox.reset();
-  inGame=false;connected=false;notices.clear();liveHud.reset();wardrobe=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
-  $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';lastEvent='';audio.setParty(false);closeModal();renderAuth();
+  stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
+  inGame=false;connected=false;notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';lastEvent='';closeModal();renderAuth();
 }
 function renderChat():void {
   const messages=$('#messages');const atBottom=messages.scrollHeight-messages.scrollTop-messages.clientHeight<50;
@@ -136,6 +169,7 @@ function renderWorld():void {
   $('#occupancy-fill').style.width=`${Math.min(100,world.occupancy/world.capacity*100)}%`;
   const self=world.players[user.id];
   liveHud.update(world,user,wardrobe,blocked);
+  needsHud.update(self);
   const actionKey=self?`${self.id}:${self.animationState}`:'';
   if(previousAction&&actionKey!==previousAction&&self){const titles:Record<string,string>={dance:'No passinho!',drink:'Saúde! Sua gelada chegou.',kick:'Golpe de karatê!'};if(titles[self.animationState])notices.show({title:titles[self.animationState],id:`action:${self.id}:${self.animationStartedAt}:${self.animationState}`,duration:3400});}
   previousAction=actionKey;
@@ -143,19 +177,18 @@ function renderWorld():void {
   $('#hud-skin').textContent=`${self?.skin==='custom'?'Meu personagem':SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
   const activities:Record<string,string>={idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas'};
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
-  $('#hud-activity').textContent=self?.currentTableId?'No blackjack':ordering?'Esperando o Seu Zé':self?.oldWalk&&self.animationState==='walk'?'No passo da bengala':activities[self?.animationState||'idle'];
+  $('#hud-activity').textContent=needsHud.activity(self)??(self?.currentTableId?'No blackjack':ordering?'Esperando o Seu Zé':self?.oldWalk&&self.animationState==='walk'?'No passo da bengala':activities[self?.animationState||'idle']);
   $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
   $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
   const interaction=self?nearestInteraction(self):undefined;
   const context=$('#context');
-  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!self.interactionState&&!self.currentTableId&&!interaction));
-  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':self?.interactionState?'Levantar / encerrar':interaction?.label||'';
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction));
+  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.label||'';
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
-  if(event?.type&&event.id!==lastEvent){lastEvent=event.id;toast(eventName[event.type]);audio.setParty(event.type==='PARTY');}
+  if(event?.type&&event.id!==lastEvent){lastEvent=event.id;toast(eventName[event.type]);}
   $('#event-banner').classList.toggle('hidden',!event?.type);
   if(event?.type)$('#event-banner').innerHTML=`<span class="event-spark">✳</span><div><small>ACONTECEU NO B.A.R.</small><b>${eventName[event.type]}</b></div><span class="event-time">${Math.max(0,Math.ceil((event.startedAt+event.durationMs-serverNow())/1000))}s</span>`;
-  else audio.setParty(false);
   const table=self?.currentTableId?world.tables[self.currentTableId]:undefined;
   $('#blackjack').classList.toggle('hidden',!table);
   if(table){if(table.phase==='results'&&table.roundId!==previousResult){previousResult=table.roundId;const result=table.seats.find(s=>s.playerId===user!.id)?.result;if(result)notices.show({variant:result==='win'||result==='blackjack'?'conquista':'acao',title:result==='win'||result==='blackjack'?'Você ganhou!':result==='draw'?'Empate!':'A rodada fechou',text:'Confira as cartas na mesa.',id:`round:${table.roundId}`});}const key=JSON.stringify(table);if(key!==tableKey){tableKey=key;renderBlackjack(table);}}
@@ -180,7 +213,12 @@ function interact():void {
   if(self.currentTableId){network.send('blackjack.leave');return;}
   if(self.interactionState){network.send('player.interact',{objectId:'stand'});return;}
   const object=nearestInteraction(self);if(!object)return;
+  if(object.type==='counter'){orderDrink();return;}
   if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});
+}
+/** At the counter: choose what Seu Zé serves. The choice travels with the order and shows in the hand. */
+function orderDrink():void {
+  showModal('PEDIR AO SEU ZÉ',`<p class="modal-description">O Seu Zé prepara e entrega. Você bebe quando ele terminar.</p><div class="drink-choice"><button class="button primary" data-action="order" data-item="garrafa">${uiIcon('beer')}<span><b>Long neck</b><small>Cerveja na garrafa</small></span></button><button class="button primary" data-action="order" data-item="copo">${uiIcon('beer')}<span><b>Copo americano</b><small>Cerveja no copo</small></span></button></div>`,'order');
 }
 function kick():void {
   if(!connected||activeModal||!world||!user)return;
@@ -191,9 +229,9 @@ function kick():void {
 function people():void {peopleKey='';showModal('Quem está por perto','', 'people');renderPeopleContent();}
 function renderPeopleContent():void {
   const players=Object.values(world?.players||{}).filter(player=>player.id!==user?.id);
-  const key=JSON.stringify([world?.occupancy,...players.map(p=>[p.id,p.displayName,p.connected,blocked.has(p.id)])]);
+  const key=JSON.stringify([world?.occupancy,...players.map(p=>[p.id,p.displayName,p.connected,p.voice,blocked.has(p.id),voice.isMuted(p.id)])]);
   if(key===peopleKey)return;peopleKey=key;
-  $('#modal-content').innerHTML=`<p class="modal-description">Você vê as pessoas próximas a você. O bar tem ${world?.occupancy||0} frequentador(es) agora.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?'No bar':'Ausente'}</small></div><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Bloquear oculta mensagens de chat. Denúncias são encaminhadas à administração.</p>`;
+  $('#modal-content').innerHTML=`<p class="modal-description">Você vê as pessoas próximas a você. O bar tem ${world?.occupancy||0} frequentador(es) agora.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?(player.voice?'No bar · microfone ligado':'No bar'):'Ausente'}</small></div><button class="mini-button" data-action="voice-mute" data-id="${e(player.id)}" aria-pressed="${voice.isMuted(player.id)}">${voice.isMuted(player.id)?'Ouvir voz':'Silenciar voz'}</button><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Silenciar voz vale só para você. Bloquear oculta mensagens de chat e corta a voz nos dois sentidos. Denúncias são encaminhadas à administração.</p>`;
 }
 async function account():Promise<void> {
   showModal('Seu lugar no B.A.R.',`<div class="account-card"><span class="profile-initial" style="--avatar:${e(user?.color)}">${e(user?.displayName[0])}</span><h3>${e(user?.displayName)}</h3><p>${e(user?.email)}</p></div><div id="statistics" class="statistics">Carregando suas rodadas…</div><button class="button secondary full" data-action="leave">Voltar à entrada</button><button class="text-button full" data-action="logout">Sair da conta</button>`,'account');
@@ -255,7 +293,7 @@ async function wearSkin(id:string):Promise<void> {
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();toast(`Visual trocado: ${skin?.name??'Meu personagem'}.`);
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -271,7 +309,7 @@ app.addEventListener('click',event=>{
       case 'account':await account();break;
       case 'help':help();break;
       case 'interact':interact();break;
-      case 'watch-tv':{const system=JUKEBOX_SYSTEMS[0],self=world?.players[user?.id??''];if(!self||distance(self,system.source)>8){toast('Chegue mais perto da TV do salão.');break;}closeModal();watchingTv=true;document.body.classList.add('watching-tv');tvBack.hidden=false;scene?.watchTelevision(system.tvId);tvBack.focus();break;}
+      case 'watch-tv':{const system=television.selectedSystem,self=world?.players[user?.id??''];if(!system||!self||distance(self,system.source)>8){toast('Chegue mais perto desta TV.');break;}closeModal();watchingTv=true;document.body.classList.add('watching-tv');tvBack.hidden=false;scene?.watchTelevision(system.tvId);tvBack.focus();break;}
       case 'drink':{
         const self=world?.players[user?.id||''];
         if(!connected||!self||activeModal)break;
@@ -279,7 +317,7 @@ app.addEventListener('click',event=>{
         else toast('Chegue ao balcão, no fundo à direita do térreo, e aperte E para pedir uma gelada.');
         break;
       }
-      case 'scene-use':{const self=world?.players[user?.id??''],object=INTERACTABLES.find(p=>p.id===button.dataset.object);if(!connected||!self||!object||activeModal)break;if(!canInteract(object,self)){toast('Chegue mais perto para usar '+object.label.toLowerCase()+'.');break;}if(self.currentTableId||self.interactionState){toast('Encerre a interação atual com E antes de usar outro lugar.');break;}if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});break;}
+      case 'scene-use':{const self=world?.players[user?.id??''],object=INTERACTABLES.find(p=>p.id===button.dataset.object);if(!connected||!self||!object||activeModal)break;if(!canInteract(object,self)){toast('Chegue mais perto para usar '+object.label.toLowerCase()+'.');break;}if(self.currentTableId||self.interactionState){toast('Encerre a interação atual com E antes de usar outro lugar.');break;}if(object.type==='counter'){orderDrink();break;}if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});break;}
       case 'wave':if(connected&&!activeModal)network.send('player.emote',{emote:'wave'});break;
       case 'chat':focusChat();break;
       case 'skins':await skins();break;
@@ -288,7 +326,12 @@ app.addEventListener('click',event=>{
       case 'daily':{const owner=user?.id,generation=modalGeneration;const result=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();break;}
       case 'kick':kick();break;
       case 'skin':await wearSkin(button.dataset.skin!);break;
-      case 'audio':{const on=!(audio.enabled||jukebox.soundEnabled);if(audio.enabled!==on)audio.toggle();jukebox.setMuted(!on);toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
+      case 'audio':{const on=!(audio.enabled||media.some(m=>m.soundEnabled));if(audio.enabled!==on)audio.toggle();media.forEach(m=>m.setMuted(!on));toast(on?'Som da casa ligado.':'Som da casa desligado.');break;}
+      case 'order':{const self=world?.players[user?.id??''],counter=INTERACTABLES.find(i=>i.type==='counter');closeModal();if(!connected||!self||!counter)break;if(!canInteract(counter,self)){toast('Chegue ao balcão para pedir.');break;}network.send('player.interact',{objectId:counter.id,item:button.dataset.item==='copo'?'copo':'garrafa'});break;}
+      case 'voice-mic':await toggleMicrophone();break;
+      case 'voice-listen':{const on=!settings.get().voicesEnabled;voice.unlock();settings.update({voicesEnabled:on});toast(on?'Você voltou a ouvir as vozes do bar.':'Vozes silenciadas. Ninguém ouve você enquanto o microfone estiver desligado.');break;}
+      case 'voice-mute':{const id=button.dataset.id!;const muted=voice.toggleMute(id);peopleKey='';renderPeopleContent();toast(muted?'Voz silenciada para você.':'Você voltou a ouvir essa pessoa.');break;}
+      case 'settings':openSettings();break;
       case 'dance':network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
       case 'chat-toggle':setChatOpen(hud.isCollapsed('chat'));break;
@@ -330,10 +373,100 @@ document.addEventListener('keydown',event=>{
   // Closing must not reach the scene's own C handler on window, which would reopen the selector.
   if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
+  if(inGame&&!typing()&&!event.repeat){
+    if(event.code==='KeyM'){event.preventDefault();void toggleMicrophone();}
+    if(event.code==='KeyB'&&settings.get().voiceMode==='ptt'){event.preventDefault();voice.setPushToTalk(true);}
+  }
   if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();focusChat();}
 });
+document.addEventListener('keyup',event=>{if(event.code==='KeyB')voice.setPushToTalk(false);});
+window.addEventListener('blur',()=>voice.setPushToTalk(false));
 $('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
+$('#modal').addEventListener('input',event=>{
+  const input=event.target as HTMLInputElement,key=input.dataset.setting;if(!key||input.type!=='range')return;
+  const value=Number(input.value)/100;
+  if(key==='jukebox')jukebox.setVolume(value);else if(key==='television')television.setVolume(value);else settings.update({[key]:value} as Partial<GameSettings>);
+  const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${Math.round(key==='mic'?value*200:value*100)}%`;
+});
+$('#modal').addEventListener('change',event=>{
+  const input=event.target as HTMLInputElement|HTMLSelectElement,key=input.dataset.setting;if(!key)return;
+  if(key==='micEnabled'){void voice.setMicrophone((input as HTMLInputElement).checked);return;}
+  if(key==='voicesEnabled'){voice.unlock();settings.update({voicesEnabled:(input as HTMLInputElement).checked});return;}
+  if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});openSettings();return;}
+  if(key==='inputDevice')settings.update({inputDevice:input.value});
+});
 renderAuth();renderChat();
+
+function typing():boolean {const element=document.activeElement as HTMLElement|null;return !!element&&(['INPUT','TEXTAREA','SELECT'].includes(element.tagName)||element.isContentEditable);}
+async function toggleMicrophone():Promise<void> {
+  if(!inGame)return;
+  const on=!settings.get().micEnabled;
+  if(on&&voice.unavailableReason){toast(voice.unavailableReason,true);return;}
+  const active=await voice.setMicrophone(on);
+  if(on&&active)toast(settings.get().voiceMode==='ptt'?'Microfone pronto. Segure B para falar.':`Microfone ligado. Quem estiver a até ${VOICE.maxDistance} metros ouve você.`);
+  else if(!on)toast('Microfone desligado.');
+}
+// General × ambience scales the quiet background bus; the jukebox and the TVs retain their own volumes.
+function applySound(current:GameSettings):void {audio.volume=current.master*current.music;media.forEach(m=>m.setMaster(current.master));}
+settings.subscribe(current=>{applySound(current);renderVoice();});
+applySound(settings.get());
+/** Microphone level on a −60…0 dB scale, 0–1. */
+const levelScale=(rms:number)=>Math.max(0,Math.min(1,(20*Math.log10(Math.max(rms,1e-6))+60)/60));
+function renderVoice():void {
+  const current=settings.get(),mic=$('#voice-mic'),listen=$('#voice-listen');
+  mic.classList.toggle('on',voice.micActive);mic.classList.toggle('transmitting',voice.transmitting);
+  mic.setAttribute('aria-pressed',String(voice.micActive));
+  const micLabel=voice.micActive?(current.voiceMode==='ptt'?'Microfone pronto · segure B para falar · M desliga':'Desligar microfone (M)'):'Ligar microfone (M)';
+  mic.title=micLabel;mic.setAttribute('aria-label',micLabel);
+  mic.querySelector('.voice-icon')!.innerHTML=uiIcon(voice.micActive?'mic':'micOff');
+  listen.classList.toggle('off',!current.voicesEnabled);listen.setAttribute('aria-pressed',String(current.voicesEnabled));
+  const listenLabel=current.voicesEnabled?'Silenciar vozes':'Ouvir vozes';listen.title=listenLabel;listen.setAttribute('aria-label',listenLabel);
+  listen.querySelector('.voice-icon')!.innerHTML=uiIcon(current.voicesEnabled?'headphones':'headphonesOff');
+  if(activeModal==='settings'){
+    const status=document.querySelector('#voice-status');if(status)status.textContent=voice.status||(voice.micActive?'Microfone ligado.':'Microfone desligado.');
+    const toggle=document.querySelector<HTMLInputElement>('[data-setting="micEnabled"]');if(toggle)toggle.checked=voice.micActive;
+  }
+  if(activeModal==='people')renderPeopleContent();
+}
+function renderVoiceLevel():void {
+  const level=voice.micActive?levelScale(voice.level):0;
+  $('#voice-mic').style.setProperty('--level',level.toFixed(3));
+  if(activeModal!=='settings')return;
+  const fill=document.querySelector<HTMLElement>('#mic-meter-fill');if(fill){fill.style.width=`${level*100}%`;fill.classList.toggle('open',voice.transmitting);}
+}
+function openSettings():void {
+  const current=settings.get(),reason=voice.unavailableReason;
+  const range=(key:string,label:string,value:number,scale=100,disabled=false)=>`<label class="setting-row"><span>${label}</span><input type="range" min="0" max="100" step="1" data-setting="${key}" value="${Math.round(value*100)}" ${disabled?'disabled':''}><output>${Math.round(value*scale)}%</output></label>`;
+  const toggle=(key:string,label:string,hint:string,checked:boolean,disabled=false)=>`<label class="setting-toggle"><span><b>${label}</b><small>${hint}</small></span><input type="checkbox" role="switch" data-setting="${key}" ${checked?'checked':''} ${disabled?'disabled':''}><i aria-hidden="true"></i></label>`;
+  // −60 dB (whisper) … −20 dB (loud) maps onto the meter's −60…0 dB scale.
+  const threshold=current.sensitivity*40/60*100;
+  showModal('Configurações',`<div class="settings-panel" data-capture-input>
+    <section><h3>${uiIcon('music')} Volume do jogo</h3>
+      ${range('master','Geral',current.master)}${range('music','Som ambiente',current.music)}${range('jukebox','Jukebox',jukebox.ownVolume)}${range('television','TVs',television.ownVolume)}${range('voice','Vozes',current.voice)}
+      <p class="fine-print">A cidade toca baixinho ao fundo, com transições suaves. O ambiente diminui enquanto a jukebox ou uma TV está em uso.</p>
+    </section>
+    <section><h3>${uiIcon('mic')} Chat de voz por proximidade</h3>
+      <p class="fine-print">Quem estiver a até ${VOICE.maxDistance} metros ouve você, mais alto quanto mais perto e do lado certo. A voz passa pelo servidor do bar e não é gravada.</p>
+      ${reason?`<p class="form-message error" role="alert">${e(reason)}</p>`:''}
+      ${toggle('micEnabled','Microfone','Atalho: M',voice.micActive,!!reason)}
+      ${toggle('voicesEnabled','Ouvir outras pessoas','Também no botão de fones do topo',current.voicesEnabled)}
+      <fieldset class="setting-choice"><legend>Quando transmitir</legend>
+        <label><input type="radio" name="voice-mode" data-setting="voiceMode" value="open" ${current.voiceMode==='open'?'checked':''}><span>Ao detectar voz</span></label>
+        <label><input type="radio" name="voice-mode" data-setting="voiceMode" value="ptt" ${current.voiceMode==='ptt'?'checked':''}><span>Segurando B</span></label>
+      </fieldset>
+      ${range('sensitivity','Sensibilidade',current.sensitivity,100,current.voiceMode==='ptt')}
+      ${range('mic','Volume do microfone',current.mic,200)}
+      <div class="mic-meter" role="presentation"><i id="mic-meter-fill"></i>${current.voiceMode==='open'?`<b style="left:${threshold.toFixed(1)}%" title="Acima desta marca, sua voz é transmitida"></b>`:''}</div>
+      <p id="voice-status" class="fine-print" role="status">${e(voice.status||(voice.micActive?'Microfone ligado.':'Microfone desligado.'))}</p>
+      <label class="setting-row device-row"><span>Dispositivo</span><select data-setting="inputDevice" id="voice-device"><option value="">Padrão do sistema</option></select></label>
+    </section>
+  </div>`,'settings');
+  void voice.devices().then(devices=>{
+    const select=document.querySelector<HTMLSelectElement>('#voice-device');if(!select||activeModal!=='settings')return;
+    for(const [i,device] of devices.entries())if(device.deviceId&&device.deviceId!=='default'){const option=document.createElement('option');option.value=device.deviceId;option.textContent=device.label||`Microfone ${i+1}`;select.append(option);}
+    select.value=[...select.options].some(o=>o.value===settings.get().inputDevice)?settings.get().inputDevice:'';
+  });
+}
 
 async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
@@ -341,17 +474,21 @@ async function start():Promise<void>{
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
-  if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';renderAuth();return;}
-  try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;renderAuth();if(!user.character)createCharacter();}catch{/* No active session: show login. */}
+  if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';checkingSession=false;renderAuth();return;}
+  try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;}catch{/* No active session: show login. */}
+  checkingSession=false;renderAuth();if(user&&!user.character)createCharacter();
 }
 let displayedSound:boolean|undefined;
-void start().then(()=>{if(scene)scene.onMediaFrame=()=>{jukebox.frame();const on=audio.enabled||jukebox.soundEnabled;if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar música':'Ativar música');}};});
+void start().then(()=>{if(scene)scene.onMediaFrame=()=>{media.forEach(m=>m.frame());voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}};});
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry()}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];
-  $('#labels').innerHTML=labels.map(label=>`<span class="world-label" style="left:${label.x}px;top:${label.y}px">${e(label.name)}</span>`).join('');
+  $('#labels').innerHTML=labels.map(label=>{
+    const speaking=label.local?voice.transmitting:voice.isSpeaking(label.id),mic=!label.npc&&world?.players[label.id]?.voice;
+    return `<span class="world-label${speaking?' speaking':''}" style="left:${label.x}px;top:${label.y}px">${mic?`<i class="label-mic" aria-hidden="true">${uiIcon('mic')}</i>`:''}${e(label.name)}</span>`;
+  }).join('');
   const table=world.tables[world.players[user?.id||'']?.currentTableId];
   const timer=document.querySelector('#turn-timer');if(timer&&table?.deadline)timer.textContent=`${Math.max(0,Math.ceil((table.deadline-serverNow())/1000))}s`;
 },100);

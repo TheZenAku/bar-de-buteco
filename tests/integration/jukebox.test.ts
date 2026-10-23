@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {youtubeVideoId,initialJukebox,commandJukebox,jukeboxTime,jukeboxGain,jukeboxCommandSchema,JUKEBOX_SYSTEMS,TELEVISIONS} from '@bar/shared';
+import {youtubeVideoId,initialJukebox,commandJukebox,jukeboxTime,jukeboxGain,jukeboxCommandSchema,JUKEBOX_SYSTEMS,TV_SYSTEMS,TELEVISIONS} from '@bar/shared';
 const id='M7lc1UVf-VE';
 test('YouTube URLs: official domains and four formats, no executable or ambiguous URLs',()=>{
   for(const url of [`https://www.youtube.com/watch?v=${id}&t=25`,`https://youtube.com/watch?v=${id}`,`https://m.youtube.com/watch?v=${id}`,`https://youtu.be/${id}?si=share`,`https://www.youtube.com/shorts/${id}`,`https://www.youtube.com/embed/${id}`])assert.equal(youtubeVideoId(url),id,url);
@@ -28,6 +28,9 @@ test('proximity attenuation is continuous, bounded, per-listener and silent outs
   for(let d=0;d<=21;d+=.01){const value=jukeboxGain({x:d,y:0,z:0},source);assert.ok(value>=0&&value<=1&&value<=previous+1e-9);previous=value;}
   assert.equal(jukeboxGain({x:5,y:0,z:0},source),1);assert.ok(Math.abs(jukeboxGain({x:15,y:0,z:0},source)-.07)<1e-9);
   assert.equal(jukeboxGain({x:20,y:0,z:0},source),0);assert.equal(jukeboxGain({x:0,y:21,z:0},source),0);
-  assert.ok(JUKEBOX_SYSTEMS.every(system=>TELEVISIONS.some(tv=>tv.id===system.tvId)));
+  // The jukebox and the TVs are separate sources: the jukebox drives no screen; every TV drives only its own.
+  assert.deepEqual(JUKEBOX_SYSTEMS.map(s=>[s.id,s.kind,s.tvId]),[['jukebox','jukebox','']]);
+  assert.deepEqual(TV_SYSTEMS.map(s=>s.tvId),TELEVISIONS.map(tv=>tv.id));
+  assert.ok(TV_SYSTEMS.every(s=>s.kind==='tv'&&s.id===s.tvId&&s.audio.maxDistance<JUKEBOX_SYSTEMS[0]!.audio.maxDistance));
   assert.equal(new Set(TELEVISIONS.map(tv=>tv.id)).size,TELEVISIONS.length);
 });

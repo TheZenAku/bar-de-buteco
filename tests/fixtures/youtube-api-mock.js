@@ -12,6 +12,8 @@ class Player {
   getCurrentTime(){return this.time+(this.state===1?(performance.now()-this.started)/1000:0);}
   getDuration(){return 1200;}
   getPlayerState(){return this.state;}
+  getVolume(){return this.volume;}
+  isMuted(){return this.muted??false;}
   getVideoData(){return this.data;}
   getIframe(){return this.frame;}
   setVolume(volume){this.volume=volume;}

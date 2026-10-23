@@ -1,0 +1,12 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Ambient streaming fixture</title>
+<button id="enter">Enter</button><button id="toggle">Toggle</button><button id="leave">Leave</button>
+<script type="module">
+import {BarAudio} from '/src/audio.ts';
+const audio=new BarAudio();
+document.querySelector('#enter').onclick=()=>{audio.unlock();audio.setActive(true);};
+document.querySelector('#toggle').onclick=()=>audio.toggle();
+document.querySelector('#leave').onclick=()=>audio.setActive(false);
+window.fixture={audio,seekEnd:seconds=>{audio.current.media.currentTime=audio.current.media.duration-seconds;audio.tick();},
+  hidden:value=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>value});document.dispatchEvent(new Event('visibilitychange'));},
+  rms:()=>{const analyser=audio.context.createAnalyser();analyser.fftSize=2048;audio.bus.connect(analyser);return new Promise(resolve=>setTimeout(()=>{const samples=new Float32Array(2048);analyser.getFloatTimeDomainData(samples);audio.bus.disconnect(analyser);resolve(Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length));},100));}};
+</script></html>

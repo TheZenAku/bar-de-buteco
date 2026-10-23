@@ -1,6 +1,7 @@
 import map from './map-data.json';
 import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } from './index.js';
-import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT} from './jukebox.js';
+import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,TV_SYSTEMS,TELEVISIONS} from './jukebox.js';
+import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 
 export const WALK_SPEED = 3.5;
 export const RUN_SPEED = 6;
@@ -22,7 +23,26 @@ export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
 });
 const BLACKJACK_COLLIDER:Collider={id:'blackjack',x:BLACKJACK_TABLE.x,z:BLACKJACK_TABLE.z,hx:.75,hz:.42,minY:BLACKJACK_TABLE.y,maxY:BLACKJACK_TABLE.y+.8};
 const JUKEBOX_COLLIDER:Collider={id:'jukebox',x:JUKEBOX.x,z:JUKEBOX.z,hx:JUKEBOX.hx,hz:JUKEBOX.hz,minY:JUKEBOX.y,maxY:JUKEBOX.y+1.55};
+/** Static solids: walls, furniture, the game's props. Door leaves move; see solidColliders. */
 export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER,JUKEBOX_COLLIDER];
+// Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
+// Doors start open, as authored in the map.
+const openDoors=new Map(DOORS.map(door=>[door.id,true]));
+let solids:readonly Collider[]=[];
+function rebuildSolids():void {
+  solids=[...COLLIDERS,...DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw))];
+}
+rebuildSolids();
+/** Every solid volume right now, including each door leaf where its door state puts it. */
+export function solidColliders():readonly Collider[] {return solids;}
+export function isDoorOpen(id:string):boolean {return openDoors.get(id)??true;}
+/** Applies door states (id → open); unknown ids are ignored. Returns whether anything changed. */
+export function setDoorStates(states:Iterable<readonly [string,boolean]>):boolean {
+  let changed=false;
+  for(const [id,open] of states)if(openDoors.has(id)&&openDoors.get(id)!==open){openDoors.set(id,open);changed=true;}
+  if(changed)rebuildSolids();
+  return changed;
+}
 const footprint=({id,x,z,hx,hz}:Collider):Footprint=>({id,x,z,hx,hz});
 /** The ground-floor L-shaped counter (the lounge upstairs has its own, unattended). */
 export const COUNTER_FOOTPRINT:readonly Footprint[]=map.colliders
@@ -33,7 +53,12 @@ export const INTERACTABLES: readonly Interactable[] = [
   // The point is where a player stands touching the jukebox front.
   {id:'jukebox',type:'jukebox',label:'Tocar a jukebox',x:JUKEBOX.x,y:JUKEBOX.y,z:JUKEBOX.z+JUKEBOX.hz+PLAYER_RADIUS+.05,footprint:[footprint(JUKEBOX_COLLIDER)]},
   ...map.seats.map(seat=>({...seat,type:'seat' as const,label:'Sentar'})),
+  ...DOORS.map(door=>({id:door.id,type:'door' as const,label:door.label,x:door.x,y:door.y,z:door.z,footprint:door.footprint})),
+  // The toilets of both floors' restrooms (COL_Mob_Vaso in the map export), used by touching them.
+  ...map.colliders.filter(c=>/^COL_Mob_Vaso(\.\d+)?$/.test(c.id)).map((c,i)=>({id:`toilet-${i+1}`,type:'toilet' as const,label:'Usar o banheiro',x:c.x,y:c.minY,z:c.z,footprint:[footprint(c)]})),
 ];
+// Each TV is used from the floor in front of its screen (see tvSpot); defined after the floor functions.
+export const TV_SPOTS:Record<string,Required<Position>>={};
 
 function triangleHeight(points:number[][],x:number,z:number):number|undefined {
   const [a,b,c]=points;
@@ -55,13 +80,24 @@ export function floorHeight(x:number,z:number,reference=.3):number|undefined {
   return highest;
 }
 
+// People turn sideways through a doorway: inside an open door's frame the body is this narrow.
+const DOORWAY_RADIUS=.25;
+/** Within an open door's frame (the zone a leaf closes), on its floor. */
+function inOpenDoorway(x:number,z:number,y:number):boolean {
+  return DOORS.some(door=>{
+    if(!isDoorOpen(door.id)||Math.abs(door.y-y)>.5)return false;
+    const yaw=door.leaves[0]!.closedYaw*Math.PI/180,dx=x-door.x,dz=z-door.z;
+    return Math.abs(dx*Math.sin(yaw)+dz*Math.cos(yaw))<.6&&Math.abs(dx*Math.cos(yaw)-dz*Math.sin(yaw))<.4*door.leaves.length;
+  });
+}
 function obstructed(x:number,z:number,y:number,ignored?:Set<string>):boolean {
+  const body=inOpenDoorway(x,z,y)?DOORWAY_RADIUS:PLAYER_RADIUS;
   if(x<WORLD.minX+PLAYER_RADIUS||x>WORLD.maxX-PLAYER_RADIUS||z<WORLD.minZ+PLAYER_RADIUS||z>WORLD.maxZ-PLAYER_RADIUS)return true;
-  for(const c of COLLIDERS){
+  for(const c of solids){
     if(c.ramp||ignored?.has(c.id))continue;
     if((c.maxY??Infinity)<=y+.26||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
     // Below knee height only the feet collide, so the body may lean over a step edge (the stage's 30 cm treads).
-    const radius=(c.maxY??Infinity)<=y+.5?.15:PLAYER_RADIUS;
+    const radius=(c.maxY??Infinity)<=y+.5?.15:body;
     if(Math.abs(x-c.x)<c.hx+radius-.00001&&Math.abs(z-c.z)<c.hz+radius-.00001)return true;
   }
   // Sloped collision boxes are sampled on their real upper face, not their enclosing AABB.
@@ -78,17 +114,38 @@ export function isWalkable(x:number,z:number,y?:number):boolean {
   return supported!==undefined&&(y===undefined||Math.abs(supported-y)<.08)&&!obstructed(x,z,supported);
 }
 
+/**
+ * The map's doorways are 0.8 m wide for a 0.68 m body: pushing through an open door against its jamb
+ * slides the body towards the middle of the doorway instead of leaving it stuck on the frame.
+ */
+function throughDoorway(fromX:number,fromZ:number,x:number,z:number,y:number,wx:number,wz:number):Position|undefined {
+  const wanted=Math.hypot(wx,wz);if(wanted<1e-6)return;
+  for(const door of DOORS){
+    if(!isDoorOpen(door.id)||Math.abs(door.y-y)>.5)continue;
+    const yaw=door.leaves[0]!.closedYaw*Math.PI/180,ux=Math.cos(yaw),uz=-Math.sin(yaw),nx=Math.sin(yaw),nz=Math.cos(yaw);
+    const along=(fromX-door.x)*ux+(fromZ-door.z)*uz,across=(fromX-door.x)*nx+(fromZ-door.z)*nz;
+    // Heading through the doorway, close to it and roughly in front of it, and held back by the frame.
+    if(Math.abs(wx*nx+wz*nz)<.5*wanted||Math.abs(across)>.9||Math.abs(along)>.45)continue;
+    const progress=((x-fromX)*nx+(z-fromZ)*nz)/((wx*nx+wz*nz)||1);
+    if(progress>.5||Math.abs(along)<.005)continue;
+    const shift=-Math.sign(along)*Math.min(Math.abs(along),wanted),px=x+ux*shift,pz=z+uz*shift;
+    if(!obstructed(px,pz,y))return {x:px,z:pz};
+  }
+}
 export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false):Required<Position> {
   const magnitude=Math.hypot(input.dx,input.dz);
   const scale=(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
   for(let step=0;step<steps;step++){
-    const nx=x+input.dx*scale/steps,nz=z+input.dz*scale/steps;
+    const wx=input.dx*scale/steps,wz=input.dz*scale/steps,fromX=x,fromZ=z;
+    const nx=x+wx,nz=z+wz;
     let nextY=floorHeight(nx,z,y);
     if(nextY!==undefined&&!obstructed(nx,z,nextY)){x=nx;y=nextY;}
     nextY=floorHeight(x,nz,y);
     if(nextY!==undefined&&!obstructed(x,nz,nextY)){z=nz;y=nextY;}
+    const guided=throughDoorway(fromX,fromZ,x,z,y,wx,wz);
+    if(guided){x=guided.x;z=guided.z;}
   }
   return {x,y,z};
 }
@@ -131,17 +188,29 @@ export function canInteract(object:Interactable,position:Position,slack=0):boole
   const reach=interactionReach(object,position);
   if(reach.gap>TOUCH_GAP+slack+(object.type==='jukebox'?JUKEBOX_INTERACTION_SLACK:0))return false;
   const eye=y+1.3;
-  return !COLLIDERS.some(c=>!c.ramp&&!object.footprint?.some(f=>f.id===c.id)&&(c.minY??-Infinity)<eye&&(c.maxY??Infinity)>eye
+  return !solids.some(c=>!c.ramp&&!object.footprint?.some(f=>f.id===c.id)&&(c.minY??-Infinity)<eye&&(c.maxY??Infinity)>eye
     &&segmentCrossesBox(position.x,position.z,reach.x,reach.z,c));
 }
+/** The first walkable point on the floor in front of a TV, searching a little to the sides. */
+function tvSpot(tv:typeof TELEVISIONS[number]):Required<Position> {
+  const a=tv.yaw*Math.PI/180,nx=Math.sin(a),nz=Math.cos(a),floor=tv.y>4?3.45:.3;
+  for(let d=.35;d<=2.5;d+=.05)for(const side of [0,.3,-.3,.6,-.6]){
+    const x=tv.x+nx*d+nz*side,z=tv.z+nz*d-nx*side,y=floorHeight(x,z,floor);
+    if(y!==undefined&&Math.abs(y-floor)<.05&&isWalkable(x,z,y))return {x,y,z};
+  }
+  throw new Error(`Nenhum ponto livre diante de ${tv.id}`);
+}
+for(const tv of TELEVISIONS)TV_SPOTS[tv.id]=tvSpot(tv);
+(INTERACTABLES as Interactable[]).push(...TV_SYSTEMS.map(system=>({id:system.id,type:'television' as const,label:`Usar a ${system.label}`,...TV_SPOTS[system.tvId]!})));
+
 export function nearestInteraction(position:Position):Interactable|undefined {
-  return INTERACTABLES.filter(i=>canInteract(i,position))
-    .sort((a,b)=>interactionReach(a,position).gap-interactionReach(b,position).gap)[0];
+  // At a doorway the door comes first, even with a chair of the next table within reach.
+  const rank=(i:Interactable)=>interactionReach(i,position).gap-(i.type==='door'?.1:0);
+  return INTERACTABLES.filter(i=>canInteract(i,position)).sort((a,b)=>rank(a)-rank(b))[0];
 }
 
 /** The authored spawn marker is on the pavement; choose the closest clear position to it. */
-export function findSpawn(occupied:readonly Position[]=[]):Position {
-  const anchor=map.markers.Spawn_Jogador;
+export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Position>=map.markers.Spawn_Jogador):Position {
   const offsets:Array<{x:number;z:number}>=[];
   for(let x=-12;x<=12;x++)for(let z=-12;z<=12;z++)offsets.push({x:x*.8,z:z*.8});
   offsets.sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
@@ -155,7 +224,7 @@ export function findSpawn(occupied:readonly Position[]=[]):Position {
 
 export function standingPosition(position:Position,rotation=0):Position {
   if(isWalkable(position.x,position.z,position.y))return {...position};
-  const ignored=new Set(COLLIDERS.filter(c=>(c.maxY??Infinity)>(position.y??.3)+.035&&(c.minY??-Infinity)<(position.y??.3)+PLAYER_HEIGHT&&Math.abs(position.x-c.x)<c.hx+PLAYER_RADIUS&&Math.abs(position.z-c.z)<c.hz+PLAYER_RADIUS).map(c=>c.id));
+  const ignored=new Set(solids.filter(c=>(c.maxY??Infinity)>(position.y??.3)+.035&&(c.minY??-Infinity)<(position.y??.3)+PLAYER_HEIGHT&&Math.abs(position.x-c.x)<c.hx+PLAYER_RADIUS&&Math.abs(position.z-c.z)<c.hz+PLAYER_RADIUS).map(c=>c.id));
   const directions=[rotation,rotation+Math.PI/2,rotation-Math.PI/2,rotation+Math.PI];
   for(const direction of directions)for(const offset of [.2,.35,.5,.7,.85]){
     const x=position.x-Math.sin(direction)*offset,z=position.z-Math.cos(direction)*offset;
@@ -172,7 +241,7 @@ export function standingPosition(position:Position,rotation=0):Position {
 /** Ray/box camera boom clipping, including the veranda ceiling absent from player colliders. */
 export function cameraFraction(start:Required<Position>,end:Required<Position>):number {
   let ratio=1;
-  for(const c of [...COLLIDERS,...(map.cameraCeilings as Collider[])]){
+  for(const c of [...solids,...(map.cameraCeilings as Collider[])]){
     // Posts, trunks and pillars are too thin to hide the player; letting the boom pass them avoids the
     // camera snapping onto the avatar (the spawn marker stands in front of a street lamp).
     if(c.ramp||(c.hx<.2&&c.hz<.2))continue;

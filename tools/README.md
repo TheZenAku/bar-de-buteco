@@ -11,13 +11,15 @@ Os arquivos podem ser abertos com dois cliques, a partir de qualquer pasta. É n
 | `logs.bat` | Acompanha o log; Ctrl+C encerra o acompanhamento |
 | `liberar-firewall.bat` | Configura acesso pela rede privada; solicita administrador |
 
-Abra **http://localhost:5173** depois de aparecer **B.A.R. ligado!**. As portas são 3001 para a API, 2567 para o mundo e 5173 para o site. O status consulta a identidade da API e do mundo e verifica a transformação do código e do CSS no Vite, além da página inicial.
+Abra **https://localhost:5173** depois de aparecer **B.A.R. ligado!** (na primeira visita, aceite o aviso do certificado próprio em *Avançado*; o HTTPS libera o microfone do [chat de voz](../docs/voice.md)). As portas são 3001 para a API, 2567 para o mundo e 5173 para o site; o site repassa o mundo em `/game`, então quem joga de fora só precisa da porta 5173. Com `BAR_HTTPS=0` no ambiente, o site volta a usar HTTP. O status consulta a identidade da API e do mundo e verifica a transformação do código e do CSS no Vite, além da página inicial.
 
 Se a execução estiver incompleta, use `reiniciar.bat`. Processos de outros programas que ocupem essas portas são informados e não são encerrados. As ferramentas não executam seed nem apagam contas ou dados do jogo.
 
 Os comandos de desenvolvimento da API e do mundo também monitoram explicitamente `packages/shared/src/**/*.{ts,json}`, incluindo TypeScript e JSON. Assim, alterações nos contratos compartilhados e no catálogo de roupas recarregam os dois serviços; sem isso, o cliente podia atualizar enquanto a API continuava rejeitando os campos novos. Após atualizar os próprios comandos `dev`, execute `reiniciar.bat` uma vez para ativar o novo monitoramento.
 
 Para instalar novos FBX masculinos, use [os scripts em `tools/roupas`](roupas/README.md): listagem, validação e importação com backup e catálogo automático.
+
+Para atualizar os [sons ambientes](../docs/ambient.md), adicione gravações em `assets-bar/sound/ambient` e execute `npm run assets:ambient -- "C:\caminho\ffmpeg.exe"`. O importador normaliza o volume, converte para AAC e elimina duplicatas sem alterar os originais.
 
 Antes de iniciar, o script verifica Node/npm, dependências essenciais e marcadores de conflito de merge no código. Se houver conflito, informa o arquivo e a linha e termina com erro. Um `git status` limpo não garante ausência de marcadores salvos em um commit.
 
