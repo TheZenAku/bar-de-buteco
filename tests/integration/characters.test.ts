@@ -40,9 +40,9 @@ test('male garments share the animated body rig with normalized surface weights 
   const groups=json.nodes.filter((n:any)=>n.name==='SuperHero_Male'||n.name.startsWith('body-coverage-'));
   assert.ok(groups.length>3);
   const primitive=json.meshes[groups[0].mesh].primitives[0];
-  const source=JSON.parse(readFileSync(resolve(root,'../../../assets-bar/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf'),'utf8'));
-  const original=source.meshes[2].primitives[0];
-  assert.equal(groups.reduce((sum:number,n:any)=>sum+json.accessors[json.meshes[n.mesh].primitives[0].indices].count,0),source.accessors[original.indices].count,'all original body triangles survive; unequipping restores them');
+  // The source kit is no longer in the repository: its counts were measured once into a fixture (see the file).
+  const source=JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)),'../fixtures/characters/base-male-source.json'),'utf8'));
+  assert.equal(groups.reduce((sum:number,n:any)=>sum+json.accessors[json.meshes[n.mesh].primitives[0].indices].count,0),source.body.indexCount,'all original body triangles survive; unequipping restores them');
   for(const group of groups)assert.deepEqual(json.meshes[group.mesh].primitives[0].attributes,primitive.attributes,'body regions share original geometry and weights');
   for(const group of groups.filter((n:any)=>n.name.startsWith('body-coverage-')))for(const id of group.name.slice('body-coverage-'.length).split('+'))assert.ok(MALE_CLOTHING.some(item=>item.id===id&&item.slot!=='accessory'));
 });
