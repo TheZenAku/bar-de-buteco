@@ -2,8 +2,8 @@ import { CONSUMABLES, applyConsumable, canRun, createNeeds, damage, maxHp, relie
 import type { Player } from '../state.js';
 
 /**
- * What the needs system asks of an inventory. There is no inventory yet: the bar plugs NO_INVENTORY in,
- * and the future inventory implements this interface (and calls BarRoom.consume for food and drinks).
+ * Small synchronous adapter retained for alternate room modes and isolated simulations. The main bar
+ * persists inventory through the API because a database mutation cannot safely fit this synchronous port.
  */
 export interface InventoryPort {
   /** Items that may be lost when the character faints (e.g. not quest or bound items). */

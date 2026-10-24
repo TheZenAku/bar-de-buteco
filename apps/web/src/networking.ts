@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
 import {api} from './api';
 
 export interface NetworkHooks {
@@ -14,8 +14,10 @@ export interface NetworkHooks {
   /** A proximity voice frame relayed by the server. */
   voice?:(frame:Uint8Array)=>void;
   removed?:(kind:'kick'|'ban',reason:string)=>void;
-  /** The future inventory removed an item when the character fainted. */
+  /** The persistent inventory removed an eligible item when the character fainted. */
   itemLost?:(item:string)=>void;
+  inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
+  inventoryResult?:(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>void;
 }
 export class BarNetwork {
   room?:Room;
@@ -78,6 +80,8 @@ export class BarNetwork {
     room.onMessage('tv.open',(message:{id:string})=>this.hooks.television?.(message.id));
     room.onMessage('tv.result',()=>{});
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
+    room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
+    room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));
     room.onMessage('voice',(frame:Uint8Array)=>this.hooks.voice?.(frame));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
@@ -86,7 +90,7 @@ export class BarNetwork {
     room.onDrop(()=>{this.transportReady=false;this.stopTimers();this.pending=[];this.hooks.status('Conexão interrompida. Tentando reconectar…',false);});
     room.onReconnect(()=>{if(this.stopped)return;this.transportReady=true;this.pending=[];this.startTimers();this.hooks.status('Você está no bar',true);});
     room.onLeave((code:number)=>{if(!this.stopped&&this.room===room){this.transportReady=false;this.stopTimers();this.stopped=true;if(removal&&this.hooks.removed)this.hooks.removed(removal.kind,removal.reason);else this.hooks.status(code===4000?'Sua participação foi encerrada. Volte à entrada para continuar.':'A conexão terminou. Volte à entrada para entrar novamente.',false);}});
-    this.startTimers();
+    this.startTimers();this.send('inventory.sync');
   }
   private sendInput():void {
     if(!this.transportReady||!this.room||!this.user||!this.world||this.pending.length>12)return;

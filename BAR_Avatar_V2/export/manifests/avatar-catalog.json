@@ -1,0 +1,3652 @@
+{
+  "schema": "bar-avatar-v2/avatar-catalog",
+  "catalogVersion": "2.0.0",
+  "generated": "2026-10-24",
+  "generator": "scripts/s25_manifests.py",
+  "rigId": "BAR_HUMANOID_V2",
+  "boneContractVersion": "2.0.0",
+  "pathBase": "raiz do export (pasta que contém manifests/); nenhum caminho absoluto",
+  "units": "metros; glTF +Y para cima; personagem olha para +Z; lado esquerdo do personagem em +X",
+  "validationStates": {
+    "approved_blender": "aprovado no Blender",
+    "approved_gltf_reimport": "aprovado em reimportação glTF",
+    "pending_playcanvas": "pendente de validação no PlayCanvas (todas as entradas)",
+    "failed": "reprovado"
+  },
+  "colorFields": {
+    "skinTone": "CharacterSkin (A=1)",
+    "outfitColor": "CharacterSkin (A=0, roupa de baixo base)",
+    "eyeColor": "CharacterEyes (A=1)",
+    "hairColor": "CharacterHair (cabelo, sobrancelhas, barba)",
+    "topColor": "TOP",
+    "bottomColor": "BOTTOM",
+    "footwearColor": "FOOTWEAR",
+    "accessoryColor": "ACCESSORY (exceto lentes)"
+  },
+  "sharedTextures": [
+    "textures/bottom_jeans_female.png",
+    "textures/bottom_jeans_male.png",
+    "textures/bottom_pants_female.png",
+    "textures/bottom_pants_male.png",
+    "textures/bottom_shorts_female.png",
+    "textures/bottom_shorts_male.png",
+    "textures/bottom_skirt.png",
+    "textures/eye_v2.png",
+    "textures/footwear_boots.png",
+    "textures/footwear_flipflops.png",
+    "textures/footwear_shoes.png",
+    "textures/footwear_sneakers.png",
+    "textures/hair_v2.png",
+    "textures/skin_female.png",
+    "textures/skin_male.png",
+    "textures/top_hoodie_female.png",
+    "textures/top_hoodie_male.png",
+    "textures/top_jacket_female.png",
+    "textures/top_jacket_male.png",
+    "textures/top_shirt_female.png",
+    "textures/top_shirt_male.png",
+    "textures/top_tank_female.png",
+    "textures/top_tank_male.png",
+    "textures/top_tee_female.png",
+    "textures/top_tee_male.png",
+    "textures/top_tee_print_female.png",
+    "textures/top_tee_print_male.png"
+  ],
+  "regionRules": [
+    {
+      "region": "waist",
+      "hideWhen": {
+        "allOf": [
+          "TOP",
+          "BOTTOM"
+        ]
+      },
+      "reason": "faixa de faces que cruza a barra das blusas e o cós das calças/saia no corpo decimado: nenhuma das duas cobre sozinha; juntas cobrem (medido por raios em cantos e centro)"
+    }
+  ],
+  "hiddenRegionsAlgorithm": "hidden = união de pieces[*].hidesRegions das peças vestidas + regiões de regionRules cuja condição vale",
+  "bodies": [
+    {
+      "id": "male",
+      "name": "Corpo masculino",
+      "path": "bodies/male.glb",
+      "rig": "rigs/bar_humanoid_v2_male.glb",
+      "animations": "animations/humanoid_v2_male.glb",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "armatureNode": "BAR_HUMANOID_V2",
+      "measurements": {
+        "heightM": 1.7794,
+        "floorYM": 0.0004,
+        "hipJointYM": 0.9304,
+        "upperlegLYM": 0.9904,
+        "legLengthM": 0.9005,
+        "eyeYM": 1.6633,
+        "shoulderWidthM": 0.399
+      },
+      "meshes": {
+        "body": "BAR_Body",
+        "eyes": "BAR_Eyes",
+        "brows": {
+          "regular": "BAR_Brows_regular",
+          "thin": "BAR_Brows_thin",
+          "thick": "BAR_Brows_thick"
+        }
+      },
+      "triangles": {
+        "BAR_Body": 5030,
+        "BAR_Brows_regular": 24,
+        "BAR_Brows_thick": 24,
+        "BAR_Brows_thin": 24,
+        "BAR_Eyes": 336
+      },
+      "morphTargets": [
+        "face_jaw_wide",
+        "face_jaw_narrow",
+        "face_nose_big",
+        "face_nose_small",
+        "face_cheeks_full",
+        "face_cheekbones",
+        "face_brow_heavy",
+        "face_lips_full"
+      ],
+      "morphTargetMaxDeltaM": {
+        "face_jaw_wide": 0.0173,
+        "face_jaw_narrow": 0.006,
+        "face_nose_big": 0.0105,
+        "face_nose_small": 0.0088,
+        "face_cheeks_full": 0.0189,
+        "face_cheekbones": 0.0068,
+        "face_brow_heavy": 0.0053,
+        "face_lips_full": 0.0038
+      },
+      "morphTargetsAlsoOn": [
+        "BAR_Brows_regular",
+        "BAR_Brows_thin",
+        "BAR_Brows_thick",
+        "facial_* (todas as peças de barba)"
+      ],
+      "facePresets": {
+        "default": {},
+        "classico": {
+          "face_jaw_wide": 0.6,
+          "face_nose_big": 0.5,
+          "face_brow_heavy": 0.5
+        },
+        "magro": {
+          "face_jaw_narrow": 0.7,
+          "face_cheekbones": 0.6,
+          "face_nose_small": 0.2
+        },
+        "bochechudo": {
+          "face_cheeks_full": 0.9,
+          "face_nose_big": 0.3,
+          "face_jaw_wide": 0.2
+        },
+        "serio": {
+          "face_brow_heavy": 0.9,
+          "face_cheekbones": 0.5,
+          "face_jaw_wide": 0.4
+        }
+      },
+      "materials": [
+        {
+          "name": "CharacterSkin",
+          "role": "skin",
+          "category": "Skin",
+          "configurable": true,
+          "colorField": "skinTone",
+          "secondaryColorField": "outfitColor",
+          "rule": "albedo = tex.rgb * mix(outfitColor, skinTone, tex.a)",
+          "shader": "mesmo chunk skinDiffuse do legado (character-materials.ts)",
+          "defaultColor": "#cf936d",
+          "texture": "embedded skin_{body}",
+          "textureSize": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "CharacterEyes",
+          "role": "eyes",
+          "category": "Eyes",
+          "configurable": true,
+          "colorField": "eyeColor",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), eyeColor, tex.a)",
+          "shader": "chunk eyes NOVO: íris pela máscara alfa (o chunk legado detecta a íris por luminância e NÃO serve)",
+          "texture": "textures/eye_v2.png"
+        },
+        {
+          "name": "CharacterHair",
+          "role": "brows",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "texture": "textures/hair_v2.png"
+        }
+      ],
+      "regionMask": {
+        "attribute": "TEXCOORD_1",
+        "encoding": "u = (regionId + 0.5) / 32, v = 0.5",
+        "triangles": 5030,
+        "per_triangle_uniform": true,
+        "v_is_half": true,
+        "ids_in_range": true,
+        "triangles_per_region": {
+          "head": 1502,
+          "neck": 164,
+          "chest": 187,
+          "shoulder_l": 70,
+          "shoulder_r": 65,
+          "torso_lower": 268,
+          "pelvis": 74,
+          "upperarm_a_l": 69,
+          "upperarm_b_l": 48,
+          "lowerarm_a_l": 46,
+          "lowerarm_b_l": 56,
+          "hand_l": 409,
+          "thigh_a_l": 122,
+          "thigh_b_l": 107,
+          "shin_a_l": 87,
+          "shin_b_l": 64,
+          "foot_l": 317,
+          "upperarm_a_r": 77,
+          "upperarm_b_r": 48,
+          "lowerarm_a_r": 46,
+          "lowerarm_b_r": 56,
+          "hand_r": 409,
+          "thigh_a_r": 122,
+          "thigh_b_r": 107,
+          "shin_a_r": 87,
+          "shin_b_r": 64,
+          "foot_r": 317,
+          "waist": 42
+        }
+      },
+      "dependencies": [
+        "textures/hair_v2.png",
+        "textures/eye_v2.png"
+      ],
+      "validation": {
+        "state": "approved_gltf_reimport",
+        "blender": "approved",
+        "gltfReimport": "approved",
+        "playcanvas": "pending",
+        "errors": []
+      }
+    },
+    {
+      "id": "female",
+      "name": "Corpo feminino",
+      "path": "bodies/female.glb",
+      "rig": "rigs/bar_humanoid_v2_female.glb",
+      "animations": "animations/humanoid_v2_female.glb",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "armatureNode": "BAR_HUMANOID_V2",
+      "measurements": {
+        "heightM": 1.6696,
+        "floorYM": 0.0003,
+        "hipJointYM": 0.8621,
+        "upperlegLYM": 0.9218,
+        "legLengthM": 0.8417,
+        "eyeYM": 1.5606,
+        "shoulderWidthM": 0.3002
+      },
+      "meshes": {
+        "body": "BAR_Body",
+        "eyes": "BAR_Eyes",
+        "brows": {
+          "regular": "BAR_Brows_regular",
+          "thin": "BAR_Brows_thin",
+          "thick": "BAR_Brows_thick"
+        }
+      },
+      "triangles": {
+        "BAR_Body": 5030,
+        "BAR_Brows_regular": 24,
+        "BAR_Brows_thick": 24,
+        "BAR_Brows_thin": 24,
+        "BAR_Eyes": 336
+      },
+      "morphTargets": [
+        "face_jaw_wide",
+        "face_jaw_narrow",
+        "face_nose_big",
+        "face_nose_small",
+        "face_cheeks_full",
+        "face_cheekbones",
+        "face_brow_heavy",
+        "face_lips_full"
+      ],
+      "morphTargetMaxDeltaM": {
+        "face_jaw_wide": 0.0162,
+        "face_jaw_narrow": 0.0056,
+        "face_nose_big": 0.0098,
+        "face_nose_small": 0.0082,
+        "face_cheeks_full": 0.0177,
+        "face_cheekbones": 0.0064,
+        "face_brow_heavy": 0.005,
+        "face_lips_full": 0.0035
+      },
+      "morphTargetsAlsoOn": [
+        "BAR_Brows_regular",
+        "BAR_Brows_thin",
+        "BAR_Brows_thick",
+        "facial_* (todas as peças de barba)"
+      ],
+      "facePresets": {
+        "default": {},
+        "suave": {
+          "face_lips_full": 0.6,
+          "face_nose_small": 0.5
+        },
+        "marcante": {
+          "face_cheekbones": 0.8,
+          "face_jaw_narrow": 0.4
+        },
+        "redonda": {
+          "face_cheeks_full": 0.8,
+          "face_nose_small": 0.3
+        },
+        "forte": {
+          "face_jaw_wide": 0.5,
+          "face_nose_big": 0.4,
+          "face_brow_heavy": 0.4
+        }
+      },
+      "materials": [
+        {
+          "name": "CharacterSkin",
+          "role": "skin",
+          "category": "Skin",
+          "configurable": true,
+          "colorField": "skinTone",
+          "secondaryColorField": "outfitColor",
+          "rule": "albedo = tex.rgb * mix(outfitColor, skinTone, tex.a)",
+          "shader": "mesmo chunk skinDiffuse do legado (character-materials.ts)",
+          "defaultColor": "#cf936d",
+          "texture": "embedded skin_{body}",
+          "textureSize": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "CharacterEyes",
+          "role": "eyes",
+          "category": "Eyes",
+          "configurable": true,
+          "colorField": "eyeColor",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), eyeColor, tex.a)",
+          "shader": "chunk eyes NOVO: íris pela máscara alfa (o chunk legado detecta a íris por luminância e NÃO serve)",
+          "texture": "textures/eye_v2.png"
+        },
+        {
+          "name": "CharacterHair",
+          "role": "brows",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "texture": "textures/hair_v2.png"
+        }
+      ],
+      "regionMask": {
+        "attribute": "TEXCOORD_1",
+        "encoding": "u = (regionId + 0.5) / 32, v = 0.5",
+        "triangles": 5030,
+        "per_triangle_uniform": true,
+        "v_is_half": true,
+        "ids_in_range": true,
+        "triangles_per_region": {
+          "head": 1502,
+          "neck": 164,
+          "chest": 187,
+          "shoulder_l": 70,
+          "shoulder_r": 65,
+          "torso_lower": 268,
+          "pelvis": 74,
+          "upperarm_a_l": 69,
+          "upperarm_b_l": 48,
+          "lowerarm_a_l": 46,
+          "lowerarm_b_l": 56,
+          "hand_l": 409,
+          "thigh_a_l": 122,
+          "thigh_b_l": 107,
+          "shin_a_l": 87,
+          "shin_b_l": 64,
+          "foot_l": 317,
+          "upperarm_a_r": 77,
+          "upperarm_b_r": 48,
+          "lowerarm_a_r": 46,
+          "lowerarm_b_r": 56,
+          "hand_r": 409,
+          "thigh_a_r": 122,
+          "thigh_b_r": 107,
+          "shin_a_r": 87,
+          "shin_b_r": 64,
+          "foot_r": 317,
+          "waist": 42
+        }
+      },
+      "dependencies": [
+        "textures/hair_v2.png",
+        "textures/eye_v2.png"
+      ],
+      "validation": {
+        "state": "approved_gltf_reimport",
+        "blender": "approved",
+        "gltfReimport": "approved",
+        "playcanvas": "pending",
+        "errors": []
+      }
+    }
+  ],
+  "pieces": [
+    {
+      "id": "top_hoodie",
+      "name": "Moletom",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_hoodie",
+      "socket": null,
+      "hidesRegions": [
+        "chest",
+        "shoulder_l",
+        "shoulder_r",
+        "torso_lower",
+        "upperarm_a_l",
+        "upperarm_a_r",
+        "upperarm_b_l",
+        "upperarm_b_r",
+        "lowerarm_a_l",
+        "lowerarm_a_r",
+        "lowerarm_b_l",
+        "lowerarm_b_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "tops/top_hoodie_female.glb",
+          "sizeBytes": 157612,
+          "triangles": 1578,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.86,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.41,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 1.0,
+            "lowerarm_a_l": 1.0,
+            "lowerarm_b_l": 0.92,
+            "thigh_a_l": 0.1,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 1.0,
+            "lowerarm_a_r": 1.0,
+            "lowerarm_b_r": 0.92,
+            "thigh_a_r": 0.1,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "sentado (Sit): 69 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "tops/top_hoodie_male.glb",
+          "sizeBytes": 157748,
+          "triangles": 1558,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.05,
+            "neck": 0.92,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.42,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 1.0,
+            "lowerarm_a_l": 1.0,
+            "lowerarm_b_l": 0.92,
+            "thigh_a_l": 0.07,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 1.0,
+            "lowerarm_a_r": 1.0,
+            "lowerarm_b_r": 0.92,
+            "thigh_a_r": 0.07,
+            "waist": 0.99
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "sentado (Sit): 54 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_hoodie",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#545961",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "top_jacket",
+      "name": "Jaqueta",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_jacket",
+      "socket": null,
+      "hidesRegions": [
+        "chest",
+        "shoulder_l",
+        "shoulder_r",
+        "torso_lower",
+        "upperarm_a_l",
+        "upperarm_a_r",
+        "upperarm_b_l",
+        "upperarm_b_r",
+        "lowerarm_a_l",
+        "lowerarm_a_r",
+        "lowerarm_b_l",
+        "lowerarm_b_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "tops/top_jacket_female.glb",
+          "sizeBytes": 155692,
+          "triangles": 1582,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.76,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.49,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 1.0,
+            "lowerarm_a_l": 1.0,
+            "lowerarm_b_l": 0.94,
+            "thigh_a_l": 0.16,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 1.0,
+            "lowerarm_a_r": 1.0,
+            "lowerarm_b_r": 0.94,
+            "thigh_a_r": 0.16,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 11 pares de triângulos em pé (Walk)",
+              "sentado (Sit): 70 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "tops/top_jacket_male.glb",
+          "sizeBytes": 154424,
+          "triangles": 1556,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.03,
+            "neck": 0.85,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.52,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 1.0,
+            "lowerarm_a_l": 1.0,
+            "lowerarm_b_l": 0.93,
+            "thigh_a_l": 0.12,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 1.0,
+            "lowerarm_a_r": 1.0,
+            "lowerarm_b_r": 0.93,
+            "thigh_a_r": 0.12,
+            "waist": 0.99
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 14 pares de triângulos em pé (Wave)",
+              "sentado (Sit): 77 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_jacket",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#29332e",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "top_shirt",
+      "name": "Camisa casual",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_shirt",
+      "socket": null,
+      "hidesRegions": [
+        "chest",
+        "shoulder_l",
+        "shoulder_r",
+        "torso_lower",
+        "upperarm_a_l",
+        "upperarm_a_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "tops/top_shirt_female.glb",
+          "sizeBytes": 135180,
+          "triangles": 1316,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.6,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.41,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.39,
+            "thigh_a_l": 0.1,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.39,
+            "thigh_a_r": 0.1,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 34 pares de triângulos em pé (Walk, Wave)",
+              "sentado (Sit): 76 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "tops/top_shirt_male.glb",
+          "sizeBytes": 131884,
+          "triangles": 1286,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.02,
+            "neck": 0.42,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.42,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.39,
+            "thigh_a_l": 0.08,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.39,
+            "thigh_a_r": 0.08,
+            "waist": 0.99
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 16 pares de triângulos em pé (Walk)",
+              "sentado (Sit): 57 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_shirt",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#d9d1bd",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "top_tank",
+      "name": "Regata",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_tank",
+      "socket": null,
+      "hidesRegions": [
+        "torso_lower"
+      ],
+      "bodies": {
+        "female": {
+          "path": "tops/top_tank_female.glb",
+          "sizeBytes": 88000,
+          "triangles": 730,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "chest": 0.63,
+            "torso_lower": 1.0,
+            "waist": 0.72
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "sentado (Sit): 75 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "tops/top_tank_male.glb",
+          "sizeBytes": 82508,
+          "triangles": 694,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "chest": 0.28,
+            "torso_lower": 0.99,
+            "pelvis": 0.06,
+            "waist": 0.68
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "sentado (Sit): 54 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_tank",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#ebebe6",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "top_tee",
+      "name": "Camiseta básica",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_tee",
+      "socket": null,
+      "hidesRegions": [
+        "chest",
+        "shoulder_l",
+        "shoulder_r",
+        "torso_lower",
+        "upperarm_a_l",
+        "upperarm_a_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "tops/top_tee_female.glb",
+          "sizeBytes": 119408,
+          "triangles": 1184,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.24,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.28,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.28,
+            "waist": 0.82
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 40 pares de triângulos em pé (Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 72 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "tops/top_tee_male.glb",
+          "sizeBytes": 120256,
+          "triangles": 1205,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.27,
+            "chest": 0.99,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.06,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.28,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.28,
+            "waist": 0.87
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 29 pares de triângulos em pé (Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 48 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_tee",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#385d86",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "top_tee_print",
+      "name": "Camiseta estampada",
+      "category": "TOP",
+      "slot": "top",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "top_tee",
+      "socket": null,
+      "hidesRegions": [
+        "chest",
+        "shoulder_l",
+        "shoulder_r",
+        "torso_lower",
+        "upperarm_a_l",
+        "upperarm_a_r"
+      ],
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-top_tee",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "topColor",
+          "defaultColor": "#212124",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "textures/top_tee_print_{body}.png (override do baseColor)"
+        }
+      ],
+      "variantOf": "top_tee",
+      "bodies": {
+        "female": {
+          "path": "tops/top_tee_female.glb",
+          "sizeBytes": 119408,
+          "triangles": 1184,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.24,
+            "chest": 1.0,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.28,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.28,
+            "waist": 0.82
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/top_tee_print_female.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)",
+              "override textures/top_tee_print_female.png aplicado sobre CharacterClothing-top_tee do GLB reimportado; mesmo tamanho ([512, 512]); render masked"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 40 pares de triângulos em pé (Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 72 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          },
+          "textureOverride": {
+            "material": "CharacterClothing-top_tee",
+            "baseColorTexture": "textures/top_tee_print_female.png",
+            "size": [
+              512,
+              512
+            ]
+          }
+        },
+        "male": {
+          "path": "tops/top_tee_male.glb",
+          "sizeBytes": 120256,
+          "triangles": 1205,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "neck": 0.27,
+            "chest": 0.99,
+            "shoulder_l": 1.0,
+            "shoulder_r": 1.0,
+            "torso_lower": 1.0,
+            "pelvis": 0.06,
+            "upperarm_a_l": 1.0,
+            "upperarm_b_l": 0.28,
+            "upperarm_a_r": 1.0,
+            "upperarm_b_r": 0.28,
+            "waist": 0.87
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/top_tee_print_male.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)",
+              "override textures/top_tee_print_male.png aplicado sobre CharacterClothing-top_tee do GLB reimportado; mesmo tamanho ([512, 512]); render masked"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 29 pares de triângulos em pé (Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 48 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          },
+          "textureOverride": {
+            "material": "CharacterClothing-top_tee",
+            "baseColorTexture": "textures/top_tee_print_male.png",
+            "size": [
+              512,
+              512
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bottom_jeans",
+      "name": "Calça jeans",
+      "category": "BOTTOM",
+      "slot": "bottom",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "bottom_jeans",
+      "socket": null,
+      "hidesRegions": [
+        "pelvis",
+        "thigh_a_l",
+        "thigh_a_r",
+        "thigh_b_l",
+        "thigh_b_r",
+        "shin_a_l",
+        "shin_a_r",
+        "shin_b_l",
+        "shin_b_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "bottoms/bottom_jeans_female.glb",
+          "sizeBytes": 141536,
+          "triangles": 1152,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.16,
+            "pelvis": 0.94,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 1.0,
+            "shin_a_l": 1.0,
+            "shin_b_l": 1.0,
+            "foot_l": 0.1,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 1.0,
+            "shin_a_r": 1.0,
+            "shin_b_r": 1.0,
+            "foot_r": 0.1,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "bottoms/bottom_jeans_male.glb",
+          "sizeBytes": 141420,
+          "triangles": 1152,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.15,
+            "pelvis": 0.96,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 1.0,
+            "shin_a_l": 1.0,
+            "shin_b_l": 1.0,
+            "foot_l": 0.09,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 1.0,
+            "shin_a_r": 1.0,
+            "shin_b_r": 1.0,
+            "foot_r": 0.09,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-bottom_jeans",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Denim",
+          "configurable": true,
+          "colorField": "bottomColor",
+          "defaultColor": "#334566",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "bottom_pants",
+      "name": "Calça casual",
+      "category": "BOTTOM",
+      "slot": "bottom",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "bottom_jeans",
+      "socket": null,
+      "hidesRegions": [
+        "pelvis",
+        "thigh_a_l",
+        "thigh_a_r",
+        "thigh_b_l",
+        "thigh_b_r",
+        "shin_a_l",
+        "shin_a_r",
+        "shin_b_l",
+        "shin_b_r"
+      ],
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-bottom_jeans",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "bottomColor",
+          "defaultColor": "#786b54",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "textures/bottom_pants_{body}.png (override do baseColor)"
+        }
+      ],
+      "variantOf": "bottom_jeans",
+      "bodies": {
+        "female": {
+          "path": "bottoms/bottom_jeans_female.glb",
+          "sizeBytes": 141536,
+          "triangles": 1152,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.16,
+            "pelvis": 0.94,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 1.0,
+            "shin_a_l": 1.0,
+            "shin_b_l": 1.0,
+            "foot_l": 0.1,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 1.0,
+            "shin_a_r": 1.0,
+            "shin_b_r": 1.0,
+            "foot_r": 0.1,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/bottom_pants_female.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)",
+              "override textures/bottom_pants_female.png aplicado sobre CharacterClothing-bottom_jeans do GLB reimportado; mesmo tamanho ([512, 512]); render masked"
+            ],
+            "warnings": [],
+            "errors": []
+          },
+          "textureOverride": {
+            "material": "CharacterClothing-bottom_jeans",
+            "baseColorTexture": "textures/bottom_pants_female.png",
+            "size": [
+              512,
+              512
+            ]
+          }
+        },
+        "male": {
+          "path": "bottoms/bottom_jeans_male.glb",
+          "sizeBytes": 141420,
+          "triangles": 1152,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.15,
+            "pelvis": 0.96,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 1.0,
+            "shin_a_l": 1.0,
+            "shin_b_l": 1.0,
+            "foot_l": 0.09,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 1.0,
+            "shin_a_r": 1.0,
+            "shin_b_r": 1.0,
+            "foot_r": 0.09,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/bottom_pants_male.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)",
+              "override textures/bottom_pants_male.png aplicado sobre CharacterClothing-bottom_jeans do GLB reimportado; mesmo tamanho ([512, 512]); render masked"
+            ],
+            "warnings": [],
+            "errors": []
+          },
+          "textureOverride": {
+            "material": "CharacterClothing-bottom_jeans",
+            "baseColorTexture": "textures/bottom_pants_male.png",
+            "size": [
+              512,
+              512
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "bottom_shorts",
+      "name": "Shorts",
+      "category": "BOTTOM",
+      "slot": "bottom",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "bottom_shorts",
+      "socket": null,
+      "hidesRegions": [
+        "pelvis",
+        "thigh_a_l",
+        "thigh_a_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "bottoms/bottom_shorts_female.glb",
+          "sizeBytes": 97464,
+          "triangles": 768,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.15,
+            "pelvis": 0.91,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 0.17,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 0.17,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "bottoms/bottom_shorts_male.glb",
+          "sizeBytes": 97292,
+          "triangles": 768,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "torso_lower": 0.15,
+            "pelvis": 0.94,
+            "thigh_a_l": 1.0,
+            "thigh_b_l": 0.15,
+            "thigh_a_r": 1.0,
+            "thigh_b_r": 0.15,
+            "waist": 1.0
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-bottom_shorts",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "bottomColor",
+          "defaultColor": "#8c8061",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "bottom_skirt",
+      "name": "Saia",
+      "category": "BOTTOM",
+      "slot": "bottom",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "bottom_skirt",
+      "socket": null,
+      "hidesRegions": [
+        "pelvis",
+        "thigh_a_l",
+        "thigh_a_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "bottoms/bottom_skirt_female.glb",
+          "sizeBytes": 181152,
+          "triangles": 960,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "pelvis": 0.77,
+            "thigh_a_l": 0.82,
+            "thigh_b_l": 0.53,
+            "thigh_a_r": 0.82,
+            "thigh_b_r": 0.53,
+            "waist": 0.61
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave (com TOP: 'waist' oculto)"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "exige uma peça TOP: sozinha a faixa 'waist' fica visível e atravessa o cós (128 pares em pé)",
+              "interseção com pele visível: até 35 pares de triângulos em pé (Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 105 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "requiresCategory": [
+        "TOP"
+      ],
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-bottom_skirt",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "bottomColor",
+          "defaultColor": "#334566",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "footwear_boots",
+      "name": "Bota",
+      "category": "FOOTWEAR",
+      "slot": "footwear",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "footwear_boots",
+      "socket": null,
+      "hidesRegions": [
+        "foot_l",
+        "foot_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "footwear/footwear_boots_female.glb",
+          "sizeBytes": 185852,
+          "triangles": 1072,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "shin_b_l": 0.07,
+            "foot_l": 0.97,
+            "shin_b_r": 0.07,
+            "foot_r": 0.97
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 23 pares de triângulos em pé (rest, Walk, Dance, Drink, Wave)",
+              "sentado (Sit): 22 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "footwear/footwear_boots_male.glb",
+          "sizeBytes": 186004,
+          "triangles": 1056,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.95,
+            "foot_r": 0.94
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-footwear_boots",
+          "alphaMode": "OPAQUE",
+          "doubleSided": false,
+          "role": "clothing",
+          "category": "Leather",
+          "configurable": true,
+          "colorField": "footwearColor",
+          "defaultColor": "#5c3d24",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "footwear_flipflops",
+      "name": "Chinelo",
+      "category": "FOOTWEAR",
+      "slot": "footwear",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "footwear_flipflops",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "footwear/footwear_flipflops_female.glb",
+          "sizeBytes": 62624,
+          "triangles": 232,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.34,
+            "foot_r": 0.34
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "the planted sole of the foot sits into the flip-flop sole (hidden)",
+              "sentado (Sit): 440 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "footwear/footwear_flipflops_male.glb",
+          "sizeBytes": 62768,
+          "triangles": 232,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.35,
+            "foot_r": 0.35
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "the planted sole of the foot sits into the flip-flop sole (hidden)",
+              "sentado (Sit): 420 pares contra a pele (limite de skinning linear)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-footwear_flipflops",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Rubber",
+          "configurable": true,
+          "colorField": "footwearColor",
+          "defaultColor": "#337359",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "footwear_shoes",
+      "name": "Sapato casual",
+      "category": "FOOTWEAR",
+      "slot": "footwear",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "footwear_shoes",
+      "socket": null,
+      "hidesRegions": [
+        "foot_l",
+        "foot_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "footwear/footwear_shoes_female.glb",
+          "sizeBytes": 186652,
+          "triangles": 1046,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.96,
+            "foot_r": 0.96
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "footwear/footwear_shoes_male.glb",
+          "sizeBytes": 186828,
+          "triangles": 1034,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.93,
+            "foot_r": 0.95
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "notes": [
+        "inclui meia escura (faces da região foot acima da abertura do calçado, cor fixa da faixa da sola, A=0)"
+      ],
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-footwear_shoes",
+          "alphaMode": "OPAQUE",
+          "doubleSided": false,
+          "role": "clothing",
+          "category": "Leather",
+          "configurable": true,
+          "colorField": "footwearColor",
+          "defaultColor": "#52331f",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "footwear_sneakers",
+      "name": "Tênis",
+      "category": "FOOTWEAR",
+      "slot": "footwear",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "footwear_sneakers",
+      "socket": null,
+      "hidesRegions": [
+        "foot_l",
+        "foot_r"
+      ],
+      "bodies": {
+        "female": {
+          "path": "footwear/footwear_sneakers_female.glb",
+          "sizeBytes": 144672,
+          "triangles": 1038,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.96,
+            "foot_r": 0.96
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "footwear/footwear_sneakers_male.glb",
+          "sizeBytes": 145536,
+          "triangles": 1054,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "foot_l": 0.97,
+            "foot_r": 0.97
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "notes": [
+        "inclui meia branca (faces da região foot acima da abertura do calçado, cor fixa da faixa da sola, A=0)"
+      ],
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-footwear_sneakers",
+          "alphaMode": "OPAQUE",
+          "doubleSided": false,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "footwearColor",
+          "defaultColor": "#873d38",
+          "rule": "albedo = tex.rgb * mix(vec3(1.0), color, tex.a)",
+          "shader": "chunk diffusePS 'clothing' (INTEGRATION_CODEX §8); A=1 tecido tingível, A=0 partes de cor fixa",
+          "texture": "embedded"
+        }
+      ]
+    },
+    {
+      "id": "hair_bun",
+      "name": "Coque",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_bun",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_bun_female.glb",
+          "sizeBytes": 36948,
+          "triangles": 510,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.59
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_bun_male.glb",
+          "sizeBytes": 37220,
+          "triangles": 514,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_buzzed",
+      "name": "Cabelo raspado",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_buzzed",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_buzzed_female.glb",
+          "sizeBytes": 27576,
+          "triangles": 222,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_buzzed_male.glb",
+          "sizeBytes": 27860,
+          "triangles": 228,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.56
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_long",
+      "name": "Cabelo longo",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_long",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_long_female.glb",
+          "sizeBytes": 41308,
+          "triangles": 604,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.72,
+            "neck": 0.38,
+            "chest": 0.15
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_long_male.glb",
+          "sizeBytes": 41352,
+          "triangles": 604,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.7,
+            "neck": 0.36,
+            "chest": 0.13
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 12 pares de triângulos em pé (Wave)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_medium",
+      "name": "Cabelo médio",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_medium",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_medium_female.glb",
+          "sizeBytes": 39136,
+          "triangles": 570,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.71,
+            "neck": 0.22
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_medium_male.glb",
+          "sizeBytes": 39280,
+          "triangles": 570,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.69,
+            "neck": 0.19
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_parted",
+      "name": "Cabelo repartido",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_parted",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_parted_female.glb",
+          "sizeBytes": 31420,
+          "triangles": 342,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_parted_male.glb",
+          "sizeBytes": 32180,
+          "triangles": 358,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_ponytail",
+      "name": "Cabelo preso (rabo de cavalo)",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_ponytail",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_ponytail_female.glb",
+          "sizeBytes": 36776,
+          "triangles": 462,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.59,
+            "neck": 0.02,
+            "chest": 0.02
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 25 pares de triângulos em pé (Walk, Dance, Wave)"
+            ],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_ponytail_male.glb",
+          "sizeBytes": 37048,
+          "triangles": 466,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57,
+            "neck": 0.06
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [
+              "interseção com pele visível: até 25 pares de triângulos em pé (Walk, Dance, Wave)"
+            ],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_short",
+      "name": "Cabelo curto",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_short",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_short_female.glb",
+          "sizeBytes": 31248,
+          "triangles": 336,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.57
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_short_male.glb",
+          "sizeBytes": 31584,
+          "triangles": 342,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.56
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "hair_wavy",
+      "name": "Cabelo ondulado",
+      "category": "HAIR",
+      "slot": "hair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "hair_wavy",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "hair/hair_wavy_female.glb",
+          "sizeBytes": 39012,
+          "triangles": 567,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.71,
+            "neck": 0.19
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "hair/hair_wavy_male.glb",
+          "sizeBytes": 39276,
+          "triangles": 570,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.68,
+            "neck": 0.24
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "facial_beard_full",
+      "name": "Barba cheia",
+      "category": "FACIAL_HAIR",
+      "slot": "facialHair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "facial_beard_full",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "facial_hair/facial_beard_full_female.glb",
+          "sizeBytes": 45260,
+          "triangles": 308,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {
+            "head": 0.07,
+            "neck": 0.08
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "facial_hair/facial_beard_full_male.glb",
+          "sizeBytes": 45724,
+          "triangles": 314,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {
+            "head": 0.1,
+            "neck": 0.1
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "facial_beard_short",
+      "name": "Barba curta",
+      "category": "FACIAL_HAIR",
+      "slot": "facialHair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "facial_beard_short",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "facial_hair/facial_beard_short_female.glb",
+          "sizeBytes": 45280,
+          "triangles": 308,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {
+            "head": 0.07,
+            "neck": 0.07
+          },
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "facial_hair/facial_beard_short_male.glb",
+          "sizeBytes": 45652,
+          "triangles": 314,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {
+            "head": 0.09,
+            "neck": 0.1
+          },
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "facial_goatee",
+      "name": "Cavanhaque",
+      "category": "FACIAL_HAIR",
+      "slot": "facialHair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "facial_goatee",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "facial_hair/facial_goatee_female.glb",
+          "sizeBytes": 36720,
+          "triangles": 182,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "facial_hair/facial_goatee_male.glb",
+          "sizeBytes": 35428,
+          "triangles": 164,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "facial_mustache",
+      "name": "Bigode",
+      "category": "FACIAL_HAIR",
+      "slot": "facialHair",
+      "attachment": "skinned",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "facial_mustache",
+      "socket": null,
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "facial_hair/facial_mustache_female.glb",
+          "sizeBytes": 31200,
+          "triangles": 106,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/female.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "facial_hair/facial_mustache_male.glb",
+          "sizeBytes": 29756,
+          "triangles": 90,
+          "primitives": 1,
+          "morphTargets": [
+            "face_jaw_wide",
+            "face_jaw_narrow",
+            "face_nose_big",
+            "face_nose_small",
+            "face_cheeks_full",
+            "face_cheekbones",
+            "face_brow_heavy",
+            "face_lips_full"
+          ],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/male.glb#BAR_HUMANOID_V2",
+            "textures/hair_v2.png"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "montada no esqueleto único do corpo; juntas de repouso idênticas (dif. 0 m)"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterHair",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "hair",
+          "category": "Hair",
+          "configurable": true,
+          "colorField": "hairColor",
+          "rule": "albedo = tex.rgb * hairColor",
+          "shader": "diffuse padrão do PlayCanvas (material.diffuse multiplica o mapa)",
+          "defaultColor": "#493126",
+          "texture": "textures/hair_v2.png"
+        }
+      ]
+    },
+    {
+      "id": "accessory_bracelet",
+      "name": "Pulseira",
+      "category": "ACCESSORY",
+      "slot": "accessory",
+      "attachment": "socket",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "accessory_bracelet",
+      "socket": "socket_wrist_l",
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "accessories/accessory_bracelet_female.glb",
+          "sizeBytes": 14868,
+          "triangles": 192,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/female.glb#socket_wrist_l"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_wrist_l; erro máx. do centro vs master 0.00 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "accessories/accessory_bracelet_male.glb",
+          "sizeBytes": 14868,
+          "triangles": 192,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {},
+          "dependencies": [
+            "bodies/male.glb#socket_wrist_l"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_wrist_l; erro máx. do centro vs master 0.67 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-accessory_bracelet",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Metal",
+          "configurable": true,
+          "colorField": "accessoryColor",
+          "defaultColor": "#bf9e4c",
+          "rule": "albedo = color",
+          "shader": "diffuse padrão (sem textura)",
+          "metallic": 0.8999999761581421
+        }
+      ]
+    },
+    {
+      "id": "accessory_cap",
+      "name": "Boné",
+      "category": "ACCESSORY",
+      "slot": "accessory",
+      "attachment": "socket",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "accessory_cap",
+      "socket": "socket_head_top",
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "accessories/accessory_cap_female.glb",
+          "sizeBytes": 22436,
+          "triangles": 606,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.49
+          },
+          "dependencies": [
+            "bodies/female.glb#socket_head_top"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_head_top; erro máx. do centro vs master 0.17 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "accessories/accessory_cap_male.glb",
+          "sizeBytes": 21276,
+          "triangles": 567,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.49
+          },
+          "dependencies": [
+            "bodies/male.glb#socket_head_top"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_head_top; erro máx. do centro vs master 0.87 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-accessory_cap",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "accessoryColor",
+          "defaultColor": "#8c1f1a",
+          "rule": "albedo = color",
+          "shader": "diffuse padrão (sem textura)",
+          "metallic": 0
+        }
+      ]
+    },
+    {
+      "id": "accessory_glasses",
+      "name": "Óculos",
+      "category": "ACCESSORY",
+      "slot": "accessory",
+      "attachment": "socket",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "accessory_glasses",
+      "socket": "socket_glasses",
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "accessories/accessory_glasses_female.glb",
+          "sizeBytes": 10724,
+          "triangles": 308,
+          "primitives": 2,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.05
+          },
+          "dependencies": [
+            "bodies/female.glb#socket_glasses"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_glasses; erro máx. do centro vs master 0.15 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "accessories/accessory_glasses_male.glb",
+          "sizeBytes": 10724,
+          "triangles": 308,
+          "primitives": 2,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.04
+          },
+          "dependencies": [
+            "bodies/male.glb#socket_glasses"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_glasses; erro máx. do centro vs master 0.84 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-accessory_glasses",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Metal",
+          "configurable": true,
+          "colorField": "accessoryColor",
+          "defaultColor": "#1a1a1c",
+          "rule": "albedo = color",
+          "shader": "diffuse padrão (sem textura)",
+          "metallic": 0.20000000298023224
+        },
+        {
+          "name": "CharacterLens-accessory_glasses",
+          "alphaMode": "BLEND",
+          "doubleSided": true,
+          "role": "lens",
+          "category": "Glass",
+          "configurable": false,
+          "note": "cor e transparência fixas (BLEND); não aplicar cor do jogador (mesma regra do legado)"
+        }
+      ]
+    },
+    {
+      "id": "accessory_hat",
+      "name": "Chapéu",
+      "category": "ACCESSORY",
+      "slot": "accessory",
+      "attachment": "socket",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "accessory_hat",
+      "socket": "socket_head_top",
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "accessories/accessory_hat_female.glb",
+          "sizeBytes": 20928,
+          "triangles": 312,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.34
+          },
+          "dependencies": [
+            "bodies/female.glb#socket_head_top"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_head_top; erro máx. do centro vs master 0.19 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "accessories/accessory_hat_male.glb",
+          "sizeBytes": 20928,
+          "triangles": 312,
+          "primitives": 1,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.34
+          },
+          "dependencies": [
+            "bodies/male.glb#socket_head_top"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_head_top; erro máx. do centro vs master 0.94 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-accessory_hat",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Fabric",
+          "configurable": true,
+          "colorField": "accessoryColor",
+          "defaultColor": "#9e855c",
+          "rule": "albedo = color",
+          "shader": "diffuse padrão (sem textura)",
+          "metallic": 0
+        }
+      ]
+    },
+    {
+      "id": "accessory_sunglasses",
+      "name": "Óculos escuros",
+      "category": "ACCESSORY",
+      "slot": "accessory",
+      "attachment": "socket",
+      "rigId": "BAR_HUMANOID_V2",
+      "boneContractVersion": "2.0.0",
+      "meshNode": "accessory_sunglasses",
+      "socket": "socket_glasses",
+      "hidesRegions": [],
+      "bodies": {
+        "female": {
+          "path": "accessories/accessory_sunglasses_female.glb",
+          "sizeBytes": 10744,
+          "triangles": 308,
+          "primitives": 2,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.05
+          },
+          "dependencies": [
+            "bodies/female.glb#socket_glasses"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_glasses; erro máx. do centro vs master 0.15 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        },
+        "male": {
+          "path": "accessories/accessory_sunglasses_male.glb",
+          "sizeBytes": 10740,
+          "triangles": 308,
+          "primitives": 2,
+          "morphTargets": [],
+          "coversRegions": {
+            "head": 0.05
+          },
+          "dependencies": [
+            "bodies/male.glb#socket_glasses"
+          ],
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "gltfReimport": "approved",
+            "playcanvas": "pending",
+            "testsBlender": [
+              "pesos normalizados <= 4 influências (export)",
+              "interseção contra pele visível em rest/Walk/Sit/Dance/Drink/Wave"
+            ],
+            "testsGltf": [
+              "leitura do GLB (acessores, pesos, morphs, materiais, URIs)",
+              "reimportação em cena limpa (--factory-startup)",
+              "fixada em socket_glasses; erro máx. do centro vs master 0.84 mm em rest/Walk/Dance"
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        }
+      },
+      "configurableMaterials": [
+        {
+          "name": "CharacterClothing-accessory_sunglasses",
+          "alphaMode": "OPAQUE",
+          "doubleSided": true,
+          "role": "clothing",
+          "category": "Metal",
+          "configurable": true,
+          "colorField": "accessoryColor",
+          "defaultColor": "#141417",
+          "rule": "albedo = color",
+          "shader": "diffuse padrão (sem textura)",
+          "metallic": 0.20000000298023224
+        },
+        {
+          "name": "CharacterLens-accessory_sunglasses",
+          "alphaMode": "BLEND",
+          "doubleSided": true,
+          "role": "lens",
+          "category": "Glass",
+          "configurable": false,
+          "note": "cor e transparência fixas (BLEND); não aplicar cor do jogador (mesma regra do legado)"
+        }
+      ]
+    }
+  ]
+}

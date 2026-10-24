@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, DoorState, Player, SeatState, TableState } from './state.js';
@@ -41,9 +41,13 @@ interface Presence {
   /** Voice packets relayed in the current one-second window. */
   voicePackets: number;
   voiceWindowAt: number;
+  /** Private persistent item state. It is sent only to this player, never through the room schema. */
+  inventory:Map<ItemId,number>;
+  inventoryBusy?:boolean;
+  inventoryItem?:ItemId;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
-const NEEDS_CONSCIOUS = new Set(['player.interact', 'player.emote', 'player.skin', 'player.appearance', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command']);
+const NEEDS_CONSCIOUS = new Set(['player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
 
@@ -124,7 +128,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    this.people.set(auth.userId, { joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0 });
+    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity]))};
+    this.people.set(auth.userId,presence);
     this.state.occupancy = this.people.size;
     this.refreshViews();
     this.syncTable();
@@ -154,7 +159,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const access = await validateAccess(presence.ticket.sessionId, presence.ticket.userId).catch(() => undefined);
     if (access && !access.valid) { if(access.banned)this.removeByAdmin(presence.ticket.userId,'ban','Sua conta está banida do bar.');else this.expel(presence.ticket.userId, 'Sua sessão terminou. Entre novamente.'); return; }
     if (!access) this.log('auth_refresh_unavailable', { playerId: presence.ticket.userId });
-    if (access) presence.blocked = new Set(access.blocked);
+    if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);}
     presence.rejectReconnect = undefined;
     presence.queue.length = 0;
     const player = this.state.players.get(presence.ticket.userId)!;
@@ -190,6 +195,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.currentTableId = '';
     // The microphone belongs to a session; a new one switches it on again itself.
     player.voice = false;
+    const presence=this.people.get(player.id);if(presence)presence.inventoryItem=undefined;
     if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
   }
 
@@ -223,6 +229,17 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.queue.push(input);
     });
     this.handle('player.interact', z.object({ objectId: z.string().max(64), item: z.enum(DRINK_ITEMS).optional() }).strict(), 5, (client, command) => this.interact(client, command.objectId, command.item));
+    this.handle('inventory.sync',z.object({}).strict(),2,async client=>{
+      const presence=this.forClient(client)!;const access=await validateAccess(presence.ticket.sessionId,presence.ticket.userId);
+      if(this.forClient(client)!==presence)return;if(!access.valid){this.expel(presence.ticket.userId,'Sua sessão terminou.');return;}
+      this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);
+    });
+    this.handle('inventory.use',z.object({itemId:z.enum(ITEM_IDS)}).strict(),3,(client,{itemId})=>this.useInventory(client,itemId));
+    this.handle('inventory.discard',z.object({itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10)}).strict(),3,async(client,{itemId,quantity})=>{
+      const player=this.player(client);if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual antes de mexer na mochila.');
+      const presence=this.forClient(client)!;const view=await this.removeInventory(presence,itemId,quantity,'discard');
+      if(this.forClient(client)===presence){this.sendInventory(presence,view);client.send('inventory.result',{action:'discard',itemId,quantity});}
+    });
     // The jukebox and the TVs are separate sources: own state map, own messages, same validation.
     for(const kind of ['jukebox','tv'] as const){
       const states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions;
@@ -398,15 +415,46 @@ export class BarRoom extends Room<{ state: BarState }> {
     else { this.requireMedia('jukebox',client,object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('jukebox.open',{id:object.id}); }
   }
 
+  private setInventory(presence:Presence,stacks:readonly InventoryStack[]):void {
+    presence.inventory=new Map(stacks.filter(stack=>stack.quantity>0&&itemById(stack.itemId)).map(stack=>[stack.itemId,stack.quantity]));
+  }
+  private sendInventory(presence:Presence,view?:Partial<InventoryView>):void {
+    const stacks=[...presence.inventory].map(([itemId,quantity])=>({itemId,quantity}));
+    presence.client.send('inventory.state',{capacity:INVENTORY_CAPACITY,usedSlots:stacks.length,...view,stacks});
+  }
+  private async removeInventory(presence:Presence,itemId:ItemId,quantity:number,reason:'use'|'discard'|'faint'):Promise<InventoryView>{
+    if(presence.inventoryBusy)throw new Error('Aguarde a operação anterior da mochila.');
+    if((presence.inventory.get(itemId)??0)<quantity)throw new Error('Você não tem este item na mochila.');
+    presence.inventoryBusy=true;
+    try{
+      const view=await internal<InventoryView>('inventory',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,itemId,quantity,reason,requestId:randomUUID()});
+      this.setInventory(presence,view.stacks);return view;
+    }finally{presence.inventoryBusy=false;}
+  }
+  private async useInventory(client:Client,itemId:ItemId):Promise<void>{
+    const item=itemById(itemId);if(!item)throw new Error('Item inválido.');
+    const player=this.player(client),presence=this.forClient(client)!;
+    if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a ação atual antes de usar um item.');
+    const view=await this.removeInventory(presence,itemId,1,'use');
+    if(this.forClient(client)!==presence||!player.connected)return;
+    presence.inventoryItem=itemId;player.interactionState='inventory';player.animationStartedAt=Date.now();
+    if(item.drink){player.animationState=item.prop?'drink':'use';player.drinkItem=item.prop??'';}
+    else {player.animationState='use';player.drinkItem='';}
+    presence.interactionEndsAt=player.animationStartedAt+(item.prop?DRINK_DURATION_MS:USE_DURATION_MS);
+    this.sendInventory(presence,view);
+  }
+
   /** A drink or a toilet visit ran its full time. */
   private finishInteraction(player: Player, presence: Presence, now: number): void {
-    if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now);
+    if(presence.inventoryItem){const used=presence.inventoryItem;this.needs.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;}
+    else if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now);
     if (player.interactionState.startsWith('toilet-')) this.needs.relieve(player, now);
     player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined;
   }
   /** Ending a drink or a toilet visit early counts the part already done. */
   private consumePart(player: Player, presence: Presence, now: number): void {
-    if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now, (now - player.animationStartedAt) / DRINK_DURATION_MS);
+    if(presence.inventoryItem){this.needs.consume(player,presence.inventoryItem,now,(now-player.animationStartedAt)/Math.max(1,(presence.interactionEndsAt??now)-player.animationStartedAt));presence.inventoryItem=undefined;}
+    else if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now, (now - player.animationStartedAt) / DRINK_DURATION_MS);
     if (player.interactionState.startsWith('toilet-') && presence.interactionEndsAt)
       this.needs.relieve(player, now, 1 - (presence.interactionEndsAt - now) / (NEEDS.bladder.toiletSeconds * 1000));
   }
@@ -415,6 +463,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
     if (player.interactionState && player.interactionState !== 'fainted' && player.interactionState !== 'stumbling') Object.assign(player, standingPosition(player, player.rotation));
     this.service.cancel(player.id);
+    presence.inventoryItem=undefined;
     player.drinkItem = ''; presence.interactionEndsAt = undefined; presence.queue.length = 0;
     player.lastProcessedInput = presence.lastReceived;
   }
@@ -429,9 +478,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (event.cause === 'alcohol') { presence.recoveryMoveAt = now + NEEDS.faint.moveAfterSeconds * 1000; this.systemMessage(`${player.displayName} bebeu demais e apagou.`, player); }
       else {
         this.systemMessage(`${player.displayName} desmaiou.`, player);
-        // The future inventory decides what can be lost; without one, nothing happens.
-        const lost = this.needs.loseItemOnFaint(player.id);
-        if (lost) presence.client.send('needs.itemLost', { item: lost });
+        // Keep the injectable inventory port useful for isolated modes/tests; the normal room uses the
+        // persistent API-backed inventory below.
+        const localLost=this.needs.loseItemOnFaint(player.id);
+        if(localLost)presence.client.send('needs.itemLost',{item:localLost});
+        else void this.loseInventoryOnFaint(presence);
       }
     }
     if ((event.type === 'woke' && player.interactionState === 'fainted') || (event.type === 'steady' && player.interactionState === 'stumbling')) {
@@ -439,6 +490,15 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(event.type==='woke')this.playTemporary(player,presence,'recover',RECOVER_DURATION_MS);
       else player.animationState = 'idle';
     }
+  }
+
+  private async loseInventoryOnFaint(presence:Presence):Promise<void>{
+    if(Math.random()>=NEEDS.faint.itemLossChance)return;
+    const candidates=[...presence.inventory].filter(([id,quantity])=>quantity>0&&itemById(id)?.loseOnFaint);
+    if(!candidates.length)return;
+    const [itemId]=candidates[Math.floor(Math.random()*candidates.length)]!;
+    try{const view=await this.removeInventory(presence,itemId,1,'faint');if(this.people.get(presence.ticket.userId)!==presence)return;this.sendInventory(presence,view);presence.client.send('needs.itemLost',{item:itemId});}
+    catch(error){this.log('inventory_loss_failed',{playerId:presence.ticket.userId,itemId,error:error instanceof Error?error.message:String(error)});}
   }
 
   /** Plays a synced gesture without claiming a chair/object. Movement may cancel it and is never reset later. */

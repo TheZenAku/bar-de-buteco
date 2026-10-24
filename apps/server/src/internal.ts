@@ -1,7 +1,7 @@
 import { authSecret } from '@bar/shared/tickets';
-import type {CharacterConfig} from '@bar/shared';
+import type {CharacterConfig,InventoryStack} from '@bar/shared';
 
-export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';character?:CharacterConfig|null;equippedSkin?:string;ownedSkins?:string[] }
+export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';character?:CharacterConfig|null;equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[] }
 export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event'; playerId?: string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string }
 
 export async function internal<T>(path: string, body?: unknown): Promise<T> {

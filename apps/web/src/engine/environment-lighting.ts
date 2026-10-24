@@ -2,7 +2,7 @@ import * as pc from 'playcanvas';
 import {WORLD} from '@bar/shared';
 import {daylightAt,EDGE_FOG_WIDTH,type Rgb} from './day-night';
 
-interface Lamp {entity:pc.Entity;base:number;outside:boolean;street:boolean;}
+interface Lamp {entity:pc.Entity;base:number;outside:boolean;street:boolean;enabled:boolean;}
 interface Glow {material:pc.StandardMaterial;base:number;outside:boolean;}
 const streetFixtures=[
   [-1.9,1.9,225],[12,2.62,-90],[33.9,1.9,-45],[34.62,-13,0],[33.9,-27.9,45],
@@ -43,8 +43,6 @@ export class EnvironmentLighting {
   private rotation=new pc.Quat();
   private direction=new pc.Vec3();
   private shadowLights:pc.LightComponent[]=[];
-  private shadowRefresh=0;
-  private shadowCursor=0;
   constructor(private app:pc.Application,private camera:pc.Entity){
     app.scene.fog.type=pc.FOG_LINEAR;
     this.moon=new pc.Entity('Moonlight');
@@ -84,7 +82,7 @@ export class EnvironmentLighting {
         light.castShadows=true;light.shadowResolution=512;light.shadowType=pc.SHADOW_PCF3_32F;light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;
         light.shadowBias=.3;light.normalOffsetBias=.04;
         this.shadowLights.push(light);
-        this.lamps.push({entity:light.entity,base:2.3*Math.pow(relative,.6),outside,street:false});
+        this.lamps.push({entity:light.entity,base:2.3*Math.pow(relative,.6),outside,street:false,enabled:true});
       }
     }
     for(const [x,z,degrees] of streetFixtures){
@@ -93,7 +91,7 @@ export class EnvironmentLighting {
       entity.addComponent('light',{type:'spot',color:new pc.Color(1,.85,.65),intensity:0,range:14,innerConeAngle:32,outerConeAngle:58,
         falloffMode:pc.LIGHTFALLOFF_LINEAR,castShadows:true,shadowResolution:512,shadowType:pc.SHADOW_PCF3_32F,shadowBias:.15,normalOffsetBias:.04,shadowUpdateMode:pc.SHADOWUPDATE_THISFRAME});
       this.shadowLights.push(entity.light!);
-      this.app.root.addChild(entity);this.lamps.push({entity,base:3.1,outside:true,street:true});
+      this.app.root.addChild(entity);this.lamps.push({entity,base:3.1,outside:true,street:true,enabled:false});
     }
     const nativeFog=pc.ShaderChunks.get(this.app.graphicsDevice,pc.SHADERLANGUAGE_GLSL).get('fogPS') as string;
     const edgeFog=`
@@ -144,23 +142,19 @@ float botecoEdgeVisibility(){
       sunVisible:state.sunIntensity/1.15,moonVisible:state.moonIntensity/.18,night:nowNight,barSkyExposure:state.exposure}))this.skyMaterial.setParameter(name,value);
     for(const lamp of this.lamps){
       const intensity=lamp.base*(lamp.outside?nowNight:.68+nowNight*.32)*this.electrical;
-      lamp.entity.light!.intensity=intensity;lamp.entity.light!.enabled=intensity>.015;
+      const enabled=intensity>.015,light=lamp.entity.light!;
+      // Refresh the static map once when a lamp turns on. Periodically redrawing a different lamp
+      // produced visibly frozen, stepping silhouettes.
+      if(enabled&&!lamp.enabled)light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;
+      light.intensity=intensity;light.enabled=enabled;lamp.enabled=enabled;
     }
     for(const glow of this.glows){
       glow.material.emissiveIntensity=glow.base*(glow.outside?nowNight:.65+nowNight*.35)*this.electrical;
       glow.material.update();
     }
-    // The building is static: keep its cached shadow maps and refresh a single relevant local light at
-    // a short cadence. A realtime light redraws every map mesh as a shadow caster every frame; after the
-    // expanded neighbourhood export, doing that for the two closest lamps could stall software and iGPUs.
-    // Ten shadow samples per second still track moving characters cleanly and suits the PS2-era direction.
-    const eye=this.camera.getPosition();
-    const visible=this.shadowLights.filter(light=>light.enabled&&light.intensity>.015)
-      .map(light=>({light,distance:light.entity.getPosition().distance(eye)})).sort((a,b)=>a.distance-b.distance);
+    // Directional sun/moon shadows remain realtime and therefore move smoothly. Local lamp shadows are
+    // cached because their lights and architectural casters do not move; never cycle them between frames.
     for(const light of this.shadowLights)if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;
-    this.shadowRefresh+=dt;
-    const relevant=visible.filter(item=>item.distance<24).slice(0,6);
-    if(this.shadowRefresh>=.1&&relevant.length){this.shadowRefresh%=.1;relevant[this.shadowCursor++%relevant.length].light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;}
   }
   addPartyShadows(lights:pc.Entity[]):void {for(const entity of lights)if(entity.light){entity.light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;this.shadowLights.push(entity.light);}}
   get partyStrength():number{return this.party;}

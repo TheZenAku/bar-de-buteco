@@ -88,6 +88,10 @@ for(const [type,count] of Object.entries(expectedEffects)){
   const actual=effects.filter(effect=>effect.type===type).length;
   if(actual!==count)throw new Error(`Expected ${count} ${type} FX anchor(s), found ${actual}`);
 }
+// The cart root used to survive the Blender export only as an empty FX parent, making the prop invisible.
+// Treat its renderable mesh as part of the map contract so a future export cannot silently regress it.
+const cart=visual.json.nodes.find(node=>node.name==='Carrinho_Espeto');
+if(cart?.mesh===undefined||!visual.json.meshes[cart.mesh]?.primitives?.length)throw new Error('Carrinho_Espeto has no renderable mesh');
 // Red tables keep compact collision volumes, while chairs are deliberately pass-through GPU instances so
 // people can circulate between them. Derive seat positions from EXT_mesh_gpu_instancing and validate that
 // every unused chair belongs to one of the three authored stacks in the upper-floor storage room.

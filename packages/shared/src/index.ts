@@ -5,6 +5,7 @@ export * from './jukebox.js';
 export * from './voice.js';
 export * from './doors.js';
 export * from './needs.js';
+export * from './inventory.js';
 import type {JukeboxState} from './jukebox.js';
 import type {CharacterConfig} from './character.js';
 

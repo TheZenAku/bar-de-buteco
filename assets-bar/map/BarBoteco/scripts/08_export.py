@@ -156,6 +156,10 @@ for g, objs in sorted(grupos.items()):
         stats[g] = (len(j.data.loop_triangles), len({p.material_index for p in j.data.polygons}))
 for cn in LINKAR:
     for o in bpy.data.collections[cn].objects:
+        # Interactive props must remain renderable even when their parent also owns empty FX anchors.
+        # A hidden cart previously exported as only an empty node, leaving fire floating in the street.
+        if o.type == 'MESH' and o.data and o.data.polygons:
+            o.hide_render = False
         exp.objects.link(o)
 set_active(exp)
 vl.update()
@@ -165,6 +169,10 @@ for k in extras_addon:
 out = os.path.join(B.EXPORT_DIR, "bar_boteco.glb")
 try:
     gltf(out)
+    exported = resumo_glb(out)
+    cart = next((n for n in exported.get('nodes', []) if n.get('name') == 'Carrinho_Espeto'), None)
+    if not cart or 'mesh' not in cart:
+        raise RuntimeError('Carrinho_Espeto foi exportado sem malha renderizavel')
     gltf(os.path.join(B.EXPORT_DIR, "bar_boteco_draco.glb"), export_draco_mesh_compression_enable=True,
          export_draco_mesh_compression_level=6, export_image_format='WEBP', export_image_quality=82)
 finally:

@@ -289,9 +289,10 @@ export class BarScene {
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;lights:number;effects?:MapEffectsStatus} {
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus} {
+    const cart=this.mapEntity?.findByName('Carrinho_Espeto') as pc.Entity|undefined;
     return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
-      renders:this.mapEntity?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry()};
+      renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry()};
   }
   getEnvironmentStatus(){return this.environment.telemetry();}
 

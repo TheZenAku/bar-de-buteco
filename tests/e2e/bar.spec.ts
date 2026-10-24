@@ -91,7 +91,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await page.getByLabel('Senha',{exact:true}).fill(process.env.DEMO_PASSWORD||'ButecoDemo2026!');
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await gameReady(page);
-  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,lights:14,
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,cartRenders:1,lights:14,
     effects:{fire:true,smoke:true,embers:true,taps:2,particles:19}});
   await page.screenshot({path:'test-results/map-exterior.png'});
   for(const [x,z] of TO_UPSTAIRS)await walkTo(page,x,z,.12);

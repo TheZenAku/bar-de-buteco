@@ -5,7 +5,7 @@ import {gameUi} from './game-ui';
 import {createHudPanels} from './hud-panels';
 import {createNotifications} from './notifications';
 import {createLiveHud} from './live-hud';
-import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card} from '@bar/shared';
+import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,ITEM_CATALOG,itemById,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card,type InventoryView,type ItemId} from '@bar/shared';
 import {characterEditor} from './character-editor';
 import './character.css';
 import './admin.css';
@@ -51,6 +51,7 @@ let editor:ReturnType<typeof characterEditor>|undefined;
 let administration:ReturnType<typeof adminPanel>|undefined;
 let refreshingAdministration=false;
 let wardrobe:Wardrobe|undefined;
+let inventory:InventoryView|undefined;
 let modalGeneration=0;
 let watchingTv=false;
 // The jukebox and the TVs are independent: separate controllers, players, panels and volumes.
@@ -122,7 +123,9 @@ const network=new BarNetwork({
   jukebox:openJukebox,
   television:openTelevision,
   voice:frame=>voice.receive(frame),
-  itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${item}.`}),
+  itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
+  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[]};if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};liveHud.update(world,user,wardrobe,blocked,inventory);if(activeModal==='inventory')renderInventory();},
+  inventoryResult:result=>{const name=itemById(result.itemId)?.name??result.itemId;toast(result.action==='use'?`${name} usado.`:`${result.quantity}× ${name} descartado(s).`);},
   removed:(kind,reason)=>{void leaveBar().then(()=>{
     if(kind==='ban'){user=undefined;renderAuth();authMessage(`Conta banida. ${reason} Peça a um administrador para remover o banimento.`,true);}
     else authMessage(`Você foi expulso desta participação. ${reason} Sua conta não está banida; pode entrar novamente.`,true);
@@ -150,12 +153,12 @@ async function enterBar():Promise<void> {
   // Entering is a click: the browser lets this page play voices from now on.
   voice.unlock();audio.unlock();
   inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
-  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe')]);blocked=new Set(result.blocked);wardrobe=collection;await network.connect();await voice.enter();}
+  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection,items]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);blocked=new Set(result.blocked);wardrobe=collection;inventory=items;await network.connect();await voice.enter();}
   catch(error){await leaveBar();toast(errorMessage(error),true);}
 }
 async function leaveBar():Promise<void> {
   stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
-  inGame=false;connected=false;notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  inGame=false;connected=false;notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;inventory=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';lastEvent='';closeModal();renderAuth();
 }
 function renderChat():void {
@@ -168,7 +171,7 @@ function renderWorld():void {
   $('#occupancy').textContent=`${world.occupancy} / ${world.capacity}`;
   $('#occupancy-fill').style.width=`${Math.min(100,world.occupancy/world.capacity*100)}%`;
   const self=world.players[user.id];
-  liveHud.update(world,user,wardrobe,blocked);
+  liveHud.update(world,user,wardrobe,blocked,inventory);
   needsHud.update(self);
   const actionKey=self?`${self.id}:${self.animationState}`:'';
   if(previousAction&&actionKey!==previousAction&&self){const titles:Record<string,string>={dance:'No passinho!',drink:'Saúde! Sua gelada chegou.',kick:'Golpe de karatê!'};if(titles[self.animationState])notices.show({title:titles[self.animationState],id:`action:${self.id}:${self.animationStartedAt}:${self.animationState}`,duration:3400});}
@@ -264,7 +267,7 @@ async function refreshAdministration():Promise<void>{
     $('#admin-button').classList.toggle('hidden',user.role!=='admin');
     if(user.role!=='admin'&&activeModal==='admin')closeModal();
     if(changed)toast(user.role==='admin'?'Você recebeu acesso à administração.':'Sua permissão administrativa foi removida.');
-    const result=await api<Wardrobe>('/wardrobe');if(user?.id!==owner||!inGame)return;wardrobe=result;liveHud.update(world,user,wardrobe,blocked);
+    const [result,inventoryResult]=await Promise.all([api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);if(user?.id!==owner||!inGame)return;wardrobe=result;inventory=inventoryResult;liveHud.update(world,user,wardrobe,blocked,inventory);
     if(activeModal==='skins'||activeModal==='purchase'){
       const balance=document.querySelector('#wallet-balance');if(balance)balance.innerHTML=result.balance.toLocaleString('pt-BR')+' <small>moedas</small>';
       const purchase=document.querySelector('#purchase-balance');if(purchase)purchase.textContent=result.balance.toLocaleString('pt-BR');
@@ -275,6 +278,35 @@ async function refreshAdministration():Promise<void>{
   finally{refreshingAdministration=false;}
 }
 setInterval(()=>{void refreshAdministration();},5000);
+
+const effectText=(item:typeof ITEM_CATALOG[number])=>Object.entries(item.effects).filter(([key,value])=>key!=='name'&&typeof value==='number'&&Number(value)!==0)
+  .map(([key,value])=>`${({hunger:'fome',thirst:'sede',hp:'vida',drunk:'álcool',bladder:'bexiga'} as Record<string,string>)[key]??key} ${Number(value)>0?'+':''}${value}`).join(' · ');
+function renderInventory():void {
+  if(activeModal!=='inventory'||!inventory)return;
+  const quantities=new Map(inventory.stacks.map(stack=>[stack.itemId,stack.quantity]));
+  const self=world?.players[user?.id??''],canUse=connected&&self?.condition!=='fainted'&&self?.condition!=='stumbling'&&!self?.interactionState&&!self?.currentTableId;
+  const owned=inventory.stacks.map(stack=>{const item=itemById(stack.itemId);if(!item)return '';
+    return `<article class="item-card owned"><div class="item-icon" aria-hidden="true">${item.icon}</div><div class="item-copy"><small>${e(item.category)}</small><b>${e(item.name)}</b><p>${e(item.description)}</p><span>${e(effectText(item as typeof ITEM_CATALOG[number]))}</span></div><strong>×${stack.quantity}</strong><div class="item-actions"><button class="mini-button" data-action="inventory-use" data-item="${e(item.id)}" ${canUse?'':'disabled'}>Usar</button><button class="mini-button danger" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></article>`;}).join('');
+  const shop=ITEM_CATALOG.map(item=>{const quantity=quantities.get(item.id)??0,full=quantity>=item.stackMax,poor=inventory!.balance<item.price;
+    return `<article class="shop-item"><span class="item-icon" aria-hidden="true">${item.icon}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${item.price.toLocaleString('pt-BR')} 🪙</span><button class="mini-button" data-action="inventory-buy" data-item="${e(item.id)}" ${full||poor?'disabled':''}>${full?'Pilha cheia':poor?'Sem moedas':'Comprar'}</button></article>`;}).join('');
+  const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar'};
+  const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
+  $('#modal-content').innerHTML=`<div class="inventory-summary"><div><small>ESPAÇO</small><b>${inventory.usedSlots} / ${inventory.capacity} pilhas</b></div><div><small>CARTEIRA</small><b>${inventory.balance.toLocaleString('pt-BR')} moedas</b></div></div>
+    <p class="modal-description">Use alimentos, bebidas e curativos no jogo. Cada item ocupa uma pilha; quantidades iguais se agrupam.</p><h3>Na mochila</h3><div class="inventory-grid">${owned||'<p class="empty-state">Sua mochila está vazia.</p>'}</div>
+    <h3>Venda da casa</h3><div class="shop-grid">${shop}</div><details class="inventory-history"><summary>Histórico recente</summary><ol>${history||'<li>Nenhuma movimentação.</li>'}</ol></details>`;
+}
+async function openInventory():Promise<void>{
+  showModal('Mochila','<p>Conferindo seus itens…</p>','inventory');const generation=modalGeneration;
+  const result=await api<InventoryView>('/inventory');if(activeModal!=='inventory'||generation!==modalGeneration)return;inventory=result;if(wardrobe)wardrobe={...wardrobe,balance:result.balance};renderInventory();liveHud.update(world,user,wardrobe,blocked,inventory);
+}
+function useInventoryItem(id:string):void{
+  const item=itemById(id);if(!item||!inventory?.stacks.some(stack=>stack.itemId===id&&stack.quantity>0)){toast('Este item não está mais na mochila.',true);return;}
+  if(activeModal)closeModal();network.send('inventory.use',{itemId:id});
+}
+function confirmDiscard(id:string):void{
+  const item=itemById(id),stack=inventory?.stacks.find(entry=>entry.itemId===id);if(!item||!stack)return;
+  showModal('Descartar item',`<div class="discard-confirm"><span class="item-icon" aria-hidden="true">${item.icon}</span><p>Descartar uma unidade de <b>${e(item.name)}</b>? Esta ação não devolve moedas.</p><button class="button primary" data-action="inventory-discard-confirm" data-item="${e(item.id)}">Descartar 1</button><button class="text-button" data-action="inventory">Voltar à mochila</button></div>`,'inventory-discard');
+}
 
 async function skins():Promise<void> {
   showModal('Personagem e skins','<p>Carregando sua coleção…</p>','skins');
@@ -293,7 +325,7 @@ async function wearSkin(id:string):Promise<void> {
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();toast(`Visual trocado: ${skin?.name??'Meu personagem'}.`);
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>I</kbd><span>Abrir a mochila, usar itens e comprar mantimentos</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -320,6 +352,11 @@ app.addEventListener('click',event=>{
       case 'scene-use':{const self=world?.players[user?.id??''],object=INTERACTABLES.find(p=>p.id===button.dataset.object);if(!connected||!self||!object||activeModal)break;if(!canInteract(object,self)){toast('Chegue mais perto para usar '+object.label.toLowerCase()+'.');break;}if(self.currentTableId||self.interactionState){toast('Encerre a interação atual com E antes de usar outro lugar.');break;}if(object.type==='counter'){orderDrink();break;}if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});break;}
       case 'wave':if(connected&&!activeModal)network.send('player.emote',{emote:'wave'});break;
       case 'chat':focusChat();break;
+      case 'inventory':await openInventory();break;
+      case 'inventory-use':useInventoryItem(button.dataset.item!);break;
+      case 'inventory-discard':confirmDiscard(button.dataset.item!);break;
+      case 'inventory-discard-confirm':{const itemId=button.dataset.item as ItemId;closeModal();network.send('inventory.discard',{itemId,quantity:1});break;}
+      case 'inventory-buy':{const itemId=button.dataset.item as ItemId;button.setAttribute('disabled','');try{const result=await api<InventoryView>('/inventory/buy',{itemId,quantity:1,requestId:crypto.randomUUID()});inventory=result;if(wardrobe)wardrobe={...wardrobe,balance:result.balance};network.send('inventory.sync');renderInventory();liveHud.update(world,user,wardrobe,blocked,inventory);notices.show({variant:'conquista',title:'Item comprado!',text:`${itemById(itemId)?.name??itemId} entrou na mochila.`});}finally{button.removeAttribute('disabled');}break;}
       case 'skins':await skins();break;
       case 'character':createCharacter();break;
       case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;notices.show({variant:'conquista',title:'Nova skin na coleção!',text:'Skin comprada e adicionada à sua coleção.'});if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
@@ -375,6 +412,7 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
   if(inGame&&!typing()&&!event.repeat){
     if(event.code==='KeyM'){event.preventDefault();void toggleMicrophone();}
+    if(event.code==='KeyI'){event.preventDefault();if(activeModal==='inventory')closeModal();else if(!activeModal)void openInventory().catch(error=>toast(errorMessage(error),true));}
     if(event.code==='KeyB'&&settings.get().voiceMode==='ptt'){event.preventDefault();voice.setPushToTalk(true);}
   }
   if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();focusChat();}

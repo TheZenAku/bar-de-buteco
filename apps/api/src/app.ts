@@ -7,8 +7,9 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {characterSchema,skinMessageSchema,MAX_COIN_BALANCE,type PublicUser} from '@bar/shared';
+import {characterSchema,skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
+import {InventoryService} from './inventory-service.js';
 import {AdminService} from './admin-service.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import { readConfig, type ApiConfig } from './config.js';
@@ -40,6 +41,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const connection = options.database ? null : await connectDatabase({ url: config.databaseUrl, path: config.dataPath });
   const db = options.database ?? connection!.db;
   const wardrobe=new WardrobeService(db);
+  const inventory=new InventoryService(db,wardrobe);
   const administration=new AdminService(db,wardrobe);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
@@ -214,6 +216,11 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   app.post('/api/wardrobe/buy',{preHandler:authenticated},request=>wardrobe.buy(request.auth!.user,skinMessageSchema.parse(request.body).skin));
   app.post('/api/wardrobe/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
+  app.get('/api/inventory',{preHandler:authenticated},request=>inventory.view(request.auth!.user.id));
+  app.post('/api/inventory/buy',{preHandler:authenticated},request=>{
+    const body=z.object({itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
+    return inventory.buy(request.auth!.user,body.itemId,body.quantity,body.requestId);
+  });
   app.get('/api/stats', { preHandler: authenticated }, async (request) => {
     const [stats] = await db.select().from(tables.statistics).where(eq(tables.statistics.userId, request.auth!.user.id));
     return { gamesPlayed: stats?.gamesPlayed ?? 0, wins: stats?.blackjackWins ?? 0, losses: stats?.blackjackLosses ?? 0, draws: stats?.blackjackDraws ?? 0 };
@@ -268,7 +275,14 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session] = await db.select().from(tables.sessions).where(and(eq(tables.sessions.id, sessionId), eq(tables.sessions.userId, userId), gt(tables.sessions.expiresAt, new Date())));
     const user = session ? await getUser(db, userId) : null;
     const banned=await isBanned(db,userId),valid = !!user?.verified && !banned;
-    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?await wardrobe.access(user):{}) };
+    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?{...await wardrobe.access(user),...await inventory.access(user.id)}:{}) };
+  });
+  app.post('/api/internal/inventory',internalOptions,async request=>{
+    const body=z.object({sessionId:uuidSchema,userId:uuidSchema,itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),
+      reason:z.enum(['use','discard','faint']),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
+    const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
+    if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
+    return inventory.remove(body.userId,body.itemId,body.quantity,body.reason,body.requestId);
   });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);
@@ -306,5 +320,5 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return { messages: mailer.messages };
   });
   await app.ready();
-  return { app, db, mailer, config };
+  return { app, db, mailer, config,inventory };
 }

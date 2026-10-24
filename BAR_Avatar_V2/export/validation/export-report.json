@@ -1,0 +1,1355 @@
+{
+  "schema": "bar-avatar-v2/export-report",
+  "catalogVersion": "2.0.0",
+  "generated": "2026-10-24",
+  "generator": "scripts/s25_manifests.py",
+  "blender": "4.0.2",
+  "gltfExporter": "Khronos glTF Blender I/O v4.0.44",
+  "exportRoot": "BAR_Avatar_V2/export (caminhos relativos)",
+  "counts": {
+    "rigs": 2,
+    "bodies": 2,
+    "hair": 16,
+    "facial_hair": 8,
+    "tops": 10,
+    "bottoms": 5,
+    "footwear": 8,
+    "accessories": 10,
+    "animations": 2,
+    "textures": 27,
+    "manifests": 4,
+    "validation": 4
+  },
+  "glbFiles": 63,
+  "totalBytes": 11900304,
+  "glbBytes": 8327136,
+  "textureNote": "texturas compartilhadas (hair_v2, eye_v2) externas em textures/; demais embutidas no GLB da peça e também copiadas em textures/ (fonte e overrides)",
+  "textureGpuEstimateBytes": {
+    "textures/bottom_jeans_female.png": 1398101,
+    "textures/bottom_jeans_male.png": 1398101,
+    "textures/bottom_pants_female.png": 1398101,
+    "textures/bottom_pants_male.png": 1398101,
+    "textures/bottom_shorts_female.png": 1398101,
+    "textures/bottom_shorts_male.png": 1398101,
+    "textures/bottom_skirt.png": 699050,
+    "textures/eye_v2.png": 349525,
+    "textures/footwear_boots.png": 699050,
+    "textures/footwear_flipflops.png": 174762,
+    "textures/footwear_shoes.png": 699050,
+    "textures/footwear_sneakers.png": 699050,
+    "textures/hair_v2.png": 1398101,
+    "textures/skin_female.png": 5592405,
+    "textures/skin_male.png": 5592405,
+    "textures/top_hoodie_female.png": 1398101,
+    "textures/top_hoodie_male.png": 1398101,
+    "textures/top_jacket_female.png": 1398101,
+    "textures/top_jacket_male.png": 1398101,
+    "textures/top_shirt_female.png": 1398101,
+    "textures/top_shirt_male.png": 1398101,
+    "textures/top_tank_female.png": 1398101,
+    "textures/top_tank_male.png": 1398101,
+    "textures/top_tee_female.png": 1398101,
+    "textures/top_tee_male.png": 1398101,
+    "textures/top_tee_print_female.png": 1398101,
+    "textures/top_tee_print_male.png": 1398101
+  },
+  "triangleBudget": {
+    "target": [
+      8000,
+      15000
+    ],
+    "male": {
+      "baseBodyEyesBrows": 5390,
+      "heaviestPerSlot": {
+        "top": {
+          "piece": "top_hoodie",
+          "triangles": 1558
+        },
+        "bottom": {
+          "piece": "bottom_jeans",
+          "triangles": 1152
+        },
+        "footwear": {
+          "piece": "footwear_boots",
+          "triangles": 1056
+        },
+        "hair": {
+          "piece": "hair_long",
+          "triangles": 604
+        },
+        "facialHair": {
+          "piece": "facial_beard_full",
+          "triangles": 314
+        },
+        "socket_glasses": {
+          "piece": "accessory_glasses",
+          "triangles": 308
+        },
+        "socket_head_top": {
+          "piece": "accessory_cap",
+          "triangles": 567
+        },
+        "socket_wrist_l": {
+          "piece": "accessory_bracelet",
+          "triangles": 192
+        }
+      },
+      "upperBoundAllSlotsHeaviest": 11141,
+      "validationOutfits": {
+        "validacao_1": {
+          "pieces": [
+            "hair_short",
+            "top_shirt",
+            "bottom_jeans",
+            "footwear_shoes",
+            "accessory_glasses",
+            "facial_mustache"
+          ],
+          "triangles": 9602,
+          "drawCalls": 10
+        },
+        "validacao_2_variantes": {
+          "pieces": [
+            "hair_parted",
+            "top_tee",
+            "bottom_jeans",
+            "footwear_sneakers",
+            "accessory_hat",
+            "facial_beard_short"
+          ],
+          "triangles": 9785,
+          "drawCalls": 9
+        }
+      },
+      "note": "triângulos enviados (regiões ocultas por máscara continuam no buffer; são descartadas por alpha test)"
+    },
+    "female": {
+      "baseBodyEyesBrows": 5390,
+      "heaviestPerSlot": {
+        "top": {
+          "piece": "top_jacket",
+          "triangles": 1582
+        },
+        "bottom": {
+          "piece": "bottom_jeans",
+          "triangles": 1152
+        },
+        "footwear": {
+          "piece": "footwear_boots",
+          "triangles": 1072
+        },
+        "hair": {
+          "piece": "hair_long",
+          "triangles": 604
+        },
+        "facialHair": {
+          "piece": "facial_beard_full",
+          "triangles": 308
+        },
+        "socket_glasses": {
+          "piece": "accessory_glasses",
+          "triangles": 308
+        },
+        "socket_head_top": {
+          "piece": "accessory_cap",
+          "triangles": 606
+        },
+        "socket_wrist_l": {
+          "piece": "accessory_bracelet",
+          "triangles": 192
+        }
+      },
+      "upperBoundAllSlotsHeaviest": 11214,
+      "validationOutfits": {
+        "validacao_1": {
+          "pieces": [
+            "hair_long",
+            "top_tank",
+            "bottom_skirt",
+            "footwear_flipflops",
+            "accessory_bracelet"
+          ],
+          "triangles": 8108,
+          "drawCalls": 8
+        },
+        "validacao_2_variantes": {
+          "pieces": [
+            "hair_ponytail",
+            "top_tee",
+            "bottom_jeans",
+            "footwear_sneakers",
+            "accessory_sunglasses"
+          ],
+          "triangles": 9534,
+          "drawCalls": 9
+        }
+      },
+      "note": "triângulos enviados (regiões ocultas por máscara continuam no buffer; são descartadas por alpha test)"
+    }
+  },
+  "validationSummary": {
+    "validatorErrorsTotal": 0,
+    "filesChecked": 63,
+    "materialsVsMaster": 67
+  },
+  "files": [
+    {
+      "path": "INTEGRATION_CODEX.md",
+      "sizeBytes": 34276,
+      "sha256": "3a15ba8792ad7053e39f6c16508a90d1bb6ac7e68d989384d8516361e6343a04"
+    },
+    {
+      "path": "LICENSES.md",
+      "sizeBytes": 6660,
+      "sha256": "4977e852540e3e00c59be2c32832da462cece8622aae6b7d600bc825a5eb7639"
+    },
+    {
+      "path": "README.md",
+      "sizeBytes": 5379,
+      "sha256": "9f6dee0fc6a297e0f337ed9180226db3a9a2427675d33e8634a3cac600171c63"
+    },
+    {
+      "path": "accessories/accessory_bracelet_female.glb",
+      "sizeBytes": 14868,
+      "sha256": "381daa5a264a959fa9c488c3cc7e160597a172175758a1d68a813c920a353897",
+      "triangles": 192,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_bracelet_male.glb",
+      "sizeBytes": 14868,
+      "sha256": "531cfe3c6bdfd1415c3686a817106877f8e22fa6a8fc16aeb70e6df22ad86096",
+      "triangles": 192,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_cap_female.glb",
+      "sizeBytes": 22436,
+      "sha256": "645d276a825fc2603e8ce4d8fea2d4a0344512687b4c9aef0ce7ec3b2a9e8c4c",
+      "triangles": 606,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_cap_male.glb",
+      "sizeBytes": 21276,
+      "sha256": "0fe8bef7da4d65d6826b614ab526b2a0ab3524d9db867b88d79a4a2789070f52",
+      "triangles": 567,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_glasses_female.glb",
+      "sizeBytes": 10724,
+      "sha256": "c20807ac0c3b1ea6a0a170f8d021109e98b79be8eef5155852de39708f22f731",
+      "triangles": 308,
+      "primitives": 2,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_glasses_male.glb",
+      "sizeBytes": 10724,
+      "sha256": "b95fd54e9f656b1e6810f4e54e3de5ff9f7bf348feb740833762e059f339c3dd",
+      "triangles": 308,
+      "primitives": 2,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_hat_female.glb",
+      "sizeBytes": 20928,
+      "sha256": "9142c767ac5a52c8358384e3a9da3e51d7d76dc890c696c8eb868725b91a270c",
+      "triangles": 312,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_hat_male.glb",
+      "sizeBytes": 20928,
+      "sha256": "4f432c01315a70f1b87b5f63a41f6b9bd58fed1cf8885bb90444593a5c7209ba",
+      "triangles": 312,
+      "primitives": 1,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_sunglasses_female.glb",
+      "sizeBytes": 10744,
+      "sha256": "db249b2330a97f06307d05880735307c43183322d9d63491750949e303b6e6f7",
+      "triangles": 308,
+      "primitives": 2,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "accessories/accessory_sunglasses_male.glb",
+      "sizeBytes": 10740,
+      "sha256": "74fd02d3f26b29665f448df33749990c971dcd7adbbbb68206d510512506116b",
+      "triangles": 308,
+      "primitives": 2,
+      "skins": 0,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "animations/humanoid_v2_female.glb",
+      "sizeBytes": 1366928,
+      "sha256": "f24e26d6cc87b7caa87939b3642e8c46a7ed04936dc498f0f0b856c1caa14b9e",
+      "triangles": 0,
+      "primitives": 0,
+      "skins": 1,
+      "animations": 18,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "animations/humanoid_v2_male.glb",
+      "sizeBytes": 1366232,
+      "sha256": "0d009307fea32921b332d188e147632b9470e9b2b54985bf3b81877f43678df3",
+      "triangles": 0,
+      "primitives": 0,
+      "skins": 1,
+      "animations": 18,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "bodies/female.glb",
+      "sizeBytes": 695304,
+      "sha256": "18df9c1df2f80a3cfb1b4e0861123dc0f81ee4bf09c4e1d1d26c13ab8c010dd2",
+      "triangles": 5438,
+      "primitives": 5,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "skin_female"
+      ],
+      "externalImages": [
+        "../textures/hair_v2.png",
+        "../textures/eye_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "bodies/male.glb",
+      "sizeBytes": 691120,
+      "sha256": "257f2d3bda8424ec44c2e78b93eda4bcdeb8dc6f4541b9c56a1939b104e08c42",
+      "triangles": 5438,
+      "primitives": 5,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "skin_male"
+      ],
+      "externalImages": [
+        "../textures/hair_v2.png",
+        "../textures/eye_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "bottoms/bottom_jeans_female.glb",
+      "sizeBytes": 141536,
+      "sha256": "a32dfe9ef9f3503124cbcd31282cfb559f54fc03c68eb89f8b49649e0deb3513",
+      "triangles": 1152,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "bottom_jeans_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "bottoms/bottom_jeans_male.glb",
+      "sizeBytes": 141420,
+      "sha256": "01e16ce7ba008f1704a082d511bdddce78c61cff3fffec4155a69b80b92bcefe",
+      "triangles": 1152,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "bottom_jeans_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "bottoms/bottom_shorts_female.glb",
+      "sizeBytes": 97464,
+      "sha256": "29e4425dcf772ea1d1aa80e8d7bad8bd1f02904b850602bbc3ce21f93e8bf97b",
+      "triangles": 768,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "bottom_shorts_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "bottoms/bottom_shorts_male.glb",
+      "sizeBytes": 97292,
+      "sha256": "69920c624ad108cd18f370d84dadef56cb6e822a3b9fdf2095684441c16438e2",
+      "triangles": 768,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "bottom_shorts_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "bottoms/bottom_skirt_female.glb",
+      "sizeBytes": 181152,
+      "sha256": "793332bc658b93ae6cf5f3534c6dd4708bf48101467f41ff29ad426016c2f25f",
+      "triangles": 960,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "bottom_skirt"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_beard_full_female.glb",
+      "sizeBytes": 45260,
+      "sha256": "4777ba528929e824fb309f0ce71e48b10113c7eaf15df46c75006ae94fe28dc7",
+      "triangles": 308,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_beard_full_male.glb",
+      "sizeBytes": 45724,
+      "sha256": "d947724a3dd54e6d06a1f43d83b2a929d3978b6669e3c2e25b4c6ec2756a27b8",
+      "triangles": 314,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_beard_short_female.glb",
+      "sizeBytes": 45280,
+      "sha256": "38f37778a4c523be9af8387f6c8447cadc37c435e2b8b063514b4e4177037dd2",
+      "triangles": 308,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_beard_short_male.glb",
+      "sizeBytes": 45652,
+      "sha256": "cae5b618050eb718fd9365c5befd85afac3790d268664de21be7bb01b13cde7f",
+      "triangles": 314,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_goatee_female.glb",
+      "sizeBytes": 36720,
+      "sha256": "08dae862b7ade251a047ed1ff66b3a353b34bea1a20c5d299842530cbb3e9ab3",
+      "triangles": 182,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_goatee_male.glb",
+      "sizeBytes": 35428,
+      "sha256": "3b8e398895a952be3c95b649fe2125260a5c34adcb6246c83df58aa8e0661430",
+      "triangles": 164,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_mustache_female.glb",
+      "sizeBytes": 31200,
+      "sha256": "0ccaa6c40913431dfe170e1b7cfb03c9b8e14866523c924b2d27df2075297685",
+      "triangles": 106,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "facial_hair/facial_mustache_male.glb",
+      "sizeBytes": 29756,
+      "sha256": "9970d3838e278138cafbc2d6a23e892e533b30bc50dc3db0d2577017e0ecb5c4",
+      "triangles": 90,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_boots_female.glb",
+      "sizeBytes": 185852,
+      "sha256": "786bfdad2fddfd1a595ae87e0b62cbb0c843fbc912d42a417333d07fe5dccdde",
+      "triangles": 1072,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_boots"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_boots_male.glb",
+      "sizeBytes": 186004,
+      "sha256": "56ab20a092228e0736b297fb6f9ac78c08f5de36865bda0b72cc3b4825646d18",
+      "triangles": 1056,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_boots"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_flipflops_female.glb",
+      "sizeBytes": 62624,
+      "sha256": "c264a453dec7fa9896acb439fd8cf4dab0440b4ca672d9aad56e21755dbf3d0d",
+      "triangles": 232,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_flipflops"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_flipflops_male.glb",
+      "sizeBytes": 62768,
+      "sha256": "608a00d4cb31f2d51674ddfec82b0b1f7c1c1f6a5b84221bd6c36b6c4c45c3b6",
+      "triangles": 232,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_flipflops"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_shoes_female.glb",
+      "sizeBytes": 186652,
+      "sha256": "ed09c29712e5d546eb0894a725575cb4d7232fb42148c5cb29bde6f020b4867d",
+      "triangles": 1046,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_shoes"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_shoes_male.glb",
+      "sizeBytes": 186828,
+      "sha256": "e6fabc18082aa51ced3d54fa17cfc8bfcda0af25e5e56562f449909cc7cffa00",
+      "triangles": 1034,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_shoes"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_sneakers_female.glb",
+      "sizeBytes": 144672,
+      "sha256": "6190fe996ec1c00499a553c67c4cb85b90400ebdca3b039f3d1652d2fce11751",
+      "triangles": 1038,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_sneakers"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "footwear/footwear_sneakers_male.glb",
+      "sizeBytes": 145536,
+      "sha256": "6db977721516605b940274fde143b3d3b7f49c0aeb53c8c6c64bd002bf094db6",
+      "triangles": 1054,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "footwear_sneakers"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_bun_female.glb",
+      "sizeBytes": 36948,
+      "sha256": "585b4e4785d5faaf98588b614470133ff28df3c2c792b6b9d9feeaef7c528905",
+      "triangles": 510,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_bun_male.glb",
+      "sizeBytes": 37220,
+      "sha256": "8668ebfbbdf1648f062d230b801173a3cd882d563a6b39fa4954e04fbf44cf78",
+      "triangles": 514,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_buzzed_female.glb",
+      "sizeBytes": 27576,
+      "sha256": "2c5f51ee5142e72ff75d3acd591a2c362c6b56529faad816134077e895a984b2",
+      "triangles": 222,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_buzzed_male.glb",
+      "sizeBytes": 27860,
+      "sha256": "6cdce6249b788a4e1b333cbc00e49a1e6b40992b50a70f0008954b9d70b1ae8e",
+      "triangles": 228,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_long_female.glb",
+      "sizeBytes": 41308,
+      "sha256": "270f9aa0326e45c3854f990d830a36021ee0e14dc757db7bf74067261757e448",
+      "triangles": 604,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_long_male.glb",
+      "sizeBytes": 41352,
+      "sha256": "76d9e18468d163712513dd6f3f27052617436339e4980bf53c484c992cfbc954",
+      "triangles": 604,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_medium_female.glb",
+      "sizeBytes": 39136,
+      "sha256": "476d0af04fc9fe7eed45c4a62573cc8bbe4dcf40accb878840ba9f990202bd0b",
+      "triangles": 570,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_medium_male.glb",
+      "sizeBytes": 39280,
+      "sha256": "4593ad6201a8a85d536be281d6fbfcfa88fffb8503cd034cd66058add0782e98",
+      "triangles": 570,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_parted_female.glb",
+      "sizeBytes": 31420,
+      "sha256": "27642924e42ff12f5f33383f5154bddacb66abe7637a518d16673769f7e446f6",
+      "triangles": 342,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_parted_male.glb",
+      "sizeBytes": 32180,
+      "sha256": "1aefd07d99cab9ac734000e757bcae0b01e6f9d97ff447d90fe52b467c1b2057",
+      "triangles": 358,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_ponytail_female.glb",
+      "sizeBytes": 36776,
+      "sha256": "8a8edf98f44be5b53ed0788eb4eac8a4140323900c3984f46ed29e67308e30fa",
+      "triangles": 462,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_ponytail_male.glb",
+      "sizeBytes": 37048,
+      "sha256": "13be13768009b1870ea01b8bde18c27dccc47fe085fd109a26481b925a78388b",
+      "triangles": 466,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_short_female.glb",
+      "sizeBytes": 31248,
+      "sha256": "c67805d5ed173bbe7e02603f9bd2b75d3927a641348b02e106e5d65644f1df18",
+      "triangles": 336,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_short_male.glb",
+      "sizeBytes": 31584,
+      "sha256": "f8a2bbf93f29bab192727505aa28a3a58cb88964c928e7d2317fdc7ec1bccddb",
+      "triangles": 342,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_wavy_female.glb",
+      "sizeBytes": 39012,
+      "sha256": "344e72657b80086d510f26007db80e476acd2369037604043d2fe348f4381cc3",
+      "triangles": 567,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "hair/hair_wavy_male.glb",
+      "sizeBytes": 39276,
+      "sha256": "60e8c4d2bdc02c4a93891406f85fd4645ff2270e986e13d3212979421aa93452",
+      "triangles": 570,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [
+        "../textures/hair_v2.png"
+      ],
+      "errors": []
+    },
+    {
+      "path": "manifests/animation-catalog.json",
+      "sizeBytes": 47675,
+      "sha256": "e0a2848a7c43335fa25e049cc79a171819a4ca8a320d40a02dfbac493d8e0f09"
+    },
+    {
+      "path": "manifests/avatar-catalog.json",
+      "sizeBytes": 125441,
+      "sha256": "f56a5a1e2b473de0d56e4d538d5e23120c738c3e06ec4745ed9d0d878de6afdb"
+    },
+    {
+      "path": "manifests/compatibility.json",
+      "sizeBytes": 145026,
+      "sha256": "c615a570eab950fc3c006e00f47276509e8f8aad9517f599db8b4ae93d627fe6"
+    },
+    {
+      "path": "manifests/rig-contract.json",
+      "sizeBytes": 59442,
+      "sha256": "af4b593fd4d477c5caccc591d846d7429f80ce095aef2ea2611f5d22136253f6"
+    },
+    {
+      "path": "rigs/bar_humanoid_v2_female.glb",
+      "sizeBytes": 21244,
+      "sha256": "28d3e8947381226fa7942fecc27552b1053993ab5c912801f3b21c54496be12b",
+      "triangles": 0,
+      "primitives": 0,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "rigs/bar_humanoid_v2_male.glb",
+      "sizeBytes": 21316,
+      "sha256": "b04de12ae14505a3528523f675571734b973fe75f647620d70fc628eb7d96acb",
+      "triangles": 0,
+      "primitives": 0,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "textures/bottom_jeans_female.png",
+      "sizeBytes": 78139,
+      "sha256": "fafe0ebedf1e4e3a54738c93b0f267acadc81a1313a2b45a8ce93c9b0f3831f3",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_jeans_male.png",
+      "sizeBytes": 77882,
+      "sha256": "92cca98e33d75c091b8ee228d66cb3ada385cd21d4bfccf92bf4169f5a2e2aa3",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_pants_female.png",
+      "sizeBytes": 77404,
+      "sha256": "e0551b34f35492f53519f53c65adefd4bc1ee2edec2b9cd85ae36adf296e9a13",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_pants_male.png",
+      "sizeBytes": 76953,
+      "sha256": "07a9b16d3537bf59a673d12d76e4be2dc64d23a97de2f12e6c7586ddec2f92fb",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_shorts_female.png",
+      "sizeBytes": 46311,
+      "sha256": "142edf1c67e6311329f2fea9ac2fa91c368233982a13d73d8c22dc06dace81e8",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_shorts_male.png",
+      "sizeBytes": 46000,
+      "sha256": "2e757e5a2c32e6416792dcfaeea61f4d72e94209233c8d144d6df6c54079e277",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/bottom_skirt.png",
+      "sizeBytes": 128593,
+      "sha256": "28d15283a809a6fa3820ff6145d5319536d70cf1f6259b55e212a06d99b397a3",
+      "pixels": [
+        512,
+        256
+      ]
+    },
+    {
+      "path": "textures/eye_v2.png",
+      "sizeBytes": 36796,
+      "sha256": "d2a04249f2ba8582318024d08be087f16a336da956f7e4680c670b8fdb946795",
+      "pixels": [
+        256,
+        256
+      ]
+    },
+    {
+      "path": "textures/footwear_boots.png",
+      "sizeBytes": 120246,
+      "sha256": "280143c1284fa6dc77498cb4fa9bcbc4a55499ceb07ff3faaffa6502a89d80d1",
+      "pixels": [
+        512,
+        256
+      ]
+    },
+    {
+      "path": "textures/footwear_flipflops.png",
+      "sizeBytes": 18353,
+      "sha256": "0e9a619650590910b6b7b05a5ee0e7e40adefa703a5c2a081341595b7eefbf6c",
+      "pixels": [
+        256,
+        128
+      ]
+    },
+    {
+      "path": "textures/footwear_shoes.png",
+      "sizeBytes": 119795,
+      "sha256": "319f9bcc036376f3419250833c0be1a942dfc9bdeebcf1ca046b50ec36968449",
+      "pixels": [
+        512,
+        256
+      ]
+    },
+    {
+      "path": "textures/footwear_sneakers.png",
+      "sizeBytes": 78268,
+      "sha256": "5d543959814366f007a466f28755fe368915dbe41e2bbe37a17ad1525dacc448",
+      "pixels": [
+        512,
+        256
+      ]
+    },
+    {
+      "path": "textures/hair_v2.png",
+      "sizeBytes": 324638,
+      "sha256": "a728c19f0131bf738564d64daa9b36acff05b62262d43ba0c0c577edd4911997",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/skin_female.png",
+      "sizeBytes": 352291,
+      "sha256": "19b148bcc83d77d5d2a8773dbfc4a1851dd5de883ef187bc9a1b40f3fef0c047",
+      "pixels": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "path": "textures/skin_male.png",
+      "sizeBytes": 348723,
+      "sha256": "018b82046bf3e01ec7572cca37adde134c3d81f11f15540b4cf8fc336a7ae189",
+      "pixels": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "path": "textures/top_hoodie_female.png",
+      "sizeBytes": 76732,
+      "sha256": "6882c00d7bbc61c8312085ab978c8c62e160feca4826bff4828cf8b85cc82159",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_hoodie_male.png",
+      "sizeBytes": 77840,
+      "sha256": "af85b9618ea558c71d009bfdd04ecf916f3bf305c6d782090f6a8436978cb7cc",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_jacket_female.png",
+      "sizeBytes": 75095,
+      "sha256": "20ddcfd383bab8ad132abea29e97637142fa63acb90da4b6c496014786acd6b8",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_jacket_male.png",
+      "sizeBytes": 74729,
+      "sha256": "af742a5c829c8a9db87733a019159694363b9d1f42db62c447213f472b57492c",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_shirt_female.png",
+      "sizeBytes": 63031,
+      "sha256": "fce6cfa9ce165e6c87683f1857c5c5c77bcce0a13a63d5a91e48ebe5b6f85533",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_shirt_male.png",
+      "sizeBytes": 61283,
+      "sha256": "d03ab39d116e08b196888f82b4f3ae03ce09ce2ef3b5e9acf51fe10bff5ead86",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tank_female.png",
+      "sizeBytes": 40802,
+      "sha256": "28903469c84d92c68e4f5b1aed81781ef659ca527d6ef5680d3db947b1dc5f39",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tank_male.png",
+      "sizeBytes": 36785,
+      "sha256": "e3764c6f43b45403a20db793ef697dd27418245f95d779ab6a1ad4a45e3069df",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tee_female.png",
+      "sizeBytes": 53675,
+      "sha256": "527256c7525527d213c2f6987dda088514de08d632275f7ab61753e72f13dd34",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tee_male.png",
+      "sizeBytes": 53057,
+      "sha256": "3e743e43616c911617474e6233f09db35858c46f82615489cd1b48c0f5b381cf",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tee_print_female.png",
+      "sizeBytes": 53784,
+      "sha256": "28aa68b35190a503a0f36d53f4f409885c1ac63987d4335e42ad938d5d367b29",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "textures/top_tee_print_male.png",
+      "sizeBytes": 53183,
+      "sha256": "3575bd4e8c5799e228d579f178089d4c744fb2fff312458003821524bf9e1ef5",
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "path": "tops/top_hoodie_female.glb",
+      "sizeBytes": 157612,
+      "sha256": "ef0378ff568a2257bc6fe5f92c2268c4e42fb2a31a93c2b1073bc06c17c0a187",
+      "triangles": 1578,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_hoodie_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_hoodie_male.glb",
+      "sizeBytes": 157748,
+      "sha256": "abc4e5f9ac84339d9f53e6684004266ea2604da66c50e9eb12dcf7b911679faa",
+      "triangles": 1558,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_hoodie_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_jacket_female.glb",
+      "sizeBytes": 155692,
+      "sha256": "b7efd8841bc22dd170a59ff436dc35dd36f99810e13fc3b84dcf32c04b94a9f2",
+      "triangles": 1582,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_jacket_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_jacket_male.glb",
+      "sizeBytes": 154424,
+      "sha256": "7f8f01d8321c6411e571ccb0f94451cb9afddea30f438e41e44376024ce7e5e6",
+      "triangles": 1556,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_jacket_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_shirt_female.glb",
+      "sizeBytes": 135180,
+      "sha256": "9929e263aed3a2291f4228070716a4bdf45aa2e95a6bdbccec3eeb9890ba6120",
+      "triangles": 1316,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_shirt_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_shirt_male.glb",
+      "sizeBytes": 131884,
+      "sha256": "96fde23b9a5033ece11c2c8d291e5128e2aeb81264a20ccb4ebf5601855a4aed",
+      "triangles": 1286,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_shirt_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_tank_female.glb",
+      "sizeBytes": 88000,
+      "sha256": "9c6f7040c98deb41e051c36ade642035e64400366d4832961204ea7f9c354721",
+      "triangles": 730,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_tank_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_tank_male.glb",
+      "sizeBytes": 82508,
+      "sha256": "e310c9ca4a6b1b1f8e3e242433615f547436c1f2c9b5b0ebdaffa55306354f5b",
+      "triangles": 694,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_tank_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_tee_female.glb",
+      "sizeBytes": 119408,
+      "sha256": "7c1ed1d1a9a54cf045cbf0595a6d10c624d805528b1e7c60315ad9625f4d1a5b",
+      "triangles": 1184,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_tee_female"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "tops/top_tee_male.glb",
+      "sizeBytes": 120256,
+      "sha256": "f3003429c88e1ebbd1c86a058f53542867947877622f9097b03a3614d23d8a4d",
+      "triangles": 1205,
+      "primitives": 1,
+      "skins": 1,
+      "animations": 0,
+      "embeddedImages": [
+        "top_tee_male"
+      ],
+      "externalImages": [],
+      "errors": []
+    },
+    {
+      "path": "validation/animation-report-blender.json",
+      "sizeBytes": 25836,
+      "sha256": "673fd5cf1588d7fa9a7d22e4adc33052412287250b88d3bf72d49f37bf1b0c2f"
+    },
+    {
+      "path": "validation/reference_poses.json",
+      "sizeBytes": 284244,
+      "sha256": "3a941ddc04be1b97fdf60ca6610654cc94a3f1b4e5c7ac933f3f9cb2142bb502"
+    },
+    {
+      "path": "validation/validate_glb.log",
+      "sizeBytes": 10134,
+      "sha256": "5a998ebcbc59eb770b00d03e04e2e51615f2b13f45ed9c0e1361c73a8f88794a"
+    },
+    {
+      "path": "validation/validation-report.json",
+      "sizeBytes": 178667,
+      "sha256": "c5630553d7feb5f2daefdc3a21339de2060b8a308fb05a51b86a18670a02082d"
+    }
+  ]
+}

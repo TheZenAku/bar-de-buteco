@@ -23,6 +23,14 @@ export const currencyLedger=pgTable('currency_ledger',{
   id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
   amount:integer('amount').notNull(),reason:text('reason').notNull(),createdAt:date('created_at').notNull().defaultNow(),
 });
+export const itemInventory=pgTable('item_inventory',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),itemId:text('item_id').notNull(),
+  quantity:integer('quantity').notNull(),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.itemId]})]);
+export const inventoryLedger=pgTable('inventory_ledger',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  itemId:text('item_id').notNull(),quantity:integer('quantity').notNull(),reason:text('reason').notNull(),createdAt:date('created_at').notNull().defaultNow(),
+});
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(), userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   tokenHash: text('token_hash').notNull().unique(), expiresAt: date('expires_at').notNull(), createdAt: date('created_at').notNull().defaultNow(),

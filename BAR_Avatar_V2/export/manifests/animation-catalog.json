@@ -1,0 +1,1538 @@
+{
+  "schema": "bar-avatar-v2/animation-catalog",
+  "catalogVersion": "2.0.0",
+  "generated": "2026-10-24",
+  "rigId": "BAR_HUMANOID_V2",
+  "boneContractVersion": "2.0.0",
+  "fps": 30,
+  "banks": {
+    "male": "animations/humanoid_v2_male.glb",
+    "female": "animations/humanoid_v2_female.glb"
+  },
+  "bankNote": "um banco por corpo (rotações calibradas por corpo e altura do quadril própria); cada glTF animation = um clipe",
+  "keyframeReduction": "chaves redundantes removidas com tolerância 0,1° / 0,3 mm; erro máx. de junta após reimportação <= 3 mm",
+  "criteria": {
+    "loop_seam": "loops: 1º e último quadro iguais (<= 1° e <= 5 mm)",
+    "in_place": "clipes in-place: deslocamento líquido do quadril <= 1 cm",
+    "feet_above_ground": "juntas dos pés >= -1 cm",
+    "body_mesh_above_floor": "malha do corpo deformada >= -2.5 cm (cantos de calcanhar/ponta do pé)",
+    "gltfReimport": "reimportado no corpo exportado: erro máx. de junta <= 3 mm em 0/25/50/75/100 %, mesmo nº de quadros, sem canais de escala, translação só no hip"
+  },
+  "aliases": {
+    "SeatedIdle": "Sit",
+    "Interact": "Use",
+    "Faint": "Fallen"
+  },
+  "gameOneShots": [
+    "Drink",
+    "Fallen",
+    "Wave",
+    "Use",
+    "Recover"
+  ],
+  "notIncluded": {
+    "Kick": "exclusivo da skin Rafael",
+    "Bartend": "exclusivo do Seu Zé (Magrão)",
+    "Shuffle": "dealer",
+    "carta-distribui / carta-recomeco": "dealer"
+  },
+  "clips": [
+    {
+      "name": "Idle",
+      "aliases": [],
+      "gltfAnimation": "Idle",
+      "loop": true,
+      "fps": 30,
+      "source": "Unarmed Idle 01.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 8,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 5.1,
+          "frames": 154,
+          "keys": 1020,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0024,
+            "z": 0.004
+          },
+          "hipVerticalRangeM": 0.0038,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": 0.0004,
+          "maxRotStepPerFrameDeg": 3.589,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002501,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 5.1,
+          "frames": 154,
+          "keys": 1020,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0023,
+            "z": 0.0037
+          },
+          "hipVerticalRangeM": 0.0033,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": 0.0003,
+          "maxRotStepPerFrameDeg": 3.588,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002166,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Walk",
+      "aliases": [],
+      "gltfAnimation": "Walk",
+      "loop": true,
+      "fps": 30,
+      "source": "Standard Walk.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 0,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, deriva horizontal removida",
+      "hipMode": "drift",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 1.1667,
+          "frames": 36,
+          "keys": 1341,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0464,
+            "z": 0.0574
+          },
+          "hipVerticalRangeM": 0.0562,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": -0.0201,
+          "maxRotStepPerFrameDeg": 30.225,
+          "loopSeam": {
+            "rotDeg": 0.0,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001436,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 1.1667,
+          "frames": 36,
+          "keys": 1339,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0432,
+            "z": 0.0534
+          },
+          "hipVerticalRangeM": 0.0549,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": -0.0149,
+          "maxRotStepPerFrameDeg": 30.225,
+          "loopSeam": {
+            "rotDeg": 0.0,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001362,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Run",
+      "aliases": [],
+      "gltfAnimation": "Run",
+      "loop": true,
+      "fps": 30,
+      "source": "Run.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 0,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, deriva horizontal removida",
+      "hipMode": "drift",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 0.7333,
+          "frames": 23,
+          "keys": 1035,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0194,
+            "z": 0.037
+          },
+          "hipVerticalRangeM": 0.0967,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": -0.0201,
+          "maxRotStepPerFrameDeg": 43.901,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 0.7333,
+          "frames": 23,
+          "keys": 1039,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0181,
+            "z": 0.0344
+          },
+          "hipVerticalRangeM": 0.0888,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": -0.0147,
+          "maxRotStepPerFrameDeg": 43.901,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Sit",
+      "aliases": [
+        "SeatedIdle"
+      ],
+      "gltfAnimation": "Sit",
+      "loop": true,
+      "fps": 30,
+      "source": "Seated Idle.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 10,
+      "groundFix": "não",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 4.1667,
+          "frames": 126,
+          "keys": 472,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0011,
+            "z": 0.0013
+          },
+          "hipVerticalRangeM": 0.0012,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0424,
+          "lowestBodyMeshM": 0.0126,
+          "maxRotStepPerFrameDeg": 0.231,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002093,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 4.1667,
+          "frames": 126,
+          "keys": 474,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.001,
+            "z": 0.0012
+          },
+          "hipVerticalRangeM": 0.0011,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0376,
+          "lowestBodyMeshM": 0.011,
+          "maxRotStepPerFrameDeg": 0.231,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001815,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Drink",
+      "aliases": [],
+      "gltfAnimation": "Drink",
+      "loop": false,
+      "fps": 30,
+      "source": "bebendo.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 0,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 8.8667,
+          "frames": 267,
+          "keys": 1267,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0073,
+            "z": 0.0224
+          },
+          "hipVerticalRangeM": 0.0156,
+          "hipNetTravelM": 0.0003,
+          "lowestFootJointM": 0.0289,
+          "lowestBodyMeshM": 0.0023,
+          "maxRotStepPerFrameDeg": 6.361,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001524,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 8.8667,
+          "frames": 267,
+          "keys": 1265,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0068,
+            "z": 0.0208
+          },
+          "hipVerticalRangeM": 0.0145,
+          "hipNetTravelM": 0.0003,
+          "lowestFootJointM": 0.0248,
+          "lowestBodyMeshM": 0.0007,
+          "maxRotStepPerFrameDeg": 6.362,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001286,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Dance",
+      "aliases": [],
+      "gltfAnimation": "Dance",
+      "loop": true,
+      "fps": 30,
+      "source": "Samba Dancing.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 12,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 19.8,
+          "frames": 595,
+          "keys": 23109,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.7163,
+            "z": 1.1548
+          },
+          "hipVerticalRangeM": 0.2789,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": -0.0088,
+          "maxRotStepPerFrameDeg": 35.374,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0005
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 19.8,
+          "frames": 595,
+          "keys": 23127,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.6667,
+            "z": 1.0749
+          },
+          "hipVerticalRangeM": 0.2543,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": -0.0079,
+          "maxRotStepPerFrameDeg": 35.374,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0005
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Wave",
+      "aliases": [],
+      "gltfAnimation": "Wave",
+      "loop": false,
+      "fps": 30,
+      "source": "Waving Gesture.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 0,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 1.4667,
+          "frames": 45,
+          "keys": 1288,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0259,
+            "z": 0.1088
+          },
+          "hipVerticalRangeM": 0.0188,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0275,
+          "lowestBodyMeshM": 0.0008,
+          "maxRotStepPerFrameDeg": 15.555,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002554,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 1.4667,
+          "frames": 45,
+          "keys": 1293,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0241,
+            "z": 0.1013
+          },
+          "hipVerticalRangeM": 0.0157,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0244,
+          "lowestBodyMeshM": 0.0005,
+          "maxRotStepPerFrameDeg": 15.555,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002345,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Use",
+      "aliases": [
+        "Interact"
+      ],
+      "gltfAnimation": "Use",
+      "loop": false,
+      "fps": 30,
+      "source": "Button Pushing.fbx",
+      "sourceTrimS": [
+        0.45,
+        2.45
+      ],
+      "tailBlendFrames": 0,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 2.0,
+          "frames": 61,
+          "keys": 886,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0056,
+            "z": 0.0117
+          },
+          "hipVerticalRangeM": 0.001,
+          "hipNetTravelM": 0.0059,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": 0.0005,
+          "maxRotStepPerFrameDeg": 7.642,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001862,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 2.0,
+          "frames": 61,
+          "keys": 888,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0052,
+            "z": 0.0109
+          },
+          "hipVerticalRangeM": 0.0008,
+          "hipNetTravelM": 0.0055,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": 0.0003,
+          "maxRotStepPerFrameDeg": 7.641,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001929,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "DrunkIdle",
+      "aliases": [],
+      "gltfAnimation": "DrunkIdle",
+      "loop": true,
+      "fps": 30,
+      "source": "Drunk Idle Variation.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 12,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 3.9667,
+          "frames": 120,
+          "keys": 3544,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0294,
+            "z": 0.0957
+          },
+          "hipVerticalRangeM": 0.0186,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": -0.0017,
+          "maxRotStepPerFrameDeg": 14.175,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0001
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001995,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 3.9667,
+          "frames": 120,
+          "keys": 3538,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0273,
+            "z": 0.0891
+          },
+          "hipVerticalRangeM": 0.0182,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.024,
+          "lowestBodyMeshM": -0.0027,
+          "maxRotStepPerFrameDeg": 14.175,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0002
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002149,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "DrunkWalk",
+      "aliases": [],
+      "gltfAnimation": "DrunkWalk",
+      "loop": true,
+      "fps": 30,
+      "source": "Drunk Walk.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 6,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, deriva horizontal removida",
+      "hipMode": "drift",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 3.0,
+          "frames": 91,
+          "keys": 3432,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.1166,
+            "z": 0.4379
+          },
+          "hipVerticalRangeM": 0.1081,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": -0.0038,
+          "maxRotStepPerFrameDeg": 29.998,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001599,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 3.0,
+          "frames": 91,
+          "keys": 3437,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.1085,
+            "z": 0.4076
+          },
+          "hipVerticalRangeM": 0.1022,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": -0.0006,
+          "maxRotStepPerFrameDeg": 29.998,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001407,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Fallen",
+      "aliases": [
+        "Faint"
+      ],
+      "gltfAnimation": "Fallen",
+      "loop": false,
+      "fps": 30,
+      "source": "Standing Death Backward 01.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 0,
+      "groundFix": "malha do corpo (s12b)",
+      "rootMotion": "deslocamento visual relativo ao início (35 % do deslocamento da fonte); a posição autoritativa continua no servidor",
+      "hipMode": "start:0.35",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 2.5667,
+          "frames": 78,
+          "keys": 2129,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.1784,
+            "z": 0.501
+          },
+          "hipVerticalRangeM": 0.7109,
+          "hipNetTravelM": 0.51,
+          "lowestFootJointM": 0.0248,
+          "lowestBodyMeshM": -0.0,
+          "maxRotStepPerFrameDeg": 69.409,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": null
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001828,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 2.5667,
+          "frames": 78,
+          "keys": 2129,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.166,
+            "z": 0.4663
+          },
+          "hipVerticalRangeM": 0.6717,
+          "hipNetTravelM": 0.4747,
+          "lowestFootJointM": 0.022,
+          "lowestBodyMeshM": -0.0,
+          "maxRotStepPerFrameDeg": 69.409,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": null
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001662,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Recover",
+      "aliases": [],
+      "gltfAnimation": "Recover",
+      "loop": false,
+      "fps": 30,
+      "source": "Standing Up.fbx",
+      "sourceTrimS": [
+        0.0,
+        5.0
+      ],
+      "tailBlendFrames": 0,
+      "groundFix": "malha do corpo (s12b)",
+      "rootMotion": "deslocamento visual relativo ao início (100 % do deslocamento da fonte); a posição autoritativa continua no servidor",
+      "hipMode": "start",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 5.0,
+          "frames": 151,
+          "keys": 3742,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.329,
+            "z": 0.3325
+          },
+          "hipVerticalRangeM": 0.8422,
+          "hipNetTravelM": 0.1774,
+          "lowestFootJointM": 0.0253,
+          "lowestBodyMeshM": -0.0,
+          "maxRotStepPerFrameDeg": 14.612,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": null
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002195,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 5.0,
+          "frames": 151,
+          "keys": 3748,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.3063,
+            "z": 0.3095
+          },
+          "hipVerticalRangeM": 0.7451,
+          "hipNetTravelM": 0.1651,
+          "lowestFootJointM": 0.0225,
+          "lowestBodyMeshM": -0.0,
+          "maxRotStepPerFrameDeg": 14.612,
+          "loopSeam": null,
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": null,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": null
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002039,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Wait",
+      "aliases": [],
+      "gltfAnimation": "Wait",
+      "loop": true,
+      "fps": 30,
+      "source": "Standing Idle 03.fbx",
+      "sourceTrimS": [
+        0.0,
+        4.0
+      ],
+      "tailBlendFrames": 15,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 4.0,
+          "frames": 121,
+          "keys": 2071,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.1029,
+            "z": 0.1588
+          },
+          "hipVerticalRangeM": 0.0144,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": 0.0004,
+          "maxRotStepPerFrameDeg": 6.867,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0002
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002456,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 4.0,
+          "frames": 121,
+          "keys": 2068,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0958,
+            "z": 0.1478
+          },
+          "hipVerticalRangeM": 0.0132,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": 0.0003,
+          "maxRotStepPerFrameDeg": 6.867,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0002
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.00251,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "CardsSit",
+      "aliases": [],
+      "gltfAnimation": "CardsSit",
+      "loop": true,
+      "fps": 30,
+      "source": "carta-sentado.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 10,
+      "groundFix": "não",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 4.8,
+          "frames": 145,
+          "keys": 630,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0013,
+            "z": 0.0006
+          },
+          "hipVerticalRangeM": 0.0014,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0118,
+          "lowestBodyMeshM": -0.016,
+          "maxRotStepPerFrameDeg": 0.158,
+          "loopSeam": {
+            "rotDeg": 0.0,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001302,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 4.8,
+          "frames": 145,
+          "keys": 630,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0012,
+            "z": 0.0006
+          },
+          "hipVerticalRangeM": 0.0013,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0138,
+          "lowestBodyMeshM": -0.011,
+          "maxRotStepPerFrameDeg": 0.158,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001186,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "AngrySit",
+      "aliases": [],
+      "gltfAnimation": "AngrySit",
+      "loop": true,
+      "fps": 30,
+      "source": "sit-angry.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 10,
+      "groundFix": "não",
+      "rootMotion": "nenhum: in-place, quadril centrado na média",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 2.7333,
+          "frames": 83,
+          "keys": 2353,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0026,
+            "z": 0.0035
+          },
+          "hipVerticalRangeM": 0.0036,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0051,
+          "lowestBodyMeshM": -0.0214,
+          "maxRotStepPerFrameDeg": 19.367,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001774,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 2.7333,
+          "frames": 83,
+          "keys": 2356,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0024,
+            "z": 0.0033
+          },
+          "hipVerticalRangeM": 0.0034,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0061,
+          "lowestBodyMeshM": -0.0175,
+          "maxRotStepPerFrameDeg": 19.367,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001269,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "Pose",
+      "aliases": [],
+      "gltfAnimation": "Pose",
+      "loop": true,
+      "fps": 30,
+      "source": "",
+      "sourceTrimS": null,
+      "tailBlendFrames": null,
+      "groundFix": "não",
+      "rootMotion": "nenhum: quadro neutro estático (Idle quadro 0)",
+      "hipMode": "static",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 0.0333,
+          "frames": 2,
+          "keys": 108,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0,
+            "z": 0.0
+          },
+          "hipVerticalRangeM": 0.0,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": 0.0008,
+          "maxRotStepPerFrameDeg": 0.056,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 0.0333,
+          "frames": 2,
+          "keys": 108,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0,
+            "z": 0.0
+          },
+          "hipVerticalRangeM": 0.0,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.024,
+          "lowestBodyMeshM": 0.0006,
+          "maxRotStepPerFrameDeg": 0.04,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 1e-06,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "OldCaneWalk",
+      "aliases": [],
+      "gltfAnimation": "OldCaneWalk",
+      "loop": true,
+      "fps": 30,
+      "source": "A_Male_Walk_OldCane_walkstyle.fbx",
+      "sourceTrimS": null,
+      "tailBlendFrames": 4,
+      "groundFix": "juntas dos pés (s12)",
+      "rootMotion": "nenhum: in-place, deriva horizontal removida",
+      "hipMode": "drift",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 1.5667,
+          "frames": 48,
+          "keys": 490,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.046,
+            "z": 0.0032
+          },
+          "hipVerticalRangeM": 0.0174,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0465,
+          "lowestBodyMeshM": 0.0122,
+          "maxRotStepPerFrameDeg": 3.841,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001342,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 1.5667,
+          "frames": 48,
+          "keys": 491,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0428,
+            "z": 0.003
+          },
+          "hipVerticalRangeM": 0.0162,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0435,
+          "lowestBodyMeshM": 0.0131,
+          "maxRotStepPerFrameDeg": 3.841,
+          "loopSeam": {
+            "rotDeg": 0.0,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.001273,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    },
+    {
+      "name": "OldCaneHold",
+      "aliases": [],
+      "gltfAnimation": "OldCaneHold",
+      "loop": true,
+      "fps": 30,
+      "source": "Idle + A_Male_Walk_OldCane_walkstyle.fbx (right arm, frame 0)",
+      "sourceTrimS": null,
+      "tailBlendFrames": null,
+      "groundFix": "não",
+      "rootMotion": "nenhum: Idle com o braço direito da caminhada com bengala",
+      "hipMode": "mean",
+      "channels": "rotação de 53 juntas + translação do 'hip'; sem escala",
+      "bodies": {
+        "male": {
+          "durationS": 5.1,
+          "frames": 154,
+          "keys": 635,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0024,
+            "z": 0.004
+          },
+          "hipVerticalRangeM": 0.0038,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0271,
+          "lowestBodyMeshM": 0.0004,
+          "maxRotStepPerFrameDeg": 3.589,
+          "loopSeam": {
+            "rotDeg": 0.056,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002429,
+            "playcanvas": "pending"
+          }
+        },
+        "female": {
+          "durationS": 5.1,
+          "frames": 154,
+          "keys": 640,
+          "channels": 54,
+          "hipSwayRangeM": {
+            "x": 0.0023,
+            "z": 0.0037
+          },
+          "hipVerticalRangeM": 0.0033,
+          "hipNetTravelM": 0.0,
+          "lowestFootJointM": 0.0239,
+          "lowestBodyMeshM": 0.0003,
+          "maxRotStepPerFrameDeg": 3.588,
+          "loopSeam": {
+            "rotDeg": 0.04,
+            "posM": 0.0
+          },
+          "validation": {
+            "state": "approved_gltf_reimport",
+            "blender": "approved",
+            "blenderCriteria": {
+              "no_nan": true,
+              "unit_quaternions": true,
+              "loop_seam": true,
+              "feet_above_ground": true,
+              "body_mesh_above_floor": true,
+              "in_place": true
+            },
+            "gltfReimport": "approved",
+            "gltfReimportMaxJointErrorM": 0.002166,
+            "playcanvas": "pending"
+          }
+        }
+      }
+    }
+  ]
+}

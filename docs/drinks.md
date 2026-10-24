@@ -34,7 +34,7 @@ Assim não há um deslocamento fixo por convenção de osso. Funciona nos esquel
 
 ## Estado e multiplayer
 
-`Player.drinkItem` (`garrafa`, `copo` ou vazio) é definido no pedido e sincronizado com a sala; os outros jogadores veem o mesmo objeto na mesma mão. Ele é limpo ao terminar de beber, ao cancelar o pedido, ao sair e ao entrar de novo. Uma segunda bebida não começa durante a primeira, porque o personagem fica ocupado no balcão até terminar. O NPC que bebe usa a garrafa. Não há inventário no jogo, então o objeto existe só durante a ação. Se o modelo não carregar, aparece o copo simples antigo.
+`Player.drinkItem` (`garrafa`, `copo` ou vazio) é definido no pedido ou pelo item da mochila e sincronizado com a sala; os outros jogadores veem o mesmo objeto na mesma mão. Ele é limpo ao terminar de beber, ao cancelar, ao sair e ao entrar de novo. Uma segunda bebida não começa durante a primeira. O NPC que bebe usa a garrafa. Água, refrigerante e café reaproveitam o copo; long neck usa a garrafa. Se o modelo não carregar, aparece o copo simples antigo. Veja também [inventário](inventory.md).
 
 ## Testes
 

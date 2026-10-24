@@ -1,3 +1,5 @@
+import {ITEM_CATALOG} from './inventory.js';
+
 /**
  * Character needs: HP, stamina, hunger, thirst, bladder and drunkenness. Pure, time-based rules shared by
  * the authoritative server (which owns the values) and the client (which predicts running and sway).
@@ -127,13 +129,10 @@ export interface ConsumableEffects {
 }
 /**
  * The bar's real drinks (the drinks served by Seu Zé, see DRINK_ITEMS). Beer hydrates a little, but alcohol
- * is never treated as water: its thirst value is declared explicitly. Foods have no catalogue yet; add them
- * here (or from the future inventory) with the same shape.
+ * is never treated as water: its thirst value is declared explicitly. The inventory catalogue is the single
+ * source of truth, so UI descriptions, purchases and authoritative effects cannot drift apart.
  */
-export const CONSUMABLES: Record<string, ConsumableEffects> = {
-  garrafa: { name: 'Long neck', thirst: 8, drunk: 12, bladder: 18 },
-  copo: { name: 'Copo americano', thirst: 5, drunk: 7, bladder: 11 },
-};
+export const CONSUMABLES: Record<string, ConsumableEffects> = Object.fromEntries(ITEM_CATALOG.map(item=>[item.id,item.effects]));
 
 const clamp = (value: number, min: number, max: number) => Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
 export function createNeeds(now = 0): NeedsState {

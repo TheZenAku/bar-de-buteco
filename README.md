@@ -46,6 +46,7 @@ O corpo masculino também pode vestir **camiseta, suéter, calça, calça social
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
+| I | Abrir ou fechar a mochila, usar itens e acessar a venda da casa |
 | C | Escolher o visual (skin); todos veem a troca na hora |
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
 | Enter | Abrir o chat de proximidade (12 m) |
@@ -59,6 +60,8 @@ A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube,
 As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/drinks.md).
 
 O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/needs.md).
+
+A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com atalhos no painel **Bolso**, loja, histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Veja [inventário](docs/inventory.md).
 
 O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/old-cane.md).
 

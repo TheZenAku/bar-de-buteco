@@ -12,12 +12,12 @@ O protótipo original usa React, Tailwind e Sonner. A integração reproduz seus
 | Ações | Bebida, dança, aceno, chat, visual, interação, som e o golpe exclusivo do Rafael |
 | Papo no Balcão | Chat de proximidade, histórico e comandos, incluindo `/velho` |
 | Galera no Bar | Jogadores próximos, presença e atividade dos NPCs; acesso aos bloqueios e denúncias |
-| Bolso | Personagem e skins que a conta possui; acesso à coleção e loja |
+| Bolso | Atalhos dos itens carregados; acesso à mochila, venda da casa e histórico |
 | Pelo Bar | Balcão, jukebox, blackjack e assentos, com distância e indicação de alcance |
 
 A carteira é consultada na API ao entrar e atualizada periodicamente, incluindo alterações feitas pela administração. Comprar uma skin atualiza saldo e coleção; vestir preserva o personagem personalizado. Os botões de lugares continuam exigindo proximidade e validação do servidor. Não teleportam o personagem.
 
-O protótipo possui álcool, energia, humor, gastos locais, objetos de inventário, sinuca, dardos e mensagens periódicas fictícias. Como esses sistemas não existem no servidor atual, foram adaptados aos sistemas disponíveis. A interface não inventa saldo, ganhos, consumo ou jogadores. O blackjack usa as cartas, turnos e resultados reais, sem apostas.
+Álcool, necessidades, carteira e inventário agora usam dados reais. A interface não inventa saldo, ganhos, consumo ou jogadores. Sinuca, dardos, humor e mensagens periódicas do protótipo continuam fora do jogo; o blackjack usa cartas, turnos e resultados reais, sem apostas.
 
 ## Organizar a interface
 

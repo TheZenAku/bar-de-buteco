@@ -57,7 +57,7 @@ Todos os efeitos passam por uma única função, `applyConsumable(state, effects
 { name, hunger?, thirst?, hp?, maxHp?: { amount, seconds }, drunk?, bladder? }
 ```
 
-O catálogo `CONSUMABLES` tem só as bebidas que existem no bar: `garrafa` (long neck) e `copo` (copo americano). A cerveja hidrata pouco e de forma explícita: álcool não é tratado como água. Ainda não há comidas nem água; acrescente-as em `CONSUMABLES` no mesmo formato.
+O catálogo `CONSUMABLES` é derivado do catálogo real do inventário e inclui água, refrigerante, café, long neck, copo americano, coxinha, pastel, torresmo e curativo. A cerveja hidrata pouco e de forma explícita: álcool não é tratado como água. Nomes, efeitos, preços e limites ficam em `packages/shared/src/inventory.ts`.
 
 A bebida conta ao terminar o gole. Se a pessoa levanta no meio, conta a fração já bebida. Desmaiado ou cambaleando, não é possível consumir.
 
@@ -70,9 +70,11 @@ Todos os valores ficam no objeto `NEEDS`, em `packages/shared/src/needs.ts`, que
 - o fôlego dura cerca de 11 s de corrida;
 - cada long neck dá 12 de embriaguez e 18 de bexiga.
 
-## Inventário futuro
+## Inventário
 
-O servidor fala com o inventário pela interface `InventoryPort`, em `apps/server/src/world/needs.ts`:
+O inventário principal é persistido pela API e integrado em `BarRoom`. Uso, descarte e perda removem a unidade em transação antes de atualizar a cópia privada da sala. Ao terminar a animação, `room.needs.consume(player, itemId, Date.now())` aplica o efeito. Veja [inventário](inventory.md).
+
+`InventoryPort`, em `apps/server/src/world/needs.ts`, permanece como um adaptador síncrono pequeno para simulações e modos alternativos:
 
 ```ts
 interface InventoryPort {
@@ -81,19 +83,15 @@ interface InventoryPort {
 }
 ```
 
-- **Agora.** O bar usa `NO_INVENTORY`: nada é perdido e nada quebra.
-- **Ao criar o inventário:**
-  - atribua `room.needs.inventory = seuInventario`;
-  - para comer ou beber um item, chame `room.needs.consume(player, itemId, Date.now())`, ou `applyConsumable` com os efeitos do próprio item.
-- **Item perdido.** O cliente recebe `needs.itemLost` e mostra um aviso.
+- **Sala principal.** Usa a API assíncrona e autoritativa; o adaptador fica em `NO_INVENTORY`.
+- **Item perdido.** O cliente recebe `needs.itemLost`, atualiza a mochila privada e mostra um aviso.
 
 ## Assets e sistemas que ainda não existem
 
 | O que falta | Como o jogo resolve hoje |
 | --- | --- |
 | Animação própria de exaustão | A falta de fôlego impede a corrida e mantém a caminhada normal; ainda não há um clipe separado de cansaço. Levantar, tropeçar, embriaguez e uso do banheiro já têm estados e clipes próprios. |
-| Comidas e água | A estrutura está pronta, mas a fome e a sede só se recuperam com a cerveja (sede) até haver itens. |
-| Inventário | Veja a seção acima. |
+| Props próprios para cada comida | Comidas e curativo usam `Use`; bebidas reutilizam o copo ou a garrafa existentes. |
 
 ## Testes
 

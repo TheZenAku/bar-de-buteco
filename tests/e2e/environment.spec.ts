@@ -5,6 +5,14 @@ import type {EnvironmentLighting} from '../../apps/web/src/engine/environment-li
 type EnvironmentStatus=ReturnType<EnvironmentLighting['telemetry']>;
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
 
+test('the authored skewer cart has visible geometry below its fire and smoke FX',async({page})=>{
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getMapStatus().cartRenders)).toBeGreaterThan(0);
+  await page.evaluate(()=>(window as any).fixture.view([8.7,1.45,4.4],[8.7,.85,1.5]));
+  await page.screenshot({path:'test-results/carrinho-espeto.png'});
+  await page.evaluate(()=>(window as any).fixture.scene.destroy());
+});
+
 test('full map renders through daylight, dusk and night with correct light directions, shadows and border fog',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -20,7 +28,7 @@ test('full map renders through daylight, dusk and night with correct light direc
   expect(day.lamps.filter(l=>l.outside).every(l=>!l.enabled)).toBe(true);
   expect(day.lamps.filter(l=>!l.outside).every(l=>l.shadows&&l.direction[1]<-.99)).toBe(true);
   expect(day.lamps.filter(l=>l.street).length).toBe(12);
-  expect(day.realtimeLocalShadows).toBeLessThanOrEqual(2);
+  expect(day.realtimeLocalShadows).toBe(0);
   await page.screenshot({path:'docs/previews/day-night-noon.png'});
   await page.evaluate(()=>(window as any).fixture.hour(18));await expect.poll(async()=>(await status()).hour).toBeCloseTo(18);
   await page.screenshot({path:'docs/previews/day-night-dusk.png'});
