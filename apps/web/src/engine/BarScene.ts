@@ -8,6 +8,9 @@ import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
+import {AvatarAssetCache,AvatarV2Instance} from '../avatar-v2-lab/avatar';
+import {loadCatalogs,type CatalogBundle} from '../avatar-v2-lab/catalog';
+import {AVATAR_V2_GAME_ENABLED,characterToAvatarV2} from './avatar-v2-game';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -47,6 +50,9 @@ interface Avatar {
   /** Skeletal player model, and which skin it shows. */
   skin?: SkinnedRig;
   skinId?: string;
+  /** Experimental modular V2 visual. Only enabled by the local development server until animation licensing is verified. */
+  v2?:AvatarV2Instance;
+  v2Key?:string;
   cup: pc.Entity;
   /** The bottle or glass in hand, created on first use. */
   drinks?: Partial<Record<DrinkItem, pc.Entity>>;
@@ -150,6 +156,9 @@ export class BarScene {
   private readonly animationRequests = new Set<string>();
   private readonly caneModels=new Map<string,pc.ContainerResource>();
   private readonly caneRequests=new Set<string>();
+  private readonly v2Cache?:AvatarAssetCache;
+  private readonly v2Catalogs?:Promise<CatalogBundle>;
+  private readonly v2Failures=new Set<string>();
   private serverClockOffset = 0;
   /** Skins already requested, including failed ones, so a missing file is not fetched again. */
   private readonly skinRequests = new Set<string>();
@@ -182,6 +191,7 @@ export class BarScene {
     });
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
+    if(AVATAR_V2_GAME_ENABLED){this.v2Cache=new AvatarAssetCache(this.app);this.v2Catalogs=loadCatalogs();}
 
     this.camera = new pc.Entity('Third-person camera');
     this.camera.addComponent('camera', {
@@ -208,7 +218,8 @@ export class BarScene {
     this.loadDrinks();
     void this.ready.catch(() => {}); // The UI reports loading failures before admission.
     this.installControls();
-    this.loadSkin('base-male');this.loadSkin(DEFAULT_MODEL);
+    if(!AVATAR_V2_GAME_ENABLED)this.loadSkin('base-male');
+    this.loadSkin(DEFAULT_MODEL);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
     this.resize();
@@ -381,22 +392,25 @@ export class BarScene {
         const existing = this.actors.get(actor.id);
         const local = actor.id === localId;
         if (existing) {
+          const previousCharacter=existing.actor.character;
           const moved = actor.x !== existing.actor.x || actor.y !== existing.actor.y || actor.z !== existing.actor.z;
           // The local position comes from prediction (updateLocal), not from the server snapshot.
           existing.actor = local ? { ...actor, x: existing.actor.x, y: existing.actor.y, z: existing.actor.z } : { ...actor };
           if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
           existing.ring.enabled = local;
-          if (this.usesSkin(existing.actor, npc) && this.skinFor(existing.actor, npc) !== existing.skinId) this.replaceAvatar(actor.id, existing);
+          if(this.wantsAvatarV2(existing.actor,npc)){
+            if(previousCharacter!==existing.actor.character||!existing.v2)void this.ensureAvatarV2(existing);
+          } else if (this.usesSkin(existing.actor, npc) && this.skinFor(existing.actor, npc) !== existing.skinId) this.replaceAvatar(actor.id, existing);
           else if(existing.skin&&existing.skinId?.startsWith('base-'))applyCharacter(existing.skin.model,characterFromJson(existing.actor.character));
         } else {
-          this.actors.set(actor.id, this.makeAvatar(actor, npc));
+          const avatar=this.makeAvatar(actor,npc);this.actors.set(actor.id,avatar);if(this.wantsAvatarV2(actor,npc))void this.ensureAvatarV2(avatar);
           if (local) this.lastRotation = actor.rotation ?? this.lastRotation;
         }
       }
     }
     for (const [id, avatar] of this.actors) {
       if (!seen.has(id)) {
-        disposeCharacter(avatar.skin?.model);avatar.root.destroy();
+        this.disposeAvatar(avatar);
         this.actors.delete(id);
       }
     }
@@ -479,7 +493,7 @@ export class BarScene {
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
     this.app.off('update', this.update, this);
-    for(const avatar of this.actors.values())disposeCharacter(avatar.skin?.model);
+    for(const avatar of this.actors.values())this.disposeAvatar(avatar,false);
     this.materials.forEach(material => material.destroy());
     this.textures.forEach(texture => texture.destroy());
     this.app.destroy();
@@ -669,7 +683,7 @@ export class BarScene {
       this.skinModels.set(id, asset.resource as pc.ContainerResource);
       // Players waiting for this skin (or for any model, on the box avatar) switch to it in place.
       for (const [actorId, avatar] of this.actors) {
-        if (this.usesSkin(avatar.actor, avatar.npc) && this.skinFor(avatar.actor, avatar.npc) !== avatar.skinId) this.replaceAvatar(actorId, avatar);
+        if (!this.wantsAvatarV2(avatar.actor,avatar.npc)&&this.usesSkin(avatar.actor, avatar.npc) && this.skinFor(avatar.actor, avatar.npc) !== avatar.skinId) this.replaceAvatar(actorId, avatar);
       }
     });
   }
@@ -723,9 +737,51 @@ export class BarScene {
    */
   private skinFor(actor: SceneActor, npc: boolean): string | undefined {
     const selection=(npc ? NPC_SKINS[actor.id]??DEFAULT_MODEL : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : 'custom');
+    if(selection==='custom'&&this.wantsAvatarV2(actor,npc))return undefined;
     const wanted=selection==='custom'?`base-${characterFromJson(actor.character).body}`:selection;
     if (!this.skinModels.has(wanted)) this.loadSkin(wanted);
     return this.skinModels.has(wanted)?wanted:undefined;
+  }
+
+  private wantsAvatarV2(actor:SceneActor,npc:boolean):boolean{
+    if(!AVATAR_V2_GAME_ENABLED||npc||this.v2Failures.has(actor.id))return false;
+    return !actor.skin||actor.skin==='custom'||!SKIN_IDS.has(actor.skin);
+  }
+
+  private async ensureAvatarV2(avatar:Avatar):Promise<void>{
+    if(!this.wantsAvatarV2(avatar.actor,avatar.npc)||!this.v2Cache||!this.v2Catalogs)return;
+    const config=characterFromJson(avatar.actor.character),key=JSON.stringify(config);
+    if(avatar.v2Key===key&&(avatar.v2||avatar.skinId===`v2-${config.body}`))return;
+    avatar.v2Key=key;
+    let instance:AvatarV2Instance|undefined;
+    try{
+      const bundle=await this.v2Catalogs;if(this.destroyed||this.actors.get(avatar.actor.id)!==avatar||avatar.v2Key!==key)return;
+      instance=new AvatarV2Instance(this.app,this.v2Cache,bundle);instance.host.enabled=false;
+      await instance.update(characterToAvatarV2(config,bundle));
+      if(this.destroyed||this.actors.get(avatar.actor.id)!==avatar||avatar.v2Key!==key){instance.destroy();return;}
+      const entity=instance.modelEntity();if(!entity)throw new Error('O corpo V2 foi montado sem entidade raiz.');
+      const bones=Object.fromEntries(SKIN_BONES.map(name=>[name,entity.findByName(name)])) as Record<SkinBone,pc.Entity>;
+      for(const name of SKIN_BONES)if(!bones[name])throw new Error(`Osso V2 ausente: ${name}`);
+      const hipHeight=bones.upperleg_l.getPosition().y-entity.getPosition().y;
+      const legLength=bones.upperleg_l.getPosition().distance(bones.lowerleg_l.getPosition())+bones.lowerleg_l.getPosition().distance(bones.foot_l.getPosition());
+      avatar.v2?.destroy();avatar.v2=instance;instance.attachTo(avatar.body);instance.host.enabled=true;
+      for(const child of [...avatar.body.children])if(child!==instance.host&&child.name==='Avatar V2 loading')child.destroy();
+      avatar.body.setLocalScale(1,1,1);
+      avatar.skin={model:entity,bones,clip:'',tracks:new Set(bundle.animations.clips.map(clip=>clip.name)),sitDrop:hipHeight-.56,oldCaneRate:.88758844/legLength,drinkHand:findHand(entity,'l')};
+      avatar.skinId=`v2-${config.body}`;instance.play('Idle');
+    }catch(error){
+      if(instance){
+        if(avatar.v2===instance){avatar.v2=undefined;avatar.skin=undefined;avatar.skinId=undefined;}
+        instance.destroy();
+      }
+      console.error(`Avatar V2 de ${avatar.actor.id} falhou; voltando ao personagem legado.`,error);this.v2Failures.add(avatar.actor.id);avatar.v2Key=undefined;
+      const fallback=`base-${config.body}`;this.loadSkin(fallback);
+      const wait=()=>{if(this.destroyed||this.actors.get(avatar.actor.id)!==avatar)return;if(this.skinModels.has(fallback))this.replaceAvatar(avatar.actor.id,avatar);else window.setTimeout(wait,100);};wait();
+    }
+  }
+
+  private disposeAvatar(avatar:Avatar,destroyRoot=true):void{
+    avatar.v2?.destroy();avatar.v2=undefined;if(!avatar.skinId?.startsWith('v2-'))disposeCharacter(avatar.skin?.model);if(destroyRoot)avatar.root.destroy();
   }
 
   /** Rebuilds an avatar (e.g. with another skin) where the old one stood, keeping its motion and pose. */
@@ -738,7 +794,7 @@ export class BarScene {
     replacement.glideAt = avatar.glideAt;
     replacement.glide = avatar.glide;
     replacement.seatedBlend = avatar.seatedBlend;
-    disposeCharacter(avatar.skin?.model);avatar.root.destroy();
+    this.disposeAvatar(avatar);
     this.actors.set(id, replacement);
   }
 
@@ -772,7 +828,8 @@ export class BarScene {
   private makeAvatar(actor: SceneActor, npc: boolean): Avatar {
     const root = this.group(`Avatar ${actor.id}`, [actor.x,actor.y??0,actor.z]);
     const body = this.group('Animated rig', [0, 0, 0], root);
-    const skinId = this.usesSkin(actor, npc) ? this.skinFor(actor, npc) : undefined;
+    const useV2=this.wantsAvatarV2(actor,npc);
+    const skinId = !useV2&&this.usesSkin(actor, npc) ? this.skinFor(actor, npc) : undefined;
     if (!skinId) body.setLocalScale(...BOX_AVATAR_SCALE);
     const isBartender = actor.role === 'bartender' || (actor.displayName ?? actor.name)?.toLowerCase().includes('zé');
     const hash = [...actor.id].reduce((value, letter) => value + letter.charCodeAt(0), 0);
@@ -780,6 +837,11 @@ export class BarScene {
     ring.enabled = actor.id === this.localId;
     const motion = { glideFrom: new pc.Vec3(actor.x,actor.y??0,actor.z), glideAt: 0, glide: PATCH_GLIDE, yaw: (actor.rotation ?? 0) * RAD_TO_DEG };
     root.setEulerAngles(0, motion.yaw, 0);
+    if(useV2){
+      this.box('Avatar V2 loading',[0,1,0],[.48,1.7,.32],this.material('#40352d'),body);
+      const cup=this.makeCup(0,0,0,root);cup.enabled=false;
+      return {root,body,cup,ring,actor:{...actor},npc,phase:hash%12,...motion};
+    }
     if (skinId) {
       const cup = this.makeCup(0, 0, 0, root);
       cup.enabled = false;
