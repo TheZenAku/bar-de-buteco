@@ -70,4 +70,7 @@ export const gameResults = pgTable('game_results', {
 export const controls = pgTable('game_controls', {
   id: text('id').primaryKey(), payload: jsonb('payload').notNull(), createdAt: date('created_at').notNull().defaultNow(),
   acknowledged: boolean('acknowledged').notNull().default(false),
+  // Outbox state (infra/migrations/004_control_outbox.sql, apps/api/src/control-outbox.ts).
+  status: text('status').notNull().default('pending'), leaseOwner: text('lease_owner'), leaseExpiresAt: date('lease_expires_at'),
+  attempts: integer('attempts').notNull().default(0), appliedAt: date('applied_at'), lastError: text('last_error'),
 });

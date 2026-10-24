@@ -12,6 +12,8 @@ import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {AdminService} from './admin-service.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
+import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
+import {createApiMetrics,requestIdFor} from './observability.js';
 import { readConfig, type ApiConfig } from './config.js';
 import { connectDatabase, type Database } from './database/index.js';
 import * as tables from './database/schema.js';
@@ -49,7 +51,12 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const allowedOrigins = new Set([config.webOrigin]);
   if (!config.production) for (const scheme of ['http', 'https']) { allowedOrigins.add(`${scheme}://localhost:5173`); allowedOrigins.add(`${scheme}://127.0.0.1:5173`); }
   // In development the Vite proxy (loopback) forwards the browser address, so LAN clients are not treated as local.
-  const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : config.production ? false : 'loopback', logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false });
+  const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : config.production ? false : 'loopback', logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false,
+    // Correlation: the caller's x-request-id (the world sends one per internal call) or a new id, logged as requestId.
+    genReqId: requestIdFor, requestIdLogLabel: 'requestId' });
+  const metrics = createApiMetrics();
+  app.addHook('onSend', async (request, reply) => { reply.header('x-request-id', request.id); });
+  app.addHook('onResponse', async (request, reply) => { metrics.record(request.method, request.routeOptions.url, reply.statusCode, reply.elapsedTime); });
   app.decorateRequest('auth', null);
   await app.register(cookie);
   await app.register(cors, { origin: [...allowedOrigins], credentials: true, methods: ['GET', 'POST', 'DELETE', 'OPTIONS'] });
@@ -101,7 +108,13 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const internalOptions = { preHandler: internal, config: { rateLimit: false as const } };
   const dummyHash = await hashPassword(newToken());
 
+  // /api/health: the process answers. /api/ready: the database answers too (traffic can come).
   app.get('/api/health', async () => ({ ok: true, service: 'bar-api', database: connection?.driver ?? 'injected' }));
+  app.get('/api/ready', { config: { rateLimit: false } }, async (_request, reply) => {
+    try { await db.execute(sql`select 1`); return { ready: true, checks: { database: true } }; }
+    catch { return reply.code(503).send({ ready: false, checks: { database: false } }); }
+  });
+  app.get('/api/internal/metrics', internalOptions, async (_request, reply) => reply.type('text/plain; version=0.0.4').send(metrics.registry.render()));
   app.get('/api/auth/config', async () => ({ emailVerificationRequired: !config.autoVerifyEmail }));
   app.post('/api/auth/register', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
     const body = z.object({ email: emailSchema, username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/, 'Use 3 a 24 letras, números ou sublinhado.'),
@@ -293,10 +306,18 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await wardrobe.equip(user,skin);
     return {valid:true,role:user.role,blocked:await blockedIds(db,userId),...await wardrobe.access({...user,equippedSkin:skin})};
   });
-  app.get('/api/internal/controls', internalOptions, async () => {
-    // DELETE RETURNING claims a queued command once, atomically, even if pollers overlap.
-    const queued = await db.delete(tables.controls).returning();
-    return { controls: queued.sort((a,b) => a.createdAt.getTime()-b.createdAt.getTime()).map((row) => row.payload) };
+  // Previous world versions: each control delivered once, as before (no confirmation).
+  app.get('/api/internal/controls', internalOptions, async () => ({ controls: await claimControlsOnce(db) }));
+  const ownerSchema = z.string().min(1).max(128);
+  // Outbox: the world leases controls, applies them, then confirms. Unconfirmed leases are delivered again.
+  app.post('/api/internal/controls/lease', internalOptions, async (request) => {
+    const { owner } = z.object({ owner: ownerSchema }).strict().parse(request.body);
+    return { controls: (await leaseControls(db, owner)).map(({ id, payload, attempts }) => ({ ...payload, id, attempts })) };
+  });
+  app.post('/api/internal/controls/ack', internalOptions, async (request) => {
+    const { owner, applied, failed } = z.object({ owner: ownerSchema, applied: z.array(z.string().min(1).max(128)).max(100),
+      failed: z.array(z.object({ id: z.string().min(1).max(128), error: z.string().max(500) }).strict()).max(100).default([]) }).strict().parse(request.body);
+    return acknowledgeControls(db, owner, applied, failed);
   });
   app.post('/api/internal/stats', internalOptions, async (request) => {
     const { roundId, results } = z.object({ roundId: z.string().min(1).max(128), results: z.array(z.object({ userId: uuidSchema, result: z.enum(['win','loss','draw']) }).strict()).min(1).max(64) }).strict().parse(request.body);
