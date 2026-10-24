@@ -58,15 +58,20 @@ test('Boteco interface uses live state and its action bar works at desktop and n
 });
 
 async function walkTo(page:Page,x:number,z:number,tolerance=.22):Promise<void>{
-  for(let step=0;step<220;step++){
+  for(let step=0;step<140;step++){
     const position=await page.evaluate(()=>{const {world,localId}=(window as any).barDebug.snapshot();return world.players[localId] as {x:number;y:number;z:number};});
-    const dx=x-position.x,dz=z-position.z;if(Math.hypot(dx,dz)<tolerance)return;
+    const dx=x-position.x,dz=z-position.z,distance=Math.hypot(dx,dz);
+    if(distance<tolerance){
+      await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending),{intervals:[25,50,100],timeout:5000}).toBe(0);
+      return;
+    }
     const horizontal=dx*Math.cos(.15)-dz*Math.sin(.15),forward=-dx*Math.sin(.15)-dz*Math.cos(.15);
     const key=Math.abs(horizontal)>Math.abs(forward)?horizontal>0?'d':'a':forward>0?'w':'s';
-    // The expanded GLB is intentionally tested with software WebGL. Slightly longer keyboard pulses keep the
-    // route representative while avoiding hundreds of network round trips that can starve its heartbeat.
-    await page.keyboard.press(key,{delay:90});
-    await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending),{intervals:[25,50,100],timeout:5000}).toBe(0);
+    // Long stretches use a held key and the last metre returns to single-tick precision. This still exercises
+    // browser input, prediction and authoritative collision, without recording hundreds of identical trace frames.
+    const pulse=distance>2?350:distance>.85?180:65;
+    await page.keyboard.press(key,{delay:pulse});
+    await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending),{intervals:[25,50,100],timeout:5000}).toBeLessThanOrEqual(2);
   }
   throw new Error(`Could not reach ${x},${z}: ${JSON.stringify(await page.evaluate(()=>(window as any).barDebug.snapshot()))}`);
 }
@@ -86,7 +91,8 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await page.getByLabel('Senha',{exact:true}).fill(process.env.DEMO_PASSWORD||'ButecoDemo2026!');
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await gameReady(page);
-  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,lights:14});
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,lights:14,
+    effects:{fire:true,smoke:true,embers:true,taps:2,particles:19}});
   await page.screenshot({path:'test-results/map-exterior.png'});
   for(const [x,z] of TO_UPSTAIRS)await walkTo(page,x,z,.12);
   const height=()=>page.evaluate(()=>{const {world,localId}=(window as any).barDebug.snapshot();return world.players[localId].y;});
@@ -108,11 +114,13 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   // He prepares the order facing the player; the drink comes only when he is done.
   await expect(page.locator('#context-label')).toHaveText('Cancelar pedido');
   await expect.poll(async()=>(await bartender())?.clip,{timeout:15000}).toBe('Bartend');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(true);
   const ownClip=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.clip;});
   expect(await ownClip()).not.toBe('Drink');
   await expect.poll(ownClip,{timeout:30000}).toBe('Drink');
   await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.drink?.item;})).toBe('garrafa');
   expect((await bartender())?.clip).not.toBe('Bartend');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(false);
   await page.keyboard.press('e');
   await walkTo(page,14.45,-7.6,.12);
   await expect(page.locator('#context-label')).toHaveText('Sentar');await page.keyboard.press('e');

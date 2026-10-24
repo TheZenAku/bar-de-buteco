@@ -38,6 +38,8 @@ test('published map and collision export match the supplied BarBoteco assets exa
   assert.equal(map.seats.length,124);
   assert.deepEqual(map.bounds,{minX:-103,maxX:135,minZ:-117,maxZ:91});
   assert.deepEqual(['Ponto_Praca','Ponto_Igreja','Ponto_Campinho','Ponto_Escola','Ponto_Onibus'].map(id=>id in map.markers),[true,true,true,true,true]);
+  assert.deepEqual(map.effects.map(effect=>effect.type).sort(),['brasas','fogo','fumaca','torneira','torneira']);
+  assert.ok(map.effects.every(effect=>Number.isFinite(effect.x)&&Number.isFinite(effect.y)&&Number.isFinite(effect.z)));
 });
 
 test('capacity spawn positions avoid street furniture and every authored solid',()=>{

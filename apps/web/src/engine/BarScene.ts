@@ -7,6 +7,7 @@ import {applyCharacter,characterFromJson,disposeCharacter} from './character-mat
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
+import {MapEffects,type MapEffectsStatus} from './map-effects';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -133,6 +134,7 @@ export class BarScene {
   private readonly warmLights: pc.Entity[] = [];
   private readonly partyLights: pc.Entity[] = [];
   private readonly environment:EnvironmentLighting;
+  private mapEffects?:MapEffects;
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
@@ -271,6 +273,7 @@ export class BarScene {
         const lights = map.findComponents('light') as pc.LightComponent[];
         this.warmLights.push(...lights.map(light=>light.entity));
         this.environment.configureMap(map);
+        this.mapEffects=new MapEffects(this.app,map);
         resolve();
       });
     });
@@ -286,9 +289,9 @@ export class BarScene {
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;lights:number} {
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;lights:number;effects?:MapEffectsStatus} {
     return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
-      renders:this.mapEntity?.findComponents('render').length??0,lights:this.warmLights.length};
+      renders:this.mapEntity?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry()};
   }
   getEnvironmentStatus(){return this.environment.telemetry();}
 
@@ -470,6 +473,7 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
+    this.mapEffects?.destroy();this.mapEffects=undefined;
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
@@ -1028,6 +1032,8 @@ export class BarScene {
       this.frames = 0;
     }
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    const bartender=this.actors.get('bartender');
+    this.mapEffects?.update(this.elapsed,bartender?.actor.animation==='bartend'||bartender?.skin?.clip==='Bartend');
     const player = this.actors.get(this.localId);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
     if(television){

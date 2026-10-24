@@ -1,6 +1,6 @@
 {
-  "visualHash": "1ae01d535ecbf5315400cff0299ad01ec2a0660ba2ac08be375293ebd55f7019",
-  "collisionHash": "4bcbebfa48690d2e4b076129edd898af32e4c49cee8f141b45e5305c41933d97",
+  "visualHash": "55bf83cf84b5746b935ce373db1fb1fac96c7f43195412d84dc086fafbbb5841",
+  "collisionHash": "63ce79e250f66550857f1f240076a170fab3e73943d713077f75eef890cf89d2",
   "bounds": {
     "minX": -103,
     "maxX": 135,
@@ -84,6 +84,43 @@
       "z": -53
     }
   },
+  "effects": [
+    {
+      "id": "Carrinho_Espeto_FX_Brasas",
+      "type": "brasas",
+      "x": 8.7,
+      "y": 0.15,
+      "z": 1.5
+    },
+    {
+      "id": "Carrinho_Espeto_FX_Fogo",
+      "type": "fogo",
+      "x": 8.745815,
+      "y": 1.045191,
+      "z": 1.566219
+    },
+    {
+      "id": "Carrinho_Espeto_FX_Fumaca",
+      "type": "fumaca",
+      "x": 8.745815,
+      "y": 1.941523,
+      "z": 1.566219
+    },
+    {
+      "id": "Chopeira_FX_Torneira_1",
+      "type": "torneira",
+      "x": 17.890593,
+      "y": 1.333223,
+      "z": -9.142107
+    },
+    {
+      "id": "Chopeira_FX_Torneira_2",
+      "type": "torneira",
+      "x": 17.887696,
+      "y": 1.334155,
+      "z": -9.258621
+    }
+  ],
   "colliders": [
     {
       "id": "COL_Rua_Quadra",
@@ -14226,16 +14263,6 @@
       "ramp": false
     },
     {
-      "id": "COL_Ext_Carrinho_Churrasco",
-      "x": 8.552049,
-      "z": 1.520793,
-      "hx": 0.711388,
-      "hz": 0.43002,
-      "minY": 0.15,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
       "id": "COL_Ext_Lixeira.014",
       "x": 16.5,
       "z": 2.4,
@@ -14243,6 +14270,16 @@
       "hz": 0.2,
       "minY": 0.15,
       "maxY": 0.89,
+      "ramp": false
+    },
+    {
+      "id": "COL_Int_Carrinho_Espeto",
+      "x": 8.7,
+      "z": 1.5,
+      "hx": 0.512672,
+      "hz": 0.395009,
+      "minY": 0.15,
+      "maxY": 2.045792,
       "ramp": false
     },
     {

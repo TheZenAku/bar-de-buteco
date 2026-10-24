@@ -10,6 +10,7 @@ export const PLAYER_RADIUS = 0.34;
 export const PLAYER_HEIGHT = 1.86;
 export const WORLD = map.bounds;
 export const MAP_MARKERS = map.markers;
+export const MAP_EFFECTS = map.effects;
 export const MAP_COLLIDERS = map.colliders;
 export const MAP_SURFACES = map.surfaces;
 export const CAFE_TABLES = map.tables;

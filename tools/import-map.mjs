@@ -74,6 +74,20 @@ const markerEntries=visual.json.nodes.flatMap((node,index)=>{
 });
 if(new Set(markerEntries.map(([name])=>name)).size!==markerEntries.length)throw new Error('Duplicate gameplay marker after Blender suffix normalization');
 const markers=Object.fromEntries(markerEntries);
+// VFX anchors are authored as empty nodes below their prop. Keep their world-space positions in
+// the generated metadata as a stable contract between Blender and the runtime, and fail loudly if
+// an export silently drops one of the effects introduced by the map author.
+const effects=visual.json.nodes.flatMap((node,index)=>{
+  const type=node.extras?.fx;
+  if(typeof type!=='string')return [];
+  const position=new Vector3().setFromMatrixPosition(visualTransform(index));
+  return [{id:node.name,type,...Object.fromEntries(['x','y','z'].map((axis,k)=>[axis,round(position.getComponent(k))]))}];
+});
+const expectedEffects={brasas:1,fogo:1,fumaca:1,torneira:2};
+for(const [type,count] of Object.entries(expectedEffects)){
+  const actual=effects.filter(effect=>effect.type===type).length;
+  if(actual!==count)throw new Error(`Expected ${count} ${type} FX anchor(s), found ${actual}`);
+}
 // Red tables keep compact collision volumes, while chairs are deliberately pass-through GPU instances so
 // people can circulate between them. Derive seat positions from EXT_mesh_gpu_instancing and validate that
 // every unused chair belongs to one of the three authored stacks in the upper-floor storage room.
@@ -140,10 +154,10 @@ const cameraCeilings = [
   {id:'veranda-front-ceiling', x:(-.57 + 23.8) / 2, z:(-3.5 + .57) / 2, hx:(23.8 + .57) / 2, hz:(3.5 + .57) / 2, minY:2.72, maxY:2.8},
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
-const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, colliders, surfaces, cameraCeilings, doors, seats,
+const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
   tables:tables.map((table,i)=>({id:`map-table-${i+1}`,x:table.x,y:table.minY,z:table.z})) };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));
 fs.writeFileSync(path.join(root,'packages/shared/src/map-data.json'),`${JSON.stringify(data,null,2)}\n`);
-console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats; all textures embedded.`);
+console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${effects.length} FX anchors, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats; all textures embedded.`);

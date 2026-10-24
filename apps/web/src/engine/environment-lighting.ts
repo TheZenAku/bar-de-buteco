@@ -150,19 +150,17 @@ float botecoEdgeVisibility(){
       glow.material.emissiveIntensity=glow.base*(glow.outside?nowNight:.65+nowNight*.35)*this.electrical;
       glow.material.update();
     }
-    // The building is static: keep its cached shadow maps, refreshing nearby moving actors.
-    // Realtime updates for every ceiling/street lamp multiply the cost of skinned characters.
+    // The building is static: keep its cached shadow maps and refresh a single relevant local light at
+    // a short cadence. A realtime light redraws every map mesh as a shadow caster every frame; after the
+    // expanded neighbourhood export, doing that for the two closest lamps could stall software and iGPUs.
+    // Ten shadow samples per second still track moving characters cleanly and suits the PS2-era direction.
     const eye=this.camera.getPosition();
     const visible=this.shadowLights.filter(light=>light.enabled&&light.intensity>.015)
       .map(light=>({light,distance:light.entity.getPosition().distance(eye)})).sort((a,b)=>a.distance-b.distance);
-    const near=new Set(visible.filter(item=>item.distance<15).slice(0,2).map(item=>item.light));
-    for(const light of this.shadowLights){
-      if(near.has(light))light.shadowUpdateMode=pc.SHADOWUPDATE_REALTIME;
-      else if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;
-    }
+    for(const light of this.shadowLights)if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;
     this.shadowRefresh+=dt;
-    const distant=visible.filter(item=>!near.has(item.light)&&item.distance<24);
-    if(this.shadowRefresh>=.25&&distant.length){this.shadowRefresh=0;distant[this.shadowCursor++%distant.length].light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;}
+    const relevant=visible.filter(item=>item.distance<24).slice(0,6);
+    if(this.shadowRefresh>=.1&&relevant.length){this.shadowRefresh%=.1;relevant[this.shadowCursor++%relevant.length].light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;}
   }
   addPartyShadows(lights:pc.Entity[]):void {for(const entity of lights)if(entity.light){entity.light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;this.shadowLights.push(entity.light);}}
   get partyStrength():number{return this.party;}
