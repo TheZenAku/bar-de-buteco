@@ -14,6 +14,10 @@ import { NeedsDirector } from './world/needs.js';
 import { NEEDS, MAP_MARKERS, isConscious, swayInput, type NeedsEvent } from '@bar/shared';
 import {JUKEBOX_SYSTEMS,TV_SYSTEMS,initialJukebox,jukeboxCommandSchema,commandJukebox,jukeboxTime,type JukeboxState} from '@bar/shared';
 import {Jukebox} from './state.js';
+import { readWorldConfig } from './config.js';
+import { FileOutbox } from './world/outbox.js';
+import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
+import { health, logLine, worldMetrics } from './observability.js';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
@@ -55,20 +59,21 @@ export class BarRoom extends Room<{ state: BarState }> {
   private administrativeEvent?:{commandId:string;eventId:string};
   static activeId: string | undefined;
   state = new BarState();
+  /** Validated once per room (apps/server/src/config.ts); a bad variable stops the world at start. */
+  private readonly config = readWorldConfig();
   private people = new Map<string, Presence>();
   private usedTickets = new Map<string, number>();
   private blackjack = new BlackjackTable('blackjack-1', (roundId, userId, result) => this.recordResult(roundId, userId, result), undefined,
-    Math.max(5000, Number(process.env.BLACKJACK_TURN_MS) || 25_000));
-  private eventMinimum = Math.max(1000, Number(process.env.EVENT_MIN_MS) || 300_000);
-  private events = new EventDirector(
-    this.eventMinimum,
-    Math.max(this.eventMinimum, Number(process.env.EVENT_MAX_MS) || 600_000),
-  );
+    this.config.blackjackTurnMs);
+  private events = new EventDirector(this.config.eventMinMs, this.config.eventMaxMs);
   private npcs = new NpcDirector();
   private service = new BarService();
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
   readonly needs = new NeedsDirector();
-  private results = new Map<string, Map<string, 'win' | 'loss' | 'draw'>>();
+  /** Administrative controls: leased from the API's outbox, applied once, then confirmed. */
+  private controls = new ControlRelay(this.config.instanceId, internal);
+  /** Finished rounds wait on disk until the API confirms them (survives crashes and API outages). */
+  private results = new ResultRelay(new FileOutbox(this.config.outboxPath, (event, details) => this.log(event, details)), internal);
   private maintenanceBusy = false;
   private lastTableJson = '';
   private resultsResetAt = 0;
@@ -80,7 +85,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (BarRoom.activeId && BarRoom.activeId !== this.roomId) throw new ServerError(503, 'BAR_FULL: O bar está cheio. Aguarde uma vaga.');
     BarRoom.activeId = this.roomId;
     this.autoDispose = false;
-    this.maxClients = Math.max(2, Math.min(128, Number(process.env.ROOM_CAPACITY || process.env.BAR_CAPACITY) || 32));
+    this.maxClients = this.config.capacity;
     this.maxMessagesPerSecond = 100;
     this.state.capacity = this.maxClients;
     this.setPatchRate(PATCH_MS);
@@ -91,7 +96,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id,system.tvId)));
     for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id,system.tvId)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
-    this.setFixedTimestep(() => this.step(), 1000 / TICK_MS);
+    this.setFixedTimestep(() => { const started = performance.now(); this.step(); worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', performance.now() - started); }, 1000 / TICK_MS);
+    health.roomId = this.roomId;
+    worldMetrics.gauge('bar_world_players_connected', 'Players connected to the bar', () => [...this.state.players.values()].filter(p => p.connected).length);
+    worldMetrics.gauge('bar_world_avatars', 'Avatars in the bar, including those waiting offline', () => this.state.players.size);
+    worldMetrics.gauge('bar_world_result_outbox_pending', 'Finished rounds waiting for the API', () => this.results.pending);
+    worldMetrics.gauge('bar_world_api_last_ok_seconds', 'Seconds since the API last answered the maintenance round trip', () => health.apiOkAt ? (Date.now() - health.apiOkAt) / 1000 : undefined);
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
     this.registerMessages();
   }
@@ -110,6 +120,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
+    worldMetrics.inc('bar_world_joins_total', 'Joins accepted');
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
     const previous = this.people.get(auth.userId);
     if (previous) this.replaceSession(previous);
@@ -153,6 +164,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   async onReconnect(client: Client): Promise<void> {
     const presence = this.forClient(client);
     if (!presence || presence.revoked) { client.leave(4000); return; }
+    worldMetrics.inc('bar_world_reconnects_total', 'Connections resumed after a drop');
     presence.client = client;
     // An API that does not answer in time is not an ended session: keep the player. Maintenance revalidates
     // every few seconds and expels then if the session really ended.
@@ -175,6 +187,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
+    worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
     this.people.delete(userId);
     const player = this.state.players.get(userId);
     // Expelled players are removed; everyone else leaves the avatar standing (or seated) where it was.
@@ -209,7 +222,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
   }
 
-  onDispose(): void { if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; }
+  onDispose(): void { if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -322,13 +335,14 @@ export class BarRoom extends Room<{ state: BarState }> {
       const now = Date.now();
       const recent = (presence.rates.get(name) || []).filter(t => now - t < 1000);
       presence.rates.set(name, recent);
-      if (recent.length >= limit) return;
+      const rejected = (reason: string) => worldMetrics.inc('bar_world_commands_rejected_total', 'Commands refused by the room', { command: name, reason });
+      if (recent.length >= limit) { rejected('rate_limit'); return; }
       recent.push(now);
       const parsed = schema.safeParse(message);
-      if (!parsed.success) { client.send('error', { message: 'Comando inválido.' }); return; }
+      if (!parsed.success) { rejected('invalid'); client.send('error', { message: 'Comando inválido.' }); return; }
       const subject = this.state.players.get(presence.ticket.userId)!;
-      if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
-      try { await handler(client, parsed.data); } catch (e) { client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
+      if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { rejected('unconscious'); client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
+      try { await handler(client, parsed.data); } catch (e) { rejected('refused'); client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
     });
   }
 
@@ -626,29 +640,35 @@ export class BarRoom extends Room<{ state: BarState }> {
         else if(this.people.get(id)===p){ p.blocked = new Set(access.blocked); p.ticket.role = access.role;const player=this.state.players.get(id);if(player)this.applyAppearance(player,access); }
       }));
       if (checks.some(r => r.status === 'rejected')) this.log('auth_refresh_unavailable', {});
-      const { controls } = await internal<{ controls: Control[] }>('controls');
-      for (const control of controls) {
-        if ((control.action === 'kick' || control.action === 'ban') && control.playerId){
-          const presence=this.people.get(control.playerId);
-          // A queued kick ends the participation that existed when it was issued, never a later join.
-          if(presence&&(control.action!=='kick'||control.issuedAt===undefined||presence.joinedAt<=control.issuedAt))this.removeByAdmin(control.playerId,control.action,control.reason||'Um administrador encerrou sua participação.');
-        }
-        if (control.action === 'event') {
-          try {
-            if(control.expectedControlId&&(this.administrativeEvent?.commandId!==control.expectedControlId||this.administrativeEvent.eventId!==this.state.event.id))continue;
-            if (control.eventType === 'STOP' || control.eventType === '') this.events.stop();
-            else if (control.eventType && eventKinds[control.eventType]) { this.events.stop(); this.events.start(eventKinds[control.eventType]); }
-            this.syncEvent(Date.now());
-            this.administrativeEvent=control.eventType==='STOP'||control.eventType===''?undefined:{commandId:control.id,eventId:this.state.event.id};
-          } catch { this.log('event_control_rejected', { id: control.id }); }
-        }
-      }
-      for (const [roundId, results] of this.results) {
-        await internal('stats', { roundId, results: [...results].map(([userId, result]) => ({ userId, result })) });
-        this.results.delete(roundId);
-      }
-    } catch (e) { this.log('maintenance_retry', { message: e instanceof Error ? e.message : 'error' }); }
+      const { applied, failed } = await this.controls.poll(control => this.applyControl(control));
+      health.apiOkAt = Date.now();
+      if (applied.length) worldMetrics.inc('bar_world_controls_total', 'Administrative controls confirmed', { outcome: 'applied' }, applied.length);
+      if (failed.length) worldMetrics.inc('bar_world_controls_total', 'Administrative controls confirmed', { outcome: 'failed' }, failed.length);
+      for (const id of failed) this.log('event_control_rejected', { id });
+      await this.results.flush();
+    } catch (e) {
+      worldMetrics.inc('bar_world_maintenance_failures_total', 'Maintenance rounds that failed (API unreachable or refused)');
+      this.log('maintenance_retry', { message: e instanceof Error ? e.message : 'error', requestId: (e as { requestId?: string }).requestId });
+    }
     finally { this.maintenanceBusy = false; }
+  }
+
+  /** One administrative control. Throws to reject it for good (the API records it as failed). */
+  private applyControl(control: Control): void {
+    if ((control.action === 'kick' || control.action === 'ban') && control.playerId){
+      const presence=this.people.get(control.playerId);
+      // A queued kick ends the participation that existed when it was issued, never a later join.
+      if(presence&&(control.action!=='kick'||control.issuedAt===undefined||presence.joinedAt<=control.issuedAt))this.removeByAdmin(control.playerId,control.action,control.reason||'Um administrador encerrou sua participação.');
+    }
+    if (control.action === 'event') {
+      // An undo for an event that is no longer the current one has nothing left to stop: done, not failed.
+      if(control.expectedControlId&&(this.administrativeEvent?.commandId!==control.expectedControlId||this.administrativeEvent.eventId!==this.state.event.id))return;
+      if (control.eventType === 'STOP' || control.eventType === '') this.events.stop();
+      else if (control.eventType && eventKinds[control.eventType]) { this.events.stop(); this.events.start(eventKinds[control.eventType]); }
+      else throw new Error(`Evento desconhecido: ${control.eventType}`);
+      this.syncEvent(Date.now());
+      this.administrativeEvent=control.eventType==='STOP'||control.eventType===''?undefined:{commandId:control.id,eventId:this.state.event.id};
+    }
   }
 
   private applyAppearance(player:Player,access:Access):void {
@@ -659,9 +679,10 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private recordResult(roundId: string, userId: string, result: Result): void {
-    const record = this.results.get(roundId) || new Map<string, 'win' | 'loss' | 'draw'>();
-    record.set(userId, result === 'push' ? 'draw' : result);
-    this.results.set(roundId, record);
+    const outcome: MatchResult = result === 'push' ? 'draw' : result;
+    try { this.results.record(roundId, userId, outcome); health.outboxWritable = true; }
+    catch (error) {
+      health.outboxWritable = false; this.log('result_outbox_unavailable', { roundId, playerId: userId, error: error instanceof Error ? error.message : String(error) }); }
   }
 
   private removeByAdmin(userId:string,kind:'kick'|'ban',reason:string):void {
@@ -703,5 +724,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     const message: ChatMessage = { id: randomUUID(), playerId: 'system', displayName: 'B.A.R.', text, sentAt: Date.now(), system: true };
     for (const [id, p] of this.people) if (this.state.players.get(id)?.connected && (!origin || distance(origin, this.state.players.get(id)!) <= CHAT_RADIUS)) p.client.send('chat.message', message);
   }
-  private log(event: string, details: Record<string, unknown>): void { console.log(JSON.stringify({ service: 'game', event, ...details, at: new Date().toISOString() })); }
+  /** JSON lines with the room and pseudonymous player ids (apps/server/src/observability.ts). */
+  private log(event: string, details: Record<string, unknown>): void { console.log(logLine(event, details, this.roomId)); }
 }

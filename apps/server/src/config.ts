@@ -1,0 +1,52 @@
+import { hostname, tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+// An empty variable counts as unset, as before; anything else must be valid or the world refuses to start.
+const optional = <T extends z.ZodType>(schema: T) => z.preprocess(value => value === '' ? undefined : value, schema.optional());
+const integer = optional(z.coerce.number().int());
+
+const environmentSchema = z.object({
+  GAME_PORT: optional(z.coerce.number().int().min(1).max(65535)),
+  HOST: optional(z.string().min(1)),
+  API_INTERNAL_URL: optional(z.url({ protocol: /^https?$/ })),
+  ROOM_CAPACITY: integer, BAR_CAPACITY: integer,
+  BLACKJACK_TURN_MS: integer, EVENT_MIN_MS: integer, EVENT_MAX_MS: integer,
+  WORLD_OUTBOX_PATH: optional(z.string().min(1)),
+  WORLD_INSTANCE_ID: optional(z.string().min(1).max(128)),
+});
+
+export interface WorldConfig {
+  port: number; host: string; apiInternalUrl: string;
+  /** Players per bar; limits as before: 2–128. */
+  capacity: number;
+  blackjackTurnMs: number; eventMinMs: number; eventMaxMs: number;
+  /** Durable local outbox for results the API has not confirmed yet (JSON lines). */
+  outboxPath: string;
+  /** Owner name of this process's leases on the API's control outbox. */
+  instanceId: string;
+}
+
+export class WorldConfigError extends Error {}
+
+export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConfig {
+  const parsed = environmentSchema.safeParse(env);
+  if (!parsed.success) throw new WorldConfigError(`Configuração do mundo inválida: ${parsed.error.issues.map(issue => `${issue.path.join('.')} (${issue.message})`).join('; ')}`);
+  const e = parsed.data, eventMinMs = Math.max(1000, e.EVENT_MIN_MS || 300_000);
+  return {
+    port: e.GAME_PORT ?? 2567,
+    host: e.HOST ?? '0.0.0.0',
+    apiInternalUrl: (e.API_INTERNAL_URL ?? 'http://127.0.0.1:3001').replace(/\/+$/, ''),
+    capacity: Math.max(2, Math.min(128, e.ROOM_CAPACITY || e.BAR_CAPACITY || 32)),
+    blackjackTurnMs: Math.max(5000, e.BLACKJACK_TURN_MS || 25_000),
+    eventMinMs, eventMaxMs: Math.max(eventMinMs, e.EVENT_MAX_MS || 600_000),
+    // Under `node --test` (NODE_TEST_CONTEXT) a room never writes to the development outbox.
+    outboxPath: e.WORLD_OUTBOX_PATH ? resolve(repositoryRoot, e.WORLD_OUTBOX_PATH)
+      : env.NODE_TEST_CONTEXT ? join(tmpdir(), `bar-world-outbox-${process.pid}-${randomBytes(4).toString('hex')}.jsonl`)
+      : resolve(repositoryRoot, '.data/world/outbox.jsonl'),
+    instanceId: e.WORLD_INSTANCE_ID ?? `${hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`,
+  };
+}
