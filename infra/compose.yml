@@ -60,6 +60,10 @@ services:
       EVENT_MIN_MS: ${EVENT_MIN_MS:-300000}
       EVENT_MAX_MS: ${EVENT_MAX_MS:-600000}
       BLACKJACK_TURN_MS: ${BLACKJACK_TURN_MS:-25000}
+      WORLD_OUTBOX_PATH: /app/.data/world/outbox.jsonl
+    volumes:
+      # Finished rounds not yet confirmed by the API survive restarts and recreated containers.
+      - bar-world:/app/.data/world
     depends_on:
       api: { condition: service_healthy }
     healthcheck:
@@ -92,3 +96,4 @@ services:
 
 volumes:
   bar-postgres:
+  bar-world:

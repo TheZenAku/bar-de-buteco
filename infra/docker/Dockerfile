@@ -9,6 +9,8 @@ RUN npm ci
 
 FROM dependencies AS backend
 COPY --chown=node:node . .
+# The world's durable result outbox lives here (a volume in compose.yml); it must belong to the runtime user.
+RUN mkdir -p /app/.data/world && chown node:node /app/.data/world
 USER node
 ENV NODE_ENV=production
 CMD ["npm", "run", "start", "-w", "@bar/api"]
