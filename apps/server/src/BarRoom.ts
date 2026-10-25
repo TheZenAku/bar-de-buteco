@@ -18,6 +18,7 @@ import { readWorldConfig } from './config.js';
 import { FileOutbox } from './world/outbox.js';
 import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
 import { health, logLine, worldMetrics } from './observability.js';
+import { SessionRegistry } from './room/session-registry.js';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
@@ -61,8 +62,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   state = new BarState();
   /** Validated once per room (apps/server/src/config.ts); a bad variable stops the world at start. */
   private readonly config = readWorldConfig();
-  private people = new Map<string, Presence>();
-  private usedTickets = new Map<string, number>();
+  private readonly sessions = new SessionRegistry<Presence>();
   private blackjack = new BlackjackTable('blackjack-1', (roundId, userId, result) => this.recordResult(roundId, userId, result), undefined,
     this.config.blackjackTurnMs);
   private events = new EventDirector(this.config.eventMinMs, this.config.eventMaxMs);
@@ -110,9 +110,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     const { ticket: token } = z.object({ ticket: z.string().max(4096) }).parse(options);
     let ticket: GameTicket;
     try { ticket = verifyTicket(token); } catch { throw new ServerError(401, 'Sua entrada expirou. Entre novamente.'); }
-    if (this.usedTickets.has(ticket.nonce)) throw new ServerError(401, 'Ticket já utilizado.');
     // Reserve before awaiting so a concurrent redemption cannot reuse the nonce.
-    this.usedTickets.set(ticket.nonce, ticket.exp);
+    if (!this.sessions.reserveNonce(ticket.nonce, ticket.exp)) throw new ServerError(401, 'Ticket já utilizado.');
     const access = await validateAccess(ticket.sessionId, ticket.userId);
     if (!access.valid) throw new ServerError(401, 'Sessão encerrada ou conta suspensa.');
     if(!access.character)throw new ServerError(409,'Crie seu personagem antes de entrar.');
@@ -122,7 +121,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
     worldMetrics.inc('bar_world_joins_total', 'Joins accepted');
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
-    const previous = this.people.get(auth.userId);
+    const previous = this.sessions.getByUser(auth.userId);
     if (previous) this.replaceSession(previous);
     // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
     const skin=auth.equippedSkin==='custom'||auth.ownedSkins?.includes(auth.equippedSkin??'')?auth.equippedSkin!:DEFAULT_SKIN;
@@ -140,8 +139,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.needs.sync(player, Date.now());
     client.view = new StateView();
     const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity]))};
-    this.people.set(auth.userId,presence);
-    this.state.occupancy = this.people.size;
+    this.sessions.bind(auth.userId,presence);
+    this.state.occupancy = this.sessions.size;
     this.refreshViews();
     this.syncTable();
     this.log(previous ? 'takeover' : 'join', { playerId: auth.userId });
@@ -165,10 +164,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence || presence.revoked) { client.leave(4000); return; }
     worldMetrics.inc('bar_world_reconnects_total', 'Connections resumed after a drop');
-    presence.client = client;
+    if (!this.sessions.replaceClient(presence.ticket.userId, presence, client)) { client.leave(4000); return; }
     // An API that does not answer in time is not an ended session: keep the player. Maintenance revalidates
     // every few seconds and expels then if the session really ended.
     const access = await validateAccess(presence.ticket.sessionId, presence.ticket.userId).catch(() => undefined);
+    // A login in another tab may have replaced this presence while the API request was pending.
+    // Never let the continuation of the old reconnect expel or mutate the newer session/avatar.
+    if (presence.revoked || !this.sessions.isCurrent(presence.ticket.userId, presence)) { client.leave(4000); return; }
     if (access && !access.valid) { if(access.banned)this.removeByAdmin(presence.ticket.userId,'ban','Sua conta está banida do bar.');else this.expel(presence.ticket.userId, 'Sua sessão terminou. Entre novamente.'); return; }
     if (!access) this.log('auth_refresh_unavailable', { playerId: presence.ticket.userId });
     if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);}
@@ -188,12 +190,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!presence) return;
     const userId = presence.ticket.userId;
     worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
-    this.people.delete(userId);
+    this.sessions.remove(userId, presence);
     const player = this.state.players.get(userId);
     // Expelled players are removed; everyone else leaves the avatar standing (or seated) where it was.
     if (presence.revoked) { this.blackjack.leave(userId); this.service.cancel(userId); this.needs.forget(userId); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
-    this.state.occupancy = this.people.size;
+    this.state.occupancy = this.sessions.size;
     this.refreshViews();
     this.syncTable();
     this.log('leave', { playerId: userId });
@@ -208,18 +210,19 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.currentTableId = '';
     // The microphone belongs to a session; a new one switches it on again itself.
     player.voice = false;
-    const presence=this.people.get(player.id);if(presence)presence.inventoryItem=undefined;
+    const presence=this.sessions.getByUser(player.id);if(presence)presence.inventoryItem=undefined;
     if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
   }
 
   /** Closes an older session of the same account without touching its avatar, which the new one takes. */
   private replaceSession(previous: Presence): void {
-    this.people.delete(previous.ticket.userId);
+    this.sessions.remove(previous.ticket.userId, previous);
     previous.rejectReconnect?.();
-    if (this.state.players.get(previous.ticket.userId)?.connected) {
+    if (this.state.players.get(previous.ticket.userId)?.connected)
       previous.client.send('error', { message: 'Sua conta entrou no bar em outra janela.' });
-      previous.client.leave(4000);
-    }
+    // Also close a transport that already resumed but is still awaiting access validation. onDrop
+    // marks the avatar disconnected, so tying this close to player.connected would orphan that socket.
+    previous.client.leave(4000);
   }
 
   onDispose(): void { if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
@@ -313,7 +316,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         return;
       }
       const message: ChatMessage = { id: randomUUID(), playerId: player.id, displayName: player.displayName, text: text.replace(/[\u0000-\u001f\u007f]/g, ' '), sentAt: Date.now() };
-      for (const [id, target] of this.people) {
+      for (const [id, target] of this.sessions) {
         if (target.revoked || target.blocked.has(player.id) || sender.blocked.has(id)) continue;
         const recipient = this.state.players.get(id)!;
         if (recipient.connected && distance(player, recipient) <= CHAT_RADIUS) target.client.send('chat.message', message);
@@ -349,7 +352,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private step(): void {
     const now = Date.now();
     this.state.serverTime = now;
-    for (const [id, presence] of this.people) {
+    for (const [id, presence] of this.sessions) {
       const player = this.state.players.get(id)!;
       if (!player.connected || presence.revoked) continue;
       if(presence.gestureEndsAt&&now>=presence.gestureEndsAt){
@@ -390,7 +393,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!bartender) return;
     const waiting = (id: string) => { const p = this.state.players.get(id); return p?.connected && p.interactionState === 'counter' ? p : undefined; };
     const served = this.service.update(bartender, waiting, now);
-    const player = served ? waiting(served) : undefined, presence = served ? this.people.get(served) : undefined;
+    const player = served ? waiting(served) : undefined, presence = served ? this.sessions.getByUser(served) : undefined;
     if (!player || !presence) return;
     player.animationState = 'drink'; player.animationStartedAt = now; presence.interactionEndsAt = now + DRINK_DURATION_MS;
     this.systemMessage(`O Seu Zé serviu ${player.displayName}. Saúde!`, player);
@@ -511,7 +514,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const candidates=[...presence.inventory].filter(([id,quantity])=>quantity>0&&itemById(id)?.loseOnFaint);
     if(!candidates.length)return;
     const [itemId]=candidates[Math.floor(Math.random()*candidates.length)]!;
-    try{const view=await this.removeInventory(presence,itemId,1,'faint');if(this.people.get(presence.ticket.userId)!==presence)return;this.sendInventory(presence,view);presence.client.send('needs.itemLost',{item:itemId});}
+    try{const view=await this.removeInventory(presence,itemId,1,'faint');if(this.sessions.getByUser(presence.ticket.userId)!==presence)return;this.sendInventory(presence,view);presence.client.send('needs.itemLost',{item:itemId});}
     catch(error){this.log('inventory_loss_failed',{playerId:presence.ticket.userId,itemId,error:error instanceof Error?error.message:String(error)});}
   }
 
@@ -617,7 +620,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private refreshViews(): void {
-    for (const [id, presence] of this.people) {
+    for (const [id, presence] of this.sessions) {
       const self = this.state.players.get(id);
       if (!self || !presence.client.view) continue;
       const visible = new Set<Schema>();
@@ -633,11 +636,14 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (this.maintenanceBusy) return;
     this.maintenanceBusy = true;
     try {
-      for (const [nonce, expiry] of this.usedTickets) if (expiry < Date.now()) this.usedTickets.delete(nonce);
-      const checks = await Promise.allSettled([...this.people].map(async ([id, p]) => {
+      this.sessions.pruneExpiredNonces(Date.now());
+      const checks = await Promise.allSettled([...this.sessions].map(async ([id, p]) => {
         const access = await validateAccess(p.ticket.sessionId, id);
+        // The snapshot may be stale after a takeover. In particular, an invalid response for the
+        // previous API session must never expel the presence that replaced it while this awaited.
+        if (p.revoked || !this.sessions.isCurrent(id, p)) return;
         if (!access.valid){if(access.banned)this.removeByAdmin(id,'ban','Sua conta está banida do bar.');else this.expel(id, 'Sua sessão terminou ou a conta foi suspensa.');}
-        else if(this.people.get(id)===p){ p.blocked = new Set(access.blocked); p.ticket.role = access.role;const player=this.state.players.get(id);if(player)this.applyAppearance(player,access); }
+        else { p.blocked = new Set(access.blocked); p.ticket.role = access.role;const player=this.state.players.get(id);if(player)this.applyAppearance(player,access); }
       }));
       if (checks.some(r => r.status === 'rejected')) this.log('auth_refresh_unavailable', {});
       const { applied, failed } = await this.controls.poll(control => this.applyControl(control));
@@ -656,7 +662,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** One administrative control. Throws to reject it for good (the API records it as failed). */
   private applyControl(control: Control): void {
     if ((control.action === 'kick' || control.action === 'ban') && control.playerId){
-      const presence=this.people.get(control.playerId);
+      const presence=this.sessions.getByUser(control.playerId);
       // A queued kick ends the participation that existed when it was issued, never a later join.
       if(presence&&(control.action!=='kick'||control.issuedAt===undefined||presence.joinedAt<=control.issuedAt))this.removeByAdmin(control.playerId,control.action,control.reason||'Um administrador encerrou sua participação.');
     }
@@ -686,11 +692,11 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private removeByAdmin(userId:string,kind:'kick'|'ban',reason:string):void {
-    const presence=this.people.get(userId);if(!presence||presence.revoked)return;
+    const presence=this.sessions.getByUser(userId);if(!presence||presence.revoked)return;
     presence.client.send('moderation.removed',{kind,reason});this.expel(userId,reason);
   }
   private expel(userId: string, reason: string): void {
-    const presence = this.people.get(userId);
+    const presence = this.sessions.getByUser(userId);
     if (!presence) return;
     presence.revoked = true;
     presence.client.send('error', { message: reason });
@@ -709,7 +715,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (now - presence.voiceWindowAt >= 1000) { presence.voiceWindowAt = now; presence.voicePackets = 0; }
     if (++presence.voicePackets > VOICE.maxPacketsPerSecond) return;
     let frame: Uint8Array | undefined;
-    for (const [id, listener] of this.people) {
+    for (const [id, listener] of this.sessions) {
       if (id === speaker.id || listener.revoked || !listener.listening || listener.blocked.has(speaker.id) || presence.blocked.has(id)) continue;
       const other = this.state.players.get(id);
       if (!other?.connected || distance(speaker, other) > VOICE.maxDistance) continue;
@@ -718,11 +724,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
   }
 
-  private forClient(client: Client): Presence | undefined { return [...this.people.values()].find(p => p.client.sessionId === client.sessionId); }
+  private forClient(client: Client): Presence | undefined { return this.sessions.getByClient(client); }
   private player(client: Client): Player { const p = this.forClient(client); if (!p) throw new Error('Sessão não encontrada.'); return this.state.players.get(p.ticket.userId)!; }
   private systemMessage(text: string, origin?: Player): void {
     const message: ChatMessage = { id: randomUUID(), playerId: 'system', displayName: 'B.A.R.', text, sentAt: Date.now(), system: true };
-    for (const [id, p] of this.people) if (this.state.players.get(id)?.connected && (!origin || distance(origin, this.state.players.get(id)!) <= CHAT_RADIUS)) p.client.send('chat.message', message);
+    for (const [id, p] of this.sessions) if (this.state.players.get(id)?.connected && (!origin || distance(origin, this.state.players.get(id)!) <= CHAT_RADIUS)) p.client.send('chat.message', message);
   }
   /** JSON lines with the room and pseudonymous player ids (apps/server/src/observability.ts). */
   private log(event: string, details: Record<string, unknown>): void { console.log(logLine(event, details, this.roomId)); }

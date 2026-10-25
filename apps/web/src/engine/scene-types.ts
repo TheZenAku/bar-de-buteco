@@ -55,5 +55,9 @@ export interface SceneLabel {
 
 export interface SceneCallbacks {
   onInteract?: () => void;
-  onEmote?: (emote: string) => void;
+  onEmote?: (emote: 'dance' | 'wave') => void;
+  onChat?: () => void;
+  onSkins?: () => void;
+  onKick?: () => void;
+  onMediaFrame?: () => void;
 }

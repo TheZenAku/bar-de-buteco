@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { authSecret, internalSecret } from '@bar/shared/tickets';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // An empty variable counts as unset, as before; anything else must be valid or the world refuses to start.
@@ -35,6 +36,9 @@ export class WorldConfigError extends Error {}
 export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConfig {
   const parsed = environmentSchema.safeParse(env);
   if (!parsed.success) throw new WorldConfigError(`Configuração do mundo inválida: ${parsed.error.issues.map(issue => `${issue.path.join('.')} (${issue.message})`).join('; ')}`);
+  // Both processes fail before accepting traffic if production secrets are missing, weak or shared.
+  try { authSecret(env); internalSecret(env); }
+  catch (error) { throw new WorldConfigError(error instanceof Error ? error.message : 'Segredos inválidos.'); }
   const e = parsed.data, eventMinMs = Math.max(1000, e.EVENT_MIN_MS || 300_000);
   return {
     port: e.GAME_PORT ?? 2567,

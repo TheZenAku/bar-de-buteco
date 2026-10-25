@@ -114,12 +114,6 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
 export class BarScene {
   readonly app: pc.Application;
   readonly ready: Promise<void>;
-  onInteract?: () => void;
-  onEmote?: (emote:'dance'|'wave') => void;
-  onChat?: () => void;
-  onSkins?: () => void;
-  onKick?: () => void;
-  onMediaFrame?:()=>void;
   private televisions=new Map<string,TelevisionSurface>();
   private watchingTv='';
   private tvYaw=0;
@@ -1074,7 +1068,7 @@ export class BarScene {
       if (light){light.intensity = party * (2 + Math.sin(this.elapsed * 3 + i * Math.PI));light.enabled=light.intensity>.015;}
     }
     this.discoBall.rotate(0, dt * (8+party*62), 0);
-    this.onMediaFrame?.();
+    this.callbacks.onMediaFrame?.();
   }
 
   private inputHasFocus(): boolean {
@@ -1096,12 +1090,12 @@ export class BarScene {
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
         event.preventDefault(); this.keys.add(event.code);
       }
-      if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); this.onInteract?.(); }
-      if (!event.repeat && event.code === 'KeyG') { this.callbacks.onEmote?.('dance'); this.onEmote?.('dance'); }
-      if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); this.onEmote?.('wave'); }
-      if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.onSkins?.(); }
-      if (!event.repeat && event.code === 'KeyX') { event.preventDefault(); this.onKick?.(); }
-      if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.onChat?.(); }
+      if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
+      if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
+      if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
+      if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
+      if (!event.repeat && event.code === 'KeyX') { event.preventDefault(); this.callbacks.onKick?.(); }
+      if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }
     });
     listen(window, 'keyup', event => this.keys.delete(event.code));
     listen(window, 'blur', () => { this.keys.clear(); this.dragging = false; });

@@ -19,7 +19,7 @@ const count=Math.max(2,Math.min(64,Number(process.env.LOAD_CLIENTS)||32));
 const durationMs=Math.max(5000,Number(process.env.LOAD_DURATION_MS)||30000);
 process.env.ROOM_CAPACITY=String(count);
 const config={...readConfig(),production:false,dataPath:'memory://',databaseUrl:undefined,mailEnabled:true,smtpHost:undefined};
-const {app,db}=await createApi({config,rateLimit:false});
+const {app,db}=await createApi({config,rateLimit:false,migrate:true});
 await app.listen({port:0,host:'127.0.0.1'});
 process.env.API_INTERNAL_URL=`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 const http=createServer();

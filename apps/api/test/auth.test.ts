@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { verifyTicket } from '@bar/shared/tickets';
 import { createApi } from '../src/app.js';
-import { connectDatabase } from '../src/database/index.js';
+import { connectDatabase,connectMigratedDatabase } from '../src/database/index.js';
 import { emailVerifications, users } from '../src/database/schema.js';
 import type { ApiConfig } from '../src/config.js';
 import {DEFAULT_CHARACTER} from '@bar/shared';
@@ -14,12 +14,13 @@ import {DEFAULT_CHARACTER} from '@bar/shared';
 const config: ApiConfig = {
   production: false, host: '127.0.0.1', port: 0, webOrigin: 'http://localhost:5173',
   authSecret: 'tests-only-secret-with-at-least-thirty-two-characters',
+  internalSecret: 'tests-only-internal-secret-distinct-and-long-enough',
   mailEnabled: true, autoVerifyEmail: false, smtpPort: 1025, mailFrom: 'test@bar.local', dataPath: 'memory://',
 };
 const password = 'ButecoSeguro2026!';
 
 test('automatic activation unlocks existing accounts and new registrations without sending confirmation', async (t) => {
-  const connection = await connectDatabase({ path: 'memory://' });
+  const connection = await connectMigratedDatabase({ path: 'memory://' });
   t.after(() => connection.close());
   const pending = await createApi({ config, database: connection.db, rateLimit: false });
   assert.deepEqual((await pending.app.inject('/api/auth/config')).json(), { emailVerificationRequired: true });
@@ -64,7 +65,7 @@ test('automatic activation unlocks existing accounts and new registrations witho
 });
 
 test('contas, sessões, moderação e estatísticas obedecem à autorização persistida', async (t) => {
-  const api = await createApi({ config, rateLimit: false });
+  const api = await createApi({ config, rateLimit: false, migrate: true });
   t.after(() => api.app.close());
   const post = (url: string, payload: unknown, cookie?: string) => api.app.inject({ method: 'POST', url, payload: payload as object, headers: cookie ? { cookie } : {} });
   async function register(username: string) {
@@ -103,7 +104,7 @@ test('contas, sessões, moderação e estatísticas obedecem à autorização pe
   const ticketResponse = await post('/api/game-ticket', {}, alice.cookie);
   assert.equal(ticketResponse.statusCode, 200);
   const claims = verifyTicket(ticketResponse.json().ticket, config.authSecret);
-  const internalHeaders = { 'x-internal-secret': config.authSecret };
+  const internalHeaders = { 'x-internal-secret': config.internalSecret };
   await t.test('API interna exige segredo; sessões pertencem ao usuário solicitado', async () => {
     const payload = { sessionId: claims.sessionId, userId: claims.userId };
     assert.equal((await post('/api/internal/validate', payload)).statusCode, 401);
@@ -163,7 +164,7 @@ test('contas, sessões, moderação e estatísticas obedecem à autorização pe
 test('PostgreSQL embutido preserva contas ao reiniciar e aplica a migração novamente', async () => {
   const directory = await mkdtemp(join(tmpdir(),'bar-api-persistence-'));
   try {
-    const first = await createApi({config:{...config,dataPath:directory}});
+    const first = await createApi({config:{...config,dataPath:directory},migrate:true});
     const response = await first.app.inject({method:'POST',url:'/api/auth/register',payload:{email:'persist@test.local',username:'persist',displayName:'Persistente',password}});
     assert.equal(response.statusCode,201,response.body);
     await first.app.close();

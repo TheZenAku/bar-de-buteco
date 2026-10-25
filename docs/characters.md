@@ -19,7 +19,7 @@ O guarda-roupa usa cartões selecionáveis com a prévia de cada modelo, em vez 
 
 ## Persistência e autoridade
 
-`user_profiles.character_config` guarda a configuração versionada e validada; `equipped_skin` guarda o que está vestido. A migração `002_characters.sql` acrescenta essas colunas e as tabelas de carteira, coleção e lançamentos sem apagar dados existentes. Todas as migrações continuam idempotentes e são aplicadas ao iniciar a API.
+`user_profiles.character_config` guarda a configuração versionada e validada; `equipped_skin` guarda o que está vestido. A migração `002_characters.sql` acrescenta essas colunas e as tabelas de carteira, coleção e lançamentos sem apagar dados existentes. Em desenvolvimento, os scripts `dev` e `seed` chamam o runner explícito antes de iniciar; em produção, o serviço one-shot `migrate` conclui antes da API. A conexão runtime nunca aplica DDL.
 
 `POST /api/character` aceita somente opções e cores instaladas. `GET /api/wardrobe` retorna personagem, seleção, catálogo, preços, posse e saldo da própria conta. `POST /api/wardrobe/buy` compra uma skin; `POST /api/wardrobe/equip` seleciona uma opção já adquirida ou `custom`. Os corpos internos `base-male` e `base-female` não são skins que o cliente possa equipar por mensagens.
 

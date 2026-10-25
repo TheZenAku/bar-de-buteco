@@ -1,4 +1,5 @@
 FROM node:24-bookworm-slim AS dependencies
+RUN npm install --global npm@11.20.0
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json

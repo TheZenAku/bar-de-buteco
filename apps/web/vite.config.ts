@@ -1,6 +1,6 @@
 import {defineConfig} from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
-import {redirectHttpToHttps} from './http-redirect';
+import {redirectHttpToHttps} from './http-redirect.js';
 // Browsers only grant the microphone (proximity voice) to secure pages, so the site is served over HTTPS
 // with a self-signed certificate unless BAR_HTTPS=0. /game reaches the multiplayer server through the same
 // address, because an https:// page cannot open a plain ws:// connection to another port.

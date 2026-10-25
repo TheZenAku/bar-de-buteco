@@ -10,7 +10,7 @@ import {currencyLedger,inventoryLedger,itemInventory,wallets} from '../src/datab
 
 test('inventory persists starters and makes purchases and removals atomic and idempotent',async t=>{
   const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
-  const api=await createApi({config,rateLimit:false});t.after(()=>api.app.close());
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
   const account={email:'inventory@example.com',username:'inventory',displayName:'Mochileiro',password:'InventarioSeguro2026!'};
   const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:account});
   assert.equal(register.statusCode,201);
@@ -42,7 +42,7 @@ test('inventory persists starters and makes purchases and removals atomic and id
 
   const ticket=await post('/api/game-ticket',{}),claims=verifyTicket(ticket.json().ticket,config.authSecret);
   const removeId=randomUUID(),remove={sessionId:claims.sessionId,userId,itemId:'agua',quantity:3,reason:'use',requestId:removeId};
-  const internal=(payload:object)=>api.app.inject({method:'POST',url:'/api/internal/inventory',headers:{'x-internal-secret':config.authSecret},payload});
+  const internal=(payload:object)=>api.app.inject({method:'POST',url:'/api/internal/inventory',headers:{'x-internal-secret':config.internalSecret},payload});
   assert.equal((await internal(remove)).statusCode,200);
   assert.equal((await internal(remove)).statusCode,200,'repeating the same room command is harmless');
   view=(await get()).json();assert.equal(view.stacks.find((stack:any)=>stack.itemId==='agua').quantity,7);

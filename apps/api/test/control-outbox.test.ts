@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {eq} from 'drizzle-orm';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
-import {connectDatabase} from '../src/database/index.js';
+import {connectMigratedDatabase} from '../src/database/index.js';
 import {controls} from '../src/database/schema.js';
 import {CONTROL_OUTBOX,acknowledgeControls,claimControlsOnce,leaseControls} from '../src/control-outbox.js';
 
 const pause=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 
 test('control outbox: lease, confirm, redelivery after a crash, dead letter and the previous version',async t=>{
-  const connection=await connectDatabase({path:'memory://'});t.after(()=>connection.close());
+  const connection=await connectMigratedDatabase({path:'memory://'});t.after(()=>connection.close());
   const {db}=connection;
   // Rows are written exactly as the admin transaction writes them (id + payload): status defaults to pending.
   const issue=async(id:string,action='kick')=>{await db.insert(controls).values({id,payload:{id,action,playerId:'p1',issuedAt:Date.now()}});await pause(5);};
@@ -77,8 +77,8 @@ test('control outbox: lease, confirm, redelivery after a crash, dead letter and 
 
 test('internal outbox routes require the internal secret and validate the owner',async t=>{
   const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
-  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
-  const headers={'x-internal-secret':config.authSecret};
+  const service=await createApi({config,rateLimit:false,migrate:true});t.after(()=>service.app.close());
+  const headers={'x-internal-secret':config.internalSecret};
   await service.db.insert(controls).values({id:'route',payload:{id:'route',action:'event',eventType:'PARTY'}});
   assert.equal((await service.app.inject({method:'POST',url:'/api/internal/controls/lease',payload:{owner:'w'}})).statusCode,401);
   assert.equal((await service.app.inject({method:'POST',url:'/api/internal/controls/lease',payload:{owner:''},headers})).statusCode,400);

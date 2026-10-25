@@ -5,7 +5,7 @@ Fonte: [prompt mestre](../auditoria/PROMPT-MESTRE-CLAUDE.md) e [roadmap da audit
 | Marco | Nome | Depende de | Situação |
 | --- | --- | --- | --- |
 | 0 | Baseline reproduzível | — | concluído (veja [ESTADO.md](ESTADO.md)) |
-| 1 | Modularização e operação | 0 | não iniciado |
+| 1 | Modularização e operação | 0 | em andamento: fundação, lifecycle e tooling de recovery prontos; homologação externa pendente |
 | 2 | Pipeline e performance | 1 | não iniciado |
 | 3 | Framework universal de interação | 1 | não iniciado |
 | 4 | Primeiro loop econômico | 3 | não iniciado |
@@ -29,6 +29,7 @@ Fonte: [prompt mestre](../auditoria/PROMPT-MESTRE-CLAUDE.md) e [roadmap da audit
 - Validar a configuração.
 - Readiness, métricas e logs correlacionados.
 - Outbox transacional para controles administrativos e estatísticas.
+- Migração one-shot com ledger/checksum/lock e credencial runtime sem DDL.
 - Homologar o staging: Compose, PostgreSQL, backup/restore e SMTP.
 
 ### Marco 2

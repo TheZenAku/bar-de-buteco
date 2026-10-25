@@ -6,13 +6,13 @@ import {DEFAULT_CHARACTER,MAX_COIN_BALANCE} from '@bar/shared';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 import {OWNER_EMAIL,ensureOwnerAdministrator} from '../src/admin-policy.js';
-import {connectDatabase} from '../src/database/index.js';
+import {connectMigratedDatabase} from '../src/database/index.js';
 import {users,wallets,currencyLedger,moderationActions,controls} from '../src/database/schema.js';
 
 const password='AdminTestsOnly2026!';
 test('primary account manages administrators, wallets and moderation with persistent authorization',async t=>{
   const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
-  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
+  const service=await createApi({config,rateLimit:false,migrate:true});t.after(()=>service.app.close());
   const post=(url:string,payload:object,cookie?:string)=>service.app.inject({method:'POST',url,payload,headers:cookie?{cookie}:{}});
   const get=(url:string,cookie?:string)=>service.app.inject({url,headers:cookie?{cookie}:{}});
   async function register(username:string,email=`${username}@admin.test`){
@@ -71,7 +71,7 @@ test('primary account manages administrators, wallets and moderation with persis
   });
   await t.test('kick/ban controls are delivered once; ban revokes sessions; removed administrators lose API access immediately',async()=>{
     assert.equal((await post('/api/admin/action',{action:'kick',playerId:player.user.id,reason:'Teste de expulsão'},staff.cookie)).statusCode,200);
-    const headers={'x-internal-secret':config.authSecret};
+    const headers={'x-internal-secret':config.internalSecret};
     const queued=(await service.app.inject({url:'/api/internal/controls',headers})).json().controls;
     assert.ok(queued.some((c:{action:string;playerId:string})=>c.action==='kick'&&c.playerId===player.user.id));
     assert.equal((await service.app.inject({url:'/api/internal/controls',headers})).json().controls.length,0);
@@ -91,7 +91,7 @@ test('primary account manages administrators, wallets and moderation with persis
 
 test('administrative reversals compensate once, preserve newer actions and cancel pending moderation',async t=>{
   const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
-  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
+  const service=await createApi({config,rateLimit:false,migrate:true});t.after(()=>service.app.close());
   const post=(url:string,payload:object,cookie:string)=>service.app.inject({method:'POST',url,payload,headers:{cookie}});
   async function register(username:string,email=`${username}@reverse.test`){
     const r=await service.app.inject({method:'POST',url:'/api/auth/register',payload:{username,email,displayName:username,password}});
@@ -163,7 +163,7 @@ test('administrative reversals compensate once, preserve newer actions and cance
 });
 
 test('reserved primary e-mail receives no privileges before verification; existing verified account is promoted at startup',async t=>{
-  const connection=await connectDatabase({path:'memory://'});t.after(()=>connection.close());
+  const connection=await connectMigratedDatabase({path:'memory://'});t.after(()=>connection.close());
   const config={...readConfig(),production:false,databaseUrl:undefined,autoVerifyEmail:false,mailEnabled:true,smtpHost:undefined};
   const first=await createApi({config,database:connection.db,rateLimit:false});t.after(()=>first.app.close());
   const registered=await first.app.inject({method:'POST',url:'/api/auth/register',payload:{username:'primary',displayName:'Principal',email:OWNER_EMAIL.toUpperCase(),password}});

@@ -2,6 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
+import {previewPath} from './preview-path';
 const controllerFixture='/@fs/'+fileURLToPath(new URL('../fixtures/jukebox-controller.html',import.meta.url)).replaceAll('\\','/');
 async function walkTo(page:Page,x:number,z:number,tolerance=.22):Promise<void>{
   const trail:string[]=[];
@@ -53,7 +54,7 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   expect(await page.locator('.jukebox-player iframe').count()).toBe(1);expect(await page.locator('.tv-player iframe').count()).toBe(0);
   expect((await telemetry())[0].mode).toBe('dock');await expect(page.getByRole('button',{name:'Assistir na TV',exact:true})).toHaveCount(0);
   expect((await tvShared()).status).toBe('off');
-  await page.screenshot({path:'docs/previews/jukebox-controls.png'});
+  await page.screenshot({path:previewPath('jukebox-controls.png')});
   // The hall TV: its own panel, link, player and screen, while the jukebox keeps playing.
   await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});
   for(const [x,z] of [[11.5,-9.55],[11.5,-10.95],[10.2,-10.95],[8.9,-10.95],[7.3,-10.95],[7.3,-11.1]])await walkTo(page,x,z,.12);
@@ -70,12 +71,12 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   await page.getByRole('button',{name:'Assistir na TV',exact:true}).click();
   await expect(page.locator('#modal')).toBeHidden();await expect.poll(async()=>(await tvTelemetry())[0]?.mode).toBe('tv');
   const box=await page.locator('.tv-dock.on-surface iframe').boundingBox();expect(box!.height).toBeGreaterThanOrEqual(200);expect(box!.width).toBeGreaterThanOrEqual(200);
-  await page.screenshot({path:'docs/previews/jukebox-tv.png'});
+  await page.screenshot({path:previewPath('jukebox-tv.png')});
   const firstTime=(await tvTelemetry())[0].currentTime;await page.waitForTimeout(1300);expect((await tvTelemetry())[0].currentTime).toBeGreaterThan(firstTime+.5);
   const straight=await page.locator('.tv-player').evaluate(element=>element.style.transform);
   await page.mouse.move(90,320);await page.mouse.down();await page.mouse.move(160,335,{steps:8});await page.mouse.up();
   await expect.poll(()=>page.locator('.tv-player').evaluate(element=>element.style.transform)).not.toBe(straight);
-  expect((await tvTelemetry())[0].mode).toBe('tv');await page.screenshot({path:'docs/previews/jukebox-tv-angle.png'});
+  expect((await tvTelemetry())[0].mode).toBe('tv');await page.screenshot({path:previewPath('jukebox-tv-angle.png')});
   await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});await page.keyboard.press('e');await expect(page.locator('#modal-title')).toHaveText('TV DO SALÃO');
   // Pausing and switching the TV off leave the jukebox playing.
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await tvTelemetry())[0]?.status).toBe('paused');
@@ -104,7 +105,7 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
     await page.setViewportSize({width:390,height:844});await page.locator('#jukebox-volume').fill('35');await expect.poll(async()=>(await telemetry())[0].volume).toBe(35);
     await expect(page.getByRole('button',{name:'Fechar janela'})).toBeInViewport();
     expect(await page.locator('.jukebox-player iframe').count()).toBe(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await page.screenshot({path:'docs/previews/jukebox-mobile.png'});await page.setViewportSize({width:960,height:640});
+    await page.screenshot({path:previewPath('jukebox-mobile.png')});await page.setViewportSize({width:960,height:640});
     await page.getByRole('button',{name:'Parar',exact:true}).click();await expect.poll(async()=>(await shared()).status).toBe('stopped');await expect.poll(async()=>['stopped','paused'].includes((await telemetry())[0]?.status)).toBe(true);
     await page.getByRole('button',{name:'Desligar jukebox',exact:true}).click();await expect.poll(()=>telemetry()).toEqual([]);await expect.poll(()=>telemetry(other)).toEqual([]);
     await page.keyboard.press('Escape');await page.keyboard.press('s',{delay:150});const moved=await page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId];});expect(Math.hypot(moved.x-before.x,moved.z-before.z)).toBeGreaterThan(.15);

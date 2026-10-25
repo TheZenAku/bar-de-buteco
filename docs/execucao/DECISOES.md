@@ -77,3 +77,59 @@ Não reutilizar Avatar V2/Antonia nem Quaternius como avatar final, sistema modu
 **Decisão.** Usar `npm update body-parser`, que leva à 2.4.0, sem override e sem mexer nos manifests.
 
 **Consequência.** Reverter só o lockfile desfaz a mudança.
+
+## ADR-005 — entrega confiável entre API e mundo (Marco 1)
+
+**Contexto.** Controles administrativos e resultados de partidas podiam se perder quando um processo caía entre leitura e confirmação.
+
+**Decisão.** A API mantém controles em outbox transacional com lease, confirmação, reentrega e dead letter. O mundo mantém resultados pendentes em outbox durável em disco e confirma apenas depois da aceitação pela API. As rotas anteriores continuam compatíveis durante a transição.
+
+**Consequência.** Reinícios deixam de perder comandos/resultados e a idempotência permanece na fronteira persistente. O volume `bar-world` é obrigatório no Compose.
+
+## ADR-006 — readiness e observabilidade protegida (Marco 1)
+
+**Contexto.** Liveness isolada não informa se API, banco e relay estão aptos a servir tráfego, e identificadores crus não devem aparecer nos logs.
+
+**Decisão.** API e mundo expõem health, readiness e métricas internas protegidas; chamadas carregam `x-request-id`; logs do mundo usam pseudônimos. O Compose usa readiness na API, mas liveness no mundo: a sala nasce sob demanda no primeiro ingresso e usar `/ready` para liberar o próprio frontend criaria um deadlock de bootstrap. A readiness do mundo permanece disponível para monitorar a sala depois de criada.
+
+**Consequência.** A API não libera dependentes antes do banco; o processo do mundo precisa estar vivo para o frontend subir, e `/ready` distingue depois se sala, API e outbox estão operacionais. Investigações correlacionam falhas sem registrar IDs de conta em claro.
+
+## ADR-007 — lifecycle incremental por fachadas (Marco 1)
+
+**Contexto.** `main.ts`, `BarScene` e `BarRoom` concentram responsabilidades. Uma reescrita simultânea mudaria demasiadas invariantes de conexão, reconexão e gameplay.
+
+**Decisão.** Manter as três fachadas e extrair primeiro fronteiras pequenas e testáveis: `AdmissionLifecycle` invalida continuações assíncronas antigas do cliente; `SceneCallbacks` é o único canal de eventos da cena; `SessionRegistry` possui nonces e índices de sessões da sala. A remoção por presença esperada torna inofensivo o `onLeave` atrasado de uma sessão substituída.
+
+**Consequência.** Sair durante o carregamento não pode reconectar rede/microfone por trás do lobby; takeover e reconnect deixam de depender de busca linear. Mensagens e estado de rede permanecem iguais. Sistemas de gameplay continuam atrás das fachadas e serão extraídos apenas em fatias futuras com caracterização própria.
+
+## ADR-008 — segredos distintos por finalidade (Marco 1)
+
+**Contexto.** `AUTH_SECRET` assinava tickets e também autorizava API↔mundo, métricas e HMAC de logs. O vazamento de uma função comprometia todas as demais.
+
+**Decisão.** `AUTH_SECRET` fica exclusivo para tickets. `INTERNAL_SECRET` protege chamadas internas, métricas e pseudônimos. Produção exige chaves fortes, diferentes e com pelo menos 32 caracteres; somente desenvolvimento mantém fallback transitório quando a nova variável está ausente.
+
+**Consequência.** A chave de ticket não abre endpoints internos. Compose, exemplos, ferramenta de pseudônimo e testes usam o contrato novo; ambientes de produção precisam provisionar a variável antes de atualizar.
+
+## ADR-009 — recuperação testável e runtime fixado (Marco 1)
+
+**Contexto.** Havia apenas a recomendação genérica de usar `pg_dump`, sem restore ensaiável, e a versão de Node divergia entre documentação, host e CI.
+
+**Decisão.** Fixar Node 24 em `.nvmrc`/`engines`/CI. Backups custom do PostgreSQL ficam sob `.local/backups`, com SHA-256, publicação sem overwrite e validação por restore em banco temporário de nome reservado. A CI ganha job isolado com PostgreSQL 17 e reaplicação das migrações.
+
+**Consequência.** Restore nunca aponta para `bar` e só remove um banco que a própria execução confirmou ter criado. Docker/restore e o job remoto continuam não comprovados até rodarem nos ambientes correspondentes.
+
+## ADR-010 — CI isolada e scripts de dependências negados por padrão (Marco 1)
+
+**Contexto.** Build, testes, E2E e carga competiam dentro de um único job de 15 minutos. O npm 11 também listava scripts pendentes de `argon2`, `esbuild` e `msgpackr-extract`, embora o alvo suportado já receba binários pré-compilados e todas as três dependências funcionem sem executá-los.
+
+**Decisão.** Separar `verify`, `e2e`, `load` e `postgres-smoke`, com limites e artefatos próprios. Fixar npm 11.20 como gerenciador de desenvolvimento (a versão mínima que aplica esta política), instalá-lo explicitamente antes de `npm ci` nos quatro jobs e nos estágios Docker, registrar negação explícita dos três scripts em `allowScripts` e manter o lockfile como fonte das versões; qualquer dependência futura que realmente precise de lifecycle exige revisão específica, não aprovação global.
+
+**Consequência.** Uma suíte lenta não consome o orçamento das demais e os relatórios sobrevivem a falhas. CI e imagem não dependem da versão de npm que vier embutida no Node 24 para interpretar `devEngines`/`allowScripts`. A instalação não executa código adicional desnecessário; plataformas fora do alvo Node 24/Linux x64 precisam comprovar seus binários antes de serem declaradas suportadas. O workflow remoto continua não comprovado até uma execução no GitHub Actions.
+
+## ADR-011 — migração explícita e credencial runtime sem DDL (Marco 1)
+
+**Contexto.** Toda conexão da API reaplicava quatro arquivos com `IF NOT EXISTS` usando o mesmo superuser `bar` do PostgreSQL. Não havia histórico imutável, checksum, exclusão entre réplicas nem forma de distinguir um schema legado correto de outro apenas parcialmente compatível.
+
+**Decisão.** `connectDatabase` passa a somente conectar e validar. O comando one-shot `migrate` usa um ledger com checksum normalizado, valida contrato estrutural, serializa concorrentes por lock consultivo com timeout e aplica o lote pendente numa transação. A API em produção usa `bar_runtime`, sem superuser nem DDL; `bar_migrator` assume o owner sem login `bar_owner` somente no runner. O bootstrap `bar` permanece reservado à operação. A ordem do Compose é PostgreSQL saudável → migração concluída → API.
+
+**Consequência.** Startup runtime não altera schema e falha cedo se o deploy esqueceu a migração. SQL aplicado torna-se imutável; toda evolução exige novo arquivo expand/contract. Volumes legados só recebem baseline depois de verificar colunas, defaults, chaves, checks e índices esperados. Um runtime anterior à migração explícita precisa excepcionalmente da credencial bootstrap para rollback, conforme o runbook; versões já adaptadas aceitam linhas futuras no ledger para permitir rollback de aplicação compatível. Compose, papéis reais e upgrade de volume continuam sem homologação local enquanto Docker não existir neste host.

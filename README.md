@@ -6,7 +6,7 @@ MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, 
 
 No Windows, também é possível abrir **`tools/iniciar.bat`** com dois cliques. Use `tools/reiniciar.bat`, `tools/parar.bat` e `tools/status.bat` para controlar os serviços. Consulte [os iniciadores do Windows](tools/README.md) para logs e diagnóstico.
 
-Requer **Node.js 24** e npm. Na raiz:
+Requer **Node.js 24** e **npm 11.20.x** (a mesma versão fixada na CI e nas imagens). Na raiz:
 
 ```sh
 npm install
@@ -86,7 +86,7 @@ A interface segue a nova referência **Boteco Social**, em `assets-bar/ui/nova-u
 
 A API usa a porta 3001; o jogo, 2567; o cliente, 5173 (HTTPS, com o jogo em `/game` no mesmo endereço; `BAR_HTTPS=0` volta ao HTTP). Para jogar pela internet basta abrir a porta 5173. `.env.example` contém a configuração. Sem `DATABASE_URL`, os dados persistem em `.data/postgres` via PGlite (PostgreSQL embutido). `DATABASE_URL` ativa PostgreSQL nativo. Movimento, NPCs e rodadas ficam em memória; reiniciar o jogo reinicia esse estado.
 
-Em produção, use PostgreSQL nativo, SMTP, HTTPS e um segredo aleatório. Veja [execução em Docker e configuração de produção](infra/README.md). Os arquivos de infraestrutura estão preparados, mas Docker e entrega SMTP externa não foram executados neste ambiente.
+Em produção, use PostgreSQL nativo, SMTP, HTTPS e segredos aleatórios distintos para tickets e tráfego interno. Veja [execução em Docker e configuração de produção](infra/README.md). Os arquivos de infraestrutura estão preparados, mas Docker e entrega SMTP externa não foram executados neste ambiente.
 
 ## Verificação
 
@@ -98,6 +98,8 @@ npm run test:load
 ```
 
 Os testes de navegador iniciam serviços isolados nas portas 3111/2677/5273, preparam contas de demonstração e usam `.local/character-e2e/postgres`, sem alterar o banco do bar de desenvolvimento. As contas criadas nessa execução recebem saldo de teste para exercitar compras. No Windows usam Edge instalado; em outros sistemas, execute `npx playwright install chromium`. `PLAYWRIGHT_CHANNEL` pode selecionar outro canal instalado. Não use contas reais nos testes.
+
+Capturas automáticas vão para `test-results/previews` e não alteram a documentação. Para atualizar deliberadamente a galeria rastreada, execute os E2E com `UPDATE_PREVIEWS=1` (no PowerShell: `$env:UPDATE_PREVIEWS='1'` antes do comando) e revise as imagens antes do commit.
 
 `test:load` cria API, PostgreSQL em memória e servidor isolados em portas aleatórias; não altera os dados do bar de desenvolvimento. O padrão é 32 clientes durante 30 segundos. Para duas horas, ajuste `LOAD_DURATION_MS=7200000`; para mudar a carga, ajuste `LOAD_CLIENTS`. O relatório sai em `test-results/load-report.json`.
 

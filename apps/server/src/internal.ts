@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { authSecret } from '@bar/shared/tickets';
+import { internalSecret } from '@bar/shared/tickets';
 import type {CharacterConfig,InventoryStack} from '@bar/shared';
 import { readWorldConfig } from './config.js';
 
@@ -14,7 +14,7 @@ export async function internal<T>(path: string, body?: unknown): Promise<T> {
   const requestId = `world-${randomUUID()}`;
   const response = await fetch(`${readWorldConfig().apiInternalUrl}/api/internal/${path}`, {
     method: body === undefined ? 'GET' : 'POST',
-    headers: { 'content-type': 'application/json', 'x-internal-secret': authSecret(), 'x-request-id': requestId },
+    headers: { 'content-type': 'application/json', 'x-internal-secret': internalSecret(), 'x-request-id': requestId },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(4000),
   }).catch((error: unknown) => { throw Object.assign(new Error(`API interna inacessível: ${error instanceof Error ? error.message : String(error)}`), { requestId }); });

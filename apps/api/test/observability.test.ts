@@ -4,8 +4,8 @@ import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 
 test('API: correlation ids, readiness and protected metrics with route templates only',async t=>{
-  const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
-  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
+  const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true,internalSecret:'observability-internal-secret-distinct-and-long-enough'};
+  const service=await createApi({config,rateLimit:false,migrate:true});t.after(()=>service.app.close());
   const correlated=await service.app.inject({url:'/api/health',headers:{'x-request-id':'world-6c1f1b9e-0000-4000-8000-000000000001'}});
   assert.equal(correlated.headers['x-request-id'],'world-6c1f1b9e-0000-4000-8000-000000000001','The caller\'s id is kept');
   const forged=await service.app.inject({url:'/api/health',headers:{'x-request-id':'bad id\nwith newline'}});
@@ -14,7 +14,8 @@ test('API: correlation ids, readiness and protected metrics with route templates
   assert.equal(ready.statusCode,200);assert.deepEqual(ready.json(),{ready:true,checks:{database:true}});
   await service.app.inject({url:'/api/admin/overview?search=secret-search'});
   assert.equal((await service.app.inject({url:'/api/internal/metrics'})).statusCode,401);
-  const metrics=await service.app.inject({url:'/api/internal/metrics',headers:{'x-internal-secret':config.authSecret}});
+  assert.equal((await service.app.inject({url:'/api/internal/metrics',headers:{'x-internal-secret':config.authSecret}})).statusCode,401,'AUTH_SECRET does not authorize internal routes');
+  const metrics=await service.app.inject({url:'/api/internal/metrics',headers:{'x-internal-secret':config.internalSecret}});
   assert.equal(metrics.statusCode,200);assert.match(String(metrics.headers['content-type']),/^text\/plain/);
   assert.match(metrics.body,/bar_api_requests_total\{method="GET",route="\/api\/health",status="2xx"\} 2/);
   assert.match(metrics.body,/route="\/api\/admin\/overview",status="4xx"/);
@@ -24,7 +25,7 @@ test('API: correlation ids, readiness and protected metrics with route templates
 
 test('API readiness fails when the database does not answer',async t=>{
   const config={...readConfig(),production:false,databaseUrl:undefined,dataPath:'memory://',autoVerifyEmail:true};
-  const service=await createApi({config,rateLimit:false});t.after(()=>service.app.close());
+  const service=await createApi({config,rateLimit:false,migrate:true});t.after(()=>service.app.close());
   const original=service.db.execute.bind(service.db);
   (service.db as any).execute=async()=>{throw new Error('connection refused');};
   try{const response=await service.app.inject({url:'/api/ready'});assert.equal(response.statusCode,503);assert.deepEqual(response.json(),{ready:false,checks:{database:false}});}
@@ -40,5 +41,19 @@ test('API configuration refuses invalid numbers instead of starting with NaN',()
     }
     process.env={...saved,API_PORT:'',TRUST_PROXY_HOPS:'2'};const config=readConfig();
     assert.equal(config.port,3001);assert.equal(config.trustProxyHops,2);
+  }finally{process.env=saved;}
+});
+
+test('production requires independent strong authentication and internal secrets',()=>{
+  const saved={...process.env};
+  const auth='auth-production-secret-with-more-than-thirty-two-characters';
+  const internal='internal-production-secret-with-more-than-thirty-two-characters';
+  const base={...saved,NODE_ENV:'production',DATABASE_URL:'postgresql://bar:test@localhost/bar',SMTP_HOST:'smtp.example.com',WEB_ORIGIN:'https://bar.example.com',AUTH_SECRET:auth};
+  try{
+    process.env={...base};assert.throws(()=>readConfig(),/INTERNAL_SECRET/);
+    process.env={...base,INTERNAL_SECRET:'short'};assert.throws(()=>readConfig(),/INTERNAL_SECRET/);
+    process.env={...base,INTERNAL_SECRET:auth};assert.throws(()=>readConfig(),/diferente de AUTH_SECRET/);
+    process.env={...base,INTERNAL_SECRET:internal};const config=readConfig();
+    assert.equal(config.authSecret,auth);assert.equal(config.internalSecret,internal);
   }finally{process.env=saved;}
 });

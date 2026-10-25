@@ -1,11 +1,15 @@
 name: bar-de-buteco
 services:
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ..
+      dockerfile: infra/postgres/Dockerfile
     environment:
       POSTGRES_DB: bar
       POSTGRES_USER: bar
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      BAR_MIGRATOR_PASSWORD: ${BAR_MIGRATOR_PASSWORD:?Defina BAR_MIGRATOR_PASSWORD hexadecimal}
+      BAR_RUNTIME_PASSWORD: ${BAR_RUNTIME_PASSWORD:?Defina BAR_RUNTIME_PASSWORD hexadecimal}
     volumes:
       - bar-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +18,41 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
+
+  postgres-bootstrap:
+    build:
+      context: ..
+      dockerfile: infra/postgres/Dockerfile
+    command: ["/docker-entrypoint-initdb.d/010-roles.sh"]
+    environment:
+      POSTGRES_DB: bar
+      POSTGRES_USER: bar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      BAR_MIGRATOR_PASSWORD: ${BAR_MIGRATOR_PASSWORD:?Defina BAR_MIGRATOR_PASSWORD hexadecimal}
+      BAR_RUNTIME_PASSWORD: ${BAR_RUNTIME_PASSWORD:?Defina BAR_RUNTIME_PASSWORD hexadecimal}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: bar
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile
+      target: backend
+    command: ["npm", "run", "migrate", "-w", "@bar/api"]
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: postgresql://bar_migrator:${BAR_MIGRATOR_PASSWORD:?Defina BAR_MIGRATOR_PASSWORD hexadecimal}@postgres:5432/bar
+      MIGRATION_ROLE: bar_owner
+      MIGRATION_RUNTIME_ROLE: bar_runtime
+      MIGRATION_LOCK_TIMEOUT_MS: ${MIGRATION_LOCK_TIMEOUT_MS:-30000}
+    depends_on:
+      postgres-bootstrap: { condition: service_completed_successfully }
+    restart: "no"
 
   api:
     build:
@@ -25,8 +64,9 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 3001
       TRUST_PROXY_HOPS: 1
-      DATABASE_URL: postgresql://bar:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/bar
+      DATABASE_URL: postgresql://bar_runtime:${BAR_RUNTIME_PASSWORD:?Defina BAR_RUNTIME_PASSWORD hexadecimal}@postgres:5432/bar
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET aleatório com pelo menos 32 caracteres}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:?Defina INTERNAL_SECRET distinto com pelo menos 32 caracteres}
       WEB_ORIGIN: ${WEB_ORIGIN:?Defina WEB_ORIGIN com HTTPS}
       AUTO_VERIFY_EMAIL: ${AUTO_VERIFY_EMAIL:-false}
       SMTP_HOST: ${SMTP_HOST:?Defina SMTP_HOST}
@@ -36,8 +76,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-B.A.R. <bar@example.com>}
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -55,6 +96,7 @@ services:
       GAME_PORT: 2567
       API_INTERNAL_URL: http://api:3001
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:?Defina INTERNAL_SECRET distinto de AUTH_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN:?Defina WEB_ORIGIN}
       ROOM_CAPACITY: ${ROOM_CAPACITY:-32}
       EVENT_MIN_MS: ${EVENT_MIN_MS:-300000}
@@ -67,6 +109,8 @@ services:
     depends_on:
       api: { condition: service_healthy }
     healthcheck:
+      # Rooms are created lazily by the first player. Using /ready here would deadlock a fresh
+      # deployment because the web waits for this healthcheck before any player can create one.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2567/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s

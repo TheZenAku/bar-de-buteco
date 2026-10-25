@@ -219,6 +219,24 @@ async function createAccount(page:Page,suffix:string,customize?:(page:Page)=>Pro
   await gameReady(page);
   return email;
 }
+
+test('leaving while admission data is loading cannot reconnect the player behind the lobby',async({page})=>{
+  let release!:()=>void;
+  const held=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/blocks',async route=>{await held;await route.continue();});
+  await page.goto('/');
+  await page.getByLabel('E-mail',{exact:true}).fill('jogador1@bar.local');
+  await page.getByLabel('Senha',{exact:true}).fill(process.env.DEMO_PASSWORD||'ButecoDemo2026!');
+  const loading=page.waitForRequest(request=>request.url().endsWith('/api/blocks'));
+  await page.getByRole('button',{name:'Entrar no bar'}).click();
+  await loading;
+  await page.locator('#waiting').getByRole('button',{name:'Voltar à entrada'}).click();
+  await expect(page.locator('#lobby')).toBeVisible();
+  release();
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.snapshot().world),{timeout:10000}).toBeUndefined();
+  await expect(page.locator('#game')).toBeHidden();
+});
+
 async function selectSkin(page:Page,name:string):Promise<void>{
   const card=page.locator('.skin-card').filter({has:page.locator('b',{hasText:name})});
   await card.click();

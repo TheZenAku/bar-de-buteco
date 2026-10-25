@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
+import {previewPath} from './preview-path';
 
 async function walkTo(page:Page,x:number,z:number,tolerance=.12):Promise<void>{
   const trail:string[]=[];
@@ -45,7 +46,7 @@ test('doors swing on their own hinges for everyone, block when closed and let pe
     await expect.poll(()=>leaf(page,'Porta_WC_Masc'),{timeout:45000}).toBe(0);await expect.poll(()=>leaf(other,'Porta_WC_Masc'),{timeout:45000}).toBe(0);
     expect(await leaf(page,'Porta_WC_Fem')).toBe(1);
     await context.close();
-    await page.screenshot({path:'docs/previews/door-closed.png'});
+    await page.screenshot({path:previewPath('door-closed.png')});
     await expect(page.locator('#context-label')).toHaveText('Abrir a porta · Banheiro masculino');
     // Closed: walking into the room stops at the leaf.
     // Forward, towards the back wall (the camera looks to −z): into the closed door.
@@ -60,7 +61,7 @@ test('doors swing on their own hinges for everyone, block when closed and let pe
     // Off-centre is fine: the body is guided into the open doorway.
     await walkTo(page,5.3,-11.0);await walkTo(page,5.45,-12.1,.25);
     expect((await me(page)).z).toBeLessThan(-12);
-    await page.screenshot({path:'docs/previews/door-open.png'});
+    await page.screenshot({path:previewPath('door-open.png')});
     expect(errors).toEqual([]);
   }finally{await context.close();}
 });

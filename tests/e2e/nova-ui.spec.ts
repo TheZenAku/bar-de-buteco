@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
+import {previewPath} from './preview-path';
 
 async function ready(page:Page){await expect(page.locator('#waiting')).toBeHidden({timeout:60000});await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId]?.connected===true;}),{timeout:30000}).toBe(true);}
 async function enter(page:Page,prefix:string){
@@ -27,12 +28,12 @@ test('nova UI persists panel positions, locks and visibility per account, handle
     await page.getByRole('button',{name:'Travar painéis',exact:true}).click();await drag(40,40);expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
     await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-visible="chat"]').click();await expect(page.locator('[data-panel="chat"]')).toBeHidden();
     await page.locator('.boteco-logo').click();await page.getByRole('button',{name:/Resenhar/}).click();await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
-    await page.screenshot({path:'docs/previews/nova-ui-desktop.png'});
+    await page.screenshot({path:previewPath('nova-ui-desktop.png')});
     for(const width of [960,760,640,390]){
       await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       for(const item of await page.locator('[data-panel]').all()){const box=(await item.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(844);}
     }
-    await page.screenshot({path:'docs/previews/nova-ui-mobile.png'});
+    await page.screenshot({path:previewPath('nova-ui-mobile.png')});
     await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-reset]').click();await expect(page.getByRole('button',{name:'Travar painéis',exact:true})).toBeVisible();
     await page.evaluate(id=>localStorage.setItem(`bar:nova-ui:hud:v1:${id}:desktop`,'{"panels":{"status":{"x":"broken"}}'),id);
     await page.setViewportSize({width:1440,height:900});await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);await expect(page.locator('[data-panel="status"]')).toBeVisible();
@@ -53,7 +54,7 @@ test('real proximity messages create safe comanda toasts and blocking also suppr
     await page.getByRole('button',{name:'Fechar janela'}).click();for(const close of await page.locator('.comanda__close').all())await close.click();
     await send('Este recado está bloqueado');await expect(other.locator('#messages')).toContainText('Este recado está bloqueado');await expect(page.locator('#messages')).not.toContainText('Este recado está bloqueado');await expect(page.locator('#toasts')).not.toContainText('Este recado está bloqueado');
     await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form button').click();await expect(page.locator('.comanda[data-variant="acao"]')).toContainText('Bengala equipada');
-    await page.screenshot({path:'docs/previews/nova-ui-toast.png'});expect(errors).toEqual([]);
+    await page.screenshot({path:previewPath('nova-ui-toast.png')});expect(errors).toEqual([]);
   }finally{await Promise.allSettled([page.request.post('/api/auth/logout',{data:{}}),other.request.post('/api/auth/logout',{data:{}})]);await other.goto('about:blank').catch(()=>{});await context.close();}
 });
 
@@ -61,8 +62,8 @@ test('comanda notices are bounded, deduplicated, dismissible and pause expiry du
   const fixture=fileURLToPath(new URL('../fixtures/notifications.html',import.meta.url)).replaceAll('\\','/');await page.goto(`/@fs/${fixture}`);await page.waitForFunction(()=>(window as any).fixture);
   await page.evaluate(()=>{for(let i=0;i<6;i++)(window as any).fixture.show({title:`Recado ${i}`,duration:15000});});await expect(page.locator('.comanda')).toHaveCount(4);await expect(page.locator('.comanda').first()).toContainText('Recado 2');
   await page.evaluate(()=>{(window as any).fixture.clear();(window as any).fixture.show({title:'Pausado',duration:1000,id:'one'});(window as any).fixture.show({title:'Duplicado',id:'one'});});await expect(page.locator('.comanda')).toHaveCount(1);
-  await page.locator('.comanda').hover();await page.waitForTimeout(1200);await expect(page.locator('.comanda')).toBeVisible();await page.mouse.move(0,0);await expect(page.locator('.comanda')).toHaveCount(0,{timeout:3000});
-  await page.evaluate(()=>(window as any).fixture.show({title:'Teclado',duration:1000}));await page.getByRole('button',{name:'Fechar aviso'}).focus();await page.waitForTimeout(1200);await expect(page.locator('.comanda')).toBeVisible();await page.locator('#outside').focus();await expect(page.locator('.comanda')).toHaveCount(0,{timeout:3000});
+  await page.locator('.comanda').dispatchEvent('pointerenter');await page.evaluate(()=>(window as any).fixture.advance(1200));await expect(page.locator('.comanda')).toBeVisible();await page.locator('.comanda').dispatchEvent('pointerleave');await page.evaluate(()=>(window as any).fixture.advance(1000));await expect(page.locator('.comanda')).toHaveCount(0);
+  await page.evaluate(()=>(window as any).fixture.show({title:'Teclado',duration:1000}));await page.getByRole('button',{name:'Fechar aviso'}).focus();await page.evaluate(()=>(window as any).fixture.advance(1200));await expect(page.locator('.comanda')).toBeVisible();await page.locator('#outside').focus();await page.evaluate(()=>(window as any).fixture.advance(1000));await expect(page.locator('.comanda')).toHaveCount(0);
   await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>(window as any).fixture.show({variant:'aviso',title:'Erro real',text:'Tente novamente.',duration:15000}));await expect(page.getByRole('alert')).toContainText('Erro real');await page.getByRole('button',{name:'Fechar aviso'}).click();await expect(page.locator('.comanda')).toHaveCount(0);
 });
 

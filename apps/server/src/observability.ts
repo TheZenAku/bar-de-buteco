@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { MetricsRegistry } from '@bar/shared/metrics';
-import { authSecret } from '@bar/shared/tickets';
+import { internalSecret } from '@bar/shared/tickets';
 
 /** One registry per world process (GET /metrics, internal secret required). */
 export const worldMetrics = new MetricsRegistry();
@@ -15,10 +15,10 @@ export function readiness(now = Date.now()): { ready: boolean; checks: Record<st
 }
 
 /**
- * Logs never carry raw account ids: a keyed hash (HMAC with AUTH_SECRET) still correlates every line of the same
- * player. To find a player's lines: `node tools/pseudonym.mjs <userId>` with the same AUTH_SECRET.
+ * Logs never carry raw account ids: a keyed hash (HMAC with INTERNAL_SECRET) still correlates every line of the
+ * same player. To find a player's lines: `node tools/pseudonym.mjs <userId>` in the same environment.
  */
-export function pseudonym(id: string): string { return createHmac('sha256', authSecret()).update(`log:${id}`).digest('hex').slice(0, 12); }
+export function pseudonym(id: string): string { return createHmac('sha256', internalSecret()).update(`log:${id}`).digest('hex').slice(0, 12); }
 
 const PLAYER_FIELDS = new Set(['playerId', 'userId']);
 export function logLine(event: string, details: Record<string, unknown>, roomId?: string): string {
@@ -28,6 +28,6 @@ export function logLine(event: string, details: Record<string, unknown>, roomId?
 
 export function internalSecretMatches(value: string | null): boolean {
   if (!value) return false;
-  const a = Buffer.from(value), b = Buffer.from(authSecret());
+  const a = Buffer.from(value), b = Buffer.from(internalSecret());
   return a.length === b.length && timingSafeEqual(a, b);
 }

@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {DEFAULT_CHARACTER,MALE_CLOTHING} from '../../packages/shared/src/character';
+import {previewPath} from './preview-path';
 
 test('male clothing previews, animates, persists and replicates independently of other characters and premium skins',async({page,browser,request})=>{
   test.setTimeout(240000);
@@ -30,8 +31,8 @@ test('male clothing previews, animates, persists and replicates independently of
   await page.getByLabel('Corpo',{exact:true}).selectOption('male');await expect(page.getByRole('radio',{name:'Suéter',exact:true})).toBeChecked();
   await expect(page.locator('#preview-status')).toHaveText('');
   await page.setViewportSize({width:1100,height:1000});await page.locator('#character-preview').scrollIntoViewIfNeeded();
-  await page.locator('#character-preview').screenshot({path:'docs/previews/male-clothing.png'});
-  await page.locator('#male-clothing').scrollIntoViewIfNeeded();await page.screenshot({path:'docs/previews/clothing-menu.png'});
+  await page.locator('#character-preview').screenshot({path:previewPath('male-clothing.png')});
+  await page.locator('#male-clothing').scrollIntoViewIfNeeded();await page.screenshot({path:previewPath('clothing-menu.png')});
   await page.setViewportSize({width:390,height:844});await page.getByRole('group',{name:'Calçados',exact:true}).scrollIntoViewIfNeeded();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole('button',{name:'Criar personagem e continuar'}).click();await ready(page);

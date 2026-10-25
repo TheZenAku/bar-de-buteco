@@ -7,6 +7,7 @@ import {FileOutbox} from '../src/world/outbox.js';
 import {ControlRelay,ResultRelay,type MatchResult} from '../src/world/relays.js';
 import {InternalApiError,type Control} from '../src/internal.js';
 import {readWorldConfig,WorldConfigError} from '../src/config.js';
+import {internalSecret} from '@bar/shared/tickets';
 
 type Result={roundId:string;userId:string;result:MatchResult};
 function directory(t:test.TestContext){const dir=mkdtempSync(join(tmpdir(),'bar-outbox-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir;}
@@ -79,4 +80,13 @@ test('world configuration: invalid values stop the start; empty means unset; the
   for(const env of [{GAME_PORT:'abc'},{GAME_PORT:'70000'},{ROOM_CAPACITY:'2.5'},{API_INTERNAL_URL:'ftp://api'},{EVENT_MIN_MS:'soon'}])
     assert.throws(()=>readWorldConfig(env),WorldConfigError,JSON.stringify(env));
   assert.throws(()=>readWorldConfig({GAME_PORT:'abc'}),/GAME_PORT/);
+});
+
+test('world production configuration requires separate strong secrets; development keeps the legacy fallback',()=>{
+  const auth='auth-production-secret-with-more-than-thirty-two-characters';
+  const internal='internal-production-secret-with-more-than-thirty-two-characters';
+  assert.equal(internalSecret({NODE_ENV:'development',AUTH_SECRET:'legacy-development-secret'}),'legacy-development-secret');
+  assert.throws(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth}),/INTERNAL_SECRET/);
+  assert.throws(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth,INTERNAL_SECRET:auth}),/diferente de AUTH_SECRET/);
+  assert.doesNotThrow(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth,INTERNAL_SECRET:internal}));
 });

@@ -3,13 +3,11 @@ import { createServer } from 'node:http';
 import { config as loadEnvironment } from 'dotenv';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { authSecret } from '@bar/shared/tickets';
 import { BarRoom } from './BarRoom.js';
 import { readWorldConfig } from './config.js';
 import { worldRouter } from './http.js';
 
 loadEnvironment({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
-authSecret();
 // Fails fast with the variable's name when the environment is invalid.
 const config = readWorldConfig();
 const http = createServer();

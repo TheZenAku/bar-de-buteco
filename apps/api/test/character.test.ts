@@ -4,7 +4,7 @@ import {createApi} from '../src/app.js';import {readConfig} from '../src/config.
 
 test('creator, ownership and purchases persist; duplicate/racing requests cannot mint coins or duplicate charges',async t=>{
   const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
-  const api=await createApi({config,rateLimit:false});t.after(()=>api.app.close());
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
   const account={email:'character@example.com',username:'character',displayName:'Personagem',password:'PersonagemSeguro2026!'};
   const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:account});assert.equal(register.statusCode,201);
   const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id;
@@ -31,7 +31,7 @@ test('creator, ownership and purchases persist; duplicate/racing requests cannot
   assert.equal((await get('/api/auth/me')).json().user.equippedSkin,'nathan');
   assert.deepEqual((await get('/api/auth/me')).json().user.character,character);
   const ticket=await post('/api/game-ticket',{}),claims=verifyTicket(ticket.json().ticket,config.authSecret);
-  const validation=await api.app.inject({method:'POST',url:'/api/internal/validate',headers:{'x-internal-secret':config.authSecret},payload:{sessionId:claims.sessionId,userId}});
+  const validation=await api.app.inject({method:'POST',url:'/api/internal/validate',headers:{'x-internal-secret':config.internalSecret},payload:{sessionId:claims.sessionId,userId}});
   assert.deepEqual(validation.json().ownedSkins,['nathan']);assert.deepEqual(validation.json().character,character);
   assert.equal((await post('/api/wardrobe/equip',{skin:'custom'})).statusCode,200);
   assert.deepEqual((await get('/api/wardrobe')).json().character,character,'Equipping a premium skin must preserve the custom character');

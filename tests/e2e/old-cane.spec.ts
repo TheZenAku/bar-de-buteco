@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
+import {previewPath} from './preview-path';
 
 test('chat toggles only the cane and gait, replicates to other players and works with existing skins',async({browser,page,request})=>{
   test.setTimeout(240000);
@@ -33,7 +34,7 @@ test('chat toggles only the cane and gait, replicates to other players and works
     try{
       await expect.poll(async()=>(await animation(other))?.clip).toBe('OldCaneWalk');
       await expect.poll(async()=>(await animation(page))?.speed).toBeCloseTo(1,3);
-      await page.screenshot({path:'docs/previews/old-cane.png'});
+      await page.screenshot({path:previewPath('old-cane.png')});
     }finally{await page.keyboard.up('d');await page.keyboard.up('Shift');}
     await expect.poll(async()=>(await animation(page))?.clip).toBe('OldCaneHold');
     for(const skin of ['Nathan','Leandro','Rafael','Read']){

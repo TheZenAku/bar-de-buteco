@@ -1,6 +1,12 @@
-import { readConfig } from '../config.js';
-import { connectDatabase } from './index.js';
-const config = readConfig();
-const connection = await connectDatabase({ url: config.databaseUrl, path: config.dataPath });
-console.log(`Migrações aplicadas (${connection.driver}).`);
-await connection.close();
+import {readMigrationConfig} from '../config.js';
+import {migrateDatabase} from './index.js';
+
+const config=readMigrationConfig();
+const result=await migrateDatabase({
+  url:config.url,
+  path:config.path,
+  migrationRole:config.role,
+  migrationRuntimeRole:config.runtimeRole,
+  migrationLockTimeoutMs:config.lockTimeoutMs,
+});
+console.log(result.applied.length?`Migrações aplicadas: ${result.applied.join(', ')}.`:`Schema já está atualizado (${result.alreadyApplied.length} migrações verificadas).`);

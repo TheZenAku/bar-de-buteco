@@ -3,12 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.20.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.20.0 <12",
+      "onFail": "error"
+    }
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "concurrently -k -n API,MUNDO,WEB -c cyan,yellow,green \"npm run dev -w @bar/api\" \"npm run dev -w @bar/server\" \"npm run dev -w @bar/web\"",
@@ -24,7 +32,9 @@
     "assets:map": "node tools/repair-map-cart.mjs && node tools/import-map.mjs",
     "assets:repair-cart": "node tools/repair-map-cart.mjs",
     "assets:drinks": "node tools/import-drinks.mjs",
-    "assets:ambient": "node tools/import-ambient.mjs"
+    "assets:ambient": "node tools/import-ambient.mjs",
+    "ops:backup": "node tools/ops/postgres-backup.mjs",
+    "ops:restore-check": "node tools/ops/postgres-restore-check.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
@@ -34,5 +44,10 @@
     "three": "0.180.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "argon2": false,
+    "esbuild": false,
+    "msgpackr-extract": false
   }
 }

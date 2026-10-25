@@ -1,4 +1,4 @@
-import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
+import Fastify, { LogController, type FastifyRequest, type FastifyReply } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -15,7 +15,7 @@ import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
 import {createApiMetrics,requestIdFor} from './observability.js';
 import { readConfig, type ApiConfig } from './config.js';
-import { connectDatabase, type Database } from './database/index.js';
+import { connectDatabase, connectMigratedDatabase, type Database } from './database/index.js';
 import * as tables from './database/schema.js';
 import { Mailer } from './mail.js';
 import { blockedIds, createSession, getUser, hashPassword, hashToken, isBanned, newToken, readSession, SESSION_DAYS } from './auth/service.js';
@@ -38,9 +38,10 @@ function equalSecret(actual: unknown, expected: string) {
 }
 function isLoopback(ip: string) { return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'; }
 
-export async function createApi(options: { config?: ApiConfig; database?: Database; logger?: boolean; rateLimit?: boolean } = {}) {
+export async function createApi(options: { config?: ApiConfig; database?: Database; logger?: boolean; rateLimit?: boolean; migrate?: boolean } = {}) {
   const config = options.config ?? readConfig();
-  const connection = options.database ? null : await connectDatabase({ url: config.databaseUrl, path: config.dataPath });
+  if(options.migrate&&config.production)throw new Error('A API de produção não pode executar migrações; use o job migrate.');
+  const connection = options.database ? null : await (options.migrate?connectMigratedDatabase:connectDatabase)({ url: config.databaseUrl, path: config.dataPath });
   const db = options.database ?? connection!.db;
   const wardrobe=new WardrobeService(db);
   const inventory=new InventoryService(db,wardrobe);
@@ -53,7 +54,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   // In development the Vite proxy (loopback) forwards the browser address, so LAN clients are not treated as local.
   const app = Fastify({ bodyLimit: 16_384, trustProxy: config.trustProxyHops ? (_address: string, hop: number) => hop < config.trustProxyHops! : config.production ? false : 'loopback', logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-internal-secret'] } : false,
     // Correlation: the caller's x-request-id (the world sends one per internal call) or a new id, logged as requestId.
-    genReqId: requestIdFor, requestIdLogLabel: 'requestId' });
+    genReqId: requestIdFor, logController: new LogController({ requestIdLogLabel: 'requestId' }) });
   const metrics = createApiMetrics();
   app.addHook('onSend', async (request, reply) => { reply.header('x-request-id', request.id); });
   app.addHook('onResponse', async (request, reply) => { metrics.record(request.method, request.routeOptions.url, reply.statusCode, reply.elapsedTime); });
@@ -101,7 +102,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if (!request.auth!.user.verified || request.auth!.user.role !== 'admin') throw new HttpError(403, 'Acesso exclusivo da administração.');
   }
   async function internal(request: FastifyRequest) {
-    if (!equalSecret(request.headers['x-internal-secret'], config.authSecret)) throw new HttpError(401, 'Acesso interno inválido.');
+    if (!equalSecret(request.headers['x-internal-secret'], config.internalSecret)) throw new HttpError(401, 'Acesso interno inválido.');
   }
   const authLimit = { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } };
   const recoverLimit = { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } };

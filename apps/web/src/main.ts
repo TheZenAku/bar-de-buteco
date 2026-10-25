@@ -23,6 +23,7 @@ import {VOICE} from '@bar/shared';
 import './voice.css';
 import './needs.css';
 import {createNeedsHud} from './needs-hud';
+import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
@@ -54,6 +55,8 @@ let wardrobe:Wardrobe|undefined;
 let inventory:InventoryView|undefined;
 let modalGeneration=0;
 let watchingTv=false;
+const admission=new AdmissionLifecycle();
+let leavingPromise:Promise<void>|undefined;
 // The jukebox and the TVs are independent: separate controllers, players, panels and volumes.
 // Either one in use quiets the ambient sound.
 const mediaInUse={jukebox:false,tv:false};
@@ -150,16 +153,36 @@ async function enterBar():Promise<void> {
   if(user&&!user.character){createCharacter();return;}
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
   if(!scene){toast('Seu navegador não conseguiu iniciar o cenário 3D. Ative a aceleração gráfica e recarregue.',true);return;}
+  const attempt=admission.beginEntry();if(!attempt)return;
   // Entering is a click: the browser lets this page play voices from now on.
   voice.unlock();audio.unlock();
   inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
-  try{$('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;const [result,collection,items]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);blocked=new Set(result.blocked);wardrobe=collection;inventory=items;await network.connect();await voice.enter();}
-  catch(error){await leaveBar();toast(errorMessage(error),true);}
+  try{
+    $('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;
+    if(!admission.isCurrentEntry(attempt))return;
+    const [result,collection,items]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);
+    if(!admission.isCurrentEntry(attempt))return;
+    blocked=new Set(result.blocked);wardrobe=collection;inventory=items;await network.connect();
+    if(!admission.isCurrentEntry(attempt))return;
+    await voice.enter();
+    if(!admission.completeEntry(attempt)&&(admission.phase==='leaving'||admission.phase==='outside'))voice.leave();
+  }
+  catch(error){const departure=admission.failEntry(attempt);if(!departure)return;await leaveBarWith(departure);toast(errorMessage(error),true);}
 }
-async function leaveBar():Promise<void> {
+function leaveBar():Promise<void> {
+  if(leavingPromise)return leavingPromise;
+  const departure=admission.beginExit();
+  return departure?leaveBarWith(departure):Promise.resolve();
+}
+function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
+  if(leavingPromise)return leavingPromise;
+  const task=(async()=>{
   stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   inGame=false;connected=false;notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;inventory=undefined;previousAction='';previousResult='';await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';lastEvent='';closeModal();renderAuth();
+  })();
+  const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
+  leavingPromise=tracked;return tracked;
 }
 function renderChat():void {
   const messages=$('#messages');const atBottom=messages.scrollHeight-messages.scrollTop-messages.clientHeight<50;
@@ -508,7 +531,14 @@ function openSettings():void {
 
 async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
-  try{scene=new BarScene($<HTMLCanvasElement>('#world'));scene.onInteract=interact;scene.onEmote=emote=>network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});scene.onChat=()=>{if(inGame&&!activeModal)focusChat();};scene.onSkins=()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));};scene.onKick=kick;scene.setEnabled(false);}
+  try{scene=new BarScene($<HTMLCanvasElement>('#world'),{
+    onInteract:interact,
+    onEmote:emote=>network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
+    onChat:()=>{if(inGame&&!activeModal)focusChat();},
+    onSkins:()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));},
+    onKick:kick,
+    onMediaFrame:()=>{media.forEach(m=>m.frame());voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+  });scene.setEnabled(false);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
@@ -517,7 +547,7 @@ async function start():Promise<void>{
   checkingSession=false;renderAuth();if(user&&!user.character)createCharacter();
 }
 let displayedSound:boolean|undefined;
-void start().then(()=>{if(scene)scene.onMediaFrame=()=>{media.forEach(m=>m.frame());voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}};});
+void start();
 // Development telemetry exposes copies only, never a way to command the server.
 if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
