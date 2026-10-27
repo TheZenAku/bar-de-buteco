@@ -1,0 +1,18 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>TV controller fixture</title><div id="app"><canvas id="world"></canvas><main id="panel"></main></div><script type="module">
+import '/src/assets/fonts/nova-ui.css';import '/src/nova-ui.css';import '/src/jukebox.css';
+import {TelevisionController} from '/src/jukebox.ts';
+import {initialJukebox,commandJukebox,INTERACTABLES} from '../../packages/shared/src/index.ts';
+// The ground floor's group: three screens following one shared state.
+const spot=id=>{const o=INTERACTABLES.find(i=>i.id===id);return {id:'alice',x:o.x,y:o.y,z:o.z};};
+const world={players:{alice:spot('tv-hall')},jukeboxes:{},televisions:{'tv-main':initialJukebox('tv-main'),'tv-upstairs':initialJukebox('tv-upstairs')}};
+const projections={},shown={},sent=[];
+const controller=new TelevisionController({now:()=>Date.now(),send:(type,payload)=>{sent.push({type,payload});if(type==='tv.command'){world.televisions['tv-main']=commandJukebox(world.televisions['tv-main'],payload,'alice',Date.now());controller.setWorld(world,'alice',true);}},
+  project:screen=>projections[screen]??null,clear:()=>true,screen:(screen,visible)=>shown[screen]=visible,ambient:()=>{}});
+const panel=document.querySelector('#panel');panel.style.cssText='position:fixed;inset:0 380px 0 0;overflow:auto;padding:20px;z-index:4';
+panel.innerHTML=controller.panelHtml('tv-main');controller.attachPanel(panel);controller.setWorld(world,'alice',true);
+const timer=setInterval(()=>controller.frame(),50);
+window.fixture={controller,world,sent,shown,
+  stand:id=>{world.players.alice=spot(id);controller.setWorld(world,'alice',true);},
+  project:(screen,points)=>projections[screen]=points,
+  teardown:()=>{clearInterval(timer);controller.destroy();}};
+</script></html>

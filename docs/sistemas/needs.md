@@ -36,7 +36,7 @@ As necessidades avançam dentro do `step()` de 20 Hz que já existia. O sistema 
   - uma pessoa por vez em cada vaso;
   - quem sai antes esvazia só a parte proporcional.
 
-  Há alertas a partir de 70 e de 90. A bexiga não causa desmaio; cheia, apenas reduz o fôlego.
+  O medidor fica crítico a partir de 70, sem aviso na tela. A bexiga não causa desmaio; cheia, apenas reduz o fôlego.
 - **Embriaguez.** É independente da bexiga e cai `soberPerMinute` por minuto. Os estágios são definidos em `drunk.stages`:
   1. tela com vinheta quente e câmera levemente inclinada;
   2. o andar desvia de forma determinística (`swayInput`, igual no servidor e na predição), a câmera balança e o personagem ganha um repouso embriagado próprio;

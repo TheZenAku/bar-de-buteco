@@ -3,7 +3,7 @@ import { internalSecret } from '@bar/shared/tickets';
 import type {CharacterConfig,InventoryStack} from '@bar/shared';
 import { readWorldConfig } from './config.js';
 
-export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';character?:CharacterConfig|null;equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[] }
+export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';character?:CharacterConfig|null;equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[];balance?:number }
 export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event'; playerId?: string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string }
 
 /** The API answered with an error status (4xx: the request itself was refused; 5xx: try again later). */
@@ -18,7 +18,11 @@ export async function internal<T>(path: string, body?: unknown): Promise<T> {
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(4000),
   }).catch((error: unknown) => { throw Object.assign(new Error(`API interna inacessível: ${error instanceof Error ? error.message : String(error)}`), { requestId }); });
-  if (!response.ok) throw new InternalApiError(response.status, `API interna indisponível (${response.status}).`, requestId);
+  // A refusal (4xx) carries the API's own message, shown to the player ("Moedas insuficientes.").
+  if (!response.ok) {
+    const refusal = response.status < 500 ? await response.json().then((body: { error?: unknown }) => typeof body.error === 'string' ? body.error : undefined).catch(() => undefined) : undefined;
+    throw new InternalApiError(response.status, refusal ?? `API interna indisponível (${response.status}).`, requestId);
+  }
   return response.json() as Promise<T>;
 }
 

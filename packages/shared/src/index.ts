@@ -6,8 +6,10 @@ export * from './voice.js';
 export * from './doors.js';
 export * from './needs.js';
 export * from './inventory.js';
+export * from './economy.js';
 import type {JukeboxState} from './jukebox.js';
 import type {CharacterConfig} from './character.js';
+import type {JobSlotsView} from './economy.js';
 
 export const TICK_MS = 50;
 export const PATCH_MS = 100;
@@ -41,16 +43,19 @@ export interface PublicUser { id: string; username: string; displayName: string;
 export interface PlayerState extends Position { id: string; displayName: string; color: string; skin: string; character?:string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** Drink ordered or in hand. */ drinkItem?: string;
   /** Needs, as whole points (see needs.ts); condition: normal, stumbling, fainted or recovering. */
   hp?: number; hpMax?: number; stamina?: number; hunger?: number; thirst?: number; bladder?: number; drunk?: number;
-  exhausted?: boolean; condition?: string; conditionUntil?: number; faintCause?: string }
+  exhausted?: boolean; condition?: string; conditionUntil?: number; faintCause?: string;
+  /** The job being worked, '' otherwise (economy.ts). */ job?: string }
 export interface NpcState extends Position { id: string; displayName: string; color: string; rotation: number; animationState: AnimationState; animationStartedAt: number; behavior: string }
 export interface Card { rank: string; suit: string }
 export interface BlackjackSeat { playerId: string; displayName: string; cards: Card[]; total: number; status: string; result: string }
 export interface BlackjackTable { id: string; phase: 'waiting' | 'playing' | 'dealer' | 'results'; seats: BlackjackSeat[]; dealerCards: Card[]; dealerTotal: number; turnPlayerId: string; deadline: number; roundId: string }
 export interface ActiveEvent { id: string; type: EventType | ''; startedAt: number; durationMs: number }
-export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; event: ActiveEvent; occupancy: number; capacity: number; serverTime: number }
+export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; jobs?:Record<string,JobSlotsView>; event: ActiveEvent; occupancy: number; capacity: number; serverTime: number }
 export interface ChatMessage { id:string; playerId:string; displayName:string; text:string; sentAt:number; system?:boolean }
 /** Collision boxes the player touches to use an object; chairs have none and are reached at their seat point. */
 export type Footprint = Pick<Collider,'id'|'x'|'z'|'hx'|'hz'>;
-export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'door'|'television'|'toilet'; label:string; rotation?:number; footprint?:Footprint[] }
+export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'door'|'television'|'toilet'; label:string; rotation?:number; footprint?:Footprint[];
+  /** The media system (jukebox or TV group) this object controls. */
+  media?:string }
 export interface Collider extends Position { id:string; hx:number; hz:number; minY?:number; maxY?:number; ramp?:boolean }
 export interface Seat extends Position { rotation:number }

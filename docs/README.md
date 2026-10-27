@@ -17,6 +17,8 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 - [Regras desta versão](projeto/game-design.md)
 - [Especificação técnica do MVP](projeto/mvp-specification.md)
+- [Funcionalidades: situação e plano](projeto/funcionalidades.md)
+- [Assets recomendados](projeto/assets-recomendados.md)
 
 ## Arquitetura
 
@@ -30,6 +32,8 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Som ambiente](sistemas/ambient.md)
 - [Personagens e coleção de skins](sistemas/characters.md)
 - [Ciclo de dia e noite](sistemas/day-night.md)
+- [Economia: moedas, balcão, mesa, empregos e mídia](sistemas/economia.md)
+- [Configurações gráficas](sistemas/graficos.md)
 - [Portas](sistemas/doors.md)
 - [Cerveja: garrafa e copo americano](sistemas/drinks.md)
 - [Interface Boteco Social](sistemas/interface.md)

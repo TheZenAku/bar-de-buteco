@@ -7,9 +7,10 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {characterSchema,skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,type PublicUser} from '@bar/shared';
+import {characterSchema,skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,WALLET_REASON,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
+import {WalletService} from './wallet-service.js';
 import {AdminService} from './admin-service.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
@@ -45,6 +46,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const db = options.database ?? connection!.db;
   const wardrobe=new WardrobeService(db);
   const inventory=new InventoryService(db,wardrobe);
+  const wallet=new WalletService(db,wardrobe);
   const administration=new AdminService(db,wardrobe);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
@@ -297,6 +299,14 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
     if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
     return inventory.remove(body.userId,body.itemId,body.quantity,body.reason,body.requestId);
+  });
+  // Coins spent or earned in the room (apps/api/src/wallet-service.ts); only the live session's player.
+  app.post('/api/internal/wallet',internalOptions,async request=>{
+    const body=z.object({sessionId:uuidSchema,userId:uuidSchema,amount:z.number().int().min(-100_000).max(100_000).refine(n=>n!==0),
+      reason:z.string().max(90).regex(WALLET_REASON),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
+    const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
+    if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
+    return wallet.change(body);
   });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);

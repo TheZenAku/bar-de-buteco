@@ -1,0 +1,89 @@
+# Funcionalidades: situação e plano
+
+Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. **Pronto** quer dizer implementado e coberto por testes. **Parcial** quer dizer que funciona, mas falta parte do pedido. **Falta** quer dizer que não existe ainda. A coluna "Onde" aponta o código ou o documento.
+
+| Funcionalidade | Situação | Onde / o que falta |
+| --- | --- | --- |
+| Bar multiplayer | Pronto | Colyseus autoritativo, AOI de 18 m, predição e reconciliação ([rede](../arquitetura/networking.md)) |
+| Sentar nas mesas | Pronto | 124 assentos do mapa, dois andares |
+| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto (novo)** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega e estorno |
+| Magrão no balcão prepara e cobra | **Pronto (novo)** | O balcão agora cobra o preço do item e estorna o pedido que cair |
+| Jukebox com som 3D, custando moedas | **Pronto (cobrança nova)** | Volume pela distância ([jukebox](../sistemas/jukebox.md)); 15 moedas por vídeo. O YouTube não entra no Web Audio, então não há pan estéreo, só atenuação |
+| TV com YouTube para todos, custando moedas | **Pronto (cobrança nova)** | 25 moedas por vídeo |
+| Telão na área de show | **Pronto (novo)** | Tela de 4,8 × 2,7 m no fundo do palco, controlada na frente do palco; som pelo quintal todo; 60 moedas |
+| Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno, karatê. Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
+| Fumar, beber e comer com props | Parcial | Beber com garrafa ou copo na mão é real. Faltam clipes e props de **fumar** e **comer** |
+| Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
+| Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
+| Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
+| Minigame de entrega (moto, mapa procedural) | Falta | Plano abaixo |
+| Celular com apps paródia | Falta | Plano abaixo |
+| Pôquer | Falta | Plano abaixo, com uma ressalva legal |
+| Emprego no espetinho, cardápio e preço do jogador | Falta | Plano abaixo; o mapa já tem o `Carrinho_Espeto` |
+| Emprego no bar com poucas vagas | **Pronto (novo)** | Ajudante do Magrão: 2 vagas, tarefas por estação, pagamento por tarefa, teto diário |
+| Sistema que gerencia os empregos e painéis de admin para depurar | **Pronto (novo)** | `JOBS` orientado a dados e **Administração → Mundo ao vivo** (empregos, pedidos, mídia, NPCs, jogadores) |
+| Indicação de assets | **Pronto (novo)** | [assets recomendados](assets-recomendados.md) |
+| Sistema resiliente, baixa latência, mapa maior | Parcial | Veja "Escala e latência" |
+| Skybox, névoa atmosférica, iluminação | Pronto | Céu procedural com sol, lua e estrelas, névoa de borda, ciclo de 40 min ([dia e noite](../sistemas/day-night.md)) |
+| Configurações gráficas e tecnologias modernas | **Pronto (novo)** | [gráficos](../sistemas/graficos.md): presets, escala de renderização, resolução dinâmica, sombras, névoa e limite de FPS |
+| Scripts `.bat` para ligar e desligar | Pronto (+4 novos) | [ferramentas](../../tools/README.md): `abrir-jogo`, `atualizar`, `testar` e `contas-demo` |
+
+## Próximas entregas, em ordem
+
+A ordem segue o que destrava mais coisas: as próximas três reaproveitam a carteira, o A* e o framework de empregos desta entrega.
+
+### 1. Controle por toque (pré-requisito do celular)
+
+Joystick virtual à esquerda e botões contextuais (E, T, J, correr) à direita, ligados ao mesmo `getInput()` da cena, com a câmera arrastada no lado direito. Sem isso, o jogo abre no celular mas não se joga.
+
+### 2. Espetinho do jogador
+
+- **Estação:** o `Carrinho_Espeto` vira um emprego com 1 vaga, do tipo "loja do jogador".
+- **Ingredientes:** catálogo compartilhado com itens comuns (carne, frango, queijo coalho, linguiça) e engraçados (rato, cigarro, chiclete, meia), cada um com efeitos nas necessidades. Montar um espeto escolhe de 1 a 4 ingredientes e gera um item `espeto:<hash dos ingredientes>` com o nome que o vendedor der.
+- **Cardápio e preço livres:** o vendedor publica até 8 receitas com preço entre 1 e 500. Os nomes passam por um filtro de palavrões e limite de tamanho, e a administração pode ocultá-los.
+- **Troca entre jogadores:** a carteira ganha a operação `transfer` na API, que debita o comprador e credita o vendedor na mesma transação, com `requestId` único e taxa opcional da casa como sink. É a mesma peça que o Nubank do celular vai usar.
+- **Preparo:** cada pedido exige que o vendedor fique na churrasqueira por alguns segundos (estação com animação), para não virar clique infinito.
+
+### 3. Pôquer (Texas Hold'em)
+
+- Regras inteiramente no servidor, como o blackjack: baralho com `crypto.randomInt`, cartas fechadas enviadas só ao dono, potes laterais, blinds, timeout por turno e reconexão sem perder a cadeira.
+- **Ressalva:** se as moedas puderem ser compradas com dinheiro real, apostar essas moedas em jogo de azar cria risco jurídico no Brasil (e nas lojas de apps). A recomendação é usar **fichas de mesa gratuitas e não conversíveis**: todo mundo senta com o mesmo número de fichas, e o ranking e as conquistas são o prêmio. Apostas em moedas só depois de uma avaliação jurídica.
+- Peças a reaproveitar: interface `Activity` (join, leave, start, command, tick, visões pública e privada, resultado), outbox de resultados e as estatísticas.
+
+### 4. Celular no jogo
+
+A tecla **P** abre o aparelho na tela, sem sair do mundo. Os apps ficam numa pasta própria (`apps/web/src/phone/`), cada um um módulo:
+
+| App | Paródia de | Primeira versão |
+| --- | --- | --- |
+| Zap | WhatsApp | Conversas 1:1 e de grupo entre jogadores, persistidas na API, com bloqueio e denúncia reaproveitados |
+| Busão | Nubank | Saldo, extrato (livro-caixa) e Pix entre jogadores (operação `transfer`) |
+| Botecogram | Instagram | Câmera: captura do canvas com filtros pré-definidos (sépia, neon, VHS, P&B) em shader ou canvas 2D, legenda e postagem no feed do bar |
+| Crush | Tinder | Perfis do personagem com "chegar junto" e "passar"; um match abre conversa no Zap |
+| Ligação e áudio | — | Chamada é voz por proximidade que ignora a distância entre dois jogadores que aceitaram. O áudio usa o mesmo codec da voz, gravado até 30 s |
+
+Moderação e custo: fotos e áudios precisam de armazenamento (S3 compatível ou disco com limite por conta), limite de envio e denúncia. O feed começa visível só para quem está no bar. Não usar nomes ou marcas reais.
+
+### 5. Entregas de moto (minigame)
+
+- **Sala separada:** `DeliveryRoom` no Colyseus, uma instância por jogador ou por grupo. O bar continua leve, e o minigame pode ter física própria.
+- **Mapa procedural:** uma seed por sessão gera uma grade de quarteirões (ruas, calçadas, casas) a partir de peças modulares de cidade low-poly CC0 ([assets](assets-recomendados.md)). A mesma seed gera colisores no servidor e malhas no cliente, então só a seed trafega.
+- **Moto:** veículo arcade autoritativo no servidor (velocidade, curva, freio), com predição no cliente como a do jogador.
+- **Loop:** pegar o pedido no restaurante, entregar no endereço sorteado dentro de um tempo, receber moedas pelo framework de empregos (`job:delivery:...`) com teto diário. Quantas entregas quiser, sem dinheiro real.
+- **Entrada e saída:** a moto estacionada na rua do bar é um interactable que transfere a pessoa de sala com um ticket novo. Sair do minigame devolve a pessoa ao ponto da moto.
+
+### 6. Animações, fumar e comer
+
+- Clipes novos convertidos pelo pipeline atual (`npm run assets:animations`), com a origem e a licença de cada um em [assets recomendados](assets-recomendados.md): comer (sentado e em pé), fumar (acender, tragar, bater cinza), segurar o celular e estilos de andar.
+- **Estilo de andar escolhível:** campo `walkStyle` no personagem, salvo na conta, que troca o clipe `Walk` pelo do estilo (como já acontece com a bengala).
+- **Props:** cigarro com partícula de fumaça e prato ou espeto na mão, presos pela mesma lógica de mão de `drink-props.ts`. O cigarro entra como item da mochila com efeito próprio.
+
+## Escala e latência
+
+O que já protege a sala: estado autoritativo a 20 Hz com patch a 10 Hz, AOI de 18 m, limite de mensagens por comando, outbox durável de resultados, créditos com novas tentativas e idempotência em toda moeda. Para crescer:
+
+1. **Mapa maior:** a colisão já usa uma grade espacial de 8 m, e o A* não depende do tamanho do mapa. O passo seguinte é carregar o cenário por setores no cliente, com LOD e KTX2/meshopt (Marco 2 do [plano](../execucao/PLANO.md)).
+2. **Mais jogadores:** uma sala por bar (instâncias "Bar 1", "Bar 2"), com o Colyseus em vários processos e o Redis como presence e driver. A carteira e o inventário já estão na API, então várias salas compartilham a mesma conta sem conflito.
+3. **Minigames em salas próprias** (entregas, pôquer de torneio), para não pesar no tick do bar.
+4. **Latência:** WebSocket com msgpack, o padrão do Colyseus, e servidor perto dos jogadores (São Paulo). WebTransport só quando estiver estável em todos os navegadores.
+5. **Observabilidade:** as métricas novas `bar_world_wallet_credits_pending`, `bar_world_table_orders_pending` e `bar_world_job_workers` somam-se às de tick, rejeições e manutenção.

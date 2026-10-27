@@ -116,6 +116,8 @@ float botecoEdgeVisibility(){
         patched.add(material);material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('fogPS',edgeFog);material.shaderChunksVersion='2.23';material.update();
       }
     }
+    // The map's lamps exist only now: the chosen shadow quality applies to them too.
+    this.setQuality(this.quality,this.fogScale);
     this.update(Date.now(),0,'');
   }
   update(serverTime:number,dt:number,event:string):void {
@@ -134,7 +136,7 @@ float botecoEdgeVisibility(){
     const ambient=this.app.scene.ambientLight;
     ambient.set(state.ambient[0]*(1-this.party*.08),state.ambient[1]*(1-this.party*.16),state.ambient[2]);
     this.app.scene.exposure=state.exposure;
-    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=state.fogStart;this.app.scene.fog.end=state.fogEnd;
+    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=state.fogStart*this.fogScale;this.app.scene.fog.end=state.fogEnd*this.fogScale;
     this.camera.camera!.clearColor.set(...state.horizon,1);
     this.skirtMaterial.emissive.set(...state.horizon);this.skirtMaterial.update();
     this.sky.setPosition(this.camera.getPosition());
@@ -156,6 +158,22 @@ float botecoEdgeVisibility(){
     // cached because their lights and architectural casters do not move; never cycle them between frames.
     for(const light of this.shadowLights)if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;
   }
+  /**
+   * Graphics settings: shadow maps of the sun/moon (resolution, cascades) and of the lamps, and how far the
+   * atmospheric fog lets the city show. 'off' keeps the lighting and drops every shadow map.
+   */
+  setQuality(shadows:'off'|'low'|'medium'|'high'|'ultra',fogScale:number):void {
+    this.fogScale=fogScale;
+    const sky={off:[0,1],low:[1024,1],medium:[2048,2],high:[2048,2],ultra:[4096,3]}[shadows];
+    const local={off:0,low:0,medium:256,high:512,ultra:1024}[shadows];
+    for(const entity of [this.sun,this.moon])if(entity?.light){
+      entity.light.castShadows=sky[0]>0;if(sky[0])entity.light.shadowResolution=sky[0];entity.light.numCascades=sky[1]!;
+    }
+    for(const light of this.shadowLights){light.castShadows=local>0;if(local)light.shadowResolution=local;}
+    this.quality=shadows;
+  }
+  private fogScale=1;
+  private quality:'off'|'low'|'medium'|'high'|'ultra'='high';
   addPartyShadows(lights:pc.Entity[]):void {for(const entity of lights)if(entity.light){entity.light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;this.shadowLights.push(entity.light);}}
   get partyStrength():number{return this.party;}
   telemetry(){

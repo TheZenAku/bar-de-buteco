@@ -8,7 +8,7 @@ export default defineConfig({
   // the trusted local Vite proxy forwards these test-only headers.
   projects:[
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
-    {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
+    {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
     {name:'interface',testMatch:['**/nova-ui.spec.ts','**/clothing.spec.ts','**/old-cane.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
     {name:'media',testMatch:'**/jukebox.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'doors',testMatch:'**/doors.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},

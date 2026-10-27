@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, DRINK_DURATION_MS, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
-import { BarState, CardState, DoorState, Player, SeatState, TableState } from './state.js';
+import { BarState, CardState, DoorState, JobSlotState, Player, SeatState, TableState } from './state.js';
 import { BlackjackTable, type Result } from './minigames/blackjack.js';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
@@ -19,6 +19,10 @@ import { FileOutbox } from './world/outbox.js';
 import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
 import { health, logLine, worldMetrics } from './observability.js';
 import { SessionRegistry } from './room/session-registry.js';
+import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
+import { JobDirector, type Payment } from './world/jobs.js';
+import { changeWallet, WalletRetries } from './world/wallet.js';
+import { JOBS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, type MediaPriceKind } from '@bar/shared';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
@@ -50,9 +54,13 @@ interface Presence {
   inventory:Map<ItemId,number>;
   inventoryBusy?:boolean;
   inventoryItem?:ItemId;
+  /** Coins as last confirmed by the API (the API decides every change; this only feeds the HUD and messages). */
+  balance:number;
+  /** The counter drink paid for and not yet served; refunded if the order is dropped. */
+  counterCharge?:{requestId:string;amount:number};
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
-const NEEDS_CONSCIOUS = new Set(['player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command']);
+const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
 
@@ -68,6 +76,10 @@ export class BarRoom extends Room<{ state: BarState }> {
   private events = new EventDirector(this.config.eventMinMs, this.config.eventMaxMs);
   private npcs = new NpcDirector();
   private service = new BarService();
+  /** Tonico's table service and the jobs (apps/server/src/world/waiter.ts, jobs.ts). */
+  private waiter = new WaiterService();
+  readonly jobs = new JobDirector();
+  private walletRetries = new WalletRetries((event, details) => this.log(event, details));
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
   readonly needs = new NeedsDirector();
   /** Administrative controls: leased from the API's outbox, applied once, then confirmed. */
@@ -93,14 +105,19 @@ export class BarRoom extends Room<{ state: BarState }> {
     // Doors start open, as authored in the map; the shared physics mirrors this room's door states.
     setDoorStates(DOORS.map(door => [door.id, true] as const));
     for (const door of DOORS) this.state.doors.set(door.id, new DoorState().assign({ id: door.id, open: true }));
-    for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id,system.tvId)));
-    for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id,system.tvId)));
+    for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
+    for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
+    for (const job of JOBS) this.state.jobs.set(job.id, new JobSlotState());
+    this.syncJobs();
     this.setFixedTimestep(() => { const started = performance.now(); this.step(); worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', performance.now() - started); }, 1000 / TICK_MS);
     health.roomId = this.roomId;
     worldMetrics.gauge('bar_world_players_connected', 'Players connected to the bar', () => [...this.state.players.values()].filter(p => p.connected).length);
     worldMetrics.gauge('bar_world_avatars', 'Avatars in the bar, including those waiting offline', () => this.state.players.size);
     worldMetrics.gauge('bar_world_result_outbox_pending', 'Finished rounds waiting for the API', () => this.results.pending);
+    worldMetrics.gauge('bar_world_wallet_credits_pending', 'Refunds and job pay waiting for the API', () => this.walletRetries.size);
+    worldMetrics.gauge('bar_world_table_orders_pending', 'Table orders waiting for Tonico', () => this.waiter.pending);
+    worldMetrics.gauge('bar_world_job_workers', 'Players working a job shift', () => JOBS.reduce((sum, job) => sum + this.jobs.workers(job.id).length, 0));
     worldMetrics.gauge('bar_world_api_last_ok_seconds', 'Seconds since the API last answered the maintenance round trip', () => health.apiOkAt ? (Date.now() - health.apiOkAt) / 1000 : undefined);
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
     this.registerMessages();
@@ -138,11 +155,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity]))};
+    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
     this.syncTable();
+    client.send('wallet.state',{balance:presence.balance});
+    this.sendJob(presence);
     this.log(previous ? 'takeover' : 'join', { playerId: auth.userId });
   }
 
@@ -154,7 +173,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (player && player.animationState !== 'drink') player.drinkItem = '';
     presence.queue.length = 0;
     // A pending order is dropped with the connection, which would otherwise leave the player waiting forever.
-    this.service.cancel(presence.ticket.userId);
+    this.cancelCounter(presence.ticket.userId);
+    this.cancelTable(presence.ticket.userId);
+    if (player) this.endShift(player, 'Você caiu da conexão e o turno foi encerrado.');
     if (player?.interactionState === 'counter' && player.animationState !== 'drink') player.interactionState = '';
     const reservation = this.allowReconnection(client, 30);
     presence.rejectReconnect = () => reservation.reject();
@@ -173,7 +194,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (presence.revoked || !this.sessions.isCurrent(presence.ticket.userId, presence)) { client.leave(4000); return; }
     if (access && !access.valid) { if(access.banned)this.removeByAdmin(presence.ticket.userId,'ban','Sua conta está banida do bar.');else this.expel(presence.ticket.userId, 'Sua sessão terminou. Entre novamente.'); return; }
     if (!access) this.log('auth_refresh_unavailable', { playerId: presence.ticket.userId });
-    if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);}
+    if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);if(access.balance!==undefined)presence.balance=access.balance;client.send('wallet.state',{balance:presence.balance});}
     presence.rejectReconnect = undefined;
     presence.queue.length = 0;
     const player = this.state.players.get(presence.ticket.userId)!;
@@ -190,10 +211,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!presence) return;
     const userId = presence.ticket.userId;
     worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
+    // Pending orders are refunded while the session is still registered (refunds go to its wallet owner).
+    this.cancelCounter(userId); this.cancelTable(userId);
     this.sessions.remove(userId, presence);
     const player = this.state.players.get(userId);
     // Expelled players are removed; everyone else leaves the avatar standing (or seated) where it was.
-    if (presence.revoked) { this.blackjack.leave(userId); this.service.cancel(userId); this.needs.forget(userId); this.state.players.delete(userId); }
+    if (presence.revoked) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.needs.forget(userId); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -205,7 +228,9 @@ export class BarRoom extends Room<{ state: BarState }> {
   private park(player: Player): void {
     player.drinkItem = '';
     this.blackjack.leave(player.id);
-    this.service.cancel(player.id);
+    this.cancelCounter(player.id);
+    this.cancelTable(player.id);
+    this.endShift(player, 'Turno encerrado.');
     if (player.currentTableId) Object.assign(player, standingPosition(player, player.rotation));
     player.currentTableId = '';
     // The microphone belongs to a session; a new one switches it on again itself.
@@ -216,6 +241,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** Closes an older session of the same account without touching its avatar, which the new one takes. */
   private replaceSession(previous: Presence): void {
+    this.cancelCounter(previous.ticket.userId); this.cancelTable(previous.ticket.userId);
     this.sessions.remove(previous.ticket.userId, previous);
     previous.rejectReconnect?.();
     if (this.state.players.get(previous.ticket.userId)?.connected)
@@ -259,11 +285,20 @@ export class BarRoom extends Room<{ state: BarState }> {
     // The jukebox and the TVs are separate sources: own state map, own messages, same validation.
     for(const kind of ['jukebox','tv'] as const){
       const states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions;
-      this.handle(`${kind}.command`,jukeboxCommandSchema,4,(client,command)=>{
+      this.handle(`${kind}.command`,jukeboxCommandSchema,4,async(client,command)=>{
         this.requireMedia(kind,client,command.id);
-        const state=states.get(command.id)!;
-        state.assign(commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now()));
-        client.send(`${kind}.result`,{id:command.id,revision:state.revision});
+        const state=states.get(command.id)!,presence=this.forClient(client)!;
+        // Validates the command (revision, link) before any coin moves.
+        commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now());
+        // Choosing a new video costs coins; pausing, resuming, stopping and switching off are free.
+        const price=command.action==='play'?this.config.prices[this.mediaPrice(kind,command.id)]:0,requestId=randomUUID();
+        if(price)await this.charge(presence,price,`media:${command.id}`,requestId);
+        try{
+          if(this.forClient(client)!==presence)throw new Error('Sua sessão mudou. Moedas devolvidas.');
+          this.requireMedia(kind,client,command.id);
+          state.assign(commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now()));
+        }catch(error){if(price)this.refund(presence,requestId,price);throw error;}
+        client.send(`${kind}.result`,{id:command.id,revision:state.revision,price});
       });
       // End notifications cannot overwrite a newer selection or another controller.
       this.handle(`${kind}.ended`,z.object({id:z.string().max(64),revision:z.number().int().min(0),videoId:z.string().length(11),duration:z.number().finite().positive().max(86400)}).strict(),2,(client,report)=>{
@@ -273,6 +308,62 @@ export class BarRoom extends Room<{ state: BarState }> {
         state.assign({status:'ended',position:report.duration,updatedAt:Date.now(),revision:state.revision+1});
       });
     }
+    // Tonico takes orders from anyone seated at a table and brings them from the counter.
+    this.handle('table.order',tableOrderSchema,2,async(client,{items})=>{
+      const player=this.player(client),presence=this.forClient(client)!,seatId=player.interactionState;
+      if(!seatId.startsWith('seat-')||player.animationState!=='sit')throw new Error('Sente-se a uma mesa para pedir ao Tonico.');
+      if(this.waiter.has(player.id))throw new Error('Seu pedido já está com o Tonico.');
+      if(this.waiter.pending>=TABLE_QUEUE_MAX)throw new Error('O Tonico está atolado de pedidos. Tente daqui a pouco.');
+      const order:TableOrder={id:randomUUID(),playerId:player.id,seatId,items,total:orderTotal(items),placedAt:Date.now(),owner:{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId}};
+      await this.charge(presence,order.total,`table:${items.join('-')}`,order.id);
+      if(this.forClient(client)!==presence||player.interactionState!==seatId){this.refund(presence,order.id,order.total);throw new Error('Você saiu da mesa. Moedas devolvidas.');}
+      try{this.waiter.order(order);}catch(error){this.refund(presence,order.id,order.total);throw error;}
+      client.send('table.state',{status:'ordered',order:publicOrder(order)});
+      this.systemMessage(`${player.displayName} pediu ao Tonico: ${items.map(id=>catalogItem(id)?.name??id).join(', ')}.`,player);
+    });
+    this.handle('table.cancel',z.object({}).strict(),2,client=>{
+      const player=this.player(client);if(!this.waiter.has(player.id))throw new Error('Você não tem pedido com o Tonico.');
+      this.cancelTable(player.id,'Pedido cancelado. Moedas devolvidas.');
+    });
+    this.handle('job.start',z.object({jobId:z.string().max(32)}).strict(),2,(client,{jobId})=>{
+      const player=this.player(client),presence=this.forClient(client)!;
+      if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual antes de começar a trabalhar.');
+      const shift=this.jobs.start(player.id,jobId,player,Date.now());
+      player.job=jobId;this.syncJobs();this.sendJob(presence);
+      this.log('job_start',{playerId:player.id,jobId,shiftId:shift.shiftId});
+      this.systemMessage(`${player.displayName} começou o turno: ${JOBS.find(j=>j.id===jobId)!.name}.`,player);
+    });
+    this.handle('job.stop',z.object({}).strict(),2,client=>{
+      const player=this.player(client);if(!this.jobs.shift(player.id))throw new Error('Você não está trabalhando.');
+      this.endShift(player,'Turno encerrado. Valeu pela ajuda!');
+    });
+    this.handle('job.work',z.object({}).strict(),3,client=>{
+      const player=this.player(client),presence=this.forClient(client)!;
+      if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual primeiro.');
+      const task=this.jobs.begin(player.id,player,Date.now());
+      const target=task.station;player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
+      player.interactionState='job';player.animationState='use';player.animationStartedAt=Date.now();
+      presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;this.sendJob(presence);
+    });
+    // Administration and debugging (role from the session, refreshed every maintenance round).
+    this.handle('admin.world',z.object({}).strict(),2,client=>{this.requireAdmin(client);client.send('admin.world',this.adminSnapshot());});
+    this.handle('admin.job',z.object({jobId:z.string().max(32),enabled:z.boolean().optional(),pay:z.number().int().min(0).max(100).optional(),slots:z.number().int().min(0).max(16).optional(),endShiftOf:z.string().max(64).optional()}).strict(),5,(client,command)=>{
+      const admin=this.requireAdmin(client);
+      if(command.endShiftOf){const target=this.state.players.get(command.endShiftOf);if(!target||!this.jobs.shift(target.id))throw new Error('Este jogador não está trabalhando.');this.endShift(target,'Um administrador encerrou o seu turno.');}
+      this.jobs.configure(command.jobId,{enabled:command.enabled,pay:command.pay,slots:command.slots});this.syncJobs();
+      this.log('admin_job',{playerId:admin,...command});
+      client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.table',z.object({cancelFor:z.string().max(64)}).strict(),5,(client,{cancelFor})=>{
+      const admin=this.requireAdmin(client);this.cancelTable(cancelFor,'Um administrador cancelou o pedido. Moedas devolvidas.');
+      this.log('admin_table_cancel',{playerId:admin,customer:cancelFor});client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.media',z.object({kind:z.enum(['jukebox','tv']),id:z.string().max(64)}).strict(),5,(client,{kind,id})=>{
+      const admin=this.requireAdmin(client),states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions,state=states.get(id);
+      if(!state)throw new Error('Aparelho desconhecido.');
+      state.assign({videoId:'',status:'off',position:0,updatedAt:Date.now(),updatedBy:admin,revision:state.revision+1});
+      this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
+    });
     this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
       if (p.interactionState) throw new Error('Levante-se primeiro.');
@@ -361,6 +452,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
       // The drink is finished and leaves the hand together with the interaction.
       if (presence.interactionEndsAt && now >= presence.interactionEndsAt) this.finishInteraction(player, presence, now);
+      // A job task keeps the hands busy for its whole duration (the use clip is shorter, so it restarts).
+      if (player.interactionState === 'job' && player.animationState === 'use' && now - player.animationStartedAt >= TASK_GESTURE_MS) player.animationStartedAt = now;
       const input = presence.queue.shift();
       let moving = false, running = false;
       if (input) {
@@ -384,6 +477,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (this.resultsResetAt && now >= this.resultsResetAt) { this.blackjack.resetRound(); this.resultsResetAt = 0; this.cleanTable(); this.syncTable(); }
     if (this.events.update(now, this.state.occupancy)) this.syncEvent(now);
     this.serveDrinks(now);
+    this.serveTables(now);
+    this.runJobs(now);
     this.npcs.update(this.state.npcs.values(), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
     if (++this.tickCount % 2 === 0) this.refreshViews();
   }
@@ -395,16 +490,17 @@ export class BarRoom extends Room<{ state: BarState }> {
     const served = this.service.update(bartender, waiting, now);
     const player = served ? waiting(served) : undefined, presence = served ? this.sessions.getByUser(served) : undefined;
     if (!player || !presence) return;
+    presence.counterCharge = undefined;
     player.animationState = 'drink'; player.animationStartedAt = now; presence.interactionEndsAt = now + DRINK_DURATION_MS;
-    this.systemMessage(`O Seu Zé serviu ${player.displayName}. Saúde!`, player);
+    this.systemMessage(`O Magrão serviu ${player.displayName}. Saúde!`, player);
   }
 
-  private interact(client: Client, objectId: string, item: DrinkItem = 'garrafa'): void {
+  private async interact(client: Client, objectId: string, item: DrinkItem = 'garrafa'): Promise<void> {
     const player = this.player(client), presence = this.forClient(client)!, now = Date.now();
     if (objectId === 'stand') {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
       if (player.currentTableId) this.leaveTable(client);
-      else { this.consumePart(player, presence, now); this.service.cancel(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined; }
+      else { this.consumePart(player, presence, now); this.cancelCounter(player.id); if (player.interactionState.startsWith('seat-')) this.cancelTable(player.id); if (player.interactionState === 'job') this.jobs.interrupt(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined; }
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
@@ -419,17 +515,126 @@ export class BarRoom extends Room<{ state: BarState }> {
       if ([...this.state.players.values()].some(p => p.interactionState === object.id)) throw new Error('Esse lugar está ocupado.');
       player.x = object.x; player.y = object.y ?? player.y; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.interactionState = object.id;
     } else if (object.type === 'counter') {
-      // The player waits at the counter; the drink starts when Seu Zé finishes preparing it (see serveDrinks).
-      player.animationState = 'wait'; player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = undefined;
+      // Magrão charges first (the API decides); the player then waits and the drink starts when he finishes
+      // preparing it (see serveDrinks). Anything that drops the order before that refunds it (cancelCounter).
+      const price = catalogItem(item)?.price ?? 0, requestId = randomUUID();
+      if (price) await this.charge(presence, price, `counter:${item}`, requestId);
+      if (this.forClient(client) !== presence || !player.connected || player.interactionState || !canInteract(object, player, INTERACTION_SLACK)) {
+        if (price) this.refund(presence, requestId, price);
+        throw new Error('Você saiu do balcão. Moedas devolvidas.');
+      }
+      if (price) presence.counterCharge = { requestId, amount: price };
+      player.animationState = 'wait'; player.animationStartedAt=Date.now();player.interactionState = object.id; presence.interactionEndsAt = undefined;
       player.drinkItem = item;
       this.service.order(player.id);
-      this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo americano' : 'uma long neck'} ao Seu Zé.`, player);
+      this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo americano' : 'uma long neck'} ao Magrão.`, player);
     } else if (object.type === 'toilet') {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
       player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
     } else if (object.type === 'door') {this.toggleDoor(player, object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);}
-    else if (object.type === 'television') { this.requireMedia('tv',client,object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('tv.open',{id:object.id}); }
-    else { this.requireMedia('jukebox',client,object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('jukebox.open',{id:object.id}); }
+    else if (object.type === 'television') { this.requireMedia('tv',client,object.media!);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('tv.open',{id:object.media}); }
+    else { this.requireMedia('jukebox',client,object.media!);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('jukebox.open',{id:object.media}); }
+  }
+
+  /** Charges coins through the API; refuses the action when the wallet cannot pay. */
+  private async charge(presence:Presence,amount:number,reason:string,requestId:string):Promise<void> {
+    const change=await changeWallet(presence.ticket,-amount,reason,requestId);
+    this.walletChanged(presence,change.balance,change.applied,reason);
+  }
+  /** Gives a charge back; retried until the API takes it (WalletRetries). */
+  private refund(presence:Presence,requestId:string,amount:number):void {
+    void this.walletRetries.credit(presence.ticket,amount,`refund:${requestId}`,randomUUID(),change=>this.walletChanged(presence,change.balance,change.applied,'refund'));
+  }
+  private walletChanged(presence:Presence,balance:number,delta:number,reason:string):void {
+    presence.balance=balance;
+    if(this.sessions.getByUser(presence.ticket.userId)===presence)presence.client.send('wallet.state',{balance,delta,reason:reason.split(':')[0]});
+  }
+  private mediaPrice(kind:'jukebox'|'tv',id:string):MediaPriceKind {return kind==='jukebox'?'jukebox':id==='telao'?'telao':'tv';}
+  /** Drops a counter order not served yet, refunding what Magrão charged. */
+  private cancelCounter(playerId:string):void {
+    this.service.cancel(playerId);
+    const presence=this.sessions.getByUser(playerId),charge=presence?.counterCharge;
+    if(presence&&charge){presence.counterCharge=undefined;this.refund(presence,charge.requestId,charge.amount);}
+  }
+  private cancelTable(playerId:string,message?:string):void {
+    const presence=this.sessions.getByUser(playerId);
+    for(const order of this.waiter.cancel(playerId)){
+      this.refundOrder(order);
+      if(presence&&message)presence.client.send('table.state',{status:'cancelled',order:publicOrder(order),message});
+    }
+  }
+  /** A table order carries the wallet it was charged to, so its refund never depends on the session still being here. */
+  private refundOrder(order:TableOrder):void {
+    void this.walletRetries.credit(order.owner,order.total,`refund:${order.id}`,randomUUID(),change=>{const presence=this.sessions.getByUser(order.playerId);if(presence)this.walletChanged(presence,change.balance,change.applied,'refund');});
+  }
+  private serveTables(now:number):void {
+    const tonico=this.state.npcs.get('tonico');if(!tonico)return;
+    const events=this.waiter.update(tonico,order=>{
+      const player=this.state.players.get(order.playerId),seat=INTERACTABLES.find(i=>i.id===order.seatId);
+      return player?.connected&&player.interactionState===order.seatId&&seat?{x:seat.x,y:seat.y??player.y,z:seat.z}:undefined;
+    },now);
+    if(events.delivered){
+      const order=events.delivered,player=this.state.players.get(order.playerId),presence=this.sessions.getByUser(order.playerId);
+      if(player)for(const id of order.items)this.needs.consume(player,id,now);
+      presence?.client.send('table.state',{status:'delivered',order:publicOrder(order)});
+      if(player)this.systemMessage(`O Tonico entregou o pedido de ${player.displayName}. Bom apetite!`,player);
+      this.log('table_delivered',{playerId:order.playerId,orderId:order.id,total:order.total,waitMs:now-order.placedAt});
+    }
+    if(events.dropped){
+      const {order,reason}=events.dropped,presence=this.sessions.getByUser(order.playerId);
+      this.refundOrder(order);presence?.client.send('table.state',{status:'cancelled',order:publicOrder(order),message:reason});
+      this.log('table_dropped',{playerId:order.playerId,orderId:order.id,reason});
+    }
+  }
+  private runJobs(now:number):void {
+    for(const event of this.jobs.tick(now)){
+      const player=this.state.players.get(event.playerId),presence=this.sessions.getByUser(event.playerId);
+      if(event.type==='paid'){
+        if(player?.interactionState==='job'){player.interactionState='';player.animationState='idle';}
+        this.payJob(event.payment);
+        if(presence)this.sendJob(presence);
+      }else if(player){
+        if(player.interactionState==='job'){player.interactionState='';player.animationState='idle';}
+        player.job='';presence?.client.send('job.state',{task:null,message:event.reason});this.syncJobs();
+      }
+    }
+  }
+  private payJob(payment:Payment):void {
+    const presence=this.sessions.getByUser(payment.playerId);
+    if(!presence){this.log('job_pay_without_session',{playerId:payment.playerId,reason:payment.reason});return;}
+    void this.walletRetries.credit(presence.ticket,payment.amount,payment.reason,payment.requestId,change=>{
+      this.jobs.paid(payment,change.applied);this.walletChanged(presence,change.balance,change.applied,'job');
+      if(!change.applied&&this.sessions.getByUser(payment.playerId)===presence)presence.client.send('job.state',{...this.jobView(payment.playerId),message:'Você já atingiu o limite de ganhos por trabalho de hoje.'});
+      else if(this.sessions.getByUser(payment.playerId)===presence)this.sendJob(presence);
+    });
+  }
+  private endShift(player:Player,message:string):void {
+    const shift=this.jobs.stop(player.id,Date.now());if(!shift)return;
+    if(player.interactionState==='job'){player.interactionState='';player.animationState='idle';}
+    player.job='';this.syncJobs();
+    this.sessions.getByUser(player.id)?.client.send('job.state',{task:null,message});
+    this.log('job_end',{playerId:player.id,jobId:shift.jobId,tasks:shift.tasks,earned:shift.earned});
+  }
+  private jobView(playerId:string){return {task:this.jobs.view(playerId)??null};}
+  private sendJob(presence:Presence):void {presence.client.send('job.state',this.jobView(presence.ticket.userId));}
+  private syncJobs():void {for(const view of this.jobs.slots())this.state.jobs.get(view.id)?.assign(view);}
+  private requireAdmin(client:Client):string {
+    const presence=this.forClient(client);if(presence?.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');
+    return presence.ticket.userId;
+  }
+  /** What the in-game administration panel shows to debug the world: people, orders, jobs, devices, queues. */
+  private adminSnapshot(){
+    const now=Date.now();
+    return {
+      at:now,occupancy:this.state.occupancy,capacity:this.state.capacity,
+      players:[...this.state.players.values()].map(p=>({id:p.id,name:p.displayName,connected:p.connected,x:+p.x.toFixed(1),y:+p.y.toFixed(1),z:+p.z.toFixed(1),
+        animation:p.animationState,interaction:p.interactionState,job:p.job,condition:p.condition,balance:this.sessions.getByUser(p.id)?.balance})),
+      npcs:[...this.state.npcs.values()].map(n=>({id:n.id,name:n.displayName,behavior:n.behavior,animation:n.animationState,x:+n.x.toFixed(1),z:+n.z.toFixed(1)})),
+      waiter:this.waiter.snapshot(),counterQueue:[...this.sessions].filter(([,p])=>p.counterCharge).map(([id])=>id),
+      jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000)}))})),
+      media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
+      prices:this.config.prices,walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,event:this.state.event.type,
+    };
   }
 
   private setInventory(presence:Presence,stacks:readonly InventoryStack[]):void {
@@ -479,7 +684,9 @@ export class BarRoom extends Room<{ state: BarState }> {
   private knockDown(player: Player, presence: Presence): void {
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
     if (player.interactionState && player.interactionState !== 'fainted' && player.interactionState !== 'stumbling') Object.assign(player, standingPosition(player, player.rotation));
-    this.service.cancel(player.id);
+    this.cancelCounter(player.id);
+    this.cancelTable(player.id);
+    if (player.interactionState === 'job') this.jobs.interrupt(player.id);
     presence.inventoryItem=undefined;
     player.drinkItem = ''; presence.interactionEndsAt = undefined; presence.queue.length = 0;
     player.lastProcessedInput = presence.lastReceived;
@@ -555,9 +762,10 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   private requireMedia(kind:'jukebox'|'tv',client:Client,id:string):void {
     const name=kind==='jukebox'?'a jukebox':'a TV';
-    const object=INTERACTABLES.find(o=>o.id===id&&o.type===(kind==='jukebox'?'jukebox':'television')),player=this.player(client);
+    // A TV group is controlled from any of its screens.
+    const objects=INTERACTABLES.filter(o=>o.media===id&&o.type===(kind==='jukebox'?'jukebox':'television')),player=this.player(client);
     const states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions;
-    if(!object||!states.has(id)||!canInteract(object,player,INTERACTION_SLACK))throw new Error(`Chegue mais perto d${name}.`);
+    if(!states.has(id)||!objects.some(object=>canInteract(object,player,INTERACTION_SLACK)))throw new Error(`Chegue mais perto d${name}.`);
     if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error(`Encerre a interação atual antes de usar ${name}.`);
   }
 
@@ -652,6 +860,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (failed.length) worldMetrics.inc('bar_world_controls_total', 'Administrative controls confirmed', { outcome: 'failed' }, failed.length);
       for (const id of failed) this.log('event_control_rejected', { id });
       await this.results.flush();
+      await this.walletRetries.flush();
     } catch (e) {
       worldMetrics.inc('bar_world_maintenance_failures_total', 'Maintenance rounds that failed (API unreachable or refused)');
       this.log('maintenance_retry', { message: e instanceof Error ? e.message : 'error', requestId: (e as { requestId?: string }).requestId });

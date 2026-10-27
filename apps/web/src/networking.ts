@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import {api} from './api';
 
 export interface NetworkHooks {
@@ -18,7 +18,13 @@ export interface NetworkHooks {
   itemLost?:(item:string)=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
   inventoryResult?:(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>void;
+  /** Coins after a change made in the room (media, counter, table, job, refund). */
+  wallet?:(change:{balance:number;delta?:number;reason?:string})=>void;
+  table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
+  job?:(update:{task?:JobTaskView|null;message?:string})=>void;
+  adminWorld?:(snapshot:unknown)=>void;
 }
+export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number}
 export class BarNetwork {
   room?:Room;
   // By default the game is reached through the site's own address (Vite proxies /game), which also works
@@ -83,6 +89,10 @@ export class BarNetwork {
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
     room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));
     room.onMessage('voice',(frame:Uint8Array)=>this.hooks.voice?.(frame));
+    room.onMessage('wallet.state',(change:{balance:number;delta?:number;reason?:string})=>this.hooks.wallet?.(change));
+    room.onMessage('table.state',(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>this.hooks.table?.(update));
+    room.onMessage('job.state',(update:{task?:JobTaskView|null;message?:string})=>this.hooks.job?.(update));
+    room.onMessage('admin.world',(snapshot:unknown)=>this.hooks.adminWorld?.(snapshot));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));

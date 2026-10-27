@@ -15,7 +15,7 @@ function requestId(){
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
-export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=>void;changedWallet:()=>void;denied:()=>void}){
+export function adminPanel(container:HTMLElement,hooks:{changedWallet:()=>void;denied:()=>void}){
   let data:AdminOverview|undefined,selectedId='',search='',offset=0,mode='',busy=false,disposed=false,generation=0;
   let reversingId='',historyOpen=false;
   let pending:{signature:string;id:string}|undefined;
@@ -80,7 +80,7 @@ export function adminPanel(container:HTMLElement,hooks:{notify:(message:string)=
   }
   async function mutate(job:()=>Promise<unknown>,success:string,wallet=false){
     if(busy||disposed)return;busy=true;setBusy(true);message('Aplicando alteração…');
-    try{await job();if(disposed)return;if(wallet)hooks.changedWallet();mode='';reversingId='';pending=undefined;await load();if(!disposed){message(success);hooks.notify(success);}}
+    try{await job();if(disposed)return;if(wallet)hooks.changedWallet();mode='';reversingId='';pending=undefined;await load();if(!disposed)message(success);}
     catch(error){if(disposed)return;if(error instanceof ApiError&&error.status===403)hooks.denied();message(error instanceof Error?error.message:'Não foi possível concluir a ação.',true);}
     finally{busy=false;if(!disposed)setBusy(false);}
   }

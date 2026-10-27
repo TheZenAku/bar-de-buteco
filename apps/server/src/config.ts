@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { authSecret, internalSecret } from '@bar/shared/tickets';
+import { MEDIA_PRICES, type MediaPriceKind } from '@bar/shared';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // An empty variable counts as unset, as before; anything else must be valid or the world refuses to start.
@@ -18,6 +19,9 @@ const environmentSchema = z.object({
   BLACKJACK_TURN_MS: integer, EVENT_MIN_MS: integer, EVENT_MAX_MS: integer,
   WORLD_OUTBOX_PATH: optional(z.string().min(1)),
   WORLD_INSTANCE_ID: optional(z.string().min(1).max(128)),
+  PRICE_JUKEBOX: optional(z.coerce.number().int().min(0).max(10_000)),
+  PRICE_TV: optional(z.coerce.number().int().min(0).max(10_000)),
+  PRICE_TELAO: optional(z.coerce.number().int().min(0).max(10_000)),
 });
 
 export interface WorldConfig {
@@ -29,6 +33,8 @@ export interface WorldConfig {
   outboxPath: string;
   /** Owner name of this process's leases on the API's control outbox. */
   instanceId: string;
+  /** Coins per new video on the jukebox, a TV and the stage screen (packages/shared/src/economy.ts). */
+  prices: Record<MediaPriceKind, number>;
 }
 
 export class WorldConfigError extends Error {}
@@ -51,6 +57,7 @@ export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConf
     outboxPath: e.WORLD_OUTBOX_PATH ? resolve(repositoryRoot, e.WORLD_OUTBOX_PATH)
       : env.NODE_TEST_CONTEXT ? join(tmpdir(), `bar-world-outbox-${process.pid}-${randomBytes(4).toString('hex')}.jsonl`)
       : resolve(repositoryRoot, '.data/world/outbox.jsonl'),
+    prices: { jukebox: e.PRICE_JUKEBOX ?? MEDIA_PRICES.jukebox, tv: e.PRICE_TV ?? MEDIA_PRICES.tv, telao: e.PRICE_TELAO ?? MEDIA_PRICES.telao },
     instanceId: e.WORLD_INSTANCE_ID ?? `${hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`,
   };
 }

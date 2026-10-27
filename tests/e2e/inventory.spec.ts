@@ -23,21 +23,22 @@ test('mochila compra, usa e descarta itens com estado persistido',async({page})=
   await expect.poll(()=>page.evaluate(()=>{const state=(window as any).barDebug.snapshot();return state.world?.players?.[state.localId]?.connected===true;}),{timeout:30000}).toBe(true);
 
   await page.keyboard.press('i');
-  await expect(page.getByRole('heading',{name:'Mochila'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Mochila',exact:true})).toBeVisible();
   await expect(page.locator('.inventory-summary')).toContainText('3 / 12 pilhas');
   await expect(page.locator('.item-card')).toHaveCount(3);
   const soda=page.locator('.shop-item').filter({hasText:'Refrigerante'});
   await soda.getByRole('button',{name:'Comprar'}).click();
-  await expect(page.locator('#toasts')).toContainText('Item comprado');
+  // Purchases, use and discards show up in the backpack itself, without a notice.
   await expect(page.locator('.item-card').filter({hasText:'Refrigerante'})).toContainText('×1');
+  await expect(page.locator('#toasts')).toBeEmpty();
 
   await page.locator('.item-card').filter({hasText:'Coxinha'}).getByRole('button',{name:'Usar'}).click();
-  await expect(page.locator('#toasts')).toContainText('Coxinha usado');
   await page.keyboard.press('i');
   await expect(page.locator('.item-card').filter({hasText:'Coxinha'})).toHaveCount(0);
+  // The backpack only changes once the character has finished eating.
+  await expect.poll(()=>page.evaluate(()=>{const state=(window as any).barDebug.snapshot();return state.world.players[state.localId].interactionState;}),{timeout:20000}).toBe('');
   await page.locator('.item-card').filter({hasText:'Água mineral'}).getByRole('button',{name:'Descartar'}).click();
   await page.getByRole('button',{name:'Descartar 1'}).click();
-  await expect(page.locator('#toasts')).toContainText('1× Água mineral descartado');
   await page.keyboard.press('i');
   await expect(page.locator('.item-card').filter({hasText:'Água mineral'})).toContainText('×1');
 });

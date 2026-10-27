@@ -10,6 +10,10 @@ Os arquivos podem ser abertos com dois cliques, a partir de qualquer pasta. É n
 | `status.bat` | Verifica os serviços e mostra os endereços |
 | `logs.bat` | Acompanha o log; Ctrl+C encerra o acompanhamento |
 | `liberar-firewall.bat` | Configura acesso pela rede privada; solicita administrador |
+| `abrir-jogo.bat` | Abre https://localhost:5173 no navegador padrão (com `BAR_HTTPS=0`, o endereço HTTP) |
+| `atualizar.bat` | Para os serviços, executa `npm install` e o typecheck e liga tudo de novo; se algo falhar, os serviços ficam desligados e o erro aparece na janela |
+| `testar.bat` | Executa `npm test` (API, mundo e integração); `testar.bat navegador` também executa os E2E no Edge |
+| `contas-demo.bat` | Para os serviços, cria as contas de demonstração (`npm run seed`) e liga tudo de novo; o PostgreSQL embutido aceita um processo por vez |
 
 Abra **https://localhost:5173** depois de aparecer **B.A.R. ligado!** (na primeira visita, aceite o aviso do certificado próprio em *Avançado*; o HTTPS libera o microfone do [chat de voz](../docs/sistemas/voice.md)). As portas são 3001 para a API, 2567 para o mundo e 5173 para o site; o site repassa o mundo em `/game`, então quem joga de fora só precisa da porta 5173. Com `BAR_HTTPS=0` no ambiente, o site volta a usar HTTP. O status consulta a identidade da API e do mundo e verifica a transformação do código e do CSS no Vite, além da página inicial.
 

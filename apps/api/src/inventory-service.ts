@@ -77,5 +77,5 @@ export class InventoryService {
     return this.view(userId);
   }
 
-  async access(userId:string){return {inventory:(await this.view(userId)).stacks};}
+  async access(userId:string){const view=await this.view(userId);return {inventory:view.stacks,balance:view.balance};}
 }

@@ -31,25 +31,33 @@ export class TelevisionSurface {
     app.root.addChild(this.plane);
   }
   show(value:boolean):void {if(this.visible!==value){this.visible=value;for(const mesh of this.plane.render!.meshInstances)mesh.material=value?this.material:this.offMaterial;this.app.renderNextFrame=true;}}
-  project(camera:pc.CameraComponent,width:number,height:number):Point[]|null {
+  /**
+   * The video always stays on its screen, at any size and even when partly outside the view; the
+   * depth-tested alpha aperture hides it behind walls, furniture and people. Null only when the camera
+   * sees the back of the TV or a corner is behind the camera, where no projection exists.
+   */
+  project(camera:pc.CameraComponent):Point[]|null {
     const d=this.definition,eye=camera.entity.getPosition();
     if(new pc.Vec3(eye.x-d.x,eye.y-d.y,eye.z-d.z).dot(this.normal)<=.02)return null;
-    const corners=[[-1,1],[1,1],[1,-1],[-1,-1]].map(([x,y])=>new pc.Vec3(d.x+this.right.x*x*d.width/2,d.y+y*d.height/2,d.z+this.right.z*x*d.width/2));
-    const points=corners.map(p=>camera.worldToScreen(p));
-    if(points.some(p=>p.z<=camera.nearClip||p.x<8||p.y<8||p.x>width-8||p.y>height-8))return null;
-    const side=(a:number,b:number)=>Math.hypot(points[a].x-points[b].x,points[a].y-points[b].y);
-    if(Math.min(side(3,0),side(2,1))<200||Math.min(side(1,0),side(2,3))<200)return null;
-    // Structural walls: choose the visible dock rather than leaving a hidden player running.
-    // The depth-tested alpha aperture also handles exact mesh and moving-character occlusion.
-    if(corners.some(p=>COLLIDERS.some(box=>{
+    const points=this.corners().map(p=>camera.worldToScreen(p));
+    if(points.some(p=>p.z<=camera.nearClip))return null;
+    return points.map(p=>({x:p.x,y:p.y}));
+  }
+  private corners():pc.Vec3[] {
+    const d=this.definition;
+    return [[-1,1],[1,1],[1,-1],[-1,-1]].map(([x,y])=>new pc.Vec3(d.x+this.right.x*x*d.width/2,d.y+y*d.height/2,d.z+this.right.z*x*d.width/2));
+  }
+  /** No structural wall between the camera and the screen: only then may the pointer reach its player. */
+  clearFrom(camera:pc.CameraComponent):boolean {
+    const eye=camera.entity.getPosition();
+    return !this.corners().some(p=>COLLIDERS.some(box=>{
       if(box.ramp)return false;
       const from=[eye.x,eye.y,eye.z],to=[p.x,p.y,p.z],min=[box.x-box.hx,(box.minY??-1000),box.z-box.hz],max=[box.x+box.hx,(box.maxY??1000),box.z+box.hz];
       let enter=.001,exit=.995;
       for(let a=0;a<3;a++) {const delta=to[a]-from[a];if(Math.abs(delta)<1e-8){if(from[a]<min[a]||from[a]>max[a])return false;continue;}
         const s=(min[a]-from[a])/delta,t=(max[a]-from[a])/delta;enter=Math.max(enter,Math.min(s,t));exit=Math.min(exit,Math.max(s,t));if(enter>exit)return false;}
       return true;
-    })))return null;
-    return points.map(p=>({x:p.x,y:p.y}));
+    }));
   }
   destroy():void {this.plane.destroy();this.material.destroy();this.offMaterial.destroy();}
 }

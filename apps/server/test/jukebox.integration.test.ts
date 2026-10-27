@@ -6,7 +6,13 @@ import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean):Promise<void>{const deadline=Date.now()+4000;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 test('real room: proximity, late join, shared controls, conflicting revisions and stale ends', {timeout:20000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
-  const api=createServer(async(req,res)=>{for await(const _ of req){}res.setHeader('content-type','application/json');res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[]}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
+  const wallets=new Map<string,number>(),applied=new Map<string,number>(),charges:Array<{userId:string;amount:number;reason:string}>=[];
+  const api=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;res.setHeader('content-type','application/json');
+    if(req.url?.endsWith('/wallet')){const body=JSON.parse(raw),balance=wallets.get(body.userId)??1000;
+      if(applied.has(body.requestId)){res.end(JSON.stringify({balance,applied:applied.get(body.requestId)}));return;}
+      if(balance+body.amount<0){res.statusCode=409;res.end(JSON.stringify({error:'Moedas insuficientes.'}));return;}
+      wallets.set(body.userId,balance+body.amount);applied.set(body.requestId,body.amount);charges.push({userId:body.userId,amount:body.amount,reason:body.reason});res.end(JSON.stringify({balance:balance+body.amount,applied:body.amount}));return;}
+    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[],balance:1000}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let authoritative:BarRoom;
   server.define('bar',BarRoom).on('create',room=>{authoritative=room as BarRoom;});await server.listen(0,'127.0.0.1');
@@ -23,7 +29,7 @@ test('real room: proximity, late join, shared controls, conflicting revisions an
     a.send('jukebox.command',command);await until(()=>a.state.jukeboxes.get('jukebox').revision===1);
     const b=await join('music-b'),otherErrors:string[]=[];b.onMessage('error',m=>otherErrors.push(m.message));
     await until(()=>b.state?.jukeboxes?.get('jukebox')?.revision===1);
-    assert.equal(b.state.jukeboxes.get('jukebox').videoId,'M7lc1UVf-VE');assert.equal(b.state.jukeboxes.get('jukebox').tvId,'','The jukebox has no TV: it plays on its own');
+    assert.equal(b.state.jukeboxes.get('jukebox').videoId,'M7lc1UVf-VE');
     const other=authoritative!.state.players.get('music-b')!;other.assign({x:point.x,y:point.y,z:point.z});
     b.send('jukebox.command',{id:'jukebox',revision:1,action:'pause'});await until(()=>a.state.jukeboxes.get('jukebox').status==='paused');
     a.send('jukebox.command',{id:'jukebox',revision:1,action:'stop'});await until(()=>errors.some(e=>e.includes('Outra pessoa')));assert.equal(a.state.jukeboxes.get('jukebox').status,'paused');
@@ -34,16 +40,28 @@ test('real room: proximity, late join, shared controls, conflicting revisions an
     // The TVs are separate sources: own state map, own messages, own reach. Nothing crosses over.
     await new Promise(r=>setTimeout(r,1050));
     const tvOpens:string[]=[];a.onMessage('tv.open',m=>tvOpens.push(m.id));
-    a.send('tv.command',{id:'tv-hall',revision:0,action:'play',url:'https://youtu.be/aqz-KE-bpKQ'});await until(()=>errors.some(e=>e.includes('perto da TV')));
-    assert.equal(a.state.televisions.get('tv-hall').status,'off');
+    // The ground floor's screens share one state (tv-main); upstairs has its own.
+    a.send('tv.command',{id:'tv-main',revision:0,action:'play',url:'https://youtu.be/aqz-KE-bpKQ'});await until(()=>errors.some(e=>e.includes('perto da TV')));
+    assert.equal(a.state.televisions.get('tv-main').status,'off');
     const tv=INTERACTABLES.find(i=>i.id==='tv-hall')!;player.assign({x:tv.x,y:tv.y,z:tv.z});
-    a.send('player.interact',{objectId:'tv-hall'});await until(()=>tvOpens.length===1);
-    a.send('tv.command',{id:'tv-hall',revision:0,action:'play',url:'https://youtu.be/aqz-KE-bpKQ'});await until(()=>b.state.televisions.get('tv-hall')?.revision===1);
-    assert.equal(b.state.televisions.get('tv-hall').videoId,'aqz-KE-bpKQ');
+    a.send('player.interact',{objectId:'tv-hall'});await until(()=>tvOpens.length===1);assert.equal(tvOpens[0],'tv-main','Each screen opens its group');
+    a.send('tv.command',{id:'tv-main',revision:0,action:'play',url:'https://youtu.be/aqz-KE-bpKQ'});await until(()=>b.state.televisions.get('tv-main')?.revision===1);
+    assert.equal(b.state.televisions.get('tv-main').videoId,'aqz-KE-bpKQ');
     assert.deepEqual([b.state.jukeboxes.get('jukebox').videoId,b.state.jukeboxes.get('jukebox').status,b.state.jukeboxes.get('jukebox').revision],['M7lc1UVf-VE','playing',3],'The TV never changes the jukebox');
-    a.send('tv.command',{id:'tv-hall',revision:1,action:'pause'});await until(()=>b.state.televisions.get('tv-hall').status==='paused');
+    // Another screen of the same group controls the same video.
+    const counter=INTERACTABLES.find(i=>i.id==='tv-counter')!;player.assign({x:counter.x,y:counter.y,z:counter.z});
+    a.send('tv.command',{id:'tv-main',revision:1,action:'pause'});await until(()=>b.state.televisions.get('tv-main').status==='paused');
     assert.equal(b.state.jukeboxes.get('jukebox').status,'playing','Pausing the TV leaves the jukebox playing');
-    for(const id of ['tv-left','tv-counter','tv-upstairs'])assert.equal(b.state.televisions.get(id).status,'off','Each TV keeps its own state');
+    assert.deepEqual([...b.state.televisions.keys()].sort(),['telao','tv-main','tv-upstairs']);
+    // Only choosing a video costs coins: one jukebox play and one TV play so far; pause, resume and stop are free.
+    assert.deepEqual(charges.map(c=>[c.userId,c.amount,c.reason]),[['music-a',-15,'media:jukebox'],['music-a',-25,'media:tv-main']]);
+    assert.equal(b.state.televisions.get('telao').status,'off','The stage screen keeps its own state');
+    assert.equal(b.state.televisions.get('tv-upstairs').status,'off','Upstairs keeps its own state');
+    // Upstairs cannot control the ground floor's group.
+    await new Promise(r=>setTimeout(r,1050));
+    const upstairs=INTERACTABLES.find(i=>i.id==='tv-upstairs')!;player.assign({x:upstairs.x,y:upstairs.y,z:upstairs.z});errors.length=0;
+    a.send('tv.command',{id:'tv-main',revision:2,action:'resume'});await until(()=>errors.some(e=>e.includes('perto da TV')));
+    assert.equal(b.state.televisions.get('tv-main').status,'paused');
     // A jukebox id is not a TV and the reverse.
     a.send('tv.command',{id:'jukebox',revision:3,action:'stop'});await new Promise(r=>setTimeout(r,150));
     assert.equal(b.state.jukeboxes.get('jukebox').status,'playing');

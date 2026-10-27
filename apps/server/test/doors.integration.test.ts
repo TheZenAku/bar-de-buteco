@@ -7,7 +7,13 @@ async function until(check:()=>boolean):Promise<void>{const deadline=Date.now()+
 
 test('doors: synced swing, nobody is crushed, the user steps back, and the ordered drink is shared', {timeout:20000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
-  const api=createServer(async(req,res)=>{for await(const _ of req){}res.setHeader('content-type','application/json');res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[]}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
+  const wallets=new Map<string,number>(),applied=new Map<string,number>(),charges:Array<{userId:string;amount:number;reason:string}>=[];
+  const api=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;res.setHeader('content-type','application/json');
+    if(req.url?.endsWith('/wallet')){const body=JSON.parse(raw),balance=wallets.get(body.userId)??1000;
+      if(applied.has(body.requestId)){res.end(JSON.stringify({balance,applied:applied.get(body.requestId)}));return;}
+      if(balance+body.amount<0){res.statusCode=409;res.end(JSON.stringify({error:'Moedas insuficientes.'}));return;}
+      wallets.set(body.userId,balance+body.amount);applied.set(body.requestId,body.amount);charges.push({userId:body.userId,amount:body.amount,reason:body.reason});res.end(JSON.stringify({balance:balance+body.amount,applied:body.amount}));return;}
+    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[],balance:1000}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let authoritative:BarRoom;
   server.define('bar',BarRoom).on('create',room=>{authoritative=room as BarRoom;});await server.listen(0,'127.0.0.1');

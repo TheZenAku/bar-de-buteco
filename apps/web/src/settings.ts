@@ -1,13 +1,15 @@
-/** Per-browser preferences for sound and proximity voice. The jukebox keeps its own volume (jukebox.ts). */
+import {readGraphics,defaultGraphics,type GraphicsSettings} from './graphics';
+/** Per-browser preferences for sound, proximity voice and graphics. The jukebox keeps its own volume (jukebox.ts). */
 export interface GameSettings {
   /** Volumes 0–1; the microphone gain is mic × 2 (0.5 = unchanged). */
   master:number;music:number;voice:number;mic:number;
   micEnabled:boolean;voicesEnabled:boolean;voiceMode:'open'|'ptt';
   /** 0 picks up whispers, 1 only loud speech. */
   sensitivity:number;inputDevice:string;
+  graphics:GraphicsSettings;
 }
 const KEY='bar:settings:v1';
-export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:''};
+export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics()};
 const unit=(value:unknown,fallback:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 
 export function createSettings(){
@@ -21,6 +23,7 @@ export function createSettings(){
       micEnabled:saved.micEnabled===true,voicesEnabled:typeof saved.voicesEnabled==='boolean'?saved.voicesEnabled:current.voicesEnabled,
       voiceMode:saved.voiceMode==='ptt'?'ptt':'open',sensitivity:unit(saved.sensitivity,current.sensitivity),
       inputDevice:typeof saved.inputDevice==='string'?saved.inputDevice.slice(0,256):'',
+      graphics:readGraphics(saved.graphics),
     };
   }catch{/* Private mode or malformed: defaults. */}
   return {

@@ -41,7 +41,7 @@ test('nova UI persists panel positions, locks and visibility per account, handle
   }finally{await page.request.post('/api/auth/logout',{data:{}});}
 });
 
-test('real proximity messages create safe comanda toasts and blocking also suppresses notifications',async({page,browser})=>{
+test('real proximity messages appear safely in the chat only, and blocking hides them',async({page,browser})=>{
   test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await enter(page,'Recados');await page.getByRole('button',{name:'Sua conta',exact:true}).click();
   const context=await browser.newContext({viewport:{width:640,height:480}}),other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));
@@ -49,11 +49,13 @@ test('real proximity messages create safe comanda toasts and blocking also suppr
     const sender=await enter(other,'Vizinho');
     const send=async(text:string)=>{await other.getByRole('button',{name:/Resenhar/}).click();await other.getByLabel('Mensagem por proximidade').fill(text);await other.locator('#chat-form button').click();};
     const text='Oi <img src=x onerror="window.toastInjected=1">!';await send(text);
-    const notice=page.locator('.comanda[data-variant="mensagem"]').filter({hasText:text});await expect(notice).toBeVisible();await expect(notice.locator('.comanda__title')).toHaveText('Vizinho');await expect(notice.locator('img')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).toastInjected)).toBeUndefined();
+    // Chat lives in its panel: a message never becomes a notice.
+    await expect(page.locator('#messages')).toContainText(text);await expect(page.locator('#messages img')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).toastInjected)).toBeUndefined();
+    await expect(page.locator('.comanda')).toHaveCount(0);
     await page.getByRole('button',{name:'Fechar janela'}).click();await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.locator(`[data-action="block"][data-id="${sender}"]`).click();
     await page.getByRole('button',{name:'Fechar janela'}).click();for(const close of await page.locator('.comanda__close').all())await close.click();
     await send('Este recado está bloqueado');await expect(other.locator('#messages')).toContainText('Este recado está bloqueado');await expect(page.locator('#messages')).not.toContainText('Este recado está bloqueado');await expect(page.locator('#toasts')).not.toContainText('Este recado está bloqueado');
-    await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form button').click();await expect(page.locator('.comanda[data-variant="acao"]')).toContainText('Bengala equipada');
+    await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form button').click();await expect(page.locator('#messages')).toContainText('Bengala equipada');await expect(page.locator('.comanda')).toHaveCount(0);
     await page.screenshot({path:previewPath('nova-ui-toast.png')});expect(errors).toEqual([]);
   }finally{await Promise.allSettled([page.request.post('/api/auth/logout',{data:{}}),other.request.post('/api/auth/logout',{data:{}})]);await other.goto('about:blank').catch(()=>{});await context.close();}
 });

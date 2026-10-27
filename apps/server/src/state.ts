@@ -36,6 +36,8 @@ export class Player extends Schema {
   @type('string') condition = 'normal';
   @type('number') conditionUntil = 0;
   @type('string') faintCause = '';
+  /** The job being worked ('' when not working), shown to everyone. */
+  @type('string') job = '';
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -77,10 +79,9 @@ export class EventState extends Schema {
   @type('number') startedAt = 0;
   @type('number') durationMs = 0;
 }
-/** Playback of one YouTube source: the jukebox, or one TV (separate maps in BarState). */
+/** Playback of one YouTube source: the jukebox, or one TV group (separate maps in BarState). */
 export class Jukebox extends Schema {
   @type('string') id='';
-  @type('string') tvId='';
   @type('string') videoId='';
   @type('string') status='off';
   @type('number') position=0;
@@ -94,6 +95,15 @@ export class DoorState extends Schema {
   @type('boolean') open = true;
   @type('number') changedAt = 0;
 }
+/** Public occupancy of a job's slots (apps/server/src/world/jobs.ts). */
+export class JobSlotState extends Schema {
+  @type('string') id = '';
+  @type('string') name = '';
+  @type('uint8') slots = 0;
+  @type('uint8') workers = 0;
+  @type('uint16') pay = 0;
+  @type('boolean') enabled = true;
+}
 export class BarState extends Schema {
   @view() @type({ map: Player }) players = new MapSchema<Player>();
   @view() @type({ map: Npc }) npcs = new MapSchema<Npc>();
@@ -101,6 +111,7 @@ export class BarState extends Schema {
   @type({ map: Jukebox }) jukeboxes = new MapSchema<Jukebox>();
   @type({ map: Jukebox }) televisions = new MapSchema<Jukebox>();
   @type({ map: DoorState }) doors = new MapSchema<DoorState>();
+  @type({ map: JobSlotState }) jobs = new MapSchema<JobSlotState>();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

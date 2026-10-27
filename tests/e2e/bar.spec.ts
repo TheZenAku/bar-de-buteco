@@ -1,7 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import map from '../../packages/shared/src/map-data.json' with {type:'json'};
 // Route validated by tests/integration/map.test.ts: pavement, veranda east opening, counter aisle, both stair flights.
-const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.9],[14,-10.9],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
+const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.2],[14,-10.2],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
 
 const password='ButecoTeste2026!';
 test('Boteco interface uses live state and its action bar works at desktop and narrow widths',async({page})=>{

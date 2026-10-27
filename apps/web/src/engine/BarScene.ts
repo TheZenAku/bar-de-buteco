@@ -8,6 +8,7 @@ import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
+import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -24,7 +25,7 @@ const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
 // Degrees by drunk stage (0-4): body sway of every avatar and camera roll of the local player.
 const DRUNK_BODY_SWAY = [0, 0, 3, 6, 6];
 const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
-// NPCs with their own skin, not offered in the selector: Seu Zé is Magrão.
+// NPCs with their own skin, not offered in the selector: the bartender is Magrão.
 const NPC_SKINS: Record<string, string> = { bartender: 'magrao' };
 interface SkinnedRig {
   model: pc.Entity;
@@ -167,6 +168,11 @@ export class BarScene {
   private frames = 0;
   private fps = 60;
   private staticBatchId = -1;
+  private graphics?: GraphicsSettings;
+  /** Current render scale (dynamic resolution moves it between 0.5 and the chosen scale). */
+  private scale = 1;
+  private goodSeconds = 0;
+  private drawClock = 0;
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks = {}) {
     this.canvas = canvas;
@@ -196,7 +202,8 @@ export class BarScene {
     this.environment.addPartyShadows(this.partyLights);
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
-    for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.tvId===tv.id)))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
+    for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.screens.includes(tv.id))))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
+    this.buildStageScreen();
     this.discoBall = this.buildDiscoBall();
     this.ready = this.loadMap();
     this.loadDrinks();
@@ -272,6 +279,14 @@ export class BarScene {
         resolve();
       });
     });
+  }
+
+  /** The stage screen is not in the map: a dark frame and two hanging cables around its video surface. */
+  private buildStageScreen(): void {
+    const screen=TELEVISIONS.find(tv=>tv.id==='telao');if(!screen)return;
+    const frame=this.material('#141418','#050507',.6),cable=this.material('#222226');
+    this.box('Stage screen frame',[screen.x,screen.y,screen.z-.05],[screen.width+.24,screen.height+.24,.08],frame);
+    for(const side of [-1,1])this.box('Stage screen cable',[screen.x+side*screen.width*.42,screen.y+screen.height/2+.65,screen.z-.05],[.025,1.3,.025],cable);
   }
 
   private buildPartyLighting(): void {
@@ -353,8 +368,9 @@ export class BarScene {
     let tv=this.televisions.get(id);const definition=TELEVISIONS.find(t=>t.id===id);
     if(!definition||!this.camera.camera)return null;
     if(!tv){tv=new TelevisionSurface(this.app,definition);this.televisions.set(id,tv);}
-    return tv.project(this.camera.camera,this.canvas.clientWidth,this.canvas.clientHeight);
+    return tv.project(this.camera.camera);
   }
+  televisionClear(id:string):boolean {const tv=this.televisions.get(id);return !!tv&&!!this.camera.camera&&tv.clearFrom(this.camera.camera);}
   showTelevision(id:string,visible:boolean):void {this.televisions.get(id)?.show(visible);}
   watchTelevision(id=''):void {
     this.watchingTv=id;this.keys.clear();this.dragging=false;
@@ -418,7 +434,7 @@ export class BarScene {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    this.app.autoRender = enabled;
+    this.app.autoRender = enabled && !this.graphics?.fpsCap;
     this.app.renderNextFrame = true;
     if (!enabled) {
       this.keys.clear();
@@ -773,7 +789,7 @@ export class BarScene {
     const body = this.group('Animated rig', [0, 0, 0], root);
     const skinId = this.usesSkin(actor, npc) ? this.skinFor(actor, npc) : undefined;
     if (!skinId) body.setLocalScale(...BOX_AVATAR_SCALE);
-    const isBartender = actor.role === 'bartender' || (actor.displayName ?? actor.name)?.toLowerCase().includes('zé');
+    const isBartender = actor.role === 'bartender' || actor.id === 'bartender';
     const hash = [...actor.id].reduce((value, letter) => value + letter.charCodeAt(0), 0);
     const ring = this.shape('Local player marker', 'cylinder', [0, 0.027, 0], [0.83, 0.018, 0.83], this.material('#b1a067', '#514322'), root);
     ring.enabled = actor.id === this.localId;
@@ -1020,16 +1036,49 @@ export class BarScene {
     bone.setRotation(this.tempTurn.setFromAxisAngle(axis, degrees).mul(bone.getRotation()));
   }
 
+  /** Configurações → Gráficos (apps/web/src/graphics.ts). */
+  setGraphics(graphics: GraphicsSettings): void {
+    this.graphics = graphics; this.scale = graphics.renderScale; this.goodSeconds = 0;
+    this.applyResolution();
+    this.environment.setQuality(graphics.shadows, FOG_SCALE[graphics.fog]);
+    this.app.autoRender = this.enabled && !graphics.fpsCap;
+    this.app.renderNextFrame = true;
+  }
+  getGraphics() { return { ...this.graphics, currentScale: this.scale, fps: this.fps, pixelRatio: this.app.graphicsDevice.maxPixelRatio }; }
+  private applyResolution(): void {
+    this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, this.graphics?.pixelRatioCap ?? 1.5) * this.scale;
+    this.resize();
+  }
+  /** With a frame cap the scene still updates every display frame but draws only at the chosen rate. */
+  private shouldDraw(dt: number): boolean {
+    const cap = this.graphics?.fpsCap;
+    if (!cap || !this.enabled) return true;
+    this.drawClock += dt;
+    if (this.drawClock < 1 / cap - 0.002) return false;
+    this.drawClock = Math.min(this.drawClock - 1 / cap, 1 / cap);
+    this.app.renderNextFrame = true;
+    return true;
+  }
+  /** Dynamic resolution: below 80% of the target for a second, draw fewer pixels; give them back after 3 s of headroom. */
+  private adaptResolution(): void {
+    const graphics = this.graphics;
+    if (!graphics?.dynamicResolution || !this.enabled) return;
+    const target = graphics.fpsCap || 60;
+    if (this.fps < target * 0.8 && this.scale > 0.5) { this.scale = Math.max(0.5, +(this.scale - 0.1).toFixed(2)); this.goodSeconds = 0; this.applyResolution(); }
+    else if (this.fps >= target * 0.95 && this.scale < graphics.renderScale && ++this.goodSeconds >= 3) { this.scale = Math.min(graphics.renderScale, +(this.scale + 0.05).toFixed(2)); this.goodSeconds = 0; this.applyResolution(); }
+  }
+
   private update(dt: number): void {
     this.frameSeconds += dt;
     this.swingDoors();
+    if (this.shouldDraw(dt)) this.frames++;
     dt = Math.min(dt, 0.1);
     this.elapsed += dt;
-    this.frames++;
     if (this.frameSeconds >= 1) {
       this.fps = Math.round(this.frames / this.frameSeconds);
       this.frameSeconds = 0;
       this.frames = 0;
+      this.adaptResolution();
     }
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
     const bartender=this.actors.get('bartender');

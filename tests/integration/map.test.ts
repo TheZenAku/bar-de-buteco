@@ -22,7 +22,7 @@ function walk(start:Position,waypoints:readonly (readonly [number,number])[]):Po
 }
 // Routes used by the browser test: from the pavement through the veranda's east opening, along the counter
 // aisle, up both stair flights to the upstairs games hall.
-const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.9],[14,-10.9],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
+const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.2],[14,-10.2],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
 
 test('published map and collision export match the supplied BarBoteco assets exactly',()=>{
   for(const [name,hash] of [['bar_boteco.glb',map.visualHash],['bar_boteco_colisao.glb',map.collisionHash]]){

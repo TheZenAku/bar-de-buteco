@@ -34,7 +34,7 @@ O [ciclo de dia e noite](docs/sistemas/day-night.md) completa um dia em **40 min
 
 O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
 
-Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. A loja está preparada, com saldo inicial zero e ganhos desativados até a definição da economia. Veja [criação de personagens, loja e integração](docs/sistemas/characters.md).
+Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [criação de personagens, loja e integração](docs/sistemas/characters.md).
 
 O corpo masculino também pode vestir **camiseta, suéter, calça, calça social, tênis, sapato Derby e óculos**, com seleção e cor independentes por categoria no criador. Salvar atualiza a aparência para os outros jogadores e guarda a escolha na conta. Para adicionar novos FBX compatíveis, execute **`tools/assets/roupas/importar.bat`**; veja [os scripts de importação de roupas](tools/assets/roupas/README.md).
 
@@ -47,6 +47,8 @@ O corpo masculino também pode vestir **camiseta, suéter, calça, calça social
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
 | I | Abrir ou fechar a mochila, usar itens e acessar a venda da casa |
+| T | Sentado à mesa: pedir comida e bebida ao Tonico |
+| J | Trabalhar no bar (Ajudante do Magrão) e ganhar moedas |
 | C | Escolher o visual (skin); todos veem a troca na hora |
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
 | Enter | Abrir o chat de proximidade (12 m) |
@@ -55,9 +57,11 @@ O corpo masculino também pode vestir **camiseta, suéter, calça, calça social
 
 Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interação. Na mesa, **Começar rodada** inicia blackjack para até quatro pessoas; **Comprar carta** e **Parar** são validados no servidor. O dealer para em 17, incluindo soft 17. Cada turno tem limite de 25 segundos. As estatísticas persistem na conta.
 
-A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. A TV mostra o vídeo na própria tela do cenário (**Assistir na TV** aproxima a câmera). A jukebox toca no card do player. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
+A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox (encostada na parede, ao pé da escada) ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. As três TVs do térreo passam sempre o mesmo vídeo; a do andar de cima tem o seu. O vídeo fica sempre na tela da TV, nunca num card no canto (**Assistir na TV** aproxima a câmera). A jukebox só toca o som, sem vídeo. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
 
-As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
+As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo americano**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
+
+A **economia** usa moedas do jogo, sem dinheiro real. Sentado a uma mesa, aperte **T** e o **Tonico** busca o pedido no balcão e leva até você, por um caminho calculado no mapa. A jukebox, as TVs e o **telão do palco** cobram por vídeo novo, e o balcão cobra a bebida. Pedido cancelado volta para a carteira. As moedas vêm do emprego de **Ajudante do Magrão** (**J**), com poucas vagas, tarefas por estação e limite diário. A administração acompanha e ajusta tudo em **⚙ → Mundo ao vivo**. Veja [economia](docs/sistemas/economia.md). Os gráficos têm presets, resolução dinâmica, sombras, névoa e limite de FPS em **Configurações** ([gráficos](docs/sistemas/graficos.md)). O que falta da lista de funcionalidades e o plano estão em [funcionalidades](docs/projeto/funcionalidades.md).
 
 O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/sistemas/needs.md).
 
@@ -116,7 +120,7 @@ O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atua
 
 ## Escopo da versão
 
-Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e Seu Zé usam modelos animados. Os jogadores começam com um personagem Quaternius personalizado e podem adquirir Nathan, Leandro, Rafael e Read na loja (`SKINS` em `packages/shared`). Leandro, Read e Magrão preservam os rigs AccuRig; Rafael preserva seu rig Character Creator / Unreal. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; o personagem, a coleção e o visual equipado ficam salvos na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e o Magrão (bartender) usam modelos animados. Os jogadores começam com um personagem Quaternius personalizado e podem adquirir Nathan, Leandro, Rafael e Read na loja (`SKINS` em `packages/shared`). Leandro, Read e Magrão preservam os rigs AccuRig; Rafael preserva seu rig Character Creator / Unreal. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; o personagem, a coleção e o visual equipado ficam salvos na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 

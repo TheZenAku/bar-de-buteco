@@ -84,12 +84,14 @@ test('doors never swing through a body and are used by touching them from either
 });
 
 test('each TV is used from a free spot on the floor in front of its own screen',()=>{
-  assert.equal(TV_SYSTEMS.length,4);
-  for(const system of TV_SYSTEMS){
-    const spot=TV_SPOTS[system.tvId]!,object=INTERACTABLES.find(i=>i.id===system.id)!;
-    assert.equal(object.type,'television');
-    assert.ok(isWalkable(spot.x,spot.z,spot.y),`${system.id}: spot is walkable`);
-    assert.equal(nearestInteraction(spot)?.id,system.id,`${system.id}: the nearest object from its spot`);
+  const screens=TV_SYSTEMS.flatMap(system=>system.screens.map(screen=>({screen,system:system.id})));
+  // Four TVs plus the stage screen, used from the sound desk in front of the stage.
+  assert.equal(screens.length,5);
+  for(const {screen,system} of screens){
+    const spot=TV_SPOTS[screen]!,object=INTERACTABLES.find(i=>i.id===screen)!;
+    assert.equal(object.type,'television');assert.equal(object.media,system,`${screen}: controls its group`);
+    assert.ok(isWalkable(spot.x,spot.z,spot.y),`${screen}: spot is walkable`);
+    assert.equal(nearestInteraction(spot)?.id,screen,`${screen}: the nearest object from its spot`);
   }
   assert.equal(nearestInteraction(TV_SPOTS['tv-hall']!)?.type,'television');
 });

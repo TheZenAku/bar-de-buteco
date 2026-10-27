@@ -74,3 +74,34 @@ Estas execuções locais também ocorreram no Windows com Node 26.12.1/npm 11.20
 | Compose/PostgreSQL/SMTP/backup | `docker ...` | **não executado:** comando `docker` ausente neste host |
 
 O build acima também verifica a migração do Fastify para `LogController`, o import ESM explícito do helper do Vite e o contrato único da cena. A última rodada integral tinha 154 testes aprovados; depois dela, os 5 testes focados do runner também passaram, mas a suíte integral ainda precisa ser repetida antes de somar esse novo conjunto ao baseline. As coberturas incluem configuração inválida, segredos separados, readiness, métricas protegidas, correlação, leases/reentrega/dead letter, persistência/replay do outbox, nonces, takeover/reconnect, lifecycle de admissão, bootstrap do Compose, caminhos de preview, backup/restore e invariantes de migração. O E2E segura `/api/blocks`, volta ao lobby durante a entrada e prova que a conclusão antiga não conecta o jogador depois.
+
+## Toasts essenciais, TVs agrupadas e jukebox na parede — `marco-1/fundacao` @ `ad40761` + árvore de trabalho (27/10/2026)
+
+Mesmo ambiente local (Windows, Edge com SwiftShader). Para separar regressão de instabilidade antiga, os E2E que falharam também rodaram em `ad40761`, sem estas mudanças.
+
+| Suíte | Comando | Resultado |
+| --- | --- | --- |
+| Typecheck e build | `npm run build` | passou |
+| API / Servidor / Integração / Ferramentas | `npm test` | 42 (+1 ignorado) / 32 / 58 / 35 |
+| E2E `environment` | `npx playwright test --project=environment` | 3/3. O fixture `environment.html` não aplicava a câmera (`onMediaFrame` fora dos callbacks), e a falha da névoa vinha daí |
+| E2E `media` (dublês) | `--project=media -g "API double\|unreachable"` | 3/3, incluindo o novo teste do grupo de TVs |
+| E2E `media` (YouTube real) | `--project=media -g "real YouTube"` | **falhou nas duas árvores**: entradas sem confirmação e interação ausente sob carga. Em `ad40761` falha ainda antes, ao chegar à jukebox |
+| E2E `interface` | `--project=interface` | 5/6. `ad40761` ficou em 3/6. `clothing.spec` falha nas duas |
+| E2E `world` + `doors` | `--project=world --project=doors` | `inventory.spec` passou depois de esperar o fim da ação antes de descartar. **Falham também em `ad40761`:** `bar.spec:86` (`cartRenders` 2 ≠ 1), recuperação de senha (timeout no clique) e `doors.spec` (rótulo "Sentar" após fechar a porta) |
+
+Não executados: `game`, `ambient`, `voice` e carga.
+
+## Economia, Tonico, empregos, telão e gráficos — `marco-1/fundacao` @ `ad40761` + árvore de trabalho (27/10/2026)
+
+Mesmo ambiente local (Windows, Edge com SwiftShader). Escopo em [economia](../sistemas/economia.md), [gráficos](../sistemas/graficos.md) e [funcionalidades](../projeto/funcionalidades.md).
+
+| Suíte | Comando | Resultado |
+| --- | --- | --- |
+| Typecheck e build | `npm run build` | passou (mesmo aviso de tamanho de chunk do Vite) |
+| API / Servidor / Integração / Ferramentas | `npm test` | 43 (+1 ignorado) / 40 / 58 / 35, nenhuma falha. Novos: `wallet.test`, `economy.integration.test`, `navigation.test`, `waiter.test`, `jobs.test` |
+| E2E `economy` (novo, projeto `world`) | `npx playwright test tests/e2e/economy.spec.ts` | 1/1 |
+| E2E `admin` | `npx playwright test tests/e2e/admin.spec.ts` | 2/2, depois de desligar a resolução dinâmica do preset Alto. Com ela ligada falhou 3/3 (a janela de 350 ms do painel ocupado não era observada); com o cliente anterior, 1/1 |
+| E2E completo | `npx playwright test` | Executado uma vez, em paralelo com outras suítes. Além das falhas antigas listadas acima (`bar.spec:86`, recuperação de senha, `clothing.spec`, `doors.spec`), falharam `bar.spec:249`, `bar.spec:297` e `voice.spec` |
+| A/B de `bar.spec:249`, `bar.spec:297` e `voice.spec` | mesmas specs com `main.ts`/`game-ui.ts` revertidos às versões anteriores | **falham igual nas duas versões do cliente**, nas mesmas linhas. O log do mundo mostra `maintenance_retry` e `auth_refresh_unavailable` (as chamadas internas à API estouram 4 s sob a carga de dois navegadores em WebGL por software), sem expulsão nem erro do servidor. Os projetos `game` e `voice` não tinham execução anterior registrada. O servidor anterior não foi testado nesse A/B |
+
+Não executados: carga e a suíte E2E completa depois das últimas correções.

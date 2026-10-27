@@ -1,6 +1,6 @@
 import map from './map-data.json';
 import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } from './index.js';
-import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,TV_SYSTEMS,TELEVISIONS} from './jukebox.js';
+import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 
 export const WALK_SPEED = 3.5;
@@ -15,7 +15,7 @@ export const MAP_COLLIDERS = map.colliders;
 export const MAP_SURFACES = map.surfaces;
 export const CAFE_TABLES = map.tables;
 // Game props the map leaves room for: blackjack in the upstairs games hall, between the last pool table
-// and the lounge; the jukebox in the empty fourth slot of the ground-floor hall's back row, clear of the stairs.
+// and the lounge; the jukebox against the base of the ground-floor stairs, beside the hall (JUKEBOX_PLACEMENT).
 export const BLACKJACK_TABLE = {x:17.4,y:3.45,z:-7.4,rx:0.95,rz:0.55};
 export const JUKEBOX = JUKEBOX_PLACEMENT;
 export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
@@ -78,7 +78,7 @@ export const INTERACTABLES: readonly Interactable[] = [
   {id:'blackjack-1',type:'blackjack',label:'Jogar blackjack',...BLACKJACK_TABLE,footprint:[footprint(BLACKJACK_COLLIDER)]},
   {id:'counter',type:'counter',label:'Pedir uma bebida',...map.markers.Ponto_Balcao,footprint:[...COUNTER_FOOTPRINT]},
   // The point is where a player stands touching the jukebox front.
-  {id:'jukebox',type:'jukebox',label:'Tocar a jukebox',x:JUKEBOX.x,y:JUKEBOX.y,z:JUKEBOX.z+JUKEBOX.hz+PLAYER_RADIUS+.05,footprint:[footprint(JUKEBOX_COLLIDER)]},
+  {id:'jukebox',type:'jukebox',media:'jukebox',label:'Tocar a jukebox',x:JUKEBOX.x,y:JUKEBOX.y,z:JUKEBOX.z+JUKEBOX.hz+PLAYER_RADIUS+.05,footprint:[footprint(JUKEBOX_COLLIDER)]},
   ...map.seats.map(seat=>({...seat,type:'seat' as const,label:'Sentar'})),
   ...DOORS.map(door=>({id:door.id,type:'door' as const,label:door.label,x:door.x,y:door.y,z:door.z,footprint:door.footprint})),
   // The toilets of both floors' restrooms (COL_Mob_Vaso in the map export), used by touching them.
@@ -220,6 +220,7 @@ export function canInteract(object:Interactable,position:Position,slack=0):boole
 }
 /** The first walkable point on the floor in front of a TV, searching a little to the sides. */
 function tvSpot(tv:typeof TELEVISIONS[number]):Required<Position> {
+  if('control' in tv)return {...tv.control};
   const a=tv.yaw*Math.PI/180,nx=Math.sin(a),nz=Math.cos(a),floor=tv.y>4?3.45:.3;
   for(let d=.35;d<=2.5;d+=.05)for(const side of [0,.3,-.3,.6,-.6]){
     const x=tv.x+nx*d+nz*side,z=tv.z+nz*d-nx*side,y=floorHeight(x,z,floor);
@@ -228,7 +229,8 @@ function tvSpot(tv:typeof TELEVISIONS[number]):Required<Position> {
   throw new Error(`Nenhum ponto livre diante de ${tv.id}`);
 }
 for(const tv of TELEVISIONS)TV_SPOTS[tv.id]=tvSpot(tv);
-(INTERACTABLES as Interactable[]).push(...TV_SYSTEMS.map(system=>({id:system.id,type:'television' as const,label:`Usar a ${system.label}`,...TV_SPOTS[system.tvId]!})));
+// One object per screen; every screen of a group controls the group's shared video.
+(INTERACTABLES as Interactable[]).push(...TV_SYSTEMS.flatMap(system=>system.screens.map(screen=>({id:screen,type:'television' as const,media:system.id,label:`Usar a ${TV_LABELS[screen]??'TV'}`,...TV_SPOTS[screen]!}))));
 
 export function nearestInteraction(position:Position):Interactable|undefined {
   // At a doorway the door comes first, even with a chair of the next table within reach.

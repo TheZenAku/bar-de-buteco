@@ -11,15 +11,11 @@ const METERS=[
   {id:'bladder',label:'Bexiga',icon:'toilet',low:false,alertAt:NEEDS.bladder.alertAt},
 ] as const;
 const STAGES=['Sóbrio','Alegrinho','Tonto','Bêbado','Apagando'];
-/** Alerts when a meter crosses its limit, once until it gets back to a comfortable level (no spam). */
-const ALERTS:Record<string,{title:string;text:string}>={
-  hp:{title:'Você não está bem',text:'Sua vida está baixa. Se chegar a zero, você desmaia.'},
-  hunger:{title:'Barriga roncando',text:'Com fome o fôlego rende menos e a bebida sobe mais rápido.'},
-  thirst:{title:'Garganta seca',text:'Hidrate-se. Sem água, a sede começa a tirar vida.'},
-  bladder:{title:'Aperto chegando',text:'Procure o banheiro: perto do balcão e no andar de cima.'},
-  bladderUrgent:{title:'Não dá mais pra segurar',text:'Corra pro banheiro! Com a bexiga cheia o fôlego cai.'},
-  exhausted:{title:'Sem fôlego',text:'Ande um pouco: só dá pra correr de novo quando recuperar o ar.'},
-};
+/**
+ * The only meter worth a notice: low life ends in fainting. The others turn critical in the status panel.
+ * It alerts once until life gets back to a comfortable level (no spam).
+ */
+const LOW_HP={title:'Você não está bem',text:'Sua vida está baixa. Se chegar a zero, você desmaia.'};
 
 export function needsMarkup():string{
   return `<div class="needs" id="hud-needs">${METERS.map(m=>`<div class="need" data-need="${m.id}"><span>${icon(m.icon)}${m.label}</span><b>100</b><div class="need-track" role="meter" aria-label="${m.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div></div>`).join('')}<div class="need drunk-meter" data-need="drunk" hidden><span>${icon('dizzy')}Embriaguez</span><b>Sóbrio</b><div class="need-track" role="meter" aria-label="Embriaguez" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div></div></div>`;
@@ -30,11 +26,11 @@ export function faintMarkup():string{
 
 /** Status panel meters, threshold alerts, the faint overlay and the screen effects of drunkenness. */
 export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,serverNow:()=>number){
-  let warned=new Set<string>(),shownKey='',timer:ReturnType<typeof setInterval>|undefined,last:PlayerState|undefined;
+  let warned=false,shownKey='',timer:ReturnType<typeof setInterval>|undefined,last:PlayerState|undefined;
   const overlay=root.querySelector<HTMLElement>('#faint-overlay')!;
-  function alert(key:string,on:boolean,clearOn:boolean):void{
-    if(on&&!warned.has(key)){warned.add(key);notify({variant:'aviso',...ALERTS[key]!,id:`needs:${key}:${Date.now()}`,duration:5200});}
-    else if(clearOn)warned.delete(key);
+  function alert(on:boolean,clearOn:boolean):void{
+    if(on&&!warned){warned=true;notify({variant:'aviso',...LOW_HP,id:`needs:hp:${Date.now()}`,duration:5200});}
+    else if(clearOn)warned=false;
   }
   function countdown():void{
     const self=last;
@@ -65,12 +61,7 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
       root.querySelector<HTMLElement>('[data-need="drunk"]')!.hidden=values.drunk!<=0;
       for(let s=1;s<=4;s++)document.body.classList.toggle(`drunk-${s}`,stage===s);
     }
-    alert('hp',values.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',values.hp!>NEEDS.hp.alertAt+15);
-    alert('hunger',values.hunger!<=NEEDS.hunger.alertAt,values.hunger!>NEEDS.hunger.alertAt+15);
-    alert('thirst',values.thirst!<=NEEDS.thirst.alertAt,values.thirst!>NEEDS.thirst.alertAt+15);
-    alert('bladder',values.bladder!>=NEEDS.bladder.alertAt,values.bladder!<NEEDS.bladder.alertAt-20);
-    alert('bladderUrgent',values.bladder!>=NEEDS.bladder.urgentAt,values.bladder!<NEEDS.bladder.alertAt-20);
-    alert('exhausted',!!self.exhausted,!self.exhausted);
+    alert(values.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',values.hp!>NEEDS.hp.alertAt+15);
     countdown();
   }
   /** What the "Agora" card says when a need is in charge; undefined when nothing special. */
@@ -83,6 +74,6 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
     if(self.exhausted&&['walk','run','idle'].includes(self.animationState))return 'Sem fôlego';
     if(drunkStage(self.drunk??0)>=2&&self.animationState==='walk')return 'Trançando as pernas';
   }
-  function reset():void{warned=new Set();shownKey='';last=undefined;countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}
+  function reset():void{warned=false;shownKey='';last=undefined;countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}
   return {update,activity,reset};
 }

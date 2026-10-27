@@ -31,10 +31,20 @@ O movimento permanece por teclado. Arrastar painéis não gira a câmera. Modais
 
 As notificações mantêm o formato da referência: canhoto colorido, linha perfurada, título, ícone ou inicial do remetente, fechamento e barra de duração. Há no máximo quatro avisos ativos. Avisos com o mesmo identificador são deduplicados enquanto estão na tela. Passar o mouse ou focar um aviso pausa tanto sua barra quanto sua expiração.
 
-- **Recado no balcão:** mensagem recebida de outro jogador, respeitando proximidade e bloqueios.
-- **No bar:** conexão, ações confirmadas no estado da sala, comandos e outras confirmações.
-- **Fique de olho:** erros da API, do servidor ou da conexão.
-- **Conquista:** compra concluída de uma skin e vitória confirmada no blackjack.
+Só o essencial vira aviso; o que já aparece em outro lugar da tela não gera comanda.
+
+- **Fique de olho:** erros da API, do servidor ou da conexão; ações recusadas (longe demais, item que sumiu, golpe em andamento); microfone indisponível ou desconectado; vida baixa; item levado durante um desmaio.
+- **No bar:** denúncia registrada e mudança na própria permissão de administração.
+
+Não viram aviso:
+
+- mensagens do chat, que ficam no painel do chat;
+- eventos do bar, que têm o banner próprio;
+- resultado do blackjack, que aparece na mesa;
+- compras, uso e descarte de itens, que aparecem na mochila;
+- troca de visual, chegada ao bar e ações do próprio personagem;
+- confirmações de som e microfone;
+- os demais medidores do painel **Seu Estado**.
 
 Textos de jogadores são inseridos como texto, inclusive nos toasts. HTML enviado pelo chat não vira marcação executável. Não existem mensagens automáticas demonstrativas. Sair do bar limpa os avisos da sessão anterior.
 

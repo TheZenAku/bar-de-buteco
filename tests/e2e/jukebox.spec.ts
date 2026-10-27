@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {previewPath} from './preview-path';
 const controllerFixture='/@fs/'+fileURLToPath(new URL('../fixtures/jukebox-controller.html',import.meta.url)).replaceAll('\\','/');
+const tvFixture='/@fs/'+fileURLToPath(new URL('../fixtures/tv-controller.html',import.meta.url)).replaceAll('\\','/');
 async function walkTo(page:Page,x:number,z:number,tolerance=.22):Promise<void>{
   const trail:string[]=[];
   for(let step=0;step<180;step++){
@@ -33,9 +34,9 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   const telemetry=(p=page)=>p.evaluate(()=>(window as any).barDebug.jukebox());
   const shared=(p=page)=>p.evaluate(()=>(window as any).barDebug.snapshot().world.jukeboxes.jukebox);
   const tvTelemetry=(p=page)=>p.evaluate(()=>(window as any).barDebug.television());
-  const tvShared=(p=page)=>p.evaluate(()=>(window as any).barDebug.snapshot().world.televisions['tv-hall']);
+  const tvShared=(p=page)=>p.evaluate(()=>(window as any).barDebug.snapshot().world.televisions['tv-main']);
   await account(page,'musica');
-  for(const [x,z] of [[14.8,1],[14.8,-2.6],[15.3,-4.6],[14.3,-9.3],[12.3,-9.55]])await walkTo(page,x,z);
+  for(const [x,z] of [[14.8,1],[14.8,-2.6],[15.3,-4.6],[15,-9.3],[15.7,-10.64]])await walkTo(page,x,z);
   await expect(page.locator('#context-label')).toHaveText('Tocar a jukebox');await page.keyboard.press('e');
   await expect(page.locator('#modal-title')).toHaveText('JUKEBOX');
   const before=await page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId];});
@@ -50,16 +51,17 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   if((await telemetry())[0]?.status==='blocked')await page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true}).click();
   await expect.poll(async()=>(await telemetry())[0]?.status,{timeout:40000}).toBe('playing');
   await expect.poll(async()=>(await telemetry())[0]?.currentTime,{timeout:20000}).toBeGreaterThan(1);
-  // The jukebox plays on its own visible player card; it drives no TV.
-  expect(await page.locator('.jukebox-player iframe').count()).toBe(1);expect(await page.locator('.tv-player iframe').count()).toBe(0);
-  expect((await telemetry())[0].mode).toBe('dock');await expect(page.getByRole('button',{name:'Assistir na TV',exact:true})).toHaveCount(0);
+  // The jukebox is sound only: its player never shows, no corner card exists, and it drives no TV.
+  expect(await page.locator('.jukebox-player.audio-only iframe').count()).toBe(1);expect(await page.locator('.tv-player iframe').count()).toBe(0);
+  expect(await page.locator('.jukebox-player').evaluate(element=>getComputedStyle(element).opacity)).toBe('0');expect(await page.locator('.tv-dock').count()).toBe(0);
+  expect((await telemetry())[0].mode).toBe('audio');await expect(page.getByRole('button',{name:'Assistir na TV',exact:true})).toHaveCount(0);
   expect((await tvShared()).status).toBe('off');
   await page.screenshot({path:previewPath('jukebox-controls.png')});
-  // The hall TV: its own panel, link, player and screen, while the jukebox keeps playing.
+  // The ground floor's TVs: their own panel, link and players, while the jukebox keeps playing.
   await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});
-  for(const [x,z] of [[11.5,-9.55],[11.5,-10.95],[10.2,-10.95],[8.9,-10.95],[7.3,-10.95],[7.3,-11.1]])await walkTo(page,x,z,.12);
+  for(const [x,z] of [[14.2,-10.62],[12.3,-10.62],[11.5,-10.95],[10.2,-10.95],[8.9,-10.95],[7.3,-10.95],[7.3,-11.1]])await walkTo(page,x,z,.12);
   await expect(page.locator('#context-label')).toHaveText('Usar a TV do salão');await page.keyboard.press('e');
-  await expect(page.locator('#modal-title')).toHaveText('TV DO SALÃO');
+  await expect(page.locator('#modal-title')).toHaveText('TVS DO SALÃO');
   await page.locator('#tv-url').fill('https://www.youtube.com/watch?v=aqz-KE-bpKQ');await page.getByRole('button',{name:'Tocar',exact:true}).click();
   await expect.poll(async()=>(await tvShared()).status).toBe('playing');
   await expect.poll(async()=>(await tvTelemetry())[0]?.ready,{timeout:45000}).toBe(true);
@@ -67,24 +69,29 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   if((await tvTelemetry())[0]?.status==='blocked')await page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true}).click();
   await expect.poll(async()=>(await tvTelemetry())[0]?.status,{timeout:40000}).toBe('playing');
   expect((await shared()).videoId).toBe('M7lc1UVf-VE');expect((await telemetry())[0].videoId).toBe('M7lc1UVf-VE');
-  expect(await page.locator('.tv-player iframe').count()).toBe(1);expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
+  // One player per screen of the group, all on the same video; the sound comes from the nearest screen only.
+  expect(await page.locator('.tv-player iframe').count()).toBe(3);expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
+  expect((await tvTelemetry()).map((p:any)=>p.screen)).toEqual(['tv-hall','tv-left','tv-counter']);
+  await expect.poll(async()=>(await tvTelemetry()).every((p:any)=>p.videoId==='aqz-KE-bpKQ')).toBe(true);
+  expect((await tvTelemetry()).filter((p:any)=>p.audible).map((p:any)=>p.screen)).toEqual(['tv-hall']);
+  const hall=page.locator('.tv-player[data-screen="tv-hall"]');
   await page.getByRole('button',{name:'Assistir na TV',exact:true}).click();
   await expect(page.locator('#modal')).toBeHidden();await expect.poll(async()=>(await tvTelemetry())[0]?.mode).toBe('tv');
-  const box=await page.locator('.tv-dock.on-surface iframe').boundingBox();expect(box!.height).toBeGreaterThanOrEqual(200);expect(box!.width).toBeGreaterThanOrEqual(200);
+  const box=await hall.locator('iframe').boundingBox();expect(box!.height).toBeGreaterThanOrEqual(200);expect(box!.width).toBeGreaterThanOrEqual(200);
   await page.screenshot({path:previewPath('jukebox-tv.png')});
   const firstTime=(await tvTelemetry())[0].currentTime;await page.waitForTimeout(1300);expect((await tvTelemetry())[0].currentTime).toBeGreaterThan(firstTime+.5);
-  const straight=await page.locator('.tv-player').evaluate(element=>element.style.transform);
+  const straight=await hall.evaluate(element=>element.style.transform);
   await page.mouse.move(90,320);await page.mouse.down();await page.mouse.move(160,335,{steps:8});await page.mouse.up();
-  await expect.poll(()=>page.locator('.tv-player').evaluate(element=>element.style.transform)).not.toBe(straight);
+  await expect.poll(()=>hall.evaluate(element=>element.style.transform)).not.toBe(straight);
   expect((await tvTelemetry())[0].mode).toBe('tv');await page.screenshot({path:previewPath('jukebox-tv-angle.png')});
-  await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});await page.keyboard.press('e');await expect(page.locator('#modal-title')).toHaveText('TV DO SALÃO');
+  await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});await page.keyboard.press('e');await expect(page.locator('#modal-title')).toHaveText('TVS DO SALÃO');
   // Pausing and switching the TV off leave the jukebox playing.
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await tvTelemetry())[0]?.status).toBe('paused');
   expect((await shared()).status).toBe('playing');expect((await telemetry())[0].status).toBe('playing');
   await page.getByRole('button',{name:'Desligar TV',exact:true}).click();await expect.poll(()=>tvTelemetry()).toEqual([]);
   expect((await shared()).status).toBe('playing');expect((await telemetry())[0].videoId).toBe('M7lc1UVf-VE');
   await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});
-  for(const [x,z] of [[7.3,-10.95],[8.9,-10.95],[10.2,-10.95],[11.5,-10.95],[11.5,-9.55],[12.3,-9.55]])await walkTo(page,x,z,.12);
+  for(const [x,z] of [[7.3,-10.95],[8.9,-10.95],[10.2,-10.95],[11.5,-10.95],[12.3,-10.62],[14.2,-10.62],[15.7,-10.64]])await walkTo(page,x,z,.12);
   await page.keyboard.press('e');await expect(page.locator('#modal-title')).toHaveText('JUKEBOX');
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await telemetry())[0]?.status).toBe('paused');
   const paused=(await telemetry())[0].currentTime;await page.waitForTimeout(1200);expect((await telemetry())[0].currentTime).toBeCloseTo(paused,0);
@@ -92,7 +99,9 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   const context=await browser.newContext({viewport:{width:640,height:480}}),other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));
   try {
     await account(other,'ouvinte');await expect.poll(async()=>(await shared(other)).videoId).toBe('M7lc1UVf-VE');await expect.poll(async()=>(await telemetry(other))[0]?.ready,{timeout:45000}).toBe(true);
-    await other.getByRole('button',{name:'Ativar Jukebox neste navegador'}).click();
+    // No card to click: if the browser blocked autoplay, any click in the game releases it.
+    await expect.poll(async()=>['playing','blocked'].includes((await telemetry(other))[0]?.status),{timeout:30000}).toBe(true);
+    if((await telemetry(other))[0]?.status==='blocked')await other.locator('#world').click({position:{x:320,y:240}});
     await expect.poll(async()=>(await telemetry(other))[0]?.status,{timeout:30000}).toBe('playing');
     await other.getByRole('button',{name:'Sua conta',exact:true}).click();await page.bringToFront();
     const near=(await telemetry())[0].volume,far=(await telemetry(other))[0].volume;expect(near).toBeGreaterThan(far);
@@ -129,12 +138,12 @@ test('API double: errors, autoplay, volume bounds, local distance, rapid replace
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).options.events.onAutoplayBlocked());await expect(page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true}).click();await expect(page.locator('#jukebox-state')).toContainText('Neste navegador: Reproduzindo');
   await page.locator('#jukebox-volume').fill('100');
-  await page.evaluate(()=>(window as any).fixture.position(12.3,.3,-10.3));
+  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-11.33));
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].volume)).toBe(100);
-  await page.evaluate(()=>(window as any).fixture.position(12.3,.3,10));await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].volume)).toBe(0);
+  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,10));await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].volume)).toBe(0);
   expect(await page.evaluate(()=>(window as any).fixturePlayers.at(-1).muted)).toBe(true);
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).unMute());await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.at(-1).isMuted())).toBe(true);
-  await page.evaluate(()=>(window as any).fixture.position(12.3,.3,-9.61));
+  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-10.64));
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).fixtureAmbient)).toBe(true);
   await page.locator('#jukebox-url').fill('https://www.youtube.com/shorts/aqz-KE-bpKQ');await page.getByRole('button',{name:'Tocar',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].videoId)).toBe('aqz-KE-bpKQ');
@@ -155,6 +164,43 @@ test('unreachable YouTube API reports connection failure and permits a clean ret
   await page.unroute('https://www.youtube.com/iframe_api');await page.route('https://www.youtube.com/iframe_api',route=>route.fulfill({contentType:'application/javascript',body:mock}));
   await page.getByRole('button',{name:'Tentar conectar novamente'}).click();await expect(page.locator('#jukebox-state')).toContainText('Neste navegador: Reproduzindo');expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
   await page.evaluate(()=>(window as any).fixture.teardown());
+});
+
+test('API double: a TV group plays one video on every screen, heard from the nearest, never leaving its screens',async({page})=>{
+  const mock=await readFile(new URL('../fixtures/youtube-api-mock.js',import.meta.url),'utf8');
+  await page.route('https://www.youtube.com/iframe_api',route=>route.fulfill({contentType:'application/javascript',body:mock}));
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const tv=()=>page.evaluate(()=>(window as any).fixture.controller.telemetry());
+  await page.goto(tvFixture);await page.locator('#tv-url').fill('https://youtu.be/M7lc1UVf-VE');await page.getByRole('button',{name:'Tocar',exact:true}).click();
+  // One player per screen of the ground floor, all on the shared video; upstairs stays off.
+  await expect.poll(async()=>(await tv()).map((p:any)=>[p.screen,p.videoId,p.status])).toEqual([['tv-hall','M7lc1UVf-VE','playing'],['tv-left','M7lc1UVf-VE','playing'],['tv-counter','M7lc1UVf-VE','playing']]);
+  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(3);
+  // Only the screen nearest to the listener is heard; the others are muted, so the sound never doubles.
+  await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([true,false,false]);
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.map((p:any)=>p.muted))).toEqual([false,true,true]);
+  await page.evaluate(()=>(window as any).fixture.stand('tv-counter'));
+  await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([false,false,true]);
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.map((p:any)=>p.muted))).toEqual([true,true,false]);
+  // The picture is always on its screen: any projected size, even tiny or partly off the page; no corner card.
+  const quad=(x:number,y:number,w:number,h:number)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
+  const hall=page.locator('.tv-player[data-screen="tv-hall"]');
+  for(const points of [quad(120,80,400,225),quad(300,200,40,22),quad(-150,-40,300,170)]){
+    await page.evaluate(points=>(window as any).fixture.project('tv-hall',points),points);
+    await expect.poll(async()=>(await tv())[0].mode).toBe('tv');
+    await expect.poll(()=>hall.evaluate(element=>element.style.transform)).toMatch(/^matrix3d/);
+    expect(await hall.evaluate(element=>element.style.visibility)).toBe('');
+  }
+  expect(await page.evaluate(()=>(window as any).fixture.shown['tv-hall'])).toBe(true);
+  // Seen from behind there is no projection: the picture is not drawn, and playback goes on.
+  await page.evaluate(()=>(window as any).fixture.project('tv-hall',null));
+  await expect.poll(async()=>(await tv())[0].mode).toBe('hidden');expect(await hall.evaluate(element=>element.style.visibility)).toBe('hidden');
+  expect((await tv())[0].status).toBe('playing');expect(await page.evaluate(()=>(window as any).fixture.shown['tv-hall'])).toBe(false);
+  expect(await page.locator('.tv-dock').count()).toBe(0);
+  // Only the player being heard reports the end of the video.
+  await page.evaluate(()=>{const players=(window as any).fixturePlayers;players[0].emit(0);players[2].emit(0);});
+  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.ended').length)).toBe(1);
+  await page.getByRole('button',{name:'Desligar TV',exact:true}).click();await expect(page.locator('.tv-player')).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as any).fixtureDestroyed)).toBe(3);await page.evaluate(()=>(window as any).fixture.teardown());expect(errors).toEqual([]);
 });
 
 test('saved session resolves before the entry button can submit an empty login form',async({page,request})=>{
