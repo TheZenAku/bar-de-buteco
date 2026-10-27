@@ -14,6 +14,7 @@
 | `7ba8df8` | Relay com lease/confirmação e outbox durável do mundo ([ADR-005](DECISOES.md)) |
 | `2751179` | Volume persistente do outbox do mundo no Compose |
 | (árvore atual, ainda sem commit) | Lifecycle de admissão, contrato único da cena e registro de sessões da sala ([ADR-007](DECISOES.md)); segredos separados, Node 24, smoke PostgreSQL e restore verificável ([ADR-008, ADR-009](DECISOES.md)); CI separada, política explícita de scripts de dependências e testes de toast determinísticos ([ADR-010](DECISOES.md)); runner de migração explícito e papéis PostgreSQL separados ([ADR-011](DECISOES.md)) |
+| (limpeza, sem commit) | Remove o Avatar V2, o protótipo `ui-marrom`, o tema visual anterior e duplicatas; reorganiza `docs/` e `tools/` por assunto ([ADR-012](DECISOES.md)) |
 
 ## Critérios de aceite do Marco 0
 

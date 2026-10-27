@@ -17,5 +17,5 @@ export default defineConfig({
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.
     {name:'voice',testMatch:'**/voice.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.2'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
   ],
-  webServer:{command:'node tools/e2e-server.mjs',url:'http://localhost:5273',reuseExistingServer:false,timeout:120000},
+  webServer:{command:'node tests/e2e/server.mjs',url:'http://localhost:5273',reuseExistingServer:false,timeout:120000},
 });

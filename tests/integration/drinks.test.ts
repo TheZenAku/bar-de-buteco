@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
-// tools/import-drinks.mjs: the real bottle and glass from assets-bar/objects, as hand props.
+// tools/assets/import-drinks.mjs: the real bottle and glass from assets-bar/objects, as hand props.
 for (const [id, height] of [['garrafa', .23], ['copo', .093]] as const) test(`${id}: real-size hand prop with its own textures, origin at the base`, () => {
   const bytes = readFileSync(new URL(`../../apps/web/public/props/${id}.glb`, import.meta.url));
   assert.equal(bytes.readUInt32LE(0), 0x46546c67);assert.equal(bytes.readUInt32LE(8), bytes.length);

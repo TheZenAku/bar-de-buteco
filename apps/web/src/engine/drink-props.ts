@@ -2,7 +2,7 @@ import * as pc from 'playcanvas';
 import type {DrinkItem} from '@bar/shared';
 
 /**
- * Bottle and glass held in a hand. The props (tools/import-drinks.mjs) have their origin at the centre of
+ * Bottle and glass held in a hand. The props (tools/assets/import-drinks.mjs) have their origin at the centre of
  * the base and +Y towards the mouth. The grip is rebuilt every frame from the hand's own bones, so each
  * skeleton is handled as authored: no shared rig, no fixed offset per bone axis convention.
  */

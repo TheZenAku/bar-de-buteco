@@ -2,7 +2,7 @@ import map from './map-data.json';
 import type {Collider,Footprint,Position} from './index.js';
 
 /**
- * Hinged door leaves of the BarBoteco map (tools/import-map.mjs). Each leaf turns about its own hinge,
+ * Hinged door leaves of the BarBoteco map (tools/assets/import-map.mjs). Each leaf turns about its own hinge,
  * the node origin, between the closed heading and the authored open heading (degrees about +Y; the
  * leaf extends along its local +X). A double door is one door with two leaves.
  */

@@ -211,7 +211,7 @@ export class BarScene {
     this.app.start();
   }
 
-/** The bottle and the glass (tools/import-drinks.mjs). Without them, the old procedural cup stays in use. */
+/** The bottle and the glass (tools/assets/import-drinks.mjs). Without them, the old procedural cup stays in use. */
   private loadDrinks(): void {
     for(const item of DRINK_ITEMS)this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}${DRINK_PROPS[item].url}`,'container',(error,asset)=>{
       if(this.destroyed)return;

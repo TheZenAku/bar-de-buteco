@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {discoverClothing,publicCatalog} from '../../tools/roupas/catalogo.mjs';
-import {replaceIfChanged} from '../../tools/roupas/publicacao.mjs';
+import {discoverClothing,publicCatalog} from '../../tools/assets/roupas/catalogo.mjs';
+import {replaceIfChanged} from '../../tools/assets/roupas/publicacao.mjs';
 
 function fixture(t,files,overrides={}){
   const prefix=path.join(os.tmpdir(),'bar-clothing-tools-'),root=fs.mkdtempSync(prefix);
   t.after(()=>{assert.ok(path.resolve(root).startsWith(path.resolve(prefix)));fs.rmSync(root,{recursive:true,force:true});});
   const directory=path.join(root,'assets-bar/Universal Base Characters[Standard]/Male-Cloth');
-  fs.mkdirSync(directory,{recursive:true});fs.mkdirSync(path.join(root,'tools/roupas'),{recursive:true});
-  fs.writeFileSync(path.join(root,'tools/roupas/ajustes.json'),JSON.stringify(overrides));
+  fs.mkdirSync(directory,{recursive:true});fs.mkdirSync(path.join(root,'tools/assets/roupas'),{recursive:true});
+  fs.writeFileSync(path.join(root,'tools/assets/roupas/ajustes.json'),JSON.stringify(overrides));
   for(const file of files)fs.writeFileSync(path.join(directory,file),'FBX fixture');
   return root;
 }
@@ -25,7 +25,7 @@ test('clothing discovery automatically adds every supported filename to its own 
 test('explicit fit/name settings are validated and do not require editing the importer',t=>{
   const root=fixture(t,['Cloth_Male_Top_Hoodie.fbx'],{'Cloth_Male_Top_Hoodie.fbx':{id:'warm-hoodie',name:'Blusa de frio',maxDistance:.1,rotationY:90}});
   const [entry]=discoverClothing(root);assert.equal(entry.id,'warm-hoodie');assert.equal(entry.name,'Blusa de frio');assert.equal(entry.maxDistance,.1);assert.equal(entry.rotationY,90);
-  fs.writeFileSync(path.join(root,'tools/roupas/ajustes.json'),JSON.stringify({'Cloth_Male_Top_Hoodie.fbx':{maxDistance:100}}));
+  fs.writeFileSync(path.join(root,'tools/assets/roupas/ajustes.json'),JSON.stringify({'Cloth_Male_Top_Hoodie.fbx':{maxDistance:100}}));
   assert.throws(()=>discoverClothing(root),/distância de encaixe/);
 });
 test('unknown names, duplicate IDs and IDs reserved by hairstyles cannot silently break models',t=>{

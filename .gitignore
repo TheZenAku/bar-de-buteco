@@ -16,3 +16,6 @@ __pycache__/
 
 # Source animation archive is already extracted under assets-bar/anim/misc.
 assets-bar/anim/ANIMS.zip
+
+# Atalhos locais do Windows.
+*.lnk

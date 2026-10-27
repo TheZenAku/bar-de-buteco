@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {AnimationClip,AnimationMixer,QuaternionKeyframeTrack,VectorKeyframeTrack,Vector3} from 'three';
-import {objects,readGlb} from '../../tools/lib/character-gltf.mjs';
+import {objects,readGlb} from '../../tools/assets/lib/character-gltf.mjs';
 const root=fileURLToPath(new URL('../../apps/web/public/',import.meta.url));
 function values({json,bin},index){const a=json.accessors[index],v=json.bufferViews[a.bufferView],width={SCALAR:1,VEC3:3,VEC4:4}[a.type];return Array.from({length:a.count*width},(_,i)=>bin.readFloatLE((v.byteOffset??0)+(a.byteOffset??0)+i*4));}
 function animate(model,bank,name){const nodes=objects(model.json),raw=bank.json.animations.find(a=>a.name===name);assert.ok(raw);const tracks=raw.channels.map(ch=>{const s=raw.samplers[ch.sampler];return new (ch.target.path==='rotation'?QuaternionKeyframeTrack:VectorKeyframeTrack)(`${nodes[ch.target.node].name}.${ch.target.path==='rotation'?'quaternion':'position'}`,values(bank,s.input),values(bank,s.output));});const mixer=new AnimationMixer(nodes[0]);mixer.clipAction(new AnimationClip(name,-1,tracks)).play();return {nodes,setTime(time){mixer.setTime(time);nodes[0].updateMatrixWorld(true);}};}

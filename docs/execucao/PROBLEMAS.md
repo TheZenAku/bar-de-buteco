@@ -36,7 +36,7 @@ Prioridade: P0 bloqueia a publicação; P1 deve ser resolvido antes do beta; P2 
 | --- | --- | --- | --- | --- |
 | LEG-01 | P0 legal | Licença não verificada das animações FBX, inclusive as publicadas em `apps/web/public/animations` e nos bancos das skins | produto/legal | Manifest de licença (Marco 2); sem release enquanto não for resolvido |
 | ART-01 | P0 direção | O personagem personalizado de produção ainda usa o corpo base do Quaternius (CC0, mas rejeitado artisticamente) | produto+arte | Marco 5: bake-off, aprovação visual e só então a migração |
-| DEBT-01 | P2 | `BAR_Avatar_V2/` continua no repositório (295 arquivos rastreados; 556 MB no disco local, incluindo arquivos não rastreados). Não entra no build | Dev A | Excluir no Marco 5, com a migração (prompt mestre, Marco 5) |
+| DEBT-01 | P2 | `BAR_Avatar_V2/` continuava no repositório (295 arquivos rastreados; 556 MB no disco local). Não entrava no build | Dev A | **Resolvido:** excluído antecipadamente ([ADR-012](DECISOES.md)) |
 | DEBT-02 | P2 | Os testes de roupa validam o GLB publicado, mas reimportar exige a fonte do kit, que não está mais no repositório | Dev A | Ao trocar o avatar, a fixture deixa de ser necessária; até lá, medir de novo se o GLB for reimportado |
 | BUILD-02 | P1 | Bundle JS principal acima de 1 800 kB depois de minificado (aviso do Vite) | Dev A | Code-splitting e carregamento por fases (Marco 2) |
 | PERF-01 | P1 | `apps/web/dist` tem 109 MB; o mapa sozinho, 16,37 MiB | Dev A | Marco 2 |

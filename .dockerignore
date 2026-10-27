@@ -10,5 +10,4 @@ test-results
 playwright-report
 **/dist
 **/*.log
-apps/web/src/engine/artifacts
 assets-bar

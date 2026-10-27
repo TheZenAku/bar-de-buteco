@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AnimationClip,AnimationMixer,QuaternionKeyframeTrack,VectorKeyframeTrack,Vector3} from 'three';
-import {readGlb,objects,retargetBase} from '../../tools/lib/character-gltf.mjs';
-import {createRetarget} from '../../tools/lib/animation-retarget.mjs';
+import {readGlb,objects,retargetBase} from '../../tools/assets/lib/character-gltf.mjs';
+import {createRetarget} from '../../tools/assets/lib/animation-retarget.mjs';
 const publicRoot=new URL('../../apps/web/public/',import.meta.url);
 const load=(id,bank=false)=>readGlb(new URL(`${bank?'animations':id.startsWith('base-')?'characters':'models'}/${id}.glb`,publicRoot));
 function values(g,index){const a=g.json.accessors[index],v=g.json.bufferViews[a.bufferView],size={SCALAR:1,VEC3:3,VEC4:4,MAT4:16}[a.type];assert.ok(size);return Array.from({length:a.count*size},(_,i)=>g.bin.readFloatLE((v.byteOffset??0)+(a.byteOffset??0)+i*4));}

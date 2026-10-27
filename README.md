@@ -30,13 +30,13 @@ Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novo
 
 ## Controles e atividades
 
-O [ciclo de dia e noite](docs/day-night.md) completa um dia em **40 minutos reais**, com horário sincronizado pelo servidor, sol e lua móveis, sombras, iluminação externa automática e névoa para ocultar os limites do mapa.
+O [ciclo de dia e noite](docs/sistemas/day-night.md) completa um dia em **40 minutos reais**, com horário sincronizado pelo servidor, sol e lua móveis, sombras, iluminação externa automática e névoa para ocultar os limites do mapa.
 
-O bar tem [som ambiente dinâmico](docs/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
+O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
 
-Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. A loja está preparada, com saldo inicial zero e ganhos desativados até a definição da economia. Veja [criação de personagens, loja e integração](docs/characters.md).
+Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. A loja está preparada, com saldo inicial zero e ganhos desativados até a definição da economia. Veja [criação de personagens, loja e integração](docs/sistemas/characters.md).
 
-O corpo masculino também pode vestir **camiseta, suéter, calça, calça social, tênis, sapato Derby e óculos**, com seleção e cor independentes por categoria no criador. Salvar atualiza a aparência para os outros jogadores e guarda a escolha na conta. Para adicionar novos FBX compatíveis, execute **`tools/roupas/importar.bat`**; veja [os scripts de importação de roupas](tools/roupas/README.md).
+O corpo masculino também pode vestir **camiseta, suéter, calça, calça social, tênis, sapato Derby e óculos**, com seleção e cor independentes por categoria no criador. Salvar atualiza a aparência para os outros jogadores e guarda a escolha na conta. Para adicionar novos FBX compatíveis, execute **`tools/assets/roupas/importar.bat`**; veja [os scripts de importação de roupas](tools/assets/roupas/README.md).
 
 | Controle | Ação |
 | --- | --- |
@@ -55,23 +55,23 @@ O corpo masculino também pode vestir **camiseta, suéter, calça, calça social
 
 Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interação. Na mesa, **Começar rodada** inicia blackjack para até quatro pessoas; **Comprar carta** e **Parar** são validados no servidor. O dealer para em 17, incluindo soft 17. Cada turno tem limite de 25 segundos. As estatísticas persistem na conta.
 
-A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. A TV mostra o vídeo na própria tela do cenário (**Assistir na TV** aproxima a câmera). A jukebox toca no card do player. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/jukebox.md).
+A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. A TV mostra o vídeo na própria tela do cenário (**Assistir na TV** aproxima a câmera). A jukebox toca no card do player. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
 
-As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/drinks.md).
+As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo americano**: o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
 
-O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/needs.md).
+O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/sistemas/needs.md).
 
-A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com atalhos no painel **Bolso**, loja, histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Veja [inventário](docs/inventory.md).
+A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com atalhos no painel **Bolso**, loja, histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Veja [inventário](docs/sistemas/inventory.md).
 
-O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/old-cane.md).
+O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/assets/old-cane.md).
 
 Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de engrenagem. Eventos não alteram as regras nem cancelam rodadas.
 
 O painel de pessoas permite bloquear mensagens e denunciar jogadores. A administração consulta denúncias e histórico, expulsa e bane contas. Banimento e redefinição de senha revogam sessões.
 
-O menu **⚙ Administração** também permite buscar jogadores e adicionar, remover ou definir moedas para testes. A conta principal `rafaelrodrigues-2017@hotmail.com` pode conceder e remover administradores pelo próprio jogo. Veja [permissões, carteiras e moderação](docs/admin.md).
+O menu **⚙ Administração** também permite buscar jogadores e adicionar, remover ou definir moedas para testes. A conta principal `rafaelrodrigues-2017@hotmail.com` pode conceder e remover administradores pelo próprio jogo. Veja [permissões, carteiras e moderação](docs/sistemas/admin.md).
 
-A interface segue a nova referência **Boteco Social**, em `assets-bar/ui/nova-ui`: seis painéis móveis, recolhíveis e ocultáveis, layout salvo por conta neste navegador, cores neon e notificações em formato de comanda. Carteira, coleção, pessoas, chat e interações usam os dados reais do jogo. Veja [interface e integração dos controles](docs/interface.md).
+A interface segue a referência visual **Boteco Social**: seis painéis móveis, recolhíveis e ocultáveis, layout salvo por conta neste navegador, cores neon e notificações em formato de comanda. Carteira, coleção, pessoas, chat e interações usam os dados reais do jogo. Veja [interface e integração dos controles](docs/sistemas/interface.md).
 
 ## Estrutura e execução
 
@@ -81,8 +81,11 @@ A interface segue a nova referência **Boteco Social**, em `assets-bar/ui/nova-u
 | `apps/api` | Fastify, contas, sessões, e-mails, moderação e estatísticas |
 | `apps/server` | Colyseus, movimento autoritativo, AOI, NPCs, eventos e blackjack |
 | `packages/shared` | Contratos, validação de movimento, colisões e tickets internos |
-| `tests` | Navegador, contratos e simulação de carga |
+| `tests` | Navegador (`e2e`, com o servidor isolado em `e2e/server.mjs`), integração, ferramentas e simulação de carga |
 | `infra` | PostgreSQL, migração SQL, Docker Compose e nginx |
+| `tools` | Iniciadores do Windows (`.bat`); `assets/` gera os arquivos do jogo a partir das fontes; `ops/` faz backup, restore e pseudônimos de log |
+| `assets-bar` | Fontes dos assets (FBX, Blender, texturas, sons); não entra no build, os importadores de `tools/assets` publicam em `apps/web/public` |
+| `docs` | Documentação por assunto; comece pelo [índice](docs/README.md) |
 
 A API usa a porta 3001; o jogo, 2567; o cliente, 5173 (HTTPS, com o jogo em `/game` no mesmo endereço; `BAR_HTTPS=0` volta ao HTTP). Para jogar pela internet basta abrir a porta 5173. `.env.example` contém a configuração. Sem `DATABASE_URL`, os dados persistem em `.data/postgres` via PGlite (PostgreSQL embutido). `DATABASE_URL` ativa PostgreSQL nativo. Movimento, NPCs e rodadas ficam em memória; reiniciar o jogo reinicia esse estado.
 
@@ -103,13 +106,13 @@ Capturas automáticas vão para `test-results/previews` e não alteram a documen
 
 `test:load` cria API, PostgreSQL em memória e servidor isolados em portas aleatórias; não altera os dados do bar de desenvolvimento. O padrão é 32 clientes durante 30 segundos. Para duas horas, ajuste `LOAD_DURATION_MS=7200000`; para mudar a carga, ajuste `LOAD_CLIENTS`. O relatório sai em `test-results/load-report.json`.
 
-Consulte [resultados e limites da validação](docs/validation.md), [arquitetura](docs/architecture.md), [rede](docs/networking.md) e [contratos de integração](docs/implementation-contract.md).
+Consulte [resultados e limites da validação](docs/validacao/validation.md), [arquitetura](docs/arquitetura/architecture.md), [rede](docs/arquitetura/networking.md) e [contratos de integração](docs/arquitetura/implementation-contract.md).
 
-As animações de `assets-bar/anim`, seus usos e a conversão para os modelos estão descritos em [animações](docs/animations.md). Para regenerar os bancos GLB, execute `npm run assets:animations`.
+As animações de `assets-bar/anim`, seus usos e a conversão para os modelos estão descritos em [animações](docs/assets/animations.md). Para regenerar os bancos GLB, execute `npm run assets:animations`.
 
-Cada skin mantém seu esqueleto nativo, com calibração própria de pose e ossos auxiliares. Para recalibrar os modelos existentes e regenerar todos os clipes, execute `npm run assets:retarget`. Veja [esqueletos nativos e adaptação de animações](docs/native-rigs.md).
+Cada skin mantém seu esqueleto nativo, com calibração própria de pose e ossos auxiliares. Para recalibrar os modelos existentes e regenerar todos os clipes, execute `npm run assets:retarget`. Veja [esqueletos nativos e adaptação de animações](docs/assets/native-rigs.md).
 
-O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
+O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/assets/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
 
 ## Escopo da versão
 
@@ -117,6 +120,6 @@ Os sistemas funcionais do MVP estão implementados para execução local. O cen�
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 
-O **chat de voz por proximidade** (até 15 m, áudio posicional, microfone em **M** ou segurando **B**) e os volumes do jogo ficam em **Configurações**. Veja [chat de voz](docs/voice.md).
+O **chat de voz por proximidade** (até 15 m, áudio posicional, microfone em **M** ou segurando **B**) e os volumes do jogo ficam em **Configurações**. Veja [chat de voz](docs/sistemas/voice.md).
 
-Para reimportar as skins AccuRig (Leandro, Read e Magrão, o bartender) e seus bancos de animação, execute `npm run assets:skins`. Veja [skins AccuRig](docs/skins-accurig.md).
+Para reimportar as skins AccuRig (Leandro, Read e Magrão, o bartender) e seus bancos de animação, execute `npm run assets:skins`. Veja [skins AccuRig](docs/assets/skins-accurig.md).

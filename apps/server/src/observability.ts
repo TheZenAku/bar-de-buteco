@@ -16,7 +16,7 @@ export function readiness(now = Date.now()): { ready: boolean; checks: Record<st
 
 /**
  * Logs never carry raw account ids: a keyed hash (HMAC with INTERNAL_SECRET) still correlates every line of the
- * same player. To find a player's lines: `node tools/pseudonym.mjs <userId>` in the same environment.
+ * same player. To find a player's lines: `node tools/ops/pseudonym.mjs <userId>` in the same environment.
  */
 export function pseudonym(id: string): string { return createHmac('sha256', internalSecret()).update(`log:${id}`).digest('hex').slice(0, 12); }
 

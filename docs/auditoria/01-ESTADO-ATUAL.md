@@ -27,7 +27,7 @@ Entradas: `apps/web/src/main.ts`, `apps/api/src/index.ts`, `apps/server/src/inde
 | Autenticação/sessão | Funcional, refatorar | Argon2id, tokens hash, cookie HttpOnly, recuperação revoga sessões em `apps/api/src/auth/service.ts` e `app.ts`; falta homologação externa |
 | Multiplayer | Funcional, refatorar | sala singleton, tick 20 Hz, patch 10 Hz, AOI 18 m, reconexão 30 s em `BarRoom.ts`; estado volátil e arquivo central grande |
 | Movimento/colisão/câmera | Funcional e reutilizável | `packages/shared/src/world.ts`, dados importados e testes de escada, parede, câmera e interação |
-| Mapa | Funcional, pesado | GLB visual 16,37 MiB + colisão 0,27 MiB; pipeline em `tools/import-map.mjs`; 503 colisores documentados |
+| Mapa | Funcional, pesado | GLB visual 16,37 MiB + colisão 0,27 MiB; pipeline em `tools/assets/import-map.mjs`; 503 colisores documentados |
 | Quaternius legado | Funcional tecnicamente, rejeitado artisticamente | corpo, roupas, cores e persistência existem, mas o asset não deve ser a base visual futura |
 | Avatar V2 | Rejeitado artisticamente | laboratório e 63 GLBs existem, mas o asset não deve ser integrado, polido nem usado como fallback final |
 | Novo sistema de avatar | Ausente | requer seleção visual de asset gratuito, POC PlayCanvas e aprovação explícita antes da implementação |

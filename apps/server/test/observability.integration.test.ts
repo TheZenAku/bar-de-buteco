@@ -61,7 +61,7 @@ test('log lines carry the room and pseudonyms, never raw account ids; the operat
   const id='4f6d2c1e-1111-4222-8333-944455556666',line=JSON.parse(logLine('join',{playerId:id,door:'Porta_1'},'room-1'));
   assert.equal(line.roomId,'room-1');assert.equal(line.playerId,pseudonym(id));assert.equal(line.door,'Porta_1');
   assert.ok(!JSON.stringify(line).includes(id));assert.match(line.playerId,/^[0-9a-f]{12}$/);
-  const tool=fileURLToPath(new URL('../../../tools/pseudonym.mjs',import.meta.url));
+  const tool=fileURLToPath(new URL('../../../tools/ops/pseudonym.mjs',import.meta.url));
   const output=execFileSync(process.execPath,[tool,id],{env:{...process.env,INTERNAL_SECRET:internalSecret()}}).toString().trim();
   assert.equal(output,`${id} ${pseudonym(id)}`);
 });

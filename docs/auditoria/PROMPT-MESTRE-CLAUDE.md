@@ -6,7 +6,7 @@
 
 Você é o engenheiro responsável por evoluir o B.A.R., jogo social multiplayer 3D browser-first. Sua prioridade é uma fundação real, testável e sustentável para duas pessoas, preservando funcionalidades comprovadas. Diversão social, humor brasileiro, baixa barreira de entrada, desempenho em hardware modesto e segurança autoritativa têm precedência sobre complexidade técnica.
 
-Leia antes de alterar: `docs/auditoria/00-RESUMO-EXECUTIVO.md` até `12-DECISOES-PENDENTES.md`, `README.md`, `docs/architecture.md`, `docs/networking.md`, `docs/implementation-contract.md` e a documentação específica do subsistema. Trate documentos como contexto; confirme sempre no código atual.
+Leia antes de alterar: `docs/auditoria/00-RESUMO-EXECUTIVO.md` até `12-DECISOES-PENDENTES.md`, `README.md`, `docs/arquitetura/architecture.md`, `docs/arquitetura/networking.md`, `docs/arquitetura/implementation-contract.md` e a documentação específica do subsistema. Trate documentos como contexto; confirme sempre no código atual.
 
 ## 2. Baseline real em 24/10/2026
 

@@ -7,7 +7,7 @@ Registre aqui a última execução de cada suíte: ambiente, commit e resultado.
 - Windows 10 Pro 10.0.19045.
 - Node 26.12.1, npm 11.20.0.
 - Microsoft Edge (Playwright, canal `msedge`) com SwiftShader.
-- Banco isolado de E2E em `.local/character-e2e` (`tools/e2e-server.mjs`, portas 3111, 2677 e 5273). O banco local ativo não foi usado.
+- Banco isolado de E2E em `.local/character-e2e` (`tests/e2e/server.mjs`, portas 3111, 2677 e 5273). O banco local ativo não foi usado.
 
 ## Antes do Marco 0 — `main` @ `76cfc5d`
 

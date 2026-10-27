@@ -133,3 +133,16 @@ Não reutilizar Avatar V2/Antonia nem Quaternius como avatar final, sistema modu
 **Decisão.** `connectDatabase` passa a somente conectar e validar. O comando one-shot `migrate` usa um ledger com checksum normalizado, valida contrato estrutural, serializa concorrentes por lock consultivo com timeout e aplica o lote pendente numa transação. A API em produção usa `bar_runtime`, sem superuser nem DDL; `bar_migrator` assume o owner sem login `bar_owner` somente no runner. O bootstrap `bar` permanece reservado à operação. A ordem do Compose é PostgreSQL saudável → migração concluída → API.
 
 **Consequência.** Startup runtime não altera schema e falha cedo se o deploy esqueceu a migração. SQL aplicado torna-se imutável; toda evolução exige novo arquivo expand/contract. Volumes legados só recebem baseline depois de verificar colunas, defaults, chaves, checks e índices esperados. Um runtime anterior à migração explícita precisa excepcionalmente da credencial bootstrap para rollback, conforme o runbook; versões já adaptadas aceitam linhas futuras no ledger para permitir rollback de aplicação compatível. Compose, papéis reais e upgrade de volume continuam sem homologação local enquanto Docker não existir neste host.
+
+## ADR-012 — limpeza de arquivos sem uso e reorganização de pastas (Marco 1)
+
+**Contexto.** O repositório acumulava acervos que nada carregava: o Avatar V2 rejeitado (ADR-001), o protótipo React/Lovable `assets-bar/ui/ui-marrom`, o tema visual anterior (`style.css`, `boteco.css` e quatro fontes), cópias de `.blend`, um som duplicado e um atalho do Windows. A documentação e as ferramentas ficavam numa única pasta plana cada.
+
+**Decisão.**
+
+- Antecipar a exclusão de `BAR_Avatar_V2/` prevista para o Marco 5, por decisão do responsável pelo produto. Nenhum código, teste ou build a referenciava.
+- Remover o protótipo `ui-marrom`, o tema anterior, `apps/web/src/engine/index.ts` (barrel sem importações), a sonda manual `tests/fixtures/youtube.html`, o duplicado `... (1).m4a`, `assets-bar/objects/bar_boteco.blend` (cópia idêntica do mapa) e os `.blend1`. O atalho `.lnk` sai do git e passa a ser ignorado.
+- Manter a biblioteca Mixamo de `assets-bar/anim/misc`, embora só 10 clipes estejam em uso: é a reserva para novas animações.
+- Reorganizar `docs/` em `projeto`, `arquitetura`, `sistemas`, `assets` e `validacao`, com índice em `docs/README.md`. Em `tools/`, os importadores vão para `tools/assets` (com `lib` e `roupas`), `pseudonym.mjs` para `tools/ops` e o servidor dos E2E para `tests/e2e/server.mjs`. Os iniciadores `.bat` continuam na raiz de `tools/`.
+
+**Consequência.** Tudo o que foi removido continua no histórico do git. Comandos `npm run assets:*` e `ops:*` não mudam; quem chamava os scripts pelo caminho antigo precisa usar o novo. Os rascunhos locais ignorados de `.local/` também foram apagados, sem retorno.
