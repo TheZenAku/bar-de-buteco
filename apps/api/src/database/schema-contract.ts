@@ -4,7 +4,7 @@ type ColumnSpec=readonly [type:string,nullable?:boolean,defaultFragment?:string]
 const columns:Record<string,Record<string,ColumnSpec>>={
   bar_schema_migrations:{name:['text'],checksum:['text'],applied_at:['timestamp with time zone',false,'now()']},
   users:{id:['text'],username:['text'],email:['text'],password_hash:['text'],role:['text',false,"'player'::text"],verified:['boolean',false,'false'],created_at:['timestamp with time zone',false,'now()']},
-  user_profiles:{user_id:['text'],display_name:['text'],avatar_config:['jsonb',false,'#cf7549'],character_config:['jsonb',true],equipped_skin:['text',false,"'custom'::text"]},
+  user_profiles:{user_id:['text'],display_name:['text'],avatar_config:['jsonb',false,'#cf7549'],equipped_skin:['text',false,"'nathan'::text"]},
   sessions:{id:['text'],user_id:['text'],token_hash:['text'],expires_at:['timestamp with time zone'],created_at:['timestamp with time zone',false,'now()']},
   email_verifications:{token_hash:['text'],user_id:['text'],expires_at:['timestamp with time zone']},
   password_resets:{token_hash:['text'],user_id:['text'],expires_at:['timestamp with time zone']},

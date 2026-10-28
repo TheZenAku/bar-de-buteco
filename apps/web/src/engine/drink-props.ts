@@ -1,13 +1,13 @@
 import * as pc from 'playcanvas';
-import type {DrinkItem} from '@bar/shared';
+import type {HeldDrink} from '@bar/shared';
 
 /**
- * Bottle and glass held in a hand. The props (tools/assets/import-drinks.mjs) have their origin at the centre of
+ * Bottles, glasses and cups held in a hand. The props (tools/assets/import-drinks.mjs) have their origin at the centre of
  * the base and +Y towards the mouth. The grip is rebuilt every frame from the hand's own bones, so each
  * skeleton is handled as authored: no shared rig, no fixed offset per bone axis convention.
  */
 export interface DrinkProp {
-  url:string;height:number;radius:number;
+  height:number;radius:number;
   /** Fraction of the height held at the centre of the fist. */
   grip:number;
   /** While sipping, elevation (degrees) of the bottom→top axis: negative tips the bottom up (bottle). */
@@ -15,10 +15,14 @@ export interface DrinkProp {
   /** Finger flexion at the three joints, degrees. */
   curl:readonly [number,number,number];
 }
-export const DRINK_PROPS:Record<DrinkItem,DrinkProp>={
-  garrafa:{url:'props/garrafa.glb',height:.23,radius:.031,grip:.32,sip:-28,curl:[38,48,32]},
+export const DRINK_PROPS:Record<HeldDrink,DrinkProp>={
+  garrafa:{height:.23,radius:.031,grip:.32,sip:-28,curl:[38,48,32]},
   // A copo americano is held low, its rim above the fist.
-  copo:{url:'props/copo.glb',height:.093,radius:.027,grip:.28,sip:38,curl:[34,44,30]},
+  copo:{height:.093,radius:.027,grip:.28,sip:38,curl:[34,44,30]},
+  agua:{height:.205,radius:.034,grip:.34,sip:-28,curl:[34,44,30]},
+  // Drunk through the straw: the cup stays almost upright. Radii are the cups' at the grip, below the lid.
+  refrigerante:{height:.19,radius:.042,grip:.3,sip:75,curl:[28,38,26]},
+  cafe:{height:.12,radius:.036,grip:.3,sip:40,curl:[30,40,28]},
 };
 /** Per-skeleton fine-tuning of the grip (metres along the fingers and towards the palm). */
 export const RIG_GRIP:Record<string,{along?:number;palm?:number}>={
@@ -52,9 +56,9 @@ export function findHand(model:pc.Entity,side:'l'|'r'):HandRig|undefined {
   return rig;
 }
 
-interface Frame {origin:pc.Vec3;fingers:pc.Vec3;across:pc.Vec3;palm:pc.Vec3;length:number}
+export interface Frame {origin:pc.Vec3;fingers:pc.Vec3;across:pc.Vec3;palm:pc.Vec3;length:number}
 /** The hand's grip frame: towards the fingers, across the knuckles (towards the thumb), out of the palm. */
-function handFrame(rig:HandRig):Frame {
+export function handFrame(rig:HandRig):Frame {
   const origin=rig.hand.getPosition().clone();
   const knuckles=FINGERS.flatMap(f=>rig.fingers[f]?.[0]?[rig.fingers[f]![0]!.getPosition()]:[]);
   const middle=knuckles.reduce((sum,p)=>sum.add(p),new pc.Vec3()).mulScalar(1/Math.max(1,knuckles.length));

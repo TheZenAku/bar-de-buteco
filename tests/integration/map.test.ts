@@ -32,14 +32,28 @@ test('published map and collision export match the supplied BarBoteco assets exa
     assert.ok(source.equals(published),'Import must preserve all supplied geometry and embedded textures');
   }
   // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts).
-  assert.equal(map.colliders.length,1550);
+  assert.equal(map.colliders.length,1551);
   assert.equal(map.doors.length,16);
-  assert.equal(map.tables.length,31);
   assert.equal(map.seats.length,124);
   assert.deepEqual(map.bounds,{minX:-103,maxX:135,minZ:-117,maxZ:91});
   assert.deepEqual(['Ponto_Praca','Ponto_Igreja','Ponto_Campinho','Ponto_Escola','Ponto_Onibus'].map(id=>id in map.markers),[true,true,true,true,true]);
-  assert.deepEqual(map.effects.map(effect=>effect.type).sort(),['brasas','fogo','fumaca','torneira','torneira']);
+  assert.deepEqual(map.effects.map(effect=>effect.type).sort(),['brasas','fogo','fumaca','luz_jukebox','luz_jukebox_ponto','torneira','torneira']);
   assert.ok(map.effects.every(effect=>Number.isFinite(effect.x)&&Number.isFinite(effect.y)&&Number.isFinite(effect.z)));
+});
+
+test('every customer table keeps the number written on it in the map, and every seat knows its table',()=>{
+  assert.deepEqual(map.tables.map(table=>table.number),Array.from({length:39},(_,i)=>i+1));
+  const count=(area:string)=>map.tables.filter(table=>table.area===area).length;
+  assert.deepEqual({salao:count('salao'),varanda:count('varanda'),quintal:count('quintal'),superior:count('superior'),terraco:count('terraco')},
+    {salao:11,varanda:9,quintal:11,superior:2,terraco:6});
+  assert.ok(map.tables.every(table=>table.floor===(table.y>2?1:0)&&table.top>table.y+.6&&table.top<table.y+.85));
+  assert.equal(new Set(map.tables.map(table=>table.collider)).size,39,'one number per table');
+  // Picnic tables (24-31) have built-in benches; every chair belongs to a numbered café table nearby.
+  for(const seat of map.seats){
+    const table=map.tables.find(t=>t.number===seat.table)!;
+    assert.ok(table&&table.places===4&&Math.hypot(seat.x-table.x,seat.z-table.z)<.9,`${seat.id} → mesa ${seat.table}`);
+  }
+  assert.equal(INTERACTABLES.find(i=>i.id==='seat-1')?.label,'Sentar · mesa 1');
 });
 
 test('capacity spawn positions avoid street furniture and every authored solid',()=>{

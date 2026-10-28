@@ -24,10 +24,32 @@ export const orderTotal=(items:readonly ItemId[])=>items.reduce((sum,id)=>sum+(i
 /** Where Tonico picks orders up: the customers' side of the counter, beside the bar stools. */
 export const PICKUP_POINT:Required<Position>={x:map.markers.Ponto_Balcao.x-.6,y:map.markers.Ponto_Balcao.y,z:map.markers.Ponto_Balcao.z+1.4};
 export const ORDER_PREPARATION_MS=3500;
-export const HAND_OVER_MS=1800;
+/**
+ * At the table Tonico puts the order down one item at a time: after a short lead, each item takes SERVE_ITEM_MS
+ * from his tray to its spot on the table top.
+ */
+export const SERVE_LEAD_MS=300;
+export const SERVE_ITEM_MS=700;
+export const handOverMs=(items:number)=>SERVE_LEAD_MS*2+items*SERVE_ITEM_MS;
+/** What a customer leaves on the table stays there this long after they get up, unless the helper clears it first. */
+export const LEFTOVER_MS=4*60_000;
+
+/**
+ * Footprint (radius around the base, metres) and height of what Tonico serves, at real size
+ * (tools/assets/import-drinks.mjs builds apps/web/public/props/<id>.glb). Snacks come on a small plate (`plate`: its radius).
+ */
+export const SERVED_PROPS:Readonly<Partial<Record<ItemId,{radius:number;height:number;plate?:number}>>>={
+  agua:{radius:.034,height:.205},refrigerante:{radius:.047,height:.19},cafe:{radius:.039,height:.12},
+  garrafa:{radius:.031,height:.23},copo:{radius:.027,height:.093},
+  coxinha:{radius:.07,height:.08,plate:.07},pastel:{radius:.095,height:.039,plate:.095},torresmo:{radius:.115,height:.081},
+};
+/** Something Tonico put on a table top: where it stands, and when it touched down (before that it was the `slot`-th item on his tray for `orderId`). */
+export interface ServedItemState {id:string;item:string;table:number;x:number;y:number;z:number;rotation:number;placedAt:number;orderId:string;slot:number}
 
 /** A task of a job: go to a station, hold the action for its duration, get paid. */
-export interface JobStation {id:string;label:string;action:string;durationMs:number;footprint:Footprint[];x:number;y:number;z:number}
+export interface JobStation {id:string;label:string;action:string;durationMs:number;footprint:Footprint[];x:number;y:number;z:number;
+  /** Height of the station's top (counter, sink, table top): the worker's objective marker floats above it. */
+  top:number}
 export interface JobDefinition {
   id:string;name:string;description:string;
   /** How many players may work at once. */
@@ -46,11 +68,11 @@ export const JOB_START_RADIUS=4;
 export const JOB_DAILY_CAP=400;
 const collider=(id:string)=>{const c=map.colliders.find(c=>c.id===id);if(!c)throw new Error(`Estação de trabalho sem colisor no mapa: ${id}`);return c;};
 const station=(id:string,colliderId:string,label:string,action:string,durationMs:number):JobStation=>{
-  const c=collider(colliderId);return {id,label,action,durationMs,x:c.x,y:c.minY??.3,z:c.z,footprint:[{id:c.id,x:c.x,z:c.z,hx:c.hx,hz:c.hz}]};
+  const c=collider(colliderId);return {id,label,action,durationMs,x:c.x,y:c.minY??.3,z:c.z,top:c.maxY??(c.minY??.3)+1,footprint:[{id:c.id,x:c.x,z:c.z,hx:c.hx,hz:c.hz}]};
 };
-// Ground-floor tables, wiped by the helper. Footprint: a 0.9 m square around the table point.
-const tableStations=map.tables.filter(t=>Math.abs(t.y-.3)<.1).slice(0,10).map((t,i):JobStation=>({id:`mesa-${i+1}`,label:`Limpar a mesa ${i+1}`,action:'Limpando a mesa',durationMs:4000,
-  x:t.x,y:t.y,z:t.z,footprint:[{id:t.id,x:t.x,z:t.z,hx:.45,hz:.45}]}));
+// The hall's tables, wiped by the helper and named by the number written on them. Footprint: a 0.9 m square around the table point.
+const tableStations=map.tables.filter(t=>t.area==='salao').map((t):JobStation=>({id:`mesa-${t.number}`,label:`Limpar a mesa ${t.number}`,action:'Limpando a mesa',durationMs:4000,
+  x:t.x,y:t.y,z:t.z,top:t.top,footprint:[{id:t.id,x:t.x,z:t.z,hx:.45,hz:.45}]}));
 export const JOBS:readonly JobDefinition[]=[{
   id:'bar',name:'Ajudante do Magrão',description:'Repõe a geladeira, lava os copos e limpa as mesas do salão. Poucas vagas por vez.',
   slots:2,pay:6,start:map.markers.Ponto_Balcao,taskTimeoutMs:60_000,shiftMaxMs:15*60_000,cooldownMs:3*60_000,

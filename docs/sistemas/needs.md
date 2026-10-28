@@ -57,7 +57,7 @@ Todos os efeitos passam por uma única função, `applyConsumable(state, effects
 { name, hunger?, thirst?, hp?, maxHp?: { amount, seconds }, drunk?, bladder? }
 ```
 
-O catálogo `CONSUMABLES` é derivado do catálogo real do inventário e inclui água, refrigerante, café, long neck, copo americano, coxinha, pastel, torresmo e curativo. A cerveja hidrata pouco e de forma explícita: álcool não é tratado como água. Nomes, efeitos, preços e limites ficam em `packages/shared/src/inventory.ts`.
+O catálogo `CONSUMABLES` é derivado do catálogo real do inventário e inclui água, refrigerante, café, long neck, copo de chopp, coxinha, pastel, torresmo e curativo. A cerveja hidrata pouco e de forma explícita: álcool não é tratado como água. Nomes, efeitos, preços e limites ficam em `packages/shared/src/inventory.ts`.
 
 A bebida conta ao terminar o gole. Se a pessoa levanta no meio, conta a fração já bebida. Desmaiado ou cambaleando, não é possível consumir.
 

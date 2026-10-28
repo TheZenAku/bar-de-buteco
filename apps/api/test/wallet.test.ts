@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {eq} from 'drizzle-orm';
-import {DEFAULT_CHARACTER,JOB_DAILY_CAP} from '@bar/shared';
+import {JOB_DAILY_CAP} from '@bar/shared';
 import {verifyTicket} from '@bar/shared/tickets';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
@@ -13,7 +13,6 @@ test('the world wallet charges, refunds once, caps job pay per day and only for 
   const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
   const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{email:'wallet@example.com',username:'carteira',displayName:'Carteira',password:'CarteiraSegura2026!'}});
   const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id as string;
-  await api.app.inject({method:'POST',url:'/api/character',headers:{cookie},payload:DEFAULT_CHARACTER});
   const ticket=await api.app.inject({method:'POST',url:'/api/game-ticket',headers:{cookie},payload:{}}),{sessionId}=verifyTicket(ticket.json().ticket,config.authSecret);
   const wallet=(amount:number,reason:string,requestId=randomUUID(),session=sessionId)=>api.app.inject({method:'POST',url:'/api/internal/wallet',headers:{'x-internal-secret':config.internalSecret},payload:{sessionId:session,userId,amount,reason,requestId}});
   await api.app.inject({method:'GET',url:'/api/inventory',headers:{cookie}});

@@ -2,7 +2,6 @@ import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {eq} from 'drizzle-orm';
-import {DEFAULT_CHARACTER} from '@bar/shared';
 import {verifyTicket} from '@bar/shared/tickets';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
@@ -25,9 +24,6 @@ test('inventory persists starters and makes purchases and removals atomic and id
   await get();
   assert.equal((await api.db.select().from(itemInventory).where(eq(itemInventory.userId,userId))).length,3,'reading twice cannot duplicate the starter kit');
 
-  const requestId=randomUUID();
-  assert.equal((await post('/api/inventory/buy',{itemId:'agua',quantity:1,requestId})).statusCode,409,'a character is required before shopping');
-  assert.equal((await post('/api/character',DEFAULT_CHARACTER)).statusCode,200);
   assert.equal((await post('/api/inventory/buy',{itemId:'agua',quantity:1,requestId:randomUUID()})).statusCode,409,'the wallet cannot go negative');
   await api.db.update(wallets).set({balance:100}).where(eq(wallets.userId,userId));
 

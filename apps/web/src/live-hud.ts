@@ -1,6 +1,6 @@
 import {INTERACTABLES,canInteract,itemById,type PublicUser,type WorldState,type Wardrobe,type InventoryView} from '@bar/shared';
 import {escape as e} from './api';
-import {uiIcon} from './ui-icons';
+import {itemImage,uiIcon} from './ui-icons';
 export function createLiveHud(root:HTMLElement){
   let peopleKey='',inventoryKey='',sceneKey='';
   function update(world:WorldState|undefined,user:PublicUser|undefined,wardrobe:Wardrobe|undefined,blocked:Set<string>,inventory?:InventoryView){
@@ -14,7 +14,7 @@ export function createLiveHud(root:HTMLElement){
     }
     const nextInventory=JSON.stringify(inventory?.stacks);
     if(nextInventory!==inventoryKey){inventoryKey=nextInventory;
-      root.querySelector('#hud-inventory')!.innerHTML=inventory?.stacks.length?inventory.stacks.slice(0,6).map(stack=>{const item=itemById(stack.itemId);return item?`<button class="inventory-item" data-action="inventory-use" data-item="${e(item.id)}" title="Usar ${e(item.name)}"><i aria-hidden="true">${item.icon}</i><b>${stack.quantity}</b><span>${e(item.name)}</span></button>`:'';}).join(''):'<p class="empty-state">Seu bolso está vazio.</p>';
+      root.querySelector('#hud-inventory')!.innerHTML=inventory?.stacks.length?inventory.stacks.slice(0,6).map(stack=>{const item=itemById(stack.itemId);return item?`<button class="inventory-item" data-action="inventory-use" data-item="${e(item.id)}" title="Usar ${e(item.name)}"><i aria-hidden="true">${itemImage(item)}</i><b>${stack.quantity}</b><span>${e(item.name)}</span></button>`:'';}).join(''):'<p class="empty-state">Seu bolso está vazio.</p>';
     }
     if(self){const places=[{type:'counter',title:'Balcão',icon:'beer'},{type:'jukebox',title:'Jukebox',icon:'music'},{type:'television',title:'TV',icon:'eye'},{type:'blackjack',title:'Blackjack',icon:'cards'},{type:'seat',title:'Assentos',icon:'map'},{type:'toilet',title:'Banheiro',icon:'toilet'}];
       const rows=places.map(place=>{const distance=(p:{x:number;y?:number;z:number})=>Math.hypot(p.x-self.x,(p.y??0)-(self.y??0),p.z-self.z);

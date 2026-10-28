@@ -83,7 +83,7 @@ const effects=visual.json.nodes.flatMap((node,index)=>{
   const position=new Vector3().setFromMatrixPosition(visualTransform(index));
   return [{id:node.name,type,...Object.fromEntries(['x','y','z'].map((axis,k)=>[axis,round(position.getComponent(k))]))}];
 });
-const expectedEffects={brasas:1,fogo:1,fumaca:1,torneira:2};
+const expectedEffects={brasas:1,fogo:1,fumaca:1,torneira:2,luz_jukebox:1,luz_jukebox_ponto:1};
 for(const [type,count] of Object.entries(expectedEffects)){
   const actual=effects.filter(effect=>effect.type===type).length;
   if(actual!==count)throw new Error(`Expected ${count} ${type} FX anchor(s), found ${actual}`);
@@ -92,6 +92,20 @@ for(const [type,count] of Object.entries(expectedEffects)){
 // Treat its renderable mesh as part of the map contract so a future export cannot silently regress it.
 const cart=visual.json.nodes.find(node=>node.name==='Carrinho_Espeto');
 if(cart?.mesh===undefined||!visual.json.meshes[cart.mesh]?.primitives?.length)throw new Error('Carrinho_Espeto has no renderable mesh');
+// The jukebox is part of the map (12_jukebox.py): the Jukebox node carries its lit tubes (Jukebox_FX_Luz, whose
+// emissive the game recolours) and its point light; COL_Int_Jukebox is its solid volume.
+const jukeboxIndex=visual.json.nodes.findIndex(node=>node.extras?.interativo==='jukebox');
+const jukeboxCollider=colliders.find(c=>c.id==='COL_Int_Jukebox');
+if(jukeboxIndex<0||!jukeboxCollider)throw new Error('The map has no Jukebox node or COL_Int_Jukebox volume');
+if(!visual.json.materials.some(m=>m.name==='A_jukebox_luz'&&m.emissiveTexture))throw new Error('A_jukebox_luz lost its emissive mask');
+const jukeboxPosition=new Vector3().setFromMatrixPosition(visualTransform(jukeboxIndex));
+const jukeboxTurn=new Quaternion().setFromRotationMatrix(visualTransform(jukeboxIndex));
+const jukebox={x:round(jukeboxPosition.x),y:round(jukeboxPosition.y),z:round(jukeboxPosition.z),hx:jukeboxCollider.hx,hz:jukeboxCollider.hz,maxY:jukeboxCollider.maxY,
+  yaw:round(2*Math.atan2(jukeboxTurn.y,jukeboxTurn.w)*180/Math.PI)};
+// The lit facade (13_fachada.py): the logo sign, the two veranda boards, the neon rim and the magenta halo light.
+for(const name of ['Letreiro_Highland','Placa_Highland','Neon_Magenta'])
+  if(!visual.json.materials.some(m=>m.name===name&&m.emissiveFactor?.some(v=>v>0)))throw new Error(`Facade material ${name} is missing or no longer emissive`);
+if(!visual.json.extensions?.KHR_lights_punctual?.lights?.some(light=>light.name==='Luz_Letreiro'))throw new Error('Luz_Letreiro (facade halo) is missing');
 // Red tables keep compact collision volumes, while chairs are deliberately pass-through GPU instances so
 // people can circulate between them. Derive seat positions from EXT_mesh_gpu_instancing and validate that
 // every unused chair belongs to one of the three authored stacks in the upper-floor storage room.
@@ -118,11 +132,27 @@ const unexpected=unusedChairs.filter(chair=>!chairStacks.some(stack=>Math.abs(ch
 if(unexpected.length)throw new Error(`Instanced chairs belong neither to a café table nor a storage stack: ${JSON.stringify(unexpected)}`);
 const badSets=chairsByTable.map((set,index)=>({table:tables[index].id,chairs:set.length})).filter(set=>set.chairs<2||set.chairs>4);
 if(badSets.length)throw new Error(`Invalid café table sets: ${JSON.stringify(badSets)}`);
+// Every customer table is numbered in the map (14_mesas.py): a Mesa_NN empty on its top with extras mesa, area,
+// andar and lugares. That number is how players and staff name a table, so tables and their seats carry it.
+const customerTables=colliders.filter(c=>/^COL_Mob_Mesa(?:_Madeira)?(?:\.\d+)?$/.test(c.id));
+const numberedTables=visual.json.nodes.flatMap((node,index)=>{
+  if(!Number.isInteger(node.extras?.mesa))return [];
+  const top=new Vector3().setFromMatrixPosition(visualTransform(index));
+  const matches=customerTables.filter(c=>Math.abs(top.x-c.x)<=c.hx&&Math.abs(top.z-c.z)<=c.hz&&top.y>c.minY&&top.y<=c.maxY+.05);
+  if(matches.length!==1)throw new Error(`${node.name} must sit on exactly one customer table, found ${matches.length}`);
+  const {mesa:number,area,andar:floor,lugares:places}=node.extras;
+  if(typeof area!=='string'||!Number.isInteger(floor)||!Number.isInteger(places))throw new Error(`${node.name} lacks area/andar/lugares`);
+  return [{id:`mesa-${number}`,number,area,floor,places,x:matches[0].x,y:matches[0].minY,z:matches[0].z,top:round(top.y),collider:matches[0].id}];
+}).sort((a,b)=>a.number-b.number);
+if(numberedTables.some((table,i)=>table.number!==i+1))throw new Error(`Table numbers must run 1..N without gaps: ${numberedTables.map(t=>t.number)}`);
+const unnumbered=customerTables.filter(c=>numberedTables.filter(t=>t.collider===c.id).length!==1);
+if(unnumbered.length)throw new Error(`Customer tables without exactly one number: ${unnumbered.map(c=>c.id)}`);
+const tableNumber=new Map(numberedTables.map(t=>[t.collider,t.number]));
 let seatNumber=0;
 const seats=tables.flatMap((table,index)=>chairsByTable[index]
   .sort((a,b)=>Math.atan2(a.z-table.z,a.x-table.x)-Math.atan2(b.z-table.z,b.x-table.x))
   .map(chair=>({id:`seat-${++seatNumber}`,x:chair.x,y:chair.y,z:chair.z,
-    rotation:round(Math.atan2(table.x-chair.x,table.z-chair.z))})));
+    rotation:round(Math.atan2(table.x-chair.x,table.z-chair.z)),table:tableNumber.get(table.id)})));
 // Door leaves (04_predio.py) are separate nodes whose origin is the hinge. They were exported open; the
 // closed heading is the custom property angulo_fechada_graus. Both angles turn about +Y, as in Blender's Z.
 // Their collision is not static: the game places it from the door state (packages/shared/src/doors.ts).
@@ -159,9 +189,9 @@ const cameraCeilings = [
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
 const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
-  tables:tables.map((table,i)=>({id:`map-table-${i+1}`,x:table.x,y:table.minY,z:table.z})) };
+  tables:numberedTables, jukebox };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));
 fs.writeFileSync(path.join(root,'packages/shared/src/map-data.json'),`${JSON.stringify(data,null,2)}\n`);
-console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${effects.length} FX anchors, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats; all textures embedded.`);
+console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${effects.length} FX anchors, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats, ${numberedTables.length} numbered tables; all textures embedded.`);

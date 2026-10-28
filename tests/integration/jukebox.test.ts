@@ -46,10 +46,16 @@ test('TV groups: the ground floor shares one video on all its screens; upstairs 
 });
 test('the jukebox stands against the wall at the foot of the stairs, reachable and clear of the corridor',()=>{
   const back=JUKEBOX.z-JUKEBOX.hz,stairBase=COLLIDERS.find(c=>c.id==='COL_Predio_Escada_Base')!;
-  // Its back touches the face of the stair base and it fits under the upper flight.
+  // It is the map's own jukebox (12_jukebox.py), with its exported solid volume.
+  const volume=COLLIDERS.find(c=>c.id==='COL_Int_Jukebox')!;
+  assert.deepEqual([JUKEBOX.x,JUKEBOX.z,JUKEBOX.hx,JUKEBOX.hz,JUKEBOX.maxY],[volume.x,volume.z,volume.hx,volume.hz,volume.maxY]);
+  assert.equal(COLLIDERS.filter(c=>/jukebox/i.test(c.id)).length,1,'one jukebox volume');
+  // Its back touches the face of the stair base, and nothing else occupies its place.
   assert.ok(Math.abs(back-(stairBase.z+stairBase.hz))<.03,'against the stair base');
   assert.ok(JUKEBOX.x-JUKEBOX.hx>=stairBase.x-stairBase.hx&&JUKEBOX.x+JUKEBOX.hx<=stairBase.x+stairBase.hx,'within the stair base face');
-  assert.ok(JUKEBOX.y+1.55<(stairBase.maxY??0),'below the upper flight');
+  const overlapping=COLLIDERS.filter(c=>c!==volume&&Math.abs(c.x-JUKEBOX.x)<c.hx+JUKEBOX.hx-.01&&Math.abs(c.z-JUKEBOX.z)<c.hz+JUKEBOX.hz-.01
+    &&(c.minY??-Infinity)<JUKEBOX.maxY-.01&&(c.maxY??Infinity)>JUKEBOX.y+.01);
+  assert.deepEqual(overlapping.map(c=>c.id),[]);
   // The corridor opening (x 11.1–13.1) and the foot of the steps (x 13.25–14.75) stay free.
   assert.ok(JUKEBOX.x-JUKEBOX.hx>14.75);
   const spot=INTERACTABLES.find(i=>i.id==='jukebox')!;assert.ok(isWalkable(spot.x,spot.z,spot.y),'the use spot in front is walkable');

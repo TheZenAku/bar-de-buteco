@@ -29,15 +29,16 @@ Prioridade: P0 bloqueia a publicação; P1 deve ser resolvido antes do beta; P2 
 | QA-02 | Teste de toast dependia de 1,2 s reais contra expiração de 1 s e falhava sob carga | Scheduler injetável e relógio virtual na fixture; pause/resume por ponteiro e foco passaram 10/10 sem espera real |
 | DB-01 | O superuser `bar` também era a credencial normal da aplicação | Bootstrap idempotente cria owner sem login, migrador `NOINHERIT` e runtime sem DDL; Compose reserva `bar` a init/ops. A prova em PostgreSQL/Compose real continua coberta por ENV-02 ([ADR-011](DECISOES.md)) |
 | MIG-01 | Startup da API aplicava DDL sem ledger, checksum ou lock | Runner explícito transacional, ledger imutável, validação estrutural, lock com espera limitada e gate one-shot antes da API ([ADR-011](DECISOES.md)) |
+| GAME-02 | No trabalho, a imagem congelava a partir da segunda tarefa (ou de um segundo turno): o marcador recriado desenhava a malha do anel já liberada pelo PlayCanvas e cada quadro lançava erro. O selo do blip, um elemento HTML movido a cada quadro, também derrubava o FPS com a acessibilidade do navegador ativa. O cartão da tarefa ficava fixo no meio da tela | Um único marcador, movido e ocultado; selo desenhado em canvas só quando muda; a tarefa virou o painel **Turno** do HUD (arrastar, recolher, esconder e mostrar pelo botão do topo). E2E do turno real em `economy.spec.ts` e regressão do marcador em `environment.spec.ts` |
 
 ## Abertos
 
 | ID | Prioridade | Problema | Dono sugerido | Próxima ação |
 | --- | --- | --- | --- | --- |
 | LEG-01 | P0 legal | Licença não verificada das animações FBX, inclusive as publicadas em `apps/web/public/animations` e nos bancos das skins | produto/legal | Manifest de licença (Marco 2); sem release enquanto não for resolvido |
-| ART-01 | P0 direção | O personagem personalizado de produção ainda usa o corpo base do Quaternius (CC0, mas rejeitado artisticamente) | produto+arte | Marco 5: bake-off, aprovação visual e só então a migração |
+| ART-01 | P0 direção | O personagem personalizado de produção ainda usa o corpo base do Quaternius (CC0, mas rejeitado artisticamente) | produto+arte | **Resolvido:** criador aposentado; só skins, com Nathan gratuito ([ADR-013](DECISOES.md)) |
 | DEBT-01 | P2 | `BAR_Avatar_V2/` continuava no repositório (295 arquivos rastreados; 556 MB no disco local). Não entrava no build | Dev A | **Resolvido:** excluído antecipadamente ([ADR-012](DECISOES.md)) |
-| DEBT-02 | P2 | Os testes de roupa validam o GLB publicado, mas reimportar exige a fonte do kit, que não está mais no repositório | Dev A | Ao trocar o avatar, a fixture deixa de ser necessária; até lá, medir de novo se o GLB for reimportado |
+| DEBT-02 | P2 | Os testes de roupa validam o GLB publicado, mas reimportar exige a fonte do kit, que não está mais no repositório | Dev A | **Resolvido:** testes, fixture e roupas removidos com o criador ([ADR-013](DECISOES.md)) |
 | BUILD-02 | P1 | Bundle JS principal acima de 1 800 kB depois de minificado (aviso do Vite) | Dev A | Code-splitting e carregamento por fases (Marco 2) |
 | PERF-01 | P1 | `apps/web/dist` tem 109 MB; o mapa sozinho, 16,37 MiB | Dev A | Marco 2 |
 | OPS-01 | P1 operacional | Homologação integral de staging ainda não ocorreu | DevOps | Executar as ações externas de ENV-02 e SMTP-01; DB-01/MIG-01 já estão implementados, mas entram nessa homologação |

@@ -21,7 +21,7 @@ Cada ajuste usa uma transação com bloqueio da carteira, lançamento no histór
 | Banir | Revoga as sessões e impede novos acessos até a remoção do banimento |
 | Desbanir | Remove o bloqueio; o jogador entra novamente com seu login |
 | Dar administrador | Concede administração a uma conta confirmada e não banida |
-| Remover administrador | Remove a permissão, preservando personagem, compras e moedas |
+| Remover administrador | Remove a permissão, preservando skins, compras e moedas |
 
 Após uma expulsão, o jogador volta automaticamente à entrada com uma mensagem explicando que sua conta continua liberada. Pode usar **Entrar no bar** na mesma sessão. Uma ordem de expulsão atrasada não atinge uma participação iniciada depois da emissão da ordem. Após banimento, a tela mostra a restrição e pede novo login quando o banimento for removido; sessões revogadas não são restauradas.
 

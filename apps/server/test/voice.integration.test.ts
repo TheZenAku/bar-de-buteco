@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {DEFAULT_CHARACTER,VOICE,VOICE_CODECS,encodeVoicePacket,unwrapVoice} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {VOICE,VOICE_CODECS,encodeVoicePacket,unwrapVoice} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean):Promise<void>{const deadline=Date.now()+4000;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 const settle=(ms=150)=>new Promise(r=>setTimeout(r,ms));
@@ -10,7 +10,7 @@ test('proximity voice: only switched-on speakers, relayed to listeners in earsho
   const previous=process.env.API_INTERNAL_URL;
   // voice-d has blocked voice-a.
   const api=createServer(async(req,res)=>{let body='';for await(const chunk of req)body+=chunk;const userId=body?JSON.parse(body).userId:'';res.setHeader('content-type','application/json');
-    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:userId==='voice-d'?['voice-a']:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[]}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
+    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:userId==='voice-d'?['voice-a']:[],role:'user',equippedSkin:'nathan',ownedSkins:['nathan']}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let authoritative:BarRoom;
   server.define('bar',BarRoom).on('create',room=>{authoritative=room as BarRoom;});await server.listen(0,'127.0.0.1');

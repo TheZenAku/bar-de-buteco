@@ -1,5 +1,4 @@
 import {test,expect,type Page} from '@playwright/test';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {previewPath} from './preview-path';
@@ -24,7 +23,6 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   const suffix=Date.now().toString(36),password='JukeboxTeste2026!';
   const account=async(p:Page,name:string)=>{
     expect((await p.request.post('/api/auth/register',{headers:{'X-Forwarded-For':'::1'},data:{email:`${name}_${suffix}@example.com`,username:`${name}_${suffix}`,displayName:name,password}})).ok()).toBe(true);
-    expect((await p.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
     // Forwarded identity is for our API only. Sending it to YouTube/Googlevideo
     // adds unsupported CORS preflights to fonts, icons and actual video streams.
     await p.context().setExtraHTTPHeaders({});
@@ -36,7 +34,7 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   const tvTelemetry=(p=page)=>p.evaluate(()=>(window as any).barDebug.television());
   const tvShared=(p=page)=>p.evaluate(()=>(window as any).barDebug.snapshot().world.televisions['tv-main']);
   await account(page,'musica');
-  for(const [x,z] of [[14.8,1],[14.8,-2.6],[15.3,-4.6],[15,-9.3],[15.7,-10.64]])await walkTo(page,x,z);
+  for(const [x,z] of [[14.8,1],[14.8,-2.6],[15.3,-4.6],[15,-9.3],[15.7,-10.56]])await walkTo(page,x,z);
   await expect(page.locator('#context-label')).toHaveText('Tocar a jukebox');await page.keyboard.press('e');
   await expect(page.locator('#modal-title')).toHaveText('JUKEBOX');
   const before=await page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId];});
@@ -91,7 +89,7 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
   await page.getByRole('button',{name:'Desligar TV',exact:true}).click();await expect.poll(()=>tvTelemetry()).toEqual([]);
   expect((await shared()).status).toBe('playing');expect((await telemetry())[0].videoId).toBe('M7lc1UVf-VE');
   await page.keyboard.press('Escape');await page.locator('#world').click({position:{x:470,y:240}});
-  for(const [x,z] of [[7.3,-10.95],[8.9,-10.95],[10.2,-10.95],[11.5,-10.95],[12.3,-10.62],[14.2,-10.62],[15.7,-10.64]])await walkTo(page,x,z,.12);
+  for(const [x,z] of [[7.3,-10.95],[8.9,-10.95],[10.2,-10.95],[11.5,-10.95],[12.3,-10.62],[14.2,-10.62],[15.7,-10.56]])await walkTo(page,x,z,.12);
   await page.keyboard.press('e');await expect(page.locator('#modal-title')).toHaveText('JUKEBOX');
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await telemetry())[0]?.status).toBe('paused');
   const paused=(await telemetry())[0].currentTime;await page.waitForTimeout(1200);expect((await telemetry())[0].currentTime).toBeCloseTo(paused,0);
@@ -138,12 +136,12 @@ test('API double: errors, autoplay, volume bounds, local distance, rapid replace
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).options.events.onAutoplayBlocked());await expect(page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true}).click();await expect(page.locator('#jukebox-state')).toContainText('Neste navegador: Reproduzindo');
   await page.locator('#jukebox-volume').fill('100');
-  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-11.33));
+  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-11.29));
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].volume)).toBe(100);
   await page.evaluate(()=>(window as any).fixture.position(15.7,.3,10));await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].volume)).toBe(0);
   expect(await page.evaluate(()=>(window as any).fixturePlayers.at(-1).muted)).toBe(true);
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).unMute());await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.at(-1).isMuted())).toBe(true);
-  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-10.64));
+  await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-10.56));
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).fixtureAmbient)).toBe(true);
   await page.locator('#jukebox-url').fill('https://www.youtube.com/shorts/aqz-KE-bpKQ');await page.getByRole('button',{name:'Tocar',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].videoId)).toBe('aqz-KE-bpKQ');

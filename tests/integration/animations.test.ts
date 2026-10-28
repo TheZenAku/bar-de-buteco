@@ -12,7 +12,7 @@ function glb(file: string) {
 }
 
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao']) {
+  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo']) {
     const { json, bin } = glb(`animations/${skin}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
@@ -50,27 +50,52 @@ test('generated animations bind to existing skins and contain valid skeletal rot
   }
 });
 
-for (const [id,name,joints] of [['leandro','Leandro',100],['read','Read',82],['magrao','Magrao',100]] as const) test(`${name} preserves the AccuRig joints, normalized weights and embedded materials`, () => {
+// Every player skin (and Magrão) has its own Mixamo skeleton, auto-rigged on its body. Canonical names alias the
+// joints, whose Mixamo names stay recorded as sourceBone; `weights` says where the skin weights came from.
+const MIXAMO_SKINS = [
+  {id:'rafael',name:'Rafael',joints:34,weights:'mixamo'},
+  {id:'leandro',name:'Leandro',joints:41,weights:'accurig'},
+  {id:'read',name:'Read',joints:41,weights:'accurig'},
+  {id:'magrao',name:'Magrao',joints:41,weights:'accurig'},
+  {id:'gilmar-gordo',name:'Gilmar',joints:41,weights:'automatic'},
+] as const;
+for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has its own Mixamo skeleton, normalized ${source} weights and embedded materials`, () => {
   const {json,bin}=glb(`models/${id}.glb`);
-  assert.equal(json.asset.extras.rig,'AccuRig');
+  assert.equal(json.asset.extras.rig,'Mixamo');assert.equal(json.asset.extras.weights,source);
   assert.equal(json.nodes[json.scenes[json.scene].nodes[0]].name,name);
   assert.deepEqual(json.nodes[json.scenes[json.scene].nodes[0]].scale??[1,1,1],[1,1,1], 'Instance scale must remain one');
   assert.equal(json.skins.length,1);assert.equal(json.skins[0].joints.length,joints);
-  for(const [name,source] of [['hip','CC_Base_Hip'],['upperleg_l','CC_Base_L_Thigh'],['hand_r','CC_Base_R_Hand']]){
-    assert.equal(json.nodes.find((n:any)=>n.name===name)?.extras?.sourceBone,source);
+  for(const [joint,source] of [['hip','mixamorigHips'],['upperleg_l','mixamorigLeftUpLeg'],['hand_r','mixamorigRightHand']]){
+    assert.equal(json.nodes.find((n:any)=>n.name===joint)?.extras?.sourceBone,source);
   }
   for(const name of ['Idle','Walk','Pose'])assert.ok(json.animations.some((a:any)=>a.name===name));
+  const read=(index:number,size:number,at:(offset:number)=>number,bytes:number)=>{const a=json.accessors[index],v=json.bufferViews[a.bufferView];return Array.from({length:a.count*size},(_,i)=>at((v.byteOffset??0)+(a.byteOffset??0)+i*bytes));};
+  let triangles=0;
   for(const mesh of json.meshes)for(const primitive of mesh.primitives){
-    const accessor=json.accessors[primitive.attributes.WEIGHTS_0],view=json.bufferViews[accessor.bufferView];
+    const accessor=json.accessors[primitive.attributes.WEIGHTS_0];
     assert.equal(accessor.componentType,5126);assert.equal(accessor.type,'VEC4');
-    for(let i=0;i<accessor.count;i++){
-      const start=(view.byteOffset??0)+(accessor.byteOffset??0)+i*16;
-      const weights=Array.from({length:4},(_,j)=>bin.readFloatLE(start+j*4));
-      assert.ok(weights.every(w=>Number.isFinite(w)&&w>=0));
-      assert.ok(Math.abs(weights.reduce((a,b)=>a+b,0)-1)<.0001,'Truncated FBX weights must be renormalized');
+    const weights=read(primitive.attributes.WEIGHTS_0,4,o=>bin.readFloatLE(o),4);
+    for(let i=0;i<weights.length;i+=4){
+      const vertex=weights.slice(i,i+4);
+      assert.ok(vertex.every(w=>Number.isFinite(w)&&w>=0));
+      assert.ok(Math.abs(vertex.reduce((a,b)=>a+b,0)-1)<.0001,'Truncated weights must be renormalized');
     }
     const material=json.materials[primitive.material];
     assert.ok(material.pbrMetallicRoughness.baseColorTexture);assert.ok(material.normalTexture);
+    // Mixamo downloads drop the normals; the importer restores them.
+    assert.ok(primitive.attributes.NORMAL!==undefined);
+    // Simplification must not bridge distant parts (e.g. a fingertip to the hip), which stretch in every pose.
+    const position=read(primitive.attributes.POSITION,3,o=>bin.readFloatLE(o),4),wide=json.accessors[primitive.indices].componentType===5125;
+    const indices=read(primitive.indices,1,o=>wide?bin.readUInt32LE(o):bin.readUInt16LE(o),wide?4:2);
+    const {min,max}=json.accessors[primitive.attributes.POSITION],height=max[1]-min[1];
+    let longest=0;
+    for(let f=0;f<indices.length;f+=3)for(let k=0;k<3;k++){
+      const a=indices[f+k]!*3,b=indices[f+(k+1)%3]!*3;
+      longest=Math.max(longest,Math.hypot(position[a]!-position[b]!,position[a+1]!-position[b+1]!,position[a+2]!-position[b+2]!));
+    }
+    assert.ok(longest/height<.13,`${name}: a triangle edge of ${(longest/height*100).toFixed(0)}% of the body height`);
+    triangles+=indices.length/3;
   }
+  assert.ok(triangles<=100000,`${name}: ${triangles} triangles exceed the skin budget`);
   assert.ok(json.images.every((image:any)=>image.bufferView!==undefined&&!image.uri),'Textures must be embedded');
 });

@@ -5,7 +5,7 @@ import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';
 import {WebSocketTransport} from '@colyseus/ws-transport';
 import {Client,type Room} from '@colyseus/sdk';
-import {DEFAULT_CHARACTER,INVENTORY_CAPACITY,type InventoryStack} from '@bar/shared';
+import {INVENTORY_CAPACITY,type InventoryStack} from '@bar/shared';
 import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 
@@ -18,7 +18,7 @@ test('room keeps inventory private, removes through the API and applies an item 
     let raw='';for await(const chunk of req)raw+=chunk;
     const body=raw?JSON.parse(raw):{};
     res.setHeader('content-type','application/json');
-    if(req.url?.endsWith('/validate'))return void res.end(JSON.stringify({valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[],inventory:stacks}));
+    if(req.url?.endsWith('/validate'))return void res.end(JSON.stringify({valid:true,blocked:[],role:'user',equippedSkin:'nathan',ownedSkins:['nathan'],inventory:stacks}));
     if(req.url?.endsWith('/inventory')){
       inventoryCalls++;
       const current=stacks.find(stack=>stack.itemId===body.itemId);

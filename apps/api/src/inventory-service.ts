@@ -39,7 +39,6 @@ export class InventoryService {
   async buy(user:PublicUser,itemId:ItemId,quantity:number,requestId:string):Promise<InventoryView>{
     const item=itemById(itemId);if(!item)throw new InventoryError(400,'Item inválido.');
     if(!user.verified)throw new InventoryError(403,'Confirme seu e-mail antes de comprar.');
-    if(!user.character)throw new InventoryError(409,'Crie seu personagem primeiro.');
     await this.initialize(user.id);
     const receipt=`inventory-buy:${requestId}`,cost=item.price*quantity;
     await this.db.transaction(async tx=>{

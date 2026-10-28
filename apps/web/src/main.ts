@@ -5,9 +5,7 @@ import {gameUi} from './game-ui';
 import {createHudPanels} from './hud-panels';
 import {createNotifications} from './notifications';
 import {createLiveHud} from './live-hud';
-import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,DEFAULT_CHARACTER,SKINS,ITEM_CATALOG,itemById,type CharacterConfig,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card,type InventoryView,type ItemId} from '@bar/shared';
-import {characterEditor} from './character-editor';
-import './character.css';
+import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene} from './engine/BarScene';
 import {BarNetwork} from './networking';
@@ -18,7 +16,7 @@ import {nearestMediaSource} from '@bar/shared';
 import './jukebox.css';
 import {createSettings,type GameSettings} from './settings';
 import {VoiceChat} from './voice';
-import {uiIcon} from './ui-icons';
+import {coins,itemImage,uiIcon} from './ui-icons';
 import {VOICE} from '@bar/shared';
 import './voice.css';
 import './needs.css';
@@ -26,8 +24,9 @@ import {createNeedsHud} from './needs-hud';
 import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
 import {JOBS,canInteract as touching,jobById,stationInteractable,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
-import {graphicsSettingsHtml,jobCardHtml,jobsHtml,mediaPriceNote,nextGraphics,tableMenuHtml,tableMenuTotal,worldAdminHtml} from './economy-ui';
+import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,tableMenuHtml,tableMenuTotal,worldAdminHtml} from './economy-ui';
 import './economy.css';
+import {createObjectiveBlip} from './objective-blip';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
@@ -51,7 +50,6 @@ const audio=new BarAudio();
 const settings=createSettings();
 const voice=new VoiceChat({sendPacket:packet=>network.sendBytes('voice',packet),sendState:state=>network.send('voice.state',state),notice:(text,error)=>toast(text,error),changed:()=>renderVoice()},settings);
 const chatHistory:ChatMessage[]=[];
-let editor:ReturnType<typeof characterEditor>|undefined;
 let administration:ReturnType<typeof adminPanel>|undefined;
 let refreshingAdministration=false;
 let wardrobe:Wardrobe|undefined;
@@ -94,7 +92,7 @@ function setBusy(form:HTMLFormElement,busy:boolean):void {form.querySelectorAll<
 function renderAuth(message=''):void {
   const formField=(label:string,name:string,type:string,placeholder:string,extra='')=>`<label>${label}<input name="${name}" type="${type}" placeholder="${placeholder}" required ${extra}></label>`;
   let content='';
-  if(user){content=`<h2>Olha quem chegou.</h2><p class="auth-description">${e(user.displayName)}, sua cadeira está esperando.</p><div class="returning-user"><span class="profile-initial" style="--avatar:${e(user.color)}">${e(user.displayName.slice(0,1).toUpperCase())}</span><div><b>${e(user.displayName)}</b><small>${e(user.email)}</small></div></div><button data-action="enter" class="button primary full">${user.character?'Entrar no bar':'Criar meu personagem'} <span>↗</span></button>${!user.verified&&emailVerificationRequired?'<button data-action="resend" class="text-button full">Reenviar confirmação de e-mail</button>':''}<button data-action="logout" class="text-button full">Usar outra conta</button>`;}
+  if(user){content=`<h2>Olha quem chegou.</h2><p class="auth-description">${e(user.displayName)}, sua cadeira está esperando.</p><div class="returning-user"><span class="profile-initial" style="--avatar:${e(user.color)}">${e(user.displayName.slice(0,1).toUpperCase())}</span><div><b>${e(user.displayName)}</b><small>${e(user.email)}</small></div></div><button data-action="enter" class="button primary full">Entrar no bar <span>↗</span></button>${!user.verified&&emailVerificationRequired?'<button data-action="resend" class="text-button full">Reenviar confirmação de e-mail</button>':''}<button data-action="logout" class="text-button full">Usar outra conta</button>`;}
   else if(authMode==='login')content=`<h2>Boa noite, vizinho.</h2><p class="auth-description">Entre na sua conta. A casa é sua.</p><div class="auth-tabs"><button class="selected" data-action="auth-login">Entrar</button><button data-action="auth-register">Criar conta</button></div><form id="auth-form" data-mode="login">${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Sua senha','autocomplete="current-password"')}<button type="button" data-action="auth-forgot" class="forgot-link">Esqueci minha senha</button><button class="button primary full" type="submit">Entrar no bar <span>↗</span></button></form>`;
   else if(authMode==='register')content=`<h2>Chega mais.</h2><p class="auth-description">Uma conta, muitas histórias pra contar.</p><div class="auth-tabs"><button data-action="auth-login">Entrar</button><button class="selected" data-action="auth-register">Criar conta</button></div><form id="auth-form" data-mode="register"><div class="field-row">${formField('Seu nome','displayName','text','Como te chamam?','autocomplete="nickname" minlength="2" maxlength="24"')}${formField('Usuário','username','text','seu_apelido','autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" minlength="3" maxlength="24"')}</div>${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Pelo menos 10 caracteres','autocomplete="new-password" minlength="10" maxlength="128"')}<button class="button primary full" type="submit">Criar minha conta <span>↗</span></button><p class="fine-print">${emailVerificationRequired?'Confirme seu e-mail para entrar no bar.':'Sua conta será ativada automaticamente. Depois, é só entrar.'}</p></form>`;
   else if(authMode==='forgot')content=`<h2>Acontece nas melhores.</h2><p class="auth-description">Vamos mandar um link para você criar uma nova senha.</p><form id="auth-form" data-mode="forgot">${formField('E-mail da conta','email','email','voce@exemplo.com','autocomplete="email"')}<button class="button primary full" type="submit">Recuperar acesso <span>↗</span></button></form><button data-action="auth-login" class="text-button full">Voltar para entrar</button>`;
@@ -106,18 +104,8 @@ function renderAuth(message=''):void {
 function authMessage(message:string,error=false):void {const node=$('#auth-message');node.className=`form-message ${error?'error':''}`;node.textContent=message;}
 function setChatOpen(open:boolean):void {if(open)hud.open('chat');else hud.collapse('chat',true);}
 function focusChat():void {setChatOpen(true);$('#chat-input').focus();}
-function showModal(title:string,content:string,type:string):void {modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('character-modal',type==='character');$('.modal').classList.toggle('admin-modal',type==='admin');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
-function closeModal():void {modalGeneration++;media.forEach(m=>m.detachPanel());editor?.destroy();editor=undefined;administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
-function createCharacter():void {
-  if(!user)return;const first=!user.character;
-  showModal(first?'Monte seu personagem':'Personalizar personagem','','character');
-  const generation=modalGeneration,owner=user.id;
-  editor=characterEditor($('#modal-content'),user.character??DEFAULT_CHARACTER,first,async character=>{
-    const result=await api<Wardrobe&{user:PublicUser}>('/character',character);if(user?.id!==owner)return;user=result.user;wardrobe=result;
-    network.send('player.appearance');renderAuth();if(modalGeneration!==generation)return;closeModal();
-    if(first&&!inGame){if(user.verified)await enterBar();else authMessage('Personagem salvo! Confirme seu e-mail antes de entrar no bar.');}
-  });
-}
+function showModal(title:string,content:string,type:string):void {modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function closeModal():void {modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
 const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
@@ -171,7 +159,6 @@ const network=new BarNetwork({
 
 async function enterBar():Promise<void> {
   if(inGame)return;
-  if(user&&!user.character){createCharacter();return;}
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
   if(!scene){toast('Seu navegador não conseguiu iniciar o cenário 3D. Ative a aceleração gráfica e recarregue.',true);return;}
   const attempt=admission.beginEntry();if(!attempt)return;
@@ -199,7 +186,7 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   if(leavingPromise)return leavingPromise;
   const task=(async()=>{
   stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
-  inGame=false;connected=false;tableOrder=undefined;jobTask=null;worldSnapshot=undefined;$('#job-hud').classList.add('hidden');notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;inventory=undefined;await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);worldSnapshot=undefined;notices.clear();liveHud.reset();needsHud.reset();wardrobe=undefined;inventory=undefined;await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
@@ -218,7 +205,7 @@ function renderWorld():void {
   liveHud.update(world,user,wardrobe,blocked,inventory);
   needsHud.update(self);
   $('#hud-name').textContent=user.displayName;
-  $('#hud-skin').textContent=`${self?.skin==='custom'?'Meu personagem':SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
+  $('#hud-skin').textContent=`${SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
   const activities:Record<string,string>={idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas'};
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
   $('#hud-activity').textContent=needsHud.activity(self)??(self?.currentTableId?'No blackjack':ordering?'Esperando o Magrão':self?.oldWalk&&self.animationState==='walk'?'No passo da bengala':activities[self?.animationState||'idle']);
@@ -243,11 +230,21 @@ function renderWorld():void {
   renderJobCard();
 }
 function jobStation(){return jobTask?jobById(jobTask.jobId)?.stations.find(s=>s.id===jobTask!.stationId):undefined;}
+let jobPanelKey='';
+/** The job panel (draggable, collapsible, hideable like the other HUD panels) and the objective marker in the scene. */
 function renderJobCard():void {
-  const card=$('#job-hud'),self=world?.players[user?.id??''],station=jobStation();
-  card.classList.toggle('hidden',!jobTask||!inGame);if(!jobTask)return;
-  card.innerHTML=jobCardHtml(jobTask,serverNow(),!!station&&!!self&&touching(stationInteractable(station),self));
+  const task=inGame?jobTask:null,self=world?.players[user?.id??''],station=jobStation();
+  // The objective marker exists only here: the room sends the task to its worker alone, so nobody else can draw it.
+  scene?.setObjective(task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z,top:station.top}:null);
+  if(!task){jobPanelKey='';hud.setAvailable('job',false);return;}
+  // Rebuilt only when the task changes; rewriting it ten times a second made its buttons miss clicks.
+  const near=!!station&&!!self&&touching(stationInteractable(station),self),key=`${task.stationId}|${task.startedAt}|${task.tasks}|${task.earned}|${near}`;
+  if(key!==jobPanelKey){jobPanelKey=key;$('#job-body').innerHTML=jobPanelHtml(task,near);}
+  jobPanelTick($('#job-body'),$('#job-summary'),task,serverNow());
+  // Filled before it shows, so the layout fits the whole panel on screen.
+  hud.setAvailable('job',true);
 }
+const objectiveBlip=createObjectiveBlip($<HTMLCanvasElement>('#job-blip'));
 function openTableMenu():void {
   const self=world?.players[user?.id??''];
   if(!self?.interactionState?.startsWith('seat-')){toast('Sente-se a uma mesa (E perto de uma cadeira) para pedir ao Tonico.');return;}
@@ -280,8 +277,8 @@ function interact():void {
 }
 /** At the counter: choose what Magrão serves. He charges on ordering; the choice travels with the order and shows in the hand. */
 function orderDrink():void {
-  const price=(id:string)=>`${(itemById(id)?.price??0).toLocaleString('pt-BR')} 🪙`;
-  showModal('PEDIR AO MAGRÃO',`<p class="modal-description">O Magrão cobra, prepara e entrega. Você bebe quando ele terminar. Carteira: ${(inventory?.balance??0).toLocaleString('pt-BR')} 🪙</p><div class="drink-choice"><button class="button primary" data-action="order" data-item="garrafa">${uiIcon('beer')}<span><b>Long neck · ${price('garrafa')}</b><small>Cerveja na garrafa</small></span></button><button class="button primary" data-action="order" data-item="copo">${uiIcon('beer')}<span><b>Copo americano · ${price('copo')}</b><small>Cerveja no copo</small></span></button></div><p class="fine-print">Sentado numa mesa? Peça comida e bebida ao Tonico com T.</p>`,'order');
+  const option=(id:'garrafa'|'copo',hint:string)=>{const item=itemById(id)!;return `<button class="button primary" data-action="order" data-item="${id}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)} · ${coins(item.price)}</b><small>${hint}</small></span></button>`;};
+  showModal('PEDIR AO MAGRÃO',`<p class="modal-description">O Magrão cobra, prepara e entrega. Você bebe quando ele terminar. Carteira: ${coins(inventory?.balance??0)}</p><div class="drink-choice">${option('garrafa','Cerveja na garrafa')}${option('copo','Chopp no copo')}</div><p class="fine-print">Sentado numa mesa? Peça comida e bebida ao Tonico com T.</p>`,'order');
 }
 function kick():void {
   if(!connected||activeModal||!world||!user)return;
@@ -347,9 +344,9 @@ function renderInventory():void {
   const quantities=new Map(inventory.stacks.map(stack=>[stack.itemId,stack.quantity]));
   const self=world?.players[user?.id??''],canUse=connected&&self?.condition!=='fainted'&&self?.condition!=='stumbling'&&!self?.interactionState&&!self?.currentTableId;
   const owned=inventory.stacks.map(stack=>{const item=itemById(stack.itemId);if(!item)return '';
-    return `<article class="item-card owned"><div class="item-icon" aria-hidden="true">${item.icon}</div><div class="item-copy"><small>${e(item.category)}</small><b>${e(item.name)}</b><p>${e(item.description)}</p><span>${e(effectText(item as typeof ITEM_CATALOG[number]))}</span></div><strong>×${stack.quantity}</strong><div class="item-actions"><button class="mini-button" data-action="inventory-use" data-item="${e(item.id)}" ${canUse?'':'disabled'}>Usar</button><button class="mini-button danger" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></article>`;}).join('');
+    return `<article class="item-card owned"><div class="item-icon" aria-hidden="true">${itemImage(item)}</div><div class="item-copy"><small>${e(item.category)}</small><b>${e(item.name)}</b><p>${e(item.description)}</p><span>${e(effectText(item as typeof ITEM_CATALOG[number]))}</span></div><strong>×${stack.quantity}</strong><div class="item-actions"><button class="mini-button" data-action="inventory-use" data-item="${e(item.id)}" ${canUse?'':'disabled'}>Usar</button><button class="mini-button danger" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></article>`;}).join('');
   const shop=ITEM_CATALOG.map(item=>{const quantity=quantities.get(item.id)??0,full=quantity>=item.stackMax,poor=inventory!.balance<item.price;
-    return `<article class="shop-item"><span class="item-icon" aria-hidden="true">${item.icon}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${item.price.toLocaleString('pt-BR')} 🪙</span><button class="mini-button" data-action="inventory-buy" data-item="${e(item.id)}" ${full||poor?'disabled':''}>${full?'Pilha cheia':poor?'Sem moedas':'Comprar'}</button></article>`;}).join('');
+    return `<article class="shop-item"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${coins(item.price)}</span><button class="mini-button" data-action="inventory-buy" data-item="${e(item.id)}" ${full||poor?'disabled':''}>${full?'Pilha cheia':poor?'Sem moedas':'Comprar'}</button></article>`;}).join('');
   const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar'};
   const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
   $('#modal-content').innerHTML=`<div class="inventory-summary"><div><small>ESPAÇO</small><b>${inventory.usedSlots} / ${inventory.capacity} pilhas</b></div><div><small>CARTEIRA</small><b>${inventory.balance.toLocaleString('pt-BR')} moedas</b></div></div>
@@ -366,27 +363,27 @@ function useInventoryItem(id:string):void{
 }
 function confirmDiscard(id:string):void{
   const item=itemById(id),stack=inventory?.stacks.find(entry=>entry.itemId===id);if(!item||!stack)return;
-  showModal('Descartar item',`<div class="discard-confirm"><span class="item-icon" aria-hidden="true">${item.icon}</span><p>Descartar uma unidade de <b>${e(item.name)}</b>? Esta ação não devolve moedas.</p><button class="button primary" data-action="inventory-discard-confirm" data-item="${e(item.id)}">Descartar 1</button><button class="text-button" data-action="inventory">Voltar à mochila</button></div>`,'inventory-discard');
+  showModal('Descartar item',`<div class="discard-confirm"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><p>Descartar uma unidade de <b>${e(item.name)}</b>? Esta ação não devolve moedas.</p><button class="button primary" data-action="inventory-discard-confirm" data-item="${e(item.id)}">Descartar 1</button><button class="text-button" data-action="inventory">Voltar à mochila</button></div>`,'inventory-discard');
 }
 
 async function skins():Promise<void> {
-  showModal('Personagem e skins','<p>Carregando sua coleção…</p>','skins');
+  showModal('Skins','<p>Carregando sua coleção…</p>','skins');
   const generation=modalGeneration;
   const result=await api<Wardrobe>('/wardrobe');if(activeModal!=='skins'||generation!==modalGeneration)return;wardrobe=result;
   const current=world?.players[user?.id||'']?.skin||savedSkin();
-  $('#modal-content').innerHTML=`<div class="wallet"><span>Sua carteira</span><b id="wallet-balance">${result.balance.toLocaleString('pt-BR')} <small>moedas</small></b></div><p class="modal-description">Seu personagem é gratuito. Skins completas ficam na sua coleção após a compra. C abre ou fecha esta janela.</p><div class="custom-character-card"><div><b>Meu personagem</b><small>Corpo, cabelo, pele e olhos do seu jeito</small></div><button class="mini-button" data-action="skin" data-skin="custom" ${current==='custom'?'disabled':''}>${current==='custom'?'Em uso':'Vestir'}</button><button class="mini-button" data-action="character">Personalizar</button></div><h3>Skins da casa</h3><div class="skin-grid">${result.catalog.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''} ${skin.owned?'':'locked'}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':skin.owned?'Vestir':`${skin.price.toLocaleString('pt-BR')} moedas · Comprar`}</small></button>`).join('')}</div>${result.dailyReward>0?`<button class="button secondary full" data-action="daily" ${result.dailyClaimed?'disabled':''}>${result.dailyClaimed?'Bônus de hoje recebido':`Receber bônus diário: ${result.dailyReward} moedas`}</button>`:''}`;
+  $('#modal-content').innerHTML=`<div class="wallet"><span>Sua carteira</span><b id="wallet-balance">${result.balance.toLocaleString('pt-BR')} <small>moedas</small></b></div><p class="modal-description">${e(SKINS.find(skin=>skin.id===DEFAULT_SKIN)!.name)} é gratuito. As outras skins ficam na sua coleção após a compra. C abre ou fecha esta janela.</p><h3>Skins da casa</h3><div class="skin-grid">${result.catalog.map(skin=>`<button class="skin-card ${skin.id===current?'selected':''} ${skin.owned?'':'locked'}" data-action="skin" data-skin="${skin.id}" aria-pressed="${skin.id===current}"><img src="${import.meta.env.BASE_URL}skins/${skin.id}.jpg" alt="" width="240" height="320"><b>${e(skin.name)}</b><small>${skin.id===current?'Em uso':skin.owned?'Vestir':`${skin.price.toLocaleString('pt-BR')} moedas · Comprar`}</small></button>`).join('')}</div>${result.dailyReward>0?`<button class="button secondary full" data-action="daily" ${result.dailyClaimed?'disabled':''}>${result.dailyClaimed?'Bônus de hoje recebido':`Receber bônus diário: ${result.dailyReward} moedas`}</button>`:''}`;
 }
 async function wearSkin(id:string):Promise<void> {
   if(world?.players[user?.id||'']?.animationState==='kick'){toast('Espere o golpe terminar para trocar o visual.');return;}
-  const skin=wardrobe?.catalog.find(option=>option.id===id);if(id!=='custom'&&!skin)return;
-  if(skin&&!skin.owned){
-    showModal(`Comprar ${skin.name}`,`<p>Esta skin custa <b>${skin.price.toLocaleString('pt-BR')} moedas</b>. Seu saldo é <span id="purchase-balance">${wardrobe!.balance.toLocaleString('pt-BR')}</span> moedas.</p><p>A compra é permanente. Seu personagem personalizado fica guardado.</p><button class="button primary full" data-action="buy-skin" data-skin="${skin.id}" ${wardrobe!.balance<skin.price?'disabled':''}>${wardrobe!.balance<skin.price?'Moedas insuficientes':'Confirmar compra'}</button><button class="text-button full" data-action="skins">Voltar à coleção</button>`,'purchase');return;
+  const skin=wardrobe?.catalog.find(option=>option.id===id);if(!skin)return;
+  if(!skin.owned){
+    showModal(`Comprar ${skin.name}`,`<p>Esta skin custa <b>${skin.price.toLocaleString('pt-BR')} moedas</b>. Seu saldo é <span id="purchase-balance">${wardrobe!.balance.toLocaleString('pt-BR')}</span> moedas.</p><p>A compra é permanente.</p><button class="button primary full" data-action="buy-skin" data-skin="${skin.id}" ${wardrobe!.balance<skin.price?'disabled':''}>${wardrobe!.balance<skin.price?'Moedas insuficientes':'Confirmar compra'}</button><button class="text-button full" data-action="skins">Voltar à coleção</button>`,'purchase');return;
   }
   const owner=user?.id,generation=modalGeneration;
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>I</kbd><span>Abrir a mochila, usar itens e comprar mantimentos</span><kbd>T</kbd><span>Sentado à mesa: pedir comida e bebida ao Tonico</span><kbd>J</kbd><span>Trabalhar no bar e ganhar moedas</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>C</kbd><span>Trocar o visual do seu personagem</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>I</kbd><span>Abrir a mochila, usar itens e comprar mantimentos</span><kbd>T</kbd><span>Sentado à mesa: pedir comida e bebida ao Tonico</span><kbd>J</kbd><span>Trabalhar no bar e ganhar moedas</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>C</kbd><span>Trocar de skin</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -419,7 +416,6 @@ app.addEventListener('click',event=>{
       case 'inventory-discard-confirm':{const itemId=button.dataset.item as ItemId;closeModal();network.send('inventory.discard',{itemId,quantity:1});break;}
       case 'inventory-buy':{const itemId=button.dataset.item as ItemId;button.setAttribute('disabled','');try{const result=await api<InventoryView>('/inventory/buy',{itemId,quantity:1,requestId:crypto.randomUUID()});inventory=result;if(wardrobe)wardrobe={...wardrobe,balance:result.balance};network.send('inventory.sync');renderInventory();liveHud.update(world,user,wardrobe,blocked,inventory);}finally{button.removeAttribute('disabled');}break;}
       case 'skins':await skins();break;
-      case 'character':createCharacter();break;
       case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
       case 'daily':{const owner=user?.id,generation=modalGeneration;const result=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();break;}
       case 'kick':kick();break;
@@ -464,8 +460,8 @@ app.addEventListener('submit',event=>{
     setBusy(form,true);
     try{
       if(form.id==='auth-form'){
-        if(authMode==='login'){const result=await api<{user:PublicUser}>('/auth/login',data);user=result.user;renderAuth();if(!user.character)createCharacter();else if(user.verified)await enterBar();else authMessage(emailVerificationRequired?'Confirme seu e-mail antes de entrar. Você pode pedir um novo link abaixo.':'Sua conta ainda precisa ser ativada. Entre novamente após a ativação.');}
-        else if(authMode==='register'){const result=await api<{user:PublicUser;message:string;verificationRequired:boolean}>('/auth/register',data);emailVerificationRequired=result.verificationRequired;user=result.user;authMode='login';renderAuth(result.message);createCharacter();}
+        if(authMode==='login'){const result=await api<{user:PublicUser}>('/auth/login',data);user=result.user;renderAuth();if(user.verified)await enterBar();else authMessage(emailVerificationRequired?'Confirme seu e-mail antes de entrar. Você pode pedir um novo link abaixo.':'Sua conta ainda precisa ser ativada. Entre novamente após a ativação.');}
+        else if(authMode==='register'){const result=await api<{user:PublicUser;message:string;verificationRequired:boolean}>('/auth/register',data);emailVerificationRequired=result.verificationRequired;user=result.user;authMode='login';renderAuth(result.message);if(user.verified)await enterBar();}
         else if(authMode==='forgot'){await api('/auth/forgot',data);authMessage('Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.');}
         else {await api('/auth/reset',{token:resetToken,password:data.password});authMode='login';history.replaceState({},'',location.pathname);renderAuth('Senha atualizada. Entre novamente.');}
       }else if(form.id==='chat-form'){
@@ -594,19 +590,19 @@ async function start():Promise<void>{
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));},
     onKick:kick,
-    onMediaFrame:()=>{media.forEach(m=>m.frame());voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+    onMediaFrame:()=>{media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
   });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
   if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';checkingSession=false;renderAuth();return;}
   try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;}catch{/* No active session: show login. */}
-  checkingSession=false;renderAuth();if(user&&!user.character)createCharacter();
+  checkingSession=false;renderAuth();
 }
 let displayedSound:boolean|undefined;
 void start();
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

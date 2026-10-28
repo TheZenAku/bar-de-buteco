@@ -1,5 +1,4 @@
 import {test,expect} from '@playwright/test';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 
 const password='InventarioBrowser2026!';
 
@@ -14,7 +13,6 @@ test('mochila compra, usa e descarta itens com estado persistido',async({page})=
   const suffix=`bag_${Date.now().toString(36)}`;
   const registered=await page.request.post('/api/auth/register',{data:{email:`${suffix}@example.com`,username:suffix,displayName:'Mochileiro',password}});
   expect(registered.ok()).toBe(true);
-  expect((await page.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
 
   await page.goto('/');
   await page.getByRole('button',{name:'Entrar no bar'}).click();

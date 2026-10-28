@@ -7,15 +7,21 @@ const known=(id:string):id is PanelId=>HUD_PANELS.some(p=>p.id===id);
 export function createHudPanels(root:HTMLElement){
   let owner='guest',screenMode=mode(),layout:Layout,locked=false,drag:{id:PanelId;dx:number;dy:number;pointer:number;header:HTMLElement}|undefined;
   const elements=Object.fromEntries(HUD_PANELS.map(p=>[p.id,root.querySelector<HTMLElement>(`[data-panel="${p.id}"]`)!])) as Record<PanelId,HTMLElement>;
+  // Contextual panels (the job shift) exist only while they have something to show; hiding one is still the player's choice.
+  const available=new Set<PanelId>(HUD_PANELS.filter(p=>!('contextual' in p)).map(p=>p.id));
   const key=()=>`bar:nova-ui:hud:v1:${owner}:${screenMode}`;
   const width=(id:PanelId)=>screenMode==='mobile'?(id==='actions'||id==='chat'?innerWidth-20:(innerWidth-30)/2):Math.min(HUD_PANELS.find(p=>p.id===id)!.width,screenMode==='compact'?id==='actions'?300:240:Infinity,innerWidth-20);
   function defaults():Layout{
     const mobile=screenMode==='mobile',short=innerHeight<580,right=innerWidth-width('scene')-16,compactScene=screenMode==='compact'||innerHeight<700;
     const item=(x:number,y:number,collapsed=false):PanelState=>({x,y,collapsed,hidden:false,z:1});
+    const mobileActions=short?innerHeight-165:Math.max(255,innerHeight-221);
+    // The job panel stays off the middle of the view, where the toasts and event banners also appear: in the
+    // bottom-right corner (apply() lifts it to fit the screen), or above the actions on phones.
     return mobile?{
       status:item(10,116,true),scene:item(innerWidth/2+5,116,true),friends:{...item(10,166,true),hidden:short},inventory:{...item(innerWidth/2+5,166,true),hidden:short},
-      chat:item(10,short?166:216),actions:item(10,short?innerHeight-165:Math.max(255,innerHeight-221)),
-    }:{status:item(16,82,short),scene:item(right,82,compactScene),friends:item(right,compactScene?140:Math.min(470,innerHeight-120),true),inventory:item(right,compactScene?198:Math.min(530,innerHeight-68),true),chat:item(16,Math.max(315,innerHeight-275)),actions:item(Math.max(width('chat')+30,(innerWidth-width('actions'))/2),innerHeight-235)};
+      chat:item(10,short?166:216),actions:item(10,mobileActions),job:item(10,mobileActions-50,true),
+    }:{status:item(16,82,short),scene:item(right,82,compactScene),friends:item(right,compactScene?140:Math.min(470,innerHeight-120),true),inventory:item(right,compactScene?198:Math.min(530,innerHeight-68),true),chat:item(16,Math.max(315,innerHeight-275)),actions:item(Math.max(width('chat')+30,(innerWidth-width('actions'))/2),innerHeight-235),
+      job:item(right,innerHeight)};
   }
   function save(){try{localStorage.setItem(key(),JSON.stringify({locked,panels:layout}));}catch{/* Private mode or full storage: the current layout still works. */}}
   function load(){
@@ -30,15 +36,15 @@ export function createHudPanels(root:HTMLElement){
     root.querySelector('[data-hud-lock]')!.setAttribute('aria-pressed',String(locked));
     root.querySelector('[data-hud-lock]')!.setAttribute('aria-label',locked?'Destravar painéis':'Travar painéis');
     root.querySelector('[data-hud-lock]')!.innerHTML=`${uiIcon(locked?'lock':'unlock')}<span class="tool-label">${locked?'Travado':'Livre'}</span>`;
-    for(const p of HUD_PANELS){const state=layout[p.id],el=elements[p.id];el.style.width=`${width(p.id)}px`;el.classList.toggle('hidden',state.hidden);el.classList.toggle('is-collapsed',state.collapsed);
+    for(const p of HUD_PANELS){const state=layout[p.id],el=elements[p.id];el.style.width=`${width(p.id)}px`;el.classList.toggle('hidden',state.hidden||!available.has(p.id));el.classList.toggle('is-collapsed',state.collapsed);
       state.x=Math.max(8,Math.min(innerWidth-width(p.id)-8,state.x));
       const h=el.offsetHeight||45,top=screenMode==='mobile'?110:76;
       state.y=Math.max(top,Math.min(Math.max(top,innerHeight-Math.min(h,innerHeight-top-12)-12),state.y));
       Object.assign(el.style,{left:`${state.x}px`,top:`${state.y}px`,zIndex:String(state.z)});
       el.style.maxHeight=`${Math.max(44,innerHeight-state.y-12)}px`;
-      const button=el.querySelector<HTMLButtonElement>('.panel-heading button')!;button.setAttribute('aria-expanded',String(!state.collapsed));button.setAttribute('aria-label',p.id==='chat'?(state.collapsed?'Abrir chat':'Recolher chat'):`${state.collapsed?'Expandir':'Recolher'} ${p.title}`);
+      const button=el.querySelector<HTMLButtonElement>('.panel-heading button[aria-expanded]')!;button.setAttribute('aria-expanded',String(!state.collapsed));button.setAttribute('aria-label',p.id==='chat'?(state.collapsed?'Abrir chat':'Recolher chat'):`${state.collapsed?'Expandir':'Recolher'} ${p.title}`);
       el.querySelector('.hud-content')!.classList.toggle('hidden',state.collapsed);
-      root.querySelector(`[data-hud-visible="${p.id}"]`)!.setAttribute('aria-pressed',String(!state.hidden));
+      root.querySelectorAll(`[data-hud-visible="${p.id}"]`).forEach(toggle=>{toggle.setAttribute('aria-pressed',String(!state.hidden));toggle.classList.toggle('hidden',!available.has(p.id));});
     }
   }
   function patch(id:PanelId,value:Partial<PanelState>){Object.assign(layout[id],value);apply();save();}
@@ -50,7 +56,9 @@ export function createHudPanels(root:HTMLElement){
     if(button.hasAttribute('data-hud-menu'))menu(root.querySelector('#panel-menu')!.classList.contains('hidden'));
     if(button.hasAttribute('data-hud-reset')){layout=defaults();locked=false;apply();save();menu(false);}
     const id=button.dataset.hudCollapse;if(id&&known(id))patch(id,{collapsed:!layout[id].collapsed});
-    const visible=button.dataset.hudVisible;if(visible&&known(visible))patch(visible,{hidden:!layout[visible].hidden});
+    const visible=button.dataset.hudVisible;if(visible&&known(visible)){if(layout[visible].hidden){focus(visible);elements[visible].style.maxHeight='';}patch(visible,{hidden:!layout[visible].hidden});}
+    // Hidden from its own header: keyboard focus goes to the toolbar button that shows it again.
+    const hide=button.dataset.hudHide;if(hide&&known(hide)){patch(hide,{hidden:true});root.querySelector<HTMLElement>(`.game-tools [data-hud-visible="${hide}"]`)?.focus();}
   });
   for(const p of HUD_PANELS){const el=elements[p.id],header=el.querySelector<HTMLElement>('.panel-heading')!;
     el.addEventListener('pointerdown',()=>{focus(p.id);for(const panel of HUD_PANELS)elements[panel.id].style.zIndex=String(layout[panel.id].z);});
@@ -67,5 +75,7 @@ export function createHudPanels(root:HTMLElement){
   window.addEventListener('resize',()=>{const next=mode();if(next!==screenMode){save();screenMode=next;load();}apply();});
   load();apply();
   void document.fonts.ready.then(apply);
-  return {forUser(id:string){owner=id;load();apply();},open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},collapse(id:PanelId,collapsed:boolean){patch(id,{collapsed});},isCollapsed(id:PanelId){return layout[id].collapsed;}};
+  return {forUser(id:string){owner=id;load();apply();},open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},collapse(id:PanelId,collapsed:boolean){patch(id,{collapsed});},isCollapsed(id:PanelId){return layout[id].collapsed;},
+    // Appearing, the panel is measured at its natural height (not the one it was squeezed to while hidden) and lifted to fit.
+    setAvailable(id:PanelId,on:boolean){if(available.has(id)===on)return;if(on){available.add(id);elements[id].style.maxHeight='';}else available.delete(id);apply();}};
 }

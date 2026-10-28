@@ -8,7 +8,7 @@ import {assertLocalMigrationHelperAllowed,connectDatabase,defaultMigrationFolder
 import {loadMigrations,MIGRATION_TABLE} from '../src/database/migrations.js';
 import {readMigrationConfig} from '../src/config.js';
 
-const migrationNames=['001_initial.sql','002_characters.sql','003_inventory.sql','004_control_outbox.sql'];
+const migrationNames=['001_initial.sql','002_characters.sql','003_inventory.sql','004_control_outbox.sql','005_retire_character_creator.sql'];
 
 async function fixture(t:TestContext){
   const root=await mkdtemp(join(tmpdir(),'bar-migrations-')),folder=join(root,'migrations'),path=join(root,'database');
@@ -33,7 +33,7 @@ test('runtime connection is read-only about schema; explicit migration records o
   const second=await migrateDatabase({path,migrationFolder:folder});assert.deepEqual(second,{applied:[],alreadyApplied:migrationNames});
   const connection=await connectDatabase({path,migrationFolder:folder});await connection.close();
   await raw(path,async db=>{
-    assert.equal((await db.query<{count:number}>(`SELECT count(*)::int AS count FROM ${MIGRATION_TABLE}`)).rows[0]!.count,4);
+    assert.equal((await db.query<{count:number}>(`SELECT count(*)::int AS count FROM ${MIGRATION_TABLE}`)).rows[0]!.count,5);
     assert.equal((await db.query<{count:number}>("SELECT count(*)::int AS count FROM users WHERE id='sentinel'")).rows[0]!.count,1);
   });
 });
@@ -49,7 +49,7 @@ test('checksums ignore checkout line endings but reject a real change before tou
 
 test('all pending migrations and ledger inserts roll back together when a later SQL file fails',async t=>{
   const {folder,path}=await fixture(t);
-  await writeFile(join(folder,'005_broken.sql'),'CREATE TABLE should_rollback (id integer); SELECT function_that_does_not_exist();\n');
+  await writeFile(join(folder,'006_broken.sql'),'CREATE TABLE should_rollback (id integer); SELECT function_that_does_not_exist();\n');
   await assert.rejects(()=>migrateDatabase({path,migrationFolder:folder}));
   await raw(path,async db=>{
     const relations=await db.query<{users:string|null;broken:string|null;ledger:string|null}>("SELECT to_regclass('public.users')::text AS users, to_regclass('public.should_rollback')::text AS broken, to_regclass('public.bar_schema_migrations')::text AS ledger");

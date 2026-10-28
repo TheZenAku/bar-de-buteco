@@ -1,6 +1,7 @@
-import { HAND_OVER_MS, ORDER_PREPARATION_MS, PICKUP_POINT, type ItemId, type Position } from '@bar/shared';
+import { ORDER_PREPARATION_MS, PICKUP_POINT, handOverMs, type ItemId, type Position } from '@bar/shared';
 import type { Npc } from '../state.js';
 import { findPath, PathFollower } from './navigation.js';
+import type { TablePlan } from './served.js';
 
 type Point = Required<Position>;
 export interface TableOrder { id: string; playerId: string; seatId: string; items: ItemId[]; total: number; placedAt: number; owner: { sessionId: string; userId: string } }
@@ -12,21 +13,28 @@ export const TABLE_QUEUE_MAX = 8;
 export const publicOrder = ({ owner: _owner, ...order }: TableOrder) => order;
 
 export interface WaiterEvents {
+  /** Tonico starts putting the order on the table, at the planned spots: the room shows the items there. */
+  placing?: { order: TableOrder; plan: TablePlan };
   /** The order reached the table: the room applies its effects. */
   delivered?: TableOrder;
   /** The order could not be delivered (the customer left the seat, no path): the room refunds it. */
   dropped?: { order: TableOrder; reason: string };
 }
+/** Where an order will stand on the table top (apps/server/src/world/served.ts); without it Tonico hands it over. */
+export interface TableTop { plan(order: TableOrder): TablePlan | undefined }
 
 /**
  * Tonico runs table orders one at a time: from wherever he is to the counter, waits for Magrão to
- * prepare them, carries them to the seat along a path found on the shared floor and colliders, hands
- * them over and walks back. While serving, the wandering NPC director leaves him alone (behavior 'serving').
+ * prepare them, carries them on his tray to the table along a path found on the shared floor and colliders,
+ * puts them down where `tables` planned and walks back. While serving, the wandering NPC director leaves him
+ * alone (behavior 'serving').
  */
 export class WaiterService {
   private queue: TableOrder[] = [];
-  private job?: { order: TableOrder; phase: Phase; follower?: PathFollower; until?: number };
+  private job?: { order: TableOrder; phase: Phase; follower?: PathFollower; until?: number; plan?: TablePlan };
   private returning?: PathFollower;
+
+  constructor(private readonly tables?: TableTop) {}
 
   has(playerId: string): boolean { return this.job?.order.playerId === playerId || this.queue.some(o => o.playerId === playerId); }
   get pending(): number { return this.queue.length + (this.job ? 1 : 0); }
@@ -49,6 +57,8 @@ export class WaiterService {
   /** `seat` answers where the customer sits now, or undefined if they left their seat. */
   update(npc: Npc, seat: (order: TableOrder) => Point | undefined, now: number): WaiterEvents {
     if (!this.job) {
+      // The order on his tray was cancelled: the tray empties.
+      unload(npc);
       const order = this.queue.shift();
       if (!order) {
         // The order he was carrying was cancelled: he walks back instead of standing there for good.
@@ -64,7 +74,7 @@ export class WaiterService {
     }
     const job = this.job, target = seat(job.order);
     npc.behavior = 'serving';
-    if (!target) { this.job = undefined; this.goBack(npc); return { dropped: { order: job.order, reason: 'Você saiu da mesa e o Tonico levou o pedido de volta. Moedas devolvidas.' } }; }
+    if (!target) { this.job = undefined; unload(npc); this.goBack(npc); return { dropped: { order: job.order, reason: 'Você saiu da mesa e o Tonico levou o pedido de volta. Moedas devolvidas.' } }; }
     if (job.phase === 'pickup') {
       npc.animationState = 'walk';
       if (!job.follower || job.follower.step(npc)) { job.phase = 'preparing'; job.until = now + ORDER_PREPARATION_MS; npc.animationState = 'wait'; npc.animationStartedAt = now; npc.rotation = Math.PI / 2; }
@@ -72,18 +82,24 @@ export class WaiterService {
     }
     if (job.phase === 'preparing') {
       if (now < job.until!) return {};
-      const path = findPath(here(npc), p => Math.hypot(p.x - target.x, p.z - target.z) < .9 && Math.abs(p.y - target.y) < .3, target);
+      job.plan = this.tables?.plan(job.order);
+      const spots = job.plan && centre(job.plan.spots);
+      // Beside the customer, within reach of where the order goes (never on top of them); failing that, near the seat.
+      const path = (spots && findPath(here(npc), p => Math.hypot(p.x - spots.x, p.z - spots.z) < .75 && Math.hypot(p.x - target.x, p.z - target.z) > .45 && Math.abs(p.y - target.y) < .3, { ...spots, y: target.y }))
+        ?? findPath(here(npc), p => Math.hypot(p.x - target.x, p.z - target.z) < .9 && Math.abs(p.y - target.y) < .3, target);
       if (!path) { this.job = undefined; this.goBack(npc); return { dropped: { order: job.order, reason: 'O Tonico não achou caminho até a sua mesa. Moedas devolvidas.' } }; }
       job.phase = 'delivering'; job.follower = new PathFollower(path, .4); npc.animationState = 'walk';
+      npc.carrying = job.order.items.join(','); npc.carryingOrder = job.order.id;
       return {};
     }
     if (job.phase === 'delivering') {
       if (!job.follower!.step(npc)) return {};
-      job.phase = 'handing'; job.until = now + HAND_OVER_MS;
-      npc.rotation = Math.atan2(target.x - npc.x, target.z - npc.z); npc.animationState = 'use'; npc.animationStartedAt = now;
-      return {};
+      job.phase = 'handing'; job.until = now + handOverMs(job.order.items.length);
+      const look = job.plan ? centre(job.plan.spots) : target;
+      npc.rotation = Math.atan2(look.x - npc.x, look.z - npc.z); npc.animationState = 'use'; npc.animationStartedAt = now;
+      return job.plan ? { placing: { order: job.order, plan: job.plan } } : {};
     }
-    if (job.phase === 'handing' && now >= job.until!) { this.job = undefined; this.goBack(npc); return { delivered: job.order }; }
+    if (job.phase === 'handing' && now >= job.until!) { this.job = undefined; unload(npc); this.goBack(npc); return { delivered: job.order }; }
     return {};
   }
 
@@ -94,3 +110,6 @@ export class WaiterService {
   }
 }
 const here = (npc: Npc): Point => ({ x: npc.x, y: npc.y, z: npc.z });
+const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
+/** Empties the tray (only writes when there is something to clear, so the state is not patched every tick). */
+const unload = (npc: Npc): void => { if (npc.carrying || npc.carryingOrder) { npc.carrying = ''; npc.carryingOrder = ''; } };

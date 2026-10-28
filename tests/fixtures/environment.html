@@ -8,6 +8,7 @@ Date.now=()=>timestamp;
 let eye=[18,9,16],target=[14,1.8,-6];
 const scene=new BarScene(document.querySelector('canvas'),{onMediaFrame:()=>{scene.camera.setPosition(...eye);scene.camera.lookAt(...target);scene.app.autoRender=true;}});
 window.fixture={scene,ready:scene.ready,hour:hour=>{timestamp=DAY_NIGHT.epochMs+(hour-DAY_NIGHT.offsetHours)/24*DAY_NIGHT.durationMs;},
+now:()=>timestamp,advance:ms=>{timestamp+=ms;},
 event:type=>scene.updateState({players:[],npcs:[],event:{type}},''),view:(position,look)=>{eye=position;target=look;},
 pixels:()=>new Promise(resolve=>scene.app.once('postrender',()=>{const canvas=document.createElement('canvas');canvas.width=48;canvas.height=32;const c=canvas.getContext('2d');c.drawImage(document.querySelector('#world'),0,0,48,32);resolve([...c.getImageData(0,0,48,32).data]);}))};
 </script></html>

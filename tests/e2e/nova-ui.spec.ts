@@ -1,6 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 import {previewPath} from './preview-path';
 
 async function ready(page:Page){await expect(page.locator('#waiting')).toBeHidden({timeout:60000});await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId]?.connected===true;}),{timeout:30000}).toBe(true);}
@@ -8,7 +7,6 @@ async function enter(page:Page,prefix:string){
   const name=`${prefix}_${Date.now().toString(36)}`;
   const response=await page.request.post('/api/auth/register',{data:{username:name,displayName:prefix,email:`${name}@example.com`,password:'NovaInterface2026!'}});expect(response.ok()).toBe(true);
   const id=(await response.json()).user.id;
-  expect((await page.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
   await page.goto('/');await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);return id;
 }
 test.beforeEach(async({request})=>{await expect.poll(async()=>{try{return (await request.get('/api/health')).ok()&&(await request.get('http://localhost:2677/health')).ok();}catch{return false;}},{timeout:30000}).toBe(true);});
@@ -18,7 +16,8 @@ test('nova UI persists panel positions, locks and visibility per account, handle
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const id=await enter(page,'Layout');
   try{
-    await expect(page.locator('[data-panel]')).toHaveCount(6);
+    // Six panels, plus the job panel that only shows during a shift.
+    await expect(page.locator('[data-panel]')).toHaveCount(7);await expect(page.locator('[data-panel="job"]')).toBeHidden();
     const wardrobe=await(await page.request.get('/api/wardrobe')).json();await expect(page.locator('#hud-balance')).toHaveText(wardrobe.balance.toLocaleString('pt-BR'));
     const panel=page.locator('[data-panel="status"]'),header=panel.locator('.panel-heading');const before=(await panel.boundingBox())!;
     const drag=async(dx:number,dy:number)=>{const box=(await header.boundingBox())!;await page.mouse.move(box.x+20,box.y+20);await page.mouse.down();await page.mouse.move(box.x+20+dx,box.y+20+dy,{steps:8});await page.mouse.up();};
@@ -31,7 +30,7 @@ test('nova UI persists panel positions, locks and visibility per account, handle
     await page.screenshot({path:previewPath('nova-ui-desktop.png')});
     for(const width of [960,760,640,390]){
       await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      for(const item of await page.locator('[data-panel]').all()){const box=(await item.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(844);}
+      for(const item of await page.locator('[data-panel]:visible').all()){const box=(await item.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(844);}
     }
     await page.screenshot({path:previewPath('nova-ui-mobile.png')});
     await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-reset]').click();await expect(page.getByRole('button',{name:'Travar painéis',exact:true})).toBeVisible();
@@ -67,13 +66,4 @@ test('comanda notices are bounded, deduplicated, dismissible and pause expiry du
   await page.locator('.comanda').dispatchEvent('pointerenter');await page.evaluate(()=>(window as any).fixture.advance(1200));await expect(page.locator('.comanda')).toBeVisible();await page.locator('.comanda').dispatchEvent('pointerleave');await page.evaluate(()=>(window as any).fixture.advance(1000));await expect(page.locator('.comanda')).toHaveCount(0);
   await page.evaluate(()=>(window as any).fixture.show({title:'Teclado',duration:1000}));await page.getByRole('button',{name:'Fechar aviso'}).focus();await page.evaluate(()=>(window as any).fixture.advance(1200));await expect(page.locator('.comanda')).toBeVisible();await page.locator('#outside').focus();await page.evaluate(()=>(window as any).fixture.advance(1000));await expect(page.locator('.comanda')).toHaveCount(0);
   await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>(window as any).fixture.show({variant:'aviso',title:'Erro real',text:'Tente novamente.',duration:15000}));await expect(page.getByRole('alert')).toContainText('Erro real');await page.getByRole('button',{name:'Fechar aviso'}).click();await expect(page.locator('.comanda')).toHaveCount(0);
-});
-
-test('closing character previews while both native models load preserves the asset registry until texture parsing completes',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  await page.route('**/characters/base-*.glb',async route=>{await new Promise(resolve=>setTimeout(resolve,200));await route.continue();});
-  const fixture=fileURLToPath(new URL('../fixtures/character-preview.html',import.meta.url)).replaceAll('\\','/');
-  await page.goto(`/@fs/${fixture}`);await page.waitForFunction(()=>(window as any).fixture);
-  for(let i=0;i<3;i++)await page.evaluate(()=>(window as any).fixture.closeDuringLoad());
-  await page.waitForTimeout(250);expect(errors).toEqual([]);
 });

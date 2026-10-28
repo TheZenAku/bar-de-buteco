@@ -1,13 +1,15 @@
 import * as pc from 'playcanvas';
-import { BLACKJACK_SEATS, BLACKJACK_TABLE, COLLIDERS, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, MALE_CLOTHING, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
-import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,DRINK_ITEMS,type DoorLeaf,type DrinkItem} from '@bar/shared';
+import { BLACKJACK_SEATS, BLACKJACK_TABLE, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
+import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
+import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
 import type { SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
-import {applyCharacter,characterFromJson,disposeCharacter} from './character-materials';
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
+import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
+import {JUKEBOX_SYSTEMS,type JukeboxState} from '@bar/shared';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
@@ -16,10 +18,8 @@ type Limbs = Record<'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg' | 'head', pc
 const SKIN_BONES = ['head', 'upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r', 'hand_l', 'middle_01_l', 'hand_r', 'middle_01_r',
   'upperleg_l', 'lowerleg_l', 'upperleg_r', 'lowerleg_r','foot_l','foot_r'] as const;
 type SkinBone = typeof SKIN_BONES[number];
-// Skins with a Character Creator / Unreal skeleton name the leg bones differently; Read's rig has
-// no middle finger, so the cup is held by the index finger instead.
-const BONE_ALIASES: Partial<Record<SkinBone, string>> = { upperleg_l: 'thigh_l', lowerleg_l: 'calf_l', upperleg_r: 'thigh_r', lowerleg_r: 'calf_r',
-  middle_01_l: 'index_01_l', middle_01_r: 'index_01_r' };
+// Read's AccuRig and the Mixamo rigs (two-finger hands) have no middle finger, so the cup is held by the index finger instead.
+const BONE_ALIASES: Partial<Record<SkinBone, string>> = { middle_01_l: 'index_01_l', middle_01_r: 'index_01_r' };
 // Looping clips that sit the hips on a chair (anchored to the 0.56 m seat height).
 const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
 // Degrees by drunk stage (0-4): body sway of every avatar and camera roll of the local player.
@@ -50,7 +50,11 @@ interface Avatar {
   skinId?: string;
   cup: pc.Entity;
   /** The bottle or glass in hand, created on first use. */
-  drinks?: Partial<Record<DrinkItem, pc.Entity>>;
+  drinks?: Partial<Record<HeldDrink, pc.Entity>>;
+  /** Tonico's tray and the order on it (`key`: the items it was built for). */
+  tray?: { entity: pc.Entity; key: string; items: pc.Entity[] };
+  /** The bone that bows the upper body (Tonico putting an order down); null when the rig has none. */
+  spine?: pc.Entity | null;
   /** A small fan of real geometry shown between both hands at the blackjack table. */
   cards?:pc.Entity;
   /** How close the drink is to the lips, 0–1 (telemetry). */
@@ -83,8 +87,11 @@ interface Pose {
  * procedural gestures build on. Leandro, Rafael, Read and Magrão carry clips retargeted to their authored rigs.
  */
 const DEFAULT_MODEL='nathan';
-const skinUrl = (id: string): string => `${import.meta.env.BASE_URL}${id.startsWith('base-')?'characters':'models'}/${id}.glb${id === 'leandro' ? '?v=accurig-20261021' : ''}`;
-const SKIN_IDS = new Set<string>(['custom',...SKINS.map(skin => skin.id)]);
+// Bumped when a skin is reimported: its model, animation bank and cane change together, so no cached file is mixed in.
+const SKIN_VERSIONS: Record<string, string> = { leandro: 'mixamo-20261027', rafael: 'mixamo-20261027b', read: 'mixamo-20261027', magrao: 'mixamo-20261027' };
+const skinAsset = (folder: string, file: string, id: string): string => `${import.meta.env.BASE_URL}${folder}/${file}.glb${SKIN_VERSIONS[id] ? `?v=${SKIN_VERSIONS[id]}` : ''}`;
+const skinUrl = (id: string): string => skinAsset('models', id, id);
+const SKIN_IDS = new Set<string>(SKINS.map(skin => skin.id));
 // The bar is built in real-world metres around this model at its natural 1.86 m.
 const PLAYER_MODEL_SCALE = 1;
 // The box avatars (NPCs, and players while the model loads) are drawn about 2 m tall and stocky;
@@ -100,6 +107,8 @@ const WALK_CLIP_SPEED = 1.9;
 const INPUT_GLIDE = TICK_MS / 1000 * 1.2;
 const PATCH_GLIDE = PATCH_MS / 1000 * 1.2;
 const SNAP_DISTANCE = 1.5;
+// The job objective marker takes the job panel's neon green (--neon-green in nova-ui.css).
+const OBJECTIVE_COLOR = '#5fd86c';
 
 const TAU = Math.PI * 2;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -130,6 +139,11 @@ export class BarScene {
   private readonly partyLights: pc.Entity[] = [];
   private readonly environment:EnvironmentLighting;
   private mapEffects?:MapEffects;
+  private jukeboxLights?:JukeboxLights;
+  private jukeboxState?:JukeboxState;
+  private jukeboxDuration=0;
+  /** The local worker's current job station: a marker only this browser draws (the task is sent to the worker alone). */
+  private objective?:{target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity};
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
@@ -150,7 +164,14 @@ export class BarScene {
   private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
   private mapEntity?: pc.Entity;
-  private readonly drinkModels=new Map<DrinkItem,pc.ContainerResource>();
+  /** What the bar serves, by item (tools/assets/import-drinks.mjs): held while drinking, carried on the tray, left on tables. */
+  private readonly propModels=new Map<string,pc.ContainerResource>();
+  /** What Tonico left on the tables (synced by the room). `moved`: the frame in which his hand last carried it. */
+  private readonly servedItems=new Map<string,{state:ServedItemState;entity?:pc.Entity;settled:boolean;moved:number}>();
+  /** The order on Tonico's tray in the frame `trayFrame`: its items still on the tray are his to draw. */
+  private trayOrder='';
+  private trayFrame=-1;
+  private frameId=0;
   /** Each map door leaf, turned about its own hinge (the node origin) by its door's synced state. */
   private readonly doorLeaves:Array<{leaf:DoorLeaf;entity?:pc.Entity;openness:number;from:number;target:number;changedAt:number}>=
     DOOR_LEAVES.map(leaf=>({leaf,openness:1,from:1,target:1,changedAt:0}));
@@ -197,7 +218,6 @@ export class BarScene {
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
     this.buildBlackjack();
-    this.buildJukebox();
     this.buildPartyLighting();
     this.environment.addPartyShadows(this.partyLights);
     this.app.batcher.generate([this.staticBatchId]);
@@ -206,10 +226,9 @@ export class BarScene {
     this.buildStageScreen();
     this.discoBall = this.buildDiscoBall();
     this.ready = this.loadMap();
-    this.loadDrinks();
+    this.loadProps();
     void this.ready.catch(() => {}); // The UI reports loading failures before admission.
     this.installControls();
-    this.loadSkin('base-male');
     this.loadSkin(DEFAULT_MODEL);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -218,19 +237,31 @@ export class BarScene {
     this.app.start();
   }
 
-/** The bottle and the glass (tools/assets/import-drinks.mjs). Without them, the old procedural cup stays in use. */
-  private loadDrinks(): void {
-    for(const item of DRINK_ITEMS)this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}${DRINK_PROPS[item].url}`,'container',(error,asset)=>{
+/**
+   * Drinks and food (tools/assets/import-drinks.mjs). Without them a drink falls back to the old procedural cup,
+   * and what Tonico serves only appears once its model arrives.
+   */
+  private loadProps(): void {
+    for(const item of new Set<string>([...HELD_DRINKS,...Object.keys(SERVED_PROPS)]))this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}props/${item}.glb`,'container',(error,asset)=>{
       if(this.destroyed)return;
-      if(error||!asset){console.warn(`Objeto de bebida "${item}" indisponível; usando o copo simples.`,error);return;}
-      this.drinkModels.set(item,asset.resource as pc.ContainerResource);
+      if(error||!asset){console.warn(`Objeto "${item}" indisponível.`,error);return;}
+      this.propModels.set(item,asset.resource as pc.ContainerResource);
     });
   }
 
+  /** A new copy of an item's prop, origin at the centre of its base; snacks come on a small plate. Undefined until loaded. */
+  private makeProp(item:string):pc.Entity|undefined {
+    const model=this.propModels.get(item);if(!model)return;
+    const prop=new pc.Entity(`Served ${item}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true}),plate=SERVED_PROPS[item as ItemId]?.plate;
+    prop.addChild(body);
+    if(plate){this.shape('Small plate','cylinder',[0,PLATE_HEIGHT/2,0],[plate*2,PLATE_HEIGHT,plate*2],this.material('#f1ede4',undefined,.3),prop);body.setLocalPosition(0,PLATE_HEIGHT,0);}
+    return prop;
+  }
+
   /** The avatar's bottle or glass, created once and reused; undefined until the model has loaded. */
-  private drink(avatar:Avatar,item:DrinkItem):pc.Entity|undefined {
+  private drink(avatar:Avatar,item:HeldDrink):pc.Entity|undefined {
     const existing=avatar.drinks?.[item];if(existing)return existing;
-    const model=this.drinkModels.get(item);if(!model)return;
+    const model=this.propModels.get(item);if(!model)return;
     const prop=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
     prop.name=`Drink ${item}`;prop.enabled=false;avatar.root.addChild(prop);
     (avatar.drinks??={})[item]=prop;
@@ -276,6 +307,7 @@ export class BarScene {
         this.warmLights.push(...lights.map(light=>light.entity));
         this.environment.configureMap(map);
         this.mapEffects=new MapEffects(this.app,map);
+        this.jukeboxLights=new JukeboxLights(map);
         resolve();
       });
     });
@@ -299,10 +331,67 @@ export class BarScene {
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus} {
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;objective?:{x:number;y:number;z:number;visible:boolean}} {
     const cart=this.mapEntity?.findByName('Carrinho_Espeto') as pc.Entity|undefined;
     return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
-      renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry()};
+      renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry(),
+      jukebox:this.jukeboxLights?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined};
+  }
+
+  /** Seconds of the jukebox's video, known by the local YouTube player (0 while loading): paces its colours. */
+  setJukeboxDuration(seconds:number):void {this.jukeboxDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
+
+  /**
+   * The job objective ("blip") of the local worker: a ring on the floor around the station and a chevron above it,
+   * seen through walls. Drawn only by the worker's browser; null hides it.
+   * One marker is built and then moved from task to task. Destroying it also freed its ring mesh (PlayCanvas frees a
+   * mesh with its last instance), and the next task's marker drew the freed mesh: every frame threw and the view froze.
+   */
+  setObjective(target:(Required<Position>&{top:number})|null):void {
+    if(!target){if(this.objective)this.objective.marker.enabled=false;return;}
+    const objective=this.objective??=this.buildObjective();
+    objective.target={...target};objective.marker.setPosition(target.x,target.y,target.z);objective.marker.enabled=true;
+    this.animateObjective();
+  }
+
+  private buildObjective():{target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity} {
+    const marker=this.group('Job objective',[0,0,0]);
+    const glow=(depthTest:boolean)=>{
+      const material=new pc.StandardMaterial();material.useLighting=false;material.useFog=false;material.diffuse.set(0,0,0);
+      material.emissive=color(OBJECTIVE_COLOR);material.opacity=depthTest ? .85 : .92;material.blendType=pc.BLEND_NORMAL;
+      material.depthTest=depthTest;material.depthWrite=false;material.cull=pc.CULLFACE_NONE;material.update();this.materials.push(material);return material;
+    };
+    const ring=new pc.Entity('Job objective ring');
+    const torus=pc.Mesh.fromGeometry(this.app.graphicsDevice,new pc.TorusGeometry({tubeRadius:.025,ringRadius:.62,segments:48}));
+    ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true))],castShadows:false,receiveShadows:false});
+    ring.setLocalPosition(0,.03,0);marker.addChild(ring);
+    // Above the station; it shows through walls and furniture, like a map blip.
+    const chevron=new pc.Entity('Job objective chevron');
+    chevron.addComponent('render',{type:'cone',material:glow(false),castShadows:false,receiveShadows:false});
+    chevron.setLocalEulerAngles(180,0,0);chevron.setLocalScale(.26,.34,.26);marker.addChild(chevron);
+    return {target:{x:0,y:0,z:0,top:0},marker,chevron};
+  }
+
+  /** Where the objective is on screen (also when off it or behind the camera), and how far it is from the player. */
+  projectObjective():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
+    const objective=this.objective,player=this.actors.get(this.localId);
+    if(!objective?.marker.enabled||!this.camera.camera||!player)return null;
+    const point=objective.chevron.getPosition(),eye=this.camera.getPosition(),forward=this.camera.forward;
+    this.tempPosition.set(point.x-eye.x,point.y-eye.y,point.z-eye.z);
+    const behind=this.tempPosition.dot(forward)<=0;
+    // Mirrored in front of the camera when behind it, so the direction on screen still points the right way.
+    if(behind)this.tempPosition.sub(this.axisFront.copy(forward).mulScalar(2*this.tempPosition.dot(forward)-.1));
+    this.camera.camera.worldToScreen(this.tempPosition.add(eye),this.tempScreen);
+    const width=this.canvas.clientWidth,height=this.canvas.clientHeight,p=player.root.getPosition();
+    const onScreen=!behind&&this.tempScreen.x>=0&&this.tempScreen.x<=width&&this.tempScreen.y>=0&&this.tempScreen.y<=height;
+    return {x:this.tempScreen.x,y:this.tempScreen.y,onScreen,behind,distance:Math.hypot(objective.target.x-p.x,objective.target.z-p.z),above:objective.target.y-p.y};
+  }
+
+  private animateObjective():void {
+    const objective=this.objective;if(!objective?.marker.enabled)return;
+    const {target,chevron}=objective;
+    chevron.setLocalPosition(0,target.top-target.y+.55+Math.sin(this.elapsed*3)*.07,0);
+    chevron.setLocalEulerAngles(180,this.elapsed*90%360,0);
   }
   getEnvironmentStatus(){return this.environment.telemetry();}
 
@@ -332,6 +421,7 @@ export class BarScene {
   setWorld(world: WorldState, localId: string): void {
     // The empty snapshot used when leaving the bar has serverTime=0; keep the clock running.
     if(Number.isFinite(world.serverTime)&&world.serverTime>0)this.serverClockOffset = world.serverTime - Date.now();
+    this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
     for(const door of this.doorLeaves){
       const state=world.doors?.[door.leaf.group];if(!state)continue;
       const target=state.open?1:0;
@@ -345,6 +435,39 @@ export class BarScene {
       npcs: Object.values(world.npcs).map(npc => ({ ...npc, animation: npc.animationState, role: npc.behavior })),
       event: world.event,
     }, localId);
+    this.syncServed(world.served??{});
+  }
+
+  /** Follows what the room has on the tables; the entities are made (and placed) by placeServed. */
+  private syncServed(served:Record<string,ServedItemState>):void {
+    for(const [id,entry] of this.servedItems)if(!served[id]){entry.entity?.destroy();this.servedItems.delete(id);}
+    for(const state of Object.values(served)){
+      const entry=this.servedItems.get(state.id);
+      if(entry)entry.state=state;else this.servedItems.set(state.id,{state,settled:false,moved:-1});
+    }
+  }
+
+  /**
+   * Each item stands on its spot once it has touched the table. Before that it is on Tonico's tray or in his hand
+   * (carryTray draws it); with Tonico out of sight it simply appears there when he would have taken it.
+   */
+  private placeServed(now:number):void {
+    const carried=this.trayFrame===this.frameId?this.trayOrder:'';
+    for(const entry of this.servedItems.values()){
+      if(entry.moved===this.frameId)continue;
+      const {state}=entry,entity=entry.entity??=this.makeProp(state.item);
+      if(!entity)continue;
+      if(!entity.parent)this.app.root.addChild(entity);
+      const show=now>=state.placedAt||(state.orderId!==carried&&now>=state.placedAt-SERVE_ITEM_MS);
+      if(show&&!entry.settled){entity.setPosition(state.x,state.y,state.z);entity.setEulerAngles(0,state.rotation*RAD_TO_DEG,0);entry.settled=now>=state.placedAt;}
+      entity.enabled=show;
+    }
+  }
+
+  /** What stands on the tables, as drawn (telemetry and tests). */
+  getServed():Array<{id:string;item:string;table:number;visible:boolean;settled:boolean;x:number;y:number;z:number}> {
+    return [...this.servedItems.values()].map(({state,entity,settled})=>{const p=entity?.getPosition();
+      return {id:state.id,item:state.item,table:state.table,visible:!!entity?.enabled,settled,x:+(p?.x??state.x).toFixed(3),y:+(p?.y??state.y).toFixed(3),z:+(p?.z??state.z).toFixed(3)};});
   }
 
   /** Smooth swing toward each door's state; a late arrival sees doors already where they are. */
@@ -398,7 +521,6 @@ export class BarScene {
           if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
           existing.ring.enabled = local;
           if (this.usesSkin(existing.actor, npc) && this.skinFor(existing.actor, npc) !== existing.skinId) this.replaceAvatar(actor.id, existing);
-          else if(existing.skin&&existing.skinId?.startsWith('base-'))applyCharacter(existing.skin.model,characterFromJson(existing.actor.character));
         } else {
           const avatar=this.makeAvatar(actor,npc);this.actors.set(actor.id,avatar);
           if (local) this.lastRotation = actor.rotation ?? this.lastRotation;
@@ -407,7 +529,7 @@ export class BarScene {
     }
     for (const [id, avatar] of this.actors) {
       if (!seen.has(id)) {
-        this.disposeAvatar(avatar);
+        avatar.root.destroy();
         this.actors.delete(id);
       }
     }
@@ -469,16 +591,11 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[]; clothing?:Record<string,{enabled:boolean;skinned:boolean;color?:string}> }> {
+  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[] }> {
     return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
       height: avatar.skin ? avatar.skin.bones.head.getPosition().y - avatar.root.getPosition().y : undefined,
       time: avatar.skin?.model.anim?.baseLayer?.activeStateCurrentTime, tracks: [...(avatar.skin?.tracks ?? [])],
-      speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cards:avatar.cards?.enabled?avatar.cards.children.filter(card=>card.enabled).length:undefined,cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined,
-      clothing:avatar.skinId==='base-male'?Object.fromEntries(MALE_CLOTHING.map(({id:name})=>{
-        const part=avatar.skin?.model.findByName(`part-${name}`) as pc.Entity|undefined;
-        const instances=(part?.findComponents('render') as pc.RenderComponent[]|undefined)?.flatMap(r=>r.meshInstances)??[];
-        return [name,{enabled:!!part?.enabled,skinned:instances.length>0&&instances.every(i=>!!i.skinInstance),color:(instances[0]?.material as pc.StandardMaterial|undefined)?.diffuse?.toString(false)}];
-      })):undefined }));
+      speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cards:avatar.cards?.enabled?avatar.cards.children.filter(card=>card.enabled).length:undefined,tray:avatar.tray?.entity.enabled?{items:avatar.tray.items.length,onTray:avatar.tray.items.filter(item=>item.enabled).length}:undefined,cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined }));
   }
 
   destroy(): void {
@@ -486,11 +603,11 @@ export class BarScene {
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.mapEffects?.destroy();this.mapEffects=undefined;
+    this.objective?.marker.destroy();this.objective=undefined;
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
     this.app.off('update', this.update, this);
-    for(const avatar of this.actors.values())this.disposeAvatar(avatar,false);
     this.materials.forEach(material => material.destroy());
     this.textures.forEach(texture => texture.destroy());
     this.app.destroy();
@@ -564,28 +681,6 @@ export class BarScene {
     return entity;
   }
 
-  private sign(name: string, position: V3, size: [number, number], lines: string[],
-    options: { background?: string; foreground?: string; accent?: string; rotation?: V3; glow?: boolean } = {}): pc.Entity {
-    const art = this.textured((ctx, width, height) => {
-      ctx.fillStyle = options.background ?? '#203a32';
-      ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = options.accent ?? '#cfac64';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(16, 16, width - 32, height - 32);
-      ctx.lineWidth = 1;
-      ctx.strokeRect(24, 24, width - 48, height - 48);
-      ctx.fillStyle = options.foreground ?? '#f7e9bc';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const lineHeight = (height - 58) / lines.length;
-      lines.forEach((line, index) => {
-        ctx.font = `${index === 0 ? '900' : '500'} ${Math.min(lineHeight * 0.7, width / (line.length * 0.59))}px ${index === 0 ? 'Georgia' : 'sans-serif'}`;
-        ctx.fillText(line, width / 2, 30 + lineHeight * (index + 0.5), width - 70);
-      });
-    }, 1024, Math.round(1024 * size[1] / size[0]), options.glow ?? false);
-    return this.shape(name, 'plane', position, [size[0], 1, size[1]], art, undefined, options.rotation ?? [90, 0, 0]);
-  }
-
   private makeCup(x: number, y: number, z: number, parent?: pc.Entity): pc.Entity {
     const cup = this.group('Drink', [x, y, z], parent);
     this.shape('Glass', 'cylinder', [0, 0.06, 0], [0.08, 0.12, 0.08], this.material('#d59c3c'), cup);
@@ -635,28 +730,6 @@ export class BarScene {
     for (const yy of [0.66, 0.84]) this.box('Chair back slat', [0, yy, -0.195], [0.38, 0.08, 0.02], seat, chair);
   }
 
-  private buildJukebox(): void {
-    const collider = COLLIDERS.find(collider => collider.id === 'jukebox')!;
-    const juke = this.group('Jukebox', [collider.x, collider.minY??0, collider.z]);
-    // Modelled at 1.8 × 2.44 × 1.15 and scaled to a 1.55 m cabinet on the collider footprint.
-    juke.setLocalScale(collider.hx * 2 / 1.8, 1.55 / 2.44, collider.hz * 2 / 1.15);
-    const shell = this.material('#774430');
-    const dark = this.material('#202a27');
-    const brass = this.material('#dba85a');
-    const teal = this.material('#5cb6ab', '#398a7c');
-    this.box('Jukebox housing', [0, 1.22, 0], [1.8, 2.44, 1.15], shell, juke);
-    this.box('Jukebox speaker face', [0, 0.85, 0.59], [1.35, 1.3, 0.06], dark, juke);
-    this.box('Jukebox selection face', [0, 1.95, 0.6], [1.4, 0.7, 0.08], this.material('#d0bd80', '#50451e'), juke);
-    for (const xx of [-0.79, 0.79]) {
-      this.box('Jukebox illuminated edge', [xx, 1.35, 0.64], [0.08, 2.25, 0.09], teal, juke);
-      this.box('Jukebox gold trim', [xx * 0.87, 0.84, 0.65], [0.06, 1.34, 0.08], brass, juke);
-    }
-    this.box('Jukebox illuminated cap', [0, 2.48, 0.62], [1.63, 0.1, 0.12], teal, juke);
-    for (let i = 0; i < 8; i++) this.box('Speaker gold grille', [-0.52 + i * 0.15, 0.85, 0.66], [0.03, 1.2, 0.04], brass, juke);
-    for (let i = 0; i < 6; i++) this.box('Jukebox track button', [-0.5 + i * 0.2, 1.76, 0.67], [0.12, 0.08, 0.06], dark, juke);
-    this.sign('Jukebox marquee', [collider.x, (collider.minY ?? 0) + 1.24, collider.z + collider.hz + 0.05], [0.46, 0.18], ['RÁDIO BOTECO'], { background: '#bba871', foreground: '#373e30' });
-  }
-
   private buildDiscoBall(): pc.Entity {
     // Over the ground-floor hall, between its two ceiling lights (slab underside at 3.2 m).
     const disco = this.group('Disco ball', [9.75, 2.85, -7.6]);
@@ -692,7 +765,7 @@ export class BarScene {
   private loadAnimations(id: string): void {
     if (this.animationRequests.has(id)) return;
     this.animationRequests.add(id);
-    this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}animations/${id}.glb`, 'container', (error, asset) => {
+    this.app.assets.loadFromUrl(skinAsset('animations', id, id), 'container', (error, asset) => {
       if (this.destroyed) return;
       if (error || !asset) { console.warn(`Animações de ${id} indisponíveis.`, error); return; }
       const bank = asset.resource as pc.ContainerResource;
@@ -714,7 +787,7 @@ export class BarScene {
 
   private loadCane(id:string):void{
     if(this.caneRequests.has(id))return;this.caneRequests.add(id);
-    this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}props/old-cane-${id}.glb`,'container',(error,asset)=>{
+    this.app.assets.loadFromUrl(skinAsset('props', `old-cane-${id}`, id),'container',(error,asset)=>{
       if(this.destroyed)return;
       if(error||!asset){console.warn(`Bengala de ${id} indisponível.`,error);return;}
       this.caneModels.set(id,asset.resource as pc.ContainerResource);
@@ -733,14 +806,9 @@ export class BarScene {
    * Asks for missing skins.
    */
   private skinFor(actor: SceneActor, npc: boolean): string | undefined {
-    const selection=(npc ? NPC_SKINS[actor.id]??DEFAULT_MODEL : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : 'custom');
-    const wanted=selection==='custom'?`base-${characterFromJson(actor.character).body}`:selection;
+    const wanted=npc ? NPC_SKINS[actor.id]??DEFAULT_MODEL : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
     if (!this.skinModels.has(wanted)) this.loadSkin(wanted);
     return this.skinModels.has(wanted)?wanted:undefined;
-  }
-
-  private disposeAvatar(avatar:Avatar,destroyRoot=true):void{
-    disposeCharacter(avatar.skin?.model);if(destroyRoot)avatar.root.destroy();
   }
 
   /** Rebuilds an avatar (e.g. with another skin) where the old one stood, keeping its motion and pose. */
@@ -753,7 +821,7 @@ export class BarScene {
     replacement.glideAt = avatar.glideAt;
     replacement.glide = avatar.glide;
     replacement.seatedBlend = avatar.seatedBlend;
-    this.disposeAvatar(avatar);
+    avatar.root.destroy();
     this.actors.set(id, replacement);
   }
 
@@ -775,6 +843,7 @@ export class BarScene {
     // No clip yet: the first pose is applied without a cross-fade (e.g. a skin swap while seated).
     const skin: SkinnedRig = { model: entity, bones, clip: '', tracks: new Set(tracks.map(track => track.name)), sitDrop: hipHeight - 0.56 };
     const legLength=bones.upperleg_l.getPosition().distance(bones.lowerleg_l.getPosition())+bones.lowerleg_l.getPosition().distance(bones.foot_l.getPosition());
+    // The cane gait plays at 1× on 0.8876 m legs (the body it was fitted to); other legs scale its rate.
     skin.oldCaneRate=.88758844/legLength;
     const id = [...this.skinModels].find(([, resource]) => resource === model)?.[0];
     const bank = this.animationBanks.get(id ?? DEFAULT_MODEL);
@@ -799,7 +868,6 @@ export class BarScene {
       const cup = this.makeCup(0, 0, 0, root);
       cup.enabled = false;
       const skin=this.makeSkin(body,this.skinModels.get(skinId)!);
-      if(skinId.startsWith('base-'))applyCharacter(skin.model,characterFromJson(actor.character));
       return { root, body, skin, skinId, cup, ring, actor: { ...actor }, npc, phase: hash % 12, ...motion };
     }
     const skin = this.material(['#b98059', '#dcac7c', '#86583e', '#c48d66'][hash % 4]!);
@@ -880,6 +948,98 @@ export class BarScene {
     if(avatar.cards)avatar.cards.enabled=false;
     if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose);
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
+    if (avatar.skin && avatar.npc && actor.role === 'serving') this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
+    else if (avatar.tray) avatar.tray.entity.enabled = false;
+  }
+
+  /** A round aluminium tray with a rolled rim; carryTray puts the order on top. */
+  private buildTray(avatar: Avatar): NonNullable<Avatar['tray']> {
+    const entity = this.group('Serving tray', [0, 0, 0], avatar.root), metal = this.trayMaterial();
+    this.shape('Tray', 'cylinder', [0, TRAY_HEIGHT / 2, 0], [TRAY_RADIUS * 2, TRAY_HEIGHT, TRAY_RADIUS * 2], metal, entity);
+    const rim = new pc.Entity('Tray rim');
+    rim.addComponent('render', { meshInstances: [new pc.MeshInstance(pc.Mesh.fromGeometry(this.app.graphicsDevice, new pc.TorusGeometry({ tubeRadius: .007, ringRadius: TRAY_RADIUS, segments: 40 })), metal)], castShadows: true });
+    rim.setLocalPosition(0, TRAY_HEIGHT, 0); entity.addChild(rim);
+    entity.enabled = false;
+    return avatar.tray = { entity, key: '', items: [] };
+  }
+
+  private trayMaterial(): pc.StandardMaterial {
+    const key = 'serving-tray', existing = this.materialCache.get(key);
+    if (existing) return existing;
+    const material = new pc.StandardMaterial();
+    // Brushed aluminium, as a light grey with a broad highlight: a metalness setup turns black without an environment map.
+    material.diffuse = color('#b9bec4'); material.specular = color('#8f959c'); material.gloss = .55; material.update();
+    this.materials.push(material); this.materialCache.set(key, material);
+    return material;
+  }
+
+  /**
+   * Tonico while serving: the tray level on his left hand with the order on it. At the table his right hand takes
+   * each item off the tray and sets it on its spot, bowing a little, as the room timed it (ServedItemState.placedAt).
+   */
+  private carryTray(avatar: Avatar, skin: SkinnedRig, now: number): void {
+    const { actor, body, root } = avatar, bones = skin.bones, hand = skin.drinkHand;
+    const tray = avatar.tray ?? this.buildTray(avatar);
+    if (!hand) { tray.entity.enabled = false; return; }
+    const up = pc.Vec3.UP, front = body.forward.clone().mulScalar(-1), side = body.right.clone();
+    front.y = 0; front.normalize(); side.y = 0; side.normalize();
+    // The order on the tray, rebuilt when it changes (or once its models have loaded).
+    const items = (actor.carrying ?? '').split(',').filter(Boolean), key = items.join(',');
+    if (tray.key !== key) {
+      const made = items.map(item => this.makeProp(item));
+      if (made.every(Boolean)) {
+        tray.items.forEach(item => item.destroy());
+        const slots = traySlots(items);
+        tray.items = made.map((prop, i) => { tray.entity.addChild(prop!); prop!.setLocalPosition(slots[i]!.x, TRAY_HEIGHT, slots[i]!.z); return prop!; });
+        tray.key = key;
+      } else made.forEach(prop => prop?.destroy());
+    }
+    // The item being put down now (or the last one, while the hand comes back).
+    const placing = key ? [...this.servedItems.values()].filter(e => e.state.orderId === actor.carryingOrder).sort((a, b) => a.state.slot - b.state.slot) : [];
+    const current = placing.find(e => now >= e.state.placedAt - SERVE_ITEM_MS && now < e.state.placedAt);
+    const last = placing.at(-1), t = current ? (now - current.state.placedAt + SERVE_ITEM_MS) / SERVE_ITEM_MS : 1;
+    const weight = current ? (current.state.slot === 0 ? smoothstep(t / .3) : 1) : last && now >= last.state.placedAt ? 1 - smoothstep((now - last.state.placedAt) / SERVE_LEAD_MS) : 0;
+    if (weight > 0) {
+      avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
+      if (avatar.spine) this.turn(avatar.spine, body.right, 22 * weight);
+    }
+    // Left hand under the middle of the tray, forearm level in front of the body.
+    const shoulder = bones.upperarm_l.getPosition();
+    const wrist = shoulder.clone().add(front.clone().mulScalar(.3)).sub(up.clone().mulScalar(.27)).sub(side.clone().mulScalar(.03));
+    reach(bones.upperarm_l, bones.lowerarm_l, bones.hand_l, wrist, new pc.Vec3().sub(up).sub(front.clone().mulScalar(.4)).add(side.clone().mulScalar(.6)));
+    palmUp(hand, up, front);
+    tray.entity.setPosition(trayCentre(hand, up)); tray.entity.setEulerAngles(0, avatar.yaw, 0); tray.entity.enabled = true;
+    this.trayOrder = actor.carryingOrder ?? ''; this.trayFrame = this.frameId;
+    // An item leaves the tray when the right hand takes it.
+    tray.items.forEach((item, i) => { const entry = placing[i]; item.enabled = !entry || now < entry.state.placedAt - SERVE_ITEM_MS * .7; });
+    type Entry = typeof placing[number];
+    const slot = (entry: Entry) => tray.items[entry.state.slot]?.getPosition().clone() ?? root.getPosition().clone();
+    const spot = (entry: Entry) => new pc.Vec3(entry.state.x, entry.state.y, entry.state.z);
+    // The hand closes over the top of what it carries.
+    const grip = (entry: Entry) => up.clone().mulScalar(Math.min(.12, SERVED_PROPS[entry.state.item as ItemId]?.height ?? .1) * .7 + .05);
+    const pole = new pc.Vec3().sub(up).sub(side.clone().mulScalar(.6)).sub(front.clone().mulScalar(.3));
+    if (current) {
+      const from = slot(current), to = spot(current), previous = placing[current.state.slot - 1];
+      if (t < .3) {
+        // Reaching for it on the tray (from the item set down before, if any).
+        const target = from.clone().add(grip(current));
+        if (previous) target.lerp(spot(previous).add(grip(previous)), target, smoothstep(t / .3));
+        reach(bones.upperarm_r, bones.lowerarm_r, bones.hand_r, target, pole, weight);
+      } else {
+        // Over to its spot in a low arc; in the hand on the way, set down at the end even if the arm falls short.
+        const s = (t - .3) / .7, path = new pc.Vec3().lerp(from, to, smoothstep(s)).add(up.clone().mulScalar(Math.sin(Math.PI * s) * .1));
+        reach(bones.upperarm_r, bones.lowerarm_r, bones.hand_r, path.add(grip(current)), pole, weight);
+        const held = bones.hand_r.getPosition().clone().sub(grip(current));
+        const position = s < .2 ? from.lerp(from, held, smoothstep(s / .2)) : s < .8 ? held : held.lerp(held, to, smoothstep((s - .8) / .2));
+        const entity = current.entity ??= this.makeProp(current.state.item);
+        if (entity) {
+          if (!entity.parent) this.app.root.addChild(entity);
+          const yaw = avatar.yaw / RAD_TO_DEG, turn = Math.atan2(Math.sin(current.state.rotation - yaw), Math.cos(current.state.rotation - yaw));
+          entity.setPosition(position); entity.setEulerAngles(0, (yaw + turn * smoothstep(s)) * RAD_TO_DEG, 0);
+          entity.enabled = true; current.moved = this.frameId; current.settled = false;
+        }
+      }
+    } else if (last && weight > 0) reach(bones.upperarm_r, bones.lowerarm_r, bones.hand_r, spot(last).add(grip(last)), pole, weight);
   }
 
   private poseLimbs({ actor, body, npc }: Avatar, limbs: Limbs, pose: Pose): void {
@@ -962,8 +1122,8 @@ export class BarScene {
         body.setLocalPosition(0,(actor.y??0)+0.56-hipY,0);
       }
       if(clip==='CardsSit'&&(actor.cardCount??0)>0)this.holdCards(avatar,skin,actor.cardCount!);
-      // The drinking clip raises the drink with the left hand: the ordered bottle or glass (NPCs: a bottle).
-      const item:DrinkItem|undefined=drinking?(actor.drinkItem==='copo'?'copo':'garrafa'):undefined;
+      // The drinking clip raises the drink with the left hand: the one ordered or taken from the backpack (NPCs: a bottle).
+      const item:HeldDrink|undefined=drinking?(HELD_DRINKS.find(id=>id===actor.drinkItem)??'garrafa'):undefined;
       const prop=item&&clip==='Drink'&&skin.drinkHand?this.drink(avatar,item):undefined;
       for(const [name,entity] of Object.entries(avatar.drinks??{}))entity.enabled=!!prop&&name===item;
       avatar.sip=0;
@@ -1080,7 +1240,9 @@ export class BarScene {
       this.frames = 0;
       this.adaptResolution();
     }
+    this.frameId++;
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    this.placeServed(Date.now()+this.serverClockOffset);
     const bartender=this.actors.get('bartender');
     this.mapEffects?.update(this.elapsed,bartender?.actor.animation==='bartend'||bartender?.skin?.clip==='Bartend');
     const player = this.actors.get(this.localId);
@@ -1111,6 +1273,8 @@ export class BarScene {
       this.camera.lookAt(14,1.8,-6);
     }
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
+    this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
+    this.animateObjective();
     const party = this.environment.partyStrength;
     for (let i = 0; i < this.partyLights.length; i++) {
       const light = this.partyLights[i]!.light;

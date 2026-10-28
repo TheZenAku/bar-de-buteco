@@ -1,22 +1,33 @@
-// Imports the beer bottle and the "copo americano" from assets-bar/objects into hand props:
-// real-world size, origin at the centre of the base (+Y up, the mouth at the top), simplified mesh
-// that keeps texture seams, PBR textures resized and embedded. Offline only: npm run assets:drinks.
+// Imports what the bar serves (drinks and food, assets-bar/objects) into props held in a hand, carried on
+// Tonico's tray and left on the tables: real-world size, origin at the centre of the base (+Y up, the mouth
+// at the top, the label towards +Z), simplified mesh that keeps texture seams, PBR textures resized and
+// embedded. Offline only: npm run assets:drinks.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Box3,Texture,TextureLoader,Vector3} from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
-import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
+import {mergeVertices,toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 import {MeshoptSimplifier} from 'meshoptimizer';
 import {chromium} from '@playwright/test';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const output=path.join(root,'apps/web/public/props');
-// Heights of the real objects: a 355 ml long neck and a 190 ml copo americano.
+// Sizes of the real objects: `height` sets the height, `length` the longest side seen from above. A 355 ml long
+// neck, a 190 ml copo americano, a 500 ml water bottle, a 500 ml fountain cup (straw included), a 300 ml
+// coffee cup with its lid, a bar coxinha, a pastel and a plate of torresmo. The pastel is modelled standing on
+// its edge and is laid flat (`flat`: the side facing +Z ends up on top).
 const props=[
   {id:'garrafa',name:'Garrafa de cerveja',folder:'assets-bar/objects/garrafa de cerveja',prefix:'garrafa_texture',height:.23,triangles:3000},
   {id:'copo',name:'Copo americano',folder:'assets-bar/objects/copo americano',prefix:'copo_texture',height:.093,triangles:2400},
+  {id:'agua',name:'Garrafa de água',folder:'assets-bar/objects/Garrafa de Agua',prefix:'agua_texture',height:.205,triangles:2400},
+  {id:'refrigerante',name:'Copo de refrigerante',folder:'assets-bar/objects/highcola',prefix:'highcola_texture',height:.19,triangles:2400},
+  {id:'cafe',name:'Copo de café',folder:'assets-bar/objects/Cafe',prefix:'cafe_texture',height:.12,triangles:2000},
+  {id:'coxinha',name:'Coxinha',folder:'assets-bar/objects/Coxinha',prefix:'coxinha_texture',height:.08,triangles:1500},
+  {id:'pastel',name:'Pastel',folder:'assets-bar/objects/Pastel',prefix:'pastel_texture',length:.15,flat:true,triangles:1500},
+  {id:'torresmo',name:'Porção de torresmo',folder:'assets-bar/objects/Porção de Torresmo',prefix:'torresmo_texture',length:.23,triangles:3000},
 ];
+const only=process.argv.slice(2);
 // The FBX embeds its images; their copies beside it are used instead (no browser image API here).
 TextureLoader.prototype.load=()=>new Texture();
 globalThis.window??={URL:{createObjectURL:()=>''}};
@@ -25,7 +36,7 @@ fs.mkdirSync(output,{recursive:true});
 const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined)});
 try{
   const page=await browser.newPage();
-  for(const prop of props)await importProp(prop,page);
+  for(const prop of props)if(!only.length||only.includes(prop.id))await importProp(prop,page);
 }finally{await browser.close();}
 
 async function importProp(prop,page){
@@ -36,11 +47,17 @@ async function importProp(prop,page){
   if(meshes.length!==1)throw new Error(`${prop.id}: expected one mesh, found ${meshes.length}`);
   let geometry=meshes[0].geometry.clone().applyMatrix4(meshes[0].matrixWorld);
   for(const name of Object.keys(geometry.attributes))if(!['position','normal','uv'].includes(name))geometry.deleteAttribute(name);
-  geometry=mergeVertices(geometry,1e-5);
+  // Some exports split the normals at every face: no vertex could be merged, nor the mesh simplified. Those get
+  // creased normals instead (smooth, with edges sharper than 60° kept hard).
+  const withoutNormals=geometry.clone();withoutNormals.deleteAttribute('normal');
+  const merged=mergeVertices(geometry.clone(),1e-5);
+  geometry=merged.attributes.position.count>1.5*mergeVertices(withoutNormals,1e-5).attributes.position.count?mergeVertices(toCreasedNormals(geometry,Math.PI/3),1e-5):merged;
+  if(prop.flat)geometry.rotateX(-Math.PI/2);
   // Real size, base centred on the origin.
   const box=new Box3().setFromBufferAttribute(geometry.attributes.position),size=box.getSize(new Vector3());
-  const scale=prop.height/size.y,centre=box.getCenter(new Vector3());
+  const scale=prop.height?prop.height/size.y:prop.length/Math.max(size.x,size.z),centre=box.getCenter(new Vector3());
   geometry.translate(-centre.x,-box.min.y,-centre.z);geometry.scale(scale,scale,scale);
+  const height=size.y*scale;
   // FBX textures use bottom-left UVs; glTF images use top-left UVs.
   const uv=geometry.attributes.uv;for(let i=0;i<uv.count;i++)uv.setY(i,1-uv.getY(i));
   // Simplify, keeping UV seams and shading (normals) as attributes.
@@ -48,7 +65,10 @@ async function importProp(prop,page){
   const attributes=new Float32Array(count*5);
   for(let i=0;i<count;i++){attributes.set([uv.getX(i),uv.getY(i)],i*5);attributes.set([geometry.attributes.normal.getX(i),geometry.attributes.normal.getY(i),geometry.attributes.normal.getZ(i)],i*5+2);}
   const sourceIndices=new Uint32Array(geometry.index.array);
-  const [simplified,error]=MeshoptSimplifier.simplifyWithAttributes(sourceIndices,new Float32Array(positions),3,attributes,5,[1,1,.5,.5,.5],null,prop.triangles*3,.02,[]);
+  const simplify=flags=>MeshoptSimplifier.simplifyWithAttributes(sourceIndices,new Float32Array(positions),3,attributes,5,[1,1,.5,.5,.5],null,prop.triangles*3,.02,flags);
+  // Jagged food (many hard edges) only reaches the budget when edges may collapse across those seams.
+  let [simplified,error]=simplify([]);
+  if(simplified.length>prop.triangles*3*1.05)[simplified,error]=simplify(['Permissive']);
   const [remap,vertices]=MeshoptSimplifier.compactMesh(simplified);
   const out={position:new Float32Array(vertices*3),normal:new Float32Array(vertices*3),uv:new Float32Array(vertices*2)};
   for(let i=0;i<count;i++){const j=remap[i];if(j===0xffffffff)continue;
@@ -57,8 +77,8 @@ async function importProp(prop,page){
     out.normal.set(n.toArray(),j*3);out.uv.set([uv.getX(i),uv.getY(i)],j*2);}
   const radius=Math.max(...Array.from({length:vertices},(_,i)=>Math.hypot(out.position[i*3],out.position[i*3+2])));
   const textures=await bakeTextures(page,folder,prop.prefix);
-  writeProp(path.join(output,`${prop.id}.glb`),prop,out,simplified,textures,{height:prop.height,radius});
-  console.log(`${prop.name}: ${count} → ${vertices} vertices, ${simplified.length/3} triangles (error ${error.toFixed(4)}), ${prop.height} m tall, radius ${radius.toFixed(3)} m, ${(fs.statSync(path.join(output,`${prop.id}.glb`)).size/1024).toFixed(0)} KiB`);
+  writeProp(path.join(output,`${prop.id}.glb`),prop,out,simplified,textures,{height:+height.toFixed(4),radius:+radius.toFixed(4)});
+  console.log(`${prop.name}: ${count} → ${vertices} vertices, ${simplified.length/3} triangles (error ${error.toFixed(4)}), ${height.toFixed(3)} m tall, radius ${radius.toFixed(3)} m, ${(fs.statSync(path.join(output,`${prop.id}.glb`)).size/1024).toFixed(0)} KiB`);
 }
 
 /** Base colour (JPEG 512), normal (JPEG 512) and glTF metallic-roughness (G roughness, B metallic). */

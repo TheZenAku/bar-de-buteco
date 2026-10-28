@@ -20,10 +20,12 @@ export interface SceneActor {
   role?: string;
   /** Player model id (see SKINS); NPCs keep the box avatar. */
   skin?: string;
-  character?: string;
   oldWalk?: boolean;
-  /** Ordered drink ('garrafa' or 'copo'), held while drinking. */
+  /** The drink held while drinking (HELD_DRINKS: ordered at the counter or taken from the backpack). */
   drinkItem?: string;
+  /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
+  carrying?: string;
+  carryingOrder?: string;
   /** False for an avatar left in the bar by a player who logged out. */
   connected?: boolean;
   /** Drunkenness 0-100 (packages/shared/src/needs.ts): the body sways by stage. */

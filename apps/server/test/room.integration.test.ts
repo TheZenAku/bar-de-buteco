@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Client as BrowserClient, type Room as ClientRoom } from '@colyseus/sdk';
-import { BLACKJACK_TABLE,DEFAULT_CHARACTER,SKINS,OLD_CANE_SPEED,TICK_MS } from '@bar/shared';
+import { BLACKJACK_TABLE,SKINS,OLD_CANE_SPEED,TICK_MS } from '@bar/shared';
 import { signTicket } from '@bar/shared/tickets';
 import { BarRoom } from '../src/BarRoom.js';
 
@@ -21,7 +21,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
   const previousApi = process.env.API_INTERNAL_URL, previousCapacity = process.env.BAR_CAPACITY;
   process.env.BAR_CAPACITY = '2';
   const equipped:Record<string,string>={alice:'nathan',bob:'leandro'};
-  const access=(userId:string)=>({valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:equipped[userId]??'custom',ownedSkins:userId==='bob'?['leandro']:SKINS.map(s=>s.id)});
+  const access=(userId:string)=>({valid:true,blocked:[],role:'user',equippedSkin:equipped[userId]??'nathan',ownedSkins:userId==='bob'?['nathan','leandro']:SKINS.map(s=>s.id)});
   const internal = createServer(async (req, res) => {
     let data = '';
     for await (const chunk of req) data += chunk;
@@ -29,7 +29,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     res.setHeader('content-type', 'application/json');
     if (req.url === '/api/internal/validate') res.end(JSON.stringify({...access(body.userId),valid:body.sessionId===`session-${body.userId}`}));
     else if(req.url==='/api/internal/equip'){
-      if(body.skin!=='custom'&&!access(body.userId).ownedSkins.includes(body.skin)){res.statusCode=403;res.end('{"error":"Skin não adquirida"}');}
+      if(!access(body.userId).ownedSkins.includes(body.skin)){res.statusCode=403;res.end('{"error":"Skin não adquirida"}');}
       else {equipped[body.userId]=body.skin;res.end(JSON.stringify(access(body.userId)));}
     }
     else if (req.url === '/api/internal/controls') res.end('{"controls":[]}');
@@ -54,7 +54,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.onMessage('error', m => errors.push(m.message));
     first.onMessage('chat.message', () => {});
     await eventually(() => first.state?.players?.has('alice'));
-    const second = await browser.joinOrCreate('bar', { ticket: ticket('bob'), skin: 'rafael',character:{body:'forged'} }); rooms.push(second);
+    const second = await browser.joinOrCreate('bar', { ticket: ticket('bob'), skin: 'rafael' }); rooms.push(second);
     const secondErrors: string[] = [];
     second.onMessage('error', m => secondErrors.push(m.message));
     const received: string[] = [];
@@ -78,10 +78,10 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.send('chat.send', { text: 'Olá do teste real' });
     await eventually(() => received.includes('Olá do teste real'));
     const bob = authoritative!.state.players.get('bob')!;
-    const savedAppearance={skin:bob.skin,character:bob.character};
+    const savedSkin=bob.skin;
     second.send('chat.send',{text:'/velho'});
     await eventually(()=>first.state.players.get('bob').oldWalk===true);
-    assert.equal(bob.skin,savedAppearance.skin);assert.equal(bob.character,savedAppearance.character);
+    assert.equal(bob.skin,savedSkin);
     const slowX=bob.x;second.send('player.input',{seq:0,dx:1,dz:0,running:true,rotation:0});
     await eventually(()=>bob.lastProcessedInput===0);
     assert.ok(Math.abs(bob.x-slowX-OLD_CANE_SPEED*TICK_MS/1000)<1e-5);
@@ -94,8 +94,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     await eventually(()=>bob.animationState==='idle',2500);
     // Skins: chosen on arrival, switched live and seen by others; unknown ones are refused.
     assert.equal(player.skin, 'nathan');
-    assert.equal(bob.skin, 'leandro');
-    assert.equal(bob.character,JSON.stringify(DEFAULT_CHARACTER),'Arrival options cannot forge a character or a paid skin');
+    assert.equal(bob.skin, 'leandro', 'Arrival options cannot forge a paid skin');
     second.send('player.skin',{skin:'rafael'});
     await eventually(()=>secondErrors.length>0);
     assert.equal(bob.skin,'leandro','The server rejects skins absent from the account inventory');

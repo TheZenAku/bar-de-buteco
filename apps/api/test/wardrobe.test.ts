@@ -1,0 +1,42 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {eq} from 'drizzle-orm';
+import {verifyTicket} from '@bar/shared/tickets';
+import {createApi} from '../src/app.js';import {readConfig} from '../src/config.js';import {wallets,skinInventory,currencyLedger} from '../src/database/schema.js';
+
+test('Nathan is free for new accounts; purchases persist and duplicate/racing requests cannot mint coins or duplicate charges',async t=>{
+  const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
+  const account={email:'wardrobe@example.com',username:'wardrobe',displayName:'Coleção',password:'ColecaoSegura2026!'};
+  const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:account});assert.equal(register.statusCode,201);
+  const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id;
+  const post=(url:string,payload:object)=>api.app.inject({method:'POST',url,payload,headers:{cookie}});
+  const get=(url:string)=>api.app.inject({url,headers:{cookie}});
+  assert.equal(register.json().user.equippedSkin,'nathan');assert.equal('character' in register.json().user,false);
+  assert.equal((await post('/api/game-ticket',{})).statusCode,200,'A new account enters the bar without any appearance step');
+  let view=(await get('/api/wardrobe')).json();assert.equal(view.balance,0);
+  assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['read',false,850],['gilmar-gordo',false,900]]);
+  assert.equal((await post('/api/wardrobe/daily',{})).statusCode,409,'No income is enabled by default');
+  assert.equal((await post('/api/wardrobe/buy',{skin:'nathan'})).statusCode,200,'Buying the free skin is a no-op');
+  assert.equal((await post('/api/wardrobe/equip',{skin:'rafael'})).statusCode,403);
+  assert.equal((await post('/api/wardrobe/equip',{skin:'custom'})).statusCode,400);
+  assert.equal((await post('/api/wardrobe/buy',{skin:'rafael',price:0})).statusCode,400);
+  assert.equal((await post('/api/wardrobe/buy',{skin:'leandro'})).statusCode,409,'Insufficient coins');
+  await api.db.update(wallets).set({balance:1000}).where(eq(wallets.userId,userId)); // Controlled test funds, never a public route.
+  const duplicates=await Promise.all([0,1,2].map(()=>post('/api/wardrobe/buy',{skin:'leandro'})));
+  assert.ok(duplicates.every(r=>r.statusCode===200));
+  view=(await get('/api/wardrobe')).json();assert.equal(view.balance,250);assert.deepEqual(view.catalog.filter((s:any)=>s.owned).map((s:any)=>s.id),['nathan','leandro']);
+  assert.equal((await api.db.select().from(skinInventory)).length,1);
+  assert.equal((await api.db.select().from(currencyLedger)).filter(r=>r.reason.startsWith('skin:')).length,1);
+  assert.equal((await post('/api/wardrobe/equip',{skin:'leandro'})).statusCode,200);
+  assert.equal((await get('/api/auth/me')).json().user.equippedSkin,'leandro');
+  const ticket=await post('/api/game-ticket',{}),claims=verifyTicket(ticket.json().ticket,config.authSecret);
+  const validation=(await api.app.inject({method:'POST',url:'/api/internal/validate',headers:{'x-internal-secret':config.internalSecret},payload:{sessionId:claims.sessionId,userId}})).json();
+  assert.deepEqual(validation.ownedSkins,['nathan','leandro']);assert.equal(validation.equippedSkin,'leandro');assert.equal('character' in validation,false);
+  assert.equal((await post('/api/wardrobe/equip',{skin:'nathan'})).statusCode,200);
+  await api.db.update(wallets).set({balance:1000}).where(eq(wallets.userId,userId));
+  const race=await Promise.all(['rafael','read'].map(skin=>post('/api/wardrobe/buy',{skin})));
+  assert.equal(race.filter(r=>r.statusCode===200).length,1);assert.equal(race.filter(r=>r.statusCode===409).length,1);
+  assert.ok((await get('/api/wardrobe')).json().balance>=0);
+  await post('/api/auth/logout',{});
+  const login=await api.app.inject({method:'POST',url:'/api/auth/login',payload:{email:account.email,password:account.password}});
+  assert.equal(login.json().user.equippedSkin,'nathan','the selection survives logging in again');
+});

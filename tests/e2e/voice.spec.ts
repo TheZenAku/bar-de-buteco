@@ -12,7 +12,6 @@ async function enter(browser:Browser,name:string):Promise<{page:Page;id:string}>
   await page.getByLabel('E-mail',{exact:true}).fill(email);
   await page.getByLabel('Senha',{exact:true}).fill(password);
   await page.getByRole('button',{name:'Criar minha conta'}).click();
-  await page.getByRole('button',{name:'Criar personagem e continuar'}).click();
   await expect(page.locator('#game')).toBeVisible({timeout:60000});await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
   return {page,id:await page.evaluate(()=>(window as any).barDebug.snapshot().localId)};
 }

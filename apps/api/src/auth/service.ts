@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import { and, eq, gt, isNull, or } from 'drizzle-orm';
-import {readCharacter,type PublicUser} from '@bar/shared';
+import type {PublicUser} from '@bar/shared';
 import type { Database } from '../database/index.js';
 import { users, profiles, sessions, moderationActions, blocks } from '../database/schema.js';
 import {isOwnerEmail} from '../admin-policy.js';
@@ -17,7 +17,7 @@ export async function getUser(db: Database, id: string): Promise<PublicUser | nu
   const avatar = row.profile.avatarConfig as { color?: string };
   return { id: row.user.id, username: row.user.username, email: row.user.email, displayName: row.profile.displayName,
     verified: row.user.verified, role: row.user.role === 'admin' ? 'admin' : 'user', isOwner:row.user.verified&&row.user.role==='admin'&&isOwnerEmail(row.user.email), color: avatar.color ?? '#cf7549',
-    character:row.profile.characterConfig?readCharacter(row.profile.characterConfig):null,equippedSkin:row.profile.equippedSkin };
+    equippedSkin:row.profile.equippedSkin };
 }
 export async function isBanned(db: Database, userId: string) {
   const rows = await db.select({ id: moderationActions.id }).from(moderationActions).where(and(

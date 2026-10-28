@@ -1,5 +1,4 @@
 import {test,expect,type Page} from '@playwright/test';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 import {previewPath} from './preview-path';
 
 async function walkTo(page:Page,x:number,z:number,tolerance=.12):Promise<void>{
@@ -27,7 +26,6 @@ test('doors swing on their own hinges for everyone, block when closed and let pe
   const suffix=Date.now().toString(36),password='PortaTeste2026!';
   const account=async(p:Page,name:string)=>{
     expect((await p.request.post('/api/auth/register',{data:{email:`${name}_${suffix}@example.com`,username:`${name}_${suffix}`,displayName:name,password}})).ok()).toBe(true);
-    expect((await p.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
     await p.goto('/');await p.getByRole('button',{name:'Entrar no bar'}).click();await expect(p.locator('#waiting')).toBeHidden({timeout:60000});
     await expect.poll(()=>p.evaluate(()=>(window as any).barDebug.map().doors),{timeout:60000}).toBe(16);
   };

@@ -10,12 +10,6 @@ export function writeGlb(file,json,bin){
   const bh=Buffer.alloc(8);bh.writeUInt32LE(data.length);bh.writeUInt32LE(0x004e4942,4);fs.writeFileSync(file,Buffer.concat([header,text,bh,data]));
 }
 export function objects(json){const nodes=json.nodes.map((n,i)=>{const o=new Object3D();o.name=n.name??`node_${i}`;if(n.matrix)new Matrix4().fromArray(n.matrix).decompose(o.position,o.quaternion,o.scale);else{o.position.fromArray(n.translation??[0,0,0]);o.quaternion.fromArray(n.rotation??[0,0,0,1]);o.scale.fromArray(n.scale??[1,1,1]);}return o;});json.nodes.forEach((n,i)=>n.children?.forEach(c=>nodes[i].add(nodes[c])));for(const i of json.scenes[json.scene??0].nodes)nodes[i].updateMatrixWorld(true);return nodes;}
-export function topological(json){
-  const order=[];const visit=i=>{order.push(i);json.nodes[i].children?.forEach(visit);};json.scenes[json.scene??0].nodes.forEach(visit);
-  const map=new Map(order.map((old,i)=>[old,i]));json.nodes=order.map(i=>({...json.nodes[i],children:json.nodes[i].children?.map(c=>map.get(c))}));
-  for(const scene of json.scenes)scene.nodes=scene.nodes.map(i=>map.get(i));
-  for(const skin of json.skins??[]){skin.joints=skin.joints.map(i=>map.get(i));if(skin.skeleton!==undefined)skin.skeleton=map.get(skin.skeleton);}
-}
 export function retargetBase(target,reference){
   const json=target.json,source=objects(reference.json),nodes=objects(json),byName=new Map(source.map(n=>[n.name,n]));
   // glTF animation targets require TRS rather than a matrix. Keep the same native transform.

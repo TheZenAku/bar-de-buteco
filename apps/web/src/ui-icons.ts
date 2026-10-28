@@ -14,6 +14,7 @@ const paths:Record<string,string>={
   panels:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   reset:'<path d="M3 10a9 9 0 1 1 2 9M3 3v7h7"/>',
   eye:'<path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/>',
   coins:'<ellipse cx="9" cy="6" rx="7" ry="3"/><path d="M2 6v5c0 4 14 4 14 0V6M2 11v5c0 4 14 4 14 0v-5m2-2c6 0 6 5 0 6m3-3v6c0 2-4 3-7 3"/>',
   hand:'<path d="M8 13V5a2 2 0 0 1 4 0v7-9a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v9a7 7 0 0 1-12 5L3 14a2 2 0 0 1 3-3l2 2Z"/>',
   shirt:'<path d="m8 3-6 4 3 5 3-2v11h8V10l3 2 3-5-6-4a4 4 0 0 1-8 0Z"/>',
@@ -39,3 +40,9 @@ const paths:Record<string,string>={
   kick:'<path d="m10 8 4 4 7-3M14 12l-1 5 5 4M10 8l-5 3-3-3m8 0 2 6-5 7"/><circle cx="13" cy="4" r="2"/>',
 };
 export function uiIcon(name:string):string{return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]??paths.sparkles}</svg>`;}
+/** A catalog item's picture (ITEM_CATALOG.icon). Decorative: the item's name is always beside it. */
+export function itemImage(item:{icon:string}):string{return `<img class="item-img" src="${import.meta.env.BASE_URL}${item.icon}" alt="" draggable="false">`;}
+/** The coin after prices and earnings; read as "moedas". */
+export const coinImage=`<img class="coin" src="${import.meta.env.BASE_URL}ui/moeda.png" alt="moedas" draggable="false">`;
+/** An amount of coins, kept on one line with its coin. */
+export const coins=(value:number)=>`<span class="coins">${value.toLocaleString('pt-BR')} ${coinImage}</span>`;

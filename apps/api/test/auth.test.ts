@@ -9,7 +9,6 @@ import { createApi } from '../src/app.js';
 import { connectDatabase,connectMigratedDatabase } from '../src/database/index.js';
 import { emailVerifications, users } from '../src/database/schema.js';
 import type { ApiConfig } from '../src/config.js';
-import {DEFAULT_CHARACTER} from '@bar/shared';
 
 const config: ApiConfig = {
   production: false, host: '127.0.0.1', port: 0, webOrigin: 'http://localhost:5173',
@@ -27,7 +26,6 @@ test('automatic activation unlocks existing accounts and new registrations witho
   const account = { email: 'pending@test.local', username: 'pending', displayName: 'Pending', password };
   const registered = await pending.app.inject({ method: 'POST', url: '/api/auth/register', payload: account });
   assert.equal(registered.statusCode, 201);
-  await pending.app.inject({method:'POST',url:'/api/character',payload:DEFAULT_CHARACTER,headers:{cookie:`${registered.cookies[0].name}=${registered.cookies[0].value}`}});
   assert.equal(registered.json().verificationRequired, true);
   const [before] = await connection.db.select().from(users).where(eq(users.email, account.email));
   assert.equal(before.verified, false);
@@ -52,7 +50,6 @@ test('automatic activation unlocks existing accounts and new registrations witho
   const freshAccount = { ...account, email: 'automatic@test.local', username: 'automatic' };
   const fresh = await active.app.inject({ method: 'POST', url: '/api/auth/register', payload: freshAccount });
   assert.equal(fresh.statusCode, 201);
-  await active.app.inject({method:'POST',url:'/api/character',payload:DEFAULT_CHARACTER,headers:{cookie:`${fresh.cookies[0].name}=${fresh.cookies[0].value}`}});
   assert.equal(fresh.json().verificationRequired, false);
   const login = await active.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: freshAccount.email, password } });
   assert.equal(login.statusCode, 200);
@@ -72,7 +69,6 @@ test('contas, sessões, moderação e estatísticas obedecem à autorização pe
     const email = `${username}@test.local`;
     const response = await post('/api/auth/register', { email, username, displayName: username, password });
     assert.equal(response.statusCode, 201, response.body);
-    assert.equal((await post('/api/character',DEFAULT_CHARACTER,`${response.cookies[0].name}=${response.cookies[0].value}`)).statusCode,200);
     return email;
   }
   function mailToken(email: string, kind: 'verify'|'reset') {

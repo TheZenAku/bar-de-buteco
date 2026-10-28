@@ -146,3 +146,23 @@ Não reutilizar Avatar V2/Antonia nem Quaternius como avatar final, sistema modu
 - Reorganizar `docs/` em `projeto`, `arquitetura`, `sistemas`, `assets` e `validacao`, com índice em `docs/README.md`. Em `tools/`, os importadores vão para `tools/assets` (com `lib` e `roupas`), `pseudonym.mjs` para `tools/ops` e o servidor dos E2E para `tests/e2e/server.mjs`. Os iniciadores `.bat` continuam na raiz de `tools/`.
 
 **Consequência.** Tudo o que foi removido continua no histórico do git. Comandos `npm run assets:*` e `ops:*` não mudam; quem chamava os scripts pelo caminho antigo precisa usar o novo. Os rascunhos locais ignorados de `.local/` também foram apagados, sem retorno.
+
+## ADR-013 — aposentar o criador de personagem; só skins (Marco 1)
+
+**Contexto.** O personagem gratuito usava os corpos base do Quaternius, rejeitados artisticamente (ART-01), com cabelo, cores e roupas masculinas importadas. O responsável pelo produto pediu a retirada completa do criador, mantendo apenas o sistema de skins.
+
+**Decisão.**
+
+- Remover o criador e tudo o que só ele usava: editor e prévia 3D, materiais por cor, `characterSchema`/`DEFAULT_CHARACTER`, `POST /api/character`, o campo `character` de `PublicUser`, `Access` e `PlayerState`, a skin `custom`, os GLBs `base-male`/`base-female` (modelos, texturas, bancos e bengalas), o catálogo e a importação de roupas (`tools/assets/roupas`, `import-characters.mjs`, `character-clothing.mjs`, `npm run assets:characters`), testes, fixtures, capturas e documentação próprios.
+- **Nathan passa a ser a skin gratuita** (`DEFAULT_SKIN`): pertence a toda conta sem registro em `skin_inventory`, é o visual de contas novas e o substituto de skin não possuída. Leandro, Rafael e Read continuam à venda.
+- Contas novas entram no bar sem etapa de aparência; os bloqueios "crie seu personagem" saíram do ticket, do mundo, da loja de skins e da mochila.
+- `005_retire_character_creator.sql` passa `equipped_skin='custom'` para `'nathan'`, muda o default e **remove a coluna `character_config`**.
+- `CHARACTER_INITIAL_COINS`/`CHARACTER_DAILY_COINS` passam a `WALLET_INITIAL_COINS`/`WALLET_DAILY_COINS`; `SKIN_PRICE_NATHAN` deixa de existir.
+- Mantidos por servirem às skins: `tools/assets/lib/character-gltf.mjs` (sem `topological`), `BONE_ALIASES` de Rafael/Read e a mensagem `player.appearance`, que sincroniza a skin vestida pela API. A migração `002_characters.sql` mantém o nome, porque cria carteira, coleção e lançamentos e migrações aplicadas são imutáveis.
+
+**Consequência.**
+
+- A migração 005 é contrativa, diferente das anteriores: a configuração salva dos personagens é apagada e uma versão anterior da API recusa iniciar contra o schema novo (exige `character_config`). Rollback exige restaurar o backup anterior à migração ou recriar a coluna (`ALTER TABLE user_profiles ADD COLUMN character_config jsonb`) e o default `'custom'`, e então implantar a versão antiga — cujos jogadores voltariam a passar pelo criador.
+- API e mundo devem ser implantados juntos: um mundo antigo recusa a entrada de quem não tem `character`.
+- Quem comprou Nathan antes desta mudança não é reembolsado automaticamente.
+- ART-01 e DEBT-02 deixam de existir. O código removido continua no histórico do git.

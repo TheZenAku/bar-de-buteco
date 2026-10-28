@@ -6,7 +6,6 @@ export class Player extends Schema {
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
   @type('string') skin: string = DEFAULT_SKIN;
-  @type('string') character = '';
   @type('boolean') oldWalk = false;
   @type('float32') x = 0;
   @type('float32') y = 0;
@@ -50,6 +49,23 @@ export class Npc extends Schema {
   @type('string') animationState = 'idle';
   @type('number') animationStartedAt = 0;
   @type('string') behavior = 'idle';
+  /** Tonico's tray: the items of the order he carries, comma-separated ('' when empty), and its id. */
+  @type('string') carrying = '';
+  @type('string') carryingOrder = '';
+}
+/** Something Tonico put on a table top (apps/server/src/world/served.ts). */
+export class ServedItem extends Schema {
+  @type('string') id = '';
+  @type('string') item = '';
+  @type('uint8') table = 0;
+  @type('float32') x = 0;
+  @type('float32') y = 0;
+  @type('float32') z = 0;
+  @type('float32') rotation = 0;
+  /** When it touches the table; until then it travels from the tray, where it was the order's `slot`-th item. */
+  @type('number') placedAt = 0;
+  @type('string') orderId = '';
+  @type('uint8') slot = 0;
 }
 export class CardState extends Schema {
   @type('string') rank = '?';
@@ -112,6 +128,7 @@ export class BarState extends Schema {
   @type({ map: Jukebox }) televisions = new MapSchema<Jukebox>();
   @type({ map: DoorState }) doors = new MapSchema<DoorState>();
   @type({ map: JobSlotState }) jobs = new MapSchema<JobSlotState>();
+  @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

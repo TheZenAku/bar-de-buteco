@@ -20,6 +20,7 @@ import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
 import { health, logLine, worldMetrics } from './observability.js';
 import { SessionRegistry } from './room/session-registry.js';
 import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
+import { ServedItems, type Seated } from './world/served.js';
 import { JobDirector, type Payment } from './world/jobs.js';
 import { changeWallet, WalletRetries } from './world/wallet.js';
 import { JOBS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, type MediaPriceKind } from '@bar/shared';
@@ -76,8 +77,11 @@ export class BarRoom extends Room<{ state: BarState }> {
   private events = new EventDirector(this.config.eventMinMs, this.config.eventMaxMs);
   private npcs = new NpcDirector();
   private service = new BarService();
-  /** Tonico's table service and the jobs (apps/server/src/world/waiter.ts, jobs.ts). */
-  private waiter = new WaiterService();
+  /** Whether a customer still sits where they ordered from (a logged-out avatar has left). */
+  private readonly seated: Seated = (playerId, seatId) => { const player = this.state.players.get(playerId); return !!player?.connected && player.interactionState === seatId; };
+  /** What Tonico left on the tables, Tonico's table service and the jobs (apps/server/src/world/served.ts, waiter.ts, jobs.ts). */
+  private served = new ServedItems(this.state.served);
+  private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated) });
   readonly jobs = new JobDirector();
   private walletRetries = new WalletRetries((event, details) => this.log(event, details));
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
@@ -131,7 +135,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!this.sessions.reserveNonce(ticket.nonce, ticket.exp)) throw new ServerError(401, 'Ticket já utilizado.');
     const access = await validateAccess(ticket.sessionId, ticket.userId);
     if (!access.valid) throw new ServerError(401, 'Sessão encerrada ou conta suspensa.');
-    if(!access.character)throw new ServerError(409,'Crie seu personagem antes de entrar.');
     return { ...ticket,...access };
   }
 
@@ -140,17 +143,16 @@ export class BarRoom extends Room<{ state: BarState }> {
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
     const previous = this.sessions.getByUser(auth.userId);
     if (previous) this.replaceSession(previous);
-    // The browser remembers the chosen skin and sends it on join; anything unknown falls back to the default.
-    const skin=auth.equippedSkin==='custom'||auth.ownedSkins?.includes(auth.equippedSkin??'')?auth.equippedSkin!:DEFAULT_SKIN;
-    const character=JSON.stringify(auth.character);
+    // The skin comes from the account, never from the join options; anything not owned falls back to the default.
+    const skin=auth.ownedSkins?.includes(auth.equippedSkin??'')?auth.equippedSkin!:DEFAULT_SKIN;
     // Avatars stay in the bar after their player leaves; logging in again takes control of the same one.
     let player = this.state.players.get(auth.userId);
     if (player) {
       this.park(player);
       player.assign({ displayName: auth.displayName, color: auth.color, connected: true, lastProcessedInput: -1 });
-      player.skin=skin;player.character=character;
+      player.skin=skin;
     } else {
-      player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin, character,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
+      player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
       this.state.players.set(auth.userId, player);
     }
     this.needs.sync(player, Date.now());
@@ -527,7 +529,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.animationState = 'wait'; player.animationStartedAt=Date.now();player.interactionState = object.id; presence.interactionEndsAt = undefined;
       player.drinkItem = item;
       this.service.order(player.id);
-      this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo americano' : 'uma long neck'} ao Magrão.`, player);
+      this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo de chopp' : 'uma long neck'} ao Magrão.`, player);
     } else if (object.type === 'toilet') {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
       player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
@@ -559,7 +561,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private cancelTable(playerId:string,message?:string):void {
     const presence=this.sessions.getByUser(playerId);
     for(const order of this.waiter.cancel(playerId)){
-      this.refundOrder(order);
+      this.refundOrder(order);this.served.removeOrder(order.id);
       if(presence&&message)presence.client.send('table.state',{status:'cancelled',order:publicOrder(order),message});
     }
   }
@@ -573,6 +575,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       const player=this.state.players.get(order.playerId),seat=INTERACTABLES.find(i=>i.id===order.seatId);
       return player?.connected&&player.interactionState===order.seatId&&seat?{x:seat.x,y:seat.y??player.y,z:seat.z}:undefined;
     },now);
+    if(events.placing)this.served.place(events.placing.order,events.placing.plan,now);
+    this.served.update(now,this.seated);
     if(events.delivered){
       const order=events.delivered,player=this.state.players.get(order.playerId),presence=this.sessions.getByUser(order.playerId);
       if(player)for(const id of order.items)this.needs.consume(player,id,now);
@@ -582,7 +586,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     if(events.dropped){
       const {order,reason}=events.dropped,presence=this.sessions.getByUser(order.playerId);
-      this.refundOrder(order);presence?.client.send('table.state',{status:'cancelled',order:publicOrder(order),message:reason});
+      this.refundOrder(order);this.served.removeOrder(order.id);presence?.client.send('table.state',{status:'cancelled',order:publicOrder(order),message:reason});
       this.log('table_dropped',{playerId:order.playerId,orderId:order.id,reason});
     }
   }
@@ -591,6 +595,9 @@ export class BarRoom extends Room<{ state: BarState }> {
       const player=this.state.players.get(event.playerId),presence=this.sessions.getByUser(event.playerId);
       if(event.type==='paid'){
         if(player?.interactionState==='job'){player.interactionState='';player.animationState='idle';}
+        // Wiping a table takes away what customers who left had on it.
+        const table=/^mesa-(d+)$/.exec(event.stationId)?.[1];
+        if(table)this.served.clearTable(Number(table),this.seated);
         this.payJob(event.payment);
         if(presence)this.sendJob(presence);
       }else if(player){
@@ -630,7 +637,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       players:[...this.state.players.values()].map(p=>({id:p.id,name:p.displayName,connected:p.connected,x:+p.x.toFixed(1),y:+p.y.toFixed(1),z:+p.z.toFixed(1),
         animation:p.animationState,interaction:p.interactionState,job:p.job,condition:p.condition,balance:this.sessions.getByUser(p.id)?.balance})),
       npcs:[...this.state.npcs.values()].map(n=>({id:n.id,name:n.displayName,behavior:n.behavior,animation:n.animationState,x:+n.x.toFixed(1),z:+n.z.toFixed(1)})),
-      waiter:this.waiter.snapshot(),counterQueue:[...this.sessions].filter(([,p])=>p.counterCharge).map(([id])=>id),
+      waiter:this.waiter.snapshot(),servedItems:this.served.size,counterQueue:[...this.sessions].filter(([,p])=>p.counterCharge).map(([id])=>id),
       jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000)}))})),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
       prices:this.config.prices,walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,event:this.state.event.type,
@@ -887,10 +894,10 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private applyAppearance(player:Player,access:Access):void {
-    if(player.animationState==='kick'||!access.character)return;
+    // A response without the collection (invalid session) leaves the avatar as it is.
+    if(player.animationState==='kick'||!access.ownedSkins)return;
     const requested=access.equippedSkin??DEFAULT_SKIN;
-    player.skin=requested==='custom'||access.ownedSkins?.includes(requested)?requested:DEFAULT_SKIN;
-    player.character=JSON.stringify(access.character);
+    player.skin=access.ownedSkins.includes(requested)?requested:DEFAULT_SKIN;
   }
 
   private recordResult(roundId: string, userId: string, result: Result): void {

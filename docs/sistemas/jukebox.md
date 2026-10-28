@@ -4,15 +4,25 @@ A jukebox e as TVs são **sistemas independentes**. Cada um tem seu próprio obj
 
 | | Jukebox | TVs |
 | --- | --- | --- |
-| Objeto | Encostada na base da escada do térreo, virada para o salão, em `(15.7, 0.3, -11.33)` | Dois grupos: **TVs do salão** (salão, parede lateral e balcão) e **TV do andar de cima** |
+| Objeto | O modelo do próprio mapa (`Jukebox`, de `12_jukebox.py`), encostado na base da escada do térreo e virado para o salão, em `(15.7, 0.3, -11.29)` | Dois grupos: **TVs do salão** (salão, parede lateral e balcão) e **TV do andar de cima** |
 | Interação | Encostar na frente da jukebox e apertar **E** (*Tocar a jukebox*) | Ficar no chão diante de qualquer tela do grupo e apertar **E** (*Usar a TV…*) |
-| Imagem | Nenhuma: a jukebox só toca o som | Sempre na **tela física da TV**, com perspectiva. As três TVs do salão mostram o mesmo vídeo |
+| Imagem | O vídeo não aparece; os tubos da jukebox acendem com as cores dele (veja *Luzes da jukebox*) | Sempre na **tela física da TV**, com perspectiva. As três TVs do salão mostram o mesmo vídeo |
 | Som | Pela distância até a jukebox (cheio até 5 m, mudo a partir de 20 m) | Pela distância até a TV do grupo mais próxima (cheio até 3 m, mudo a partir de 14 m) |
 | Estado na sala | `BarState.jukeboxes` | `BarState.televisions`: `tv-main` e `tv-upstairs` |
 | Mensagens | `jukebox.command`, `jukebox.ended`, `jukebox.open`, `jukebox.result` | `tv.command`, `tv.ended`, `tv.open`, `tv.result` |
 | Volume pessoal | Configurações → *Jukebox* (`bar:jukebox:volume`) | Configurações → *TVs* (`bar:tv:volume`) |
 
-A jukebox ficava solta no piso, na frente da entrada do corredor dos fundos. Agora está encostada na parede logo à direita da escada, sem tapar o corredor nem a subida.
+A jukebox vem do mapa: o importador lê o nó `Jukebox` e o volume `COL_Int_Jukebox`, e `JUKEBOX_PLACEMENT` sai deles (`map-data.json` → `jukebox`). A antiga jukebox de caixas, montada no código, foi removida. Mover a jukebox no Blender e rodar `npm run assets:map` move a interação, o som e a colisão juntos.
+
+## Luzes da jukebox
+
+Desligada, a jukebox fica apagada. Quando alguém põe um vídeo para tocar, os tubos dos arcos e a grade da frente (`Jukebox_FX_Luz`) acendem, e a luz na frente dela (`Jukebox_FX_Ponto_Luz`) pinta o chão e as paredes com a mesma cor. Faixas de cor sobem pelos dois lados dos arcos e se encontram no topo, com "lâmpadas" correndo por elas. Pausada, a jukebox fica com as luzes paradas e fracas. Parada, encerrada ou desligada, ela apaga devagar.
+
+**De onde vêm as cores.** O player do YouTube é um iframe de outro domínio, e nenhuma página consegue ler os pixels dele. O YouTube publica, porém, imagens do próprio vídeo que podem ser lidas (`i.ytimg.com` responde com CORS): a capa e os quadros em 25 %, 50 % e 75 % da duração. `apps/web/src/engine/video-palette.ts` tira as três cores mais vivas de cada imagem, ignorando preto, branco e cinza, e as deixa no brilho máximo, como um neon. `apps/web/src/engine/jukebox-lights.ts` passa de uma imagem para a outra conforme a música avança, então as cores mudam ao longo do vídeo. Um vídeo sem cor (preto e branco) ou sem rede fica no âmbar original da jukebox.
+
+**Limitações.** As cores acompanham o vídeo pelas quatro imagens, não quadro a quadro. O pisca não segue a batida da música, porque o áudio do iframe também não pode ser lido.
+
+Todos os navegadores mostram as mesmas cores no mesmo momento, porque o desenho segue a linha do tempo compartilhada da jukebox. O brilho é dividido pela exposição da cena e nunca passa de 1, então a tela mostra exatamente o tom tirado do vídeo, sem estourar para branco. A luz da jukebox não entra no circuito das luminárias de teto (`environment-lighting.ts` ignora `Jukebox_FX_*`).
 
 ## Código
 
@@ -21,6 +31,7 @@ A jukebox ficava solta no piso, na frente da entrada do corredor dos fundos. Ago
 - `apps/server/src/BarRoom.ts`: um par de handlers por tipo, cada um com seu mapa de estado. `requireMedia` aceita o comando de quem estiver perto de qualquer tela do grupo, e `tv.open` abre o painel do grupo.
 - `apps/web/src/jukebox.ts`: `MediaController` com duas instâncias, `JukeboxController` e `TelevisionController`. Cada uma tem seus players, painéis (IDs `#jukebox-*` e `#tv-*`), mensagens e volume.
 - `apps/web/src/engine/television-surface.ts`: projeção do player na tela da TV.
+- `apps/web/src/engine/video-palette.ts` e `jukebox-lights.ts`: cores do vídeo e luzes da jukebox do mapa.
 
 ## Player e tela da TV
 
@@ -51,7 +62,8 @@ O estado compartilhado representa a intenção do bar; o painel mostra à parte 
 - `tests/integration/jukebox.test.ts`:
   - links, linha do tempo e curva de volume;
   - os grupos de TVs: as três telas do térreo num grupo e a de cima em outro, com o som vindo da tela mais próxima;
-  - o lugar da jukebox: encostada na base da escada, sob o lance de cima, sem tapar corredor nem escada e com ponto de uso andável.
+  - o lugar da jukebox: é a do mapa (`COL_Int_Jukebox`), encostada na base da escada, sem outro volume no lugar dela, sem tapar corredor nem escada e com ponto de uso andável.
+- `tests/e2e/environment.spec.ts`: a jukebox apagada, acesa com as cores do vídeo, pausada e desligada (capturas `jukebox-off.png`, `jukebox-playing.png`).
 - `apps/server/test/jukebox.integration.test.ts`: conexões reais.
   - Proximidade, entrada tardia e revisões conflitantes.
   - Para as TVs: cada tela abre o painel do grupo, e outra tela do mesmo grupo controla o mesmo vídeo. A TV de cima não controla o térreo, e o estado da jukebox não muda.

@@ -217,6 +217,11 @@ export class MediaController {
   setMaster(value:number):void {if(!Number.isFinite(value))return;this.master=Math.max(0,Math.min(1,value));for(const session of this.sessions.values())this.applyVolume(session,true);}
   setMuted(value:boolean):void {this.muted=value;for(const session of this.sessions.values())this.applyVolume(session,true);this.renderPanel();}
   get soundEnabled():boolean {return this.sessions.size>0&&!this.muted;}
+  /** Length in seconds of the video this source plays, from the player being heard (0 while unknown). */
+  duration(id:string):number {
+    const session=this.sessions.get(id),p=session?.players[session.audible],value=p?.ready?p.player?.getDuration()??0:0;
+    return Number.isFinite(value)&&value>0?value:0;
+  }
   get selectedSystem():MediaSystem|undefined {return this.system(this.selected);}
   selectedSystemLabel(id:string):string {return (this.system(id)?.label??this.kind.name).toUpperCase();}
   panelHtml(id:string):string {

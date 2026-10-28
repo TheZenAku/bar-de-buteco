@@ -123,7 +123,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(false);
   await page.keyboard.press('e');
   await walkTo(page,14.45,-7.6,.12);
-  await expect(page.locator('#context-label')).toHaveText('Sentar');await page.keyboard.press('e');
+  await expect(page.locator('#context-label')).toHaveText(/^Sentar · mesa \d+$/);await page.keyboard.press('e');
   await expect(page.locator('#context-label')).toHaveText('Levantar / encerrar');
   // Common chairs play plain sitting (no glass until there is an inventory).
   await expect.poll(ownClip).toBe('Sit');
@@ -138,12 +138,12 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`anim_${Date.now().toString(36)}`);
   const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-  for(const skin of ['Nathan','Leandro','Rafael','Read']){
+  for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Read']){
     await page.keyboard.press('c');
-    // Magrão is Seu Zé's; players choose among the other four.
-    await expect(page.locator('.skin-card')).toHaveCount(4);
+    // Magrão is Seu Zé's; players choose among the other five.
+    await expect(page.locator('.skin-card')).toHaveCount(5);
     await selectSkin(page,skin);
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin.toLowerCase());
+    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin==='Gilmar'?'gilmar-gordo':skin.toLowerCase());
     await expect.poll(()=>page.evaluate((id)=>{
       const tracks=(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks??[];
       return ['Walk','Run','DrunkIdle','DrunkWalk','Dance','Sit','Wave','Use','Wait','Recover','Drink'].every(name=>tracks.includes(name));
@@ -193,7 +193,7 @@ test.beforeEach(async({request})=>{
   },{timeout:30000}).toBe(true);
 });
 test.afterEach(async({page})=>{await page.request.post('/api/auth/logout',{data:{}}).catch(()=>{});});
-async function createAccount(page:Page,suffix:string,customize?:(page:Page)=>Promise<void>):Promise<string>{
+async function createAccount(page:Page,suffix:string):Promise<string>{
   const email=`${suffix}@example.com`;
   await page.goto('/');
   await page.getByRole('button',{name:'Criar conta',exact:true}).click();
@@ -206,9 +206,6 @@ async function createAccount(page:Page,suffix:string,customize?:(page:Page)=>Pro
   const registration=await registrationResponse;
   expect(registration.ok()).toBe(true);
   const {verificationRequired}=await registration.json();
-  await expect(page.getByRole('heading',{name:'Monte seu personagem'})).toBeVisible();
-  if(customize)await customize(page);
-  await page.getByRole('button',{name:'Criar personagem e continuar'}).click();
   if(verificationRequired){
     await page.getByRole('button',{name:'Caixa de e-mail local'}).click();
     const mail=page.locator('.mail-message').filter({has:page.locator('small',{hasText:email})});
@@ -246,56 +243,40 @@ async function selectSkin(page:Page,name:string):Promise<void>{
   }
 }
 
-test('new accounts create a persistent custom character; previews, premium skins and remote changes stay separate',async({browser,page})=>{
-  test.setTimeout(240000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-  const email=await createAccount(page,`char_${Date.now().toString(36)}`,async page=>{
-    await page.getByLabel('Corpo',{exact:true}).selectOption('female');
-    await page.getByLabel('Cabelo',{exact:true}).selectOption('long');
-    await page.getByLabel('Tom de pele 6',{exact:true}).check({force:true});
-    await page.getByLabel('Cor do cabelo 5',{exact:true}).check({force:true});
-    await page.getByLabel('Cor dos olhos 3',{exact:true}).check({force:true});
-    await page.getByLabel('Roupa base 3',{exact:true}).check({force:true});
-    await expect(page.locator('#preview-status')).toHaveText('');
-    await page.setViewportSize({width:1280,height:1100});
-    await page.screenshot({path:'test-results/character-creator.png'});
-    await page.setViewportSize({width:390,height:844});
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await expect.poll(()=>page.locator('#character-preview').evaluate(canvas=>Math.abs(canvas.clientWidth-canvas.parentElement!.clientWidth)<2&&canvas.clientHeight===280)).toBe(true);
-    await page.setViewportSize({width:960,height:640});
-  });
+test('new accounts wear the free default skin; bought skins persist and other players see each change',async({browser,page})=>{
+  // Two registrations, two map loads and three skin swaps on software WebGL.
+  test.setTimeout(360000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const email=await createAccount(page,`skin_${Date.now().toString(36)}`);
   const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-  const appearance=(p:Page)=>p.evaluate((id)=>{const player=(window as any).barDebug.snapshot().world?.players?.[id];return {skin:player?.skin,character:player?.character??'{}'};},id);
-  await expect.poll(async()=>JSON.parse((await appearance(page)).character).body).toBe('female');
-  await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id)).toBe('base-female');
-  const original=(await appearance(page)).character;expect(JSON.parse(original).hair).toBe('long');
+  const skin=(p:Page)=>p.evaluate((id)=>(window as any).barDebug.snapshot().world?.players?.[id]?.skin,id);
+  const rendered=(p:Page)=>p.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id);
+  await expect.poll(()=>skin(page)).toBe('nathan');
+  await expect.poll(()=>rendered(page),{timeout:60000}).toBe('nathan');
   const otherContext=await browser.newContext({viewport:{width:640,height:480}});const other=await otherContext.newPage();other.on('pageerror',e=>errors.push(e.message));
   try{
     await createAccount(other,`look_${Date.now().toString(36)}`);
-    await expect.poll(async()=>(await appearance(other)).character).toBe(original);
-    await expect.poll(()=>other.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id)).toBe('base-female');
-    await page.keyboard.press('c');await page.getByRole('button',{name:'Personalizar',exact:true}).click();
-    await page.getByLabel('Cabelo',{exact:true}).selectOption('none');
-    await page.getByRole('button',{name:'Fechar janela'}).click();expect((await appearance(page)).character).toBe(original);
+    await expect.poll(()=>rendered(other),{timeout:60000}).toBe('nathan');
+    await page.keyboard.press('c');
+    await expect(page.locator('.skin-card').filter({has:page.locator('b',{hasText:'Nathan'})})).toContainText('Em uso');
+    await selectSkin(page,'Rafael');
+    await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
+    await expect.poll(()=>rendered(other),{timeout:60000}).toBe('rafael');
+    // Respect the authoritative skin-change rate limit.
+    await page.waitForTimeout(600);
+    await page.keyboard.press('c');await selectSkin(page,'Nathan');
+    await expect.poll(()=>skin(other),{timeout:60000}).toBe('nathan');
+    await page.waitForTimeout(600);
     await page.keyboard.press('c');await selectSkin(page,'Rafael');
-    await expect.poll(async()=>(await appearance(other)).skin).toBe('rafael');
-    expect((await appearance(page)).character).toBe(original);
-    await page.keyboard.press('c');await page.locator('.custom-character-card').getByRole('button',{name:'Vestir',exact:true}).click();
-    await expect.poll(async()=>(await appearance(other)).skin).toBe('custom');
-    await page.keyboard.press('c');await page.getByRole('button',{name:'Personalizar',exact:true}).click();
-    await expect(page.getByLabel('Cabelo',{exact:true})).toHaveValue('long');
-    await page.getByLabel('Cabelo',{exact:true}).selectOption('buns');
-    await page.getByRole('button',{name:'Salvar personagem'}).click();
-    await expect.poll(async()=>JSON.parse((await appearance(other)).character).hair).toBe('buns');
-    await page.screenshot({path:'test-results/character-in-game.png'});
+    await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
     await page.getByRole('button',{name:'Sua conta',exact:true}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
     await page.getByLabel('E-mail',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByRole('button',{name:'Entrar no bar'}).click();
-    await gameReady(page);await expect.poll(async()=>JSON.parse((await appearance(page)).character).hair).toBe('buns');
-    expect((await appearance(page)).skin).toBe('custom');expect(errors).toEqual([]);
+    await gameReady(page);await expect.poll(()=>skin(page),{timeout:60000}).toBe('rafael');
+    expect(errors).toEqual([]);
   }finally{await other.request.post('/api/auth/logout',{data:{}}).catch(()=>{});await other.goto('about:blank');await otherContext.close();}
 });
 
 test('two independent accounts register, share a 3D bar, chat, block/report and reconnect',async({browser,page})=>{
-  // Two character creators and two map loads on software WebGL take most of the default 90 s.
+  // Two registrations and two map loads on software WebGL take most of the default 90 s.
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',err=>errors.push(err.message));
   const unique=Date.now().toString(36),name1=`ana_${unique}`,name2=`bia_${unique}`;

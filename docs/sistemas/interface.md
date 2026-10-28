@@ -2,6 +2,8 @@
 
 A interface ativa substitui o tema anterior pela referência visual Boteco Social (o protótipo de origem, `assets-bar/ui/nova-ui`, saiu do repositório e continua no histórico do git). Foram portados os seis painéis, a paleta marrom com detalhes neon, os ícones de contorno, as fontes Lilita One e Nunito e as notificações em formato de comanda. A imagem fornecida aparece na entrada; o fundo da partida continua sendo o mapa PlayCanvas interativo.
 
+A marca é a logo **Highland Bar** (`assets-bar/logo/logo.png`, a mesma do letreiro da fachada). Ela aparece em destaque na entrada, na tela de espera e no topo do HUD. As versões web são reduzidas da original: `apps/web/public/ui/logo-highland.webp` (480 px, entrada e espera), `ui/logo-highland-hud.webp` (128 px, HUD), `favicon-32.png`, `favicon-192.png` e `apple-touch-icon.png` (180 px sobre fundo escuro). Ao trocar a logo, gere esses arquivos de novo nos mesmos tamanhos.
+
 O protótipo original usa React, Tailwind e Sonner. A integração reproduz seus componentes no cliente TypeScript/DOM existente, sem adicionar outro aplicativo, roteador ou renderizador. O diretório de referência permanece intacto. Fontes, licenças e imagem são distribuídas localmente; jogar não depende de Google Fonts ou de outros serviços de interface.
 
 ## Painéis
@@ -14,8 +16,9 @@ O protótipo original usa React, Tailwind e Sonner. A integração reproduz seus
 | Galera no Bar | Jogadores próximos, presença e atividade dos NPCs; acesso aos bloqueios e denúncias |
 | Bolso | Atalhos dos itens carregados; acesso à mochila, venda da casa e histórico |
 | Pelo Bar | Balcão, jukebox, blackjack e assentos, com distância e indicação de alcance |
+| Turno | Só durante um turno de trabalho: tarefa, contagem, tarefas feitas, ganhos e fim do turno. O botão **Turno** do topo mostra ou esconde o painel ([economia](economia.md)) |
 
-A carteira é consultada na API ao entrar e atualizada periodicamente, incluindo alterações feitas pela administração. Comprar uma skin atualiza saldo e coleção; vestir preserva o personagem personalizado. Os botões de lugares continuam exigindo proximidade e validação do servidor. Não teleportam o personagem.
+A carteira é consultada na API ao entrar e atualizada periodicamente, incluindo alterações feitas pela administração. Comprar uma skin atualiza saldo e coleção; vestir troca o visual na hora para todos. Os botões de lugares continuam exigindo proximidade e validação do servidor. Não teleportam o personagem.
 
 Álcool, necessidades, carteira e inventário agora usam dados reais. A interface não inventa saldo, ganhos, consumo ou jogadores. Sinuca, dardos, humor e mensagens periódicas do protótipo continuam fora do jogo; o blackjack usa cartas, turnos e resultados reais, sem apostas.
 
@@ -25,7 +28,7 @@ Arraste o cabeçalho de um painel para movê-lo. O botão do cabeçalho recolhe 
 
 Posição, visibilidade, recolhimento e trava são salvos por conta e faixa de largura em `localStorage`, neste navegador. JSON inválido é ignorado. O redimensionamento mantém os painéis dentro da tela, e telas estreitas usam uma disposição própria. Em telas baixas, o chat e as ações ficam compactos e painéis secundários podem ser reabertos pelo menu. Resenhar e Enter reabrem o chat mesmo se ele estiver oculto.
 
-O movimento permanece por teclado. Arrastar painéis não gira a câmera. Modais mantêm foco e navegação por teclado, e a interface respeita a preferência por movimento reduzido.
+O movimento permanece por teclado. Arrastar painéis não gira a câmera, e arrastar sobre o HUD não seleciona texto (só o chat e os campos permitem seleção). Modais mantêm foco e navegação por teclado, e a interface respeita a preferência por movimento reduzido.
 
 ## Comandas / toasts
 
@@ -50,11 +53,11 @@ Textos de jogadores são inseridos como texto, inclusive nos toasts. HTML enviad
 
 ## Arquivos e verificação
 
-`game-ui.ts` define as telas; `nova-ui.css` contém o tema e os estilos da comanda; `hud-panels.ts` controla o layout; `live-hud.ts` apresenta o estado; `notifications.ts` controla os avisos. `main.ts` continua conectando contas, API, multiplayer, modais e ações. `character.css` e `admin.css` usam a nova identidade.
+`game-ui.ts` define as telas; `nova-ui.css` contém o tema e os estilos da comanda; `hud-panels.ts` controla o layout; `live-hud.ts` apresenta o estado; `notifications.ts` controla os avisos. `main.ts` continua conectando contas, API, multiplayer, modais e ações. `economy.css` e `admin.css` usam a nova identidade.
 
-Os testes de `tests/e2e/nova-ui.spec.ts` verificam arrastar, trava, persistência, armazenamento inválido, limites da tela, carteira, chat entre clientes, bloqueio de notificações, segurança do texto e o ciclo de vida das comandas. Os testes existentes cobrem contas, criação, roupas, skins, administração, moderação, mapa, blackjack, eventos, animações e `/velho`, em serviços e banco isolados.
+Os testes de `tests/e2e/nova-ui.spec.ts` verificam arrastar, trava, persistência, armazenamento inválido, limites da tela, carteira, chat entre clientes, bloqueio de notificações, segurança do texto e o ciclo de vida das comandas. Os testes existentes cobrem contas, skins, administração, moderação, mapa, blackjack, eventos, animações e `/velho`, em serviços e banco isolados.
 
-A prévia de personagem pode ser fechada com modelos e texturas ainda carregando: a aplicação de prévia mantém o registro de assets até finalizar esses pedidos e então libera o motor. O painel administrativo bloqueia a edição durante buscas, impedindo que uma resposta atrasada recrie o formulário no meio de uma escolha de operação.
+O painel administrativo bloqueia a edição durante buscas, impedindo que uma resposta atrasada recrie o formulário no meio de uma escolha de operação.
 
 `npm run test:e2e` organiza os fluxos em três grupos de clientes locais para respeitar os limites de cadastro por endereço. Matchmaking e WebSocket passam pelo proxy de mesma origem do ambiente de testes. API, mundo, banco e fundos continuam isolados do desenvolvimento; os limites e as permissões de produção permanecem ativos.
 

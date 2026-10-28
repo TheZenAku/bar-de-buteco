@@ -5,9 +5,9 @@ import {createRequire} from 'node:module';import {pathToFileURL} from 'node:url'
 const {createServer}=await import(pathToFileURL(path.join(path.dirname(createRequire(new URL('../../apps/web/package.json',import.meta.url)).resolve('vite/package.json')),'dist/node/index.js')).href);
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const env={...process.env,NODE_ENV:'test',API_PORT:'3111',GAME_PORT:'2677',WEB_ORIGIN:'http://localhost:5273',API_INTERNAL_URL:'http://127.0.0.1:3111',
-  DATA_PATH:path.join(root,'.local/character-e2e/postgres'),BAR_HTTPS:'0',DATABASE_URL:'',VITE_GAME_URL:'/game',SMTP_HOST:'',AUTO_VERIFY_EMAIL:'true',CHARACTER_INITIAL_COINS:'5000',CHARACTER_DAILY_COINS:'0',
+  DATA_PATH:path.join(root,'.local/e2e/postgres'),BAR_HTTPS:'0',DATABASE_URL:'',VITE_GAME_URL:'/game',SMTP_HOST:'',AUTO_VERIFY_EMAIL:'true',WALLET_INITIAL_COINS:'5000',WALLET_DAILY_COINS:'0',
   MIGRATION_DATABASE_URL:'',MIGRATION_ROLE:'',MIGRATION_RUNTIME_ROLE:'',MIGRATION_LOCK_TIMEOUT_MS:'',
-  WORLD_OUTBOX_PATH:path.join(root,'.local/character-e2e/world-outbox.jsonl')};
+  WORLD_OUTBOX_PATH:path.join(root,'.local/e2e/world-outbox.jsonl')};
 execFileSync(process.execPath,['--import','tsx','apps/api/src/database/migrate.ts'],{env,cwd:root,stdio:'inherit',windowsHide:true});
 execFileSync(process.execPath,['--import','tsx','apps/api/src/seed.ts'],{env,cwd:root,stdio:'inherit',windowsHide:true});
 const children=['api','server'].map(app=>spawn(process.execPath,['--import','tsx',`apps/${app}/src/index.ts`],{env:{...env,TSX_TSCONFIG_PATH:path.join(root,`apps/${app}/tsconfig.json`)},cwd:root,stdio:'inherit',windowsHide:true}));

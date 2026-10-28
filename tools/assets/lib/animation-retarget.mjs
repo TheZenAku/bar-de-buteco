@@ -1,9 +1,7 @@
 import {Quaternion, Vector3} from 'three';
 
-// Names are aliases only. No joints, weights, bind matrices or mesh vertices are replaced.
-const rafael = {pelvis:'hip', spine_01:'spine_01', spine_03:'spine_02', spine_05:'spine_03',
-  neck_01:'neck', clavicle_l:'shoulder_l', clavicle_r:'shoulder_r', thigh_l:'upperleg_l',
-  thigh_r:'upperleg_r', calf_l:'lowerleg_l', calf_r:'lowerleg_r', ball_l:'toe_l', ball_r:'toe_r'};
+// Every rig carries the canonical joint names (the importers alias them). No joints, weights, bind
+// matrices or mesh vertices are replaced.
 const ends = {hip:'spine_01', spine_01:'spine_02', spine_02:'spine_03', spine_03:'neck', neck:'head'};
 for (const side of ['l','r']) {
   for (const [bone,end] of Object.entries({shoulder:'upperarm',upperarm:'lowerarm',lowerarm:'hand',
@@ -15,8 +13,7 @@ const position = node => node.getWorldPosition(new Vector3());
 /** Calibrate native A/T poses by actual bone directions, rather than assuming identical bind poses.
  * The calibration is virtual: the authored skeleton and its bind pose remain untouched. */
 export function createRetarget(nodes, referenceNodes, referenceName = node => node.name) {
-  const isRafael=nodes.some(n=>n.name==='spine_05');
-  const names=nodes.map(n=>isRafael?(rafael[n.name]??(['spine_02','spine_04'].includes(n.name)?'':n.name)):n.name);
+  const names=nodes.map(n=>n.name);
   const byName=new Map(names.map((name,i)=>[name,i]));
   const reference=new Map(referenceNodes.map(n=>[referenceName(n),n]));
   const parents=nodes.map(n=>nodes.indexOf(n.parent));

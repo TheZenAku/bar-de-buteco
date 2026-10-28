@@ -24,9 +24,9 @@ O seed é opcional: cria contas confirmadas para testar rapidamente. Execute ant
 | Chico | `jogador1@bar.local` | `ButecoDemo2026!` |
 | Bia | `jogador2@bar.local` | `ButecoDemo2026!` |
 
-`DEMO_PASSWORD` substitui a senha na criação. O seed preserva senhas e permissões existentes, prepara o personagem e a coleção das contas de demonstração e recusa execução em produção. Use duas janelas com **perfis separados ou modo anônimo**, uma conta em cada, para testar multiplayer. A mesma conta não pode ocupar duas vagas.
+`DEMO_PASSWORD` substitui a senha na criação. O seed preserva senhas e permissões existentes, prepara a coleção de skins das contas de demonstração e recusa execução em produção. Use duas janelas com **perfis separados ou modo anônimo**, uma conta em cada, para testar multiplayer. A mesma conta não pode ocupar duas vagas.
 
-Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novos cadastros são ativados automaticamente e abrem o criador de personagem; salvar a personalização leva à partida. `AUTO_VERIFY_EMAIL=false` exige confirmação antes da partida; em produção, a confirmação é exigida por padrão e `AUTO_VERIFY_EMAIL=true` habilita a ativação automática. A **Caixa de e-mail local** continua disponível em desenvolvimento para recuperar a senha ou confirmar cadastros quando essa exigência estiver habilitada. Essa caixa não existe em produção.
+Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novos cadastros são ativados automaticamente e entram direto na partida. `AUTO_VERIFY_EMAIL=false` exige confirmação antes da partida; em produção, a confirmação é exigida por padrão e `AUTO_VERIFY_EMAIL=true` habilita a ativação automática. A **Caixa de e-mail local** continua disponível em desenvolvimento para recuperar a senha ou confirmar cadastros quando essa exigência estiver habilitada. Essa caixa não existe em produção.
 
 ## Controles e atividades
 
@@ -34,9 +34,7 @@ O [ciclo de dia e noite](docs/sistemas/day-night.md) completa um dia em **40 min
 
 O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
 
-Novos cadastros abrem o **criador de personagem** com prévia 3D e opções do Quaternius Standard. A aparência fica salva na conta e pode ser editada em **C → Personalizar**. Nathan, Leandro, Rafael e Read passam a integrar a loja de skins completas; o personagem personalizado é gratuito. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [criação de personagens, loja e integração](docs/sistemas/characters.md).
-
-O corpo masculino também pode vestir **camiseta, suéter, calça, calça social, tênis, sapato Derby e óculos**, com seleção e cor independentes por categoria no criador. Salvar atualiza a aparência para os outros jogadores e guarda a escolha na conta. Para adicionar novos FBX compatíveis, execute **`tools/assets/roupas/importar.bat`**; veja [os scripts de importação de roupas](tools/assets/roupas/README.md).
+Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção: Leandro, Rafael e Read são vendidos na loja, e a skin vestida fica salva na conta. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [skins e coleção](docs/sistemas/skins.md).
 
 | Controle | Ação |
 | --- | --- |
@@ -59,7 +57,7 @@ Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interaç
 
 A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox (encostada na parede, ao pé da escada) ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. As três TVs do térreo passam sempre o mesmo vídeo; a do andar de cima tem o seu. O vídeo fica sempre na tela da TV, nunca num card no canto (**Assistir na TV** aproxima a câmera). A jukebox só toca o som, sem vídeo. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
 
-As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo americano**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
+As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo de chopp**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
 
 A **economia** usa moedas do jogo, sem dinheiro real. Sentado a uma mesa, aperte **T** e o **Tonico** busca o pedido no balcão e leva até você, por um caminho calculado no mapa. A jukebox, as TVs e o **telão do palco** cobram por vídeo novo, e o balcão cobra a bebida. Pedido cancelado volta para a carteira. As moedas vêm do emprego de **Ajudante do Magrão** (**J**), com poucas vagas, tarefas por estação e limite diário. A administração acompanha e ajusta tudo em **⚙ → Mundo ao vivo**. Veja [economia](docs/sistemas/economia.md). Os gráficos têm presets, resolução dinâmica, sombras, névoa e limite de FPS em **Configurações** ([gráficos](docs/sistemas/graficos.md)). O que falta da lista de funcionalidades e o plano estão em [funcionalidades](docs/projeto/funcionalidades.md).
 
@@ -67,7 +65,7 @@ O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel *
 
 A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com atalhos no painel **Bolso**, loja, histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Veja [inventário](docs/sistemas/inventory.md).
 
-O comando `/velho` mantém corpo, roupas e skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a configuração salva do personagem. Veja [a importação e a validação da bengala](docs/assets/old-cane.md).
+O comando `/velho` mantém a skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a skin salva na conta. Veja [a importação e a validação da bengala](docs/assets/old-cane.md).
 
 Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de engrenagem. Eventos não alteram as regras nem cancelam rodadas.
 
@@ -104,7 +102,7 @@ npm run test:e2e
 npm run test:load
 ```
 
-Os testes de navegador iniciam serviços isolados nas portas 3111/2677/5273, preparam contas de demonstração e usam `.local/character-e2e/postgres`, sem alterar o banco do bar de desenvolvimento. As contas criadas nessa execução recebem saldo de teste para exercitar compras. No Windows usam Edge instalado; em outros sistemas, execute `npx playwright install chromium`. `PLAYWRIGHT_CHANNEL` pode selecionar outro canal instalado. Não use contas reais nos testes.
+Os testes de navegador iniciam serviços isolados nas portas 3111/2677/5273, preparam contas de demonstração e usam `.local/e2e/postgres`, sem alterar o banco do bar de desenvolvimento. As contas criadas nessa execução recebem saldo de teste para exercitar compras. No Windows usam Edge instalado; em outros sistemas, execute `npx playwright install chromium`. `PLAYWRIGHT_CHANNEL` pode selecionar outro canal instalado. Não use contas reais nos testes.
 
 Capturas automáticas vão para `test-results/previews` e não alteram a documentação. Para atualizar deliberadamente a galeria rastreada, execute os E2E com `UPDATE_PREVIEWS=1` (no PowerShell: `$env:UPDATE_PREVIEWS='1'` antes do comando) e revise as imagens antes do commit.
 
@@ -120,10 +118,10 @@ O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atua
 
 ## Escopo da versão
 
-Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e o Magrão (bartender) usam modelos animados. Os jogadores começam com um personagem Quaternius personalizado e podem adquirir Nathan, Leandro, Rafael e Read na loja (`SKINS` em `packages/shared`). Leandro, Read e Magrão preservam os rigs AccuRig; Rafael preserva seu rig Character Creator / Unreal. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; o personagem, a coleção e o visual equipado ficam salvos na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e o Magrão (bartender) usam modelos animados. Os jogadores começam com Nathan, gratuito, e podem adquirir Leandro, Rafael, Read e Gilmar na loja (`SKINS` em `packages/shared`). Cada personagem tem seu próprio esqueleto Mixamo, auto-rigado no próprio corpo. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; a coleção e a skin vestida ficam salvas na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 
 O **chat de voz por proximidade** (até 15 m, áudio posicional, microfone em **M** ou segurando **B**) e os volumes do jogo ficam em **Configurações**. Veja [chat de voz](docs/sistemas/voice.md).
 
-Para reimportar as skins AccuRig (Leandro, Read e Magrão, o bartender) e seus bancos de animação, execute `npm run assets:skins`. Veja [skins AccuRig](docs/assets/skins-accurig.md).
+Para reimportar as skins (cada personagem com seu esqueleto Mixamo) e seus bancos de animação, execute `npm run assets:skins`. Veja [skins Mixamo](docs/assets/skins-mixamo.md).

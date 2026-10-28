@@ -53,7 +53,7 @@ Trabalho no balcão (3–5 min), com recompensa idempotente feita no servidor, s
 - Bake-off de até três candidatos gratuitos, com licença comercial clara, dentro do BarBoteco.
 - **Parar e pedir aprovação visual.**
 - Só então: POC do vencedor e migração por feature flag.
-- Depois da paridade, excluir o Avatar V2 e o Quaternius, junto com seus assets.
+- Depois da paridade, excluir o Avatar V2 e o Quaternius, junto com seus assets. (Ambos já saíram: [ADR-012](DECISOES.md) e [ADR-013](DECISOES.md).)
 
 ### Marco 6
 

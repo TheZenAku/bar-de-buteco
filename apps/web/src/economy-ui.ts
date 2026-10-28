@@ -2,8 +2,7 @@ import {JOBS,MEDIA_PRICES,TABLE_MENU,TABLE_ORDER_MAX_ITEMS,itemById,type JobSlot
 import {escape as e} from './api';
 import type {TableOrderView} from './networking';
 import {GRAPHICS_PRESETS,PRESET_LABELS,type GraphicsSettings} from './graphics';
-
-const coins=(value:number)=>`${value.toLocaleString('pt-BR')} 🪙`;
+import {coins,itemImage} from './ui-icons';
 
 /** Above the jukebox and TV panels: what a new video costs (the room charges it, never the browser). */
 export function mediaPriceNote(kind:'jukebox'|'tv',id:string,balance:number|undefined):string {
@@ -15,7 +14,7 @@ export function mediaPriceNote(kind:'jukebox'|'tv',id:string,balance:number|unde
 export function tableMenuHtml(balance:number,pending?:TableOrderView):string {
   if(pending)return `<div class="table-menu"><p class="modal-description">O Tonico já está cuidando do seu pedido: <b>${pending.items.map(id=>e(itemById(id)?.name??id)).join(', ')}</b> (${coins(pending.total)}).</p><p class="fine-print">Se você levantar antes da entrega, ele leva tudo de volta e as moedas voltam para a carteira.</p><button class="button secondary full" data-action="table-cancel">Cancelar pedido</button></div>`;
   return `<form id="table-order" class="table-menu" data-capture-input><p class="modal-description">Escolha até ${TABLE_ORDER_MAX_ITEMS} itens. O Tonico busca no balcão e traz até a sua mesa; você consome ali mesmo.</p>
-    <div class="menu-grid">${TABLE_MENU.map(id=>{const item=itemById(id)!;return `<label class="menu-item"><input type="checkbox" name="item" value="${id}" data-price="${item.price}"><span class="item-icon" aria-hidden="true">${item.icon}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${coins(item.price)}</span></label>`;}).join('')}</div>
+    <div class="menu-grid">${TABLE_MENU.map(id=>{const item=itemById(id)!;return `<label class="menu-item"><input type="checkbox" name="item" value="${id}" data-price="${item.price}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${coins(item.price)}</span></label>`;}).join('')}</div>
     <div class="menu-total"><span>Total <b id="table-total">${coins(0)}</b></span><small>Carteira: ${coins(balance)}</small></div>
     <button class="button primary full" type="submit" id="table-submit" disabled>Pedir ao Tonico</button></form>`;
 }
@@ -23,7 +22,7 @@ export function tableMenuTotal(form:HTMLFormElement):number {
   const boxes=[...form.querySelectorAll<HTMLInputElement>('input[name=item]')],chosen=boxes.filter(box=>box.checked);
   for(const box of boxes)box.disabled=!box.checked&&chosen.length>=TABLE_ORDER_MAX_ITEMS;
   const total=chosen.reduce((sum,box)=>sum+Number(box.dataset.price),0);
-  form.querySelector('#table-total')!.textContent=coins(total);
+  form.querySelector('#table-total')!.innerHTML=coins(total);
   (form.querySelector('#table-submit') as HTMLButtonElement).disabled=!chosen.length;
   return total;
 }
@@ -38,14 +37,22 @@ export function jobsHtml(world:WorldState|undefined,task:JobTaskView|null|undefi
         <p class="fine-print">Comece perto do balcão do térreo. Fique mais de ${Math.round(job.taskTimeoutMs/1000)} s sem trabalhar e o turno acaba.</p></article>`;}).join('')}</div>`;
 }
 
-/** The worker's current task, shown on the HUD. */
-export function jobCardHtml(task:JobTaskView,now:number,near:boolean):string {
+/** The worker's current task, in the job panel. Built when the task changes; jobPanelTick moves its clocks. */
+export function jobPanelHtml(task:JobTaskView,near:boolean):string {
   const job=JOBS.find(j=>j.id===task.jobId);
-  const progress=task.startedAt?Math.min(1,(now-task.startedAt)/task.durationMs):0;
-  const left=Math.max(0,Math.ceil((task.deadline-now)/1000));
-  return `<div class="job-hud-head"><small>${e(job?.name??'Trabalho')}</small><b>${e(task.startedAt?task.action:task.label)}</b></div>
-    ${task.startedAt?`<div class="hud-track"><i style="width:${(progress*100).toFixed(0)}%"></i></div>`:`<p>${near?'Aperte <kbd>E</kbd> para começar':'Vá até o local indicado'} · ${left}s</p>`}
-    <div class="job-hud-foot"><span>${task.tasks} tarefa(s)</span><span>+${coins(task.earned)}</span><button class="mini-button" data-action="jobs">Turno</button></div>`;
+  return `<div class="job-task"><small>${e(job?.name??'Trabalho')} · <span title="Tempo até o fim do turno" data-job-shift></span></small><b>${e(task.startedAt?task.action:task.label)}</b>
+    ${task.startedAt?'<div class="hud-track"><i data-job-progress></i></div>':`<p>${near?'Aperte <kbd>E</kbd> para começar':'Siga o marcador verde'} · <span data-job-clock></span></p>`}</div>
+    <div class="job-hud-foot"><span>${task.tasks} ${task.tasks===1?'tarefa':'tarefas'}</span><span>+${coins(task.earned)}</span><button class="mini-button" data-action="jobs">Encerrar…</button></div>`;
+}
+/** Ten times a second: only the clocks and the progress change, never the panel's structure. */
+export function jobPanelTick(body:HTMLElement,summary:HTMLElement,task:JobTaskView,now:number):void {
+  const set=(element:Element|null,text:string)=>{if(element&&element.textContent!==text)element.textContent=text;};
+  const progress=task.startedAt?Math.min(1,(now-task.startedAt)/task.durationMs):0,left=Math.max(0,Math.ceil((task.deadline-now)/1000));
+  const bar=body.querySelector<HTMLElement>('[data-job-progress]'),width=`${(progress*100).toFixed(0)}%`;
+  if(bar&&bar.style.width!==width)bar.style.width=width;
+  set(body.querySelector('[data-job-clock]'),`${left}s`);
+  set(body.querySelector('[data-job-shift]'),`fim em ${Math.max(1,Math.ceil((task.shiftEndsAt-now)/60000))} min`);
+  set(summary,task.startedAt?width:`${left}s`);
 }
 
 interface Snapshot {

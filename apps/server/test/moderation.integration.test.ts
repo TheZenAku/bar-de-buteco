@@ -5,7 +5,6 @@ import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';
 import {WebSocketTransport} from '@colyseus/ws-transport';
 import {Client,type Room} from '@colyseus/sdk';
-import {DEFAULT_CHARACTER} from '@bar/shared';
 import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 import type {Control} from '../src/internal.js';
@@ -16,7 +15,7 @@ test('moderation over real WebSockets: old kicks cannot remove a new join; event
   let banned=false,authority:BarRoom|undefined;
   const api=createServer(async(req,res)=>{
     let body='';for await(const chunk of req)body+=chunk;res.setHeader('content-type','application/json');
-    if(req.url==='/api/internal/validate')res.end(JSON.stringify({valid:!banned,banned,role:'user',blocked:[],character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[]}));
+    if(req.url==='/api/internal/validate')res.end(JSON.stringify({valid:!banned,banned,role:'user',blocked:[],equippedSkin:'nathan',ownedSkins:['nathan']}));
     // The API's control outbox: lease, then confirmation (apps/api/src/control-outbox.ts).
     else if(req.url==='/api/internal/controls/lease')res.end(JSON.stringify({controls:queued.splice(0)}));
     else if(req.url==='/api/internal/controls/ack'){acknowledged.push(JSON.parse(body));res.end('{"applied":0,"failed":0}');}

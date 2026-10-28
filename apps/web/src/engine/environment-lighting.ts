@@ -4,6 +4,13 @@ import {daylightAt,EDGE_FOG_WIDTH,type Rgb} from './day-night';
 
 interface Lamp {entity:pc.Entity;base:number;outside:boolean;street:boolean;enabled:boolean;}
 interface Glow {material:pc.StandardMaterial;base:number;outside:boolean;}
+interface Sign {material:pc.StandardMaterial;strength:number;peak:number;}
+// The lit facade (13_fachada.py): the logo sign on the corner, the two veranda boards and the sign's neon rim.
+const SIGN_MATERIALS=new Set(['Letreiro_Highland','Placa_Highland','Neon_Magenta']);
+// The magenta halo behind the corner sign, on the bricks.
+const SIGN_LIGHT='Luz_Letreiro',SIGN_LIGHT_INTENSITY=2.2,SIGN_LIGHT_RANGE=5;
+/** Map lights driven by their own prop: the jukebox colours its light (jukebox-lights.ts). */
+const PROP_LIGHT=/^Jukebox_FX_/;
 const streetFixtures=[
   [-1.9,1.9,225],[12,2.62,-90],[33.9,1.9,-45],[34.62,-13,0],[33.9,-27.9,45],
   [12,-28.62,90],[-1.9,-27.9,135],[-2.62,-13,180],[12,11.38,90],[-11.38,-13,0],[43.38,-13,180],[12,-37.38,-90],
@@ -30,6 +37,8 @@ void main(){
 export class EnvironmentLighting {
   private lamps:Lamp[]=[];
   private glows:Glow[]=[];
+  private signs:Sign[]=[];
+  private signLight?:pc.LightComponent;
   private sun?:pc.Entity;
   private moon:pc.Entity;
   private sky:pc.Entity;
@@ -62,12 +71,16 @@ export class EnvironmentLighting {
     this.skirt.setPosition(16,-.06,-13);this.skirt.setLocalScale(800,1,800);app.root.addChild(this.skirt);
   }
   configureMap(map:pc.Entity):void {
-    const lights=map.findComponents('light') as pc.LightComponent[];
-    const powers=lights.filter(light=>light.type!=='directional').map(light=>light.luminance).sort((a,b)=>a-b);
+    const lights=(map.findComponents('light') as pc.LightComponent[]).filter(light=>!PROP_LIGHT.test(light.entity.name));
+    const powers=lights.filter(light=>light.type!=='directional'&&light.entity.name!==SIGN_LIGHT).map(light=>light.luminance).sort((a,b)=>a-b);
     const median=powers[powers.length>>1]||1;
     for(const light of lights){
       light.enabled=true;
-      if(light.type==='directional'){
+      if(light.entity.name===SIGN_LIGHT){
+        // A neon halo, not a ceiling lamp: it keeps its authored colour and shines all around, without a shadow map.
+        light.type='omni';light.castShadows=false;light.falloffMode=pc.LIGHTFALLOFF_LINEAR;light.range=SIGN_LIGHT_RANGE;
+        this.signLight=light;
+      }else if(light.type==='directional'){
         if(this.sun){light.enabled=false;continue;}
         this.sun=light.entity;light.castShadows=true;light.shadowDistance=55;light.shadowResolution=2048;
         light.numCascades=2;light.cascadeBlend=.12;light.cascadeDistribution=.65;light.shadowType=pc.SHADOW_PCF3_32F;
@@ -108,6 +121,10 @@ float botecoEdgeVisibility(){
     for(const render of map.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
       let material=instance.material;
       if(!(material instanceof pc.StandardMaterial))continue;
+      const sign=material;
+      if(SIGN_MATERIALS.has(sign.name)&&!this.signs.some(known=>known.material===sign)){
+        const e=sign.emissive;this.signs.push({material:sign,strength:sign.emissiveIntensity,peak:Math.pow(Math.max(e.r,e.g,e.b,1e-3),2.2)});
+      }
       if(material.name==='Lampada'){
         const clone=material.clone();this.clones.push(clone);instance.material=material=clone;
         this.glows.push({material:clone,base:clone.emissiveIntensity,outside:/Exterior/.test(render.entity.name)});
@@ -154,6 +171,16 @@ float botecoEdgeVisibility(){
       glow.material.emissiveIntensity=glow.base*(glow.outside?nowNight:.65+nowNight*.35)*this.electrical;
       glow.material.update();
     }
+    // The facade is lit day and night (it goes dark only with the bar's power). There is no bloom, so emission above
+    // 1 would only clip towards white and shift the hue: the brightest channel stays exactly at its authored value on
+    // screen, exposure included, and the sign shows the colours of its artwork.
+    for(const sign of this.signs){
+      sign.material.emissiveIntensity=Math.min(sign.strength,1/sign.peak)*this.electrical/state.exposure;
+      sign.material.update();
+    }
+    if(this.signLight){
+      this.signLight.intensity=SIGN_LIGHT_INTENSITY*nowNight*this.electrical;this.signLight.enabled=this.signLight.intensity>.015;
+    }
     // Directional sun/moon shadows remain realtime and therefore move smoothly. Local lamp shadows are
     // cached because their lights and architectural casters do not move; never cycle them between frames.
     for(const light of this.shadowLights)if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;
@@ -180,11 +207,13 @@ float botecoEdgeVisibility(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;
     return {...this.sampled,electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
       lamps:this.lamps.map(lamp=>({name:lamp.entity.name,position:lamp.entity.getPosition().toArray(),outside:lamp.outside,street:lamp.street,enabled:lamp.entity.light!.enabled,intensity:lamp.entity.light!.intensity,shadows:lamp.entity.light!.castShadows,direction:lamp.entity.up.clone().mulScalar(-1).toArray()})),edgeFogWidth:EDGE_FOG_WIDTH,
+      facade:{materials:this.signs.map(sign=>({name:sign.material.name,emissive:sign.material.emissive.toString(false),intensity:+sign.material.emissiveIntensity.toFixed(3)})),
+        light:this.signLight?{enabled:this.signLight.enabled,intensity:+this.signLight.intensity.toFixed(3),type:this.signLight.type,color:this.signLight.color.toString(false)}:undefined},
       realtimeLocalShadows:this.shadowLights.filter(light=>light.enabled&&light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME).length};
   }
   destroy():void {
     for(const lamp of this.lamps)if(lamp.street)lamp.entity.destroy();
     this.moon.destroy();this.sky.destroy();this.skirt.destroy();this.skyMaterial.destroy();this.skirtMaterial.destroy();
-    this.clones.forEach(material=>material.destroy());this.lamps=[];this.glows=[];
+    this.clones.forEach(material=>material.destroy());this.lamps=[];this.glows=[];this.signs=[];this.signLight=undefined;
   }
 }

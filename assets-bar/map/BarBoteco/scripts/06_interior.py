@@ -334,7 +334,6 @@ for x in (3.4, 7.8, 12.2, 16.6):
             enfeitar(QT, x, y, ZP + 0.77, 0.72, 0.28, r_, n=rnd.choice((2, 3, 4, 5)))
 linha_enfeites(QT, [(17.7, 15.25, 'C'), (18.3, 15.2, 'L'), (19.7, 15.28, 'C')], 1.2)            # balcao externo
 linha_enfeites(QT, [(6.2, 25.3, 'C'), (6.45, 25.4, 'C'), (6.8, 25.35, 'L')], 0.95)              # bancada da churrasqueira
-linha_enfeites(QT, [(24.35, 25.3, 'L')], ZP + 0.6 + 0.5)                                          # em cima do amplificador
 for yv in (18.1, 21.9):
     for i in range(1, 12):
         t = i / 12
@@ -350,22 +349,7 @@ for (x, y) in ((0.7, 16.0), (20.6, 24.9), (8.6, 25.3)):
     I("P_Lixeira", QT, x, y, ZP, 0)
 pilha("P_Engradado_Vermelho", QT, 20.65, 15.45, ZP, 1, 1, 3)
 I("P_Extintor", QT, 13.3, 15.1, ZP + 0.95, 180)
-# palco
-ZS = ZP + 0.6
-for x in (22.2, 31.1):
-    I("P_Caixa_Som", QT, x, 22.0, ZS, 0, collide=True)
-I("P_Bateria", QT, 26.6, 24.6, ZS, 0)
-B.add_collider("Mob_Bateria", (25.8, 24.1, ZS), (27.4, 25.2, ZS + 1.1))
-I(BANQ, QT, 26.6, 25.25, ZS, 0, name="Banqueta")
-for (x, y) in ((25.0, 22.4), (27.0, 22.4), (28.8, 22.6)):
-    I("P_Pedestal_Mic", QT, x, y, ZS, rnd.uniform(-10, 10))
-for x in (24.2, 29.4):
-    I("P_Amplificador", QT, x, 25.3, ZS, 0, collide=True)
-for x in (25.0, 28.8):
-    I(BANQ, QT, x, 23.3, ZS, 0, name="Banqueta")
-for x in (23.0, 25.5, 28.0, 30.5):
-    I("P_Refletor", QT, x, 21.8, 4.05, 0)
-I("P_Luminaria_Tubular", QT, 26.6, 24.5, 4.45, 0, name="Luminaria_Palco")
+# palco (equipamentos, instrumentos, iluminacao): 15_palco.py
 
 # ============================================================ VARANDA
 for x in (1.9, 4.3, 9.4, 11.9, 17.4, 19.8, 22.2):

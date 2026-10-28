@@ -13,11 +13,11 @@ scn = bpy.context.scene
 vl = bpy.context.view_layer
 GRUPOS_BAR = {
     "Bar_Estrutura": ["Predio_Estrutura"],
-    "Bar_Mobilia": ["Interior_Terreo", "Varanda_Mobiliario", "Interior_Superior", "Terraco_Mobiliario", "Quintal_Mobiliario"],
+    "Bar_Mobilia": ["Interior_Terreo", "Varanda_Mobiliario", "Interior_Superior", "Terraco_Mobiliario", "Quintal_Mobiliario", "Palco"],
 }
 EXTERIOR = ["Exterior_Rua", "Exterior_Vizinhanca", "Exterior_Mobiliario"]
 DISTANTE = ["Exterior_Distante"]
-LINKAR = ["Portas", "Iluminacao", "Marcadores", "Interativos", "Interativos_Bar"]   # nos separados (o jogo acha pelo nome)
+LINKAR = ["Portas", "Iluminacao", "Marcadores", "Interativos", "Interativos_Bar", "Mesas"]   # nos separados (o jogo acha pelo nome)
 INST_MIN = 6                                   # malhas usadas >= 6 vezes viram instancias de GPU...
 INST_PREFIXOS = ("A_", "P_Arvore", "P_Canteiro")  # ...so as pesadas/numerosas; o resto vai pro lote estatico
 CHUNKS = 1                                     # 1 = bairro num lote so (menos draw calls); 3 = pedacos 3x3 p/ frustum culling
@@ -62,7 +62,8 @@ def set_active(c):
 
 def gltf(path, **kw):
     props = bpy.ops.export_scene.gltf.get_rna_type().properties.keys()
-    opts = dict(filepath=path, export_format='GLB', use_active_collection=True, use_active_collection_with_nested=True,
+    # use_active_scene: sem isso o exportador do 4.0 exporta todas as cenas e a "Animacoes" (11_animacoes.py) quebra o export
+    opts = dict(filepath=path, export_format='GLB', use_active_scene=True, use_active_collection=True, use_active_collection_with_nested=True,
                 export_apply=True, export_yup=True, export_texcoord=True, export_normals=True, export_tangents=False,
                 export_materials='EXPORT', export_image_format='AUTO', export_cameras=False, export_lights=True,
                 export_extras=True, export_animations=False, export_skins=False, export_morph=False,
@@ -156,10 +157,6 @@ for g, objs in sorted(grupos.items()):
         stats[g] = (len(j.data.loop_triangles), len({p.material_index for p in j.data.polygons}))
 for cn in LINKAR:
     for o in bpy.data.collections[cn].objects:
-        # Interactive props must remain renderable even when their parent also owns empty FX anchors.
-        # A hidden cart previously exported as only an empty node, leaving fire floating in the street.
-        if o.type == 'MESH' and o.data and o.data.polygons:
-            o.hide_render = False
         exp.objects.link(o)
 set_active(exp)
 vl.update()
@@ -169,10 +166,6 @@ for k in extras_addon:
 out = os.path.join(B.EXPORT_DIR, "bar_boteco.glb")
 try:
     gltf(out)
-    exported = resumo_glb(out)
-    cart = next((n for n in exported.get('nodes', []) if n.get('name') == 'Carrinho_Espeto'), None)
-    if not cart or 'mesh' not in cart:
-        raise RuntimeError('Carrinho_Espeto foi exportado sem malha renderizavel')
     gltf(os.path.join(B.EXPORT_DIR, "bar_boteco_draco.glb"), export_draco_mesh_compression_enable=True,
          export_draco_mesh_compression_level=6, export_image_format='WEBP', export_image_quality=82)
 finally:

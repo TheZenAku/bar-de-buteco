@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import map from './map-data.json';
 import type {Position} from './index.js';
 
 /** Metres, matching the authored Tela_TV material in BarBoteco (no model replacement). */
@@ -11,8 +12,9 @@ export const TELEVISIONS = [
   // It hangs above the stage floor, so it is used from the sound desk in front of the stage (Ponto_Palco).
   {id:'telao',x:26.65,y:3,z:-25.4,width:4.8,height:2.7,yaw:0,control:{x:26.6,y:.3,z:-19.8}},
 ] as const;
-// Against the base of the stairs (under the upper flight), facing the hall: clear of the back corridor and the steps.
-export const JUKEBOX_PLACEMENT={x:15.7,y:.3,z:-11.33,hx:.45,hz:.3};
+// The map's own jukebox (12_jukebox.py): against the base of the stairs, facing the hall (+Z), clear of the back
+// corridor and the steps. Its solid volume is the export's COL_Int_Jukebox; maxY is the top of the cabinet.
+export const JUKEBOX_PLACEMENT={x:map.jukebox.x,y:map.jukebox.y,z:map.jukebox.z,hx:map.jukebox.hx,hz:map.jukebox.hz,maxY:map.jukebox.maxY};
 export const JUKEBOX_AUDIO = {fullDistance:5,quietDistance:15,maxDistance:20,smoothingSeconds:.25};
 // A TV is quieter than the jukebox: its sound fades out sooner around its own screen.
 export const TV_AUDIO = {fullDistance:3,quietDistance:9,maxDistance:14,smoothingSeconds:.25};

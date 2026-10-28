@@ -1,12 +1,15 @@
 import {and,eq,sql} from 'drizzle-orm';
-import {SKINS,characterSchema,type CharacterConfig,type Wardrobe,type PublicUser} from '@bar/shared';
+import {DEFAULT_SKIN,SKINS,type Wardrobe,type PublicUser} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {profiles,wallets,skinInventory,currencyLedger} from './database/schema.js';
 
 export class WardrobeError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
 const envInt=(name:string,fallback:number)=>{const n=Number(process.env[name]??fallback);return Number.isSafeInteger(n)&&n>=0&&n<=1_000_000?n:fallback;};
-export function economyConfig(){return {initialCoins:envInt('CHARACTER_INITIAL_COINS',0),dailyReward:envInt('CHARACTER_DAILY_COINS',0),
-  prices:Object.fromEntries(SKINS.map((skin,i)=>[skin.id,envInt(`SKIN_PRICE_${skin.id.toUpperCase()}`,[500,750,1000,850][i])]))};}
+const PRICES:Partial<Record<string,number>>={leandro:750,rafael:1000,read:850,'gilmar-gordo':900};
+// The default skin is free and belongs to every account without an inventory row.
+const owns=(inventory:Array<{skinId:string}>,skin:string)=>skin===DEFAULT_SKIN||inventory.some(item=>item.skinId===skin);
+export function economyConfig(){return {initialCoins:envInt('WALLET_INITIAL_COINS',0),dailyReward:envInt('WALLET_DAILY_COINS',0),
+  prices:Object.fromEntries(SKINS.map(skin=>[skin.id,skin.id===DEFAULT_SKIN?0:envInt(`SKIN_PRICE_${skin.id.toUpperCase().replace(/-/g,'_')}`,PRICES[skin.id]??0)]))};}
 export class WardrobeService {
   constructor(private db:Database,readonly economy=economyConfig()){}
   async initialize(userId:string){
@@ -22,13 +25,12 @@ export class WardrobeService {
       this.db.select().from(skinInventory).where(eq(skinInventory.userId,user.id)),
       this.db.select().from(currencyLedger).where(eq(currencyLedger.id,this.dailyKey(user.id))),
     ]);
-    return {character:profile.characterConfig?characterSchema.parse(profile.characterConfig):null,equippedSkin:profile.equippedSkin,balance:wallet.balance,
-      catalog:SKINS.map(skin=>({...skin,price:this.economy.prices[skin.id],owned:inventory.some(item=>item.skinId===skin.id)})),dailyReward:this.economy.dailyReward,dailyClaimed:!!daily};
+    return {equippedSkin:profile.equippedSkin,balance:wallet.balance,
+      catalog:SKINS.map(skin=>({...skin,price:this.economy.prices[skin.id],owned:owns(inventory,skin.id)})),dailyReward:this.economy.dailyReward,dailyClaimed:!!daily};
   }
   private dailyKey(userId:string){return `daily:${userId}:${new Date().toISOString().slice(0,10)}`;}
   async claimDaily(user:PublicUser){
     if(!user.verified)throw new WardrobeError(403,'Confirme seu e-mail para receber moedas.');
-    if(!user.character)throw new WardrobeError(409,'Crie seu personagem primeiro.');
     if(!this.economy.dailyReward)throw new WardrobeError(409,'O bônus diário está desativado.');
     await this.initialize(user.id);
     await this.db.transaction(async tx=>{
@@ -41,7 +43,7 @@ export class WardrobeService {
   async buy(user:PublicUser,skinId:string){
     const skin=SKINS.find(s=>s.id===skinId);if(!skin)throw new WardrobeError(400,'Skin inválida.');
     if(!user.verified)throw new WardrobeError(403,'Confirme seu e-mail antes de comprar.');
-    if(!user.character)throw new WardrobeError(409,'Crie seu personagem primeiro.');
+    if(skinId===DEFAULT_SKIN)return this.view(user);
     await this.initialize(user.id);
     await this.db.transaction(async tx=>{
       const [wallet]=await tx.select().from(wallets).where(eq(wallets.userId,user.id)).for('update');
@@ -55,14 +57,9 @@ export class WardrobeService {
     });
     return this.view(user);
   }
-  async saveCharacter(user:PublicUser,character:CharacterConfig){
-    await this.db.update(profiles).set({characterConfig:characterSchema.parse(character)}).where(eq(profiles.userId,user.id));
-    return this.view(user);
-  }
   async equip(user:PublicUser,skin:string){
-    if(!user.character)throw new WardrobeError(409,'Crie seu personagem primeiro.');
-    if(skin!=='custom'){
-      if(!SKINS.some(s=>s.id===skin))throw new WardrobeError(400,'Skin inválida.');
+    if(!SKINS.some(s=>s.id===skin))throw new WardrobeError(400,'Skin inválida.');
+    if(skin!==DEFAULT_SKIN){
       const [owned]=await this.db.select().from(skinInventory).where(and(eq(skinInventory.userId,user.id),eq(skinInventory.skinId,skin)));
       if(!owned)throw new WardrobeError(403,'Compre esta skin na loja antes de vestir.');
     }
@@ -70,5 +67,5 @@ export class WardrobeService {
     return this.view(user);
   }
   async access(user:PublicUser){const inventory=await this.db.select().from(skinInventory).where(eq(skinInventory.userId,user.id));return {
-    character:user.character??null,equippedSkin:user.equippedSkin??'custom',ownedSkins:inventory.map(s=>s.skinId)};}
+    equippedSkin:user.equippedSkin??DEFAULT_SKIN,ownedSkins:SKINS.map(s=>s.id).filter(skin=>owns(inventory,skin))};}
 }

@@ -318,21 +318,7 @@ for y0 in (19.15, 22.5):                                                        
     B.add_collider("Predio_Pilar_Portao", (-0.08, y0, ZP), (0.32, y0 + 0.35, ZM + 0.35))
 for (y0, sgn) in ((19.5, 1), (22.5, -1)):                                                 # folhas do portao (abertas)
     qm.box((0.25, min(y0, y0 + sgn * 0.04), ZP + 0.05), (1.75, max(y0, y0 + sgn * 0.04), ZM - 0.1), "Portao_Verde")
-# palco coberto
-qm.box((21.5, 21.6, ZP), (31.8, 25.8, ZP + 0.6), "Metal_Escuro", mats={'pz': "Madeira"}, skip=('nz', 'py', 'px'))
-qm.box((20.9, 22.2, ZP), (21.5, 23.4, ZP + 0.2), "Madeira", skip=('nz', 'px'))
-qm.box((21.2, 22.2, ZP + 0.2), (21.5, 23.4, ZP + 0.4), "Madeira", skip=('nz', 'px'))
-B.add_collider("Predio_Palco", (21.5, 21.6, ZP), (31.8, 25.8, ZP + 0.6))
-B.add_collider("Predio_Palco_Degrau", (20.9, 22.2, ZP), (21.5, 23.4, ZP + 0.2))
-B.add_collider("Predio_Palco_Degrau", (21.2, 22.2, ZP + 0.2), (21.5, 23.4, ZP + 0.4))
-for (x, y, z1) in ((21.7, 21.8, 4.3), (31.6, 21.8, 4.3), (21.7, 25.6, 4.62), (31.6, 25.6, 4.62)):
-    qm.tube((x, y, ZP + 0.6), (x, y, z1), 0.06, "Metal_Escuro", segs=6)
-    B.add_collider("Predio_Palco_Pilar", (x - 0.06, y - 0.06, ZP), (x + 0.06, y + 0.06, z1))
-roof = [(21.3, 21.4, 4.30), (32.0, 21.4, 4.30), (32.0, 25.95, 4.66), (21.3, 25.95, 4.66)]
-qm.face(roof, "Metal_Ondulado", facing=(0, -0.1, 1))
-qm.face([(x, y, z - 0.01) for (x, y, z) in roof], "Metal_Ondulado", facing=(0, 0.1, -1))
-qm.box((21.7, 21.75, 4.05), (31.6, 21.85, 4.15), "Metal_Escuro")
-qm.box((22.8, 25.62, ZP + 0.85), (30.2, 25.68, ZP + 2.70), "Metal_Escuro", uvrects={'ny': B.REG['placa2']}, mats={'ny': "Atlas_Placas"})
+# palco (tablado, trelica, cobertura, telao): 15_palco.py
 # pergolado de madeira
 PXS, PYS = [1.2, 5.6, 10.0, 14.4, 18.8], [16.2, 20.0, 23.8]
 for x in PXS:

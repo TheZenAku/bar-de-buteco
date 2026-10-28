@@ -19,7 +19,7 @@ Abra **https://localhost:5173** depois de aparecer **B.A.R. ligado!** (na primei
 
 Se a execução estiver incompleta, use `reiniciar.bat`. Processos de outros programas que ocupem essas portas são informados e não são encerrados. As ferramentas não executam seed nem apagam contas ou dados do jogo.
 
-Os comandos de desenvolvimento da API e do mundo também monitoram explicitamente `packages/shared/src/**/*.{ts,json}`, incluindo TypeScript e JSON. Assim, alterações nos contratos compartilhados e no catálogo de roupas recarregam os dois serviços; sem isso, o cliente podia atualizar enquanto a API continuava rejeitando os campos novos. Após atualizar os próprios comandos `dev`, execute `reiniciar.bat` uma vez para ativar o novo monitoramento.
+Os comandos de desenvolvimento da API e do mundo também monitoram explicitamente `packages/shared/src/**/*.{ts,json}`, incluindo TypeScript e JSON. Assim, alterações nos contratos compartilhados e nos dados JSON, como o mapa, recarregam os dois serviços; sem isso, o cliente podia atualizar enquanto a API continuava rejeitando os campos novos. Após atualizar os próprios comandos `dev`, execute `reiniciar.bat` uma vez para ativar o novo monitoramento.
 
 Antes de iniciar, o script verifica Node/npm, dependências essenciais e marcadores de conflito de merge no código. Se houver conflito, informa o arquivo e a linha e termina com erro. Um `git status` limpo não garante ausência de marcadores salvos em um commit.
 
@@ -46,9 +46,9 @@ Verificado em 22/10/2026: início fora da pasta do projeto, início repetido sem
 
 | Pasta | Conteúdo |
 | --- | --- |
-| `assets/` | Importadores que geram os arquivos de `apps/web/public` a partir de `assets-bar` (chamados pelos scripts `npm run assets:*`), a biblioteca comum em `assets/lib` e a importação de roupas em `assets/roupas` |
+| `assets/` | Importadores que geram os arquivos de `apps/web/public` a partir de `assets-bar` (chamados pelos scripts `npm run assets:*`), e a biblioteca comum em `assets/lib` |
 | `ops/` | Backup e restore-check do PostgreSQL (`npm run ops:backup`, `npm run ops:restore-check`) e `pseudonym.mjs`, que acha um jogador nos logs |
 
-Para instalar novos FBX masculinos, use [os scripts em `tools/assets/roupas`](assets/roupas/README.md): listagem, validação e importação com backup e catálogo automático.
+Para trocar os ícones dos itens ou da moeda, substitua a imagem em `assets-bar/icons` (mesmo nome) e execute `npm run assets:icons`. A tabela no início de `assets/import-icons.mjs` liga cada arquivo ao item. Um item novo precisa de uma linha ali e do caminho `icon` no catálogo (`packages/shared/src/inventory.ts`).
 
 Para atualizar os [sons ambientes](../docs/sistemas/ambient.md), adicione gravações em `assets-bar/sound/ambient` e execute `npm run assets:ambient -- "C:\caminho\ffmpeg.exe"`. O importador normaliza o volume, converte para AAC e elimina duplicatas sem alterar os originais.

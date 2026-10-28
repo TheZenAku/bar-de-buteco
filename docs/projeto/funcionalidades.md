@@ -6,13 +6,13 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | --- | --- | --- |
 | Bar multiplayer | Pronto | Colyseus autoritativo, AOI de 18 m, predição e reconciliação ([rede](../arquitetura/networking.md)) |
 | Sentar nas mesas | Pronto | 124 assentos do mapa, dois andares |
-| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto (novo)** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega e estorno |
+| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega e estorno. Desde 28/10 o Tonico leva o pedido numa bandeja com os objetos 3D, põe cada item na mesa e eles ficam lá (sobras somem 4 min depois de a pessoa levantar ou quando o ajudante limpa a mesa) |
 | Magrão no balcão prepara e cobra | **Pronto (novo)** | O balcão agora cobra o preço do item e estorna o pedido que cair |
 | Jukebox com som 3D, custando moedas | **Pronto (cobrança nova)** | Volume pela distância ([jukebox](../sistemas/jukebox.md)); 15 moedas por vídeo. O YouTube não entra no Web Audio, então não há pan estéreo, só atenuação |
 | TV com YouTube para todos, custando moedas | **Pronto (cobrança nova)** | 25 moedas por vídeo |
 | Telão na área de show | **Pronto (novo)** | Tela de 4,8 × 2,7 m no fundo do palco, controlada na frente do palco; som pelo quintal todo; 60 moedas |
 | Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno, karatê. Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
-| Fumar, beber e comer com props | Parcial | Beber com garrafa ou copo na mão é real. Faltam clipes e props de **fumar** e **comer** |
+| Fumar, beber e comer com props | Parcial | Beber com o objeto real na mão: long neck, chopp, água, refrigerante e café ([bebidas e comidas em 3D](../sistemas/drinks.md)). Coxinha, pastel e torresmo já têm modelo 3D (aparecem na mesa), mas falta o clipe de **comer**; faltam clipe e props de **fumar** |
 | Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |

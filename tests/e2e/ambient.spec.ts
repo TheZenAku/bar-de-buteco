@@ -1,6 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 import catalog from '../../apps/web/src/assets/ambient.json' with {type:'json'};
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/ambient.html',import.meta.url)).replaceAll('\\','/');
 const state=(page:Page)=>page.evaluate(()=>(window as any).fixture.audio.telemetry());
@@ -87,7 +86,6 @@ test('in-game ambience starts on entry, follows settings, leaves voice independe
   test.setTimeout(120000);
   const suffix=Date.now().toString(36);
   expect((await page.request.post('/api/auth/register',{data:{email:`amb_${suffix}@example.com`,username:`amb_${suffix}`,displayName:'Ambiente',password:'AmbienteTeste2026!'}})).ok()).toBe(true);
-  expect((await page.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/');await page.getByRole('button',{name:'Entrar no bar'}).click();
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});

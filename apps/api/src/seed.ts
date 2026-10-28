@@ -4,7 +4,7 @@ import { readConfig } from './config.js';
 import { connectDatabase } from './database/index.js';
 import { users, profiles, statistics } from './database/schema.js';
 import { hashPassword } from './auth/service.js';
-import {DEFAULT_CHARACTER,SKINS} from '@bar/shared';
+import {SKINS} from '@bar/shared';
 import {skinInventory} from './database/schema.js';
 
 const config = readConfig();
@@ -20,15 +20,13 @@ try {
   ]) {
     const [existing] = await connection.db.select().from(users).where(eq(users.email, account.email));
     if (existing) {
-      const [profile]=await connection.db.select().from(profiles).where(eq(profiles.userId,existing.id));
-      if(!profile.characterConfig)await connection.db.update(profiles).set({characterConfig:DEFAULT_CHARACTER}).where(eq(profiles.userId,existing.id));
       for(const skin of SKINS)await connection.db.insert(skinInventory).values({userId:existing.id,skinId:skin.id}).onConflictDoNothing();
-      console.log(`Conta de demonstração existente: ${account.email} (personagem e coleção de teste preparados)`);continue;
+      console.log(`Conta de demonstração existente: ${account.email} (coleção de teste preparada)`);continue;
     }
     await connection.db.transaction(async (tx) => {
       const id = randomUUID();
       await tx.insert(users).values({ id, email: account.email, username: account.username, role: account.role, verified: true, passwordHash });
-      await tx.insert(profiles).values({ userId: id, displayName: account.displayName, avatarConfig: { color: account.color },characterConfig:DEFAULT_CHARACTER });
+      await tx.insert(profiles).values({ userId: id, displayName: account.displayName, avatarConfig: { color: account.color } });
       for(const skin of SKINS)await tx.insert(skinInventory).values({userId:id,skinId:skin.id});
       await tx.insert(statistics).values({ userId: id });
     });

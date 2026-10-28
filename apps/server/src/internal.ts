@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { internalSecret } from '@bar/shared/tickets';
-import type {CharacterConfig,InventoryStack} from '@bar/shared';
+import type {InventoryStack} from '@bar/shared';
 import { readWorldConfig } from './config.js';
 
-export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';character?:CharacterConfig|null;equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[];balance?:number }
+export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[];balance?:number }
 export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event'; playerId?: string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string }
 
 /** The API answered with an error status (4xx: the request itself was refused; 5xx: try again later). */

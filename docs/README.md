@@ -30,16 +30,16 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 - [Administração](sistemas/admin.md)
 - [Som ambiente](sistemas/ambient.md)
-- [Personagens e coleção de skins](sistemas/characters.md)
 - [Ciclo de dia e noite](sistemas/day-night.md)
 - [Economia: moedas, balcão, mesa, empregos e mídia](sistemas/economia.md)
 - [Configurações gráficas](sistemas/graficos.md)
 - [Portas](sistemas/doors.md)
-- [Cerveja: garrafa e copo americano](sistemas/drinks.md)
+- [Cerveja: garrafa e copo de chopp](sistemas/drinks.md)
 - [Interface Boteco Social](sistemas/interface.md)
 - [Inventário](sistemas/inventory.md)
 - [Jukebox e TVs](sistemas/jukebox.md)
 - [Necessidades do personagem](sistemas/needs.md)
+- [Skins e coleção](sistemas/skins.md)
 - [Chat de voz por proximidade](sistemas/voice.md)
 
 ## Assets
@@ -47,11 +47,10 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Animações](assets/animations.md)
 - [Mapa BarBoteco](assets/map.md)
 - [Animações nos esqueletos nativos](assets/native-rigs.md)
-- [Skins AccuRig](assets/skins-accurig.md)
+- [Skins Mixamo](assets/skins-mixamo.md)
 - [Caminhada com bengala](assets/old-cane.md)
 
 ## Validação
 
 - [Validação de 21/10/2026](validacao/validation.md)
-- [Criador e coleção](validacao/validation-characters.md)
 - [Mapa BarBoteco](validacao/validation-map.md)

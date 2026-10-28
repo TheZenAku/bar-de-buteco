@@ -5,7 +5,7 @@ interface Task { station: JobStation; index: number; requestId: string; deadline
 export interface Shift { jobId: string; playerId: string; shiftId: string; startedAt: number; endsAt: number; task: Task; tasks: number; earned: number }
 export interface Payment { playerId: string; jobId: string; reason: string; requestId: string; amount: number; attempts: number }
 export type JobEvent =
-  | { type: 'paid'; playerId: string; payment: Payment }
+  | { type: 'paid'; playerId: string; payment: Payment; stationId: string }
   | { type: 'ended'; playerId: string; reason: string };
 interface Settings { enabled: boolean; pay: number; slots: number }
 
@@ -71,7 +71,7 @@ export class JobDirector {
         const payment: Payment = { playerId: shift.playerId, jobId: job.id, reason: `job:${job.id}:${shift.shiftId}:${task.index}`, requestId: task.requestId, amount: pay, attempts: 0 };
         shift.tasks++; shift.task = this.nextTask(job, now, task.station.id, task.index + 1);
         const total = this.totals.get(job.id) ?? { tasks: 0, paid: 0 }; total.tasks++; this.totals.set(job.id, total);
-        events.push({ type: 'paid', playerId: shift.playerId, payment });
+        events.push({ type: 'paid', playerId: shift.playerId, payment, stationId: task.station.id });
         if (now >= shift.endsAt) { this.stop(shift.playerId, now); events.push({ type: 'ended', playerId: shift.playerId, reason: 'Fim do turno. Bom trabalho! Descanse um pouco antes do próximo.' }); }
       } else if (task.startedAt === undefined && now >= task.deadline) {
         this.stop(shift.playerId, now); events.push({ type: 'ended', playerId: shift.playerId, reason: 'Você ficou parado e perdeu o turno.' });

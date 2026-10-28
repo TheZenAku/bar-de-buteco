@@ -6,6 +6,7 @@ import { AnimationMixer, Object3D, Quaternion, Texture, TextureLoader, Vector3 }
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import {appendOldCane} from './lib/old-cane.mjs';
 import {createRetarget} from './lib/animation-retarget.mjs';
+import {mixamoBoneName} from './lib/mixamo-names.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const models = path.join(root, 'apps/web/public/models');
@@ -35,24 +36,15 @@ const trims = {
   Wait: {from:0,to:4,blend:.5},
 };
 
-const mixamoNames = new Map([
-  ['Hips','hip'],['Spine','spine_01'],['Spine1','spine_02'],['Spine2','spine_03'],['Neck','neck'],['Head','head'],
-  ['LeftShoulder','shoulder_l'],['LeftArm','upperarm_l'],['LeftForeArm','lowerarm_l'],['LeftHand','hand_l'],
-  ['RightShoulder','shoulder_r'],['RightArm','upperarm_r'],['RightForeArm','lowerarm_r'],['RightHand','hand_r'],
-  ['LeftUpLeg','upperleg_l'],['LeftLeg','lowerleg_l'],['LeftFoot','foot_l'],['LeftToeBase','toe_l'],
-  ['RightUpLeg','upperleg_r'],['RightLeg','lowerleg_r'],['RightFoot','foot_r'],['RightToeBase','toe_r'],
-]);
-for(const side of ['Left','Right'])for(const finger of ['Thumb','Index','Middle','Ring','Pinky'])for(let joint=1;joint<=3;joint++)
-  mixamoNames.set(`${side}Hand${finger}${joint}`,`${finger.toLowerCase()}_0${joint}_${side==='Left'?'l':'r'}`);
 const canonicalSourceName = name => {
   if(name.startsWith(prefix))return name.slice(prefix.length);
-  return mixamoNames.get(name.replace(/^mixamorig/,''))??name;
+  return mixamoBoneName(name)??name;
 };
 // No meshes/textures are exported; do not require browser image APIs for FBX materials.
 TextureLoader.prototype.load = () => new Texture();
 
 function readModel(id) {
-  const file = fs.readFileSync(path.join(id.startsWith('base-')?(process.env.BAR_CHARACTER_OUTPUT??path.join(root,'apps/web/public/characters')):models, `${id}.glb`));
+  const file = fs.readFileSync(path.join(models, `${id}.glb`));
   const length = file.readUInt32LE(12);
   const json = JSON.parse(file.subarray(20, 20 + length));
   const nodes = json.nodes.map(n => {
@@ -74,11 +66,12 @@ const previousManifest = fs.existsSync(path.join(output,'durations.json'))?JSON.
 const knownClips=new Set([...Object.keys(clips),'OldCaneWalk','OldCaneHold']);
 const manifest=Object.fromEntries(Object.entries(previousManifest).filter(([name])=>knownClips.has(name)));
 const requested=process.argv.slice(2);
-for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','base-female'].filter(id=>!requested.length||requested.includes(id))) {
+// Gilmar enters once his Mixamo skin has been imported (tools/assets/import-mixamo.mjs).
+const skins = ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
+for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);
   const retargeted = id !== 'nathan';
   const rig=createRetarget(model.nodes,reference.nodes);
-  const hipName = id === 'rafael' ? 'pelvis' : 'hip';
   const json = { asset: { version: '2.0', generator: 'B.A.R. animation converter' },
     scene: 0, scenes: [{ nodes: model.json.scenes[model.json.scene ?? 0].nodes }],
     nodes: model.json.nodes.map(({ mesh, skin, ...n }) => n), animations: [], accessors: [], bufferViews: [], buffers: [{ byteLength: 0 }] };
@@ -123,7 +116,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     const input = accessor(times, 1);
     const rotations = model.nodes.map(() => []), translations = model.nodes.map(() => []);
     const basePositions = model.nodes.map(n => n.position.clone()), baseRotations = model.nodes.map(n => n.quaternion.clone());
-    const scale = model.byName.get(hipName).getWorldPosition(new Vector3()).y / 0.956;
+    const scale = model.byName.get('hip').getWorldPosition(new Vector3()).y / 0.956;
     let firstHip, seatedOffset = 0;
     for (const time of times) {
       // Avoid AnimationMixer wrapping the final frame back to zero.
@@ -131,7 +124,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
       const sourceHip = sourceBones.get('hip').getWorldPosition(new Vector3()).multiplyScalar(sourceUnit);
       if (!firstHip) {
         firstHip = sourceHip.clone();
-        if (seatedClips.has(name)) seatedOffset = 0.56 - (adapted ? model.byName.get(hipName).getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
+        if (seatedClips.has(name)) seatedOffset = 0.56 - (adapted ? model.byName.get('hip').getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
       }
       const nativePose=adapted?sourceRig.pose(new Map([...sourceBones].map(([name,bone])=>[name,bone.getWorldQuaternion(new Quaternion())]))):undefined;
       model.nodes.forEach((node, index) => {
@@ -139,7 +132,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
         let position = basePositions[index].clone();
         const sourceName = rig.names[index];
         const bone = sourceBones.get(sourceName);
-        // The root of Rafael is a static Z-up conversion; pelvis incorporates FBX root motion.
+        // Native roots keep their authored (axis conversion) transform; the hip carries the FBX root motion.
         if (adapted) {
           local=nativePose[index];
         } else if (id === 'nathan' && bone) {
@@ -150,7 +143,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
           sourceBones.get('root').getWorldPosition(position).multiplyScalar(sourceUnit);
           position.x -= firstHip.x; position.z -= firstHip.z; position.y += seatedOffset;
         }
-        if (adapted && node.name === hipName) {
+        if (adapted && node.name === 'hip') {
           const target = node.getWorldPosition(new Vector3());
           target.x += (sourceHip.x - firstHip.x) * scale;
           target.z += (sourceHip.z - firstHip.z) * scale;
@@ -174,7 +167,7 @@ for (const id of ['nathan', 'leandro', 'rafael', 'read', 'magrao','base-male','b
     model.nodes.forEach((node, index) => {
       if (model.json.nodes[index].mesh !== undefined) return;
       for (const [property, data, size] of [['rotation', rotations[index], 4], ['translation', translations[index], 3]]) {
-        if (property === 'translation' && node.name !== (adapted ? hipName : 'root')) continue;
+        if (property === 'translation' && node.name !== (adapted ? 'hip' : 'root')) continue;
         const output = accessor(data, size);
         const sampler = animation.samplers.push({ input, output, interpolation: 'LINEAR' }) - 1;
         animation.channels.push({ sampler, target: { node: index, path: property } });

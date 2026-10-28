@@ -8,7 +8,7 @@
 #   altura_real_m  (float)  altura final em metros
 #   tris_alvo      (int)    triangulos da versao de jogo
 #   textura_px     (int)    resolucao maxima das texturas
-import bpy, math, os, re
+import bpy, bmesh, math, os, re
 import numpy as np
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
@@ -28,6 +28,7 @@ REGRAS = [
     (("cadeira",), 0.80, 1600, 1024, "assento"),
     (("banqueta", "banquinho"), 0.75, 1200, 512, "assento"),
     (("sofa", "poltrona"), 0.85, 3000, 1024, "assento"),
+    (("numeracao", "guardanapo", "paliteiro"), 0.12, 1200, 512, "objeto"),  # porta-guardanapo numerado (antes de "mesa")
     (("mesa",), 0.72, 2400, 1024, "mesa"),
     (("carrinho", "churrasqueira", "espeto"), 1.75, 3500, 1024, "fino"),   # ate o topo da chamine
     (("chopeira", "chopp", "chope"), 0.52, 2500, 1024, "objeto"),          # chopeira eletrica de balcao (2 torneiras)
@@ -308,6 +309,13 @@ def processar(src):
     co = coords(me)
     s = altura / max(co[:, 2].max() - co[:, 2].min(), 1e-6)
     me.transform(Matrix.Scale(s, 4))
+    # o colapso do decimate pode deixar faces degeneradas/duplicadas; o validate() do exportador glTF as remove mas a
+    # malha fica com loop_triangles quebrado e e descartada inteira (0 primitivas). Limpa aqui e reconstroi via bmesh.
+    me.validate()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.to_mesh(me)
+    bm.free()
     for p in me.polygons:
         p.use_smooth = True
     if hasattr(me, "use_auto_smooth"):
@@ -481,7 +489,8 @@ if ref is not None:
     ref["referencia_escala"] = True
     print("personagem de referencia: %s (%.3f m) -> fator %.3f" % (ref.name, h_ref, FATOR))
 fontes = [o.name for o in src_col.all_objects if o.type == 'MESH' and o is not ref
-          and not o.get("otimizado") and not o.get("fx") and not o.name.startswith(("OTM_", "ASSET_", "FX_"))]
+          and not o.get("otimizado") and not o.get("fx") and not o.get("pipeline_proprio")      # ex.: jukebox -> 12_jukebox.py
+          and not o.name.startswith(("OTM_", "ASSET_", "FX_"))]
 # fileira das versoes otimizadas ao lado dos originais
 rel = []
 SO = globals().get("SO_ASSETS")                  # opcional: processar so estes nomes (os outros ficam como estao)

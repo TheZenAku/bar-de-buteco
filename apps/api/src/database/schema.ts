@@ -11,7 +11,7 @@ export const users = pgTable('users', {
 export const profiles = pgTable('user_profiles', {
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   displayName: text('display_name').notNull(), avatarConfig: jsonb('avatar_config').notNull().default({ color: '#cf7549' }),
-  characterConfig: jsonb('character_config'), equippedSkin:text('equipped_skin').notNull().default('custom'),
+  equippedSkin:text('equipped_skin').notNull().default('nathan'),
 });
 export const wallets=pgTable('wallets',{
   userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),balance:integer('balance').notNull().default(0),

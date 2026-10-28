@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {DEFAULT_CHARACTER,INTERACTABLES,JOBS,canInteract,isWalkable,floorHeight,stationInteractable,type JobStation} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {INTERACTABLES,JOBS,canInteract,isWalkable,floorHeight,stationInteractable,type JobStation} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean,ms=6000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,25));}}
 /** A free spot on the floor from which the station can be touched. */
@@ -22,7 +22,7 @@ test('economy over real WebSockets: Tonico delivers paid table orders, refunds d
       wallets.set(body.userId,balance+body.amount);applied.set(body.requestId,body.amount);charges.push({userId:body.userId,amount:body.amount,reason:body.reason});
       res.end(JSON.stringify({balance:balance+body.amount,applied:body.amount}));return;}
     const id=raw?JSON.parse(raw).userId:undefined;
-    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',character:DEFAULT_CHARACTER,equippedSkin:'custom',ownedSkins:[],balance:wallets.get(id)??1000}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
+    res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:[],role:'user',equippedSkin:'nathan',ownedSkins:['nathan'],balance:wallets.get(id)??1000}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let room!:BarRoom;
   server.define('bar',BarRoom).on('create',created=>{room=created as BarRoom;});await server.listen(0,'127.0.0.1');
@@ -59,6 +59,12 @@ test('economy over real WebSockets: Tonico delivers paid table orders, refunds d
     assert.ok(Math.hypot(tonico.x-seat.x,tonico.z-seat.z)<1.6,'Tonico hands the order over at the table');
     assert.ok(eater.player().thirst>=thirst,'The delivered drink is consumed at the table');
     assert.equal(eater.player().animationState,'sit','The customer stays seated');
+    // What he brought stays on the customer's table, for everyone to see.
+    await until(()=>(eater.room.state as any).served?.size===2);
+    const onTable=[...(eater.room.state as any).served.values()] as Array<{item:string;table:number;y:number}>;
+    assert.deepEqual(onTable.map(i=>i.item).sort(),['coxinha','refrigerante']);
+    assert.ok(onTable.every(i=>i.table===seat.table&&i.y>1),'On the table top');
+    assert.equal(tonico.carrying,'','His tray is empty again');
     // A second order dropped by standing up is refunded once.
     eater.room.send('table.order',{items:['agua']});await until(()=>eater.seen.table.filter(s=>s.status==='ordered').length===2);
     eater.room.send('player.interact',{objectId:'stand'});

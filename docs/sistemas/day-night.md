@@ -21,7 +21,7 @@ O céu é procedural, com gradiente, disco solar, lua e estrelas. Compartilha o 
 
 A névoa linear começa entre **23 e 28 m** e atinge o máximo entre **49 e 58 m**, conforme a hora. Uma segunda máscara atua nos **8 m finais de cada borda** do mapa, independente da distância da câmera. Isso evita revelar o corte do terreno quando o jogador se aproxima dos limites. Um plano visual abaixo da rua completa o horizonte; não acrescenta piso jogável nem altera os limites ou colisores.
 
-O shader de borda é aplicado aos materiais do mapa por instância de aplicação, sem modificar globalmente os shaders dos previews de personagem. Usa o chunk de névoa da versão instalada e preserva seu cálculo de distância, combinado à máscara em coordenadas do mundo.
+O shader de borda é aplicado aos materiais do mapa por instância de aplicação, sem modificar globalmente os shaders. Usa o chunk de névoa da versão instalada e preserva seu cálculo de distância, combinado à máscara em coordenadas do mundo.
 
 ## Arquivos e validação
 

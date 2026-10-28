@@ -1,5 +1,4 @@
 import {test,expect,type Page} from '@playwright/test';
-import {DEFAULT_CHARACTER} from '../../packages/shared/src/character';
 
 const password='AdminBrowserTests2026!';
 test.beforeEach(async({request})=>{
@@ -9,7 +8,6 @@ async function enter(page:Page,username:string,email:string){
   const created=await page.request.post('/api/auth/register',{data:{username,email,displayName:username,password}});
   if(created.status()===409){const login=await page.request.post('/api/auth/login',{data:{email,password}});expect(login.ok()).toBe(true);}
   else expect(created.status()).toBe(201);
-  expect((await page.request.post('/api/character',{data:DEFAULT_CHARACTER})).ok()).toBe(true);
   await page.goto('/');await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);
 }
 async function ready(page:Page){

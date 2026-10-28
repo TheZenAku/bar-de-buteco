@@ -25,4 +25,4 @@ O nginx serve o cliente e encaminha `/api` e `/game`. Rotas internas e a caixa l
 
 Referências consultadas: [PlayCanvas Engine](https://api.playcanvas.com/engine/), [salas Colyseus](https://docs.colyseus.io/server/room), [sincronização](https://docs.colyseus.io/state), [Drizzle com PGlite](https://orm.drizzle.team/docs/get-started/pglite-new), [Nodemailer SMTP](https://nodemailer.com/smtp).
 
-O personagem personalizado é persistido no perfil, separado da skin equipada e do inventário. A API valida opções, compras e posse em transações; o servidor sincroniza a configuração autorizada para os clientes. Os corpos Standard do Quaternius e suas peças usam rig e bancos de animação próprios, enquanto as skins completas mantêm seus modelos e comportamentos. Veja [personagens e loja](../sistemas/characters.md).
+A skin vestida é persistida no perfil, separada do inventário. Nathan é gratuito; as demais skins são compradas. A API valida compras e posse em transações; o servidor sincroniza a skin autorizada para os clientes. Cada skin mantém seu modelo, rig e banco de animações. Veja [skins e coleção](../sistemas/skins.md).

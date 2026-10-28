@@ -13,9 +13,15 @@ export const MAP_MARKERS = map.markers;
 export const MAP_EFFECTS = map.effects;
 export const MAP_COLLIDERS = map.colliders;
 export const MAP_SURFACES = map.surfaces;
+/**
+ * Every customer table, numbered in the map (14_mesas.py: the number on its napkin holder). The number is how
+ * players and staff name a table; seats carry the number of their table (`seat.table`).
+ */
 export const CAFE_TABLES = map.tables;
+export type CafeTable = (typeof CAFE_TABLES)[number];
+export const tableByNumber=(number:number):CafeTable|undefined=>CAFE_TABLES.find(table=>table.number===number);
 // Game props the map leaves room for: blackjack in the upstairs games hall, between the last pool table
-// and the lounge; the jukebox against the base of the ground-floor stairs, beside the hall (JUKEBOX_PLACEMENT).
+// and the lounge. The jukebox is authored in the map, against the base of the ground-floor stairs (JUKEBOX_PLACEMENT).
 export const BLACKJACK_TABLE = {x:17.4,y:3.45,z:-7.4,rx:0.95,rz:0.55};
 export const JUKEBOX = JUKEBOX_PLACEMENT;
 export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
@@ -23,9 +29,9 @@ export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
   return {x:BLACKJACK_TABLE.x+dx,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z+dz,rotation:Math.atan2(-dx,-dz)};
 });
 const BLACKJACK_COLLIDER:Collider={id:'blackjack',x:BLACKJACK_TABLE.x,z:BLACKJACK_TABLE.z,hx:.75,hz:.42,minY:BLACKJACK_TABLE.y,maxY:BLACKJACK_TABLE.y+.8};
-const JUKEBOX_COLLIDER:Collider={id:'jukebox',x:JUKEBOX.x,z:JUKEBOX.z,hx:JUKEBOX.hx,hz:JUKEBOX.hz,minY:JUKEBOX.y,maxY:JUKEBOX.y+1.55};
-/** Static solids: walls, furniture, the game's props. Door leaves move; see solidColliders. */
-export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER,JUKEBOX_COLLIDER];
+const JUKEBOX_COLLIDER:Collider=map.colliders.find(c=>c.id==='COL_Int_Jukebox')!;
+/** Static solids: walls, furniture (the jukebox among them), the game's props. Door leaves move; see solidColliders. */
+export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER];
 // Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
 // Doors start open, as authored in the map.
 const openDoors=new Map(DOORS.map(door=>[door.id,true]));
@@ -79,7 +85,7 @@ export const INTERACTABLES: readonly Interactable[] = [
   {id:'counter',type:'counter',label:'Pedir uma bebida',...map.markers.Ponto_Balcao,footprint:[...COUNTER_FOOTPRINT]},
   // The point is where a player stands touching the jukebox front.
   {id:'jukebox',type:'jukebox',media:'jukebox',label:'Tocar a jukebox',x:JUKEBOX.x,y:JUKEBOX.y,z:JUKEBOX.z+JUKEBOX.hz+PLAYER_RADIUS+.05,footprint:[footprint(JUKEBOX_COLLIDER)]},
-  ...map.seats.map(seat=>({...seat,type:'seat' as const,label:'Sentar'})),
+  ...map.seats.map(seat=>({...seat,type:'seat' as const,label:`Sentar · mesa ${seat.table}`})),
   ...DOORS.map(door=>({id:door.id,type:'door' as const,label:door.label,x:door.x,y:door.y,z:door.z,footprint:door.footprint})),
   // The toilets of both floors' restrooms (COL_Mob_Vaso in the map export), used by touching them.
   ...map.colliders.filter(c=>/^COL_Mob_Vaso(\.\d+)?$/.test(c.id)).map((c,i)=>({id:`toilet-${i+1}`,type:'toilet' as const,label:'Usar o banheiro',x:c.x,y:c.minY,z:c.z,footprint:[footprint(c)]})),

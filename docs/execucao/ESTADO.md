@@ -15,6 +15,8 @@
 | `2751179` | Volume persistente do outbox do mundo no Compose |
 | (árvore atual, ainda sem commit) | Lifecycle de admissão, contrato único da cena e registro de sessões da sala ([ADR-007](DECISOES.md)); segredos separados, Node 24, smoke PostgreSQL e restore verificável ([ADR-008, ADR-009](DECISOES.md)); CI separada, política explícita de scripts de dependências e testes de toast determinísticos ([ADR-010](DECISOES.md)); runner de migração explícito e papéis PostgreSQL separados ([ADR-011](DECISOES.md)) |
 | (limpeza, sem commit) | Remove o Avatar V2, o protótipo `ui-marrom`, o tema visual anterior e duplicatas; reorganiza `docs/` e `tools/` por assunto ([ADR-012](DECISOES.md)) |
+| (árvore atual, sem commit) | Aposenta o criador de personagem: só skins, com Nathan gratuito; a migração 005 remove `character_config` ([ADR-013](DECISOES.md)) |
+| (árvore atual, sem commit) | Mapa de 27/10: a jukebox do mapa substitui a de caixas e acende com as cores do vídeo; 39 mesas numeradas (`tableByNumber`); fachada *Highland* iluminada com as cores da arte; blip do objetivo do trabalho visível só para quem trabalha ([mapa](../assets/map.md), [jukebox](../sistemas/jukebox.md#luzes-da-jukebox), [economia](../sistemas/economia.md)) |
 
 ## Critérios de aceite do Marco 0
 
@@ -38,7 +40,7 @@ Os commits são independentes e a reversão não é destrutiva:
 
 Também é possível simplesmente não fazer o merge da branch.
 
-As mudanças mais recentes do Marco 1 ainda estão somente na árvore de trabalho, portanto não existe hash para revertê-las. A reversão deve ser feita por commits pequenos depois da revisão, usando `git revert`; as fachadas `BarScene`, `BarRoom` e `main.ts` foram preservadas justamente para permitir que cada extração seja revertida sem migração de dados. Migrações aplicadas não são editadas nem desfeitas de modo destrutivo: uma versão anterior já adaptada inicia com o schema expandido, enquanto uma versão anterior ao ADR-011 exige a credencial bootstrap temporária descrita no [runbook](../../infra/README.md#rollback-de-implantação).
+As mudanças mais recentes do Marco 1 ainda estão somente na árvore de trabalho, portanto não existe hash para revertê-las. A reversão deve ser feita por commits pequenos depois da revisão, usando `git revert`; as fachadas `BarScene`, `BarRoom` e `main.ts` foram preservadas justamente para permitir que cada extração seja revertida sem migração de dados. A migração 005 (ADR-013) é a exceção contrativa: apaga `character_config`, e voltar para antes dela exige o backup anterior ou recriar a coluna. As demais migrações aplicadas não são editadas nem desfeitas de modo destrutivo: uma versão anterior já adaptada inicia com o schema expandido, enquanto uma versão anterior ao ADR-011 exige a credencial bootstrap temporária descrita no [runbook](../../infra/README.md#rollback-de-implantação).
 
 ## Próximo passo
 

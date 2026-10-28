@@ -18,7 +18,7 @@ Os novos marcadores `Ponto_Praca`, `Ponto_Igreja`, `Ponto_Campinho`, `Ponto_Esco
 
 ## Colisões e interações
 
-O export fornece 1.550 volumes sólidos e 134 triângulos de apoio. Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos, ruas, rampas, palco e escadas preservam as posições e dimensões exportadas.
+O export fornece 1.551 volumes sólidos (o da jukebox, `COL_Int_Jukebox`, entre eles) e 134 triângulos de apoio. Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos, ruas, rampas, palco e escadas preservam as posições e dimensões exportadas.
 
 As 16 folhas de porta são dinâmicas. O importador ignora apenas seus pivôs vazios `COLPORTA_*`, lê a geometria real de cada folha e exporta dobradiça, largura e ângulos. A colisão acompanha individualmente o estado aberto ou fechado; veja [portas](../sistemas/doors.md).
 
@@ -26,9 +26,29 @@ O jogador é um cilindro de 0,34 m de raio e 1,86 m de altura que sobe degraus d
 
 As 31 mesas vermelhas mantêm colisores compactos. As cadeiras são instâncias de GPU atravessáveis para permitir circulação entre conjuntos apertados. O importador lê as 142 transformações de `EXT_mesh_gpu_instancing`, associa 124 cadeiras às mesas e valida separadamente as 18 cadeiras empilhadas do depósito. Não existe lista manual para manter sincronizada: mover, adicionar ou remover conjuntos no Blender atualiza o jogo ao executar a importação. Ao levantar, o servidor sempre desloca o personagem para uma saída livre atrás ou nas diagonais da cadeira, evitando deixá-lo em pé dentro da malha visual.
 
+## Mesas numeradas
+
+Cada mesa de cliente tem um número, escrito no porta-guardanapo em cima dela (`14_mesas.py`). No export, o marcador `Mesa_NN` (coleção `Mesas`) fica no tampo, com `mesa`, `area`, `andar` e `lugares`. O importador associa cada marcador ao colisor da sua mesa e falha se faltar número, se houver número repetido ou se a sequência pular algum.
+
+| Área | Mesas | Observação |
+| --- | --- | --- |
+| Salão (térreo) | 1–11 | da frente para o fundo |
+| Varanda | 12–20 | contornando o L |
+| Quintal | 21–31 | 24–31 são as de piquenique, com 6 lugares nos bancos |
+| Salão de cima | 32–33 | |
+| Terraço | 34–39 | |
+
+`map-data.json` → `tables` traz as 39 mesas em ordem de número (`id` `mesa-N`, `number`, `area`, `floor`, `places`, posição, altura do tampo em `top` e o colisor). Cada assento tem `table`, o número da sua mesa, e o botão de sentar mostra *Sentar · mesa N*. No código, use `CAFE_TABLES` e `tableByNumber(n)` (`@bar/shared`). **Toda referência a uma mesa, no jogo ou nos pedidos de mudança, usa esse número.**
+
+## Fachada iluminada
+
+A fachada *Highland Bar* (`13_fachada.py`) tem o letreiro com a logo na quina do andar de cima (`Letreiro_Highland`, com a borda em `Neon_Magenta`), as duas placas do beiral da varanda (`Placa_Highland`) e um halo magenta nos tijolos da quina (`Luz_Letreiro`). O importador falha se algum desses materiais deixar de ser emissivo ou se a luz sumir.
+
+No jogo, a fachada fica acesa de dia e de noite e só apaga no apagão, junto com a luz do bar. O motor não tem *bloom*, então emissão acima de 1 só estoura o pixel para branco e muda o tom (o neon com força 3 viraria lilás). Por isso, `environment-lighting.ts` mantém o canal mais forte de cada material exatamente no valor do Blender **depois da exposição da cena**: o magenta, o ciano, o amarelo e o laranja da logo aparecem como na arte. `Luz_Letreiro` não vira luminária de teto: continua pontual, sem sombra, com a cor magenta original, e acende à noite.
+
 ## Pontos do jogo
 
-O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais próximo, mantendo distância das pessoas presentes. `Ponto_Balcao` posiciona o atendimento do Seu Zé. Blackjack e jukebox continuam sendo objetos do jogo: o blackjack fica no salão de jogos superior e a jukebox no salão térreo (`BLACKJACK_TABLE` e `JUKEBOX` em `packages/shared/src/world.ts`). As rotas de Tonico, Dona Lurdinha e Seu Zé são verificadas contra os novos colisores.
+O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais próximo, mantendo distância das pessoas presentes. `Ponto_Balcao` posiciona o atendimento do Seu Zé. O blackjack continua sendo um objeto do jogo, no salão de jogos superior (`BLACKJACK_TABLE` em `packages/shared/src/world.ts`). A jukebox é a do mapa (`Jukebox` + `COL_Int_Jukebox`, de `12_jukebox.py`), na base da escada do térreo; o importador exporta sua posição em `map-data.json` → `jukebox`, e as luzes dela estão em [jukebox](../sistemas/jukebox.md#luzes-da-jukebox). As rotas de Tonico, Dona Lurdinha e Seu Zé são verificadas contra os novos colisores.
 
 ## Câmera e iluminação
 
@@ -38,6 +58,6 @@ O importador glTF separa o sol das 13 luminárias do bar, preservando posições
 
 ## Testes
 
-`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e câmera. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
+`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, a numeração 1–39 das mesas e a mesa de cada assento, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e câmera. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
 
 Veja os [resultados da validação do mapa](../validacao/validation-map.md).

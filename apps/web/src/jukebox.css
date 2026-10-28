@@ -8,5 +8,5 @@
 .media-active .vignette{background:none}
 
 /* Counter order: bottle or glass. */
-.drink-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}.drink-choice .button{display:flex;align-items:center;gap:10px;text-align:left;padding:14px}.drink-choice .ui-icon{width:28px;height:28px;flex:none}.drink-choice b{display:block}.drink-choice small{display:block;font-size:12px;opacity:.8}
+.drink-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}.drink-choice .button{display:flex;align-items:center;gap:10px;text-align:left;padding:14px}.drink-choice .item-icon{flex:none}.drink-choice b{display:block}.drink-choice small{display:block;font-size:12px;opacity:.8}
 @media(max-width:560px){.drink-choice{grid-template-columns:1fr}}

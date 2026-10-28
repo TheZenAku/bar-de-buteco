@@ -7,7 +7,7 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {characterSchema,skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,WALLET_REASON,type PublicUser} from '@bar/shared';
+import {skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,WALLET_REASON,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
@@ -140,7 +140,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if (!config.autoVerifyEmail) await mailer.send(body.email, 'verify', token);
     const {token:sessionToken,expiresAt}=await createSession(db,userId);
     reply.setCookie(cookieName,sessionToken,{...cookieSettings,maxAge:SESSION_DAYS*86_400,expires:expiresAt});
-    return reply.code(201).send({user:await getUser(db,userId), verificationRequired: !config.autoVerifyEmail, message: config.autoVerifyEmail ? 'Conta criada! Vamos montar seu personagem.' : 'Conta criada. Personalize seu personagem e confirme seu e-mail para entrar.' });
+    return reply.code(201).send({user:await getUser(db,userId), verificationRequired: !config.autoVerifyEmail, message: config.autoVerifyEmail ? 'Conta criada! Puxe uma cadeira.' : 'Conta criada. Confirme seu e-mail para entrar.' });
   });
   app.post('/api/auth/verify', authLimit, async (request) => {
     const { token } = z.object({ token: tokenSchema }).strict().parse(request.body);
@@ -215,16 +215,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/game-ticket', { preHandler: authenticated }, async (request) => {
     const { user, session } = request.auth!;
     if (!user.verified) throw new HttpError(403, 'Confirme seu e-mail antes de entrar no bar.');
-    if(!user.character)throw new HttpError(409,'Crie seu personagem antes de entrar no bar.');
     const ticket = signTicket({ userId: user.id, sessionId: session.id, displayName: user.displayName, color: user.color, role: user.role }, config.authSecret);
     return { ticket, user };
   });
   app.get('/api/wardrobe',{preHandler:authenticated},request=>wardrobe.view(request.auth!.user));
-  app.post('/api/character',{preHandler:authenticated},async request=>{
-    const {character}= {character:characterSchema.parse(request.body)};
-    const result=await wardrobe.saveCharacter(request.auth!.user,character);
-    return {...result,user:await getUser(db,request.auth!.user.id)};
-  });
   app.post('/api/wardrobe/equip',{preHandler:authenticated},async request=>{
     const {skin}=skinMessageSchema.parse(request.body);
     const result=await wardrobe.equip(request.auth!.user,skin);

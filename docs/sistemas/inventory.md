@@ -4,7 +4,7 @@ O inventário é persistente por conta e funciona como uma mochila de **12 pilha
 
 ## Catálogo e efeitos
 
-`packages/shared/src/inventory.ts` é a fonte única de identificadores, nomes, preços, limite de pilha, ícone, categoria, efeito e objeto visual. O catálogo atual contém água, refrigerante, café, long neck, copo americano, coxinha, pastel, torresmo e curativo. `packages/shared/src/needs.ts` deriva `CONSUMABLES` desse catálogo, evitando diferenças entre o texto da interface e o efeito aplicado pelo servidor.
+`packages/shared/src/inventory.ts` é a fonte única de identificadores, nomes, preços, limite de pilha, ícone, categoria, efeito e objeto visual. O catálogo atual contém água, refrigerante, café, long neck, copo de chopp, coxinha, pastel, torresmo e curativo. O ícone de cada item é uma imagem em `apps/web/public/ui/items/<id>.png`. A moeda que acompanha preços e ganhos fica em `apps/web/public/ui/moeda.png`. As duas vêm de `assets-bar/icons`, pelo `npm run assets:icons`. `packages/shared/src/needs.ts` deriva `CONSUMABLES` desse catálogo, evitando diferenças entre o texto da interface e o efeito aplicado pelo servidor.
 
 Bebidas com objeto usam a animação `Drink` e os modelos de copo ou garrafa já publicados em `apps/web/public/props`. Comidas e curativo usam `Use`. O item é retirado de forma autoritativa antes da ação e o efeito só é aplicado quando a animação termina; interromper a ação aplica apenas a fração concluída. Um personagem desmaiado, cambaleando, sentado ou ocupado não pode usar ou descartar itens.
 

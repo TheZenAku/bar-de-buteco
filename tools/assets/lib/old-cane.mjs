@@ -39,7 +39,7 @@ export function appendOldCane({root,id,model,reference,json,accessor,props}){
   setSource(0);const hold=worldPose();
   const rightArm=name=>name==='shoulder_r'||name==='upperarm_r'||name==='lowerarm_r'||name==='hand_r'||/^(thumb|index|middle|ring|pinky)_.*_r$/.test(name);
   const idle=model.json.animations.find(a=>a.name==='Idle');
-  const bytes=fs.readFileSync(path.join(id.startsWith('base-')?(process.env.BAR_CHARACTER_OUTPUT??path.join(root,'apps/web/public/characters')):path.join(root,'apps/web/public/models'),`${id}.glb`));
+  const bytes=fs.readFileSync(path.join(root,'apps/web/public/models',`${id}.glb`));
   const length=bytes.readUInt32LE(12),bin=bytes.subarray(28+length);
   const values=index=>{const a=model.json.accessors[index],v=model.json.bufferViews[a.bufferView],size=a.type==='VEC4'?4:a.type==='VEC3'?3:1;return Float32Array.from({length:a.count*size},(_,i)=>bin.readFloatLE((v.byteOffset??0)+(a.byteOffset??0)+i*4));};
   const idleTracks=idle.channels.map(ch=>{const s=idle.samplers[ch.sampler],type=ch.target.path==='rotation'?QuaternionKeyframeTrack:VectorKeyframeTrack;return new type(`${nodes[ch.target.node].name}.${ch.target.path==='rotation'?'quaternion':ch.target.path==='translation'?'position':'scale'}`,values(s.input),values(s.output));});

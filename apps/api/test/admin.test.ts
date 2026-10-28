@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {eq} from 'drizzle-orm';
-import {DEFAULT_CHARACTER,MAX_COIN_BALANCE} from '@bar/shared';
+import {MAX_COIN_BALANCE} from '@bar/shared';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 import {OWNER_EMAIL,ensureOwnerAdministrator} from '../src/admin-policy.js';
@@ -18,7 +18,6 @@ test('primary account manages administrators, wallets and moderation with persis
   async function register(username:string,email=`${username}@admin.test`){
     const response=await post('/api/auth/register',{username,email,displayName:username,password});assert.equal(response.statusCode,201,response.body);
     const cookie=`${response.cookies[0].name}=${response.cookies[0].value}`;
-    assert.equal((await post('/api/character',DEFAULT_CHARACTER,cookie)).statusCode,200);
     return {cookie,user:response.json().user};
   }
   const owner=await register('owner',OWNER_EMAIL),staff=await register('staff'),player=await register('player');

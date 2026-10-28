@@ -17,7 +17,7 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Esperar / banheiro | `misc/Standing Idle 03.fbx` | Repouso neutro enquanto aguarda Seu Zé ou usa o banheiro, sem reutilizar uma ação incompatível. |
 | Sentar | `misc/Seated Idle.fbx` | Loop neutro de cadeira. Substitui `Sitting Drinking`, que fazia o personagem segurar um copo invisível. |
 | Blackjack | `carta-sentado.fbx` / `sit-angry.fbx` | Pose normal ou reação à derrota. As cartas públicas da mão aparecem como geometria real entre as duas mãos (até cinco no leque). |
-| Beber | `bebendo.fbx` | Dura 8,87 s; long neck ou copo americano acompanha a mão e inclina até os lábios. |
+| Beber | `bebendo.fbx` | Dura 8,87 s; long neck ou copo de chopp acompanha a mão e inclina até os lábios. |
 | Desmaiar | `bebado-caido.fbx` | Queda única que conserva o último quadro no chão. |
 | Recuperar | `misc/Standing Up.fbx` (primeiros 5 s) | Levanta do chão durante a condição de recuperação, em vez de saltar de caído para `Idle`. |
 | Dealer | `carta-distribui.fbx` / `carta-recomeco.fbx` | Distribui e recolhe/prepara as cartas. |
@@ -35,4 +35,4 @@ Os objetos não fazem parte dos FBXs. Garrafa, copo, bengala e cartas são entid
 
 O servidor sincroniza o início de ações únicas e encerra aceno/uso/recuperação sem sobrescrever uma caminhada que tenha começado no meio do gesto. Ações que ocupam um lugar ou objeto continuam bloqueando movimento conforme a regra do jogo. Os efeitos visuais das cartas não modificam distribuição, privacidade ou resultados do blackjack.
 
-`npm run assets:skins` reimporta os FBXs AccuRig e regenera os bancos. `npm run assets:retarget` recalibra os modelos existentes. O conversor usa `FBXLoader.parse`; os testes conferem os nomes exigidos, durações, alvos de osso, quaternions normalizados e emendas dos loops.
+`npm run assets:skins` reimporta as [skins Mixamo](skins-mixamo.md) e regenera os bancos. `npm run assets:retarget` recalibra os modelos existentes. O conversor usa `FBXLoader.parse`; os testes conferem os nomes exigidos, durações, alvos de osso, quaternions normalizados e emendas dos loops.
