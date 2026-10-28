@@ -1,3 +1,5 @@
+import type {MusicianState} from '@bar/shared';
+
 /** Small presentation-only contracts. All game rules belong to the server. */
 export interface SceneActor {
   id: string;
@@ -30,6 +32,8 @@ export interface SceneActor {
   connected?: boolean;
   /** Drunkenness 0-100 (packages/shared/src/needs.ts): the body sways by stage. */
   drunk?: number;
+  /** The stage spot this player plays at, as the room syncs it (packages/shared/src/musicians.ts). */
+  musician?: MusicianState;
 }
 
 export interface SceneWorld {

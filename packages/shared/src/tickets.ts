@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
-export interface GameTicket { userId:string; sessionId:string; displayName:string; color:string; role:'user'|'admin'; exp:number; nonce:string }
+export interface GameTicket { userId:string; sessionId:string; displayName:string; color:string; role:'user'|'admin'; exp:number; nonce:string;
+  /** A development bot (tests/load/bots.ts): its avatar leaves the bar together with it. Only the API signs tickets. */
+  bot?:boolean }
 const insecureSecret=/(local-development|replace_with|change-me)/i;
 const validProductionSecret=(secret:string|undefined)=>!!secret&&secret.length>=32&&!insecureSecret.test(secret);
 

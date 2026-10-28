@@ -105,3 +105,15 @@ Mesmo ambiente local (Windows, Edge com SwiftShader). Escopo em [economia](../si
 | A/B de `bar.spec:249`, `bar.spec:297` e `voice.spec` | mesmas specs com `main.ts`/`game-ui.ts` revertidos às versões anteriores | **falham igual nas duas versões do cliente**, nas mesmas linhas. O log do mundo mostra `maintenance_retry` e `auth_refresh_unavailable` (as chamadas internas à API estouram 4 s sob a carga de dois navegadores em WebGL por software), sem expulsão nem erro do servidor. Os projetos `game` e `voice` não tinham execução anterior registrada. O servidor anterior não foi testado nesse A/B |
 
 Não executados: carga e a suíte E2E completa depois das últimas correções.
+
+## Bots de desempenho — `marco-1/fundacao` @ `15bd316` + árvore de trabalho (28/10/2026)
+
+`npm run bots` ([`tests/load/bots.ts`](../../tests/load/bots.ts)) contra a stack isolada (`tests/e2e/server.mjs`), com a stack de desenvolvimento do usuário ligada na mesma VM. Os números do mundo vêm do `/metrics`; o FPS é de um Edge headless com GPU (`--use-angle=d3d11`), não do navegador do usuário.
+
+| Suíte | Comando | Resultado |
+| --- | --- | --- |
+| 30 bots, 3 min | `API_INTERNAL_URL=http://127.0.0.1:3111 BOTS_WORLD_URL=http://127.0.0.1:2677 BOTS_SECONDS=180 npm run bots -- 30` | 30/30 no bar; tick do mundo p95 0,7 ms parado e ~2,4 ms com os bots ativos; RTT p50 1 ms / p95 ≤ 7 ms. Pelo log do mundo: 9 shows no palco (os 4 instrumentos), 9 pedidos entregues pelo Tonico, 7 turnos de trabalho; os 30 avatares saíram ao final |
+| Cliente com 30 bots | o mesmo, com um jogador no Edge | 62–63 FPS antes dos bots; 57–63 FPS com 28 personagens no raio de visão |
+| Painel: Bots de teste | admin de demonstração na stack isolada, pelo SDK e pelo Edge | `admin.bots` acima da capacidade recusado com a mensagem; 10 → 15 → 5 → 0 bots seguiram o pedido, os que saíram levaram o avatar e o processo filho terminou com código 0; no Edge, Aplicar 12, +5 e Remover todos, com o painel atualizado sozinho e sem erros na página. Matando o mundo à força, o processo dos bots saiu junto |
+| Servidor (depois do painel) | `npm run test -w @bar/server` | 52/52 (novo: `bots.test`, nunca em produção) |
+| Servidor / API | `npm run test -w @bar/server`, `npm run test -w @bar/api` | 51/51 e 45 (+1 ignorado), nenhuma falha. Novos: `dev-bots.test` (API) e o bot que leva o avatar ao sair, em `room.integration.test` |

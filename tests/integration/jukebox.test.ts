@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {youtubeVideoId,initialJukebox,commandJukebox,jukeboxTime,jukeboxGain,mediaGain,nearestMediaSource,jukeboxCommandSchema,JUKEBOX_SYSTEMS,TV_SYSTEMS,TELEVISIONS,JUKEBOX,COLLIDERS,INTERACTABLES,isWalkable} from '@bar/shared';
+import {youtubeVideoId,initialJukebox,commandJukebox,jukeboxTime,jukeboxGain,mediaGain,nearestMediaSource,areaMix,jukeboxCommandSchema,JUKEBOX_SYSTEMS,TV_SYSTEMS,TELEVISIONS,TV_SPOTS,STAGE,JUKEBOX,COLLIDERS,INTERACTABLES,isWalkable} from '@bar/shared';
 const id='M7lc1UVf-VE';
 test('YouTube URLs: official domains and four formats, no executable or ambiguous URLs',()=>{
   for(const url of [`https://www.youtube.com/watch?v=${id}&t=25`,`https://youtube.com/watch?v=${id}`,`https://m.youtube.com/watch?v=${id}`,`https://youtu.be/${id}?si=share`,`https://www.youtube.com/shorts/${id}`,`https://www.youtube.com/embed/${id}`])assert.equal(youtubeVideoId(url),id,url);
@@ -59,4 +59,29 @@ test('the jukebox stands against the wall at the foot of the stairs, reachable a
   // The corridor opening (x 11.1–13.1) and the foot of the steps (x 13.25–14.75) stay free.
   assert.ok(JUKEBOX.x-JUKEBOX.hx>14.75);
   const spot=INTERACTABLES.find(i=>i.id==='jukebox')!;assert.ok(isWalkable(spot.x,spot.z,spot.y),'the use spot in front is walkable');
+});
+test('the stage screen is the map\'s Telao_Tela, and its sound never plays over the bar\'s',()=>{
+  // 15_palco.py: a 16:9 LED screen on the back truss, facing the audience; used at the stage's front edge.
+  const telao=TELEVISIONS.find(tv=>tv.id==='telao')!;
+  assert.deepEqual([telao.x,telao.y,telao.z,telao.width,telao.height,telao.yaw],[STAGE.screen.x,STAGE.screen.y,STAGE.screen.z,5.76,3.24,0]);
+  assert.ok(Math.abs(telao.width/telao.height-16/9)<1e-3);
+  const stage=TV_SYSTEMS.find(s=>s.id==='telao')!,bar=[JUKEBOX_SYSTEMS[0]!,...TV_SYSTEMS.filter(s=>s.id!=='telao')];
+  assert.equal(stage.area,'stage');assert.ok(bar.every(s=>s.area==='bar'));
+  // Alone, every source plays as loud as its distance allows.
+  const front=TV_SPOTS.telao!,jukeboxSpot=INTERACTABLES.find(i=>i.id==='jukebox')!;
+  assert.equal(areaMix(front,JUKEBOX_SYSTEMS[0]!,[JUKEBOX_SYSTEMS[0]!]),1,'a stage screen that is not playing never quiets the bar');
+  // Both playing: in front of the stage only the stage is heard; at the jukebox only the jukebox.
+  const both=[JUKEBOX_SYSTEMS[0]!,stage];
+  assert.ok(mediaGain(front,JUKEBOX_SYSTEMS[0]!)>0,'the jukebox would reach the stage on its own');
+  assert.equal(areaMix(front,JUKEBOX_SYSTEMS[0]!,both),0);assert.equal(areaMix(front,stage,both),1);
+  assert.ok(mediaGain(jukeboxSpot,stage)>0,'the stage would reach the jukebox on its own');
+  assert.equal(areaMix(jukeboxSpot,stage,both),0);assert.equal(areaMix(jukeboxSpot,JUKEBOX_SYSTEMS[0]!,both),1);
+  // Walking from one to the other the two cross-fade: never both loud, never a jump.
+  let previous=1;
+  for(let t=0;t<=1;t+=.01){
+    const p={x:front.x+(jukeboxSpot.x-front.x)*t,y:.3,z:front.z+(jukeboxSpot.z-front.z)*t};
+    const stageShare=areaMix(p,stage,both),barShare=areaMix(p,JUKEBOX_SYSTEMS[0]!,both);
+    assert.ok(stageShare<=previous+1e-9,'the stage only fades out on the way');previous=stageShare;
+    assert.ok(Math.abs(stageShare+barShare-1)<1e-9,`the two shares always add up to one, at ${t}`);
+  }
 });

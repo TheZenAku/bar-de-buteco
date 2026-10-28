@@ -10,10 +10,23 @@ As moedas são da conta e ficam na API. O mundo só **pede** mudanças. Cada ped
 | Mesa, com o Tonico | soma do cardápio (até 4 itens) | ao pedir | se a pessoa sair da mesa, se não houver caminho ou se a administração cancelar |
 | Jukebox | 15 por vídeo novo | ao tocar um link | se o comando falhar depois da cobrança (revisão mudou, a pessoa se afastou) |
 | TVs | 25 por vídeo novo | ao tocar um link | idem |
-| Telão do palco | 60 por vídeo novo | ao tocar um link | idem |
+| Telão do palco | 50 por vídeo novo | ao tocar um link | idem |
+| Ingresso do palco | 200, vale 30 min | ao comprar na escada do palco | se a pessoa sair de perto da escada (ou mudar de sessão) antes de receber o ingresso |
 | Ajudante do Magrão (emprego) | 6 por tarefa concluída | ao terminar a tarefa | — |
 
-Pausar, continuar, parar e desligar a mídia são de graça. Os preços estão em `MEDIA_PRICES` e `ITEM_CATALOG` (`packages/shared`). A mídia pode ser ajustada sem alterar o código, com `PRICE_JUKEBOX`, `PRICE_TV` e `PRICE_TELAO` no ambiente do mundo (`0` torna gratuito).
+Pausar, continuar, parar e desligar a mídia são de graça. Os preços estão em `MEDIA_PRICES`, `STAGE_PASS` e `ITEM_CATALOG` (`packages/shared`). Eles podem ser ajustados sem alterar o código, com `PRICE_JUKEBOX`, `PRICE_TV`, `PRICE_TELAO` e `PRICE_STAGE` no ambiente do mundo (`0` torna gratuito). O motivo no extrato do ingresso é `stage:pass`.
+
+## Palco
+
+Só sobe no palco do quintal quem tem ingresso. Ele é comprado com **E** ao pé da escada do palco (lado oeste), onde fica o blip magenta, e vale 30 minutos (`STAGE_PASS`). Enquanto vale, a pessoa sobe e desce à vontade. Se acabar lá em cima, ela pode ficar até descer; para subir de novo, precisa de outro ingresso. Não se compra um ingresso novo enquanto o atual vale.
+
+O bloqueio está no movimento compartilhado (`movePlayer`, `packages/shared/src/world.ts`): sem ingresso, os degraus seguram o corpo como uma parede, no servidor e na predição do navegador. O mundo guarda o vencimento em `Player.stageUntil` e o zera quando vence, então os dois lados decidem igual. O ingresso é da sala: reiniciar o mundo apaga os ingressos, como a jukebox e as TVs.
+
+Lá em cima, os quatro lugares de músico (violão, cavaquinho, bateria e vocal) são de graça: veja [músicos do palco](palco.md).
+
+Pôr vídeo no telão é cobrado à parte (50 moedas por vídeo novo) e não exige ingresso: basta ir ao blip turquesa, no meio da frente do palco, e apertar **E**. De cima do palco, a borda da frente também serve.
+
+Os dois blips do palco (escada e telão) só aparecem para quem está no quintal e embaixo do palco. O quintal é a área do palco (`inStageArea`): fica dentro dos muros do lote, até a parede dos fundos do prédio. No salão, na rua ou no andar de cima, os blips não aparecem.
 
 ## Garantias
 
@@ -70,9 +83,10 @@ Em **⚙ Administração → Mundo ao vivo**, a administração vê o estado da 
 - pedidos do Tonico (fase atual e fila), com **Cancelar e devolver**;
 - quem espera no balcão do Magrão;
 - jukebox, TVs e telão (vídeo, quem escolheu, preço), com **Desligar**;
+- **Bots de teste** (só em desenvolvimento): quantidade com **Aplicar**, **+5**, **+10** e **Remover todos**, o que cada bot está fazendo, o tick do mundo (p95) e, dos últimos 15 s, RTT, inputs por segundo e o event loop do processo dos bots. O mundo roda `tests/load/bots.ts` como processo filho (`apps/server/src/world/bots.ts`), muda a quantidade por IPC e recusa mais bots do que cabem (`ROOM_CAPACITY` menos os jogadores). O painel se atualiza sozinho quando todos entram ou saem. Detalhes em [tools/README.md](../../tools/README.md#bots-de-desempenho);
 - NPCs e uma tabela de jogadores com posição, animação, interação, emprego e saldo.
 
-Os comandos conferem o papel `admin` da sessão, que é revalidado a cada rodada de manutenção, e ficam registrados no log do mundo (`admin_job`, `admin_table_cancel`, `admin_media_off`). As alterações de emprego valem para a sala até o mundo reiniciar.
+Os comandos conferem o papel `admin` da sessão, que é revalidado a cada rodada de manutenção, e ficam registrados no log do mundo (`admin_job`, `admin_table_cancel`, `admin_media_off`, `admin_bots`; o processo dos bots registra `bots_start`, `bots_output` e `bots_exit`). As alterações de emprego valem para a sala até o mundo reiniciar.
 
 ## Testes
 

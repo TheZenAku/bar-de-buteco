@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import {api} from './api';
 
 export interface NetworkHooks {
@@ -11,6 +11,8 @@ export interface NetworkHooks {
   skin:()=>string;
   jukebox?:(id:string)=>void;
   television?:(id:string)=>void;
+  /** The stage's steps were touched (`open`: show the pass panel), or the pass changed: bought, or ran out (`message`). */
+  stage?:(update:{open?:boolean;until:number;price?:number;message?:string})=>void;
   /** A proximity voice frame relayed by the server. */
   voice?:(frame:Uint8Array)=>void;
   removed?:(kind:'kick'|'ban',reason:string)=>void;
@@ -85,6 +87,8 @@ export class BarNetwork {
     room.onMessage('jukebox.result',()=>{});
     room.onMessage('tv.open',(message:{id:string})=>this.hooks.television?.(message.id));
     room.onMessage('tv.result',()=>{});
+    room.onMessage('stage.open',(message:{until:number;price:number})=>this.hooks.stage?.({...message,open:true}));
+    room.onMessage('stage.state',(message:{until:number;price?:number;message?:string})=>this.hooks.stage?.(message));
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
     room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));
@@ -114,8 +118,11 @@ export class BarNetwork {
     const input={...intention,seq:++this.seq};
     this.pending.push(input);this.position=this.predict(input,self);this.hooks.position(this.position);this.send('player.input',input);
   }
-  /** The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts). The raw input is what is sent. */
-  private predict(input:PlayerInput,self:PlayerState):Position {return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk);}
+  /**
+   * The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts), the stage only with
+   * a pass. The raw input is what is sent.
+   */
+  private predict(input:PlayerInput,self:PlayerState):Position {return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self));}
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   sendBytes(type:string,bytes:Uint8Array):void {if(this.room&&!this.stopped&&this.transportReady)this.room.sendBytes(type,bytes);}
   telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length};}

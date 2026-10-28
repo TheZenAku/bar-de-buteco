@@ -12,6 +12,7 @@ import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
 import {AdminService} from './admin-service.js';
+import {DevBots} from './dev-bots.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
 import {createApiMetrics,requestIdFor} from './observability.js';
@@ -341,6 +342,15 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     });
     return { ok: true };
   });
+  // Development only: a ticket for bot number `index` (tests/load/bots.ts), its account created on first use.
+  if (!config.production) {
+    const bots = new DevBots(db, wardrobe, dummyHash);
+    app.post('/api/internal/dev/bot', internalOptions, async (request) => {
+      const { index } = z.object({ index: z.number().int().min(1).max(128) }).strict().parse(request.body);
+      const bot = await bots.prepare(index);
+      return { ...bot, ticket: signTicket({ userId: bot.userId, sessionId: bot.sessionId, displayName: bot.displayName, color: bot.color, role: 'user', bot: true }, config.authSecret) };
+    });
+  }
   if (!config.production && config.mailEnabled) app.get('/api/dev/mail', async (request) => {
     if (!isLoopback(request.ip)) throw new HttpError(403, 'A caixa de e-mail local só está disponível neste computador.');
     return { messages: mailer.messages };

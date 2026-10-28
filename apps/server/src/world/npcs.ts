@@ -5,15 +5,12 @@ const routes: Record<string, Position[]> = {
   // Veranda, through the hall's east doorway, down the aisle along the counter to the jukebox, the foot of the
   // stairs and back. The aisle ends at the jukebox's front (z -10.95, plus a body's width).
   tonico: [{x:15.3,y:.3,z:-2.6},{x:15.3,y:.3,z:-10.3},{x:14,y:.3,z:-10.6},{x:15.3,y:.3,z:-6}],
-  // Backyard, in front of the stage.
-  lurdinha: [{x:20.4,y:.3,z:-19.5},{x:30.6,y:.3,z:-19.5},{x:30.6,y:.3,z:-20.9},{x:20.4,y:.3,z:-20.9}],
 };
 export function createNpcs(): Npc[] {
   return [
     // Behind the L-shaped counter, facing the customers at Ponto_Balcao. Orders are run by BarService.
     new Npc().assign({ id: 'bartender', displayName: 'Magrão · bartender', color: '#efe0b5', x:18.6,y:.3,z:-7.5,rotation:-Math.PI/2,behavior:'idle' }),
     new Npc().assign({ id: 'tonico', displayName: 'Tonico', color: '#b75c46', ...routes.tonico[0] }),
-    new Npc().assign({ id: 'lurdinha', displayName: 'Dona Lurdinha', color: '#709e98', ...routes.lurdinha[0] }),
     new Npc().assign({ id: 'dealer', displayName: 'Dealer', color: '#efe0b5', x: BLACKJACK_TABLE.x,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z-0.95,behavior:'dealer' }),
   ];
 }

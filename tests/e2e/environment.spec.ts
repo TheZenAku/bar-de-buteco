@@ -124,6 +124,128 @@ test('the lit facade keeps its colours, the map jukebox lights up with the video
   await page.evaluate(()=>(window as any).fixture.scene.destroy());
 });
 
+test('every stage light follows the telão\'s video, its screen opens for the player, and blips mark the stage entry and the telão only in the backyard',async({page})=>{
+  test.setTimeout(180000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  const stage=()=>page.evaluate(()=>(window as any).fixture.scene.getMapStatus().stage);
+  const telao=(status:string|undefined,players:Record<string,unknown>={})=>page.evaluate(([status,players])=>{const f=(window as any).fixture,now=f.now();
+    f.scene.setWorld({players,npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:now,jukeboxes:{},
+      televisions:status?{telao:{id:'telao',videoId:'M7lc1UVf-VE',status,position:30,updatedAt:now,updatedBy:'fixture',revision:1}}:{}},Object.keys(players)[0]??'');},[status,players] as const);
+  const standby=()=>page.evaluate(()=>(window as any).fixture.scene.app.root.findByName('Telao_Tela')?.enabled);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.hour(21);f.view([26.65,2.3,-17.2],[26.65,2.5,-25]);});
+  // Off: a dim glow of the stage's own magenta, and the map's standby art on the screen.
+  await telao(undefined);
+  await expect.poll(stage).toMatchObject({playing:false,light:true,colors:['#ff47c2','#ff47c2','#ff47c2'],show:0});
+  // The white lights keep their own white: the truss's spots (the bar's bulbs over the deck) and the front wash.
+  const idle=await stage();expect(idle.lamps).toBeGreaterThan(0);expect(idle.front).toBeTruthy();expect(idle.washes).toHaveLength(1);
+  expect(await standby()).toBe(true);
+  await page.screenshot({path:previewPath('stage-idle.png')});
+  // Playing: the lenses, the LED strip, the backlight, the truss's spots and the washes take the video's colours.
+  await telao('playing');
+  await expect.poll(async()=>(await stage()).palette,{timeout:20000}).toBe(true);
+  await expect.poll(async()=>(await stage()).level,{timeout:10000}).toBeGreaterThan(.97);
+  await expect.poll(async()=>(await stage()).show,{timeout:10000}).toBeGreaterThan(.97);
+  const lit=await stage();expect(lit).toMatchObject({playing:true,videoId:'M7lc1UVf-VE'});
+  expect(lit.colors.some((c:string)=>c!=='#ff47c2'),'the video colours replace the idle magenta').toBe(true);
+  expect(lit.front,'the front wash leaves its white').not.toBe(idle.front);expect(lit.washes[0],'and so does the party wash').not.toBe(idle.washes[0]);
+  // The YouTube player shows through the screen (the controller opens it): the standby art steps aside meanwhile.
+  await page.evaluate(()=>(window as any).fixture.scene.showTelevision('telao',true));expect(await standby()).toBe(false);
+  await page.screenshot({path:previewPath('stage-playing.png')});
+  await page.evaluate(()=>(window as any).fixture.scene.showTelevision('telao',false));expect(await standby()).toBe(true);
+  await telao('paused');await expect.poll(async()=>(await stage()).level,{timeout:10000}).toBeLessThan(.37);
+  // The blips, for a player in the backyard: the entry at the foot of the stage's steps, and the telão's control in the
+  // middle of the stage's front edge. Never while up on the stage, nor anywhere outside the backyard.
+  const me={id:'me',displayName:'Eu',color:'#fff',skin:'nathan',x:22,y:.3,z:-16,rotation:0,animationState:'idle',animationStartedAt:0,interactionState:'',currentTableId:'',lastProcessedInput:0,connected:true};
+  await telao(undefined,{me});
+  // Off, the white lights are back to their own white.
+  await expect.poll(async()=>(await stage()).show,{timeout:10000}).toBe(0);
+  expect(await stage()).toMatchObject({front:idle.front,washes:idle.washes});
+  const blips=()=>page.evaluate(()=>(window as any).fixture.scene.getMapStatus().stageBlips);
+  const projected=(id:string)=>page.evaluate(id=>(window as any).fixture.scene.projectStageBlip(id),id);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.scene.setEnabled(true);f.view([24.5,2.8,-16.2],[20.6,1.2,-22.8]);});
+  await expect.poll(async()=>(await projected('entry'))?.onScreen).toBe(true);
+  expect(await blips()).toMatchObject({entry:{visible:true,y:.3},telao:{visible:true,x:26.65,y:.3}});
+  await page.screenshot({path:previewPath('stage-blip.png')});
+  await page.evaluate(()=>(window as any).fixture.view([25.2,2.6,-15.6],[26.65,.8,-21.1]));
+  await expect.poll(async()=>(await projected('telao'))?.onScreen).toBe(true);
+  await page.screenshot({path:previewPath('telao-blip.png')});
+  // In the hall, 15 m from the stage, neither shows. The local avatar follows prediction, not the snapshot.
+  await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:14,y:.3,z:-9}));
+  await expect.poll(async()=>[await projected('entry'),await projected('telao')]).toEqual([null,null]);
+  expect(await blips()).toMatchObject({entry:{visible:false},telao:{visible:false}});
+  await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:22,y:.3,z:-16}));
+  await expect.poll(async()=>(await projected('telao'))?.onScreen).toBe(true);
+  await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:26,y:.9,z:-23.5}));
+  await expect.poll(async()=>[await projected('entry'),await projected('telao')]).toEqual([null,null]);
+  expect(errors).toEqual([]);
+  await page.evaluate(()=>(window as any).fixture.scene.destroy());
+});
+
+test('the stage musicians: every spot takes, starts, loops and stops on any skin, with its instrument in hand, also for late joiners',async({page})=>{
+  test.setTimeout(240000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  // One player per spot, each with another skin; `shows`: the phase each spot's room state is in and how long ago it began.
+  const SKINS={violao:'nathan',cavaquinho:'leandro',bateria:'rafael',vocal:'gilmar-gordo'} as const;
+  const sync=(shows:Record<string,[string,number]>,extra:Record<string,unknown>={})=>page.evaluate(([shows,skins,extra])=>{
+    const f=(window as any).fixture,now=f.now(),players:Record<string,unknown>={...extra},musicians:Record<string,unknown>={};
+    const spots:Record<string,[number,number,number,number]>={violao:[24.079788,.9,-23.300556,198],cavaquinho:[29.238754,.9,-23.35762,162],bateria:[29.451313,.906,-24.998857,-8],vocal:[26.65,.9,-22.87,0]};
+    for(const [spot,[x,y,z,yaw]] of Object.entries(spots)){
+      const id=`musico-${spot}`,show=shows[spot];
+      players[id]={id,displayName:spot,color:'#fff',skin:(skins as any)[spot],x,y,z,rotation:yaw*Math.PI/180,animationState:show?'stage':'idle',animationStartedAt:now,
+        interactionState:show?`stage-${spot}`:'',currentTableId:'',lastProcessedInput:0,connected:true};
+      musicians[spot]={id:spot,playerId:show?id:'',phase:show?.[0]??'',startedAt:show?now-show[1]:0,stopping:false};
+    }
+    f.scene.setWorld({players,npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:now,musicians},'');
+  },[shows,SKINS,extra] as const);
+  const animations=()=>page.evaluate(()=>Object.fromEntries((window as any).fixture.scene.getAnimations().map((a:any)=>[a.id,a])));
+  const instruments=()=>page.evaluate(()=>(window as any).fixture.scene.getMapStatus().musicians);
+  const clips=async()=>Object.fromEntries(Object.entries(await animations()).map(([id,a]:[string,any])=>[id,a.clip]));
+  const clipsOf=(phase:string)=>Object.fromEntries(Object.keys(SKINS).map(spot=>[`musico-${spot}`,`Palco ${spot} ${phase}`]));
+  await page.evaluate(()=>{const f=(window as any).fixture;f.hour(21);f.view([26.65,2.4,-17.6],[26.65,1.5,-24]);});
+  // Nobody on the stage: every instrument on its stand.
+  await sync({});
+  await expect.poll(async()=>Object.values(await instruments()??{}).map((s:any)=>s.instrument)).toEqual([true,true,true,null]);
+  // Taking the spots: the take clip, converted for each skin; the map's instrument hides while its copy is played.
+  const take=Object.fromEntries(Object.keys(SKINS).map(spot=>[spot,['entrando',0] as [string,number]]));
+  await sync(take);
+  await expect.poll(clips,{timeout:60000}).toEqual(clipsOf('entrando'));
+  expect(await instruments()).toMatchObject({violao:{instrument:false,props:true,propState:'Palco violao entrando'},cavaquinho:{instrument:false,props:true},
+    bateria:{instrument:false,props:true},vocal:{instrument:null,props:null}});
+  // Each musician stays on its spot (the clips move the body), facing it.
+  for(const [id,a] of Object.entries(await animations()) as [string,any][])expect(a.musician,`${id} on its spot`).toMatchObject({spot:id.slice(7),phase:'entrando'});
+  // The take and start clips run into the loop without a word from the room.
+  await page.evaluate(()=>(window as any).fixture.advance(8000));
+  await expect.poll(clips).toEqual(clipsOf('loop'));
+  // The clips carried the hips from the spot to the stools and the drum throne (the avatar itself stays on the spot);
+  // the singer stands at the microphone.
+  // (Polled: the pose follows the clip on the next frame.)
+  const away=async(spot:string)=>{const {root,hip}=(await animations())[`musico-${spot}`].musician;return Math.hypot(hip[0]-root[0],hip[2]-root[2]);};
+  for(const spot of ['violao','cavaquinho','bateria'])await expect.poll(()=>away(spot),{message:`${spot} on the stool`}).toBeGreaterThan(.3);
+  await expect.poll(()=>away('vocal')).toBeLessThan(.2);
+  expect((await animations())['musico-vocal'].musician.hip[1]-.9).toBeGreaterThan(.8);
+  await page.waitForTimeout(500);
+  await page.screenshot({path:previewPath('stage-musicians.png')});
+  // Stopping: the stop clip blends in from the loop; when it ends the musicians stand idle and the instruments are back.
+  await sync(Object.fromEntries(Object.keys(SKINS).map(spot=>[spot,['saindo',0] as [string,number]])));
+  await expect.poll(clips).toEqual(clipsOf('saindo'));
+  await page.evaluate(()=>(window as any).fixture.advance(6000));
+  await expect.poll(clips).toEqual(Object.fromEntries(Object.keys(SKINS).map(spot=>[`musico-${spot}`,'Idle'])));
+  expect(Object.values(await instruments()).map((s:any)=>[s.instrument,s.props])).toEqual([[true,false],[true,false],[true,false],[null,null]]);
+  // Somebody arriving in the middle of a show sees it already playing: a new avatar, in the loop for 7 s.
+  await page.evaluate(()=>{const f=(window as any).fixture;f.scene.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:f.now()},'');});
+  await expect.poll(async()=>Object.keys(await animations()).length).toBe(0);
+  await sync({violao:['loop',7000]});
+  await expect.poll(clips).toMatchObject({'musico-violao':'Palco violao loop'});
+  const late=(await animations())['musico-violao'];
+  expect(Math.abs(late.time-7%4.8)).toBeLessThan(1.5);
+  expect((await instruments()).violao).toMatchObject({instrument:false,props:true,propState:'Palco violao loop'});
+  await page.screenshot({path:previewPath('stage-musician-late.png')});
+  expect(errors).toEqual([]);
+  await page.evaluate(()=>(window as any).fixture.scene.destroy());
+});
+
 test('the live game follows the server clock and keeps the cycle when returning to the lobby',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   expect((await page.request.post('/api/auth/login',{data:{email:'jogador2@bar.local',password:process.env.DEMO_PASSWORD||'ButecoDemo2026!'}})).ok()).toBe(true);

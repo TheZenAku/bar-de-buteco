@@ -24,6 +24,9 @@ import { ServedItems, type Seated } from './world/served.js';
 import { JobDirector, type Payment } from './world/jobs.js';
 import { changeWallet, WalletRetries } from './world/wallet.js';
 import { JOBS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, type MediaPriceKind } from '@bar/shared';
+import { STAGE_PASS, hasStagePass, onStage, musicianRole, stageSpot } from '@bar/shared';
+import { Musicians, type MusicianEnd } from './world/musicians.js';
+import { BotRunner } from './world/bots.js';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
@@ -59,9 +62,11 @@ interface Presence {
   balance:number;
   /** The counter drink paid for and not yet served; refunded if the order is dropped. */
   counterCharge?:{requestId:string;amount:number};
+  /** A stage pass being charged: a second click meanwhile must not buy (and charge) another. */
+  stageBusy?:boolean;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
-const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command']);
+const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command', 'stage.buy']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
 
@@ -81,6 +86,8 @@ export class BarRoom extends Room<{ state: BarState }> {
   private readonly seated: Seated = (playerId, seatId) => { const player = this.state.players.get(playerId); return !!player?.connected && player.interactionState === seatId; };
   /** What Tonico left on the tables, Tonico's table service and the jobs (apps/server/src/world/served.ts, waiter.ts, jobs.ts). */
   private served = new ServedItems(this.state.served);
+  /** Who plays at each of the stage's musicians' spots, and the phases of each show (apps/server/src/world/musicians.ts). */
+  private musicians = new Musicians(this.state.musicians, this.config.musicianDropMs);
   private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated) });
   readonly jobs = new JobDirector();
   private walletRetries = new WalletRetries((event, details) => this.log(event, details));
@@ -90,6 +97,10 @@ export class BarRoom extends Room<{ state: BarState }> {
   private controls = new ControlRelay(this.config.instanceId, internal);
   /** Finished rounds wait on disk until the API confirms them (survives crashes and API outages). */
   private results = new ResultRelay(new FileOutbox(this.config.outboxPath, (event, details) => this.log(event, details)), internal);
+  /** Development bots added from the administration (apps/server/src/world/bots.ts); its panel follows them as they join. */
+  private bots = new BotRunner({ apiUrl: this.config.apiInternalUrl, worldUrl: `http://${['0.0.0.0', '::'].includes(this.config.host) ? '127.0.0.1' : this.config.host}:${this.config.port}`,
+    log: (event, details) => this.log(event, details), settled: () => { const admin = this.botsAdmin; if (admin && this.sessions.getByClient(admin)) admin.send('admin.world', this.adminSnapshot()); } });
+  private botsAdmin?: Client;
   private maintenanceBusy = false;
   private lastTableJson = '';
   private resultsResetAt = 0;
@@ -217,8 +228,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelCounter(userId); this.cancelTable(userId);
     this.sessions.remove(userId, presence);
     const player = this.state.players.get(userId);
-    // Expelled players are removed; everyone else leaves the avatar standing (or seated) where it was.
-    if (presence.revoked) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.needs.forget(userId); this.state.players.delete(userId); }
+    // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
+    // (or seated) where it was.
+    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -238,7 +250,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     // The microphone belongs to a session; a new one switches it on again itself.
     player.voice = false;
     const presence=this.sessions.getByUser(player.id);if(presence)presence.inventoryItem=undefined;
-    if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
+    // A musician puts the instrument back (the stop clip plays) and the spot frees itself when it ends.
+    if (player.interactionState.startsWith('stage-')) this.musicians.stop(player.id, Date.now());
+    else if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
   }
 
   /** Closes an older session of the same account without touching its avatar, which the new one takes. */
@@ -253,7 +267,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -323,6 +337,25 @@ export class BarRoom extends Room<{ state: BarState }> {
       client.send('table.state',{status:'ordered',order:publicOrder(order)});
       this.systemMessage(`${player.displayName} pediu ao Tonico: ${items.map(id=>catalogItem(id)?.name??id).join(', ')}.`,player);
     });
+    // The stage pass is bought at its steps: charged first (the API decides), refunded if the buyer left meanwhile.
+    this.handle('stage.buy',z.object({}).strict(),2,async client=>{
+      const player=this.player(client),presence=this.forClient(client)!;
+      if(presence.stageBusy)throw new Error('Aguarde: o ingresso está sendo pago.');
+      this.requireStage(player);
+      const price=this.config.prices.stage,requestId=randomUUID();
+      presence.stageBusy=true;
+      try{
+        if(price)await this.charge(presence,price,'stage:pass',requestId);
+        try{
+          if(this.forClient(client)!==presence)throw new Error('Sua sessão mudou. Moedas devolvidas.');
+          this.requireStage(player);
+        }catch(error){if(price)this.refund(presence,requestId,price);throw error;}
+      }finally{presence.stageBusy=false;}
+      player.stageUntil=Date.now()+STAGE_PASS.durationMs;
+      client.send('stage.state',{until:player.stageUntil,price});
+      this.systemMessage(`${player.displayName} pegou o ingresso do palco.`,player);
+      this.log('stage_pass',{playerId:player.id,price});
+    });
     this.handle('table.cancel',z.object({}).strict(),2,client=>{
       const player=this.player(client);if(!this.waiter.has(player.id))throw new Error('Você não tem pedido com o Tonico.');
       this.cancelTable(player.id,'Pedido cancelado. Moedas devolvidas.');
@@ -365,6 +398,13 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(!state)throw new Error('Aparelho desconhecido.');
       state.assign({videoId:'',status:'off',position:0,updatedAt:Date.now(),updatedBy:admin,revision:state.revision+1});
       this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
+    });
+    // Development bots for performance tests: how many the bar should have (0 takes them out), never more than fit in it.
+    this.handle('admin.bots',z.object({count:z.number().int().min(0).max(128)}).strict(),3,(client,{count})=>{
+      const admin=this.requireAdmin(client),room=this.botRoom();
+      if(count>room)throw new Error(`O bar comporta ${this.config.capacity} pessoas: cabem até ${room} bots além dos jogadores. Aumente ROOM_CAPACITY no .env e reinicie o mundo.`);
+      this.bots.set(count);this.botsAdmin=client;
+      this.log('admin_bots',{playerId:admin,count});client.send('admin.world',this.adminSnapshot());
     });
     this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
@@ -462,7 +502,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
-          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk);
+          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player));
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
           player.x = position.x; player.y = position.y!; player.z = position.z; player.rotation = input.rotation;
@@ -472,8 +512,10 @@ export class BarRoom extends Room<{ state: BarState }> {
         player.lastProcessedInput = input.seq;
       } else if (now - presence.lastInputAt > 250 && ['walk', 'run'].includes(player.animationState)) player.animationState = 'idle';
       for (const event of this.needs.tick(player, TICK_MS / 1000, now, { running, moving })) this.onNeeds(player, presence, event, now);
+      if (player.stageUntil && now >= player.stageUntil) this.endStagePass(player, presence);
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
     }
+    for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
     this.syncTable();
     if (this.resultsResetAt && now >= this.resultsResetAt) { this.blackjack.resetRound(); this.resultsResetAt = 0; this.cleanTable(); this.syncTable(); }
@@ -501,6 +543,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.player(client), presence = this.forClient(client)!, now = Date.now();
     if (objectId === 'stand') {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+      // On the stage, standing up is putting the instrument back: the stop clip plays first.
+      if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
       if (player.currentTableId) this.leaveTable(client);
       else { this.consumePart(player, presence, now); this.cancelCounter(player.id); if (player.interactionState.startsWith('seat-')) this.cancelTable(player.id); if (player.interactionState === 'job') this.jobs.interrupt(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined; }
       return;
@@ -534,6 +578,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
       player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
     } else if (object.type === 'door') {this.toggleDoor(player, object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);}
+    else if (object.type === 'stage') client.send('stage.open', { until: player.stageUntil, price: this.config.prices.stage });
+    else if (object.type === 'musician') this.startMusician(player, presence, object.spot!, now);
     else if (object.type === 'television') { this.requireMedia('tv',client,object.media!);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('tv.open',{id:object.media}); }
     else { this.requireMedia('jukebox',client,object.media!);this.playTemporary(player,presence,'use',USE_DURATION_MS);client.send('jukebox.open',{id:object.media}); }
   }
@@ -635,14 +681,18 @@ export class BarRoom extends Room<{ state: BarState }> {
     return {
       at:now,occupancy:this.state.occupancy,capacity:this.state.capacity,
       players:[...this.state.players.values()].map(p=>({id:p.id,name:p.displayName,connected:p.connected,x:+p.x.toFixed(1),y:+p.y.toFixed(1),z:+p.z.toFixed(1),
-        animation:p.animationState,interaction:p.interactionState,job:p.job,condition:p.condition,balance:this.sessions.getByUser(p.id)?.balance})),
+        animation:p.animationState,interaction:p.interactionState,job:p.job,condition:p.condition,balance:this.sessions.getByUser(p.id)?.balance,
+        stageMinutes:p.stageUntil?Math.max(0,Math.ceil((p.stageUntil-now)/60_000)):undefined})),
       npcs:[...this.state.npcs.values()].map(n=>({id:n.id,name:n.displayName,behavior:n.behavior,animation:n.animationState,x:+n.x.toFixed(1),z:+n.z.toFixed(1)})),
       waiter:this.waiter.snapshot(),servedItems:this.served.size,counterQueue:[...this.sessions].filter(([,p])=>p.counterCharge).map(([id])=>id),
       jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000)}))})),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
-      prices:this.config.prices,walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,event:this.state.event.type,
+      musicians:this.musicians.snapshot(),prices:this.config.prices,walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,event:this.state.event.type,
+      bots:{...this.bots.snapshot(),inBar:[...this.sessions].filter(([,p])=>p.ticket.bot).length,max:this.botRoom(),tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95)},
     };
   }
+  /** Places in the bar for bots: the capacity less the people who are not bots. */
+  private botRoom():number {return Math.max(0,this.config.capacity-[...this.sessions].filter(([,p])=>!p.ticket.bot).length);}
 
   private setInventory(presence:Presence,stacks:readonly InventoryStack[]):void {
     presence.inventory=new Map(stacks.filter(stack=>stack.quantity>0&&itemById(stack.itemId)).map(stack=>[stack.itemId,stack.quantity]));
@@ -691,6 +741,8 @@ export class BarRoom extends Room<{ state: BarState }> {
   private knockDown(player: Player, presence: Presence): void {
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
     if (player.interactionState && player.interactionState !== 'fainted' && player.interactionState !== 'stumbling') Object.assign(player, standingPosition(player, player.rotation));
+    // A musician who falls drops out at once: the spot is free and the instrument is back on its stand.
+    this.musicians.release(player.id);
     this.cancelCounter(player.id);
     this.cancelTable(player.id);
     if (player.interactionState === 'job') this.jobs.interrupt(player.id);
@@ -768,12 +820,50 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private requireMedia(kind:'jukebox'|'tv',client:Client,id:string):void {
-    const name=kind==='jukebox'?'a jukebox':'a TV';
+    const name=kind==='jukebox'?'a jukebox':id==='telao'?'o telão':'a TV';
     // A TV group is controlled from any of its screens.
     const objects=INTERACTABLES.filter(o=>o.media===id&&o.type===(kind==='jukebox'?'jukebox':'television')),player=this.player(client);
     const states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions;
     if(!states.has(id)||!objects.some(object=>canInteract(object,player,INTERACTION_SLACK)))throw new Error(`Chegue mais perto d${name}.`);
     if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error(`Encerre a interação atual antes de usar ${name}.`);
+  }
+
+  /** At the stage's steps, free to act and without a valid pass: what buying one needs, before and after the charge. */
+  private requireStage(player:Player):void {
+    const steps=INTERACTABLES.find(i=>i.type==='stage')!;
+    if(!canInteract(steps,player,INTERACTION_SLACK))throw new Error('Chegue à escada do palco para pegar o ingresso.');
+    if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a ação atual antes de subir no palco.');
+    if(hasStagePass(player))throw new Error('Seu ingresso do palco ainda está valendo.');
+  }
+  /**
+   * Takes one of the stage's musicians' spots (E within reach of it, up on the deck). The avatar goes to the spot, facing
+   * its +Z, and stays there with movement locked until the stop clip ends (finishMusician); the clips move the body.
+   */
+  private startMusician(player:Player,presence:Presence,spotId:string,now:number):void {
+    const spot=stageSpot(spotId);
+    if(!spot)throw new Error('Esse lugar do palco não existe.');
+    if(!onStage(player))throw new Error('Suba no palco para tocar.');
+    this.musicians.start(spot.id,player.id,now);
+    Object.assign(player,{x:spot.x,y:spot.y,z:spot.z,rotation:spot.yaw*Math.PI/180});
+    player.interactionState=`stage-${spot.id}`;player.animationState='stage';player.animationStartedAt=now;player.drinkItem='';
+    presence.gestureEndsAt=undefined;presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;
+    this.systemMessage(`${player.displayName} ${musicianRole(spot.id).taken} no palco.`,player);
+    this.log('stage_musician',{playerId:player.id,spot:spot.id});
+  }
+  /** The stop clip ended: the musician stands where it left them, stepping out of the drum kit when that is where it was. */
+  private finishMusician({playerId,spotId}:MusicianEnd):void {
+    const player=this.state.players.get(playerId);
+    if(!player||player.interactionState!==`stage-${spotId}`)return;
+    Object.assign(player,standingPosition(player,player.rotation));
+    player.interactionState='';player.animationState='idle';player.animationStartedAt=Date.now();
+    const presence=this.sessions.getByUser(playerId);
+    if(presence){presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;}
+  }
+  /** A pass ran out: whoever is up there may stay until they come down; going up again takes a new one. */
+  private endStagePass(player:Player,presence:Presence):void {
+    player.stageUntil=0;
+    presence.client.send('stage.state',{until:0,message:onStage(player)
+      ?'Seu tempo no palco acabou. Pode ficar até descer; para subir de novo, pegue outro ingresso.':'Seu ingresso do palco venceu.'});
   }
 
   private joinTable(client: Client): void {

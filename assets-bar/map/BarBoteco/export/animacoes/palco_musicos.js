@@ -20,6 +20,11 @@
 //
 // Para quem chega no meio do show (multiplayer): palco.entrar(lugar, personagem, { fase: 'loop', tempo: segundos }).
 //
+// Devolvendo o controle sem "pose T": passe o mixer do jogo e ligue o idle quando o show acabar, por exemplo
+//   palco.entrar('bateria', jogador, { mixer, acaoAtual: idle,
+//     aoTerminar(show) { idle.reset().fadeIn(0.3).play(); show.liberar(0.3); liberarMovimento(); } });
+// (sem aoTerminar o modulo so some com a animacao; se nada mais tocar no mixer o three.js volta os ossos ao repouso)
+//
 // Como funciona: durante o show o personagem fica parado no lugar (e levado ate la em 0,35 s) e as animacoes movem o
 // quadril (andar ate o banco, sentar). Os clipes foram feitos num esqueleto Mixamo de 1,75 m e sao convertidos para o
 // esqueleto do personagem pela rotacao de cada osso no mundo (nomes Mixamo com qualquer prefixo: mixamorig, mixamorig1,

@@ -8,10 +8,16 @@ import type {Footprint,Interactable,Position} from './index.js';
  * apps/server/src/config.ts), never from the browser. The API applies every change in one transaction
  * with an idempotency key (apps/api/src/wallet-service.ts).
  */
-export const MEDIA_PRICES={jukebox:15,tv:25,telao:60} as const;
+export const MEDIA_PRICES={jukebox:15,tv:25,telao:50} as const;
 export type MediaPriceKind=keyof typeof MEDIA_PRICES;
+/**
+ * Going up on the backyard stage: one pass per player, paid at the foot of its steps, valid for `durationMs`. Without
+ * a valid pass nobody steps onto the stage (movePlayer); a pass that runs out up there lets its owner stay until they
+ * come down. Putting a video on the stage screen is paid apart (MEDIA_PRICES.telao).
+ */
+export const STAGE_PASS={price:200,durationMs:30*60_000} as const;
 /** What the room may ask the API to do to a wallet; refunds point to the debit they reverse. */
-export const WALLET_REASON=/^(media|counter|table|job|refund):[a-z0-9:-]{1,80}$/;
+export const WALLET_REASON=/^(media|counter|table|job|stage|refund):[a-z0-9:-]{1,80}$/;
 export const walletChangeSchema=z.object({balance:z.number().int().min(0),applied:z.number().int()}).strict();
 export type WalletChange=z.infer<typeof walletChangeSchema>;
 

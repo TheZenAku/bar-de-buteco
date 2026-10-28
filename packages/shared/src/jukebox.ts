@@ -2,15 +2,19 @@ import {z} from 'zod';
 import map from './map-data.json';
 import type {Position} from './index.js';
 
+// The stage's front edge, on the side its screen faces (15_palco.py: the audience side). Touching it, from the backyard
+// floor or from the deck, uses the screen; its control spot is the floor in front of the middle of that edge.
+const deck=map.stage.deck,facing={x:Math.round(Math.sin(map.stage.screen.yaw*Math.PI/180)),z:Math.round(Math.cos(map.stage.screen.yaw*Math.PI/180))};
+export const STAGE_FRONT={id:'stage-front',x:deck.x+facing.x*deck.hx,z:deck.z+facing.z*deck.hz,hx:facing.x?.05:deck.hx,hz:facing.z?.05:deck.hz};
 /** Metres, matching the authored Tela_TV material in BarBoteco (no model replacement). */
 export const TELEVISIONS = [
   {id:'tv-hall',x:7.3,y:2.33,z:-11.447,width:1.06,height:.6,yaw:0},
   {id:'tv-left',x:3.753,y:2.33,z:-10,width:1.06,height:.6,yaw:90},
   {id:'tv-counter',x:20,y:2.33,z:-3.753,width:1.06,height:.6,yaw:180},
   {id:'tv-upstairs',x:17.5,y:5.38,z:-3.753,width:1.06,height:.6,yaw:180},
-  // The stage's big screen, between the back pillars (COL_Predio_Palco_Pilar.002/.003), facing the backyard.
-  // It hangs above the stage floor, so it is used from the sound desk in front of the stage (Ponto_Palco).
-  {id:'telao',x:26.65,y:3,z:-25.4,width:4.8,height:2.7,yaw:0,control:{x:26.6,y:.3,z:-19.8}},
+  // The stage's LED screen (15_palco.py: Telao_Tela on the back truss, facing the audience). It hangs above the stage
+  // floor, so it is used at the stage's front edge (STAGE_FRONT), without a stage pass.
+  {id:'telao',...map.stage.screen,control:{x:STAGE_FRONT.x+facing.x*.5,y:deck.minY,z:STAGE_FRONT.z+facing.z*.5}},
 ] as const;
 // The map's own jukebox (12_jukebox.py): against the base of the stairs, facing the hall (+Z), clear of the back
 // corridor and the steps. Its solid volume is the export's COL_Int_Jukebox; maxY is the top of the cabinet.
@@ -31,8 +35,10 @@ export interface MediaSystem {
   /** Where the sound comes from: the jukebox, or each of the group's screens. */
   readonly sources:readonly Required<Position>[];
   readonly audio:typeof JUKEBOX_AUDIO;
+  /** Sound area: the bar (jukebox and TVs) or the backyard stage (its screen). Two areas never play over each other (areaMix). */
+  readonly area:'bar'|'stage';
 }
-export const JUKEBOX_SYSTEMS:readonly MediaSystem[] = [{id:'jukebox',kind:'jukebox',label:'Jukebox',screens:[],sources:[{x:JUKEBOX_PLACEMENT.x,y:JUKEBOX_PLACEMENT.y,z:JUKEBOX_PLACEMENT.z}],audio:JUKEBOX_AUDIO}];
+export const JUKEBOX_SYSTEMS:readonly MediaSystem[] = [{id:'jukebox',kind:'jukebox',label:'Jukebox',screens:[],sources:[{x:JUKEBOX_PLACEMENT.x,y:JUKEBOX_PLACEMENT.y,z:JUKEBOX_PLACEMENT.z}],audio:JUKEBOX_AUDIO,area:'bar'}];
 export const TV_LABELS:Record<string,string> = {'tv-hall':'TV do salão','tv-left':'TV da parede lateral','tv-counter':'TV do balcão','tv-upstairs':'TV do andar de cima','telao':'Telão do palco'};
 // The ground floor's TVs (hall, side wall and counter) always show the same video; upstairs has its own.
 const TV_GROUPS=[
@@ -41,7 +47,8 @@ const TV_GROUPS=[
   {id:'telao',label:'Telão do palco',screens:['telao']},
 ] as const;
 export const TV_SYSTEMS:readonly MediaSystem[] = TV_GROUPS.map(group=>({id:group.id,kind:'tv' as const,label:group.label,screens:group.screens,
-  sources:group.screens.map(id=>{const tv=TELEVISIONS.find(t=>t.id===id)!;return {x:tv.x,y:tv.y,z:tv.z};}),audio:group.id==='telao'?TELAO_AUDIO:TV_AUDIO}));
+  sources:group.screens.map(id=>{const tv=TELEVISIONS.find(t=>t.id===id)!;return {x:tv.x,y:tv.y,z:tv.z};}),
+  audio:group.id==='telao'?TELAO_AUDIO:TV_AUDIO,area:group.id==='telao'?'stage' as const:'bar' as const}));
 const distance3=(a:Position,b:Position)=>Math.hypot(a.x-b.x,(a.y??0)-(b.y??0),a.z-b.z);
 /** The source of a system closest to the listener, with its index (the screen at that index, for TVs). */
 export function nearestMediaSource(system:MediaSystem,listener:Position):{index:number;distance:number} {
@@ -100,4 +107,19 @@ export function jukeboxGain(listener:Position,source:Position,config=JUKEBOX_AUD
 /** A system is as loud as its closest source: a TV group sounds from the screen nearest to the listener. */
 export function mediaGain(listener:Position,system:MediaSystem):number {
   return jukeboxGain(listener,system.sources[nearestMediaSource(system,listener).index]!,system.audio);
+}
+/** Below this share of the two areas' loudness an area is silent; above its mirror it plays alone. */
+const AREA_CROSSFADE=[.3,.7] as const;
+/**
+ * The stage's screen and the bar's jukebox and TVs never play over each other: where both reach the listener, the area
+ * that sounds louder there takes over and the other fades out, with a short crossfade where both are about as loud.
+ * `playing`: the sources playing right now (a paused one makes no sound, so it never silences the other area).
+ * Sources of the same area still mix as before.
+ */
+export function areaMix(listener:Position,system:MediaSystem,playing:readonly MediaSystem[]):number {
+  const loudest=(inArea:boolean)=>Math.max(0,...playing.filter(other=>(other.area===system.area)===inArea).map(other=>mediaGain(listener,other)));
+  const own=Math.max(mediaGain(listener,system),loudest(true)),other=loudest(false);
+  if(other<=0)return 1;if(own<=0)return 0;
+  const [from,to]=AREA_CROSSFADE,t=Math.max(0,Math.min(1,(own/(own+other)-from)/(to-from)));
+  return t*t*(3-2*t);
 }

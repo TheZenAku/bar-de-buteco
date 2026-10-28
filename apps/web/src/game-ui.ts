@@ -37,7 +37,7 @@ export function gameUi():string{return `
     ${panel('job','',`<small class="panel-summary" id="job-summary"></small><button type="button" data-hud-hide="job" aria-label="Esconder painel do turno" title="Esconder · o botão Turno, no topo, mostra de novo">${icon('eyeOff')}</button>`)}
     ${faintMarkup()}<div id="event-banner" class="event-banner hidden" role="status"></div><div id="connection" class="connection hidden" role="status"></div>
     <button id="table-cta" data-action="table-menu" class="context table-cta hidden"><kbd>T</kbd><span><small>NA MESA</small><b id="table-cta-label">Pedir ao Tonico</b></span></button>
-    <canvas id="job-blip" class="job-blip" hidden aria-hidden="true"></canvas>
+    <canvas id="job-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="stage-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="telao-blip" class="job-blip" hidden aria-hidden="true"></canvas>
     <button id="context" data-action="interact" class="context hidden"><kbd>E</kbd><span><small>CHEGA MAIS</small><b id="context-label"></b></span></button>
     <div class="world-hint"><span><kbd>W A S D</kbd> mover</span><span><kbd>SHIFT</kbd> correr</span><span>Arraste para olhar · role para aproximar</span></div>
     <section id="blackjack" class="blackjack hud-panel hidden" aria-label="Mesa de blackjack"></section>

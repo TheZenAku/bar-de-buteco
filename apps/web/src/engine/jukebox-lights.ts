@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
-import {jukeboxTime,type JukeboxState} from '@bar/shared';
-import {PALETTE_KEYS,videoPalette,type Rgb,type VideoPalette} from './video-palette';
+import type {JukeboxState} from '@bar/shared';
+import type {Rgb} from './video-palette';
+import {VideoColours,hex} from './video-colours';
 
 export interface JukeboxLightsStatus {lit:boolean;level:number;videoId:string;palette:boolean;colors:string[];light:boolean}
 
@@ -38,8 +39,6 @@ void getEmission() {
 	#endif
 }
 `;
-const toLinear=(c:number)=>Math.pow(c,2.2);
-const brightest=(c:Rgb):Rgb=>{const m=Math.max(...c,1e-4);return [c[0]/m,c[1]/m,c[2]/m];};
 
 /**
  * The map's jukebox (12_jukebox.py) lights up while it plays: its tubes (Jukebox_FX_Luz) and the light in front of it
@@ -51,10 +50,9 @@ export class JukeboxLights {
   private light?:pc.LightComponent;
   private readonly origin=new Float32Array(3);
   private readonly uniform=new Float32Array(COLOURS*3);
-  /** Shown colours (linear), easing towards the video's. */
-  private readonly shown:Rgb[]=Array.from({length:COLOURS},()=>AMBER.map(toLinear) as Rgb);
-  private palette?:VideoPalette;
-  private requested='';
+  /** The video's colours along the song, eased (linear); amber without them. */
+  private readonly colours=new VideoColours(AMBER,COLOURS);
+  private get shown():Rgb[] {return this.colours.shown;}
   private level=0;
   private readonly lightColor=new pc.Color();
   constructor(map:pc.Entity){
@@ -78,28 +76,9 @@ export class JukeboxLights {
     this.apply(0);
   }
 
-  /** Colours of the video at this point of the song: its stills, cross-faded in the order they appear. */
-  private target(progress:number):Rgb[] {
-    const frames=this.palette?.frames;
-    if(!frames?.some(frame=>frame.length))return this.shown.map(()=>AMBER.map(toLinear) as Rgb);
-    let i=PALETTE_KEYS.length-1;while(i>0&&progress<PALETTE_KEYS[i]!)i--;
-    const next=Math.min(i+1,PALETTE_KEYS.length-1),span=(PALETTE_KEYS[next]!-PALETTE_KEYS[i]!)||1,f=next===i?0:Math.min(1,(progress-PALETTE_KEYS[i]!)/span);
-    const colour=(frame:number,k:number)=>(frames[frame]![k]??AMBER).map(toLinear) as Rgb;
-    return this.shown.map((_,k)=>{const a=colour(i,k),b=colour(next,k);return brightest([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f]);});
-  }
-
   /** `duration`: seconds of the video, from the local player (0 while unknown). */
   update(dt:number,state:JukeboxState|undefined,serverNow:number,duration:number,exposure:number):void {
-    const videoId=state&&state.status!=='off'?state.videoId:'';
-    if(videoId&&videoId!==this.requested){
-      this.requested=videoId;this.palette=undefined;
-      void videoPalette(videoId).then(palette=>{if(this.requested===palette.videoId)this.palette=palette;}).catch(()=>{});
-    }
-    const time=state?jukeboxTime(state,serverNow):0;
-    // Without the duration the stills take turns every 40 s.
-    const progress=duration>0?Math.min(.999,time/duration):(time/160)%1;
-    const blend=1-Math.exp(-Math.min(dt,.1)*2.5);
-    this.target(progress).forEach((colour,k)=>{const shown=this.shown[k]!;for(let c=0;c<3;c++)shown[c]!+=(colour[c]!-shown[c]!)*blend;});
+    const time=this.colours.update(dt,state,serverNow,duration);
     this.level+=((LEVEL[state?.status??'off']??0)-this.level)*(1-Math.exp(-Math.min(dt,.1)*3));
     if(this.level<.002)this.level=0;
     this.apply(time*BAND_SPEED,exposure);
@@ -124,7 +103,6 @@ export class JukeboxLights {
   }
 
   telemetry():JukeboxLightsStatus {
-    const hex=(c:Rgb)=>'#'+c.map(v=>Math.round(Math.pow(Math.max(0,Math.min(1,v)),1/2.2)*255).toString(16).padStart(2,'0')).join('');
-    return {lit:this.level>.01,level:+this.level.toFixed(3),videoId:this.requested,palette:!!this.palette?.frames.some(frame=>frame.length),colors:this.shown.map(hex),light:!!this.light?.enabled};
+    return {lit:this.level>.01,level:+this.level.toFixed(3),videoId:this.colours.videoId,palette:this.colours.hasPalette,colors:this.shown.map(hex),light:!!this.light?.enabled};
   }
 }

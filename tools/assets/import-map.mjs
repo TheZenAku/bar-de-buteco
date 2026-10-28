@@ -47,8 +47,9 @@ for (let i = 0; i < collision.json.nodes.length; i++) {
   if (node.name?.startsWith('COLPORTA_') && node.mesh === undefined) continue;
   if (!node.name?.startsWith('COL_') || node.mesh === undefined) throw new Error('Unexpected collision node');
   const box = new Box3(), isRamp = node.name.includes('Escada_Rampa');
-  // Volumes people stand on: streets, floors and slabs, stairs, balconies, and the stage with its steps.
-  const support = /^COL_Rua_(Quadra|Leito)/.test(node.name) || /^COL_Predio_(Piso|Laje|Escada_Rampa|Escada_Patamar|Sacada(?:\.|$)|Palco(?:\.|$)|Palco_Degrau)/.test(node.name);
+  // Volumes people stand on: streets, floors and slabs, stairs, balconies, and the stage (15_palco.py) with its steps.
+  const support = /^COL_Rua_(Quadra|Leito)/.test(node.name) || /^COL_Predio_(Piso|Laje|Escada_Rampa|Escada_Patamar|Sacada(?:\.|$))/.test(node.name)
+    || /^COL_Palco(?:\.\d+)?$/.test(node.name) || /^COL_Palco_Degrau(?:\.\d+)?$/.test(node.name);
   for (const primitive of collision.json.meshes[node.mesh].primitives) {
     const points = values(collision,primitive.attributes.POSITION).map(p => new Vector3(...p).applyMatrix4(transform(i)));
     points.forEach(p => box.expandByPoint(p));
@@ -83,7 +84,7 @@ const effects=visual.json.nodes.flatMap((node,index)=>{
   const position=new Vector3().setFromMatrixPosition(visualTransform(index));
   return [{id:node.name,type,...Object.fromEntries(['x','y','z'].map((axis,k)=>[axis,round(position.getComponent(k))]))}];
 });
-const expectedEffects={brasas:1,fogo:1,fumaca:1,torneira:2,luz_jukebox:1,luz_jukebox_ponto:1};
+const expectedEffects={brasas:1,fogo:1,fumaca:1,torneira:2,luz_jukebox:1,luz_jukebox_ponto:1,luz_palco:1,luz_palco_ponto:1};
 for(const [type,count] of Object.entries(expectedEffects)){
   const actual=effects.filter(effect=>effect.type===type).length;
   if(actual!==count)throw new Error(`Expected ${count} ${type} FX anchor(s), found ${actual}`);
@@ -102,6 +103,52 @@ const jukeboxPosition=new Vector3().setFromMatrixPosition(visualTransform(jukebo
 const jukeboxTurn=new Quaternion().setFromRotationMatrix(visualTransform(jukeboxIndex));
 const jukebox={x:round(jukeboxPosition.x),y:round(jukeboxPosition.y),z:round(jukeboxPosition.z),hx:jukeboxCollider.hx,hz:jukeboxCollider.hz,maxY:jukeboxCollider.maxY,
   yaw:round(2*Math.atan2(jukeboxTurn.y,jukeboxTurn.w)*180/Math.PI)};
+// The backyard stage (15_palco.py): a deck (COL_Palco) climbed only by its steps (COL_Palco_Degrau, on the west side),
+// the LED screen Telao_Tela on the back truss (a 16:9 plane facing the audience, origin at its centre), the coloured
+// lenses and LED strip (Palco_FX_Luz, material Palco_Luz) with their backlight Luz_Palco_Cor, and the musicians' spots.
+// The game charges to go up and to put a video on the screen, so all of it is part of the map contract.
+const stageDeck=colliders.find(c=>c.id==='COL_Palco'),stageSteps=colliders.filter(c=>/^COL_Palco_Degrau(?:\.\d+)?$/.test(c.id));
+if(!stageDeck||!stageSteps.length)throw new Error('The stage needs its deck COL_Palco and its steps COL_Palco_Degrau');
+if(!surfaces.some(s=>s.id==='COL_Palco')||stageSteps.some(step=>!surfaces.some(s=>s.id===step.id)))throw new Error('The stage deck and steps must be walkable');
+const screenIndex=visual.json.nodes.findIndex(node=>node.extras?.interativo==='telao');
+const screenNode=visual.json.nodes[screenIndex];
+if(screenIndex<0||!(screenNode.extras.largura_m>0)||!(screenNode.extras.altura_m>0))throw new Error('The stage has no Telao_Tela screen (interativo = telao, largura_m, altura_m)');
+const screenPosition=new Vector3().setFromMatrixPosition(visualTransform(screenIndex)),screenTurn=new Quaternion().setFromRotationMatrix(visualTransform(screenIndex));
+if(Math.abs(screenTurn.x)>1e-3||Math.abs(screenTurn.z)>1e-3)throw new Error('Telao_Tela must stand upright, turned only about the vertical');
+if(!visual.json.nodes.some(node=>node.name==='Palco_FX_Luz'&&node.mesh!==undefined))throw new Error('Palco_FX_Luz (stage lenses and LED strip) is missing');
+if(!visual.json.materials.some(m=>m.name==='Palco_Luz'))throw new Error('The stage lights lost their Palco_Luz material');
+if(!visual.json.extensions?.KHR_lights_punctual?.lights?.some(light=>light.name==='Luz_Palco_Cor'))throw new Error('Luz_Palco_Cor (stage backlight) is missing');
+// The musicians' spots (Palco_Lugar_*): the empty is where the musician stands, facing its +Z, at the start and at the
+// end of the four clips of its GLB (16_animacoes_palco.py, export/animacoes): take the instrument, start, loop, stop.
+// The GLBs are served as they are (public/palco); the client converts the clips to each skin and the room times the
+// phases by their length, so a spot without its four clips, or an instrument missing from the map, fails here.
+const stageClips=path.join(root,'apps/web/public/palco');
+fs.mkdirSync(stageClips,{recursive:true});
+const places=visual.json.nodes.flatMap((node,index)=>{
+  if(node.extras?.interativo!=='palco_lugar')return [];
+  const position=new Vector3().setFromMatrixPosition(visualTransform(index)),turn=new Quaternion().setFromRotationMatrix(visualTransform(index));
+  const clips=String(node.extras.clipes??'').split(',').filter(Boolean),file=String(node.extras.animacoes??`palco_${node.extras.lugar}.glb`);
+  if(clips.length!==4)throw new Error(`${node.name} needs four clips (take, start, loop, stop), not ${clips.length}`);
+  const animation=read(path.join('animacoes',file));
+  const durations=clips.map(name=>{
+    const clip=animation.json.animations?.find(a=>a.name===name);
+    if(!clip)throw new Error(`${file} lacks the clip ${name} of ${node.name}`);
+    return round(Math.max(...clip.samplers.map(sampler=>animation.json.accessors[sampler.input].max[0])));
+  });
+  for(const prop of String(animation.json.scenes[animation.json.scene??0].extras?.props??'').split(',').filter(Boolean))
+    if(!animation.json.nodes.some(n=>n.name===prop&&n.mesh!==undefined))throw new Error(`${file} lacks its instrument ${prop}`);
+  const instrument=node.extras.instrumento??'';
+  if(instrument&&!visual.json.nodes.some(n=>n.name===instrument&&n.mesh!==undefined))throw new Error(`${node.name}: the map has no ${instrument}`);
+  fs.copyFileSync(path.join(source,'animacoes',file),path.join(stageClips,file));
+  return [{id:node.extras.lugar,x:round(position.x),y:round(position.y),z:round(position.z),yaw:round(2*Math.atan2(turn.y,turn.w)*180/Math.PI),clips,
+    animation:{file,hash:animation.hash.slice(0,12),durations},instrument}];
+});
+if(new Set(places.map(place=>place.id)).size!==places.length||!places.length)throw new Error('The stage needs musicians\' spots with distinct names');
+const box=c=>({id:c.id,x:c.x,z:c.z,hx:c.hx,hz:c.hz,minY:c.minY,maxY:c.maxY});
+const stage={deck:box(stageDeck),steps:stageSteps.map(box),
+  screen:{x:round(screenPosition.x),y:round(screenPosition.y),z:round(screenPosition.z),width:screenNode.extras.largura_m,height:screenNode.extras.altura_m,
+    yaw:round(2*Math.atan2(screenTurn.y,screenTurn.w)*180/Math.PI)},
+  places};
 // The lit facade (13_fachada.py): the logo sign, the two veranda boards, the neon rim and the magenta halo light.
 for(const name of ['Letreiro_Highland','Placa_Highland','Neon_Magenta'])
   if(!visual.json.materials.some(m=>m.name===name&&m.emissiveFactor?.some(v=>v>0)))throw new Error(`Facade material ${name} is missing or no longer emissive`);
@@ -189,7 +236,7 @@ const cameraCeilings = [
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
 const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
-  tables:numberedTables, jukebox };
+  tables:numberedTables, jukebox, stage };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));

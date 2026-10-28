@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
+import {walk} from './walk';
 
 const password='EconomiaBrowser2026!';
 test.beforeEach(async({request})=>{
@@ -58,35 +59,6 @@ async function installPlanner(page:Page){
       path:target=>navigation.findPath(here(),p=>reaches(target,p,.1),goal(target),300000)?.map(p=>({x:p.x,z:p.z}))};
   })`);
 }
-/** Walks there with WASD along that path (keys relative to the camera, from the listener's yaw). */
-async function walk(page:Page,target:string){
-  const me=()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot(),p=d.world.players[d.localId];return {x:p.x as number,z:p.z as number,yaw:((window as any).barDebug.listener()?.yaw??0) as number};});
-  const reached=()=>page.evaluate(t=>(window as any).planner.reached(t) as boolean,target);
-  const held=new Set<string>();
-  const hold=async(keys:Set<string>)=>{for(const k of [...held])if(!keys.has(k)){await page.keyboard.up(k);held.delete(k);}for(const k of keys)if(!held.has(k)){await page.keyboard.down(k);held.add(k);}};
-  const steer=async(p:{x:number;z:number;yaw:number},x:number,z:number)=>{const dx=x-p.x,dz=z-p.z,length=Math.hypot(dx,dz)||1,c=Math.cos(p.yaw),s=Math.sin(p.yaw);
-    const side=(c*dx-s*dz)/length,ahead=(-s*dx-c*dz)/length,keys=new Set<string>();
-    if(side>.38)keys.add('d');if(side<-.38)keys.add('a');if(ahead>.38)keys.add('w');if(ahead<-.38)keys.add('s');await hold(keys);};
-  const goal:{x:number;z:number}=await page.evaluate(t=>(window as any).planner.goal(t),target);
-  const distance=(a:{x:number;z:number},b:{x:number;z:number})=>Math.hypot(a.x-b.x,a.z-b.z);
-  // A slow page overshoots single waypoints: aim a little ahead of the closest path point, and plan again from wherever it stopped.
-  // A minute and a half per walk, so a starved machine fails here with a clear message instead of eating the whole test.
-  const deadline=Date.now()+90_000;
-  for(let attempt=0;attempt<3&&Date.now()<deadline&&!await reached();attempt++){
-    const path:Array<{x:number;z:number}>|undefined=await page.evaluate(t=>(window as any).planner.path(t),target);expect(path,'a walkable path').toBeTruthy();
-    for(let index=0;Date.now()<deadline;){
-      const p=await me();
-      for(let j=index+1;j<Math.min(path!.length,index+7);j++)if(distance(path![j]!,p)<distance(path![index]!,p))index=j;
-      if(distance(path!.at(-1)!,p)<.3)break;
-      const aim=path![Math.min(path!.length-1,index+2)]!;await steer(p,aim.x,aim.z);await page.waitForTimeout(70);
-    }
-    await hold(new Set());
-    // The last steps in short taps, until the client's own reach rule holds.
-    for(let i=0;i<12&&Date.now()<deadline&&!await reached();i++){await steer(await me(),goal.x,goal.z);await page.waitForTimeout(90);await hold(new Set());await page.waitForTimeout(150);}
-  }
-  await hold(new Set());expect(await reached(),`reached ${target} within 90 s`).toBe(true);
-}
-
 test('a shift: the job panel moves, hides and comes back, and the next task draws its marker without freezing the view',async({page})=>{
   test.setTimeout(240000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));

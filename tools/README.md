@@ -14,6 +14,7 @@ Os arquivos podem ser abertos com dois cliques, a partir de qualquer pasta. É n
 | `atualizar.bat` | Para os serviços, executa `npm install` e o typecheck e liga tudo de novo; se algo falhar, os serviços ficam desligados e o erro aparece na janela |
 | `testar.bat` | Executa `npm test` (API, mundo e integração); `testar.bat navegador` também executa os E2E no Edge |
 | `contas-demo.bat` | Para os serviços, cria as contas de demonstração (`npm run seed`) e liga tudo de novo; o PostgreSQL embutido aceita um processo por vez |
+| `bots.bat` | Coloca 30 bots no bar para testar o desempenho (`bots.bat 12` coloca 12). O jogo precisa estar ligado. Ctrl+C tira todos do bar; veja [Bots de desempenho](#bots-de-desempenho) |
 
 Abra **https://localhost:5173** depois de aparecer **B.A.R. ligado!** (na primeira visita, aceite o aviso do certificado próprio em *Avançado*; o HTTPS libera o microfone do [chat de voz](../docs/sistemas/voice.md)). As portas são 3001 para a API, 2567 para o mundo e 5173 para o site; o site repassa o mundo em `/game`, então quem joga de fora só precisa da porta 5173. Com `BAR_HTTPS=0` no ambiente, o site volta a usar HTTP. O status consulta a identidade da API e do mundo e verifica a transformação do código e do CSS no Vite, além da página inicial.
 
@@ -41,6 +42,18 @@ Para automação, os `.bat` aceitam `--sem-pausa` e devolvem o código de saída
 ```
 
 Verificado em 22/10/2026: início fora da pasta do projeto, início repetido sem duplicar processos, reinício, parada com liberação das três portas, rejeição de conflito de merge com código 1 e preservação de outro programa ocupando uma porta. O build e os 39 testes de API, servidor e integração também passaram após a correção dos conflitos que impediam a execução.
+
+## Bots de desempenho
+
+Pelo jogo: **⚙ Administração → Mundo ao vivo → Bots de teste** (conta de administrador) define a quantidade, com atalhos +5, +10 e Remover todos, e mostra o que os bots estão fazendo. O mundo roda os bots como processo filho e eles saem quando o mundo reinicia.
+
+Pelo terminal: `bots.bat` (ou `npm run bots -- 30`) conecta jogadores de verdade ao mundo pelo WebSocket, como navegadores, e cada um vive no bar: anda pelo A* do Tonico com a mesma predição do cliente, senta e pede ao Tonico, bebe no balcão, usa o banheiro, dança, cumprimenta e conversa (prefere jogadores reais), joga blackjack, faz turno de Ajudante do Magrão, passeia de bengala (`/velho`) e compra o ingresso para tocar no palco. Sede, fome e bexiga puxam parte das escolhas. A cada 15 s a janela mostra o que fazem, o RTT, o tick do mundo (p95) e a carga do próprio processo dos bots, que divide a máquina com o jogo.
+
+- As contas `bot-01@bots.bar.local`… são criadas no primeiro uso por uma rota interna da API que só existe fora de produção (`apps/api/src/dev-bots.ts`): verificadas, com todas as roupas (cada bot veste uma) e 5000 moedas, completadas quando caem abaixo de 1000. Ninguém consegue entrar com elas.
+- O avatar de um bot sai do bar junto com ele (o de jogador continua lá). Fechando a janela sem Ctrl+C, os avatares saem depois dos 30 s de reconexão.
+- O bar comporta `ROOM_CAPACITY` pessoas (32 por padrão): com 30 bots sobram 2 vagas. Para mais bots, aumente a variável no `.env` e reinicie.
+- Use o painel ou o terminal, não os dois ao mesmo tempo: as contas são as mesmas e um tira o bot do outro.
+- `BOTS_SECONDS=120` faz uma rodada cronometrada que termina sozinha. `API_INTERNAL_URL` e `BOTS_WORLD_URL` apontam para outra stack (por exemplo, a isolada dos E2E, em 3111/2677).
 
 ## Outras ferramentas
 

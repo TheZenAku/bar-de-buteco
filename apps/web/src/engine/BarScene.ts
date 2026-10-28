@@ -9,7 +9,10 @@ import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
 import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
-import {JUKEBOX_SYSTEMS,type JukeboxState} from '@bar/shared';
+import {StageLights,type StageLightsStatus} from './stage-lights';
+import {JUKEBOX_SYSTEMS,STAGE_ENTRY,TV_SPOTS,inStageArea,onStage,type JukeboxState} from '@bar/shared';
+import {MUSICIAN_REACH,MUSICIANS,STAGE_PHASES,musicianPhase,stageSpot,type StagePhase,type StageSpot} from '@bar/shared';
+import {StageMusicians,musicianState,musicianTime} from './stage-musicians';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
@@ -70,6 +73,8 @@ interface Avatar {
   glide: number;
   /** Drawn heading in degrees. Kept here because Euler angles read back from the engine fold past ±90°. */
   yaw: number;
+  /** Seconds of the next glide, instead of the usual: a musician sliding onto a stage spot or stepping off it. */
+  glideNext?: number;
 }
 interface Pose {
   t: number;
@@ -109,6 +114,12 @@ const PATCH_GLIDE = PATCH_MS / 1000 * 1.2;
 const SNAP_DISTANCE = 1.5;
 // The job objective marker takes the job panel's neon green (--neon-green in nova-ui.css).
 const OBJECTIVE_COLOR = '#5fd86c';
+// The stage's blips: its entry (the foot of its steps, where the pass is bought) in the stage's magenta (Palco_FX_Luz
+// cor_padrao), and the telão's control (the middle of the stage's front edge) in the HUD's neon teal (--neon-teal).
+const STAGE_BLIPS = {entry:{at:STAGE_ENTRY,color:'#ff47c2'},telao:{at:TV_SPOTS.telao!,color:'#3adfd7'}} as const;
+export type StageBlip = keyof typeof STAGE_BLIPS;
+/** Floor ring and floating chevron of a blip; `target.top` is where the chevron floats above. */
+interface Marker {target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity}
 
 const TAU = Math.PI * 2;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -142,8 +153,16 @@ export class BarScene {
   private jukeboxLights?:JukeboxLights;
   private jukeboxState?:JukeboxState;
   private jukeboxDuration=0;
+  /** Every light of the stage (lenses, LED strip, backlight, truss spots, washes), coloured by the video on the telão. */
+  private stageLights?:StageLights;
+  private stageState?:JukeboxState;
+  /** The musicians' clips on the stage and the instruments they pick up (stage-musicians.ts). */
+  private musicians?:StageMusicians;
+  private stageDuration=0;
   /** The local worker's current job station: a marker only this browser draws (the task is sent to the worker alone). */
-  private objective?:{target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity};
+  private objective?:Marker;
+  /** The stage's blips (STAGE_BLIPS), shown while the player is in the stage's area and below the deck. */
+  private readonly stageBlips = new Map<StageBlip, Marker>();
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
@@ -223,7 +242,6 @@ export class BarScene {
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
     for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.screens.includes(tv.id))))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
-    this.buildStageScreen();
     this.discoBall = this.buildDiscoBall();
     this.ready = this.loadMap();
     this.loadProps();
@@ -308,38 +326,42 @@ export class BarScene {
         this.environment.configureMap(map);
         this.mapEffects=new MapEffects(this.app,map);
         this.jukeboxLights=new JukeboxLights(map);
+        this.stageLights=new StageLights(map,this.partyLights.filter(light=>light.name==='Stage party wash').map(light=>light.light!));
+        this.musicians=new StageMusicians(this.app,map);
+        // The stage screen is the map's (15_palco.py): its standby art shows while no video plays on it.
+        const standby=(map.findByName('Telao_Tela') as pc.Entity|null)??undefined;
+        if(!standby)console.warn('Tela do telão (Telao_Tela) ausente no mapa.');
+        this.televisions.get('telao')?.setStandby(standby);
         resolve();
       });
     });
   }
 
-  /** The stage screen is not in the map: a dark frame and two hanging cables around its video surface. */
-  private buildStageScreen(): void {
-    const screen=TELEVISIONS.find(tv=>tv.id==='telao');if(!screen)return;
-    const frame=this.material('#141418','#050507',.6),cable=this.material('#222226');
-    this.box('Stage screen frame',[screen.x,screen.y,screen.z-.05],[screen.width+.24,screen.height+.24,.08],frame);
-    for(const side of [-1,1])this.box('Stage screen cable',[screen.x+side*screen.width*.42,screen.y+screen.height/2+.65,screen.z-.05],[.025,1.3,.025],cable);
-  }
-
   private buildPartyLighting(): void {
     // Party washes: the ground-floor hall, the upstairs games hall and the backyard stage.
-    for (const [x,y,z,hex] of [[6.5,2.7,-7.6,'#cf5275'],[12.5,2.7,-7.6,'#41afaa'],[10.3,5.8,-7.6,'#af75e5'],[26.6,3.6,-23.4,'#cf5275']] as const) {
-      const light = new pc.Entity('Party wash');
+    // The stage's takes the telão's colours while it shows a video (StageLights).
+    for (const [x,y,z,hex,name] of [[6.5,2.7,-7.6,'#cf5275','Party wash'],[12.5,2.7,-7.6,'#41afaa','Party wash'],[10.3,5.8,-7.6,'#af75e5','Party wash'],[26.6,3.6,-23.4,'#cf5275','Stage party wash']] as const) {
+      const light = new pc.Entity(name);
       light.addComponent('light',{type:'spot',enabled:false,color:color(hex),intensity:0,range:8,innerConeAngle:35,outerConeAngle:75,
         castShadows:true,shadowResolution:512,shadowType:pc.SHADOW_PCF3_32F,shadowBias:.3,normalOffsetBias:.04});
       light.setPosition(x,y,z);this.app.root.addChild(light);this.partyLights.push(light);
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;objective?:{x:number;y:number;z:number;visible:boolean}} {
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;stage?:StageLightsStatus;musicians?:ReturnType<StageMusicians['telemetry']>;objective?:{x:number;y:number;z:number;visible:boolean};stageBlips:Partial<Record<StageBlip,{x:number;y:number;z:number;visible:boolean}>>} {
     const cart=this.mapEntity?.findByName('Carrinho_Espeto') as pc.Entity|undefined;
     return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
       renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry(),
-      jukebox:this.jukeboxLights?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined};
+      jukebox:this.jukeboxLights?.telemetry(),stage:this.stageLights?.telemetry(),musicians:this.musicians?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined,
+      stageBlips:Object.fromEntries([...this.stageBlips].map(([id,blip])=>[id,{...blip.target,visible:blip.marker.enabled}]))};
   }
 
   /** Seconds of the jukebox's video, known by the local YouTube player (0 while loading): paces its colours. */
   setJukeboxDuration(seconds:number):void {this.jukeboxDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
+  /** Seconds of the telão's video, known by the local YouTube player (0 while loading): paces the stage's colours. */
+  setStageDuration(seconds:number):void {this.stageDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
+  /** The local player is near a musician's spot: fetch its clips now, so taking it starts at once. */
+  preloadMusician(spot:string):void {this.musicians?.preload(spot);}
 
   /**
    * The job objective ("blip") of the local worker: a ring on the floor around the station and a chevron above it,
@@ -349,34 +371,57 @@ export class BarScene {
    */
   setObjective(target:(Required<Position>&{top:number})|null):void {
     if(!target){if(this.objective)this.objective.marker.enabled=false;return;}
-    const objective=this.objective??=this.buildObjective();
+    const objective=this.objective??=this.buildMarker('Job objective',OBJECTIVE_COLOR);
     objective.target={...target};objective.marker.setPosition(target.x,target.y,target.z);objective.marker.enabled=true;
-    this.animateObjective();
+    this.animateMarker(objective);
   }
 
-  private buildObjective():{target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity} {
-    const marker=this.group('Job objective',[0,0,0]);
+  private buildMarker(name:string,hex:string):Marker {
+    const marker=this.group(name,[0,0,0]);
     const glow=(depthTest:boolean)=>{
       const material=new pc.StandardMaterial();material.useLighting=false;material.useFog=false;material.diffuse.set(0,0,0);
-      material.emissive=color(OBJECTIVE_COLOR);material.opacity=depthTest ? .85 : .92;material.blendType=pc.BLEND_NORMAL;
+      material.emissive=color(hex);material.opacity=depthTest ? .85 : .92;material.blendType=pc.BLEND_NORMAL;
       material.depthTest=depthTest;material.depthWrite=false;material.cull=pc.CULLFACE_NONE;material.update();this.materials.push(material);return material;
     };
-    const ring=new pc.Entity('Job objective ring');
+    const ring=new pc.Entity(`${name} ring`);
     const torus=pc.Mesh.fromGeometry(this.app.graphicsDevice,new pc.TorusGeometry({tubeRadius:.025,ringRadius:.62,segments:48}));
     ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true))],castShadows:false,receiveShadows:false});
     ring.setLocalPosition(0,.03,0);marker.addChild(ring);
-    // Above the station; it shows through walls and furniture, like a map blip.
-    const chevron=new pc.Entity('Job objective chevron');
+    // Above its spot; it shows through walls and furniture, like a map blip.
+    const chevron=new pc.Entity(`${name} chevron`);
     chevron.addComponent('render',{type:'cone',material:glow(false),castShadows:false,receiveShadows:false});
     chevron.setLocalEulerAngles(180,0,0);chevron.setLocalScale(.26,.34,.26);marker.addChild(chevron);
     return {target:{x:0,y:0,z:0,top:0},marker,chevron};
   }
 
   /** Where the objective is on screen (also when off it or behind the camera), and how far it is from the player. */
-  projectObjective():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
-    const objective=this.objective,player=this.actors.get(this.localId);
-    if(!objective?.marker.enabled||!this.camera.camera||!player)return null;
-    const point=objective.chevron.getPosition(),eye=this.camera.getPosition(),forward=this.camera.forward;
+  projectObjective():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.objective);}
+  /** Where one of the stage's blips is on screen, while it is shown (see updateStageBlips). */
+  projectStageBlip(id:StageBlip='entry'):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.stageBlips.get(id));}
+
+  /**
+   * The stage's blips: its entry, where the pass is bought, and the telão's control. Shown only in the stage's area (the
+   * backyard, inStageArea), so they never show all over the map, and never while the player is up on the stage or
+   * watching a screen; built on first use.
+   */
+  private updateStageBlips():void {
+    const player=this.actors.get(this.localId),p=player?.root.getPosition(),at=p&&{x:p.x,y:p.y,z:p.z};
+    const show=!!at&&this.enabled&&!this.watchingTv&&inStageArea(at)&&!onStage(at);
+    for(const [id,{at:spot,color:hex}] of Object.entries(STAGE_BLIPS) as [StageBlip,typeof STAGE_BLIPS[StageBlip]][]){
+      let blip=this.stageBlips.get(id);
+      if(!show){if(blip)blip.marker.enabled=false;continue;}
+      if(!blip){
+        blip=this.buildMarker(`Stage blip ${id}`,hex);this.stageBlips.set(id,blip);
+        blip.target={...spot,top:spot.y+2};blip.marker.setPosition(spot.x,spot.y,spot.z);
+      }
+      blip.marker.enabled=true;this.animateMarker(blip);
+    }
+  }
+
+  private projectMarker(blip:Marker|undefined):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
+    const player=this.actors.get(this.localId);
+    if(!blip?.marker.enabled||!this.camera.camera||!player)return null;
+    const point=blip.chevron.getPosition(),eye=this.camera.getPosition(),forward=this.camera.forward;
     this.tempPosition.set(point.x-eye.x,point.y-eye.y,point.z-eye.z);
     const behind=this.tempPosition.dot(forward)<=0;
     // Mirrored in front of the camera when behind it, so the direction on screen still points the right way.
@@ -384,12 +429,12 @@ export class BarScene {
     this.camera.camera.worldToScreen(this.tempPosition.add(eye),this.tempScreen);
     const width=this.canvas.clientWidth,height=this.canvas.clientHeight,p=player.root.getPosition();
     const onScreen=!behind&&this.tempScreen.x>=0&&this.tempScreen.x<=width&&this.tempScreen.y>=0&&this.tempScreen.y<=height;
-    return {x:this.tempScreen.x,y:this.tempScreen.y,onScreen,behind,distance:Math.hypot(objective.target.x-p.x,objective.target.z-p.z),above:objective.target.y-p.y};
+    return {x:this.tempScreen.x,y:this.tempScreen.y,onScreen,behind,distance:Math.hypot(blip.target.x-p.x,blip.target.z-p.z),above:blip.target.y-p.y};
   }
 
-  private animateObjective():void {
-    const objective=this.objective;if(!objective?.marker.enabled)return;
-    const {target,chevron}=objective;
+  private animateMarker(blip:Marker|undefined):void {
+    if(!blip?.marker.enabled)return;
+    const {target,chevron}=blip;
     chevron.setLocalPosition(0,target.top-target.y+.55+Math.sin(this.elapsed*3)*.07,0);
     chevron.setLocalEulerAngles(180,this.elapsed*90%360,0);
   }
@@ -422,15 +467,17 @@ export class BarScene {
     // The empty snapshot used when leaving the bar has serverTime=0; keep the clock running.
     if(Number.isFinite(world.serverTime)&&world.serverTime>0)this.serverClockOffset = world.serverTime - Date.now();
     this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
+    this.stageState=world.televisions?.telao;
     for(const door of this.doorLeaves){
       const state=world.doors?.[door.leaf.group];if(!state)continue;
       const target=state.open?1:0;
       if(target!==door.target||state.changedAt!==door.changedAt){door.from=door.openness;door.target=target;door.changedAt=state.changedAt;}
     }
+    const musicians=new Map(Object.values(world.musicians??{}).filter(spot=>spot.playerId).map(spot=>[spot.playerId,spot]));
     this.updateState({
       players: Object.values(world.players).map(player => {
         const seat=world.tables[player.currentTableId]?.seats.find(seat => seat.playerId === player.id);
-        return { ...player, animation: player.animationState,cardResult:seat?.result,cardCount:seat?.cards.length??0 };
+        return { ...player, animation: player.animationState,cardResult:seat?.result,cardCount:seat?.cards.length??0,musician:musicians.get(player.id) };
       }),
       npcs: Object.values(world.npcs).map(npc => ({ ...npc, animation: npc.animationState, role: npc.behavior })),
       event: world.event,
@@ -516,6 +563,8 @@ export class BarScene {
         const local = actor.id === localId;
         if (existing) {
           const moved = actor.x !== existing.actor.x || actor.y !== existing.actor.y || actor.z !== existing.actor.z;
+          // Onto a stage spot in the time the body blends into the take clip; off the drums' spot at a walk.
+          if (!!existing.actor.musician !== !!actor.musician) existing.glideNext = actor.musician ? MUSICIANS.blendSeconds : .6;
           // The local position comes from prediction (updateLocal), not from the server snapshot.
           existing.actor = local ? { ...actor, x: existing.actor.x, y: existing.actor.y, z: existing.actor.z } : { ...actor };
           if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
@@ -548,10 +597,13 @@ export class BarScene {
   private glideTo(avatar: Avatar, seconds: number): void {
     const { root, actor } = avatar;
     const drawn = root.getPosition();
-    if (Math.hypot(actor.x - drawn.x,(actor.y??0)-drawn.y,actor.z-drawn.z)>SNAP_DISTANCE)root.setPosition(actor.x,actor.y??0,actor.z);
+    // A musician's spot is taken from up to MUSICIAN_REACH away: that slide never snaps.
+    const snap = avatar.glideNext ? SNAP_DISTANCE + MUSICIAN_REACH : SNAP_DISTANCE;
+    if (Math.hypot(actor.x - drawn.x,(actor.y??0)-drawn.y,actor.z-drawn.z)>snap)root.setPosition(actor.x,actor.y??0,actor.z);
     avatar.glideFrom.copy(root.getPosition());
     avatar.glideAt = this.elapsed;
-    avatar.glide = seconds;
+    avatar.glide = avatar.glideNext ?? seconds;
+    avatar.glideNext = undefined;
   }
 
   setEnabled(enabled: boolean): void {
@@ -591,8 +643,11 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; tracks: string[] }> {
+  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
+    const now=Date.now()+this.serverClockOffset,point=(p:pc.Vec3)=>[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];
     return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
+      musician:avatar.actor.musician?{spot:avatar.actor.musician.id,phase:musicianPhase(avatar.actor.musician,now)?.phase,root:point(avatar.root.getPosition()),
+        hip:avatar.skin?point((avatar.skin.model.findByName('hip') as pc.Entity|null)?.getPosition()??avatar.root.getPosition()):undefined}:undefined,
       height: avatar.skin ? avatar.skin.bones.head.getPosition().y - avatar.root.getPosition().y : undefined,
       time: avatar.skin?.model.anim?.baseLayer?.activeStateCurrentTime, tracks: [...(avatar.skin?.tracks ?? [])],
       speed:avatar.skin?.model.anim?.speed,drink:Object.entries(avatar.drinks??{}).filter(([,e])=>e.enabled).map(([item])=>({item,sip:+(avatar.sip??0).toFixed(3)}))[0],cards:avatar.cards?.enabled?avatar.cards.children.filter(card=>card.enabled).length:undefined,tray:avatar.tray?.entity.enabled?{items:avatar.tray.items.length,onTray:avatar.tray.items.filter(item=>item.enabled).length}:undefined,cane:avatar.skin?.cane?{enabled:avatar.skin.cane.enabled,parent:avatar.skin.cane.parent?.name,renders:avatar.skin.cane.findComponents('render').length}:undefined }));
@@ -604,6 +659,8 @@ export class BarScene {
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
+    this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
+    this.musicians?.destroy();this.musicians=undefined;
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
@@ -925,14 +982,14 @@ export class BarScene {
     if (moving && animation === 'idle') animation = 'walk';
     const seated = animation.includes('sit') || animation.includes('seat') || animation.includes('blackjack');
     // The local player faces the predicted travel direction; the server's lags behind it.
-    // Seats set the facing on the server, so seated players keep that one.
-    if (local && seated) this.lastRotation = actor.rotation ?? this.lastRotation;
+    // Seats and stage spots set the facing on the server, so seated players and musicians keep that one.
+    if (local && (seated || actor.musician)) this.lastRotation = actor.rotation ?? this.lastRotation;
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
     avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
     // Skinned avatars have dedicated drunk clips; the procedural sway remains as fallback for box avatars.
     const stage=drunkStage(actor.drunk??0),dedicatedDrunk=!!avatar.skin?.tracks.has('DrunkIdle')&&stage>=2;
-    const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
+    const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || actor.musician || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
     root.setEulerAngles(sway * Math.sin((this.elapsed + avatar.phase) * 1.3), avatar.yaw, sway * Math.sin((this.elapsed + avatar.phase) * 0.9 + 1));
     const pose: Pose = {
       t: this.elapsed + avatar.phase,
@@ -1093,7 +1150,9 @@ export class BarScene {
     const gesture = seated > 0.01 || dancing || drinking || waving;
     const action = actor.animation;
     const stage=drunkStage(actor.drunk??0);
-    const requested = action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+    // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
+    const show=this.musicianClip(avatar,skin);
+    const requested = show ? show.state : action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use'
       : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
@@ -1103,17 +1162,21 @@ export class BarScene {
     const imported=actionImported||oldGait;
     const clip = actionImported ? requested : oldGait ? (pose.walking?'OldCaneWalk':'OldCaneHold') : pose.walking && seated < 0.5 ? 'Walk' : gesture ? 'Pose' : 'Idle';
     if(skin.cane)skin.cane.enabled=oldGait&&!actionImported;
-    const playbackKey = `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
+    const playbackKey = show ? `${clip}:${show.startedAt}` : `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
     if (skin.clip !== clip || skin.playbackKey !== playbackKey) {
-      anim.baseLayer?.transition(clip, skin.clip ? (clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25) : 0);
+      // The take, start and loop clips follow each other frame to frame; the take and stop clips blend in, as palco_musicos.js does.
+      const blend = show ? show.blend : skin.clip.startsWith('Palco ') ? MUSICIANS.releaseSeconds : clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25;
+      anim.baseLayer?.transition(clip, skin.clip ? blend : 0);
       skin.clip = clip; skin.playbackKey = playbackKey;
-      if (actionImported && actor.animationStartedAt && anim.baseLayer) {
+      if (show && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = musicianTime(show.spot,show.phase,show.startedAt,show.now);
+      else if (actionImported && actor.animationStartedAt && anim.baseLayer) {
         const age = Math.max(0, (Date.now() + this.serverClockOffset - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
         anim.baseLayer.activeStateCurrentTime = ['Deal', 'Dance', 'Wait', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) ? age % duration : Math.min(age, duration);
       }
     }
     anim.speed = clip==='OldCaneWalk'?(skin.oldCaneRate??1):clip==='Walk'?WALK_CLIP_SPEED:clip==='Run'?1.15:1;
+    if (show) this.musicians!.play(show.spot.id,show.phase,show.startedAt,show.now,show.blend);
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
       if (SEATED_CLIPS.includes(clip)) {
@@ -1190,6 +1253,23 @@ export class BarScene {
     }
   }
 
+  /**
+   * The stage clip an avatar plays now: its spot's phase (musicianPhase runs the take and start clips into the next
+   * phase without waiting for the room) and how long it blends in. Undefined off the stage, or until the spot's clips
+   * have loaded and been converted for this skin (they are then added to its anim states).
+   */
+  private musicianClip(avatar:Avatar,skin:SkinnedRig):{state:string;spot:StageSpot;phase:StagePhase;startedAt:number;now:number;blend:number}|undefined {
+    const playing=avatar.actor.musician,spot=playing?stageSpot(playing.id):undefined,model=avatar.skinId?this.skinModels.get(avatar.skinId):undefined;
+    if(!playing||!spot||!model||!this.musicians)return;
+    const now=Date.now()+this.serverClockOffset,current=musicianPhase(playing,now);
+    if(!current||current.phase==='fim')return;
+    const tracks=this.musicians.bodyTracks(spot.id,avatar.skinId!,skin.model,model.animations.map(asset=>asset.resource as pc.AnimTrack));
+    if(!tracks)return;
+    if(!skin.tracks.has(tracks[0]!.name))tracks.forEach((track,i)=>{skin.model.anim!.assignAnimation(track.name,track,undefined,1,STAGE_PHASES[i]==='loop');skin.tracks.add(track.name);});
+    const blend=(current.phase==='entrando'||current.phase==='saindo')&&now-current.startedAt<MUSICIANS.blendSeconds*1000?MUSICIANS.blendSeconds:0;
+    return {state:musicianState(spot.id,current.phase),spot,...current,now,blend};
+  }
+
   /** Rotates a bone by `degrees` about a world-space axis, on top of its current pose. */
   private turn(bone: pc.Entity, axis: pc.Vec3, degrees: number): void {
     if (Math.abs(degrees) < 0.01) return;
@@ -1242,14 +1322,17 @@ export class BarScene {
     }
     this.frameId++;
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    // Instruments nobody was drawn playing this frame go back on their stands.
+    this.musicians?.frame();
     this.placeServed(Date.now()+this.serverClockOffset);
     const bartender=this.actors.get('bartender');
     this.mapEffects?.update(this.elapsed,bartender?.actor.animation==='bartend'||bartender?.skin?.clip==='Bartend');
     const player = this.actors.get(this.localId);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
     if(television){
-      const angle=television.yaw*Math.PI/180;
-      this.camera.setPosition(television.x+Math.sin(angle+this.tvYaw)*1.15*Math.cos(this.tvPitch),television.y+Math.sin(this.tvPitch)*1.15,television.z+Math.cos(angle+this.tvYaw)*1.15*Math.cos(this.tvPitch));
+      // Far enough back for the screen to fill the view: 1.15 m from a TV, about 6 m from the stage screen.
+      const angle=television.yaw*Math.PI/180,back=Math.max(1.15,television.width*1.1);
+      this.camera.setPosition(television.x+Math.sin(angle+this.tvYaw)*back*Math.cos(this.tvPitch),television.y+Math.sin(this.tvPitch)*back,television.z+Math.cos(angle+this.tvYaw)*back*Math.cos(this.tvPitch));
       this.camera.lookAt(television.x,television.y,television.z);
     } else if (player && this.enabled) {
       const p = player.root.getPosition();
@@ -1274,7 +1357,9 @@ export class BarScene {
     }
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
-    this.animateObjective();
+    this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
+    this.animateMarker(this.objective);
+    this.updateStageBlips();
     const party = this.environment.partyStrength;
     for (let i = 0; i < this.partyLights.length; i++) {
       const light = this.partyLights[i]!.light;

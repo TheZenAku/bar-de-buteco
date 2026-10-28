@@ -39,6 +39,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Inventário](sistemas/inventory.md)
 - [Jukebox e TVs](sistemas/jukebox.md)
 - [Necessidades do personagem](sistemas/needs.md)
+- [Músicos do palco](sistemas/palco.md)
 - [Skins e coleção](sistemas/skins.md)
 - [Chat de voz por proximidade](sistemas/voice.md)
 

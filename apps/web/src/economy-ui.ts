@@ -1,4 +1,4 @@
-import {JOBS,MEDIA_PRICES,TABLE_MENU,TABLE_ORDER_MAX_ITEMS,itemById,type JobSlotsView,type JobTaskView,type WorldState} from '@bar/shared';
+import {JOBS,MEDIA_PRICES,STAGE_PASS,TABLE_MENU,TABLE_ORDER_MAX_ITEMS,itemById,type JobSlotsView,type JobTaskView,type WorldState} from '@bar/shared';
 import {escape as e} from './api';
 import type {TableOrderView} from './networking';
 import {GRAPHICS_PRESETS,PRESET_LABELS,type GraphicsSettings} from './graphics';
@@ -8,6 +8,21 @@ import {coins,itemImage} from './ui-icons';
 export function mediaPriceNote(kind:'jukebox'|'tv',id:string,balance:number|undefined):string {
   const price=kind==='jukebox'?MEDIA_PRICES.jukebox:id==='telao'?MEDIA_PRICES.telao:MEDIA_PRICES.tv;
   return `<p class="media-price"><b>${coins(price)}</b> por vídeo novo · pausar, continuar e parar são de graça${balance===undefined?'':` · você tem ${coins(balance)}`}</p>`;
+}
+
+/** Minutes left on a stage pass (`until`: server clock), at least 1 while it lasts. */
+export const stageMinutes=(until:number,now:number)=>Math.max(1,Math.ceil((until-now)/60_000));
+/**
+ * At the stage's steps: buy the pass to go up (the room charges it, never the browser), or see how long the current
+ * one lasts. The screen is paid apart, at the front of the stage.
+ */
+export function stagePanelHtml(price:number,until:number,now:number,balance:number|undefined):string {
+  const telao=`<p class="fine-print">O telão é à parte: ${coins(MEDIA_PRICES.telao)} por vídeo novo. Vá ao blip turquesa no meio da frente do palco (ou encoste na borda da frente, de cima do palco) e aperte E. Todas as luzes do palco mudam de cor com o vídeo.</p>`;
+  if(until>0)return `<div class="stage-panel"><p class="modal-description">Seu ingresso está valendo: o palco é seu por mais <b>${stageMinutes(until,now)} min</b>. É só subir pela escada.</p>${telao}<button class="button secondary full" data-action="close-modal">Fechar</button></div>`;
+  const short=balance!==undefined&&balance<price;
+  return `<div class="stage-panel"><p class="media-price"><b>${coins(price)}</b> pelo ingresso · vale ${STAGE_PASS.durationMs/60_000} minutos${balance===undefined?'':` · você tem ${coins(balance)}`}</p>
+    <p class="modal-description">Só sobe no palco quem tem ingresso. Enquanto ele valer, você sobe e desce à vontade; se acabar lá em cima, pode ficar até descer.</p>
+    <button class="button primary full" data-action="stage-buy" ${short?'disabled':''}>${short?'Moedas insuficientes':`Pagar ${price} moedas e subir`}</button>${telao}</div>`;
 }
 
 /** Tonico's menu, for a seated player: up to four items, paid on ordering, refunded if the order is dropped. */
@@ -57,11 +72,28 @@ export function jobPanelTick(body:HTMLElement,summary:HTMLElement,task:JobTaskVi
 
 interface Snapshot {
   at:number;occupancy:number;capacity:number;event:string;walletRetries:number;resultOutbox:number;prices:Record<string,number>;
-  players:Array<{id:string;name:string;connected:boolean;x:number;y:number;z:number;animation:string;interaction:string;job:string;condition:string;balance?:number}>;
+  players:Array<{id:string;name:string;connected:boolean;x:number;y:number;z:number;animation:string;interaction:string;job:string;condition:string;balance?:number;stageMinutes?:number}>;
   npcs:Array<{id:string;name:string;behavior:string;animation:string;x:number;z:number}>;
   waiter:{phase:string;current?:TableOrderView&{playerId:string};queue:Array<TableOrderView&{playerId:string}>};counterQueue:string[];
   jobs:Array<JobSlotsView&{tasks?:number;paid?:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number}>}>;
   media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number}>;
+  /** Development bots (apps/server/src/world/bots.ts); `status` is what their process reported last. */
+  bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
+    status?:{walking:number;doing:Array<[string,number]>;rttP95?:number;loopP95?:number;inputs?:number;refusals?:Array<[string,number]>}};
+}
+/** The bots section of "Mundo ao vivo": how many, what they are doing, and the numbers a performance test looks at. */
+function botsAdminHtml(b:NonNullable<Snapshot['bots']>):string {
+  if(!b.available)return '<h3>Bots de teste</h3><p>Disponíveis só no ambiente de desenvolvimento.</p>';
+  const add=(n:number)=>Math.min(b.max,b.target+n),st=b.status,ms=(v:number|undefined)=>v===undefined?'—':`${Math.round(v*10)/10} ms`;
+  const state=!b.running?'Nenhum bot no bar.':b.inBar<b.target?`Entrando: ${b.inBar}/${b.target} no bar…`:b.inBar>b.target?`Saindo: ${b.inBar} no bar, ficam ${b.target}…`:`${b.inBar} bots no bar.`;
+  return `<h3>Bots de teste</h3><article class="admin-job"><header><b>${state}</b><span>cabem até ${b.max} · tick do mundo p95 ${ms(b.tickP95)}</span></header>
+    ${st?.doing.length?`<p>${st.doing.map(([what,n])=>`${e(what)} ${n}`).join(' · ')}${st.walking?` (${st.walking} andando)`:''}</p>`:''}
+    ${st?.rttP95!==undefined?`<p class="fine-print">Últimos 15 s: RTT p95 ${ms(st.rttP95)} · ${st.inputs??0} inputs/s · processo dos bots: event loop p95 ${ms(st.loopP95)}${st.refusals?.length?` · recusas: ${st.refusals.map(([text,n])=>`${n}× ${e(text)}`).join(' | ')}`:''}</p>`:''}
+    <form class="admin-bots-form"><label>Quantidade<input name="count" type="number" min="0" max="${b.max}" value="${b.target||Math.min(30,b.max)}"></label><button class="mini-button" type="submit">Aplicar</button>
+      <button class="mini-button" type="button" data-action="admin-bots" data-count="${add(5)}" ${add(5)===b.target?'disabled':''}>+5</button>
+      <button class="mini-button" type="button" data-action="admin-bots" data-count="${add(10)}" ${add(10)===b.target?'disabled':''}>+10</button>
+      ${b.running?'<button class="mini-button" type="button" data-action="admin-bots" data-count="0">Remover todos</button>':''}</form>
+    <p class="fine-print">Jogadores de teste que entram como navegadores e vivem no bar: sentam e pedem, bebem, dançam, conversam, jogam, trabalham e tocam no palco. Rodam num processo à parte, fora do mundo; saem do bar quando são removidos ou o mundo reinicia. Para mais vagas, aumente ROOM_CAPACITY no .env.</p></article>`;
 }
 /** "Mundo ao vivo" tab of the administration: the room's live state, with job, order and device controls. */
 export function worldAdminHtml(raw:unknown):string {
@@ -76,6 +108,8 @@ export function worldAdminHtml(raw:unknown):string {
     <h3>Pedidos do Tonico · ${e(s.waiter.phase)}</h3><ul>${[s.waiter.current,...s.waiter.queue].filter((o):o is TableOrderView&{playerId:string}=>!!o).map(order).join('')||'<li>Nenhum pedido.</li>'}</ul>
     <h3>Balcão do Magrão</h3><p>${s.counterQueue.map(id=>e(name(id))).join(', ')||'Ninguém esperando.'}</p>
     <h3>Jukebox, TVs e telão</h3><ul>${s.media.map(m=>`<li><b>${e(m.id)}</b> · ${e(m.status)}${m.videoId?` · ${e(m.videoId)} por ${e(name(m.updatedBy))}`:''} · preço ${coins(s.prices[m.kind==='jukebox'?'jukebox':m.id==='telao'?'telao':'tv']??0)} ${m.status!=='off'?`<button class="mini-button" data-action="admin-media-off" data-kind="${e(m.kind)}" data-id="${e(m.id)}">Desligar</button>`:''}</li>`).join('')}</ul>
+    <h3>Palco · ingresso ${coins(s.prices.stage??0)}</h3><p>${s.players.filter(p=>p.stageMinutes!==undefined).map(p=>`${e(p.name)} (${p.stageMinutes} min)`).join(', ')||'Ninguém com ingresso.'}</p>
+    ${s.bots?botsAdminHtml(s.bots):''}
     <h3>NPCs</h3><ul>${s.npcs.map(n=>`<li>${e(n.name)} · ${e(n.behavior)} · ${e(n.animation)} · (${n.x}, ${n.z})</li>`).join('')}</ul>
     <details><summary>Jogadores (${s.players.length})</summary><table class="world-table"><thead><tr><th>Nome</th><th>Posição</th><th>Animação</th><th>Interação</th><th>Emprego</th><th>Moedas</th></tr></thead><tbody>${s.players.map(p=>`<tr class="${p.connected?'':'offline'}"><td>${e(p.name)}</td><td>${p.x}, ${p.y}, ${p.z}</td><td>${e(p.animation)}</td><td>${e(p.interaction||'—')}</td><td>${e(p.job||'—')}</td><td>${p.balance??'—'}</td></tr>`).join('')}</tbody></table></details>
     <p class="fine-print">Atualizado às ${new Date(s.at).toLocaleTimeString('pt-BR')} · as alterações valem para esta sala até o mundo reiniciar e ficam registradas no log.</p>

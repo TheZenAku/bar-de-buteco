@@ -1,6 +1,6 @@
 import map from './map-data.json';
 import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } from './index.js';
-import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
+import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 
 export const WALK_SPEED = 3.5;
@@ -77,6 +77,49 @@ export function setDoorStates(states:Iterable<readonly [string,boolean]>):boolea
   return changed;
 }
 const footprint=({id,x,z,hx,hz}:Collider):Footprint=>({id,x,z,hx,hz});
+/**
+ * The backyard stage (15_palco.py, map-data `stage`): the deck, climbed only by its steps. Going up needs a pass
+ * (STAGE_PASS in economy.ts); the screen and the musicians' spots come with it.
+ */
+export const STAGE=map.stage;
+const STAGE_AREAS=[STAGE.deck,...STAGE.steps];
+/** On the deck or on one of its steps, above the backyard floor. */
+export function onStage(position:Position):boolean {
+  return (position.y??STAGE.deck.minY)>STAGE.deck.minY+.1&&STAGE_AREAS.some(a=>Math.abs(position.x-a.x)<=a.hx&&Math.abs(position.z-a.z)<=a.hz);
+}
+/** The room clears `stageUntil` the moment a pass runs out, so server and prediction agree: valid while it is set. */
+export const hasStagePass=(player:{stageUntil?:number}):boolean=>(player.stageUntil??0)>0;
+// The floor in front of the lowest step, on the side away from the deck: where a pass is bought (the stage blip).
+const lowestStep=STAGE.steps.reduce((a,b)=>a.maxY<=b.maxY?a:b);
+const stageOutward=Math.abs(lowestStep.x-STAGE.deck.x)-STAGE.deck.hx>Math.abs(lowestStep.z-STAGE.deck.z)-STAGE.deck.hz
+  ?{x:Math.sign(lowestStep.x-STAGE.deck.x),z:0}:{x:0,z:Math.sign(lowestStep.z-STAGE.deck.z)};
+export const STAGE_ENTRY:Required<Position>={x:lowestStep.x+stageOutward.x*(lowestStep.hx+PLAYER_RADIUS+.1),y:STAGE.deck.minY,
+  z:lowestStep.z+stageOutward.z*(lowestStep.hz+PLAYER_RADIUS+.1)};
+/**
+ * The stage's area: the backyard it stands in, inside the lot's walls and gate (COL_Predio_Muro*, COL_Predio_Portao) up to
+ * the building's back wall, on its floor or up on the stage. The stage's blips show only here, not all over the map.
+ */
+const backyardWalls=map.colliders.filter(c=>/^COL_Predio_(Muro|Portao)(\.\d+)?$/.test(c.id));
+if(!backyardWalls.length)throw new Error('O mapa não tem os muros do quintal (COL_Predio_Muro)');
+export const STAGE_AREA={minX:Math.min(...backyardWalls.map(c=>c.x-c.hx)),maxX:Math.max(...backyardWalls.map(c=>c.x+c.hx)),
+  minZ:Math.min(...backyardWalls.map(c=>c.z-c.hz)),maxZ:Math.max(...backyardWalls.map(c=>c.z+c.hz)),maxY:STAGE.deck.maxY+1};
+export function inStageArea(position:Position):boolean {
+  const a=STAGE_AREA;
+  return position.x>=a.minX&&position.x<=a.maxX&&position.z>=a.minZ&&position.z<=a.maxZ&&(position.y??STAGE.deck.minY)<a.maxY;
+}
+/**
+ * The musicians' spots (Palco_Lugar_*, see stage.ts) are taken from anywhere on the deck within this distance (metres):
+ * the drum kit's volume covers the drummer's spot, so nobody can stand on it.
+ */
+export const MUSICIAN_REACH=1.5;
+/** What E does at each spot, and what the bar is told when someone takes it. */
+export const MUSICIAN_ROLES:Record<string,{label:string;taken:string;stop:string}>={
+  violao:{label:'Tocar violão',taken:'pegou o violão',stop:'Parar de tocar'},
+  cavaquinho:{label:'Tocar cavaquinho',taken:'pegou o cavaquinho',stop:'Parar de tocar'},
+  bateria:{label:'Tocar bateria',taken:'sentou na bateria',stop:'Parar de tocar'},
+  vocal:{label:'Cantar no microfone',taken:'pegou o microfone',stop:'Parar de cantar'},
+};
+export const musicianRole=(spot:string)=>MUSICIAN_ROLES[spot]??{label:'Tocar no palco',taken:'subiu para tocar',stop:'Parar de tocar'};
 /** The ground-floor L-shaped counter (the lounge upstairs has its own, unattended). */
 export const COUNTER_FOOTPRINT:readonly Footprint[]=map.colliders
   .filter(c=>c.id.startsWith('COL_Mob_Balcao')&&Math.abs((c.minY??0)-map.markers.Ponto_Balcao.y)<.1).map(footprint);
@@ -89,6 +132,10 @@ export const INTERACTABLES: readonly Interactable[] = [
   ...DOORS.map(door=>({id:door.id,type:'door' as const,label:door.label,x:door.x,y:door.y,z:door.z,footprint:door.footprint})),
   // The toilets of both floors' restrooms (COL_Mob_Vaso in the map export), used by touching them.
   ...map.colliders.filter(c=>/^COL_Mob_Vaso(\.\d+)?$/.test(c.id)).map((c,i)=>({id:`toilet-${i+1}`,type:'toilet' as const,label:'Usar o banheiro',x:c.x,y:c.minY,z:c.z,footprint:[footprint(c)]})),
+  // The stage's steps: touching them, from below or from the deck, opens the pass (the room charges it).
+  {id:'stage',type:'stage',label:'Subir no palco',...STAGE_ENTRY,footprint:STAGE.steps.map(footprint)},
+  ...STAGE.places.map(place=>({id:`palco-${place.id}`,type:'musician' as const,label:musicianRole(place.id).label,spot:place.id,
+    x:place.x,y:place.y,z:place.z,reach:MUSICIAN_REACH})),
 ];
 // Each TV is used from the floor in front of its screen (see tvSpot); defined after the floor functions.
 export const TV_SPOTS:Record<string,Required<Position>>={};
@@ -165,18 +212,22 @@ function throughDoorway(fromX:number,fromZ:number,x:number,z:number,y:number,wx:
     if(!obstructed(px,pz,y))return {x:px,z:pz};
   }
 }
-export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false):Required<Position> {
+/** `stagePass`: may step onto the stage (a paid pass); without one the steps stop the body, as a wall would. */
+export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false):Required<Position> {
   const magnitude=Math.hypot(input.dx,input.dz);
   const scale=(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
+  // Whoever is already up there (a pass that ran out) may still move about and come down, never back up.
+  const gated=!stagePass&&!onStage({x,y,z});
+  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py)&&!(gated&&onStage({x:px,y:py,z:pz}));
   for(let step=0;step<steps;step++){
     const wx=input.dx*scale/steps,wz=input.dz*scale/steps,fromX=x,fromZ=z;
     const nx=x+wx,nz=z+wz;
     let nextY=floorHeight(nx,z,y);
-    if(nextY!==undefined&&!obstructed(nx,z,nextY)){x=nx;y=nextY;}
+    if(nextY!==undefined&&allowed(nx,z,nextY)){x=nx;y=nextY;}
     nextY=floorHeight(x,nz,y);
-    if(nextY!==undefined&&!obstructed(x,nz,nextY)){z=nz;y=nextY;}
+    if(nextY!==undefined&&allowed(x,nz,nextY)){z=nz;y=nextY;}
     const guided=throughDoorway(fromX,fromZ,x,z,y,wx,wz);
     if(guided){x=guided.x;z=guided.z;}
   }
@@ -189,9 +240,12 @@ export function distance(a:Position,b:Position):number {return Math.hypot(a.x-b.
 const TOUCH_GAP=.15;
 // A chair is reached by standing at it, up to this far from the seat point.
 const CHAIR_REACH=.4;
+// Objects one floor step away are still touched. The stage's deck stands exactly this far above the backyard, so its
+// front edge (the telão) and its steps are used from both (0.9 - 0.3 is 0.6000000000000001: hence the margin).
+const REACH_HEIGHT=.6+1e-6;
 /** The closest point of the object to the player and the gap between the player's body and it. */
 export function interactionReach(object:Interactable,position:Position):{x:number;z:number;gap:number} {
-  if(!object.footprint)return {x:object.x,z:object.z,gap:Math.hypot(position.x-object.x,position.z-object.z)-PLAYER_RADIUS-CHAIR_REACH+TOUCH_GAP};
+  if(!object.footprint)return {x:object.x,z:object.z,gap:Math.hypot(position.x-object.x,position.z-object.z)-(object.reach??PLAYER_RADIUS+CHAIR_REACH)+TOUCH_GAP};
   let best={x:object.x,z:object.z,gap:Infinity};
   for(const b of object.footprint){
     const x=Math.min(Math.max(position.x,b.x-b.hx),b.x+b.hx),z=Math.min(Math.max(position.z,b.z-b.hz),b.z+b.hz);
@@ -217,7 +271,7 @@ function segmentCrossesBox(ax:number,az:number,bx:number,bz:number,c:Collider):b
 /** Touching the object, on its floor, with no wall (anything above counter height) in between. */
 export function canInteract(object:Interactable,position:Position,slack=0):boolean {
   const y=position.y??.3;
-  if(Math.abs((object.y??y)-y)>.6)return false;
+  if(Math.abs((object.y??y)-y)>REACH_HEIGHT)return false;
   const reach=interactionReach(object,position);
   if(reach.gap>TOUCH_GAP+slack+(object.type==='jukebox'?JUKEBOX_INTERACTION_SLACK:0))return false;
   const eye=y+1.3;
@@ -236,12 +290,16 @@ function tvSpot(tv:typeof TELEVISIONS[number]):Required<Position> {
 }
 for(const tv of TELEVISIONS)TV_SPOTS[tv.id]=tvSpot(tv);
 // One object per screen; every screen of a group controls the group's shared video.
-(INTERACTABLES as Interactable[]).push(...TV_SYSTEMS.flatMap(system=>system.screens.map(screen=>({id:screen,type:'television' as const,media:system.id,label:`Usar a ${TV_LABELS[screen]??'TV'}`,...TV_SPOTS[screen]!}))));
+// The stage screen is used by touching the stage's front edge (STAGE_FRONT), from the backyard or from the deck; its blip
+// marks the middle of that edge on the backyard floor (TV_SPOTS.telao).
+(INTERACTABLES as Interactable[]).push(...TV_SYSTEMS.flatMap(system=>system.screens.map(screen=>({id:screen,type:'television' as const,media:system.id,
+  label:screen==='telao'?'Usar o telão do palco':`Usar a ${TV_LABELS[screen]??'TV'}`,...TV_SPOTS[screen]!,...(screen==='telao'?{footprint:[STAGE_FRONT]}:{})}))));
 
-export function nearestInteraction(position:Position):Interactable|undefined {
+/** `available`: leaves out objects the caller knows to be taken (a musician's spot in use). */
+export function nearestInteraction(position:Position,available:(object:Interactable)=>boolean=()=>true):Interactable|undefined {
   // At a doorway the door comes first, even with a chair of the next table within reach.
   const rank=(i:Interactable)=>interactionReach(i,position).gap-(i.type==='door'?.1:0);
-  return INTERACTABLES.filter(i=>canInteract(i,position)).sort((a,b)=>rank(a)-rank(b))[0];
+  return INTERACTABLES.filter(i=>canInteract(i,position)&&available(i)).sort((a,b)=>rank(a)-rank(b))[0];
 }
 
 /** The authored spawn marker is on the pavement; choose the closest clear position to it. */

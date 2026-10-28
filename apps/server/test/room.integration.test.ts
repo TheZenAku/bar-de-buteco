@@ -176,6 +176,12 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(authoritative!.state.players.get('alice'), player);
     assert.equal(player.currentTableId, '', 'Blackjack needs a present player; the avatar stands up');
     assert.equal(authoritative!.state.occupancy, 1);
+    // A development bot (tests/load/bots.ts) takes its avatar with it when it leaves.
+    const bot = await browser.joinOrCreate('bar', { ticket: signTicket({ userId: 'bot', sessionId: 'session-bot', displayName: 'Bot Zeca', role: 'user', color: '#aa8844', bot: true }) }); rooms.push(bot);
+    await eventually(() => authoritative!.state.players.get('bot')?.connected === true);
+    await bot.leave();
+    await eventually(() => !authoritative!.state.players.has('bot'));
+    assert.equal(authoritative!.state.occupancy, 1);
   } finally {
     await Promise.allSettled(rooms.filter(room=>room.connection?.isOpen).map(room => room.leave()));
     await server.gracefullyShutdown(false);

@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { authSecret, internalSecret } from '@bar/shared/tickets';
-import { MEDIA_PRICES, type MediaPriceKind } from '@bar/shared';
+import { MEDIA_PRICES, MUSICIANS, STAGE_PASS, type MediaPriceKind } from '@bar/shared';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // An empty variable counts as unset, as before; anything else must be valid or the world refuses to start.
@@ -22,6 +22,8 @@ const environmentSchema = z.object({
   PRICE_JUKEBOX: optional(z.coerce.number().int().min(0).max(10_000)),
   PRICE_TV: optional(z.coerce.number().int().min(0).max(10_000)),
   PRICE_TELAO: optional(z.coerce.number().int().min(0).max(10_000)),
+  PRICE_STAGE: optional(z.coerce.number().int().min(0).max(10_000)),
+  MUSICIAN_DROP_MS: optional(z.coerce.number().int().min(0).max(600_000)),
 });
 
 export interface WorldConfig {
@@ -33,8 +35,10 @@ export interface WorldConfig {
   outboxPath: string;
   /** Owner name of this process's leases on the API's control outbox. */
   instanceId: string;
-  /** Coins per new video on the jukebox, a TV and the stage screen (packages/shared/src/economy.ts). */
-  prices: Record<MediaPriceKind, number>;
+  /** Coins per new video on the jukebox, a TV and the stage screen, and for a stage pass (packages/shared/src/economy.ts). */
+  prices: Record<MediaPriceKind | 'stage', number>;
+  /** How long a stage musician whose connection dropped keeps playing before the spot is given up (packages/shared/src/musicians.ts). */
+  musicianDropMs: number;
 }
 
 export class WorldConfigError extends Error {}
@@ -57,7 +61,8 @@ export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConf
     outboxPath: e.WORLD_OUTBOX_PATH ? resolve(repositoryRoot, e.WORLD_OUTBOX_PATH)
       : env.NODE_TEST_CONTEXT ? join(tmpdir(), `bar-world-outbox-${process.pid}-${randomBytes(4).toString('hex')}.jsonl`)
       : resolve(repositoryRoot, '.data/world/outbox.jsonl'),
-    prices: { jukebox: e.PRICE_JUKEBOX ?? MEDIA_PRICES.jukebox, tv: e.PRICE_TV ?? MEDIA_PRICES.tv, telao: e.PRICE_TELAO ?? MEDIA_PRICES.telao },
+    prices: { jukebox: e.PRICE_JUKEBOX ?? MEDIA_PRICES.jukebox, tv: e.PRICE_TV ?? MEDIA_PRICES.tv, telao: e.PRICE_TELAO ?? MEDIA_PRICES.telao, stage: e.PRICE_STAGE ?? STAGE_PASS.price },
+    musicianDropMs: e.MUSICIAN_DROP_MS ?? MUSICIANS.dropMs,
     instanceId: e.WORLD_INSTANCE_ID ?? `${hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`,
   };
 }

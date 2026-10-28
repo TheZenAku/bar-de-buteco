@@ -25,6 +25,7 @@
     "test": "npm run test -w @bar/api && npm run test -w @bar/server && tsx --test tests/integration/*.test.ts && node --test tests/tools/*.test.mjs",
     "test:e2e": "playwright test",
     "test:load": "tsx --tsconfig tsconfig.base.json tests/load/room.ts",
+    "bots": "tsx --tsconfig tsconfig.base.json tests/load/bots.ts",
     "assets:animations": "node tools/assets/convert-animations.mjs",
     "assets:retarget": "node tools/assets/retarget-skins.mjs && node tools/assets/convert-animations.mjs",
     "assets:skins": "node tools/assets/import-mixamo.mjs && node tools/assets/convert-animations.mjs",

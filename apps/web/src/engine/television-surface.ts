@@ -15,6 +15,8 @@ export class TelevisionSurface {
   private material:pc.ShaderMaterial;
   private offMaterial:pc.StandardMaterial;
   private visible=false;
+  /** The map's own picture on this screen (the stage's standby art): shown instead of the dark aperture while no video plays. */
+  private standby?:pc.Entity;
   readonly right:pc.Vec3;
   readonly normal:pc.Vec3;
   constructor(private app:pc.Application,readonly definition:TvDefinition) {
@@ -30,7 +32,9 @@ export class TelevisionSurface {
     this.plane.setPosition(definition.x,definition.y,definition.z);this.plane.setEulerAngles(90,definition.yaw,0);this.plane.setLocalScale(definition.width,1,definition.height);
     app.root.addChild(this.plane);
   }
-  show(value:boolean):void {if(this.visible!==value){this.visible=value;for(const mesh of this.plane.render!.meshInstances)mesh.material=value?this.material:this.offMaterial;this.app.renderNextFrame=true;}}
+  show(value:boolean):void {if(this.visible!==value){this.visible=value;for(const mesh of this.plane.render!.meshInstances)mesh.material=value?this.material:this.offMaterial;this.showStandby();this.app.renderNextFrame=true;}}
+  setStandby(entity:pc.Entity|undefined):void {this.standby=entity;this.showStandby();}
+  private showStandby():void {if(!this.standby)return;this.standby.enabled=!this.visible;this.plane.enabled=this.visible;}
   /**
    * The video always stays on its screen, at any size and even when partly outside the view; the
    * depth-tested alpha aperture hides it behind walls, furniture and people. Null only when the camera

@@ -9,8 +9,8 @@ interface Sign {material:pc.StandardMaterial;strength:number;peak:number;}
 const SIGN_MATERIALS=new Set(['Letreiro_Highland','Placa_Highland','Neon_Magenta']);
 // The magenta halo behind the corner sign, on the bricks.
 const SIGN_LIGHT='Luz_Letreiro',SIGN_LIGHT_INTENSITY=2.2,SIGN_LIGHT_RANGE=5;
-/** Map lights driven by their own prop: the jukebox colours its light (jukebox-lights.ts). */
-const PROP_LIGHT=/^Jukebox_FX_/;
+/** Map lights driven by their own prop: the jukebox and the stage colour their lights (jukebox-lights.ts, stage-lights.ts). */
+const PROP_LIGHT=/^(Jukebox_FX_|Luz_Palco_Cor$)/;
 const streetFixtures=[
   [-1.9,1.9,225],[12,2.62,-90],[33.9,1.9,-45],[34.62,-13,0],[33.9,-27.9,45],
   [12,-28.62,90],[-1.9,-27.9,135],[-2.62,-13,180],[12,11.38,90],[-11.38,-13,0],[43.38,-13,180],[12,-37.38,-90],

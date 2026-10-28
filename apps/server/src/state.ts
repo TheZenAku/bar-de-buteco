@@ -37,6 +37,8 @@ export class Player extends Schema {
   @type('string') faintCause = '';
   /** The job being worked ('' when not working), shown to everyone. */
   @type('string') job = '';
+  /** Until when the stage pass lasts (server ms); cleared to 0 when it runs out. Client prediction gates the stage on it. */
+  @type('number') stageUntil = 0;
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -111,6 +113,17 @@ export class DoorState extends Schema {
   @type('boolean') open = true;
   @type('number') changedAt = 0;
 }
+/** One of the stage's musicians' spots (apps/server/src/world/musicians.ts): who plays there and since when. */
+export class MusicianSpot extends Schema {
+  @type('string') id = '';
+  /** '' while the spot is free. */
+  @type('string') playerId = '';
+  /** entrando, comecando, loop or saindo ('' while free); see packages/shared/src/musicians.ts. */
+  @type('string') phase = '';
+  /** When the phase began (server ms). */
+  @type('number') startedAt = 0;
+  @type('boolean') stopping = false;
+}
 /** Public occupancy of a job's slots (apps/server/src/world/jobs.ts). */
 export class JobSlotState extends Schema {
   @type('string') id = '';
@@ -129,6 +142,7 @@ export class BarState extends Schema {
   @type({ map: DoorState }) doors = new MapSchema<DoorState>();
   @type({ map: JobSlotState }) jobs = new MapSchema<JobSlotState>();
   @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
+  @type({ map: MusicianSpot }) musicians = new MapSchema<MusicianSpot>();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

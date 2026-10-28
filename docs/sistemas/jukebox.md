@@ -49,6 +49,10 @@ O mouse só passa para o player do YouTube quando o ponteiro está sobre uma tel
 
 O volume de cada fonte é calculado pela distância do personagem local, incluindo a altura. A jukebox usa a distância até a jukebox. Um grupo de TVs usa a distância até a tela mais próxima, e só o player dessa tela fica com som; os outros ficam mudos, então o som não se repete nem ecoa. Para o som trocar de tela, a outra precisa estar pelo menos 1,5 m mais perto, o que evita que ele fique pulando de uma TV para outra entre duas telas. Há suavização de 0,25 s, silêncio total fora do alcance e o volume geral das configurações por cima. O som ambiente baixa enquanto a jukebox ou uma TV estiver em uso.
 
+**Palco × bar.** O telão (área `stage`) e a jukebox e as TVs (área `bar`) nunca tocam um por cima do outro. Onde os dois chegam, a área que soa mais alta para quem escuta fica com o som e a outra some, com uma transição curta onde os dois estão parecidos (`areaMix` em `packages/shared/src/jukebox.ts`). Na frente do palco só se ouve o telão; na jukebox, só a jukebox. Uma fonte pausada não cala a outra área, e fontes da mesma área continuam se misturando como antes.
+
+**Fontes longe daqui.** Uma fonte que ninguém neste navegador consegue ouvir (fora do alcance, ou coberta pela outra área) e cujas telas estão fora de vista fica pausada neste navegador depois de 3 s. Ela volta, já sincronizada com a linha do tempo, assim que pode ser ouvida ou vista de novo. Com até seis players do YouTube decodificando ao mesmo tempo, o som travava em máquinas modestas. O navegador de quem deu o último comando nunca pausa a fonte, porque é ele que avisa o fim do vídeo. O painel mostra *Em espera: longe daqui*.
+
 **Limitação:** isto é atenuação por distância, não posicionamento estéreo (esquerda/direita). O áudio de um iframe do YouTube não pode ser ligado ao Web Audio (`PannerNode`). O navegador não expõe esse som à página e a política do YouTube proíbe extraí-lo. O chat de voz, que é áudio do próprio jogo, é posicional.
 
 ## Multiplayer
@@ -63,7 +67,11 @@ O estado compartilhado representa a intenção do bar; o painel mostra à parte 
   - links, linha do tempo e curva de volume;
   - os grupos de TVs: as três telas do térreo num grupo e a de cima em outro, com o som vindo da tela mais próxima;
   - o lugar da jukebox: é a do mapa (`COL_Int_Jukebox`), encostada na base da escada, sem outro volume no lugar dela, sem tapar corredor nem escada e com ponto de uso andável.
-- `tests/e2e/environment.spec.ts`: a jukebox apagada, acesa com as cores do vídeo, pausada e desligada (capturas `jukebox-off.png`, `jukebox-playing.png`).
+- `tests/e2e/environment.spec.ts`:
+  - a jukebox apagada, acesa com as cores do vídeo, pausada e desligada (capturas `jukebox-off.png`, `jukebox-playing.png`);
+  - o palco: lentes, spots da treliça, luz frontal e luz de festa com as cores do telão e de volta ao branco; os blips da escada e do telão no quintal, nunca no salão nem em cima do palco (capturas `stage-*.png`, `telao-blip.png`).
+- `tests/integration/map.test.ts`: o telão alcançado do blip e da borda da frente do tablado (nunca do fundo do palco), e a área do palco igual ao quintal.
+- `apps/server/test/stage.integration.test.ts`: o telão trocado de cima do palco, cobrado de novo.
 - `apps/server/test/jukebox.integration.test.ts`: conexões reais.
   - Proximidade, entrada tardia e revisões conflitantes.
   - Para as TVs: cada tela abre o painel do grupo, e outra tela do mesmo grupo controla o mesmo vídeo. A TV de cima não controla o térreo, e o estado da jukebox não muda.
@@ -74,8 +82,19 @@ O estado compartilhado representa a intenção do bar; o painel mostra à parte 
 
 Capturas: [TV](../previews/jukebox-tv.png), [TV em perspectiva](../previews/jukebox-tv-angle.png) e [controles da jukebox](../previews/jukebox-controls.png).
 
-## Telão do palco e preços
+## Telão do palco
 
-O **telão** (`telao` em `TELEVISIONS`) é um terceiro sistema de vídeo, independente das TVs: tela de 4,8 × 2,7 m entre os pilares do fundo do palco, controlada com **E** na frente do palco (`Ponto_Palco`) e com som que alcança o quintal todo (`TELAO_AUDIO`: cheio até 7 m, silêncio a 30 m). A moldura e os cabos são desenhados pela cena, porque o mapa não tem o objeto.
+O **telão** (`telao` em `TELEVISIONS`) é um terceiro sistema de vídeo, independente das TVs, com o mesmo player e a mesma sincronia. É a tela de LED do mapa (`Telao_Tela`, de `15_palco.py`): 5,76 × 3,24 m (16:9) na treliça do fundo do palco, virada para a plateia; o importador exporta posição e tamanho em `map-data.json` → `stage.screen`. Sem vídeo, a tela mostra a arte de espera do mapa (*Música ao vivo*); com vídeo, a cena esconde essa arte e abre a tela para o player.
 
-Escolher um vídeo novo custa moedas: 15 na jukebox, 25 nas TVs e 60 no telão. Pausar, continuar, parar e desligar são de graça. O servidor valida o comando antes de cobrar e estorna se ele falhar depois. Veja [economia](economia.md).
+Para usar, vá ao **blip turquesa** no chão, no meio da frente do palco (`TV_SPOTS.telao`), e aperte **E**. Vale a borda inteira da frente do tablado (`STAGE_FRONT`), do quintal ou de cima do palco: o tablado fica exatamente 0,6 m acima do quintal, o limite de altura do alcance (`REACH_HEIGHT` em `world.ts`, com margem para o arredondamento de 0,9 − 0,3). Não precisa de ingresso do palco. O blip, assim como o da escada do palco, só aparece para quem está no quintal (`inStageArea`) e embaixo do palco. O selo diz *Vídeo no telão · 50 moedas*, ou *Telão · trocar o vídeo* enquanto um vídeo toca. O som alcança o quintal todo (`TELAO_AUDIO`: cheio até 7 m, silêncio a 30 m) e não toca por cima da jukebox e das TVs (veja *Som*). **Assistir no telão**, no painel, afasta a câmera o bastante para a tela caber na vista.
+
+**Luzes do palco.** Todas as luzes do palco seguem as cores do vídeo do telão, do mesmo jeito que a jukebox (`apps/web/src/engine/stage-lights.ts`, com as cores de `video-colours.ts`). Três cores tiradas das imagens do vídeo correm do meio do palco para as laterais e sobem pela treliça, com "lâmpadas" correndo. Cada luz mostra a cor que passa pelo seu lugar:
+
+- as lentes dos refletores, as barras de LED do chão e a fita de LED da borda (`Palco_FX_Luz`);
+- a contraluz colorida (`Luz_Palco_Cor`), com a cor do meio;
+- os spots brancos da treliça: as lâmpadas do bar (`Lampada`) acima do tablado. O shader troca a emissão só dentro do volume do palco, e as outras lâmpadas do bar ficam como estão;
+- a luz frontal (`Luz_Palco`) e a luz de festa do palco (`Stage party wash`). Elas mantêm o brilho dado pelo dia e noite e pela festa, e só a cor muda.
+
+Pausado, as cores param e a luz fica fraca. Desligado, as lentes, a fita e a contraluz ficam com um brilho fraco do magenta original, para o palco não ficar morto à noite, e os spots e as luzes brancas voltam ao branco. Todos os navegadores veem as mesmas cores no mesmo momento. A paleta é a mesma da jukebox, então um vídeo de cores claras (como *Big Buck Bunny*) dá luzes claras.
+
+Escolher um vídeo novo custa moedas: 15 na jukebox, 25 nas TVs e 50 no telão. Pausar, continuar, parar e desligar são de graça. O servidor valida o comando antes de cobrar e estorna se ele falhar depois. Subir no palco é outro pagamento (ingresso de 200 moedas). Veja [economia](economia.md#palco).

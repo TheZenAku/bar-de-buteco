@@ -1,6 +1,6 @@
 {
-  "visualHash": "de47a44f1fda8759625249d83fc4a8dcdf269e993db54444b19f42a9ce2bb1d0",
-  "collisionHash": "8c405ad74809e9461c44946ff4f401f6387561a11de35e1e54aea4162699c463",
+  "visualHash": "90b64ce88c639635e23eb1c7c8cc822624131434de4a66ce8ee41bba44bf8d71",
+  "collisionHash": "ebe5b74590ca76c3b27288c67f13e1bb1de88c8a7e5cbce162ef94fe638c252e",
   "bounds": {
     "minX": -103,
     "maxX": 135,
@@ -86,6 +86,13 @@
   },
   "effects": [
     {
+      "id": "Luz_Palco_Cor",
+      "type": "luz_palco_ponto",
+      "x": 26.65,
+      "y": 4.75,
+      "z": -24.75
+    },
+    {
       "id": "Carrinho_Espeto_FX_Brasas",
       "type": "brasas",
       "x": 8.7,
@@ -133,6 +140,13 @@
       "x": 15.7,
       "y": 1.19373,
       "z": -10.697333
+    },
+    {
+      "id": "Palco_FX_Luz",
+      "type": "luz_palco",
+      "x": 0,
+      "y": 0,
+      "z": 0
     }
   ],
   "colliders": [
@@ -2744,76 +2758,6 @@
       "hz": 0.175,
       "minY": 0.3,
       "maxY": 3.05,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco",
-      "x": 26.65,
-      "z": -23.700001,
-      "hx": 5.15,
-      "hz": 2.099999,
-      "minY": 0.3,
-      "maxY": 0.9,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Degrau",
-      "x": 21.200001,
-      "z": -22.799999,
-      "hx": 0.3,
-      "hz": 0.599999,
-      "minY": 0.3,
-      "maxY": 0.5,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Degrau.001",
-      "x": 21.35,
-      "z": -22.799999,
-      "hx": 0.15,
-      "hz": 0.599999,
-      "minY": 0.5,
-      "maxY": 0.7,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Pilar",
-      "x": 21.700001,
-      "z": -21.799999,
-      "hx": 0.06,
-      "hz": 0.06,
-      "minY": 0.3,
-      "maxY": 4.3,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Pilar.001",
-      "x": 31.6,
-      "z": -21.799999,
-      "hx": 0.059999,
-      "hz": 0.06,
-      "minY": 0.3,
-      "maxY": 4.3,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Pilar.002",
-      "x": 21.700001,
-      "z": -25.6,
-      "hx": 0.06,
-      "hz": 0.059999,
-      "minY": 0.3,
-      "maxY": 4.62,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Palco_Pilar.003",
-      "x": 31.6,
-      "z": -25.6,
-      "hx": 0.059999,
-      "hz": 0.059999,
-      "minY": 0.3,
-      "maxY": 4.62,
       "ramp": false
     },
     {
@@ -15357,56 +15301,6 @@
       "ramp": false
     },
     {
-      "id": "COL_Mob_Caixa_Som",
-      "x": 22.200001,
-      "z": -21.999001,
-      "hx": 0.3,
-      "hz": 0.251,
-      "minY": 0.9,
-      "maxY": 1.9,
-      "ramp": false
-    },
-    {
-      "id": "COL_Mob_Caixa_Som.001",
-      "x": 31.1,
-      "z": -21.999001,
-      "hx": 0.3,
-      "hz": 0.251,
-      "minY": 0.9,
-      "maxY": 1.9,
-      "ramp": false
-    },
-    {
-      "id": "COL_Mob_Bateria",
-      "x": 26.599998,
-      "z": -24.650002,
-      "hx": 0.8,
-      "hz": 0.55,
-      "minY": 0.9,
-      "maxY": 2,
-      "ramp": false
-    },
-    {
-      "id": "COL_Mob_Amplificador",
-      "x": 24.200001,
-      "z": -25.297499,
-      "hx": 0.3,
-      "hz": 0.1525,
-      "minY": 0.9,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Mob_Amplificador.001",
-      "x": 29.4,
-      "z": -25.297499,
-      "hx": 0.3,
-      "hz": 0.1525,
-      "minY": 0.9,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
       "id": "COL_Mob_Mesa.022",
       "x": 1.9,
       "z": -1.75,
@@ -15644,6 +15538,186 @@
       "hz": 0.341333,
       "minY": 0.3,
       "maxY": 1.924965,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco",
+      "x": 26.65,
+      "z": -23.700001,
+      "hx": 5.15,
+      "hz": 2.099999,
+      "minY": 0.3,
+      "maxY": 0.9,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Degrau",
+      "x": 21.200001,
+      "z": -22.799999,
+      "hx": 0.3,
+      "hz": 0.599999,
+      "minY": 0.3,
+      "maxY": 0.5,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Degrau.001",
+      "x": 21.35,
+      "z": -22.799999,
+      "hx": 0.15,
+      "hz": 0.599999,
+      "minY": 0.5,
+      "maxY": 0.7,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Corrimao",
+      "x": 21.275,
+      "z": -22.209999,
+      "hx": 0.375,
+      "hz": 0.03,
+      "minY": 0.3,
+      "maxY": 1.84,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Corrimao.001",
+      "x": 21.275,
+      "z": -23.389999,
+      "hx": 0.375,
+      "hz": 0.03,
+      "minY": 0.3,
+      "maxY": 1.84,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Torre",
+      "x": 21.799999,
+      "z": -21.9,
+      "hx": 0.16,
+      "hz": 0.16,
+      "minY": 0.9,
+      "maxY": 5.59,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Torre.001",
+      "x": 31.5,
+      "z": -21.9,
+      "hx": 0.16,
+      "hz": 0.16,
+      "minY": 0.9,
+      "maxY": 5.59,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Torre.002",
+      "x": 21.799999,
+      "z": -25.5,
+      "hx": 0.16,
+      "hz": 0.16,
+      "minY": 0.9,
+      "maxY": 5.59,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Torre.003",
+      "x": 31.5,
+      "z": -25.5,
+      "hx": 0.16,
+      "hz": 0.16,
+      "minY": 0.9,
+      "maxY": 5.59,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_PA_Esq",
+      "x": 22.4,
+      "z": -22.1,
+      "hx": 0.363027,
+      "hz": 0.400475,
+      "minY": 0.9,
+      "maxY": 2.974,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_PA_Dir",
+      "x": 30.9,
+      "z": -22.1,
+      "hx": 0.363027,
+      "hz": 0.400475,
+      "minY": 0.9,
+      "maxY": 2.974,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Retorno_1",
+      "x": 24.549999,
+      "z": -21.98,
+      "hx": 0.28,
+      "hz": 0.22,
+      "minY": 0.9,
+      "maxY": 1.216,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Retorno_2",
+      "x": 26.65,
+      "z": -21.98,
+      "hx": 0.28,
+      "hz": 0.22,
+      "minY": 0.9,
+      "maxY": 1.216,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Retorno_3",
+      "x": 28.75,
+      "z": -21.98,
+      "hx": 0.28,
+      "hz": 0.22,
+      "minY": 0.9,
+      "maxY": 1.216,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Bateria",
+      "x": 29.791752,
+      "z": -24.547081,
+      "hx": 0.946108,
+      "hz": 0.860998,
+      "minY": 0.906,
+      "maxY": 2.106,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Amp_Guitarra",
+      "x": 23.05146,
+      "z": -25.039602,
+      "hx": 0.356941,
+      "hz": 0.191403,
+      "minY": 0.9,
+      "maxY": 1.455,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Amp_Baixo",
+      "x": 24.35,
+      "z": -25.059999,
+      "hx": 0.3,
+      "hz": 0.22,
+      "minY": 0.9,
+      "maxY": 1.720321,
+      "ramp": false
+    },
+    {
+      "id": "COL_Palco_Mesa_Som",
+      "x": 22.450001,
+      "z": -24.200001,
+      "hx": 0.302,
+      "hz": 0.402,
+      "minY": 0.900877,
+      "maxY": 1.707387,
       "ramp": false
     }
   ],
@@ -18209,7 +18283,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco",
+      "id": "COL_Palco",
       "points": [
         [
           31.799999,
@@ -18229,7 +18303,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco",
+      "id": "COL_Palco",
       "points": [
         [
           31.799999,
@@ -18249,7 +18323,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco_Degrau",
+      "id": "COL_Palco_Degrau",
       "points": [
         [
           21.500001,
@@ -18269,7 +18343,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco_Degrau",
+      "id": "COL_Palco_Degrau",
       "points": [
         [
           21.500001,
@@ -18289,7 +18363,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco_Degrau.001",
+      "id": "COL_Palco_Degrau.001",
       "points": [
         [
           21.5,
@@ -18309,7 +18383,7 @@
       ]
     },
     {
-      "id": "COL_Predio_Palco_Degrau.001",
+      "id": "COL_Palco_Degrau.001",
       "points": [
         [
           21.5,
@@ -20127,5 +20201,142 @@
     "hz": 0.341333,
     "maxY": 1.924965,
     "yaw": 0
+  },
+  "stage": {
+    "deck": {
+      "id": "COL_Palco",
+      "x": 26.65,
+      "z": -23.700001,
+      "hx": 5.15,
+      "hz": 2.099999,
+      "minY": 0.3,
+      "maxY": 0.9
+    },
+    "steps": [
+      {
+        "id": "COL_Palco_Degrau",
+        "x": 21.200001,
+        "z": -22.799999,
+        "hx": 0.3,
+        "hz": 0.599999,
+        "minY": 0.3,
+        "maxY": 0.5
+      },
+      {
+        "id": "COL_Palco_Degrau.001",
+        "x": 21.35,
+        "z": -22.799999,
+        "hx": 0.15,
+        "hz": 0.599999,
+        "minY": 0.5,
+        "maxY": 0.7
+      }
+    ],
+    "screen": {
+      "x": 26.65,
+      "y": 3.48,
+      "z": -25.299999,
+      "width": 5.76,
+      "height": 3.24,
+      "yaw": 0
+    },
+    "places": [
+      {
+        "id": "violao",
+        "x": 24.079788,
+        "y": 0.9,
+        "z": -23.300556,
+        "yaw": 198.000003,
+        "clips": [
+          "violao_sentar_pegar",
+          "violao_comecar_tocar",
+          "violao_tocando_loop",
+          "violao_parar_sair"
+        ],
+        "animation": {
+          "file": "palco_violao.glb",
+          "hash": "06d02c6c7430",
+          "durations": [
+            4.966667,
+            2.966667,
+            4.8,
+            5.466667
+          ]
+        },
+        "instrument": "Palco_Violao"
+      },
+      {
+        "id": "cavaquinho",
+        "x": 29.238754,
+        "y": 0.9,
+        "z": -23.35762,
+        "yaw": 161.999997,
+        "clips": [
+          "cavaquinho_sentar_pegar",
+          "cavaquinho_comecar_tocar",
+          "cavaquinho_tocando_loop",
+          "cavaquinho_parar_sair"
+        ],
+        "animation": {
+          "file": "palco_cavaquinho.glb",
+          "hash": "80c2eff8b4b7",
+          "durations": [
+            4.966667,
+            2.966667,
+            4.8,
+            5.466667
+          ]
+        },
+        "instrument": "Palco_Cavaquinho"
+      },
+      {
+        "id": "bateria",
+        "x": 29.451313,
+        "y": 0.906,
+        "z": -24.998857,
+        "yaw": -8.000003,
+        "clips": [
+          "bateria_sentar_pegar",
+          "bateria_comecar_tocar",
+          "bateria_tocando_loop",
+          "bateria_parar_sair"
+        ],
+        "animation": {
+          "file": "palco_bateria.glb",
+          "hash": "537914d7e938",
+          "durations": [
+            4.3,
+            2.966667,
+            4.8,
+            3.966667
+          ]
+        },
+        "instrument": "Palco_Baquetas"
+      },
+      {
+        "id": "vocal",
+        "x": 26.65,
+        "y": 0.9,
+        "z": -22.870001,
+        "yaw": 0,
+        "clips": [
+          "vocal_chegar_pegar",
+          "vocal_comecar_cantar",
+          "vocal_cantando_loop",
+          "vocal_parar_sair"
+        ],
+        "animation": {
+          "file": "palco_vocal.glb",
+          "hash": "74a9563497de",
+          "durations": [
+            2.966667,
+            2.366667,
+            4.8,
+            3.3
+          ]
+        },
+        "instrument": ""
+      }
+    ]
   }
 }

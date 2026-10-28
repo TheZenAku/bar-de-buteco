@@ -1,15 +1,20 @@
-import {JUKEBOX_SYSTEMS,TV_SYSTEMS,TV_LABELS,INTERACTABLES,canInteract,mediaGain,nearestMediaSource,jukeboxTime,youtubeVideoId,type JukeboxState,type JukeboxCommand,type MediaSystem,type WorldState} from '@bar/shared';
+import {JUKEBOX_SYSTEMS,TV_SYSTEMS,TV_LABELS,INTERACTABLES,canInteract,mediaGain,nearestMediaSource,jukeboxTime,youtubeVideoId,type JukeboxState,type JukeboxCommand,type MediaSystem,type Position,type WorldState} from '@bar/shared';
 import {loadYoutubeApi,youtubeError,type YoutubeApi,type YoutubePlayer} from './youtube-player';
 import {televisionTransform,type Point} from './engine/television-surface';
-type LocalStatus='loading'|'playing'|'paused'|'buffering'|'blocked'|'error'|'ended'|'stopped'|'hidden';
+type LocalStatus='loading'|'playing'|'paused'|'buffering'|'blocked'|'error'|'ended'|'stopped'|'hidden'|'distant';
 /** One official YouTube player: the jukebox's (sound only) or one screen of a TV group. */
 interface Playback {
   screen:string;frame:HTMLDivElement;player?:YoutubePlayer;ready:boolean;revision:number;videoId:string;
   status:LocalStatus;error:string;title:string;lastSync:number;lastVolume:number;onScreen:boolean;timeout?:ReturnType<typeof setTimeout>;
   muted?:boolean;
+  /** The screen's corners on the page in the last frame (null without a projection). */
+  points?:Point[]|null;
 }
-/** A shared source playing in this browser: every screen follows the same state; one player is heard. */
-interface Session {state:JukeboxState;system:MediaSystem;players:Playback[];audible:number;gain:number;audibleVolume:number}
+/**
+ * A shared source playing in this browser: every screen follows the same state; one player is heard.
+ * `distant`: out of earshot and out of sight, so its players wait paused here (see updateDistant).
+ */
+interface Session {state:JukeboxState;system:MediaSystem;players:Playback[];audible:number;gain:number;audibleVolume:number;distant:boolean;silentSince?:number}
 interface Hooks {
   send:(type:string,payload:unknown)=>void;now:()=>number;
   /** The screen's corners on the page, or null when no projection exists (the back of the TV). */
@@ -17,6 +22,8 @@ interface Hooks {
   /** No wall between the camera and the screen, so the pointer may reach its player. */
   clear:(screen:string)=>boolean;
   screen:(screen:string,visible:boolean)=>void;ambient:(suppressed:boolean)=>void;
+  /** Share of this source's sound the listener gets next to the other area's (areaMix); 1 when absent. */
+  mix?:(system:MediaSystem,listener:Position)=>number;
 }
 /** What differs between the jukebox and the TVs. Everything else is the same code with separate state. */
 interface MediaKind {
@@ -33,11 +40,13 @@ const JUKEBOX_KIND:MediaKind={prefix:'jukebox',stateKey:'jukeboxes',systems:JUKE
 const TV_KIND:MediaKind={prefix:'tv',stateKey:'televisions',systems:TV_SYSTEMS,volumeKey:'bar:tv:volume',
   name:'TV',tooFar:'Chegue mais perto da TV.',intro:'Escolha um vídeo. Ele passa ao mesmo tempo em todas as TVs deste ambiente. Os controles são compartilhados com o bar; o volume é só seu.',
   off:'Desligar TV',offState:'TV desligada',nothing:'Nenhum vídeo selecionado'};
-const labels:Record<LocalStatus,string>={loading:'Carregando vídeo…',playing:'Reproduzindo',paused:'Pausado',buffering:'Carregando vídeo…',blocked:'Clique em Ativar reprodução neste navegador.',error:'Não foi possível reproduzir',ended:'Vídeo encerrado',stopped:'Reprodução interrompida',hidden:'Reprodução local suspensa'};
+const labels:Record<LocalStatus,string>={loading:'Carregando vídeo…',playing:'Reproduzindo',paused:'Pausado',buffering:'Carregando vídeo…',blocked:'Clique em Ativar reprodução neste navegador.',error:'Não foi possível reproduzir',ended:'Vídeo encerrado',stopped:'Reprodução interrompida',hidden:'Reprodução local suspensa',distant:'Em espera: longe daqui, volta quando você se aproximar'};
 /** Metres closer another screen must be before the sound moves to it, so walking between two TVs never flips it back and forth. */
 const AUDIBLE_HYSTERESIS=1.5;
 /** Seconds a screen may drift from the shared timeline before it is corrected. */
 const DRIFT_TOLERANCE=1.5;
+/** How long a source must stay silent and out of sight here before its players pause (no flapping at the edge of its reach). */
+const DISTANT_AFTER_MS=3000;
 
 /** The players sit under the canvas: a TV's shows through its screen's aperture, the jukebox's never shows. */
 function playerContainer():HTMLElement {
@@ -89,7 +98,7 @@ export class MediaController {
   private system(id:string):MediaSystem|undefined {return this.kind.systems.find(s=>s.id===id);}
   private async create(state:JukeboxState):Promise<void> {
     const system=this.system(state.id);if(!system)return;
-    const session:Session={state,system,players:[],audible:0,gain:0,audibleVolume:0};
+    const session:Session={state,system,players:[],audible:0,gain:0,audibleVolume:0,distant:false};
     // The jukebox has one hidden player for its sound; a TV group has one player per screen.
     for(const screen of system.screens.length?system.screens:['']){
       const frame=document.createElement('div');frame.className=`media-player ${this.kind.prefix}-player${screen?'':' audio-only'}`;frame.dataset.media=state.id;if(screen)frame.dataset.screen=screen;
@@ -135,6 +144,8 @@ export class MediaController {
     if(!p.ready||!p.player)return;
     const state=session.state,target=jukeboxTime(state,this.hooks.now());
     if(document.hidden||!this.connected){if(p.status!=='hidden')p.player.pauseVideo();p.status='hidden';p.revision=-1;return;}
+    // Waiting out of earshot and out of sight; coming back resyncs it to the shared timeline (revision -1).
+    if(session.distant){if(p.status!=='distant')p.player.pauseVideo();p.status='distant';p.revision=-1;clearTimeout(p.timeout);return;}
     if(p.revision===state.revision)return;
     p.revision=state.revision;p.lastSync=performance.now();p.error='';
     const playing=state.status==='playing';
@@ -162,14 +173,16 @@ export class MediaController {
         if(!p.screen)continue;
         // The picture never leaves its screen: without a projection (seen from behind) it is simply not drawn.
         const points=!document.hidden&&this.connected?this.hooks.project(p.screen):null;
+        p.points=points;
         if(points){
           p.frame.style.transform=televisionTransform(points);
           if(!p.onScreen){p.onScreen=true;p.frame.style.visibility='';this.hooks.screen(p.screen,true);}
-          if(!pointerOnTv&&points.every((point,i)=>{const next=points[(i+1)%4]!;return (next.x-point.x)*(this.pointer.y-point.y)-(next.y-point.y)*(this.pointer.x-point.x)>=0;}))pointerOnTv=this.hooks.clear(p.screen);
+          // The stage screen fills the view from the backyard: it never takes the pointer, or the camera could not be dragged there.
+          if(!pointerOnTv&&session.system.area==='bar'&&points.every((point,i)=>{const next=points[(i+1)%4]!;return (next.x-point.x)*(this.pointer.y-point.y)-(next.y-point.y)*(this.pointer.x-point.x)>=0;}))pointerOnTv=this.hooks.clear(p.screen);
         }else if(p.onScreen){p.onScreen=false;p.frame.style.visibility='hidden';this.hooks.screen(p.screen,false);}
       }
       if(periodic){
-        this.chooseAudible(session);this.applyVolume(session,false,dt);
+        this.chooseAudible(session);this.applyVolume(session,false,dt);this.updateDistant(session,now);
         // Keep every screen on the shared timeline, without continuously seeking during buffering, ads or errors.
         for(const p of session.players)if(p.ready&&p.player&&p.status==='playing'&&session.state.status==='playing'&&now-p.lastSync>5000&&!document.hidden&&this.connected){
           const target=jukeboxTime(session.state,this.hooks.now()),duration=p.player.getDuration();
@@ -190,13 +203,43 @@ export class MediaController {
     const currentDistance=Math.hypot(self.x-current.x,(self.y??0)-current.y,self.z-current.z);
     if(nearest.index!==session.audible&&(immediate||nearest.distance<currentDistance-AUDIBLE_HYSTERESIS)){session.audible=nearest.index;this.applyVolume(session,true);}
   }
+  /** Where the listener stands: the source's distance fade, shared with the other area where both reach (areaMix). */
+  private spatialGain(session:Session):number {
+    const self=this.world?.players[this.localId];if(!self)return 0;
+    const gain=mediaGain(self,session.system);
+    return gain>0?gain*(this.hooks.mix?.(session.system,self)??1):0;
+  }
+  /**
+   * A source nobody here can hear (out of its reach, or covered by the other area) and whose screens are out of sight
+   * waits paused in this browser after DISTANT_AFTER_MS: several YouTube players decoding at once made the sound
+   * stutter on modest machines. It resumes, resynced, as soon as it can be heard or seen again. The player who last
+   * commanded it keeps playing, because only that browser reports the end of the video.
+   */
+  private updateDistant(session:Session,now:number):void {
+    const wanted=this.spatialGain(session)===0&&session.state.updatedBy!==this.localId&&!session.players.some(p=>this.inView(p));
+    if(!wanted)session.silentSince=undefined;else session.silentSince??=now;
+    const distant=wanted&&now-session.silentSince!>=DISTANT_AFTER_MS;
+    if(distant===session.distant)return;
+    session.distant=distant;
+    for(const p of session.players){p.revision=-1;this.apply(session,p);}
+    this.renderPanel();
+  }
+  /** Some of the screen is on the page with no wall in between (the jukebox has no screen). */
+  private inView(p:Playback):boolean {
+    const points=p.points;if(!p.screen||!points)return false;
+    const xs=points.map(point=>point.x),ys=points.map(point=>point.y);
+    return Math.max(...xs)>0&&Math.min(...xs)<innerWidth&&Math.max(...ys)>0&&Math.min(...ys)<innerHeight&&this.hooks.clear(p.screen);
+  }
+  /** Systems of this kind playing right now (the other area's sound fades out where they are louder; areaMix). */
+  playingSystems():MediaSystem[] {return [...this.sessions.values()].filter(session=>session.state.status==='playing').map(session=>session.system);}
   private applyVolume(session:Session,immediate=false,dt=.1):void {
     const self=this.world?.players[this.localId],system=session.system;
-    // Each source fades with the listener's distance to that source only.
-    const target=self&&this.connected&&!document.hidden&&!this.muted?mediaGain(self,system)*this.volume*this.master:0;
+    // Each source fades with the listener's distance to that source only, and gives way to the other area's sound.
+    const target=self&&this.connected&&!document.hidden&&!this.muted?this.spatialGain(session)*this.volume*this.master:0;
     session.gain=immediate?target:session.gain+(target-session.gain)*(1-Math.exp(-dt/system.audio.smoothingSeconds));
-    // Hard silence beyond range or on mute; smoothing must never leave a tail outside the radius.
-    if(target===0)session.gain=0;
+    // Hard silence beyond range or on mute; smoothing must never leave a tail outside the radius. Giving way to the
+    // other area (its source just started) fades out instead.
+    if(target===0&&!(self&&this.connected&&!document.hidden&&!this.muted&&mediaGain(self,system)>0))session.gain=0;
     const value=Math.round(session.gain*100);session.audibleVolume=value;
     session.players.forEach((p,i)=>{
       if(!p.ready||!p.player)return;
@@ -226,8 +269,10 @@ export class MediaController {
   selectedSystemLabel(id:string):string {return (this.system(id)?.label??this.kind.name).toUpperCase();}
   panelHtml(id:string):string {
     this.selected=id;
-    const k=this.kind,pre=k.prefix,tv=pre==='tv',watch=tv?`<button type="button" class="button secondary" data-action="watch-tv" data-tv="${id}">Assistir na TV</button>`:'';
-    return `<div class="jukebox-panel media-panel ${pre}-panel" data-capture-input><p class="modal-description">${k.intro}</p><form id="${pre}-form"><label>Link do YouTube<input id="${pre}-url" name="url" type="url" required maxlength="2048" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"></label><button class="button primary" type="submit">Tocar</button></form><p id="${pre}-title" class="jukebox-title"></p><p id="${pre}-state" role="status"></p><p id="${pre}-error" class="form-message error" role="alert" hidden></p><div class="jukebox-controls"><button type="button" class="button secondary" data-media="pause">Pausar</button><button type="button" class="button secondary" data-media="resume">Continuar</button><button type="button" class="button secondary" data-media="stop">Parar</button><button type="button" class="button secondary" data-media="off">${k.off}</button></div><label>Volume ${tv?'das TVs':'da jukebox'} neste navegador <output id="${pre}-volume-value"></output><input id="${pre}-volume" type="range" min="0" max="100" step="1" value="${Math.round(this.volume*100)}"></label><p id="${pre}-distance" class="fine-print"></p><div class="jukebox-controls"><button type="button" class="button primary" data-media-local="activate">Ativar reprodução neste navegador</button>${watch}<button type="button" class="text-button" data-media-local="retry">Tentar conectar novamente</button></div><p class="fine-print">YouTube · volume pela distância até ${tv?'a TV mais próxima':'a jukebox'}. A disponibilidade depende do vídeo e do navegador.</p></div>`;
+    const k=this.kind,pre=k.prefix,tv=pre==='tv',stage=this.system(id)?.area==='stage';
+    const watch=tv?`<button type="button" class="button secondary" data-action="watch-tv" data-tv="${id}">${stage?'Assistir no telão':'Assistir na TV'}</button>`:'';
+    const intro=stage?'Escolha um vídeo para o telão do palco: todo mundo no quintal assiste junto e as luzes do palco acompanham as cores dele. Os controles são compartilhados com o bar; o volume é só seu.':k.intro;
+    return `<div class="jukebox-panel media-panel ${pre}-panel" data-capture-input><p class="modal-description">${intro}</p><form id="${pre}-form"><label>Link do YouTube<input id="${pre}-url" name="url" type="url" required maxlength="2048" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"></label><button class="button primary" type="submit">Tocar</button></form><p id="${pre}-title" class="jukebox-title"></p><p id="${pre}-state" role="status"></p><p id="${pre}-error" class="form-message error" role="alert" hidden></p><div class="jukebox-controls"><button type="button" class="button secondary" data-media="pause">Pausar</button><button type="button" class="button secondary" data-media="resume">Continuar</button><button type="button" class="button secondary" data-media="stop">Parar</button><button type="button" class="button secondary" data-media="off">${k.off}</button></div><label>Volume ${tv?'das TVs':'da jukebox'} neste navegador <output id="${pre}-volume-value"></output><input id="${pre}-volume" type="range" min="0" max="100" step="1" value="${Math.round(this.volume*100)}"></label><p id="${pre}-distance" class="fine-print"></p><div class="jukebox-controls"><button type="button" class="button primary" data-media-local="activate">Ativar reprodução neste navegador</button>${watch}<button type="button" class="text-button" data-media-local="retry">Tentar conectar novamente</button></div><p class="fine-print">YouTube · volume pela distância até ${stage?'o telão; no quintal ele cobre a jukebox e as TVs, e no salão é o contrário':tv?'a TV mais próxima':'a jukebox'}. A disponibilidade depende do vídeo e do navegador.</p></div>`;
   }
   attachPanel(root:HTMLElement):void {
     this.panel=root;
@@ -250,7 +295,7 @@ export class MediaController {
     if(this.pendingRevision!==undefined)return;
     const state=this.states()?.[this.selected],self=this.world?.players[this.localId],objects=INTERACTABLES.filter(o=>o.media===this.selected);
     if(!state||!self||!objects.length||!this.connected)return;
-    if(!objects.some(object=>canInteract(object,self))){this.showError(this.kind.tooFar);return;}
+    if(!objects.some(object=>canInteract(object,self))){this.showError(this.system(this.selected)?.area==='stage'?'Encoste na frente do palco para mexer no telão.':this.kind.tooFar);return;}
     if(action==='play'&&!youtubeVideoId(url?.trim()??'')){this.showError('Cole um link válido de vídeo do YouTube.');return;}
     const error=this.panel?.querySelector<HTMLElement>(this.id('error'));if(error){error.hidden=true;delete error.dataset.playerError;}
     this.pendingRevision=state.revision;this.pendingUntil=Date.now()+5000;
