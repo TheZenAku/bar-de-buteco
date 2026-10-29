@@ -72,6 +72,11 @@ export const NEEDS = {
     noRunFromStage: 3,
     /** After an alcohol faint, drunkenness drops to this, so waking up never triggers a new faint. */
     soberAfterFaintTo: 55,
+    /**
+     * From `fromStage`, finishing an alcoholic drink makes the character sick with this chance (at most once per
+     * cooldown). Being sick takes a little of the alcohol out, and some water with it.
+     */
+    vomit: { fromStage: 3, chance: .4, cooldownSeconds: 120, drunkRelief: 10, thirst: -8 },
   },
   faint: {
     seconds: 15,
@@ -102,6 +107,8 @@ export interface NeedsState {
   /** Increments with every faint, so a faint is handled once. */
   faints: number;
   nextStumbleAt: number;
+  /** No new sickness before this time (ms). */
+  nextVomitAt: number;
   dehydrationGraceUntil: number;
 }
 export type NeedsEvent =
@@ -137,7 +144,7 @@ export const CONSUMABLES: Record<string, ConsumableEffects> = Object.fromEntries
 const clamp = (value: number, min: number, max: number) => Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
 export function createNeeds(now = 0): NeedsState {
   return { hp: NEEDS.hp.max, stamina: NEEDS.stamina.max, hunger: NEEDS.hunger.max, thirst: NEEDS.thirst.max, bladder: 0, drunk: 0,
-    bonuses: [], exhausted: false, restAt: now, condition: 'normal', conditionUntil: 0, faints: 0, nextStumbleAt: 0, dehydrationGraceUntil: 0 };
+    bonuses: [], exhausted: false, restAt: now, condition: 'normal', conditionUntil: 0, faints: 0, nextStumbleAt: 0, nextVomitAt: 0, dehydrationGraceUntil: 0 };
 }
 /** Maximum HP right now: the base plus active temporary bonuses. */
 export function maxHp(state: Pick<NeedsState, 'bonuses'>, now: number): number {
@@ -208,6 +215,18 @@ export function applyConsumable(state: NeedsState, effects: ConsumableEffects, n
   if (effects.maxHp && amount(effects.maxHp.amount) > 0 && amount(effects.maxHp.seconds) > 0 && part > 0)
     state.bonuses.push({ source: effects.name, amount: effects.maxHp.amount * part, until: now + effects.maxHp.seconds * 1000 });
   state.hp = clamp(state.hp + amount(effects.hp) * part, 0, maxHp(state, now));
+  return true;
+}
+/**
+ * Whether finishing `effects` (a drink) makes the character sick now (NEEDS.drunk.vomit), applying what being sick does.
+ * `random` is injected as in tickNeeds.
+ */
+export function sickAfterDrink(state: NeedsState, effects: ConsumableEffects, now: number, random: () => number = Math.random): boolean {
+  const rule = NEEDS.drunk.vomit;
+  if (!((effects.drunk ?? 0) > 0) || !isConscious(state) || drunkStage(state.drunk) < rule.fromStage || now < state.nextVomitAt || random() >= rule.chance) return false;
+  state.nextVomitAt = now + rule.cooldownSeconds * 1000;
+  state.drunk = clamp(state.drunk - rule.drunkRelief, 0, NEEDS.drunk.max);
+  state.thirst = clamp(state.thirst + rule.thirst, 0, NEEDS.thirst.max);
   return true;
 }
 /** Using a toilet; `portion` (0–1) for a visit cut short. */

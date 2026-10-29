@@ -37,6 +37,7 @@ const paths:Record<string,string>={
   food:'<path d="M4 11h16a8 8 0 0 1-16 0ZM8 7c0-1 1-1.5 1-3m3 3c0-1 1-1.5 1-3m3 3c0-1 1-1.5 1-3M7 21h10"/>',
   toilet:'<path d="M6 3h5v8H6zM4 11h16a8 8 0 0 1-8 8H9l1 2H8l-2-4a6 6 0 0 1-2-6Z"/>',
   dizzy:'<circle cx="12" cy="12" r="9"/><path d="m7 8 3 3m0-3-3 3m7-3 3 3m0-3-3 3M9 16c1-1 2 1 3 0s2 1 3 0"/>',
+  smoke:'<path d="M2 15h14v4H2zM18 15v4m3-4v4M17 3c0 2 2 2 2 4s-2 2-2 4m3-7c0 1.5 1 1.5 1 3"/>',
   kick:'<path d="m10 8 4 4 7-3M14 12l-1 5 5 4M10 8l-5 3-3-3m8 0 2 6-5 7"/><circle cx="13" cy="4" r="2"/>',
 };
 export function uiIcon(name:string):string{return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]??paths.sparkles}</svg>`;}

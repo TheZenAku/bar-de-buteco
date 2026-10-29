@@ -5,18 +5,21 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Funcionalidade | Situação | Onde / o que falta |
 | --- | --- | --- |
 | Bar multiplayer | Pronto | Colyseus autoritativo, AOI de 18 m, predição e reconciliação ([rede](../arquitetura/networking.md)) |
-| Sentar nas mesas | Pronto | 124 assentos do mapa, dois andares |
-| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega e estorno. Desde 28/10 o Tonico leva o pedido numa bandeja com os objetos 3D, põe cada item na mesa e eles ficam lá (sobras somem 4 min depois de a pessoa levantar ou quando o ajudante limpa a mesa) |
-| Magrão no balcão prepara e cobra | **Pronto (novo)** | O balcão agora cobra o preço do item e estorna o pedido que cair |
+| Sentar nas mesas | Pronto | 172 lugares: 124 cadeiras nos dois andares e, desde 29/10, os bancos das 8 mesas de piquenique do quintal (24–31, 6 lugares cada), com pedido, entrega e limpeza como nas outras ([mapa](../assets/map.md#mesas-numeradas)) |
+| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega na bandeja e estorno. Desde 28/10 (noite): cada item dura minutos na mesa e faz efeito aos poucos; quem pede fica na mesa até chegar (cancela só enquanto está no balcão); o que termina é recolhido pelo ajudante ou, sem ninguém trabalhando, pelo Tonico; dá para pedir a quem trabalha no bar, que pega no balcão e leva na bandeja; o Tonico acha o caminho até o terraço de qualquer ponto |
+| Objetos do bar no cenário | **Pronto (novo)** | [decoração](../sistemas/drinks.md#decoração-do-bar): geladeiras de cerveja com porta de vidro e long necks, águas e refris reais; coxinhas e pastéis na estufa; copos na chopeira e cafés no caixa |
+| Sombras | **Corrigido (28/10)** | [dia e noite](../sistemas/day-night.md): o céu panorâmico fazia sombra no mapa inteiro (de dia nada tinha sombra do sol); pessoas deixavam sombras "fantasmas" nas lâmpadas; agora têm sombra de contato e sombra real ao sol |
+| Magrão no balcão prepara e cobra | **Pronto (animado, 28/10)** | O balcão cobra o preço do item e estorna o pedido que cair. Desde 28/10 (noite), o Magrão tira o chopp na chopeira e busca a long neck no freezer, com os clipes do mapa, e deixa a bebida no balcão ([animações do bar](../sistemas/animacoes-bar.md)) |
 | Jukebox com som 3D, custando moedas | **Pronto (cobrança nova)** | Volume pela distância ([jukebox](../sistemas/jukebox.md)); 15 moedas por vídeo. O YouTube não entra no Web Audio, então não há pan estéreo, só atenuação |
 | TV com YouTube para todos, custando moedas | **Pronto (cobrança nova)** | 25 moedas por vídeo |
 | Telão na área de show | **Pronto (palco novo, 28/10)** | O telão de LED do mapa (`Telao_Tela`, 5,76 × 3,24 m) no fundo do palco, controlado no blip turquesa da frente do palco (ou na borda da frente, de cima dele); som pelo quintal todo, sem tocar por cima da jukebox e das TVs; 50 moedas por vídeo ([jukebox e TVs](../sistemas/jukebox.md)) |
 | Palco com acesso pago | **Pronto (novo, 28/10)** | Ingresso de 200 moedas, vale 30 min, comprado na escada (blip magenta; os blips do palco só aparecem no quintal). Todas as luzes do palco (lentes, fita de LED, contraluz, spots da treliça, luz frontal e luz de festa) com as cores do vídeo do telão ([economia](../sistemas/economia.md)) |
 | Músicos no palco | **Pronto (novo, 28/10)** | Violão, cavaquinho, bateria e vocal: um jogador por lugar, E para tocar e para parar, instrumento na mão, servidor dono das fases, quem chega no meio vê o show ([músicos do palco](../sistemas/palco.md)) |
 | Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno, karatê. Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
-| Fumar, beber e comer com props | Parcial | Beber com o objeto real na mão: long neck, chopp, água, refrigerante e café ([bebidas e comidas em 3D](../sistemas/drinks.md)). Coxinha, pastel e torresmo já têm modelo 3D (aparecem na mesa), mas falta o clipe de **comer**; faltam clipe e props de **fumar** |
+| Fumar, beber e comer com props | **Pronto (28/10, noite)** | Beber com o objeto real na mão ([bebidas e comidas em 3D](../sistemas/drinks.md)). [Animações do bar](../sistemas/animacoes-bar.md): fumar (F, cigarro, brasa e fumaça), comer com garfo o que foi servido na mesa, sentar puxando a cadeira do mapa, levantar, urinar no mictório, vomitar ao beber demais, cair e levantar do chão, limpar a mesa pela quina. Falta o cigarro como item da mochila |
 | Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
+| Câmera em primeira e terceira pessoa | **Pronto (novo, 29/10)** | Q ou a rodinha alternam primeira pessoa e terceira pessoa próxima, padrão e longe; tudo suavizado; móveis e paredes entre a câmera e o jogador ficam transparentes em volta dele (raio-X). Os blips agora são só o anel no chão ([câmera](../sistemas/camera.md)) |
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
 | Minigame de entrega (moto, mapa procedural) | Falta | Plano abaixo |
 | Celular com apps paródia | Falta | Plano abaixo |
@@ -76,7 +79,9 @@ Moderação e custo: fotos e áudios precisam de armazenamento (S3 compatível o
 
 ### 6. Animações, fumar e comer
 
-- Clipes novos convertidos pelo pipeline atual (`npm run assets:animations`), com a origem e a licença de cada um em [assets recomendados](assets-recomendados.md): comer (sentado e em pé), fumar (acender, tragar, bater cinza), segurar o celular e estilos de andar.
+Fumar, comer sentado, sentar e levantar, mictório, vomitar, cair e o Magrão no balcão já estão prontos ([animações do bar](../sistemas/animacoes-bar.md)). Falta:
+
+- Clipes novos convertidos pelo pipeline atual (`npm run assets:animations`), com a origem e a licença de cada um em [assets recomendados](assets-recomendados.md): comer em pé, segurar o celular e estilos de andar.
 - **Estilo de andar escolhível:** campo `walkStyle` no personagem, salvo na conta, que troca o clipe `Walk` pelo do estilo (como já acontece com a bengala).
 - **Props:** cigarro com partícula de fumaça e prato ou espeto na mão, presos pela mesma lógica de mão de `drink-props.ts`. O cigarro entra como item da mochila com efeito próprio.
 

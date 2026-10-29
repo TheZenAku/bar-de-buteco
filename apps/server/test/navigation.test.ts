@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { INTERACTABLES, PICKUP_POINT, isWalkable } from '@bar/shared';
-import { findPath, PathFollower } from '../src/world/navigation.js';
+import { findPath, PathFollower, PathSearch } from '../src/world/navigation.js';
 import { createNpcs } from '../src/world/npcs.js';
 
 const seats = INTERACTABLES.filter(i => i.type === 'seat');
@@ -31,4 +31,25 @@ test('an unreachable goal ends within the search budget', () => {
   const started = performance.now();
   assert.equal(findPath(PICKUP_POINT, near(goal), goal, 4000), undefined);
   assert.ok(performance.now() - started < 3000);
+});
+
+test('the terrace is reached from wherever at the counter the search starts (its doorway leaves the body 15 cm)', () => {
+  const terrace = seats.filter(s => s.table !== undefined && s.table >= 34);
+  for (let i = 0; i < 8; i++) {
+    const angle = i * 2.4, r = .05 + (i % 3) * .1;
+    const start = { x: PICKUP_POINT.x + Math.cos(angle) * r, y: PICKUP_POINT.y, z: PICKUP_POINT.z + Math.sin(angle) * r };
+    const seat = terrace[i % terrace.length]!, goal = { x: seat.x, y: seat.y ?? .3, z: seat.z };
+    const started = performance.now();
+    assert.ok(findPath(start, near(goal), goal), `Path to ${seat.id} from start ${i}`);
+    assert.ok(performance.now() - started < 1500);
+  }
+});
+
+test('a search run a slice at a time finds the same way', () => {
+  const seat = seats.find(s => s.table === 39)!, goal = { x: seat.x, y: seat.y ?? .3, z: seat.z };
+  const search = new PathSearch(PICKUP_POINT, near(goal), goal);
+  let path: ReturnType<PathSearch['run']>, slices = 0;
+  while ((path = search.run(400)) === undefined) slices++;
+  assert.ok(path && slices > 1, 'Searched over several ticks');
+  assert.deepEqual(path, findPath(PICKUP_POINT, near(goal), goal));
 });

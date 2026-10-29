@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import map from './map-data.json';
 import {ITEM_IDS,itemById,type ItemId} from './inventory.js';
+import {barClipMs} from './bar-animations.js';
 import type {Footprint,Interactable,Position} from './index.js';
 
 /**
@@ -24,7 +25,8 @@ export type WalletChange=z.infer<typeof walletChangeSchema>;
 /** What Tonico brings to a table (the counter only pours the beers). */
 export const TABLE_MENU:readonly ItemId[]=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo'];
 export const TABLE_ORDER_MAX_ITEMS=4;
-export const tableOrderSchema=z.object({items:z.array(z.enum(ITEM_IDS)).min(1).max(TABLE_ORDER_MAX_ITEMS)}).strict()
+/** `to`: a player working the bar who takes the order instead of Tonico. */
+export const tableOrderSchema=z.object({items:z.array(z.enum(ITEM_IDS)).min(1).max(TABLE_ORDER_MAX_ITEMS),to:z.string().max(64).optional()}).strict()
   .refine(order=>order.items.every(id=>TABLE_MENU.includes(id)),{message:'Item fora do cardápio da mesa.'});
 export const orderTotal=(items:readonly ItemId[])=>items.reduce((sum,id)=>sum+(itemById(id)?.price??0),0);
 /** Where Tonico picks orders up: the customers' side of the counter, beside the bar stools. */
@@ -37,8 +39,22 @@ export const ORDER_PREPARATION_MS=3500;
 export const SERVE_LEAD_MS=300;
 export const SERVE_ITEM_MS=700;
 export const handOverMs=(items:number)=>SERVE_LEAD_MS*2+items*SERVE_ITEM_MS;
-/** What a customer leaves on the table stays there this long after they get up, unless the helper clears it first. */
-export const LEFTOVER_MS=4*60_000;
+/**
+ * How long a customer takes to finish each thing served at the table, seated. Its effects (CONSUMABLES) are taken in
+ * as it goes; getting up leaves the rest. A finished item (or one left behind) waits on the table to be collected.
+ */
+export const CONSUME_MS:Readonly<Partial<Record<ItemId,number>>>={
+  garrafa:180_000,copo:150_000,refrigerante:150_000,agua:120_000,cafe:90_000,
+  coxinha:90_000,pastel:90_000,torresmo:150_000,
+};
+export const consumeMs=(item:string)=>CONSUME_MS[item as ItemId]??120_000;
+/**
+ * Finished items are collected by whoever works the bar (Limpar a mesa N) or, with nobody working, by Tonico. If neither
+ * gets there (no path, nobody around), they go on their own this long after they were finished.
+ */
+export const LEFTOVER_MS=10*60_000;
+/** Taking one finished item off a table onto the tray. */
+export const CLEAR_ITEM_MS=500;
 
 /**
  * Footprint (radius around the base, metres) and height of what Tonico serves, at real size
@@ -49,13 +65,20 @@ export const SERVED_PROPS:Readonly<Partial<Record<ItemId,{radius:number;height:n
   garrafa:{radius:.031,height:.23},copo:{radius:.027,height:.093},
   coxinha:{radius:.07,height:.08,plate:.07},pastel:{radius:.095,height:.039,plate:.095},torresmo:{radius:.115,height:.081},
 };
-/** Something Tonico put on a table top: where it stands, and when it touched down (before that it was the `slot`-th item on his tray for `orderId`). */
-export interface ServedItemState {id:string;item:string;table:number;x:number;y:number;z:number;rotation:number;placedAt:number;orderId:string;slot:number}
+/**
+ * Something served on a table top: where it stands, and when it touched down (before that it was the `slot`-th item on
+ * the tray for `orderId`). `doneAt`: when it was finished or left behind (0 while the customer is still on it).
+ */
+export interface ServedItemState {id:string;item:string;table:number;x:number;y:number;z:number;rotation:number;placedAt:number;orderId:string;slot:number;doneAt?:number;
+  /** The seat it was ordered from: whoever sits there has it (and eats a snack with the bar animations). */
+  seat?:string}
 
 /** A task of a job: go to a station, hold the action for its duration, get paid. */
 export interface JobStation {id:string;label:string;action:string;durationMs:number;footprint:Footprint[];x:number;y:number;z:number;
   /** Height of the station's top (counter, sink, table top): the worker's objective marker floats above it. */
-  top:number}
+  top:number;
+  /** A customer table (`mesa-N`): offered only while finished items wait on it. */
+  table?:number}
 export interface JobDefinition {
   id:string;name:string;description:string;
   /** How many players may work at once. */
@@ -76,11 +99,28 @@ const collider=(id:string)=>{const c=map.colliders.find(c=>c.id===id);if(!c)thro
 const station=(id:string,colliderId:string,label:string,action:string,durationMs:number):JobStation=>{
   const c=collider(colliderId);return {id,label,action,durationMs,x:c.x,y:c.minY??.3,z:c.z,top:c.maxY??(c.minY??.3)+1,footprint:[{id:c.id,x:c.x,z:c.z,hx:c.hx,hz:c.hz}]};
 };
-// The hall's tables, wiped by the helper and named by the number written on them. Footprint: a 0.9 m square around the table point.
-const tableStations=map.tables.filter(t=>t.area==='salao').map((t):JobStation=>({id:`mesa-${t.number}`,label:`Limpar a mesa ${t.number}`,action:'Limpando a mesa',durationMs:4000,
-  x:t.x,y:t.y,z:t.z,top:t.top,footprint:[{id:t.id,x:t.x,z:t.z,hx:.45,hz:.45}]}));
+// The customer tables, cleared by the helper and named by the number written on them. Footprint: a 0.9 m square around
+// the table point, or the table's own volume when bigger (a picnic table with its benches).
+const tableStation=(t:(typeof map.tables)[number]):Omit<JobStation,'id'|'label'|'action'|'durationMs'>=>{
+  const c=collider(t.collider);
+  return {x:t.x,y:t.y,z:t.z,top:t.top,table:t.number,footprint:[{id:t.id,x:t.x,z:t.z,hx:Math.max(.45,c.hx),hz:Math.max(.45,c.hz)}]};
+};
+// Every table with places, the picnic tables' benches among them.
+// Clearing one takes the cleaning clip from a corner of a four-seat table (limpar_mesa, bar-animations.ts), played once.
+const tableStations=map.tables.filter(t=>map.seats.some(s=>s.table===t.number)).map((t):JobStation=>({id:`mesa-${t.number}`,label:`Limpar a mesa ${t.number}`,action:'Limpando a mesa',durationMs:barClipMs('limpar_mesa'),...tableStation(t)}));
+/** Where a worker puts an order down: the customer's table (touching it, like clearing it). */
+export const deliveryStation=(table:number,customer:string,items:number):JobStation|undefined=>{
+  const t=map.tables.find(t=>t.number===table);
+  return t&&{id:`entrega-${table}`,label:`Levar o pedido de ${customer} à mesa ${table}`,action:'Servindo a mesa',durationMs:handOverMs(items),...tableStation(t)};
+};
+const counter=map.colliders.filter(c=>c.id.startsWith('COL_Mob_Balcao')&&Math.abs((c.minY??0)-PICKUP_POINT.y)<.1);
+/** Where a worker picks an order up: the customers' side of the counter, where Tonico waits for it, while Magrão prepares it. */
+export const pickupStation=(customer:string):JobStation=>({id:'balcao',label:`Pegar o pedido de ${customer} no balcão`,action:'O Magrão está preparando',
+  durationMs:ORDER_PREPARATION_MS,...PICKUP_POINT,top:Math.max(...counter.map(c=>c.maxY??PICKUP_POINT.y+1)),footprint:counter.map(({id,x,z,hx,hz})=>({id,x,z,hx,hz}))});
+/** Orders a worker may hold at once (being carried or waiting at the counter). */
+export const MAX_WORKER_ORDERS=2;
 export const JOBS:readonly JobDefinition[]=[{
-  id:'bar',name:'Ajudante do Magrão',description:'Repõe a geladeira, lava os copos e limpa as mesas do salão. Poucas vagas por vez.',
+  id:'bar',name:'Ajudante do Magrão',description:'Leva até a mesa os pedidos feitos para você, recolhe o que os clientes terminaram, repõe a geladeira e lava os copos. Poucas vagas por vez.',
   slots:2,pay:6,start:map.markers.Ponto_Balcao,taskTimeoutMs:60_000,shiftMaxMs:15*60_000,cooldownMs:3*60_000,
   stations:[
     station('geladeira','COL_Mob_Geladeira_Expositor','Repor a geladeira','Repondo as geladas',5000),
@@ -92,5 +132,9 @@ export const JOBS:readonly JobDefinition[]=[{
 export const jobById=(id:string)=>JOBS.find(job=>job.id===id);
 /** A station as an object the shared reach rules (canInteract) understand; never listed in INTERACTABLES. */
 export const stationInteractable=(s:JobStation):Interactable=>({id:`job:${s.id}`,type:'counter',label:s.label,x:s.x,y:s.y,z:s.z,footprint:s.footprint});
-export interface JobTaskView {jobId:string;stationId:string;label:string;action:string;durationMs:number;deadline:number;startedAt?:number;earned:number;tasks:number;shiftEndsAt:number}
+/** `pickup` and `deliver`: an order a customer made to the worker, picked up at the counter and put on their table. */
+export type JobTaskKind='station'|'pickup'|'deliver';
+export interface JobTaskView {jobId:string;stationId:string;kind:JobTaskKind;label:string;action:string;durationMs:number;deadline:number;startedAt?:number;earned:number;tasks:number;shiftEndsAt:number;
+  /** Where the task is done: the worker's objective marker and the E prompt. */
+  station:JobStation}
 export interface JobSlotsView {id:string;name:string;slots:number;workers:number;pay:number;enabled:boolean}

@@ -20,7 +20,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {config as loadEnvironment} from 'dotenv';
 import {Client,type Room} from '@colyseus/sdk';
 import {internalSecret} from '@bar/shared/tickets';
-import {DRINK_DURATION_MS,DRINK_ITEMS,INTERACTABLES,JOBS,JOB_START_RADIUS,MAP_MARKERS,NEEDS,OLD_CANE_SPEED,RUN_SPEED,STAGE,STAGE_ENTRY,TICK_MS,TV_SPOTS,WALK_SPEED,
+import {barClipMs,DRINK_DURATION_MS,DRINK_ITEMS,INTERACTABLES,JOBS,JOB_START_RADIUS,MAP_MARKERS,NEEDS,OLD_CANE_SPEED,RUN_SPEED,STAGE,STAGE_ENTRY,TICK_MS,TV_SPOTS,WALK_SPEED,
   canInteract,canRun,distance,floorHeight,hasStagePass,isConscious,isWalkable,movePlayer,onStage,setDoorStates,swayInput,
   type Interactable,type ItemId,type JobTaskView,type PlayerInput} from '@bar/shared';
 import {walkSegment} from '../../apps/server/src/world/navigation.js';
@@ -42,7 +42,8 @@ const percentile=(values:number[],p:number)=>values.length?[...values].sort((a,b
 const objectById=(id:string)=>INTERACTABLES.find(i=>i.id===id)!;
 
 // Where the bots go. Every point is checked against the shared floor and walls once, here.
-const SEATS=INTERACTABLES.filter(i=>i.type==='seat'),TOILETS=INTERACTABLES.filter(i=>i.type==='toilet'),MUSICIAN_SPOTS=INTERACTABLES.filter(i=>i.type==='musician');
+// The urinals (bar animations) count as toilets: the room times their visit by the `urinar` clip.
+const SEATS=INTERACTABLES.filter(i=>i.type==='seat'),TOILETS=INTERACTABLES.filter(i=>i.type==='toilet'||i.type==='urinal'),MUSICIAN_SPOTS=INTERACTABLES.filter(i=>i.type==='musician');
 const floorPoint=(x:number,z:number,level:number):Point|undefined=>{
   const y=floorHeight(x,z,level),p=y===undefined?undefined:{x,y,z};
   return p&&Math.abs(p.y-level)<.05&&isWalkable(x,z,p.y)&&!onStage(p)?p:undefined;
@@ -294,7 +295,7 @@ class Bot {
     if(me.hunger<=45||me.thirst<=45)return()=>this.sit(true);
     const options:Array<[number,()=>Promise<void>]>=[
       [18,()=>this.sit(chance(.45))],[me.drunk<50?12:0,()=>this.counter()],[16,()=>this.wander()],[party?40:10,()=>this.dance()],
-      [9,()=>this.social()],[5,()=>this.toilet()],[7,()=>this.blackjack()],[CLIMB?6:0,()=>this.stage()],[5,()=>this.work()],[3,()=>this.cane()],
+      [9,()=>this.social()],[5,()=>this.toilet()],[7,()=>this.blackjack()],[CLIMB?6:0,()=>this.stage()],[5,()=>this.work()],[3,()=>this.cane()],[4,()=>this.smoke()],
     ];
     let roll=Math.random()*options.reduce((sum,[weight])=>sum+weight,0);
     return options.find(([weight])=>(roll-=weight)<0)?.[1]??(()=>this.wander());
@@ -327,8 +328,9 @@ class Bot {
       this.order=undefined;
       if(order)await this.act('table.order',{items:this.menu()},()=>this.order==='ordered',6000);
       for(const end=Date.now()+rand(20_000,60_000);Date.now()<end;){await this.sleep(rand(6000,15_000));if(chance(.3))this.say();}
-      // Tonico may still be on his way: better to wait for him than to cancel (a refund).
-      if(this.order==='ordered')await this.until(()=>this.order!=='ordered',60_000);
+      // Nobody leaves the table before the order arrives: wait for it, and cancel only if it never left the counter.
+      if(this.order==='ordered')await this.until(()=>this.order!=='ordered',120_000);
+      if(this.order==='ordered'){this.send('table.cancel');await this.until(()=>this.order!=='ordered',90_000);}
     }finally{claimed.delete(seat.id);this.order=undefined;await this.standUp();}
   }
   /** A long neck or a chopp from Magrão, who serves one customer at a time. */
@@ -350,8 +352,16 @@ class Bot {
     try{
       if(!await this.walk({kind:'object',id:toilet.id},{running:chance(.4)}))return;
       if(!await this.act('player.interact',{objectId:toilet.id},me=>me.interactionState===toilet.id))return;
-      await this.until(me=>!me.interactionState,NEEDS.bladder.toiletSeconds*1000+5000);
+      await this.until(me=>!me.interactionState,Math.max(NEEDS.bladder.toiletSeconds*1000,barClipMs('urinar'))+5000);
     }finally{claimed.delete(toilet.id);await this.standUp();}
+  }
+  /** A cigarette where the bot stands (F): lit, smoked a while, put out. */
+  private async smoke():Promise<void>{
+    this.doing='fumando';
+    if(!await this.act('player.emote',{emote:'smoke'},me=>me.interactionState==='smoke'))return;
+    await this.sleep(barClipMs('fumar_acender')+4000+Math.random()*12_000);
+    if(this.awake().interactionState==='smoke')this.send('player.emote',{emote:'smoke'});
+    await this.until(me=>!me.interactionState,barClipMs('fumar_apagar')+5000);
   }
   private async dance():Promise<void>{
     this.doing='dançando';

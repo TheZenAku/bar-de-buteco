@@ -1,4 +1,4 @@
-import { CONSUMABLES, applyConsumable, canRun, createNeeds, damage, maxHp, relieve, tickNeeds, NEEDS, type NeedsEvent, type NeedsState } from '@bar/shared';
+import { CONSUMABLES, applyConsumable, canRun, createNeeds, damage, maxHp, relieve, sickAfterDrink, tickNeeds, NEEDS, type NeedsEvent, type NeedsState } from '@bar/shared';
 import type { Player } from '../state.js';
 
 /**
@@ -40,6 +40,12 @@ export class NeedsDirector {
     const applied = !!effects && applyConsumable(this.state(player.id, now), effects, now, portion);
     this.sync(player, now);
     return applied;
+  }
+  /** Whether finishing the drink `itemId` made the character sick (NEEDS.drunk.vomit); its effects apply at once. */
+  sick(player: Player, itemId: string, now: number): boolean {
+    const effects = CONSUMABLES[itemId], sick = !!effects && sickAfterDrink(this.state(player.id, now), effects, now, this.random);
+    if (sick) this.sync(player, now);
+    return sick;
   }
   relieve(player: Player, now: number, portion = 1): void { relieve(this.state(player.id, now), portion); this.sync(player, now); }
   damage(player: Player, amount: number, now: number): void { damage(this.state(player.id, now), amount, now); this.sync(player, now); }

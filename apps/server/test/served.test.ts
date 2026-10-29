@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MapSchema } from '@colyseus/schema';
-import { CAFE_TABLES, INTERACTABLES, LEFTOVER_MS, SERVED_PROPS, SERVE_ITEM_MS, SERVE_LEAD_MS, type ItemId } from '@bar/shared';
+import { CAFE_TABLES, INTERACTABLES, LEFTOVER_MS, SERVED_PROPS, SERVE_ITEM_MS, SERVE_LEAD_MS, consumeMs, type ItemId } from '@bar/shared';
 import { ServedItem } from '../src/state.js';
 import { ServedItems, layoutSpots } from '../src/world/served.js';
 
@@ -27,7 +27,27 @@ test('an order stands on the customer\'s side of the table top, clear of the num
   });
 });
 
-test('a full table makes room from leftovers first, never from a seated neighbour; leftovers expire and the helper wipes them', () => {
+test('at a picnic table the order stands in front of its customer on the bench, on their half of the long top', () => {
+  const picnic = CAFE_TABLES.find(t => t.number === 24)!, places = seatsOf(24);
+  assert.equal(places.length, 6);
+  const items: ItemId[] = ['torresmo', 'garrafa', 'coxinha', 'agua'];
+  for (const customer of places) {
+    const spots = layoutSpots(customer, items, [], false, () => .5)!;
+    assert.equal(spots.length, 4, customer.id);
+    // Table axes: towards the customer's bench, and along the benches.
+    const ax = -Math.sin(customer.rotation!), az = -Math.cos(customer.rotation!);
+    const side = (customer.x - picnic.x) * az - (customer.z - picnic.z) * ax;
+    spots.forEach((spot, i) => {
+      const r = radius(items[i]!), along = (spot.x - picnic.x) * ax + (spot.z - picnic.z) * az, across = (spot.x - picnic.x) * az - (spot.z - picnic.z) * ax;
+      assert.equal(spot.y, picnic.top);
+      assert.ok(along >= 0 && along + r <= .4 && Math.abs(across) + r <= .9, `${customer.id}: ${items[i]} on the 1.8 x 0.8 m top, on the customer's half`);
+      assert.ok(Math.abs(across - side) <= .3 + 1e-9, `${customer.id}: ${items[i]} in front of the customer`);
+      assert.ok(Math.hypot(along, across) >= .1 + r, 'clear of the number holder');
+    });
+  }
+});
+
+test('a full table makes room from what is finished first, never from what a seated neighbour is having', () => {
   const state = new MapSchema<ServedItem>(), served = new ServedItems(state);
   const seatedNow = new Set([`ana:${seat!.id}`, `bia:${neighbour!.id}`]);
   const seated = (playerId: string, seatId: string) => seatedNow.has(`${playerId}:${seatId}`);
@@ -47,18 +67,46 @@ test('a full table makes room from leftovers first, never from a seated neighbou
   assert.ok(state.has('bia-1:0') && state.has('bia-1:1'), 'A seated neighbour keeps what they are having');
   assert.ok(!state.has('ana-0:0'), 'The oldest of Ana\'s own plates made room');
   assert.ok(state.has('ana-5:0'));
+});
 
-  // Bia gets up: her items stay, then go after LEFTOVER_MS, unless the helper wipes the table before.
+test('a seated customer has each item over its time, and what is finished or left behind waits to be collected', () => {
+  const state = new MapSchema<ServedItem>(), served = new ServedItems(state);
+  const seatedNow = new Set([`ana:${seat!.id}`, `bia:${neighbour!.id}`]);
+  const seated = (playerId: string, seatId: string) => seatedNow.has(`${playerId}:${seatId}`);
+  const had = new Map<string, number>();
+  const consume = (playerId: string, item: string, portion: number) => had.set(`${playerId}:${item}`, (had.get(`${playerId}:${item}`) ?? 0) + portion);
+  for (const [id, playerId, seatId, items] of [['ana-1', 'ana', seat!.id, ['coxinha', 'garrafa']], ['bia-1', 'bia', neighbour!.id, ['torresmo']]] as const) {
+    const o = { id, playerId, seatId, items: [...items] as ItemId[] };
+    served.place(o, served.plan(o, seated)!, 0);
+  }
+  const down = SERVE_LEAD_MS + 3 * SERVE_ITEM_MS;
+  for (let now = 0; now <= down + consumeMs('coxinha'); now += 1000) served.update(now, seated, consume);
+  assert.ok(Math.abs(had.get('ana:coxinha')! - 1) < 1e-9, 'The whole coxinha, a little at a time');
+  assert.ok(had.get('ana:garrafa')! > .3 && had.get('ana:garrafa')! < 1, 'The beer lasts longer');
+  assert.ok(state.get('ana-1:0')!.doneAt > 0, 'The finished coxinha waits on the table');
+  assert.equal(state.get('ana-1:1')!.doneAt, 0, 'The beer is still being had');
+  assert.deepEqual(served.dirtyTables(), [7]);
+
+  // Bia gets up halfway through her torresmo: the rest is left behind, and it waits to be collected too.
   seatedNow.delete(`bia:${neighbour!.id}`);
-  served.update(10_000, seated);
-  assert.ok(state.has('bia-1:0'), 'Still there right after she got up');
-  served.update(10_000 + LEFTOVER_MS - 1, seated);
-  assert.ok(state.has('bia-1:0'));
-  assert.equal(served.clearTable(7, seated), 2, 'Wiping the table takes her leftovers');
-  assert.ok([...state.keys()].every(id => id.startsWith('ana-')), 'Ana still has hers');
+  served.update(down + consumeMs('coxinha') + 1, seated, consume);
+  assert.ok(had.get('bia:torresmo')! < 1);
+  assert.ok(state.get('bia-1:0')!.doneAt > 0);
+
+  // Clearing the table takes everything finished; the beer Ana is still having stays.
+  assert.equal(served.clearTable(7), 2);
+  assert.deepEqual([...state.keys()], ['ana-1:1']);
+  assert.equal(served.isDirty(7), false);
+  assert.equal(served.takeOne(7), undefined, 'Nothing finished left to take');
+
+  // Finished, it is Tonico's (one item at a time) or goes on its own after LEFTOVER_MS.
   seatedNow.clear();
-  served.update(20_000, seated);
-  served.update(20_000 + LEFTOVER_MS, seated);
+  served.update(1_000_000, seated, consume);
+  assert.equal(served.takeOne(7), 'garrafa');
+  const o = { id: 'caio-1', playerId: 'caio', seatId: seat!.id, items: ['agua'] as ItemId[] };
+  served.place(o, served.plan(o, seated)!, 2_000_000);
+  served.update(2_000_000 + down, seated, consume);
+  served.update(2_000_000 + down + LEFTOVER_MS, seated, consume);
   assert.equal(state.size, 0, 'Leftovers expire');
 });
 

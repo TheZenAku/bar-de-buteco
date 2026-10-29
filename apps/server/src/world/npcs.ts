@@ -1,4 +1,4 @@
-import { BLACKJACK_TABLE, movePlayer, type Position } from '@bar/shared';
+import { BLACKJACK_TABLE, MAGRAO_SPOT, movePlayer, type Position } from '@bar/shared';
 import { Npc } from '../state.js';
 
 const routes: Record<string, Position[]> = {
@@ -8,8 +8,8 @@ const routes: Record<string, Position[]> = {
 };
 export function createNpcs(): Npc[] {
   return [
-    // Behind the L-shaped counter, facing the customers at Ponto_Balcao. Orders are run by BarService.
-    new Npc().assign({ id: 'bartender', displayName: 'Magrão · bartender', color: '#efe0b5', x:18.6,y:.3,z:-7.5,rotation:-Math.PI/2,behavior:'idle' }),
+    // At his place behind the L-shaped counter (Balcao_Lugar_Magrao), facing the customers. Orders are run by BarService.
+    new Npc().assign({ id: 'bartender', displayName: 'Magrão · bartender', color: '#efe0b5', x:MAGRAO_SPOT.x,y:MAGRAO_SPOT.y,z:MAGRAO_SPOT.z,rotation:MAGRAO_SPOT.rotation,behavior:'idle' }),
     new Npc().assign({ id: 'tonico', displayName: 'Tonico', color: '#b75c46', ...routes.tonico[0] }),
     new Npc().assign({ id: 'dealer', displayName: 'Dealer', color: '#efe0b5', x: BLACKJACK_TABLE.x,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z-0.95,behavior:'dealer' }),
   ];

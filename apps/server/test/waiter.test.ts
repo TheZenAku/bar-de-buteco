@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MapSchema } from '@colyseus/schema';
-import { INTERACTABLES, handOverMs, isWalkable } from '@bar/shared';
+import { INTERACTABLES, PICKUP_POINT, handOverMs, isWalkable } from '@bar/shared';
 import { ServedItem } from '../src/state.js';
 import { ServedItems } from '../src/world/served.js';
 import { createNpcs } from '../src/world/npcs.js';
@@ -67,4 +67,63 @@ test('a customer who left the seat gets the order dropped (to be refunded)', () 
   const events = waiter.update(tonico, () => undefined, 0);
   assert.equal(events.dropped?.order.id, 'order-dani');
   assert.match(events.dropped!.reason, /devolvidas/);
+});
+
+test('with nobody working the bar, Tonico collects what was finished from a table and takes it to the counter; an order comes first', () => {
+  const state = new MapSchema<ServedItem>(), served = new ServedItems(state);
+  const waiter = new WaiterService({ plan: o => served.plan(o, () => false), dirtyTables: () => served.dirtyTables(), takeOne: t => served.takeOne(t) });
+  const tonico = createNpcs().find(n => n.id === 'tonico')!;
+  const left = { ...order('gil'), items: ['garrafa', 'coxinha'] as TableOrder['items'] };
+  served.place(left, served.plan(left, () => false)!, 0);
+  served.update(10_000, () => false);
+  assert.deepEqual(served.dirtyTables(), [seat.table]);
+  // Someone works the bar: the table is theirs, Tonico leaves it alone.
+  for (let now = 10_000; now < 20_000; now += 50) waiter.update(tonico, () => where, now, false);
+  assert.equal(state.size, 2);
+  let tray = '';
+  for (let now = 20_000; now < 200_000 && (state.size || tonico.carrying); now += 50) {
+    waiter.update(tonico, () => where, now, true);
+    if (tonico.carrying) tray = tonico.carrying;
+    assert.ok(isWalkable(tonico.x, tonico.z, tonico.y), 'Never through furniture or walls');
+  }
+  assert.equal(state.size, 0, 'The table is clear');
+  assert.deepEqual(tray.split(',').sort(), ['coxinha', 'garrafa'], 'On his tray, to the counter');
+  assert.equal(tonico.carrying, '', 'Left at the counter');
+  assert.ok(Math.hypot(tonico.x - PICKUP_POINT.x, tonico.z - PICKUP_POINT.z) < .5);
+
+  // On his way to clear another table, an order makes him turn back for it.
+  served.place({ ...left, id: 'again' }, served.plan(left, () => false)!, 300_000);
+  served.update(310_000, () => false);
+  let now = 310_000;
+  for (; now < 311_000; now += 50) waiter.update(tonico, () => where, now, true);
+  assert.match(waiter.snapshot().phase, /bussing/);
+  waiter.order(order('hugo'));
+  waiter.update(tonico, () => where, now += 50, true);
+  waiter.update(tonico, () => where, now += 50, true);
+  assert.equal(waiter.snapshot().current?.playerId, 'hugo');
+  assert.equal(state.size, 2, 'Nothing was taken off that table');
+});
+
+test('at a picnic table Tonico serves a customer on the bench from behind it, and clears the table from beside its benches', () => {
+  const bench = INTERACTABLES.find(i => i.type === 'seat' && i.bench && i.table === 26)!, at = { x: bench.x, y: bench.y ?? .3, z: bench.z };
+  const state = new MapSchema<ServedItem>(), served = new ServedItems(state);
+  let seated = true;
+  const waiter = new WaiterService({ plan: o => served.plan(o, () => seated), dirtyTables: () => served.dirtyTables(), takeOne: t => served.takeOne(t) });
+  const tonico = createNpcs().find(n => n.id === 'tonico')!;
+  const picnic: TableOrder = { ...order('ivo'), seatId: bench.id, items: ['torresmo', 'copo'] };
+  waiter.order(picnic);
+  let delivered: TableOrder | undefined, dropped = '';
+  for (let now = 0; now < 200_000 && !delivered && !dropped; now += 50) {
+    const events = waiter.update(tonico, () => at, now);
+    if (events.placing) served.place(events.placing.order, events.placing.plan, now);
+    delivered = events.delivered; dropped = events.dropped?.reason ?? '';
+    assert.ok(isWalkable(tonico.x, tonico.z, tonico.y), 'Never through the table or its benches');
+  }
+  assert.equal(dropped, '');
+  assert.equal(delivered?.playerId, 'ivo');
+  assert.deepEqual([...state.values()].map(i => i.table), [26, 26]);
+  // The customer got up and nobody works the bar: Tonico takes it all back to the counter.
+  seated = false; served.update(250_000, () => false);
+  for (let now = 250_000; now < 450_000 && (state.size || tonico.carrying); now += 50) waiter.update(tonico, () => at, now, true);
+  assert.equal(state.size, 0, 'The picnic table is clear');
 });

@@ -29,6 +29,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 ## Sistemas do jogo
 
 - [Administração](sistemas/admin.md)
+- [Câmera: primeira e terceira pessoa, suavização e raio-X](sistemas/camera.md)
 - [Som ambiente](sistemas/ambient.md)
 - [Ciclo de dia e noite](sistemas/day-night.md)
 - [Economia: moedas, balcão, mesa, empregos e mídia](sistemas/economia.md)

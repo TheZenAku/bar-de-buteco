@@ -26,7 +26,8 @@ export interface NetworkHooks {
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
   adminWorld?:(snapshot:unknown)=>void;
 }
-export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number}
+/** `waiter`: who brings it (Tonico or a worker's name); `stage`: still at the counter, or on its way to the table. */
+export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number;waiter?:string;stage?:'queued'|'carrying'}
 export class BarNetwork {
   room?:Room;
   // By default the game is reached through the site's own address (Vite proxies /game), which also works

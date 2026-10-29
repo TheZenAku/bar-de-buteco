@@ -1,10 +1,57 @@
-import { floorHeight, isWalkable, movePlayer, type Position } from '@bar/shared';
+import { MAP_SURFACES, floorHeight, isWalkable, movePlayer, type Position } from '@bar/shared';
 
 type Point = Required<Position>;
-// Lattice spacing and the sub-steps that check each edge (stair treads rise less than a normal step per sub-step).
+// Step between search nodes and the sub-steps that check each edge (stair treads rise less than a normal step per sub-step).
 const CELL = 0.35;
 const SUBSTEP = 0.1;
+// Nodes closer than this count as the same place.
+const KEY = CELL / 2;
+// A blocked step is tried again this far to either side: an opening narrower than the step (the doorway from the upper
+// hall to the terrace leaves the body 15 cm of play) is only found by a step that happens to line up with it.
+const NUDGES = [.05, -.05, .1, -.1, .15, -.15];
 const DIRECTIONS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] as const;
+// Floors further apart than this are only joined by the stairs.
+const FLOOR_GAP = .9;
+
+const distance3 = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+/**
+ * The map's staircases, from its ramp surfaces: flights chained where one ends and the next begins (the landing). The
+ * search heads for them when the goal is on another floor, instead of searching the whole floor first.
+ */
+const STAIRS = (() => {
+  const edge = (points: number[][], high: boolean): Point => {
+    const sorted = [...points].sort((a, b) => high ? b[1]! - a[1]! : a[1]! - b[1]!).slice(0, 2);
+    return { x: (sorted[0]![0]! + sorted[1]![0]!) / 2, y: (sorted[0]![1]! + sorted[1]![1]!) / 2, z: (sorted[0]![2]! + sorted[1]![2]!) / 2 };
+  };
+  const flights = MAP_SURFACES.filter(s => s.points.length >= 3 && Math.max(...s.points.map(p => p[1]!)) - Math.min(...s.points.map(p => p[1]!)) > .4)
+    .map(s => ({ bottom: edge(s.points, false), top: edge(s.points, true) })).sort((a, b) => a.bottom.y - b.bottom.y);
+  const stairs: Array<{ bottom: Point; top: Point; length: number }> = [];
+  const used = new Set<typeof flights[number]>();
+  for (const first of flights) {
+    if (used.has(first)) continue;
+    used.add(first);
+    let top = first.top, length = distance3(first.bottom, first.top);
+    for (let next = flights.find(f => !used.has(f) && Math.abs(f.bottom.y - top.y) < .15 && Math.hypot(f.bottom.x - top.x, f.bottom.z - top.z) < 3); next;
+      next = flights.find(f => !used.has(f) && Math.abs(f.bottom.y - top.y) < .15 && Math.hypot(f.bottom.x - top.x, f.bottom.z - top.z) < 3)) {
+      used.add(next); length += distance3(top, next.bottom) + distance3(next.bottom, next.top); top = next.top;
+    }
+    stairs.push({ bottom: first.bottom, top, length });
+  }
+  return stairs;
+})();
+/** Estimated cost from `p` to `goal`: straight on the same floor, by way of the nearest staircase to another one. */
+function estimate(p: Point, goal: Point): number {
+  const direct = Math.hypot(goal.x - p.x, (goal.y - p.y) * 3, goal.z - p.z);
+  if (Math.abs(goal.y - p.y) < FLOOR_GAP) return direct;
+  let best = Infinity;
+  for (const stairs of STAIRS) {
+    const [enter, exit] = goal.y > p.y ? [stairs.bottom, stairs.top] : [stairs.top, stairs.bottom];
+    // Already on the stairs: on to their end.
+    const climbing = p.y > stairs.bottom.y + .3 && p.y < stairs.top.y - .3;
+    best = Math.min(best, (climbing ? distance3(p, exit) : distance3(p, enter) + stairs.length) + distance3(exit, goal));
+  }
+  return Number.isFinite(best) ? best : direct;
+}
 
 /** Walks from a point towards another as a body would (floor, walls, doors, stairs); undefined if blocked. */
 export function walkSegment(from: Point, to: { x: number; z: number }): Point | undefined {
@@ -42,42 +89,54 @@ class Heap<T> {
 }
 
 /**
- * A* over a lattice anchored at the start, using the shared movement rules: no navmesh to bake or keep in
- * sync with the map, so a bigger map or a moved door needs nothing. The search is bounded; callers fall back
- * (refund, serve from where the NPC stands) when no path is found within the budget.
+ * A* with fixed steps from the start, using the shared movement rules: no navmesh to bake or keep in sync with the
+ * map, so a bigger map or a moved door needs nothing. A blocked step is retried slightly to either side (NUDGES), so
+ * narrow openings are found wherever the search starts. The search is bounded; callers fall back (refund, serve from
+ * where the NPC stands) when no path is found within the budget.
  */
 export function findPath(start: Point, arrived: (p: Point) => boolean, goal: Point, budget = 25_000): Point[] | undefined {
-  const key = (ix: number, iz: number, y: number) => `${ix}:${iz}:${Math.round(y * 5)}`;
-  interface Node { ix: number; iz: number; point: Point; cost: number; parent?: Node }
-  const open = new Heap<Node>(), best = new Map<string, number>();
-  const root: Node = { ix: 0, iz: 0, point: start, cost: 0 };
-  open.push(root, 0); best.set(key(0, 0, start.y), 0);
-  const h = (p: Point) => Math.hypot(goal.x - p.x, (goal.y - p.y) * 3, goal.z - p.z);
-  // Each lattice edge is walked once per search; diagonals reuse their two orthogonal edges.
-  const edges = new Map<string, Point | null>();
-  const edge = (node: Node, dx: number, dz: number) => {
-    const k = `${key(node.ix, node.iz, node.point.y)}>${dx},${dz}`;
-    let result = edges.get(k);
-    if (result === undefined) { result = walkSegment(node.point, { x: start.x + (node.ix + dx) * CELL, z: start.z + (node.iz + dz) * CELL }) ?? null; edges.set(k, result); }
-    return result ?? undefined;
-  };
-  for (let expanded = 0; open.size && expanded < budget; expanded++) {
-    const node = open.pop()!;
-    if (arrived(node.point)) {
-      const path: Point[] = [];
-      for (let n: Node | undefined = node; n; n = n.parent) path.unshift(n.point);
-      return smooth(path);
-    }
-    if ((best.get(key(node.ix, node.iz, node.point.y)) ?? Infinity) < node.cost) continue;
-    for (const [dx, dz] of DIRECTIONS) {
-      const ix = node.ix + dx, iz = node.iz + dz;
-      // Diagonals never cut a wall corner.
-      if (dx && dz && (!edge(node, dx, 0) || !edge(node, 0, dz))) continue;
-      const point = edge(node, dx, dz);
-      if (!point) continue;
-      const cost = node.cost + Math.hypot(dx, dz) * CELL + Math.abs(point.y - node.point.y), k = key(ix, iz, point.y);
-      if (cost >= (best.get(k) ?? Infinity)) continue;
-      best.set(k, cost); open.push({ ix, iz, point, cost, parent: node }, cost + h(point));
+  return new PathSearch(start, arrived, goal, budget).run(Infinity) ?? undefined;
+}
+
+interface SearchNode { point: Point; cost: number; parent?: SearchNode }
+/**
+ * findPath run a slice at a time, so that a long search (another floor, the terrace) never holds the room's tick:
+ * `run(n)` expands up to n more nodes and returns the path, null when there is none, or undefined while searching.
+ */
+export class PathSearch {
+  private readonly open = new Heap<SearchNode>();
+  private readonly best = new Map<string, number>();
+  private expanded = 0;
+  private result?: Point[] | null;
+  constructor(private readonly start: Point, private readonly arrived: (p: Point) => boolean, private readonly goal: Point, private readonly budget = 25_000) {
+    this.open.push({ point: start, cost: 0 }, 0); this.best.set(this.key(start), 0);
+  }
+  private key(p: Point): string { return `${Math.round((p.x - this.start.x) / KEY)}:${Math.round((p.z - this.start.z) / KEY)}:${Math.round(p.y * 5)}`; }
+
+  run(expansions: number): Point[] | null | undefined {
+    if (this.result !== undefined) return this.result;
+    const { open, best } = this;
+    for (let slice = 0; slice < expansions; slice++) {
+      const node = open.pop();
+      if (!node || this.expanded++ >= this.budget) return this.result = null;
+      if (this.arrived(node.point)) {
+        const path: Point[] = [];
+        for (let n: SearchNode | undefined = node; n; n = n.parent) path.unshift(n.point);
+        return this.result = smooth(path);
+      }
+      if ((best.get(this.key(node.point)) ?? Infinity) < node.cost) continue;
+      for (const [dx, dz] of DIRECTIONS) {
+        const x = node.point.x + dx * CELL, z = node.point.z + dz * CELL;
+        let point = walkSegment(node.point, { x, z });
+        if (!point) {
+          const length = Math.hypot(dx, dz), across = { x: -dz / length, z: dx / length };
+          for (const nudge of NUDGES) if ((point = walkSegment(node.point, { x: x + across.x * nudge, z: z + across.z * nudge }))) break;
+        }
+        if (!point) continue;
+        const cost = node.cost + Math.hypot(point.x - node.point.x, point.z - node.point.z) + Math.abs(point.y - node.point.y), k = this.key(point);
+        if (cost >= (best.get(k) ?? Infinity)) continue;
+        best.set(k, cost); open.push({ point, cost, parent: node }, cost + estimate(point, this.goal));
+      }
     }
   }
 }

@@ -25,20 +25,29 @@ export function stagePanelHtml(price:number,until:number,now:number,balance:numb
     <button class="button primary full" data-action="stage-buy" ${short?'disabled':''}>${short?'Moedas insuficientes':`Pagar ${price} moedas e subir`}</button>${telao}</div>`;
 }
 
-/** Tonico's menu, for a seated player: up to four items, paid on ordering, refunded if the order is dropped. */
-export function tableMenuHtml(balance:number,pending?:TableOrderView):string {
-  if(pending)return `<div class="table-menu"><p class="modal-description">O Tonico já está cuidando do seu pedido: <b>${pending.items.map(id=>e(itemById(id)?.name??id)).join(', ')}</b> (${coins(pending.total)}).</p><p class="fine-print">Se você levantar antes da entrega, ele leva tudo de volta e as moedas voltam para a carteira.</p><button class="button secondary full" data-action="table-cancel">Cancelar pedido</button></div>`;
-  return `<form id="table-order" class="table-menu" data-capture-input><p class="modal-description">Escolha até ${TABLE_ORDER_MAX_ITEMS} itens. O Tonico busca no balcão e traz até a sua mesa; você consome ali mesmo.</p>
+/**
+ * The table menu, for a seated player: up to four items, paid on ordering, brought by Tonico or by a player working the
+ * bar (`workers`). Once ordered, the customer waits at the table; the order can be cancelled only while at the counter.
+ */
+export function tableMenuHtml(balance:number,pending?:TableOrderView,workers:ReadonlyArray<{id:string;name:string}>=[]):string {
+  if(pending){
+    const who=pending.waiter??'Tonico',items=pending.items.map(id=>e(itemById(id)?.name??id)).join(', ');
+    if(pending.stage==='carrying')return `<div class="table-menu"><p class="modal-description">${e(who)} já está trazendo o seu pedido: <b>${items}</b> (${coins(pending.total)}).</p><p class="fine-print">Fique na mesa: ele chega já, já.</p><button class="button secondary full" data-action="close-modal">Fechar</button></div>`;
+    return `<div class="table-menu"><p class="modal-description">${e(who)} vai pegar o seu pedido no balcão: <b>${items}</b> (${coins(pending.total)}).</p><p class="fine-print">Você fica na mesa até ele chegar. Enquanto o pedido ainda está no balcão, dá para cancelar e as moedas voltam para a carteira.</p><button class="button secondary full" data-action="table-cancel">Cancelar pedido</button></div>`;
+  }
+  const who=workers.length?'Quem você escolher busca no balcão e traz':'O Tonico busca no balcão e traz';
+  return `<form id="table-order" class="table-menu" data-capture-input><p class="modal-description">Escolha até ${TABLE_ORDER_MAX_ITEMS} itens. ${who} até a sua mesa; cada coisa dura alguns minutos e você consome ali mesmo. Você fica na mesa até o pedido chegar.</p>
     <div class="menu-grid">${TABLE_MENU.map(id=>{const item=itemById(id)!;return `<label class="menu-item"><input type="checkbox" name="item" value="${id}" data-price="${item.price}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${coins(item.price)}</span></label>`;}).join('')}</div>
     <div class="menu-total"><span>Total <b id="table-total">${coins(0)}</b></span><small>Carteira: ${coins(balance)}</small></div>
-    <button class="button primary full" type="submit" id="table-submit" disabled>Pedir ao Tonico</button></form>`;
+    <div class="menu-submit"><button class="button primary full" type="submit" value="" data-order-submit disabled>Pedir ao Tonico</button>
+    ${workers.map(w=>`<button class="button secondary full" type="submit" name="to" value="${e(w.id)}" data-order-submit disabled>Pedir para ${e(w.name)} <small>(trabalhando no bar)</small></button>`).join('')}</div></form>`;
 }
 export function tableMenuTotal(form:HTMLFormElement):number {
   const boxes=[...form.querySelectorAll<HTMLInputElement>('input[name=item]')],chosen=boxes.filter(box=>box.checked);
   for(const box of boxes)box.disabled=!box.checked&&chosen.length>=TABLE_ORDER_MAX_ITEMS;
   const total=chosen.reduce((sum,box)=>sum+Number(box.dataset.price),0);
   form.querySelector('#table-total')!.innerHTML=coins(total);
-  (form.querySelector('#table-submit') as HTMLButtonElement).disabled=!chosen.length;
+  for(const button of form.querySelectorAll<HTMLButtonElement>('[data-order-submit]'))button.disabled=!chosen.length;
   return total;
 }
 
@@ -75,7 +84,9 @@ interface Snapshot {
   players:Array<{id:string;name:string;connected:boolean;x:number;y:number;z:number;animation:string;interaction:string;job:string;condition:string;balance?:number;stageMinutes?:number}>;
   npcs:Array<{id:string;name:string;behavior:string;animation:string;x:number;z:number}>;
   waiter:{phase:string;current?:TableOrderView&{playerId:string};queue:Array<TableOrderView&{playerId:string}>};counterQueue:string[];
-  jobs:Array<JobSlotsView&{tasks?:number;paid?:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number}>}>;
+  jobs:Array<JobSlotsView&{tasks?:number;paid?:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number;orders?:Array<TableOrderView&{customer:string;table:number;picked:boolean}>}>}>;
+  /** Tables with finished items waiting to be collected, the longest waiting first. */
+  dirtyTables?:number[];
   media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number}>;
   /** Development bots (apps/server/src/world/bots.ts); `status` is what their process reported last. */
   bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
@@ -104,8 +115,8 @@ export function worldAdminHtml(raw:unknown):string {
     <div class="world-stats"><div><small>No bar</small><b>${s.occupancy}/${s.capacity}</b></div><div><small>Evento</small><b>${e(s.event||'nenhum')}</b></div><div><small>Créditos pendentes</small><b>${s.walletRetries}</b></div><div><small>Resultados na fila</small><b>${s.resultOutbox}</b></div></div>
     <h3>Empregos</h3>${s.jobs.map(job=>`<article class="admin-job"><header><b>${e(job.name)}</b><span>${job.workers.length}/${job.slots} vagas · ${job.tasks??0} tarefas · ${coins(job.paid??0)} pagos hoje nesta sala</span></header>
       <form class="admin-job-form" data-job="${e(job.id)}"><label>Vagas<input name="slots" type="number" min="0" max="16" value="${job.slots}"></label><label>Pagamento<input name="pay" type="number" min="0" max="100" value="${job.pay}"></label><label class="inline-check"><input name="enabled" type="checkbox" ${job.enabled?'checked':''}> Aberto</label><button class="mini-button" type="submit">Aplicar</button></form>
-      <ul>${job.workers.map(w=>`<li>${e(name(w.playerId))} · ${e(w.station)} · ${w.tasks} tarefas · ${coins(w.earned)} · termina em ${w.endsInS}s <button class="mini-button" data-action="admin-job-end" data-job="${e(job.id)}" data-id="${e(w.playerId)}">Encerrar turno</button></li>`).join('')||'<li>Ninguém trabalhando.</li>'}</ul></article>`).join('')}
-    <h3>Pedidos do Tonico · ${e(s.waiter.phase)}</h3><ul>${[s.waiter.current,...s.waiter.queue].filter((o):o is TableOrderView&{playerId:string}=>!!o).map(order).join('')||'<li>Nenhum pedido.</li>'}</ul>
+      <ul>${job.workers.map(w=>`<li>${e(name(w.playerId))} · ${e(w.station)} · ${w.tasks} tarefas · ${coins(w.earned)} · termina em ${w.endsInS}s <button class="mini-button" data-action="admin-job-end" data-job="${e(job.id)}" data-id="${e(w.playerId)}">Encerrar turno</button>${w.orders?.length?`<br><small>Pedidos: ${w.orders.map(o=>`${e(o.customer)} (mesa ${o.table}, ${o.picked?'na bandeja':'no balcão'})`).join(', ')}</small>`:''}</li>`).join('')||'<li>Ninguém trabalhando.</li>'}</ul></article>`).join('')}
+    <h3>Pedidos do Tonico · ${e(s.waiter.phase)}</h3>${s.dirtyTables?.length?`<p>Mesas para recolher: ${s.dirtyTables.map(n=>`mesa ${n}`).join(', ')}</p>`:''}<ul>${[s.waiter.current,...s.waiter.queue].filter((o):o is TableOrderView&{playerId:string}=>!!o).map(order).join('')||'<li>Nenhum pedido.</li>'}</ul>
     <h3>Balcão do Magrão</h3><p>${s.counterQueue.map(id=>e(name(id))).join(', ')||'Ninguém esperando.'}</p>
     <h3>Jukebox, TVs e telão</h3><ul>${s.media.map(m=>`<li><b>${e(m.id)}</b> · ${e(m.status)}${m.videoId?` · ${e(m.videoId)} por ${e(name(m.updatedBy))}`:''} · preço ${coins(s.prices[m.kind==='jukebox'?'jukebox':m.id==='telao'?'telao':'tv']??0)} ${m.status!=='off'?`<button class="mini-button" data-action="admin-media-off" data-kind="${e(m.kind)}" data-id="${e(m.id)}">Desligar</button>`:''}</li>`).join('')}</ul>
     <h3>Palco · ingresso ${coins(s.prices.stage??0)}</h3><p>${s.players.filter(p=>p.stageMinutes!==undefined).map(p=>`${e(p.name)} (${p.stageMinutes} min)`).join(', ')||'Ninguém com ingresso.'}</p>

@@ -160,10 +160,14 @@ const tables = colliders.filter(c => /^COL_Mob_Mesa(?:\.\d+)?$/i.test(c.id));
 const chairNodeIndex=visual.json.nodes.findIndex(node=>node.name==='INST_A_cadeira-vermelha');
 const chairNode=visual.json.nodes[chairNodeIndex],instanceAttributes=chairNode?.extensions?.EXT_mesh_gpu_instancing?.attributes;
 if(!tables.length||!instanceAttributes?.TRANSLATION)throw new Error(`Expected authored café tables and instanced chairs (${tables.length} tables)`);
-const chairParent=visualTransform(chairNodeIndex);
+const chairParent=visualTransform(chairNodeIndex),chairParentTurn=new Quaternion().setFromRotationMatrix(chairParent);
+const chairTurns=instanceAttributes.ROTATION===undefined?[]:values(visual,instanceAttributes.ROTATION);
+// Each chair keeps its instance index and the way it faces (its +Z, towards the table give or take the authored
+// jitter): the bar animations pull that very instance and seat the body along it (18_animacoes_bar.py).
 const chairs=values(visual,instanceAttributes.TRANSLATION).map((translation,index)=>{
   const position=new Vector3(...translation).applyMatrix4(chairParent);
-  return {id:`visual-chair-${index+1}`,x:round(position.x),y:round(position.y),z:round(position.z)};
+  const turn=chairParentTurn.clone().multiply(new Quaternion(...(chairTurns[index]??[0,0,0,1]))),front=new Vector3(0,0,1).applyQuaternion(turn);
+  return {id:`visual-chair-${index+1}`,index,x:round(position.x),y:round(position.y),z:round(position.z),yaw:round(Math.atan2(front.x,front.z))};
 });
 const chairsByTable = tables.map(() => []);
 const unusedChairs=[];
@@ -189,7 +193,10 @@ const numberedTables=visual.json.nodes.flatMap((node,index)=>{
   if(matches.length!==1)throw new Error(`${node.name} must sit on exactly one customer table, found ${matches.length}`);
   const {mesa:number,area,andar:floor,lugares:places}=node.extras;
   if(typeof area!=='string'||!Number.isInteger(floor)||!Number.isInteger(places))throw new Error(`${node.name} lacks area/andar/lugares`);
-  return [{id:`mesa-${number}`,number,area,floor,places,x:matches[0].x,y:matches[0].minY,z:matches[0].z,top:round(top.y),collider:matches[0].id}];
+  // The Mesa_NN empty also frames the cleaning clip (limpar_mesa): its centre on the floor, turned as the empty is.
+  const turn=new Quaternion().setFromRotationMatrix(visualTransform(index)),front=new Vector3(0,0,1).applyQuaternion(turn);
+  return [{id:`mesa-${number}`,number,area,floor,places,x:matches[0].x,y:matches[0].minY,z:matches[0].z,top:round(top.y),collider:matches[0].id,
+    node:node.name,anchor:{x:round(top.x),z:round(top.z),yaw:round(Math.atan2(front.x,front.z))}}];
 }).sort((a,b)=>a.number-b.number);
 if(numberedTables.some((table,i)=>table.number!==i+1))throw new Error(`Table numbers must run 1..N without gaps: ${numberedTables.map(t=>t.number)}`);
 const unnumbered=customerTables.filter(c=>numberedTables.filter(t=>t.collider===c.id).length!==1);
@@ -198,8 +205,30 @@ const tableNumber=new Map(numberedTables.map(t=>[t.collider,t.number]));
 let seatNumber=0;
 const seats=tables.flatMap((table,index)=>chairsByTable[index]
   .sort((a,b)=>Math.atan2(a.z-table.z,a.x-table.x)-Math.atan2(b.z-table.z,b.x-table.x))
-  .map(chair=>({id:`seat-${++seatNumber}`,x:chair.x,y:chair.y,z:chair.z,
-    rotation:round(Math.atan2(table.x-chair.x,table.z-chair.z)),table:tableNumber.get(table.id)})));
+  .map(chair=>{
+    // A chair turned away from its table would seat the body facing away from it.
+    const towards=Math.atan2(table.x-chair.x,table.z-chair.z),off=Math.abs(Math.atan2(Math.sin(chair.yaw-towards),Math.cos(chair.yaw-towards)));
+    if(off>.5)throw new Error(`Chair ${chair.index} faces ${Math.round(off*180/Math.PI)}° away from its table ${table.id}`);
+    return {id:`seat-${++seatNumber}`,x:chair.x,y:chair.y,z:chair.z,rotation:chair.yaw,table:tableNumber.get(table.id),chair:chair.index};
+  }));
+// The backyard's picnic tables (P_Mesa_Madeira, 05_props.py) have their benches built in: a 1.8 x 0.8 m top between two
+// benches whose seat line runs 0.62 m out from the middle, three places on each. Their seats are spots on those lines,
+// facing the table, with no chair to pull (`bench`, no `chair`).
+const BENCH_LINE=.62,BENCH_PLACES=[-.6,0,.6];
+for(const table of numberedTables.filter(t=>/^COL_Mob_Mesa_Madeira(?:\.\d+)?$/.test(t.collider))){
+  const box=colliders.find(c=>c.id===table.collider);
+  // The napkin holder is square to the table's sides, so its heading is the table's turn up to quarter turns; the top
+  // runs along its own X, the longer side of the collision box.
+  let turn=table.anchor.yaw-Math.round(table.anchor.yaw/(Math.PI/2))*Math.PI/2;
+  if(box.hz>box.hx)turn+=Math.PI/2;
+  const length={x:Math.cos(turn),z:-Math.sin(turn)},width={x:Math.sin(turn),z:Math.cos(turn)};
+  const benches=[-1,1].flatMap(side=>BENCH_PLACES.map(along=>({id:`seat-${++seatNumber}`,
+    x:round(table.anchor.x+width.x*side*BENCH_LINE+length.x*along),y:table.y,z:round(table.anchor.z+width.z*side*BENCH_LINE+length.z*along),
+    rotation:round(Math.atan2(-side*width.x,-side*width.z)),table:table.number,bench:true})));
+  if(benches.length!==table.places)throw new Error(`${table.node}: ${benches.length} bench places, the map says ${table.places}`);
+  seats.push(...benches);
+}
+const barAnimations=readBarAnimations();
 // Door leaves (04_predio.py) are separate nodes whose origin is the hinge. They were exported open; the
 // closed heading is the custom property angulo_fechada_graus. Both angles turn about +Y, as in Blender's Z.
 // Their collision is not static: the game places it from the door state (packages/shared/src/doors.ts).
@@ -235,8 +264,62 @@ const cameraCeilings = [
   {id:'veranda-front-ceiling', x:(-.57 + 23.8) / 2, z:(-3.5 + .57) / 2, hx:(23.8 + .57) / 2, hz:(3.5 + .57) / 2, minY:2.72, maxY:2.8},
   {id:'veranda-side-ceiling', x:(-.57 + 3.5) / 2, z:(-15 - 3.5) / 2, hx:(3.5 + .57) / 2, hz:(15 - 3.5) / 2, minY:2.72, maxY:2.8},
 ];
+/**
+ * The characters' bar animations (18_animacoes_bar.py: export/animacoes/bar_<group>.glb, a 1.90 m Mixamo skeleton, props and
+ * particle emitters) and the places in the map they happen at (17_lugares_animacao.py). The GLBs are served as they are
+ * (public/animacoes); the client converts the clips to each skin, and the room times the actions by their length and
+ * puts the body where each clip leaves it (`end`: the hips on the floor, in the clip's space, facing +Z).
+ */
+function readBarAnimations(){
+  const destination=path.join(root,'apps/web/public/animacoes');
+  fs.mkdirSync(destination,{recursive:true});
+  const groups={},clips={};
+  for(const group of ['locomocao','fumar','vomitar','cadeira','mesa','banheiro','magrao']){
+    const file=`bar_${group}.glb`,glb=read(path.join('animacoes',file)),json=glb.json;
+    const info=JSON.parse(json.scenes[json.scene??0].extras?.bar_animacoes??'null');
+    if(info?.grupo!==group)throw new Error(`${file} lacks its bar_animacoes extras`);
+    const node=name=>json.nodes.findIndex(n=>n.name===name);
+    const skeleton=node('Personagem'),hips=json.nodes.findIndex(n=>/mixamorig\d*:?Hips$/.test(n.name));
+    if(skeleton<0||hips<0||!json.nodes[skeleton].children?.includes(hips))throw new Error(`${file}: Personagem must hold mixamorig:Hips`);
+    for(const prop of info.props)if(node(prop)<0)throw new Error(`${file} lacks its prop ${prop}`);
+    const holder=json.nodes[skeleton],holderMatrix=new Matrix4().compose(new Vector3(...(holder.translation??[0,0,0])),new Quaternion(...(holder.rotation??[0,0,0,1])),new Vector3(1,1,1));
+    const holderTurn=new Quaternion(...(holder.rotation??[0,0,0,1])),restTurn=holderTurn.clone().multiply(new Quaternion(...(json.nodes[hips].rotation??[0,0,0,1])));
+    for(const [name,clip] of Object.entries(info.clipes)){
+      const animation=json.animations.find(a=>a.name===name);
+      if(!animation)throw new Error(`${file} lacks the clip ${name}`);
+      const duration=round(Math.max(...animation.samplers.map(sampler=>json.accessors[sampler.input].max[0])));
+      if(Math.abs(duration-(clip.quadros-1)/info.fps)>.05)throw new Error(`${file}: ${name} lasts ${duration} s, not ${clip.quadros} frames`);
+      const channel=property=>{const c=animation.channels.find(c=>c.target.node===hips&&c.target.path===property);if(!c)throw new Error(`${file}: ${name} does not move the hips`);return values(glb,animation.samplers[c.sampler].output);};
+      const moves=channel('translation'),turns=channel('rotation');
+      const at=key=>{
+        const p=new Vector3(...moves[key]).applyMatrix4(holderMatrix),turn=holderTurn.clone().multiply(new Quaternion(...turns[key])).multiply(restTurn.clone().invert());
+        const front=new Vector3(0,0,1).applyQuaternion(turn);
+        return {x:round(p.x),z:round(p.z),yaw:round(Math.atan2(front.x,front.z))};
+      };
+      // What the client needs of the extras (PlayCanvas drops a scene's extras): props held by a bone in frame ranges
+      // (segue), map nodes the GLB's copy stands in for (substitui), and props left on the map at the end (entrega, fica).
+      const extra=Object.fromEntries(['segue','substitui','entrega','fica','bebida'].filter(key=>clip[key]!==undefined).map(key=>[key,clip[key]]));
+      clips[name]={group,duration,loop:!!clip.loop,start:at(0),end:at(moves.length-1),...extra};
+    }
+    groups[group]={file,hash:glb.hash.slice(0,12),anchor:info.ancora??null,height:info.altura_m,fps:info.fps,props:info.props,fx:info.fx,...info.velocidade?{speeds:info.velocidade}:{}};
+    fs.copyFileSync(path.join(source,'animacoes',file),path.join(destination,file));
+  }
+  const place=name=>{
+    const index=visual.json.nodes.findIndex(n=>n.name===name);
+    if(index<0)throw new Error(`The map has no ${name} (17_lugares_animacao.py)`);
+    const p=new Vector3().setFromMatrixPosition(visualTransform(index)),turn=new Quaternion().setFromRotationMatrix(visualTransform(index)),front=new Vector3(0,0,1).applyQuaternion(turn);
+    return {x:round(p.x),y:round(p.y),z:round(p.z),yaw:round(Math.atan2(front.x,front.z))};
+  };
+  // Magrão's map props that his GLB copies while in use, and the cups and lids must stay real nodes (not merged away).
+  for(const name of ['Copo_Bandeja','Freezer_Bar_Tampa'])if(visual.json.nodes.find(n=>n.name===name)?.mesh===undefined)throw new Error(`${name} must be its own mesh node`);
+  const urinals=visual.json.nodes.filter(n=>/^Mictorio_Lugar_\d+$/.test(n.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}))
+    .map(n=>({id:`mictorio-${n.name.slice('Mictorio_Lugar_'.length)}`,node:n.name,...place(n.name)}));
+  if(!urinals.length)throw new Error('The map has no Mictorio_Lugar_N');
+  const topo=JSON.parse(read(path.join('animacoes','bar_mesa.glb')).json.scenes[0].extras.bar_animacoes).clipes.limpar_mesa.topo;
+  return {groups,clips,tableTop:topo,counter:{magrao:place('Balcao_Lugar_Magrao'),delivery:place('Balcao_Entrega')},urinals};
+}
 const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
-  tables:numberedTables, jukebox, stage };
+  tables:numberedTables, jukebox, stage, barAnimations };
 fs.mkdirSync(destination,{recursive:true});
 fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
 fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));

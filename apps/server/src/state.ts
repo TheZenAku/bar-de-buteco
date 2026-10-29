@@ -39,6 +39,9 @@ export class Player extends Schema {
   @type('string') job = '';
   /** Until when the stage pass lasts (server ms); cleared to 0 when it runs out. Client prediction gates the stage on it. */
   @type('number') stageUntil = 0;
+  /** A worker's tray: the table order picked up for a customer, comma-separated ('' when empty), and its id. */
+  @type('string') carrying = '';
+  @type('string') carryingOrder = '';
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -55,7 +58,7 @@ export class Npc extends Schema {
   @type('string') carrying = '';
   @type('string') carryingOrder = '';
 }
-/** Something Tonico put on a table top (apps/server/src/world/served.ts). */
+/** Something served on a table top (apps/server/src/world/served.ts). */
 export class ServedItem extends Schema {
   @type('string') id = '';
   @type('string') item = '';
@@ -68,6 +71,10 @@ export class ServedItem extends Schema {
   @type('number') placedAt = 0;
   @type('string') orderId = '';
   @type('uint8') slot = 0;
+  /** The seat it was ordered from: whoever sits there eats it (the bar animations' `comer`). */
+  @type('string') seat = '';
+  /** When the customer finished it or left it behind (0 while they are on it): from then on it waits to be collected. */
+  @type('number') doneAt = 0;
 }
 export class CardState extends Schema {
   @type('string') rank = '?';

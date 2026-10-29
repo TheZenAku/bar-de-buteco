@@ -1,3 +1,4 @@
+import type { CameraMode } from './camera-rig';
 import type {MusicianState} from '@bar/shared';
 
 /** Small presentation-only contracts. All game rules belong to the server. */
@@ -61,9 +62,11 @@ export interface SceneLabel {
 
 export interface SceneCallbacks {
   onInteract?: () => void;
-  onEmote?: (emote: 'dance' | 'wave') => void;
+  onEmote?: (emote: 'dance' | 'wave' | 'smoke') => void;
   onChat?: () => void;
   onSkins?: () => void;
   onKick?: () => void;
   onMediaFrame?: () => void;
+  /** The player switched the camera view (Q or the mouse wheel). */
+  onCameraMode?: (mode: CameraMode) => void;
 }

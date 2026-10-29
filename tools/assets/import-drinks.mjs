@@ -1,7 +1,8 @@
 // Imports what the bar serves (drinks and food, assets-bar/objects) into props held in a hand, carried on
 // Tonico's tray and left on the tables: real-world size, origin at the centre of the base (+Y up, the mouth
 // at the top, the label towards +Z), simplified mesh that keeps texture seams, PBR textures resized and
-// embedded. Offline only: npm run assets:drinks.
+// embedded. Each also gets a light version (<id>-decor.glb: a few hundred triangles, small textures) for the props
+// that dress the bar by the dozen (apps/web/src/engine/bar-dressing.ts). Offline only: npm run assets:drinks.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -17,6 +18,8 @@ const output=path.join(root,'apps/web/public/props');
 // neck, a 190 ml copo americano, a 500 ml water bottle, a 500 ml fountain cup (straw included), a 300 ml
 // coffee cup with its lid, a bar coxinha, a pastel and a plate of torresmo. The pastel is modelled standing on
 // its edge and is laid flat (`flat`: the side facing +Z ends up on top).
+// Triangles of the light versions: seen behind fridge glass, in the warmer or on the counter, never in a hand.
+const DECOR_TRIANGLES=360;
 const props=[
   {id:'garrafa',name:'Garrafa de cerveja',folder:'assets-bar/objects/garrafa de cerveja',prefix:'garrafa_texture',height:.23,triangles:3000},
   {id:'copo',name:'Copo americano',folder:'assets-bar/objects/copo americano',prefix:'copo_texture',height:.093,triangles:2400},
@@ -27,7 +30,8 @@ const props=[
   {id:'pastel',name:'Pastel',folder:'assets-bar/objects/Pastel',prefix:'pastel_texture',length:.15,flat:true,triangles:1500},
   {id:'torresmo',name:'Porção de torresmo',folder:'assets-bar/objects/Porção de Torresmo',prefix:'torresmo_texture',length:.23,triangles:3000},
 ];
-const only=process.argv.slice(2);
+// --decor writes only the light versions (the full ones stay as they are).
+const decorOnly=process.argv.includes('--decor'),only=process.argv.slice(2).filter(arg=>!arg.startsWith('--'));
 // The FBX embeds its images; their copies beside it are used instead (no browser image API here).
 TextureLoader.prototype.load=()=>new Texture();
 globalThis.window??={URL:{createObjectURL:()=>''}};
@@ -57,7 +61,6 @@ async function importProp(prop,page){
   const box=new Box3().setFromBufferAttribute(geometry.attributes.position),size=box.getSize(new Vector3());
   const scale=prop.height?prop.height/size.y:prop.length/Math.max(size.x,size.z),centre=box.getCenter(new Vector3());
   geometry.translate(-centre.x,-box.min.y,-centre.z);geometry.scale(scale,scale,scale);
-  const height=size.y*scale;
   // FBX textures use bottom-left UVs; glTF images use top-left UVs.
   const uv=geometry.attributes.uv;for(let i=0;i<uv.count;i++)uv.setY(i,1-uv.getY(i));
   // Simplify, keeping UV seams and shading (normals) as attributes.
@@ -65,10 +68,17 @@ async function importProp(prop,page){
   const attributes=new Float32Array(count*5);
   for(let i=0;i<count;i++){attributes.set([uv.getX(i),uv.getY(i)],i*5);attributes.set([geometry.attributes.normal.getX(i),geometry.attributes.normal.getY(i),geometry.attributes.normal.getZ(i)],i*5+2);}
   const sourceIndices=new Uint32Array(geometry.index.array);
-  const simplify=flags=>MeshoptSimplifier.simplifyWithAttributes(sourceIndices,new Float32Array(positions),3,attributes,5,[1,1,.5,.5,.5],null,prop.triangles*3,.02,flags);
-  // Jagged food (many hard edges) only reaches the budget when edges may collapse across those seams.
-  let [simplified,error]=simplify([]);
-  if(simplified.length>prop.triangles*3*1.05)[simplified,error]=simplify(['Permissive']);
+  const variants=[...decorOnly?[]:[['',prop.triangles,await bakeTextures(page,folder,prop.prefix,512),.02]],['-decor',DECOR_TRIANGLES,await bakeTextures(page,folder,prop.prefix,128),.08]];
+  for(const [suffix,triangles,images,maxError] of variants){
+    const simplify=flags=>MeshoptSimplifier.simplifyWithAttributes(sourceIndices,new Float32Array(positions),3,attributes,5,[1,1,.5,.5,.5],null,triangles*3,maxError,flags);
+    // Jagged food (many hard edges) only reaches the budget when edges may collapse across those seams.
+    let [simplified,error]=simplify([]);
+    if(simplified.length>triangles*3*1.05)[simplified,error]=simplify(['Permissive']);
+    writeVariant(prop,geometry,uv,positions,count,simplified,error,images,suffix);
+  }
+}
+
+function writeVariant(prop,geometry,uv,positions,count,simplified,error,textures,suffix){
   const [remap,vertices]=MeshoptSimplifier.compactMesh(simplified);
   const out={position:new Float32Array(vertices*3),normal:new Float32Array(vertices*3),uv:new Float32Array(vertices*2)};
   for(let i=0;i<count;i++){const j=remap[i];if(j===0xffffffff)continue;
@@ -76,25 +86,26 @@ async function importProp(prop,page){
     const n=new Vector3(geometry.attributes.normal.getX(i),geometry.attributes.normal.getY(i),geometry.attributes.normal.getZ(i)).normalize();
     out.normal.set(n.toArray(),j*3);out.uv.set([uv.getX(i),uv.getY(i)],j*2);}
   const radius=Math.max(...Array.from({length:vertices},(_,i)=>Math.hypot(out.position[i*3],out.position[i*3+2])));
-  const textures=await bakeTextures(page,folder,prop.prefix);
-  writeProp(path.join(output,`${prop.id}.glb`),prop,out,simplified,textures,{height:+height.toFixed(4),radius:+radius.toFixed(4)});
-  console.log(`${prop.name}: ${count} → ${vertices} vertices, ${simplified.length/3} triangles (error ${error.toFixed(4)}), ${height.toFixed(3)} m tall, radius ${radius.toFixed(3)} m, ${(fs.statSync(path.join(output,`${prop.id}.glb`)).size/1024).toFixed(0)} KiB`);
+  const height=Math.max(...Array.from({length:vertices},(_,i)=>out.position[i*3+1])),file=path.join(output,`${prop.id}${suffix}.glb`);
+  writeProp(file,prop,out,simplified,textures,{height:+height.toFixed(4),radius:+radius.toFixed(4)});
+  console.log(`${prop.name}${suffix}: ${count} → ${vertices} vertices, ${simplified.length/3} triangles (error ${error.toFixed(4)}), ${height.toFixed(3)} m tall, radius ${radius.toFixed(3)} m, ${(fs.statSync(file).size/1024).toFixed(0)} KiB`);
 }
 
-/** Base colour (JPEG 512), normal (JPEG 512) and glTF metallic-roughness (G roughness, B metallic). */
-async function bakeTextures(page,folder,prefix){
+/** Base colour and normal (JPEG, `size`) and glTF metallic-roughness (G roughness, B metallic; half the size, at most 256). */
+async function bakeTextures(page,folder,prefix,size){
   const data=name=>`data:image/png;base64,${fs.readFileSync(path.join(folder,`${prefix}${name}.png`)).toString('base64')}`;
-  const result=await page.evaluate(async({color,normal,metallic,roughness})=>{
+  const result=await page.evaluate(async({color,normal,metallic,roughness,size})=>{
     const load=async src=>{const image=new Image();image.src=src;await image.decode();return image;};
     const draw=(image,size)=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=size;const ctx=canvas.getContext('2d');ctx.imageSmoothingQuality='high';ctx.drawImage(image,0,0,size,size);return {canvas,ctx};};
     const encode=(canvas,type,quality)=>canvas.toDataURL(type,quality).split(',')[1];
-    const base=draw(await load(color),512),bump=draw(await load(normal),512);
-    const metal=draw(await load(metallic),256),rough=draw(await load(roughness),256),packed=draw(await load(roughness),256);
-    const m=metal.ctx.getImageData(0,0,256,256).data,r=rough.ctx.getImageData(0,0,256,256).data,pixels=packed.ctx.getImageData(0,0,256,256);
+    const small=Math.min(256,size/2);
+    const base=draw(await load(color),size),bump=draw(await load(normal),size);
+    const metal=draw(await load(metallic),small),rough=draw(await load(roughness),small),packed=draw(await load(roughness),small);
+    const m=metal.ctx.getImageData(0,0,small,small).data,r=rough.ctx.getImageData(0,0,small,small).data,pixels=packed.ctx.getImageData(0,0,small,small);
     for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=0;pixels.data[i+1]=r[i];pixels.data[i+2]=m[i];pixels.data[i+3]=255;}
     packed.ctx.putImageData(pixels,0,0);
     return {color:encode(base.canvas,'image/jpeg',.9),normal:encode(bump.canvas,'image/jpeg',.92),metallicRoughness:encode(packed.canvas,'image/png')};
-  },{color:data(''),normal:data('_normal'),metallic:data('_metallic'),roughness:data('_roughness')});
+  },{color:data(''),normal:data('_normal'),metallic:data('_metallic'),roughness:data('_roughness'),size});
   return {color:{bytes:Buffer.from(result.color,'base64'),mime:'image/jpeg'},normal:{bytes:Buffer.from(result.normal,'base64'),mime:'image/jpeg'},metallicRoughness:{bytes:Buffer.from(result.metallicRoughness,'base64'),mime:'image/png'}};
 }
 

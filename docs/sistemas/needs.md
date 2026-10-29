@@ -10,7 +10,7 @@ Cada personagem tem seis atributos de 0 a 100: **vida**, **fôlego**, **fome**, 
 | Estado por jogador, porta do inventário e sincronização | `apps/server/src/world/needs.ts` (`NeedsDirector`) |
 | Campos sincronizados | `apps/server/src/state.ts` (`Player.hp`, `hpMax`, `stamina`, `hunger`, `thirst`, `bladder`, `drunk`, `exhausted`, `condition`, `conditionUntil`, `faintCause`) |
 | Integração com o loop, as ações, o banheiro, os desmaios e o resgate | `apps/server/src/BarRoom.ts` |
-| Banheiros (vasos sanitários reais do mapa, `COL_Mob_Vaso*`) | `packages/shared/src/world.ts` |
+| Banheiros (vasos sanitários reais do mapa, `COL_Mob_Vaso*`, e os mictórios `Mictorio_Lugar_N`) | `packages/shared/src/world.ts` |
 | Predição da corrida e do andar bêbado | `apps/web/src/networking.ts` |
 | Barras, alertas, tela de desmaio e efeitos de tela | `apps/web/src/needs-hud.ts`, `apps/web/src/needs.css` |
 | Balanço do corpo e da câmera | `apps/web/src/engine/BarScene.ts` |
@@ -32,7 +32,7 @@ As necessidades avançam dentro do `step()` de 20 Hz que já existia. O sistema 
   - **Predição.** O cliente prevê a mesma regra com `canRun`, por isso a corrida não "volta" na tela.
 - **Fome.** Cai com o tempo e não tira vida. Abaixo de `staminaPenalties.hunger.from`, prejudica o fôlego. Também aumenta o efeito do álcool, em até `drunk.hungerSensitivity`.
 - **Sede.** Cai com o tempo, `runningMultiplier` vezes mais rápido correndo. Ao zerar, tira `damagePerSecond` de vida por segundo, levando ao mesmo desmaio por vida. Depois de acordar, há `graceAfterWakingSeconds` sem esse dano, para não haver desmaios em sequência.
-- **Bexiga.** Sobe com a bebida. Os vasos sanitários dos dois andares (oito no mapa) a esvaziam em `toiletSeconds`:
+- **Bexiga.** Sobe com a bebida. Os vasos sanitários dos dois andares (oito no mapa) a esvaziam em `toiletSeconds`, e os três mictórios (`Mictorio_Lugar_N`), em pé, no tempo do clipe `urinar` (11,5 s; [animações do bar](animacoes-bar.md)):
   - uma pessoa por vez em cada vaso;
   - quem sai antes esvazia só a parte proporcional.
 
@@ -40,7 +40,7 @@ As necessidades avançam dentro do `step()` de 20 Hz que já existia. O sistema 
 - **Embriaguez.** É independente da bexiga e cai `soberPerMinute` por minuto. Os estágios são definidos em `drunk.stages`:
   1. tela com vinheta quente e câmera levemente inclinada;
   2. o andar desvia de forma determinística (`swayInput`, igual no servidor e na predição), a câmera balança e o personagem ganha um repouso embriagado próprio;
-  3. sem corrida, com caminhada bêbada e tropeços de `stumbleSeconds`, no máximo um a cada `stumbleCooldownSeconds`;
+  3. sem corrida, com caminhada bêbada e tropeços de `stumbleSeconds`, no máximo um a cada `stumbleCooldownSeconds`; terminar uma bebida alcoólica nesse estágio faz passar mal com 40% de chance, no máximo a cada 2 min (`drunk.vomit`): o personagem vomita parado por 7,3 s e perde 10 de embriaguez e 8 de sede ([animações do bar](animacoes-bar.md));
   4. desmaio por álcool: depois de `moveAfterSeconds`, o corpo é levado **uma vez** ao ponto `faint.alcoholRecoveryMarker`, a calçada do `Spawn_Jogador`, em chão livre. A pessoa acorda com no máximo `soberAfterFaintTo` de embriaguez, levanta durante os cinco segundos de recuperação e não entra em um novo ciclo.
 
 Estados possíveis em `condition`:

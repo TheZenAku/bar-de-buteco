@@ -21,10 +21,11 @@ import { health, logLine, worldMetrics } from './observability.js';
 import { SessionRegistry } from './room/session-registry.js';
 import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
 import { ServedItems, type Seated } from './world/served.js';
-import { JobDirector, type Payment } from './world/jobs.js';
+import { JobDirector, type Payment, type WorkerOrder } from './world/jobs.js';
 import { changeWallet, WalletRetries } from './world/wallet.js';
-import { JOBS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, type MediaPriceKind } from '@bar/shared';
+import { JOBS, MAX_WORKER_ORDERS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, type MediaPriceKind } from '@bar/shared';
 import { STAGE_PASS, hasStagePass, onStage, musicianRole, stageSpot } from '@bar/shared';
+import { CLEANABLE_TABLES, barClipMs, cornerSpot, onBench, standUpSpot, tableCorners } from '@bar/shared';
 import { Musicians, type MusicianEnd } from './world/musicians.js';
 import { BotRunner } from './world/bots.js';
 
@@ -68,6 +69,7 @@ interface Presence {
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
 const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command', 'stage.buy']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
+const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
 
 export class BarRoom extends Room<{ state: BarState }> {
@@ -83,13 +85,13 @@ export class BarRoom extends Room<{ state: BarState }> {
   private npcs = new NpcDirector();
   private service = new BarService();
   /** Whether a customer still sits where they ordered from (a logged-out avatar has left). */
-  private readonly seated: Seated = (playerId, seatId) => { const player = this.state.players.get(playerId); return !!player?.connected && player.interactionState === seatId; };
-  /** What Tonico left on the tables, Tonico's table service and the jobs (apps/server/src/world/served.ts, waiter.ts, jobs.ts). */
+  private readonly seated: Seated = (playerId, seatId) => { const player = this.state.players.get(playerId); return !!player?.connected && player.interactionState === seatId && player.animationState === 'sit'; };
+  /** What was served on the tables, Tonico's table service and the jobs (apps/server/src/world/served.ts, waiter.ts, jobs.ts). */
   private served = new ServedItems(this.state.served);
   /** Who plays at each of the stage's musicians' spots, and the phases of each show (apps/server/src/world/musicians.ts). */
   private musicians = new Musicians(this.state.musicians, this.config.musicianDropMs);
-  private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated) });
-  readonly jobs = new JobDirector();
+  private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated), dirtyTables: () => this.served.dirtyTables(), takeOne: table => this.served.takeOne(table) });
+  readonly jobs = new JobDirector({ dirtyTables: () => this.served.dirtyTables(), isDirty: table => this.served.isDirty(table) });
   private walletRetries = new WalletRetries((event, details) => this.log(event, details));
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
   readonly needs = new NeedsDirector();
@@ -250,6 +252,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     // The microphone belongs to a session; a new one switches it on again itself.
     player.voice = false;
     const presence=this.sessions.getByUser(player.id);if(presence)presence.inventoryItem=undefined;
+    // Halfway out of a chair: the avatar is left standing beside it.
+    if (player.animationState === 'stand-up') this.finishStandUp(player);
     // A musician puts the instrument back (the stop clip plays) and the spot frees itself when it ends.
     if (player.interactionState.startsWith('stage-')) this.musicians.stop(player.id, Date.now());
     else if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
@@ -324,18 +328,24 @@ export class BarRoom extends Room<{ state: BarState }> {
         state.assign({status:'ended',position:report.duration,updatedAt:Date.now(),revision:state.revision+1});
       });
     }
-    // Tonico takes orders from anyone seated at a table and brings them from the counter.
-    this.handle('table.order',tableOrderSchema,2,async(client,{items})=>{
+    // Anyone seated at a table orders from Tonico, or from a player working the bar (`to`), who brings it from the counter.
+    this.handle('table.order',tableOrderSchema,2,async(client,{items,to})=>{
       const player=this.player(client),presence=this.forClient(client)!,seatId=player.interactionState;
-      if(!seatId.startsWith('seat-')||player.animationState!=='sit')throw new Error('Sente-se a uma mesa para pedir ao Tonico.');
-      if(this.waiter.has(player.id))throw new Error('Seu pedido já está com o Tonico.');
-      if(this.waiter.pending>=TABLE_QUEUE_MAX)throw new Error('O Tonico está atolado de pedidos. Tente daqui a pouco.');
+      if(!seatId.startsWith('seat-')||player.animationState!=='sit')throw new Error('Sente-se a uma mesa para fazer um pedido.');
+      if(this.orderPending(player.id))throw new Error('Seu pedido ainda não chegou.');
+      const worker=to?this.requireWorker(player,to):undefined,table=INTERACTABLES.find(i=>i.id===seatId)?.table;
+      if(!worker&&this.waiter.pending>=TABLE_QUEUE_MAX)throw new Error('O Tonico está atolado de pedidos. Tente daqui a pouco.');
       const order:TableOrder={id:randomUUID(),playerId:player.id,seatId,items,total:orderTotal(items),placedAt:Date.now(),owner:{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId}};
       await this.charge(presence,order.total,`table:${items.join('-')}`,order.id);
       if(this.forClient(client)!==presence||player.interactionState!==seatId){this.refund(presence,order.id,order.total);throw new Error('Você saiu da mesa. Moedas devolvidas.');}
-      try{this.waiter.order(order);}catch(error){this.refund(presence,order.id,order.total);throw error;}
-      client.send('table.state',{status:'ordered',order:publicOrder(order)});
-      this.systemMessage(`${player.displayName} pediu ao Tonico: ${items.map(id=>catalogItem(id)?.name??id).join(', ')}.`,player);
+      try{
+        if(worker){this.requireWorker(player,worker.id);this.jobs.take(worker.id,order,player.displayName,table??0,Date.now());}
+        else this.waiter.order(order);
+      }catch(error){this.refund(presence,order.id,order.total);throw error;}
+      const names=items.map(id=>catalogItem(id)?.name??id).join(', ');
+      client.send('table.state',{status:'ordered',order:{...publicOrder(order),waiter:worker?.displayName??'Tonico',stage:'queued'}});
+      if(worker){const workerPresence=this.sessions.getByUser(worker.id);if(workerPresence)workerPresence.client.send('job.state',{...this.jobView(worker.id),message:`${player.displayName} pediu para você: ${names}. Pegue no balcão e leve à mesa ${table}.`});}
+      this.systemMessage(`${player.displayName} pediu ${worker?`para ${worker.displayName}`:'ao Tonico'}: ${names}.`,player);
     });
     // The stage pass is bought at its steps: charged first (the API decides), refunded if the buyer left meanwhile.
     this.handle('stage.buy',z.object({}).strict(),2,async client=>{
@@ -356,8 +366,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.systemMessage(`${player.displayName} pegou o ingresso do palco.`,player);
       this.log('stage_pass',{playerId:player.id,price});
     });
+    // Only while the order is still at the counter: once on its way, it is coming to the table.
     this.handle('table.cancel',z.object({}).strict(),2,client=>{
-      const player=this.player(client);if(!this.waiter.has(player.id))throw new Error('Você não tem pedido com o Tonico.');
+      const player=this.player(client);
+      if(!this.orderPending(player.id))throw new Error('Você não tem pedido em andamento.');
+      if(!this.waiter.cancellable(player.id)&&this.jobs.holder(player.id)?.entry.picked!==false)throw new Error('O pedido já está a caminho da sua mesa.');
       this.cancelTable(player.id,'Pedido cancelado. Moedas devolvidas.');
     });
     this.handle('job.start',z.object({jobId:z.string().max(32)}).strict(),2,(client,{jobId})=>{
@@ -375,9 +388,18 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('job.work',z.object({}).strict(),3,client=>{
       const player=this.player(client),presence=this.forClient(client)!;
       if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual primeiro.');
-      const task=this.jobs.begin(player.id,player,Date.now());
-      const target=task.station;player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
-      player.interactionState='job';player.animationState='use';player.animationStartedAt=Date.now();
+      const now=Date.now(),task=this.jobs.begin(player.id,player,now);
+      let target:{x:number;z:number}=task.station;
+      // Serving a customer: the order goes down on their table, one item at a time, as Tonico does it.
+      if(task.kind==='deliver'&&task.order){
+        const plan=this.served.plan(task.order.order,this.seated);
+        if(plan){this.served.place(task.order.order,plan,now);target=centre(plan.spots);}
+      }
+      player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
+      // Clearing a table: from its corner nearest to the worker, where `limpar_mesa` stands the body.
+      const corner=task.kind==='station'&&task.station.table!==undefined?this.cleaningCorner(task.station.table,player):undefined;
+      if(corner)Object.assign(player,{x:corner.x,y:corner.y,z:corner.z,rotation:corner.rotation});
+      player.interactionState='job';player.animationState=corner?'clean':'use';player.animationStartedAt=now;
       presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;this.sendJob(presence);
     });
     // Administration and debugging (role from the session, refreshed every maintenance round).
@@ -406,9 +428,18 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.bots.set(count);this.botsAdmin=client;
       this.log('admin_bots',{playerId:admin,count});client.send('admin.world',this.adminSnapshot());
     });
-    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick']) }).strict(), 4, (client, { emote }) => {
+    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick', 'smoke']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
+      // A cigarette: lit and smoked where the player stands (movement held), put out and stepped on when asked again.
+      if (emote === 'smoke' && p.interactionState === 'smoke') { this.stopSmoking(p, this.forClient(client)!, Date.now()); return; }
       if (p.interactionState) throw new Error('Levante-se primeiro.');
+      if (emote === 'smoke') {
+        if (p.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+        const presence = this.forClient(client)!;
+        p.interactionState = 'smoke'; p.animationState = 'smoke'; p.animationStartedAt = Date.now(); p.drinkItem = '';
+        presence.gestureEndsAt = undefined; presence.queue.length = 0; p.lastProcessedInput = presence.lastReceived;
+        return;
+      }
       if (emote === 'kick') {
         if (p.skin !== 'rafael') throw new Error('O golpe de karatê é exclusivo do Rafael.');
         const presence = this.forClient(client)!;
@@ -545,8 +576,25 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
       // On the stage, standing up is putting the instrument back: the stop clip plays first.
       if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
+      // Already getting up, putting the cigarette out or being sick: it ends by itself.
+      if (['stand-up', 'smoke-stop', 'vomit'].includes(player.animationState)) return;
+      if (player.interactionState === 'smoke') { this.stopSmoking(player, presence, now); return; }
+      // Out of a chair: `levantar` plays (once `sentar` is over) before the body is free, the chair taken until then.
+      if (player.interactionState.startsWith('seat-') && player.animationState === 'sit') {
+        if (this.orderPending(player.id)) throw new Error(this.waiter.cancellable(player.id) || this.jobs.holder(player.id)?.entry.picked === false ? 'Espere o seu pedido chegar (ou cancele enquanto ele está no balcão).' : 'Seu pedido está a caminho. Espere chegar para levantar.');
+        // A picnic bench has no chair to push back: the body steps out behind the bench at once.
+        if (onBench(player.interactionState)) { this.finishStandUp(player); return; }
+        const from = Math.max(now, player.animationStartedAt + barClipMs('sentar'));
+        player.animationState = 'stand-up'; player.animationStartedAt = from; presence.interactionEndsAt = from + barClipMs('levantar');
+        return;
+      }
       if (player.currentTableId) this.leaveTable(client);
-      else { this.consumePart(player, presence, now); this.cancelCounter(player.id); if (player.interactionState.startsWith('seat-')) this.cancelTable(player.id); if (player.interactionState === 'job') this.jobs.interrupt(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined; }
+      else {
+        // An order on its way keeps the customer at the table; the order a worker is putting down keeps the worker there.
+        if (player.interactionState.startsWith('seat-') && this.orderPending(player.id)) throw new Error(this.waiter.cancellable(player.id) || this.jobs.holder(player.id)?.entry.picked === false ? 'Espere o seu pedido chegar (ou cancele enquanto ele está no balcão).' : 'Seu pedido está a caminho. Espere chegar para levantar.');
+        if (player.interactionState === 'job' && this.jobs.shift(player.id)?.task.kind === 'deliver') throw new Error('Termine de servir a mesa.');
+        this.consumePart(player, presence, now); this.cancelCounter(player.id); if (player.interactionState === 'job') this.jobs.interrupt(player.id); Object.assign(player, standingPosition(player, player.rotation)); player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined;
+      }
       return;
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
@@ -559,7 +607,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     if (object.type === 'seat') {
       if ([...this.state.players.values()].some(p => p.interactionState === object.id)) throw new Error('Esse lugar está ocupado.');
-      player.x = object.x; player.y = object.y ?? player.y; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.interactionState = object.id;
+      // `sentar` pulls the chair back and seats the body from beside it; the clips time from animationStartedAt.
+      player.x = object.x; player.y = object.y ?? player.y; player.z = object.z; player.rotation = object.rotation || 0; player.animationState = 'sit'; player.animationStartedAt = now; player.interactionState = object.id;
     } else if (object.type === 'counter') {
       // Magrão charges first (the API decides); the player then waits and the drink starts when he finishes
       // preparing it (see serveDrinks). Anything that drops the order before that refunds it (cancelCounter).
@@ -572,11 +621,17 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (price) presence.counterCharge = { requestId, amount: price };
       player.animationState = 'wait'; player.animationStartedAt=Date.now();player.interactionState = object.id; presence.interactionEndsAt = undefined;
       player.drinkItem = item;
-      this.service.order(player.id);
+      this.service.order(player.id, item);
       this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo de chopp' : 'uma long neck'} ao Magrão.`, player);
     } else if (object.type === 'toilet') {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
       player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
+    } else if (object.type === 'urinal') {
+      // At the spot in front of it, facing it, for the whole `urinar` clip.
+      if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
+      Object.assign(player, { x: object.x, y: object.y ?? player.y, z: object.z, rotation: object.rotation ?? player.rotation });
+      player.animationState = 'urinate'; player.animationStartedAt = now; player.interactionState = object.id; presence.interactionEndsAt = now + barClipMs('urinar');
+      presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
     } else if (object.type === 'door') {this.toggleDoor(player, object.id);this.playTemporary(player,presence,'use',USE_DURATION_MS);}
     else if (object.type === 'stage') client.send('stage.open', { until: player.stageUntil, price: this.config.prices.stage });
     else if (object.type === 'musician') this.startMusician(player, presence, object.spot!, now);
@@ -604,11 +659,43 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence=this.sessions.getByUser(playerId),charge=presence?.counterCharge;
     if(presence&&charge){presence.counterCharge=undefined;this.refund(presence,charge.requestId,charge.amount);}
   }
+  /** Whether a customer has a table order on its way (with Tonico or a worker). */
+  private orderPending(playerId:string):boolean {return this.waiter.has(playerId)||!!this.jobs.holder(playerId);}
+  /** A player working the bar who can take a customer's order now. */
+  private requireWorker(customer:Player,workerId:string):Player {
+    if(workerId===customer.id)throw new Error('Você não pode fazer um pedido para você mesmo.');
+    const worker=this.state.players.get(workerId),shift=this.jobs.shift(workerId);
+    if(!worker?.connected||!shift)throw new Error('Essa pessoa não está mais trabalhando. Peça ao Tonico.');
+    if(shift.orders.length>=MAX_WORKER_ORDERS)throw new Error(`${worker.displayName} já está com pedidos demais. Peça ao Tonico.`);
+    return worker;
+  }
+  /** Drops a customer's table order wherever it is (Tonico or a worker) and refunds it. */
   private cancelTable(playerId:string,message?:string):void {
-    const presence=this.sessions.getByUser(playerId);
-    for(const order of this.waiter.cancel(playerId)){
+    const presence=this.sessions.getByUser(playerId),now=Date.now();
+    const held=this.jobs.drop(playerId,now),orders=[...this.waiter.cancel(playerId),...held?[held.entry.order]:[]];
+    if(held){
+      const worker=this.state.players.get(held.shift.playerId);
+      if(worker){
+        if(worker.carryingOrder===held.entry.order.id){worker.carrying='';worker.carryingOrder='';}
+        // Stopped in the middle of putting it down: the worker is free again.
+        if(worker.interactionState==='job'&&!held.shift.task.startedAt){worker.interactionState='';worker.animationState='idle';}
+        const workerPresence=this.sessions.getByUser(worker.id);
+        if(workerPresence)workerPresence.client.send('job.state',{...this.jobView(worker.id),message:`O pedido de ${held.entry.customer} foi cancelado.`});
+      }
+    }
+    for(const order of orders){
       this.refundOrder(order);this.served.removeOrder(order.id);
       if(presence&&message)presence.client.send('table.state',{status:'cancelled',order:publicOrder(order),message});
+    }
+  }
+  /** A worker's shift ended with orders still to deliver: Tonico takes them, nobody pays twice. */
+  private handOver(workerId:string,orders:readonly WorkerOrder[]):void {
+    const worker=this.state.players.get(workerId);
+    if(worker&&(worker.carrying||worker.carryingOrder)){worker.carrying='';worker.carryingOrder='';}
+    for(const {order} of orders){
+      this.served.removeOrder(order.id);this.waiter.adopt(order);
+      this.sessions.getByUser(order.playerId)?.client.send('table.state',{status:'ordered',order:{...publicOrder(order),waiter:'Tonico',stage:'queued'},
+        message:`${worker?.displayName??'Quem pegou o seu pedido'} encerrou o turno. O Tonico vai levar o seu pedido.`});
     }
   }
   /** A table order carries the wallet it was charged to, so its refund never depends on the session still being here. */
@@ -617,36 +704,52 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   private serveTables(now:number):void {
     const tonico=this.state.npcs.get('tonico');if(!tonico)return;
+    // With nobody working the bar, clearing the tables is Tonico's.
     const events=this.waiter.update(tonico,order=>{
       const player=this.state.players.get(order.playerId),seat=INTERACTABLES.find(i=>i.id===order.seatId);
       return player?.connected&&player.interactionState===order.seatId&&seat?{x:seat.x,y:seat.y??player.y,z:seat.z}:undefined;
-    },now);
+    },now,this.jobs.working===0);
+    if(events.picked)this.sessions.getByUser(events.picked.playerId)?.client.send('table.state',{status:'ordered',order:{...publicOrder(events.picked),waiter:'Tonico',stage:'carrying'}});
     if(events.placing)this.served.place(events.placing.order,events.placing.plan,now);
-    this.served.update(now,this.seated);
-    if(events.delivered){
-      const order=events.delivered,player=this.state.players.get(order.playerId),presence=this.sessions.getByUser(order.playerId);
-      if(player)for(const id of order.items)this.needs.consume(player,id,now);
-      presence?.client.send('table.state',{status:'delivered',order:publicOrder(order)});
-      if(player)this.systemMessage(`O Tonico entregou o pedido de ${player.displayName}. Bom apetite!`,player);
-      this.log('table_delivered',{playerId:order.playerId,orderId:order.id,total:order.total,waitMs:now-order.placedAt});
-    }
+    // Seated customers have what is in front of them, a little at a time.
+    this.served.update(now,this.seated,(playerId,item,portion)=>{const player=this.state.players.get(playerId);if(player)this.needs.consume(player,item,now,portion);});
+    if(events.delivered)this.tableDelivered(events.delivered,'O Tonico',now);
     if(events.dropped){
       const {order,reason}=events.dropped,presence=this.sessions.getByUser(order.playerId);
       this.refundOrder(order);this.served.removeOrder(order.id);presence?.client.send('table.state',{status:'cancelled',order:publicOrder(order),message:reason});
       this.log('table_dropped',{playerId:order.playerId,orderId:order.id,reason});
     }
   }
+  /** An order reached its table (its items are there): the customer is told, and starts on it. */
+  private tableDelivered(order:TableOrder,by:string,now:number,workerId?:string):void {
+    const player=this.state.players.get(order.playerId);
+    this.sessions.getByUser(order.playerId)?.client.send('table.state',{status:'delivered',order:publicOrder(order),message:`${by} deixou tudo na mesa. Bom apetite!`});
+    if(player)this.systemMessage(`${by} entregou o pedido de ${player.displayName}. Bom apetite!`,player);
+    this.log('table_delivered',{playerId:order.playerId,orderId:order.id,total:order.total,waitMs:now-order.placedAt,...workerId?{workerId}:{}});
+  }
   private runJobs(now:number):void {
     for(const event of this.jobs.tick(now)){
       const player=this.state.players.get(event.playerId),presence=this.sessions.getByUser(event.playerId);
       if(event.type==='paid'){
         if(player?.interactionState==='job'){player.interactionState='';player.animationState='idle';}
-        // Wiping a table takes away what customers who left had on it.
-        const table=/^mesa-(d+)$/.exec(event.stationId)?.[1];
-        if(table)this.served.clearTable(Number(table),this.seated);
+        // Clearing a table takes away what was finished on it.
+        if(event.kind==='station'&&event.station.table!==undefined)this.served.clearTable(event.station.table);
+        // An order picked up at the counter goes on the worker's tray, and off it onto the customer's table.
+        const order=event.order?.order;
+        if(order&&player&&event.kind==='pickup'){
+          player.carrying=order.items.join(',');player.carryingOrder=order.id;
+          this.sessions.getByUser(order.playerId)?.client.send('table.state',{status:'ordered',order:{...publicOrder(order),waiter:player.displayName,stage:'carrying'}});
+        }
+        if(order&&event.kind==='deliver'){
+          if(player){player.carrying='';player.carryingOrder='';}
+          this.tableDelivered(order,player?.displayName??'O ajudante',now,event.playerId);
+        }
         this.payJob(event.payment);
         if(presence)this.sendJob(presence);
-      }else if(player){
+      }else if(event.type==='changed'){if(presence)this.sendJob(presence);}
+      else{
+        this.handOver(event.playerId,event.orders);
+        if(!player)continue;
         if(player.interactionState==='job'){player.interactionState='';player.animationState='idle';}
         player.job='';presence?.client.send('job.state',{task:null,message:event.reason});this.syncJobs();
       }
@@ -663,6 +766,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   private endShift(player:Player,message:string):void {
     const shift=this.jobs.stop(player.id,Date.now());if(!shift)return;
+    this.handOver(player.id,shift.orders);
     if(player.interactionState==='job'){player.interactionState='';player.animationState='idle';}
     player.job='';this.syncJobs();
     this.sessions.getByUser(player.id)?.client.send('job.state',{task:null,message});
@@ -685,7 +789,9 @@ export class BarRoom extends Room<{ state: BarState }> {
         stageMinutes:p.stageUntil?Math.max(0,Math.ceil((p.stageUntil-now)/60_000)):undefined})),
       npcs:[...this.state.npcs.values()].map(n=>({id:n.id,name:n.displayName,behavior:n.behavior,animation:n.animationState,x:+n.x.toFixed(1),z:+n.z.toFixed(1)})),
       waiter:this.waiter.snapshot(),servedItems:this.served.size,counterQueue:[...this.sessions].filter(([,p])=>p.counterCharge).map(([id])=>id),
-      jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000)}))})),
+      jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000),
+        orders:s.orders.map(o=>({...publicOrder(o.order),customer:o.customer,table:o.table,picked:o.picked}))}))})),
+      dirtyTables:this.served.dirtyTables(),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
       musicians:this.musicians.snapshot(),prices:this.config.prices,walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,event:this.state.event.type,
       bots:{...this.bots.snapshot(),inBar:[...this.sessions].filter(([,p])=>p.ticket.bot).length,max:this.botRoom(),tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95)},
@@ -723,12 +829,17 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.sendInventory(presence,view);
   }
 
-  /** A drink or a toilet visit ran its full time. */
+  /** A drink, a toilet or urinal visit, getting up from a chair, a cigarette put out or being sick ran its full time. */
   private finishInteraction(player: Player, presence: Presence, now: number): void {
-    if(presence.inventoryItem){const used=presence.inventoryItem;this.needs.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;}
-    else if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now);
-    if (player.interactionState.startsWith('toilet-')) this.needs.relieve(player, now);
-    player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = ''; presence.interactionEndsAt = undefined;
+    presence.interactionEndsAt = undefined;
+    if (player.animationState === 'stand-up') { this.finishStandUp(player); return; }
+    let drank: string | undefined;
+    if(presence.inventoryItem){const used=presence.inventoryItem;this.needs.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;drank=used;}
+    else if (player.animationState === 'drink' && player.drinkItem) { this.needs.consume(player, player.drinkItem, now); drank = player.drinkItem; }
+    if (player.interactionState.startsWith('toilet-') || player.interactionState.startsWith('mictorio-')) this.needs.relieve(player, now);
+    player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = '';
+    // Too much: the last drink comes back up (NEEDS.drunk.vomit).
+    if (drank && this.needs.sick(player, drank, now)) this.startVomiting(player, presence, now);
   }
   /** Ending a drink or a toilet visit early counts the part already done. */
   private consumePart(player: Player, presence: Presence, now: number): void {
@@ -736,6 +847,36 @@ export class BarRoom extends Room<{ state: BarState }> {
     else if (player.animationState === 'drink' && player.drinkItem) this.needs.consume(player, player.drinkItem, now, (now - player.animationStartedAt) / DRINK_DURATION_MS);
     if (player.interactionState.startsWith('toilet-') && presence.interactionEndsAt)
       this.needs.relieve(player, now, 1 - (presence.interactionEndsAt - now) / (NEEDS.bladder.toiletSeconds * 1000));
+    if (player.interactionState.startsWith('mictorio-') && presence.interactionEndsAt)
+      this.needs.relieve(player, now, 1 - (presence.interactionEndsAt - now) / barClipMs('urinar'));
+  }
+  /** `levantar` ended, or a bench was left: the body stands where the clip left it, beside the chair, or behind the bench (standUpSpot). */
+  private finishStandUp(player: Player): void {
+    const exit = standUpSpot(player.interactionState), spot = exit ?? standingPosition(player, player.rotation);
+    player.x = spot.x; player.y = spot.y ?? player.y; player.z = spot.z;
+    if (exit) player.rotation = exit.rotation;
+    player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();
+  }
+  /** Puts the cigarette out (`fumar_apagar`), once it has been lit. */
+  private stopSmoking(player: Player, presence: Presence, now: number): void {
+    if (player.animationState !== 'smoke') return;
+    const from = Math.max(now, player.animationStartedAt + barClipMs('fumar_acender'));
+    player.animationState = 'smoke-stop'; player.animationStartedAt = from; presence.interactionEndsAt = from + barClipMs('fumar_apagar');
+  }
+  /** Sick where they stand, held still for the whole clip; the puddle is the clip's. */
+  private startVomiting(player: Player, presence: Presence, now: number): void {
+    player.interactionState = 'vomit'; player.animationState = 'vomit'; player.animationStartedAt = now; player.drinkItem = '';
+    presence.interactionEndsAt = now + barClipMs('vomitar'); presence.gestureEndsAt = undefined;
+    presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    this.systemMessage(`${player.displayName} bebeu além da conta e passou mal.`, player);
+    this.log('vomit', { playerId: player.id, drunk: player.drunk });
+  }
+  /** The free corner of a table nearest to the worker, where `limpar_mesa` stands the body; none for other tables. */
+  private cleaningCorner(tableNumber: number, worker: Player) {
+    const table = CLEANABLE_TABLES.find(t => t.number === tableNumber);
+    if (!table) return;
+    return tableCorners(table).map(cornerSpot).filter(spot => isWalkable(spot.x, spot.z, spot.y))
+      .sort((a, b) => Math.hypot(a.x - worker.x, a.z - worker.z) - Math.hypot(b.x - worker.x, b.z - worker.z))[0];
   }
   /** Falling ends whatever the character was doing: table, order, drink (spilled), chair, dance. */
   private knockDown(player: Player, presence: Presence): void {
@@ -745,7 +886,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.musicians.release(player.id);
     this.cancelCounter(player.id);
     this.cancelTable(player.id);
-    if (player.interactionState === 'job') this.jobs.interrupt(player.id);
+    // A worker who falls while putting an order down takes it back on the tray (and starts over at the table).
+    if (player.interactionState === 'job') { const task = this.jobs.interrupt(player.id); if (task?.kind === 'deliver' && task.order) this.served.removeOrder(task.order.order.id); }
     presence.inventoryItem=undefined;
     player.drinkItem = ''; presence.interactionEndsAt = undefined; presence.queue.length = 0;
     player.lastProcessedInput = presence.lastReceived;

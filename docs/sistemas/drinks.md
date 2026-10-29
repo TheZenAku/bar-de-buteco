@@ -31,6 +31,18 @@ Os FBX do Meshy vêm centrados na origem, deitados (girados −90° em X) e em e
 
 Os arquivos originais não são alterados. `npm run assets:drinks -- agua cafe` reimporta só os itens citados.
 
+Cada item também ganha uma **versão leve** (`<id>-decor.glb`, 360 triângulos, texturas de 128 px, ~30 KiB) para a decoração do bar, onde aparecem às dezenas. `npm run assets:drinks -- --decor` gera só as versões leves, sem tocar nas completas.
+
+## Decoração do bar
+
+`apps/web/src/engine/bar-dressing.ts` monta o bar com os objetos reais, ancorado no próprio mapa (colisores, nós e materiais), então um novo export continua funcionando:
+
+- **Geladeiras de cerveja** (`COL_Mob_Geladeira_Expositor*`, as três do térreo e a do lounge): a porta pintada do mapa (material `Geladeira_Frente`, com latas e garrafas desenhadas) dá lugar a uma porta de vidro, com moldura, puxador e a faixa *CERVEJA GELADA*. Dentro, um forro iluminado e quatro prateleiras: águas embaixo, duas de long necks (duas fileiras) e copos de refrigerante em cima.
+- **Estufa do balcão:** os cones provisórios do mapa (material `Salgado`) dão lugar a quatro coxinhas na frente e três pastéis atrás.
+- **Balcão:** seis copos americanos ao lado da chopeira e três cafés junto ao caixa, do lado do Magrão.
+
+Cada tipo de objeto em cada lugar é um único desenho instanciado (`MeshInstance.setInstancing`), e a estrutura das geladeiras é agrupada pelo *batcher*. Os objetos dentro das geladeiras não recebem sombra das lâmpadas (o corpo da geladeira os taparia; geladeiras de verdade têm luz própria). Quando tudo está no lugar, as lâmpadas redesenham suas sombras uma vez.
+
 ## Pegada por esqueleto
 
 O clipe de bebida (`bebendo.fbx`, adaptado a cada rig) levanta a bebida com a **mão esquerda**. A cada quadro, depois da animação, `apps/web/src/engine/drink-props.ts` reconstrói a pegada a partir dos ossos daquele personagem:

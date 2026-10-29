@@ -7,6 +7,7 @@ export * from './needs.js';
 export * from './inventory.js';
 export * from './economy.js';
 export * from './musicians.js';
+export * from './bar-animations.js';
 import type {JukeboxState} from './jukebox.js';
 import type {JobSlotsView,ServedItemState} from './economy.js';
 import type {MusicianState} from './musicians.js';
@@ -15,11 +16,14 @@ export const TICK_MS = 50;
 export const PATCH_MS = 100;
 export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
-export { WALK_SPEED, RUN_SPEED, OLD_CANE_SPEED, PLAYER_RADIUS, PLAYER_HEIGHT, WORLD, MAP_MARKERS, MAP_EFFECTS, MAP_COLLIDERS, MAP_SURFACES, CAFE_TABLES, tableByNumber, type CafeTable, BLACKJACK_TABLE, BLACKJACK_SEATS, JUKEBOX, COLLIDERS, INTERACTABLES, COUNTER_FOOTPRINT, TV_SPOTS, STAGE, STAGE_ENTRY, STAGE_AREA, inStageArea, MUSICIAN_REACH, MUSICIAN_ROLES, musicianRole, onStage, hasStagePass, solidColliders, isDoorOpen, setDoorStates, floorHeight, isWalkable, movePlayer, distance, nearestInteraction, canInteract, interactionReach, findSpawn, standingPosition, cameraFraction } from './world.js';
+export { WALK_SPEED, RUN_SPEED, OLD_CANE_SPEED, PLAYER_RADIUS, PLAYER_HEIGHT, WORLD, MAP_MARKERS, MAP_EFFECTS, MAP_COLLIDERS, MAP_SURFACES, CAFE_TABLES, tableByNumber, type CafeTable, BLACKJACK_TABLE, BLACKJACK_SEATS, JUKEBOX, COLLIDERS, INTERACTABLES, COUNTER_FOOTPRINT, TV_SPOTS, STAGE, STAGE_ENTRY, STAGE_AREA, inStageArea, MUSICIAN_REACH, MUSICIAN_ROLES, musicianRole, onStage, hasStagePass, solidColliders, isDoorOpen, setDoorStates, floorHeight, isWalkable, movePlayer, distance, nearestInteraction, canInteract, interactionReach, findSpawn, standingPosition, cameraFraction, sightBlocked } from './world.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
   | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend'
   /** Playing at one of the stage's musicians' spots (BarState.musicians says which, and the phase). */
-  | 'stage';
+  | 'stage'
+  /** The bar animations (bar-animations.ts): getting up from a chair, a urinal, a cigarette lit and put out, being sick,
+   *  clearing a table from its corner, and Magrão serving at the counter. */
+  | 'stand-up' | 'urinate' | 'smoke' | 'smoke-stop' | 'vomit' | 'clean' | 'serve-chopp' | 'serve-chopp-dark' | 'serve-longneck';
 // Durations of the source FBX clips (tools/assets/convert-animations.mjs).
 export const KICK_DURATION_MS = 2000;
 export const DRINK_DURATION_MS = 8867;
@@ -56,7 +60,9 @@ export interface PlayerState extends Position { id: string; displayName: string;
   hp?: number; hpMax?: number; stamina?: number; hunger?: number; thirst?: number; bladder?: number; drunk?: number;
   exhausted?: boolean; condition?: string; conditionUntil?: number; faintCause?: string;
   /** The job being worked, '' otherwise (economy.ts). */ job?: string;
-  /** Until when (server clock, ms) the stage pass lasts; 0 without one (STAGE_PASS in economy.ts). */ stageUntil?: number }
+  /** Until when (server clock, ms) the stage pass lasts; 0 without one (STAGE_PASS in economy.ts). */ stageUntil?: number;
+  /** A worker's tray (a table order taken for a customer), like Tonico's: comma-separated items and the order's id. */
+  carrying?: string; carryingOrder?: string }
 export interface NpcState extends Position { id: string; displayName: string; color: string; rotation: number; animationState: AnimationState; animationStartedAt: number; behavior: string;
   /** Tonico's tray: the order's items, comma-separated ('' when empty), and that order's id. */
   carrying?: string; carryingOrder?: string }
@@ -70,7 +76,7 @@ export interface WorldState { players: Record<string,PlayerState>; npcs: Record<
 export interface ChatMessage { id:string; playerId:string; displayName:string; text:string; sentAt:number; system?:boolean }
 /** Collision boxes the player touches to use an object; chairs have none and are reached at their seat point. */
 export type Footprint = Pick<Collider,'id'|'x'|'z'|'hx'|'hz'>;
-export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'door'|'television'|'toilet'|'stage'|'musician'; label:string; rotation?:number; footprint?:Footprint[];
+export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'; label:string; rotation?:number; footprint?:Footprint[];
   /** Without a footprint: how far from the point (metres) the player's centre may be; a chair's seat point by default. */
   reach?:number;
   /** A musician's spot on the stage (STAGE_SPOTS id). */
@@ -78,6 +84,8 @@ export interface Interactable extends Position { id:string; type:'seat'|'counter
   /** The media system (jukebox or TV group) this object controls. */
   media?:string;
   /** A seat's table number, as written on the table (CAFE_TABLES). */
-  table?:number }
+  table?:number;
+  /** A seat on a picnic table's bench (no chair to pull; onBench). */
+  bench?:boolean }
 export interface Collider extends Position { id:string; hx:number; hz:number; minY?:number; maxY?:number; ramp?:boolean }
 export interface Seat extends Position { rotation:number }

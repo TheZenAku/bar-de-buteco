@@ -26,6 +26,8 @@ O jogador é um cilindro de 0,34 m de raio e 1,86 m de altura que sobe degraus d
 
 As 31 mesas vermelhas mantêm colisores compactos. As cadeiras são instâncias de GPU atravessáveis para permitir circulação entre conjuntos apertados. O importador lê as 142 transformações de `EXT_mesh_gpu_instancing`, associa 124 cadeiras às mesas e valida separadamente as 18 cadeiras empilhadas do depósito. Não existe lista manual para manter sincronizada: mover, adicionar ou remover conjuntos no Blender atualiza o jogo ao executar a importação. Ao levantar, o servidor sempre desloca o personagem para uma saída livre atrás ou nas diagonais da cadeira, evitando deixá-lo em pé dentro da malha visual.
 
+As 8 mesas de piquenique do quintal (24–31, `P_Mesa_Madeira`, colisor `COL_Mob_Mesa_Madeira`) têm os bancos embutidos e nenhuma cadeira. O importador cria os 6 lugares de cada uma: 3 em cada banco, a 0,62 m do meio da mesa e a −0,6, 0 e +0,6 m ao longo dela, de frente para o tampo e girados como a mesa (`bench: true`, sem `chair`). São os assentos `seat-125` a `seat-172`; o importador falha se o número de lugares não bater com o `lugares` do marcador.
+
 ## Mesas numeradas
 
 Cada mesa de cliente tem um número, escrito no porta-guardanapo em cima dela (`14_mesas.py`). No export, o marcador `Mesa_NN` (coleção `Mesas`) fica no tampo, com `mesa`, `area`, `andar` e `lugares`. O importador associa cada marcador ao colisor da sua mesa e falha se faltar número, se houver número repetido ou se a sequência pular algum.
@@ -34,7 +36,7 @@ Cada mesa de cliente tem um número, escrito no porta-guardanapo em cima dela (`
 | --- | --- | --- |
 | Salão (térreo) | 1–11 | da frente para o fundo |
 | Varanda | 12–20 | contornando o L |
-| Quintal | 21–31 | 24–31 são as de piquenique, com 6 lugares nos bancos |
+| Quintal | 21–31 | 24–31 são as de piquenique, com 6 lugares nos bancos (3 de cada lado) |
 | Salão de cima | 32–33 | |
 | Terraço | 34–39 | |
 
@@ -62,7 +64,7 @@ O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais
 
 ## Câmera e iluminação
 
-A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes, móveis e o forro da varanda. O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
+A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes e o forro da varanda; móveis e objetos ficam transparentes em volta do personagem em vez de puxar a câmera ([câmera](../sistemas/camera.md)). O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
 
 O importador glTF separa o sol das 13 luminárias do bar, preservando posições, cores e potências relativas. O ciclo completo de dia e noite dura 40 minutos; céu, lua, ambiente, névoa, luzes externas, festa e apagão permanecem integrados. Para limitar custo de GPU, doze focos externos com sombras atendem o entorno imediato do bar, enquanto o restante do bairro usa materiais emissivos, luz ambiente, lua e névoa.
 

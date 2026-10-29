@@ -15,6 +15,8 @@ export default defineConfig({
     {name:'ambient',testMatch:'**/ambient.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'environment',testMatch:'**/environment.spec.ts'},
     // Two players' worlds at once: drawn on the GPU where the host has one (software rendering starves their input loops).
+    // The bar animations: many skinned bodies, props and particles; drawn on the GPU like the stage.
+    {name:'bar-animations',testMatch:'**/bar-animations.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'stage',testMatch:'**/stage.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.
     {name:'voice',testMatch:'**/voice.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.2'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},

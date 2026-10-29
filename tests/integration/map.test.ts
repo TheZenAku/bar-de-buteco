@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import map from '../../packages/shared/src/map-data.json';
-import {findSpawn,isWalkable,movePlayer,distance,nearestInteraction,canInteract,cameraFraction,onStage,BLACKJACK_TABLE,INTERACTABLES,MAP_MARKERS,STAGE,STAGE_ENTRY,TV_SPOTS,type Interactable,type Position} from '@bar/shared';
+import {findSpawn,isWalkable,movePlayer,distance,nearestInteraction,canInteract,cameraFraction,sightBlocked,onStage,BLACKJACK_TABLE,INTERACTABLES,MAP_MARKERS,STAGE,STAGE_ENTRY,TV_SPOTS,type Interactable,type Position} from '@bar/shared';
 import {STAGE_SPOTS,STAGE_AREA,inStageArea,tableByNumber,musicianRole,stageSpot} from '@bar/shared';
 
 // Walks straight to each waypoint with the authoritative movement, like a player holding a key.
@@ -35,7 +35,8 @@ test('published map and collision export match the supplied BarBoteco assets exa
   // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts).
   assert.equal(map.colliders.length,1557);
   assert.equal(map.doors.length,16);
-  assert.equal(map.seats.length,124);
+  // 124 chairs and the picnic tables' bench places (8 × 6).
+  assert.equal(map.seats.length,172);
   assert.deepEqual(map.bounds,{minX:-103,maxX:135,minZ:-117,maxZ:91});
   assert.deepEqual(['Ponto_Praca','Ponto_Igreja','Ponto_Campinho','Ponto_Escola','Ponto_Onibus'].map(id=>id in map.markers),[true,true,true,true,true]);
   assert.deepEqual(map.effects.map(effect=>effect.type).sort(),['brasas','fogo','fumaca','luz_jukebox','luz_jukebox_ponto','luz_palco','luz_palco_ponto','torneira','torneira']);
@@ -49,10 +50,11 @@ test('every customer table keeps the number written on it in the map, and every 
     {salao:11,varanda:9,quintal:11,superior:2,terraco:6});
   assert.ok(map.tables.every(table=>table.floor===(table.y>2?1:0)&&table.top>table.y+.6&&table.top<table.y+.85));
   assert.equal(new Set(map.tables.map(table=>table.collider)).size,39,'one number per table');
-  // Picnic tables (24-31) have built-in benches; every chair belongs to a numbered café table nearby.
+  // Every chair belongs to a numbered café table nearby; the picnic tables (24-31) are sat at on their built-in benches.
   for(const seat of map.seats){
     const table=map.tables.find(t=>t.number===seat.table)!;
-    assert.ok(table&&table.places===4&&Math.hypot(seat.x-table.x,seat.z-table.z)<.9,`${seat.id} → mesa ${seat.table}`);
+    assert.ok(table&&table.places===(seat.bench?6:4)&&Math.hypot(seat.x-table.x,seat.z-table.z)<.9,`${seat.id} → mesa ${seat.table}`);
+    assert.equal(!!seat.bench,/Madeira/.test(table.collider),`${seat.id}: benches only at the picnic tables`);
   }
   assert.equal(INTERACTABLES.find(i=>i.id==='seat-1')?.label,'Sentar · mesa 1');
 });
@@ -199,4 +201,18 @@ test('walls, ceilings and upper-floor edges stop the camera and the player',()=>
   position={x:14,y:3.45,z:-11};
   for(let i=0;i<20;i++)position=movePlayer(position,{dx:0,dz:-1,running:true});
   assert.ok(position.y!>3,'Upper-floor guardrail must prevent falling through the stair void');
+});
+
+test('only the building stops the camera boom; furniture is seen through, and hiding the player opens the x-ray',()=>{
+  // Low across the counter, from the hall to behind it.
+  const hall={x:12.4,y:.8,z:-7.3},behind={x:18.6,y:.8,z:-7.3};
+  assert.ok(cameraFraction(hall,behind)<1,'The counter is solid');
+  assert.equal(cameraFraction(hall,behind,true),1,'The boom passes furniture');
+  assert.ok(cameraFraction({x:6,y:1.55,z:-5},{x:6,y:5,z:-2},true)<.6,'The slab still stops it');
+  assert.ok(cameraFraction({x:4.6,y:1.55,z:-10},{x:1,y:1.55,z:-10},true)<1,'So do the walls');
+  // The counter hides the hips of someone behind it from a low camera, not from one looking over it.
+  assert.equal(sightBlocked(hall,behind),true);
+  assert.equal(sightBlocked({x:12.4,y:3,z:-7.3},{x:18.6,y:1.9,z:-7.3}),false);
+  // The table the player stands at, beyond them, does not hide them.
+  assert.equal(sightBlocked({x:5.4,y:2.5,z:-1},{x:5.4,y:.9,z:-4.6}),false);
 });

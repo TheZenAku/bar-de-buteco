@@ -1,17 +1,16 @@
 /** Where BarScene.projectObjective puts the job station: on screen or off it, its distance and height difference. */
 export interface ObjectiveView {x:number;y:number;onScreen:boolean;distance:number;above:number}
 
-// CSS pixels: the badge (12px bold text in a 2px pill), its lift above the chevron, the screen margin, the arrow, and the
-// margin of a badge on screen.
-const HEIGHT=26,LIFT=26,EDGE=24,ARROW=16,MARGIN=6;
+// CSS pixels: the badge (12px bold text in a 2px pill), the screen margin, the arrow, and the margin of a badge on screen.
+const HEIGHT=26,EDGE=24,ARROW=16,MARGIN=6;
 
 /** `accent`: the nova-ui.css token (and fallback) of the badge's neon; `edge`: off screen, keep it on the edge with an arrow. */
 export interface BlipStyle {accent:readonly [token:string,fallback:string];edge:boolean}
 const OBJECTIVE_STYLE:BlipStyle={accent:['--neon-green','#5fd86c'],edge:true};
 
 /**
- * The worker's objective on screen: a badge over the station's chevron when it is in view, otherwise on the screen
- * edge with an arrow pointing to it. It is drawn on its own canvas, and only when it changes. Following the camera
+ * The worker's objective on screen: a badge lying on the station's floor ring when it is in view (nothing floats above
+ * it), otherwise on the screen edge with an arrow pointing to it. It is drawn on its own canvas, and only when it changes. Following the camera
  * with a DOM element restyled the page on every frame; with the browser's accessibility services on (screen readers,
  * password managers, Windows UI Automation clients) that rebuilt the accessibility tree each frame and froze the game
  * during a shift. Other blips (the stage's entry and its telão) use the same badge with their own colour and title.
@@ -32,7 +31,7 @@ export function createObjectiveBlip(canvas:HTMLCanvasElement,style:BlipStyle=OBJ
     const label=`${title?`${title} · `:''}${view.distance<10?view.distance.toFixed(1).replace('.',','):Math.round(view.distance)} m${floor}`;
     context.font=theme.font;
     const w=Math.ceil(context.measureText(label).width)+36,cx=innerWidth/2,cy=innerHeight/2;
-    let x=view.x,y=view.y-LIFT-HEIGHT/2,angle:number|undefined;
+    let x=view.x,y=view.y,angle:number|undefined;
     if(!view.onScreen){
       // On the edge, the whole badge and its arrow stay inside the screen; the arrow leaves the badge towards the station.
       const dx=view.x-cx||1e-3,dy=view.y-cy||1e-3,scale=Math.min((cx-w/2-EDGE)/Math.abs(dx),(cy-HEIGHT/2-EDGE)/Math.abs(dy));

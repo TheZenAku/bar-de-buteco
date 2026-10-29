@@ -33,7 +33,7 @@ As fases que correm sozinhas (pegar → começar → loop, e o fim) **não** dep
 
 ## Cliente
 
-O jogo usa PlayCanvas, não three.js. O módulo `palco_musicos.js` foi portado para `apps/web/src/engine/stage-musicians.ts` com a mesma conversão:
+O jogo usa PlayCanvas, não three.js. O módulo `palco_musicos.js` foi portado para `apps/web/src/engine/stage-musicians.ts` com a mesma conversão, que desde 28/10 fica em `mixamo-retarget.ts` e também serve às [animações do bar](animacoes-bar.md):
 
 - A rotação de cada osso no mundo é medida a partir da pose de repouso do esqueleto de autoria e aplicada à pose de ligação (bind) de cada skin, lida das matrizes inversas de bind.
 - Ossos da skin sem par no clipe ficam na pose de bind.

@@ -9,6 +9,14 @@ interface Sign {material:pc.StandardMaterial;strength:number;peak:number;}
 const SIGN_MATERIALS=new Set(['Letreiro_Highland','Placa_Highland','Neon_Magenta']);
 // The magenta halo behind the corner sign, on the bricks.
 const SIGN_LIGHT='Luz_Letreiro',SIGN_LIGHT_INTENSITY=2.2,SIGN_LIGHT_RANGE=5;
+/**
+ * What never casts a shadow: the far backdrop (Fundo_Distante: a sky panorama dome some 1.5 km across, distant buildings,
+ * hills and ground), which otherwise covers the whole map in the sun's shadow map and leaves everything outdoors in shade;
+ * the painted contact shadows under the furniture (Sombra_Contato); the bulbs and glowing signs the lamps shine from; and
+ * see-through materials (glass), which let the light through.
+ */
+const NO_SHADOW_NODES=new Set(['Fundo_Distante']);
+const NO_SHADOW_MATERIALS=new Set(['Sombra_Contato','Lampada','Ceu_Panorama',...SIGN_MATERIALS]);
 /** Map lights driven by their own prop: the jukebox and the stage colour their lights (jukebox-lights.ts, stage-lights.ts). */
 const PROP_LIGHT=/^(Jukebox_FX_|Luz_Palco_Cor$)/;
 const streetFixtures=[
@@ -52,6 +60,12 @@ export class EnvironmentLighting {
   private rotation=new pc.Quat();
   private direction=new pc.Vec3();
   private shadowLights:pc.LightComponent[]=[];
+  /** What moves (avatars, what they carry, what is served): kept out of the lamps' cached shadow maps. */
+  private dynamicCasters?:()=>Iterable<pc.MeshInstance>;
+  /** Hidden from shadow casting, and the sun/moon held on their last map, for the frame in which lamp maps are redrawn. */
+  private hiddenCasters:pc.MeshInstance[]=[];
+  private heldLights:pc.LightComponent[]=[];
+  private refreshAll=false;
   constructor(private app:pc.Application,private camera:pc.Entity){
     app.scene.fog.type=pc.FOG_LINEAR;
     this.moon=new pc.Entity('Moonlight');
@@ -118,6 +132,13 @@ float botecoEdgeVisibility(){
 }
 `+nativeFog.replace('return clamp(fogFactor, 0.0, 1.0);','return clamp(fogFactor, 0.0, 1.0) * botecoEdgeVisibility();');
     const patched=new Set<pc.Material>();
+    for(const render of map.findComponents('render') as pc.RenderComponent[]){
+      if(NO_SHADOW_NODES.has(render.entity.name)){render.castShadows=false;render.receiveShadows=false;}
+      for(const instance of render.meshInstances){
+        const shading=instance.material;
+        if(shading&&(NO_SHADOW_MATERIALS.has(shading.name)||(shading instanceof pc.StandardMaterial&&shading.blendType!==pc.BLEND_NONE)))instance.castShadow=false;
+      }
+    }
     for(const render of map.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
       let material=instance.material;
       if(!(material instanceof pc.StandardMaterial))continue;
@@ -184,7 +205,41 @@ float botecoEdgeVisibility(){
     // Directional sun/moon shadows remain realtime and therefore move smoothly. Local lamp shadows are
     // cached because their lights and architectural casters do not move; never cycle them between frames.
     for(const light of this.shadowLights)if(light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME)light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;
+    this.redrawLampShadows();
   }
+  /**
+   * People and what they carry move, so they stay out of the lamps' cached shadow maps: a map drawn while someone stood
+   * under the lamp kept their shadow there after they left. Whenever lamp maps are (re)drawn (map load, a lamp turning
+   * on, a quality change, refreshLampShadows), it happens in this frame with the moving things hidden from shadow
+   * casting, and the sun and moon keep last frame's map meanwhile, so their shadows of people never blink. A pending map
+   * is dropped so the lamp draws now even out of view, instead of later with someone under it. People get a contact
+   * shadow instead (BarScene).
+   */
+  private redrawLampShadows():void {
+    for(const caster of this.hiddenCasters)caster.castShadow=true;
+    for(const light of this.heldLights)light.shadowUpdateMode=pc.SHADOWUPDATE_REALTIME;
+    this.hiddenCasters=[];this.heldLights=[];
+    let redraw=false;
+    for(const light of this.shadowLights){
+      if(!light.enabled||!light.castShadows)continue;
+      if(this.refreshAll)light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;
+      if(light.shadowUpdateMode!==pc.SHADOWUPDATE_THISFRAME)continue;
+      redraw=true;
+      const scene=light.light as unknown as {shadowMap:unknown;_destroyShadowMap():void};
+      if(scene.shadowMap)scene._destroyShadowMap();
+    }
+    this.refreshAll=false;
+    if(!redraw||!this.dynamicCasters)return;
+    for(const caster of this.dynamicCasters())if(caster.castShadow){caster.castShadow=false;this.hiddenCasters.push(caster);}
+    for(const entity of [this.sun,this.moon]){
+      const light=entity?.light;
+      if(light?.enabled&&light.castShadows&&light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME){light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;this.heldLights.push(light);}
+    }
+  }
+  /** What moves in the scene (see redrawLampShadows). */
+  setDynamicCasters(casters:()=>Iterable<pc.MeshInstance>):void {this.dynamicCasters=casters;}
+  /** Static things were added or removed (the props dressing the bar): every lamp redraws its shadows once. */
+  refreshLampShadows():void {this.refreshAll=true;}
   /**
    * Graphics settings: shadow maps of the sun/moon (resolution, cascades) and of the lamps, and how far the
    * atmospheric fog lets the city show. 'off' keeps the lighting and drops every shadow map.
@@ -203,6 +258,8 @@ float botecoEdgeVisibility(){
   private quality:'off'|'low'|'medium'|'high'|'ultra'='high';
   addPartyShadows(lights:pc.Entity[]):void {for(const entity of lights)if(entity.light){entity.light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;this.shadowLights.push(entity.light);}}
   get partyStrength():number{return this.party;}
+  /** How much the sun lights the open air now: 0 at night, 1 in full daylight. */
+  get daylight():number{return Math.min(1,Math.max(0,this.sampled.sunIntensity/.6));}
   telemetry(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;
     return {...this.sampled,electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),

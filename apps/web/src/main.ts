@@ -8,6 +8,7 @@ import {createLiveHud} from './live-hud';
 import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene} from './engine/BarScene';
+import {CAMERA_LABELS,CAMERA_MODES,isCameraMode} from './engine/camera-rig';
 import {BarNetwork} from './networking';
 import {api,ApiError,escape as e} from './api';
 import {BarAudio} from './audio';
@@ -23,7 +24,7 @@ import './voice.css';
 import './needs.css';
 import {createNeedsHud} from './needs-hud';
 import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
-import {JOBS,canInteract as touching,jobById,stationInteractable,type JobTaskView} from '@bar/shared';
+import {JOBS,canInteract as touching,stationInteractable,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
 import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal,worldAdminHtml} from './economy-ui';
 import './economy.css';
@@ -139,7 +140,8 @@ const network=new BarNetwork({
   },
   table:update=>{
     tableOrder=update.status==='ordered'?update.order:undefined;
-    if(update.status==='delivered')notices.show({variant:'acao',title:'Chegou o pedido',text:'O Tonico deixou tudo na mesa. Bom apetite!'});
+    if(update.status==='delivered')notices.show({variant:'acao',title:'Chegou o pedido',text:update.message??'Ficou tudo na mesa. Bom apetite!'});
+    if(update.status==='ordered'&&update.message)notices.show({variant:'aviso',title:'Pedido',text:update.message});
     if(update.status==='cancelled'&&update.message)notices.show({variant:'aviso',title:'Pedido cancelado',text:update.message});
     if(activeModal==='table')renderTableMenu();
   },
@@ -219,10 +221,12 @@ function renderWorld():void {
   needsHud.update(self);
   $('#hud-name').textContent=user.displayName;
   $('#hud-skin').textContent=`${SKINS.find(skin=>skin.id===self?.skin)?.name||'Carregando'} · B.A.R.`;
-  const activities:Record<string,string>={stage:'No palco',idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas'};
+  const activities:Record<string,string>={stage:'No palco',idle:'De boa',walk:'No rolê',run:'Na correria',sit:'Sentado',dance:'No passinho',drink:'Uma gelada',kick:'Karatê!',fallen:'No chão',deal:'Na mesa',shuffle:'Nas cartas',
+    smoke:'Fumando',['smoke-stop']:'Apagando o cigarro',urinate:'No mictório',vomit:'Passando mal',['stand-up']:'Levantando',clean:'Limpando a mesa'};
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
   $('#hud-activity').textContent=needsHud.activity(self)??(self?.currentTableId?'No blackjack':ordering?'Esperando o Magrão':self?.oldWalk&&self.animationState==='walk'?'No passo da bengala':activities[self?.animationState||'idle']);
   $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
+  $('#smoke-button').setAttribute('aria-pressed',String(self?.interactionState==='smoke'));
   $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
   const station=jobStation(),atStation=!!station&&!!self&&!self.interactionState&&!self.currentTableId&&touching(stationInteractable(station),self);
   const interaction=self?nearestObject(self):undefined;
@@ -230,9 +234,9 @@ function renderWorld():void {
   if(interaction?.type==='musician')scene?.preloadMusician(interaction.spot!);
   const context=$('#context');
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
-  $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?'Pedido a caminho':'Pedir ao Tonico';
+  $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
   context.classList.toggle('hidden',!self||self.animationState==='kick'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation));
-  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||'';
+  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||'';
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   $('#event-banner').classList.toggle('hidden',!event?.type);
@@ -244,13 +248,17 @@ function renderWorld():void {
   if(activeModal==='people')renderPeopleContent();
   renderJobCard();
 }
-function jobStation(){return jobTask?jobById(jobTask.jobId)?.stations.find(s=>s.id===jobTask!.stationId):undefined;}
+function jobStation(){return jobTask?.station;}
+/** Players working the bar right now, who take table orders like Tonico (never the local player). */
+function workersOnShift():Array<{id:string;name:string}> {
+  return Object.values(world?.players??{}).filter(p=>p.job&&p.connected!==false&&p.id!==user?.id).map(p=>({id:p.id,name:p.displayName}));
+}
 let jobPanelKey='';
 /** The job panel (draggable, collapsible, hideable like the other HUD panels) and the objective marker in the scene. */
 function renderJobCard():void {
   const task=inGame?jobTask:null,self=world?.players[user?.id??''],station=jobStation();
   // The objective marker exists only here: the room sends the task to its worker alone, so nobody else can draw it.
-  scene?.setObjective(task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z,top:station.top}:null);
+  scene?.setObjective(task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z}:null);
   if(!task){jobPanelKey='';hud.setAvailable('job',false);return;}
   // Rebuilt only when the task changes; rewriting it ten times a second made its buttons miss clicks.
   const near=!!station&&!!self&&touching(stationInteractable(station),self),key=`${task.stationId}|${task.startedAt}|${task.tasks}|${task.earned}|${near}`;
@@ -279,10 +287,10 @@ const performing=()=>!!world?.players[user?.id??'']?.interactionState?.startsWit
 function stageLabel(self:{stageUntil?:number}):string {return hasStagePass(self)?`Palco liberado · ${stageMinutes(self.stageUntil!,serverNow())} min`:`Subir no palco · ${STAGE_PASS.price} moedas`;}
 function openTableMenu():void {
   const self=world?.players[user?.id??''];
-  if(!self?.interactionState?.startsWith('seat-')){toast('Sente-se a uma mesa (E perto de uma cadeira) para pedir ao Tonico.');return;}
-  showModal('PEDIR AO TONICO','','table');renderTableMenu();
+  if(!self?.interactionState?.startsWith('seat-')){toast('Sente-se a uma mesa (E perto de uma cadeira) para fazer um pedido.');return;}
+  showModal(workersOnShift().length?'FAZER PEDIDO':'PEDIR AO TONICO','','table');renderTableMenu();
 }
-function renderTableMenu():void {$('#modal-content').innerHTML=tableMenuHtml(inventory?.balance??0,tableOrder);}
+function renderTableMenu():void {$('#modal-content').innerHTML=tableMenuHtml(inventory?.balance??0,tableOrder,workersOnShift());}
 function openJobs():void {showModal('Trabalhar no bar',jobsHtml(world,jobTask),'jobs');}
 function cardMarkup(card:Card):string {
   const symbols:Record<string,string>={hearts:'♥',diamonds:'♦',clubs:'♣',spades:'♠',H:'♥',D:'♦',C:'♣',S:'♠','♥':'♥','♦':'♦','♣':'♣','♠':'♠',h:'♥',d:'♦',c:'♣',s:'♠'};
@@ -311,6 +319,13 @@ function interact():void {
 function orderDrink():void {
   const option=(id:'garrafa'|'copo',hint:string)=>{const item=itemById(id)!;return `<button class="button primary" data-action="order" data-item="${id}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)} · ${coins(item.price)}</b><small>${hint}</small></span></button>`;};
   showModal('PEDIR AO MAGRÃO',`<p class="modal-description">O Magrão cobra, prepara e entrega. Você bebe quando ele terminar. Carteira: ${coins(inventory?.balance??0)}</p><div class="drink-choice">${option('garrafa','Cerveja na garrafa')}${option('copo','Chopp no copo')}</div><p class="fine-print">Sentado numa mesa? Peça comida e bebida ao Tonico com T.</p>`,'order');
+}
+/** F: lights a cigarette where the player stands, or puts it out (the room plays both). */
+function smoke():void {
+  if(!connected||activeModal||!world||!user||performing())return;
+  const self=world.players[user.id];
+  if(self?.interactionState&&self.interactionState!=='smoke'){toast('Encerre a ação atual antes de acender um cigarro.');return;}
+  network.send('player.emote',{emote:'smoke'});
 }
 function kick():void {
   if(!connected||activeModal||!world||!user||performing())return;
@@ -415,7 +430,7 @@ async function wearSkin(id:string):Promise<void> {
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar.</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>I</kbd><span>Abrir a mochila, usar itens e comprar mantimentos</span><kbd>T</kbd><span>Sentado à mesa: pedir comida e bebida ao Tonico</span><kbd>J</kbd><span>Trabalhar no bar e ganhar moedas</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>C</kbd><span>Trocar de skin</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p><div class="help-grid"><kbd>W A S D</kbd><span>Caminhar pelo bar</span><kbd>SHIFT</kbd><span>Correr</span><kbd>MOUSE</kbd><span>Arraste para olhar. Role para aproximar ou afastar a câmera.</span><kbd>Q</kbd><span>Trocar a câmera: primeira pessoa ou terceira pessoa próxima, padrão e longe</span><kbd>E</kbd><span>Sentar, pedir bebida, usar a jukebox ou entrar na mesa</span><kbd>I</kbd><span>Abrir a mochila, usar itens e comprar mantimentos</span><kbd>T</kbd><span>Sentado à mesa: pedir comida e bebida ao Tonico ou a quem estiver trabalhando no bar</span><kbd>J</kbd><span>Trabalhar no bar e ganhar moedas</span><kbd>G</kbd><span>Dançar ou parar de dançar</span><kbd>V</kbd><span>Acenar para o pessoal</span><kbd>F</kbd><span>Acender um cigarro (F de novo, ou E, apaga)</span><kbd>C</kbd><span>Trocar de skin</span><kbd>ENTER</kbd><span>Conversar com quem está a até 12 metros</span><kbd>M</kbd><span>Ligar ou desligar o microfone (voz por proximidade, até 15 metros)</span><kbd>B</kbd><span>Segure para falar, no modo apertar para falar</span><kbd>ESC</kbd><span>Fechar uma janela</span></div><h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><h3>Pedido na mesa</h3><p>Sentado, aperte T e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -441,6 +456,7 @@ app.addEventListener('click',event=>{
       }
       case 'scene-use':{const self=world?.players[user?.id??''],object=INTERACTABLES.find(p=>p.id===button.dataset.object);if(!connected||!self||!object||activeModal)break;if(!canInteract(object,self)){toast('Chegue mais perto para usar '+object.label.toLowerCase()+'.');break;}if(self.currentTableId||self.interactionState){toast('Encerre a interação atual com E antes de usar outro lugar.');break;}if(object.type==='counter'){orderDrink();break;}if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});break;}
       case 'wave':if(connected&&!activeModal&&!performing())network.send('player.emote',{emote:'wave'});break;
+      case 'smoke':smoke();break;
       case 'chat':focusChat();break;
       case 'inventory':await openInventory();break;
       case 'inventory-use':useInventoryItem(button.dataset.item!);break;
@@ -501,7 +517,11 @@ app.addEventListener('submit',event=>{
       }else if(form.id==='chat-form'){
         const input=$<HTMLInputElement>('#chat-input');const text=input.value.trim();if(text){network.send('chat.send',{text});input.value='';}input.blur();
       }else if(form.id==='report-form'){await api('/reports',{playerId:form.dataset.id,reason:data.reason});closeModal();toast('Denúncia registrada. Obrigado por avisar.');}
-      else if(form.id==='table-order'){const items=new FormData(form).getAll('item').map(String);if(items.length){network.send('table.order',{items});closeModal();}}
+      else if(form.id==='table-order'){
+        // Which button sent it: Tonico, or one of the players working the bar.
+        const items=new FormData(form).getAll('item').map(String),to=((event as SubmitEvent).submitter as HTMLButtonElement|null)?.value;
+        if(items.length){network.send('table.order',to?{items,to}:{items});closeModal();}
+      }
       else if(form.classList.contains('admin-bots-form'))network.send('admin.bots',{count:Number(new FormData(form).get('count'))});
       else if(form.classList.contains('admin-job-form')){const values=new FormData(form);network.send('admin.job',{jobId:form.dataset.job,slots:Number(values.get('slots')),pay:Number(values.get('pay')),enabled:values.get('enabled')==='on'});}
       else if(form.id==='moderation-form'){await api('/admin/action',{action:form.dataset.type,playerId:form.dataset.id,reason:data.reason});await admin();}
@@ -544,6 +564,7 @@ $('#modal').addEventListener('change',event=>{
   if(key==='voicesEnabled'){voice.unlock();settings.update({voicesEnabled:(input as HTMLInputElement).checked});return;}
   if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});openSettings();return;}
   if(key==='inputDevice')settings.update({inputDevice:input.value});
+  if(key==='camera'&&isCameraMode(input.value))settings.update({camera:input.value});
 });
 renderAuth();renderChat();
 
@@ -556,7 +577,7 @@ async function toggleMicrophone():Promise<void> {
 }
 // General × ambience scales the quiet background bus; the jukebox and the TVs retain their own volumes.
 function applySound(current:GameSettings):void {audio.volume=current.master*current.music;media.forEach(m=>m.setMaster(current.master));}
-settings.subscribe((current,previous)=>{applySound(current);renderVoice();if(current.graphics!==previous.graphics)scene?.setGraphics(current.graphics);});
+settings.subscribe((current,previous)=>{applySound(current);renderVoice();if(current.graphics!==previous.graphics)scene?.setGraphics(current.graphics);if(current.camera!==previous.camera)scene?.setCameraMode(current.camera);});
 applySound(settings.get());
 /** Microphone level on a −60…0 dB scale, 0–1. */
 const levelScale=(rms:number)=>Math.max(0,Math.min(1,(20*Math.log10(Math.max(rms,1e-6))+60)/60));
@@ -590,6 +611,10 @@ function openSettings():void {
   const threshold=current.sensitivity*40/60*100;
   showModal('Configurações',`<div class="settings-panel" data-capture-input>
     ${graphicsSettingsHtml(current.graphics,scene?.getGraphics())}
+    <section><h3>${uiIcon('eye')} Câmera</h3>
+      <label class="setting-row device-row"><span>Visão</span><select data-setting="camera">${CAMERA_MODES.map(mode=>`<option value="${mode}" ${current.camera===mode?'selected':''}>${CAMERA_LABELS[mode]}</option>`).join('')}</select></label>
+      <p class="fine-print">No jogo, Q troca a visão e a rodinha do mouse aproxima ou afasta, da terceira pessoa longe até a primeira pessoa. Quando uma parede ou um móvel fica entre a câmera e você, ele fica transparente em volta do personagem.</p>
+    </section>
     <section><h3>${uiIcon('music')} Volume do jogo</h3>
       ${range('master','Geral',current.master)}${range('music','Som ambiente',current.music)}${range('jukebox','Jukebox',jukebox.ownVolume)}${range('television','TVs',television.ownVolume)}${range('voice','Vozes',current.voice)}
       <p class="fine-print">A cidade toca baixinho ao fundo, com transições suaves. O ambiente diminui enquanto a jukebox ou uma TV está em uso.</p>
@@ -621,12 +646,13 @@ async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
   try{scene=new BarScene($<HTMLCanvasElement>('#world'),{
     onInteract:interact,
-    onEmote:emote=>performing()?undefined:network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
+    onEmote:emote=>performing()?undefined:emote==='smoke'?smoke():network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));},
     onKick:kick,
+    onCameraMode:mode=>{settings.update({camera:mode});notices.show({variant:'acao',title:'Câmera',text:CAMERA_LABELS[mode],id:`camera-${mode}`,duration:1800});},
     onMediaFrame:()=>{media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
-  });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);}
+  });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCameraMode(settings.get().camera);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
@@ -636,8 +662,9 @@ async function start():Promise<void>{
 }
 let displayedSound:boolean|undefined;
 void start();
+if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

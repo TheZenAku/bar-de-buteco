@@ -13,7 +13,11 @@ import {StageLights,type StageLightsStatus} from './stage-lights';
 import {JUKEBOX_SYSTEMS,STAGE_ENTRY,TV_SPOTS,inStageArea,onStage,type JukeboxState} from '@bar/shared';
 import {MUSICIAN_REACH,MUSICIANS,STAGE_PHASES,musicianPhase,stageSpot,type StagePhase,type StageSpot} from '@bar/shared';
 import {StageMusicians,musicianState,musicianTime} from './stage-musicians';
+import {BarDressing} from './bar-dressing';
+import {BAR_ANIMATIONS,CLEANABLE_TABLES,ITEM_CATALOG,URINALS,barClipMs,seatChair,barFrame,barTimeline,cornerSpot,inFrame,nearestCorner,type BarClip,type BarFrame,type BarStep,type Meal} from '@bar/shared';
+import {BarAnimations,barEndOffset,barState} from './bar-animations';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
+import {CameraRig,type CameraMode} from './camera-rig';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -28,6 +32,8 @@ const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
 // Degrees by drunk stage (0-4): body sway of every avatar and camera roll of the local player.
 const DRUNK_BODY_SWAY = [0, 0, 3, 6, 6];
 const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
+// The head joint shrunk to nothing in first person, so the face and hair do not fill the view.
+const HIDDEN_HEAD = 1e-3;
 // NPCs with their own skin, not offered in the selector: the bartender is Magrão.
 const NPC_SKINS: Record<string, string> = { bartender: 'magrao' };
 interface SkinnedRig {
@@ -42,6 +48,8 @@ interface SkinnedRig {
   sitDrop: number;
   /** The drinking hand (the Drink clip lifts with the left), found in the bind pose. */
   drinkHand?: HandRig;
+  /** The hips, found on first use (the contact shadow follows them during a bar animation). */
+  hip?: pc.Entity;
 }
 interface Avatar {
   root: pc.Entity;
@@ -75,7 +83,33 @@ interface Avatar {
   yaw: number;
   /** Seconds of the next glide, instead of the usual: a musician sliding onto a stage spot or stepping off it. */
   glideNext?: number;
+  /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
+  contact: pc.Entity;
+  covered?: { x: number; z: number; value: boolean };
+  /** The bar animation playing (bar-animations.ts): its clip, the clip's space, and the slide into a place. */
+  bar?: { clip: BarClip; startedAt: number; time: number; space: BarFrame; frame?: BarFrame; slide?: { from: BarFrame; at: number } };
+  /** Seconds of the cross-fade from the last bar clip back to the game's own (0 when the avatar was moved to the body). */
+  barRelease?: number;
+  /** The last bar action played to its end (its last frame is the bar idle's first: no cross-fade into it). */
+  barFinished?: boolean;
+  /** Horizontal speed as drawn (m/s, smoothed): the bar walk's cadence follows it. */
+  speed?: number;
+  lastDrawn?: pc.Vec3;
 }
+/** A bar animation the debug panel plays on an avatar without the room (development only). */
+interface BarOverride { animation: string; startedAt: number; interactionState?: string; x?: number; y?: number; z?: number; meal?: Meal }
+/** What an avatar does in the bar animations this frame (barAction). */
+interface BarAction { step: BarStep; frame?: BarFrame; seat?: string; servedFood: boolean }
+// The snacks a seated customer eats with the bar animations' fork (comer).
+const FOODS = new Set<string>(ITEM_CATALOG.filter(item => item.category === 'comida').map(item => item.id));
+// The bar animations' idle and walks (animacoes_bar.js locomover), in place of the game's Idle, Walk and DrunkWalk.
+const BAR_WALKS: Record<string, BarClip> = { '': 'parado_loop', Walk: 'andar_loop', DrunkWalk: 'andar_bebado_loop' };
+const BAR_LOCOMOTION = new Set(Object.values(BAR_WALKS).map(clip => barState(clip)));
+// Metres a second each walk covers at its authored pace (bar_locomocao.glb): the cadence scales from it, within the
+// module's 0.5–2.2 (past that the legs would spin; the feet slide instead).
+const WALK_PACE = (BAR_ANIMATIONS.groups.locomocao as { speeds?: Record<string, number> }).speeds ?? {};
+// Bar clips that end an action: a debug run of one is over once it has played.
+const FINAL_CLIPS = new Set<BarClip>(['levantar', 'urinar', 'vomitar', 'fumar_apagar', 'levantar_chao', 'limpar_mesa', 'magrao_chopp', 'magrao_chopp_escuro', 'magrao_longneck']);
 interface Pose {
   t: number;
   walking: boolean;
@@ -118,9 +152,14 @@ const OBJECTIVE_COLOR = '#5fd86c';
 // cor_padrao), and the telão's control (the middle of the stage's front edge) in the HUD's neon teal (--neon-teal).
 const STAGE_BLIPS = {entry:{at:STAGE_ENTRY,color:'#ff47c2'},telao:{at:TV_SPOTS.telao!,color:'#3adfd7'}} as const;
 export type StageBlip = keyof typeof STAGE_BLIPS;
-/** Floor ring and floating chevron of a blip; `target.top` is where the chevron floats above. */
-interface Marker {target:Required<Position>&{top:number};marker:pc.Entity;chevron:pc.Entity}
+/** A blip: a ring on the floor around its spot, and nothing above it. */
+interface Marker {target:Required<Position>;marker:pc.Entity;ring:pc.Entity}
 
+// The soft shadow under each avatar (contactShadow).
+const CONTACT_VERTEX = `attribute vec3 aPosition;attribute vec2 aUv0;uniform mat4 matrix_model;uniform mat4 matrix_viewProjection;varying vec2 vUv0;
+void main(){vUv0=aUv0;gl_Position=matrix_viewProjection*matrix_model*vec4(aPosition,1.0);}`;
+const CONTACT_FRAGMENT = `precision highp float;varying vec2 vUv0;uniform float contactOpacity;
+void main(){float r=length(vUv0-.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,(1.0-smoothstep(.15,1.0,r))*contactOpacity);}`;
 const TAU = Math.PI * 2;
 const RAD_TO_DEG = 180 / Math.PI;
 const color = (hex: string): pc.Color => new pc.Color().fromString(hex);
@@ -150,6 +189,8 @@ export class BarScene {
   private readonly partyLights: pc.Entity[] = [];
   private readonly environment:EnvironmentLighting;
   private mapEffects?:MapEffects;
+  /** Fridges, warmer and counter dressed with the real props (bar-dressing.ts). */
+  private dressing?:BarDressing;
   private jukeboxLights?:JukeboxLights;
   private jukeboxState?:JukeboxState;
   private jukeboxDuration=0;
@@ -158,6 +199,11 @@ export class BarScene {
   private stageState?:JukeboxState;
   /** The musicians' clips on the stage and the instruments they pick up (stage-musicians.ts). */
   private musicians?:StageMusicians;
+  /** The bar animations (bar-animations.ts): props, the pulled chairs, particles and what is left on the map. */
+  private barAnimations?:BarAnimations;
+  private readonly barOverrides=new Map<string,BarOverride>();
+  /** Avatars that played a bar clip this frame. */
+  private readonly barPlayed=new Set<string>();
   private stageDuration=0;
   /** The local worker's current job station: a marker only this browser draws (the task is sent to the worker alone). */
   private objective?:Marker;
@@ -166,7 +212,6 @@ export class BarScene {
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
-  private readonly cameraTarget = new pc.Vec3(0, 1.2, 3.5);
   private readonly tempScreen = new pc.Vec3();
   private readonly tempPosition = new pc.Vec3();
   private readonly tempTurn = new pc.Quat();
@@ -183,9 +228,10 @@ export class BarScene {
   private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
   private mapEntity?: pc.Entity;
+  private contactMaterial?: pc.ShaderMaterial;
   /** What the bar serves, by item (tools/assets/import-drinks.mjs): held while drinking, carried on the tray, left on tables. */
   private readonly propModels=new Map<string,pc.ContainerResource>();
-  /** What Tonico left on the tables (synced by the room). `moved`: the frame in which his hand last carried it. */
+  /** What was served on the tables (synced by the room). `moved`: the frame in which a serving hand last carried it. */
   private readonly servedItems=new Map<string,{state:ServedItemState;entity?:pc.Entity;settled:boolean;moved:number}>();
   /** The order on Tonico's tray in the frame `trayFrame`: its items still on the tray are his to draw. */
   private trayOrder='';
@@ -198,9 +244,11 @@ export class BarScene {
   private enabled = false;
   private destroyed = false;
   private elapsed = 0;
-  private yaw = 0.15;
-  private pitch = 0.55;
-  private distance = 6.4;
+  /** The local player's camera: its views, smoothing and x-ray (camera-rig.ts). */
+  private readonly rig: CameraRig;
+  /** The local avatar's head joint first person hid, and its own scale to give back. */
+  private hiddenHead?: pc.Entity;
+  private readonly headScale = new pc.Vec3(1, 1, 1);
   private dragging = false;
   private lastRotation = Math.PI;
   private eventType = '';
@@ -232,7 +280,10 @@ export class BarScene {
     this.app.root.addChild(this.camera);
     this.camera.setPosition(18, 9, 16);
     this.camera.lookAt(14, 1.8, -6);
+    // Before any material is drawn: the x-ray goes into every shader.
+    this.rig = new CameraRig(this.camera, this.app.graphicsDevice);
     this.environment=new EnvironmentLighting(this.app,this.camera);
+    this.environment.setDynamicCasters(()=>this.dynamicCasters());
     this.environment.update(Date.now(),0,'');
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
@@ -271,7 +322,7 @@ export class BarScene {
   private makeProp(item:string):pc.Entity|undefined {
     const model=this.propModels.get(item);if(!model)return;
     const prop=new pc.Entity(`Served ${item}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true}),plate=SERVED_PROPS[item as ItemId]?.plate;
-    prop.addChild(body);
+    body.name='Served food';prop.addChild(body);
     if(plate){this.shape('Small plate','cylinder',[0,PLATE_HEIGHT/2,0],[plate*2,PLATE_HEIGHT,plate*2],this.material('#f1ede4',undefined,.3),prop);body.setLocalPosition(0,PLATE_HEIGHT,0);}
     return prop;
   }
@@ -328,6 +379,11 @@ export class BarScene {
         this.jukeboxLights=new JukeboxLights(map);
         this.stageLights=new StageLights(map,this.partyLights.filter(light=>light.name==='Stage party wash').map(light=>light.light!));
         this.musicians=new StageMusicians(this.app,map);
+        // A chair pulled and put back is drawn again in the lamps' cached shadows once it stops.
+        this.barAnimations=new BarAnimations(this.app,map,()=>this.environment.refreshLampShadows());
+        this.barAnimations.preload('parado_loop');
+        // Once in place, the lamps draw their shadows again with it.
+        this.dressing=new BarDressing(this.app,map,()=>this.environment.refreshLampShadows());
         // The stage screen is the map's (15_palco.py): its standby art shows while no video plays on it.
         const standby=(map.findByName('Telao_Tela') as pc.Entity|null)??undefined;
         if(!standby)console.warn('Tela do telão (Telao_Tela) ausente no mapa.');
@@ -348,14 +404,17 @@ export class BarScene {
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;stage?:StageLightsStatus;musicians?:ReturnType<StageMusicians['telemetry']>;objective?:{x:number;y:number;z:number;visible:boolean};stageBlips:Partial<Record<StageBlip,{x:number;y:number;z:number;visible:boolean}>>} {
+  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;stage?:StageLightsStatus;musicians?:ReturnType<StageMusicians['telemetry']>;barAnimations?:ReturnType<BarAnimations['telemetry']>;objective?:{x:number;y:number;z:number;visible:boolean};stageBlips:Partial<Record<StageBlip,{x:number;y:number;z:number;visible:boolean}>>} {
     const cart=this.mapEntity?.findByName('Carrinho_Espeto') as pc.Entity|undefined;
     return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
       renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry(),
-      jukebox:this.jukeboxLights?.telemetry(),stage:this.stageLights?.telemetry(),musicians:this.musicians?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined,
+      jukebox:this.jukeboxLights?.telemetry(),stage:this.stageLights?.telemetry(),musicians:this.musicians?.telemetry(),barAnimations:this.barAnimations?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined,
       stageBlips:Object.fromEntries([...this.stageBlips].map(([id,blip])=>[id,{...blip.target,visible:blip.marker.enabled}]))};
   }
 
+  /** Where a prop of a bar animation is now, and where a map chair is drawn (tests and debugging). */
+  barProp(actorId:string,name:string):number[]|undefined {return this.barAnimations?.propPosition(actorId,name);}
+  barChair(seatId:string):number[]|undefined {const index=seatChair(seatId);return index===undefined?undefined:this.barAnimations?.chairPosition(index);}
   /** Seconds of the jukebox's video, known by the local YouTube player (0 while loading): paces its colours. */
   setJukeboxDuration(seconds:number):void {this.jukeboxDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
   /** Seconds of the telão's video, known by the local YouTube player (0 while loading): paces the stage's colours. */
@@ -364,15 +423,15 @@ export class BarScene {
   preloadMusician(spot:string):void {this.musicians?.preload(spot);}
 
   /**
-   * The job objective ("blip") of the local worker: a ring on the floor around the station and a chevron above it,
-   * seen through walls. Drawn only by the worker's browser; null hides it.
+   * The job objective ("blip") of the local worker: a ring on the floor around the station (faintly seen through
+   * furniture and walls). Drawn only by the worker's browser; null hides it.
    * One marker is built and then moved from task to task. Destroying it also freed its ring mesh (PlayCanvas frees a
    * mesh with its last instance), and the next task's marker drew the freed mesh: every frame threw and the view froze.
    */
-  setObjective(target:(Required<Position>&{top:number})|null):void {
+  setObjective(target:Required<Position>|null):void {
     if(!target){if(this.objective)this.objective.marker.enabled=false;return;}
     const objective=this.objective??=this.buildMarker('Job objective',OBJECTIVE_COLOR);
-    objective.target={...target};objective.marker.setPosition(target.x,target.y,target.z);objective.marker.enabled=true;
+    objective.target={x:target.x,y:target.y,z:target.z};objective.marker.setPosition(target.x,target.y,target.z);objective.marker.enabled=true;
     this.animateMarker(objective);
   }
 
@@ -380,18 +439,15 @@ export class BarScene {
     const marker=this.group(name,[0,0,0]);
     const glow=(depthTest:boolean)=>{
       const material=new pc.StandardMaterial();material.useLighting=false;material.useFog=false;material.diffuse.set(0,0,0);
-      material.emissive=color(hex);material.opacity=depthTest ? .85 : .92;material.blendType=pc.BLEND_NORMAL;
+      material.emissive=color(hex);material.opacity=depthTest ? .85 : .3;material.blendType=pc.BLEND_NORMAL;
       material.depthTest=depthTest;material.depthWrite=false;material.cull=pc.CULLFACE_NONE;material.update();this.materials.push(material);return material;
     };
+    // Solid on the floor where it shows, and a faint copy drawn over whatever stands in front of it, like a map blip.
     const ring=new pc.Entity(`${name} ring`);
-    const torus=pc.Mesh.fromGeometry(this.app.graphicsDevice,new pc.TorusGeometry({tubeRadius:.025,ringRadius:.62,segments:48}));
-    ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true))],castShadows:false,receiveShadows:false});
+    const torus=pc.Mesh.fromGeometry(this.app.graphicsDevice,new pc.TorusGeometry({tubeRadius:.03,ringRadius:.62,segments:48}));
+    ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true)),new pc.MeshInstance(torus,glow(false))],castShadows:false,receiveShadows:false});
     ring.setLocalPosition(0,.03,0);marker.addChild(ring);
-    // Above its spot; it shows through walls and furniture, like a map blip.
-    const chevron=new pc.Entity(`${name} chevron`);
-    chevron.addComponent('render',{type:'cone',material:glow(false),castShadows:false,receiveShadows:false});
-    chevron.setLocalEulerAngles(180,0,0);chevron.setLocalScale(.26,.34,.26);marker.addChild(chevron);
-    return {target:{x:0,y:0,z:0,top:0},marker,chevron};
+    return {target:{x:0,y:0,z:0},marker,ring};
   }
 
   /** Where the objective is on screen (also when off it or behind the camera), and how far it is from the player. */
@@ -412,7 +468,7 @@ export class BarScene {
       if(!show){if(blip)blip.marker.enabled=false;continue;}
       if(!blip){
         blip=this.buildMarker(`Stage blip ${id}`,hex);this.stageBlips.set(id,blip);
-        blip.target={...spot,top:spot.y+2};blip.marker.setPosition(spot.x,spot.y,spot.z);
+        blip.target={x:spot.x,y:spot.y,z:spot.z};blip.marker.setPosition(spot.x,spot.y,spot.z);
       }
       blip.marker.enabled=true;this.animateMarker(blip);
     }
@@ -421,7 +477,7 @@ export class BarScene {
   private projectMarker(blip:Marker|undefined):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
     const player=this.actors.get(this.localId);
     if(!blip?.marker.enabled||!this.camera.camera||!player)return null;
-    const point=blip.chevron.getPosition(),eye=this.camera.getPosition(),forward=this.camera.forward;
+    const point=blip.ring.getPosition(),eye=this.camera.getPosition(),forward=this.camera.forward;
     this.tempPosition.set(point.x-eye.x,point.y-eye.y,point.z-eye.z);
     const behind=this.tempPosition.dot(forward)<=0;
     // Mirrored in front of the camera when behind it, so the direction on screen still points the right way.
@@ -434,22 +490,90 @@ export class BarScene {
 
   private animateMarker(blip:Marker|undefined):void {
     if(!blip?.marker.enabled)return;
-    const {target,chevron}=blip;
-    chevron.setLocalPosition(0,target.top-target.y+.55+Math.sin(this.elapsed*3)*.07,0);
-    chevron.setLocalEulerAngles(180,this.elapsed*90%360,0);
+    // A slow breath, so it reads as something to go to.
+    const breath=1+Math.sin(this.elapsed*3)*.05;
+    blip.ring.setLocalScale(breath,1,breath);
   }
   getEnvironmentStatus(){return this.environment.telemetry();}
+
+  /** The bar animations' debug actions (debugBarAnimation). */
+  static readonly BAR_DEBUG_ACTIONS = ['fumar','parar-fumar','vomitar','cair','levantar-chao','sentar','comer','parar-comer','levantar','limpar-mesa','urinar','chopp','chopp-escuro','longneck','parar'] as const;
+  /**
+   * Development only: plays a bar animation on the local player, or on Magrão (chopp, chopp-escuro, longneck), without
+   * the room, as the debug panel asks; the room's state takes over again once the action is over (or with 'parar').
+   * The player is held still meanwhile. Returns what happened.
+   */
+  debugBarAnimation(action:typeof BarScene.BAR_DEBUG_ACTIONS[number]):string {
+    const now=Date.now()+this.serverClockOffset,player=this.actors.get(this.localId),id=this.localId,current=this.barOverrides.get(id);
+    const serve=({chopp:'serve-chopp','chopp-escuro':'serve-chopp-dark',longneck:'serve-longneck'} as Record<string,string>)[action];
+    if(serve){
+      if(!this.actors.has('bartender'))return 'O Magrão não está à vista: chegue perto do balcão.';
+      this.barOverrides.set('bartender',{animation:serve,startedAt:now});return `Magrão: ${action}.`;
+    }
+    if(!player)return 'Entre no bar primeiro.';
+    const p=player.root.getPosition(),floor=(y?:number)=>Math.abs((y??p.y)-p.y)<.5;
+    const play=(override:BarOverride,message:string)=>{this.barOverrides.set(id,override);return message;};
+    switch(action){
+      case 'parar':this.barOverrides.delete(id);this.barOverrides.delete('bartender');return 'De volta ao estado do servidor.';
+      case 'fumar':return play({animation:'smoke',startedAt:now},'Acendendo um cigarro.');
+      case 'parar-fumar':return current?.animation==='smoke'?play({animation:'smoke-stop',startedAt:Math.max(now,current.startedAt+barClipMs('fumar_acender'))},'Apagando o cigarro.'):'Fume primeiro.';
+      case 'vomitar':return play({animation:'vomit',startedAt:now},'Passando mal.');
+      case 'cair':return play({animation:'fallen',startedAt:now},'Caiu.');
+      case 'levantar-chao':return current?.animation==='fallen'?play({animation:'recover',startedAt:now},'Levantando do chão.'):'Caia primeiro.';
+      case 'sentar':{
+        const seat=INTERACTABLES.filter(i=>i.type==='seat'&&floor(i.y)).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];
+        if(!seat||Math.hypot(seat.x-p.x,seat.z-p.z)>2.5)return 'Chegue perto de uma cadeira de mesa.';
+        return play({animation:'sit',interactionState:seat.id,startedAt:now},`Sentando: ${seat.label}.`);
+      }
+      case 'comer':return current?.animation==='sit'?play({...current,meal:{startedAt:now,endedAt:0}},'Comendo.'):'Sente-se primeiro.';
+      case 'parar-comer':return current?.meal&&!current.meal.endedAt?play({...current,meal:{...current.meal,endedAt:now}},'Parando de comer.'):'Coma primeiro.';
+      case 'levantar':return current?.animation==='sit'?play({...current,animation:'stand-up',startedAt:Math.max(now,current.startedAt+barClipMs('sentar'))},'Levantando da cadeira.'):'Sente-se primeiro.';
+      case 'limpar-mesa':{
+        const table=CLEANABLE_TABLES.filter(t=>floor(t.y)).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];
+        if(!table||Math.hypot(table.x-p.x,table.z-p.z)>2.5)return 'Chegue perto de uma mesa de quatro lugares.';
+        const spot=cornerSpot(nearestCorner(table,{x:p.x,z:p.z}));
+        return play({animation:'clean',startedAt:now,x:spot.x,y:spot.y,z:spot.z},`Limpando a mesa ${table.number}.`);
+      }
+      case 'urinar':{
+        const urinal=URINALS.filter(u=>floor(u.y)).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];
+        if(!urinal||Math.hypot(urinal.x-p.x,urinal.z-p.z)>3)return 'Chegue perto de um mictório (banheiro masculino).';
+        return play({animation:'urinate',interactionState:urinal.id,startedAt:now},'No mictório.');
+      }
+    }
+    return 'Ação desconhecida.';
+  }
+
+
+  /** The camera view chosen in the settings (or restored from them); Q and the mouse wheel change it in the game. */
+  setCameraMode(mode: CameraMode): void { this.rig.setMode(mode); }
+  getCamera() { return this.rig.telemetry(); }
+
+  /**
+   * First person shrinks the local avatar's head joint each frame (after the clips posed it), so the face and hair do not
+   * fill the view; the body, the hands and what they hold stay. Any other avatar, or a later view, gets it back.
+   */
+  private showOwnHead(player: Avatar | undefined): void {
+    const head = this.rig.firstPerson && this.enabled && !this.watchingTv ? player?.skin?.bones.head : undefined;
+    // (A head left by a skin change is gone with its model; scaling it back is harmless.)
+    if (this.hiddenHead && this.hiddenHead !== head) this.hiddenHead.setLocalScale(this.headScale);
+    if (head && head !== this.hiddenHead) this.headScale.copy(head.getLocalScale());
+    this.hiddenHead = head;
+    head?.setLocalScale(HIDDEN_HEAD, HIDDEN_HEAD, HIDDEN_HEAD);
+    // The ring at the feet is for finding yourself from behind.
+    if (player) player.ring.enabled = !head;
+  }
 
   /** Where the local player hears from: the avatar's position and the camera's heading (radians). */
   getListener(): (Position & { yaw: number }) | undefined {
     const avatar = this.actors.get(this.localId);
     if (!avatar) return undefined;
     const p = avatar.root.getPosition();
-    return { x: p.x, y: p.y, z: p.z, yaw: this.yaw };
+    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw };
   }
 
   getInput(): SceneInput {
-    if (!this.enabled || this.inputHasFocus() || document.hidden) {
+    // A debug run of a bar animation holds the player, as the room would.
+    if (!this.enabled || this.inputHasFocus() || document.hidden || this.barOverrides.has(this.localId)) {
       return { dx: 0, dz: 0, running: false, rotation: this.lastRotation };
     }
     const horizontal = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
@@ -457,9 +581,12 @@ export class BarScene {
     const vertical = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
       Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     const length = Math.hypot(horizontal, vertical) || 1;
-    const dx = (Math.cos(this.yaw) * horizontal - Math.sin(this.yaw) * vertical) / length;
-    const dz = (-Math.sin(this.yaw) * horizontal - Math.cos(this.yaw) * vertical) / length;
+    const yaw = this.rig.yaw;
+    const dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * vertical) / length;
+    const dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * vertical) / length;
     if (dx || dz) this.lastRotation = Math.atan2(dx, dz);
+    // In first person, standing still, the body turns with the view (no shoulder in front of the eyes).
+    else if (this.rig.mode === 'first') this.lastRotation = Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
     return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'), rotation: this.lastRotation };
   }
 
@@ -508,6 +635,8 @@ export class BarScene {
       const show=now>=state.placedAt||(state.orderId!==carried&&now>=state.placedAt-SERVE_ITEM_MS);
       if(show&&!entry.settled){entity.setPosition(state.x,state.y,state.z);entity.setEulerAngles(0,state.rotation*RAD_TO_DEG,0);entry.settled=now>=state.placedAt;}
       entity.enabled=show;
+      // A snack eaten up leaves its empty plate until someone collects it.
+      if(SERVED_PROPS[state.item as ItemId]?.plate){const food=entity.findByName('Served food') as pc.Entity|null;if(food)food.enabled=!state.doneAt;}
     }
   }
 
@@ -580,6 +709,7 @@ export class BarScene {
       if (!seen.has(id)) {
         avatar.root.destroy();
         this.actors.delete(id);
+        this.barAnimations?.forget(id);this.barOverrides.delete(id);
       }
     }
   }
@@ -624,6 +754,8 @@ export class BarScene {
     const eye = this.camera.getPosition();
     const forward = this.camera.forward;
     for (const [id, avatar] of this.actors) {
+      // In first person, your own name would float just over your eyes.
+      if (id === this.localId && this.hiddenHead) continue;
       const p = avatar.root.getPosition();
       this.tempPosition.set(p.x-eye.x,p.y+LABEL_HEIGHT-eye.y,p.z-eye.z);
       if (this.tempPosition.dot(forward) <= 0 || this.tempPosition.lengthSq() > 400) continue;
@@ -643,9 +775,10 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
+  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; bar?:{clip:string;time:number;placed:boolean;root:number[]}; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
     const now=Date.now()+this.serverClockOffset,point=(p:pc.Vec3)=>[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];
     return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
+      bar:avatar.bar?{clip:avatar.bar.clip,time:+avatar.bar.time.toFixed(3),placed:!!avatar.bar.frame,root:point(avatar.root.getPosition())}:undefined,
       musician:avatar.actor.musician?{spot:avatar.actor.musician.id,phase:musicianPhase(avatar.actor.musician,now)?.phase,root:point(avatar.root.getPosition()),
         hip:avatar.skin?point((avatar.skin.model.findByName('hip') as pc.Entity|null)?.getPosition()??avatar.root.getPosition()):undefined}:undefined,
       height: avatar.skin ? avatar.skin.bones.head.getPosition().y - avatar.root.getPosition().y : undefined,
@@ -661,11 +794,14 @@ export class BarScene {
     this.objective?.marker.destroy();this.objective=undefined;
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
     this.musicians?.destroy();this.musicians=undefined;
+    this.barAnimations?.destroy();this.barAnimations=undefined;
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
     this.app.off('update', this.update, this);
     this.materials.forEach(material => material.destroy());
+    this.contactMaterial?.destroy();
+    this.dressing?.destroy();
     this.textures.forEach(texture => texture.destroy());
     this.app.destroy();
     this.actors.clear();
@@ -919,13 +1055,14 @@ export class BarScene {
     const hash = [...actor.id].reduce((value, letter) => value + letter.charCodeAt(0), 0);
     const ring = this.shape('Local player marker', 'cylinder', [0, 0.027, 0], [0.83, 0.018, 0.83], this.material('#b1a067', '#514322'), root);
     ring.enabled = actor.id === this.localId;
+    const contact = this.contactShadow(root);
     const motion = { glideFrom: new pc.Vec3(actor.x,actor.y??0,actor.z), glideAt: 0, glide: PATCH_GLIDE, yaw: (actor.rotation ?? 0) * RAD_TO_DEG };
     root.setEulerAngles(0, motion.yaw, 0);
     if (skinId) {
       const cup = this.makeCup(0, 0, 0, root);
       cup.enabled = false;
       const skin=this.makeSkin(body,this.skinModels.get(skinId)!);
-      return { root, body, skin, skinId, cup, ring, actor: { ...actor }, npc, phase: hash % 12, ...motion };
+      return { root, body, skin, skinId, cup, ring, contact, actor: { ...actor }, npc, phase: hash % 12, ...motion };
     }
     const skin = this.material(['#b98059', '#dcac7c', '#86583e', '#c48d66'][hash % 4]!);
     const palette = ['#49756b', '#ba7545', '#7a6b8d', '#a95a4b', '#bc9a58', '#53758b'];
@@ -967,7 +1104,7 @@ export class BarScene {
     }
     const cup = this.makeCup(0, -0.65, 0.06, rightArm);
     cup.enabled = false;
-    return { root, body, limbs: { leftArm, rightArm, leftLeg, rightLeg, head }, cup, ring,
+    return { root, body, limbs: { leftArm, rightArm, leftLeg, rightLeg, head }, cup, ring, contact,
       actor: { ...actor }, npc, phase: hash % 12, ...motion };
   }
 
@@ -978,35 +1115,189 @@ export class BarScene {
     const moving = Math.hypot(actor.x - current.x, actor.z - current.z) > 0.025;
     const progress = clamp((this.elapsed - avatar.glideAt) / avatar.glide, 0, 1);
     root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
+    const drawn = root.getPosition(), last = avatar.lastDrawn ??= drawn.clone();
+    avatar.speed = lerp(avatar.speed ?? 0, Math.min(8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
+    last.copy(drawn);
+    // A bar animation (sitting at a table, the urinal, a cigarette, Magrão at the counter...): undefined while its clip loads.
+    const bar = avatar.skin ? this.barAction(avatar, Date.now() + this.serverClockOffset) : undefined;
+    if (avatar.bar && !bar) this.leaveBarAction(avatar);
     let animation = (actor.animation ?? actor.state ?? 'idle').toLowerCase();
     if (moving && animation === 'idle') animation = 'walk';
     const seated = animation.includes('sit') || animation.includes('seat') || animation.includes('blackjack');
     // The local player faces the predicted travel direction; the server's lags behind it.
-    // Seats and stage spots set the facing on the server, so seated players and musicians keep that one.
-    if (local && (seated || actor.musician)) this.lastRotation = actor.rotation ?? this.lastRotation;
+    // Seats, stage spots and the bar animations set the facing on the server, so the player keeps that one meanwhile.
+    if (local && (seated || actor.musician || (bar && actor.interactionState))) this.lastRotation = actor.rotation ?? this.lastRotation;
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
     avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
+    // At the urinal, between walls, the camera swings to where the action shows.
+    if (local && bar?.frame && bar.step.clip === 'urinar' && avatar.bar?.startedAt !== bar.step.startedAt) this.frameAction(bar.frame);
+    if (bar) this.enterBarAction(avatar, bar);
     // Skinned avatars have dedicated drunk clips; the procedural sway remains as fallback for box avatars.
     const stage=drunkStage(actor.drunk??0),dedicatedDrunk=!!avatar.skin?.tracks.has('DrunkIdle')&&stage>=2;
-    const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || actor.musician || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
+    const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || actor.musician || bar || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
     root.setEulerAngles(sway * Math.sin((this.elapsed + avatar.phase) * 1.3), avatar.yaw, sway * Math.sin((this.elapsed + avatar.phase) * 0.9 + 1));
+    this.shadeFeet(avatar);
     const pose: Pose = {
       t: this.elapsed + avatar.phase,
       walking: animation.includes('walk') || animation.includes('run') || animation.includes('wander'),
       running: animation.includes('run'),
       seated: avatar.seatedBlend = lerp(avatar.seatedBlend ?? 0, seated ? 1 : 0, 1 - Math.exp(-12 * dt)),
-      dancing: animation.includes('dance') || (avatar.npc && this.eventType === 'PARTY'),
-      drinking: animation.includes('drink') || (avatar.npc && animation.includes('drunk')),
+      dancing: !bar && (animation.includes('dance') || (avatar.npc && this.eventType === 'PARTY')),
+      drinking: !bar && (animation.includes('drink') || (avatar.npc && animation.includes('drunk'))),
       waving: animation.includes('wave'),
     };
     avatar.cup.enabled = pose.drinking;
     if (!pose.drinking) for (const entity of Object.values(avatar.drinks ?? {})) entity.enabled = false;
     if(avatar.cards)avatar.cards.enabled=false;
-    if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose);
+    if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose, bar);
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
-    if (avatar.skin && avatar.npc && actor.role === 'serving') this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
+    if (bar && avatar.skin && avatar.bar) {
+      this.barAnimations!.play(actor.id, bar.step, { space: avatar.bar.space, model: avatar.skin.model, servedFood: bar.servedFood, seat: bar.seat }, dt);
+      this.barPlayed.add(actor.id);
+      // The contact shadow stays under the body, which the clip may take away from the place's origin.
+      const hip = avatar.skin.hip ??= (avatar.skin.model.findByName('hip') as pc.Entity | null) ?? undefined, p = hip?.getPosition();
+      if (p) avatar.contact.setPosition(p.x, root.getPosition().y + .012, p.z);
+    } else avatar.contact.setLocalPosition(0, .012, 0);
+    // Tonico serving or clearing, and a player working the bar with an order on the tray (Magrão's hands are in his clips).
+    if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
     else if (avatar.tray) avatar.tray.entity.enabled = false;
+  }
+
+  /**
+   * The bar clip an avatar plays now (barTimeline, from the room's state or a debug run), converted for its skin and
+   * added to its anim states; undefined when none applies or while the clip's file loads.
+   */
+  private barAction(avatar: Avatar, now: number): BarAction | undefined {
+    const skin = avatar.skin!, model = avatar.skinId ? this.skinModels.get(avatar.skinId) : undefined;
+    if (!this.barAnimations || !model) return;
+    const override = this.barOverrides.get(avatar.actor.id);
+    const actor = override ? { ...avatar.actor, animation: override.animation, animationStartedAt: override.startedAt, interactionState: override.interactionState ?? '', currentTableId: '',
+      x: override.x ?? avatar.actor.x, y: override.y ?? avatar.actor.y, z: override.z ?? avatar.actor.z } : avatar.actor;
+    const npcId = avatar.npc ? actor.id : '', meal = override ? override.meal : this.meal(actor.interactionState ?? '', now);
+    const step = barTimeline(actor, now, npcId, meal);
+    if (!step) return;
+    // A debug run that has played its last clip gives the avatar back to the room.
+    if (override && FINAL_CLIPS.has(step.clip) && now - step.startedAt > barClipMs(step.clip) + 150) { this.barOverrides.delete(actor.id); return; }
+    const track = this.barAnimations.bodyTrack(step.clip, avatar.skinId!, skin.model, model.animations.map(asset => asset.resource as pc.AnimTrack));
+    if (!track) return;
+    if (!skin.tracks.has(track.name)) { skin.model.anim!.assignAnimation(track.name, track, undefined, 1, BAR_ANIMATIONS.clips[step.clip].loop); skin.tracks.add(track.name); }
+    const place = actor.interactionState ?? '';
+    return { step, frame: barFrame(actor, npcId), seat: place.startsWith('seat-') ? place : undefined, servedFood: !override && !!meal };
+  }
+
+  /** A bar animations' idle or walk for this skin (added to its anim states); undefined while its file loads. */
+  private barLocomotion(avatar: Avatar, skin: SkinnedRig, clip: BarClip): string | undefined {
+    const model = avatar.skinId ? this.skinModels.get(avatar.skinId) : undefined;
+    const track = model && this.barAnimations?.bodyTrack(clip, avatar.skinId!, skin.model, model.animations.map(asset => asset.resource as pc.AnimTrack));
+    if (!track) return;
+    if (!skin.tracks.has(track.name)) { skin.model.anim!.assignAnimation(track.name, track, undefined, 1, true); skin.tracks.add(track.name); }
+    return track.name;
+  }
+
+  /** What a seated customer eats: the snacks served from their seat, from the first touching the table until the last is finished. */
+  private meal(seat: string, now: number): Meal | undefined {
+    if (!seat.startsWith('seat-')) return;
+    const food = [...this.servedItems.values()].map(entry => entry.state).filter(state => state.seat === seat && FOODS.has(state.item) && state.placedAt <= now);
+    if (!food.length) return;
+    const eating = food.filter(state => !state.doneAt);
+    return { startedAt: Math.min(...(eating.length ? eating : food).map(state => state.placedAt)), endedAt: eating.length ? 0 : Math.max(...food.map(state => state.doneAt ?? 0)) };
+  }
+
+  /**
+   * The local player starts an action in a tight place (the urinal, in a 3.5 m restroom): behind them the boom hits the
+   * wall and the body hides the urinal and the stream, so the camera turns to the side with the most room, three quarters
+   * from behind first. The player can still turn it with the mouse.
+   */
+  private frameAction(frame: BarFrame): void {
+    if (this.rig.mode === 'first') return;
+    const { pitch, reach: length } = this.rig;
+    const target = { x: frame.x, y: frame.y + 1.25, z: frame.z }, behind = frame.yaw + Math.PI, reach = Math.cos(pitch) * length;
+    let best = this.rig.yaw, room = -1;
+    for (const turn of [-Math.PI / 4, Math.PI / 4, -Math.PI / 3, Math.PI / 3, -Math.PI / 2, Math.PI / 2, 0]) {
+      const yaw = behind + turn, end = { x: target.x + Math.sin(yaw) * reach, y: target.y + Math.sin(pitch) * length, z: target.z + Math.cos(yaw) * reach };
+      const free = cameraFraction(target, end, true) * length;
+      if (free > room + .05) { room = free; best = yaw; }
+    }
+    this.rig.turnTo(best);
+  }
+
+  /**
+   * In a place (a chair, the urinal, a table corner, Magrão's spot) the avatar stands in the place's space, sliding there
+   * in 0.3 s from where its body was (animacoes_bar.js posicionar); elsewhere the clip plays at the avatar's feet.
+   */
+  private enterBarAction(avatar: Avatar, bar: BarAction): void {
+    const { root } = avatar, p = root.getPosition(), yaw = avatar.yaw / RAD_TO_DEG;
+    if (!bar.frame) {
+      avatar.bar = { clip: bar.step.clip, startedAt: bar.step.startedAt, time: bar.step.time, space: { x: p.x, y: p.y, z: p.z, yaw } };
+      return;
+    }
+    const known = avatar.bar?.frame, same = !!known && Math.hypot(known.x - bar.frame.x, known.z - bar.frame.z) < .01 && Math.abs(known.yaw - bar.frame.yaw) < .01;
+    let slide = same ? avatar.bar!.slide : undefined;
+    if (!same) {
+      // From where the body stands now: the place, less where the clip starts the body in it.
+      const at = inFrame(bar.frame, BAR_ANIMATIONS.clips[bar.step.clip].start);
+      slide = { from: { x: p.x - (at.x - bar.frame.x), y: p.y, z: p.z - (at.z - bar.frame.z), yaw: yaw - (at.rotation - bar.frame.yaw) }, at: this.elapsed };
+    }
+    const s = smoothstep(clamp((this.elapsed - (slide?.at ?? 0)) / .3, 0, 1)), from = slide?.from ?? bar.frame;
+    const turn = Math.atan2(Math.sin(bar.frame.yaw - from.yaw), Math.cos(bar.frame.yaw - from.yaw));
+    const space = { x: lerp(from.x, bar.frame.x, s), y: lerp(from.y, bar.frame.y, s), z: lerp(from.z, bar.frame.z, s), yaw: from.yaw + turn * s };
+    root.setPosition(space.x, space.y, space.z); avatar.yaw = space.yaw * RAD_TO_DEG;
+    avatar.bar = { clip: bar.step.clip, startedAt: bar.step.startedAt, time: bar.step.time, space, frame: bar.frame, slide };
+  }
+
+  /**
+   * The bar clip is over: a clip that leaves the body away from where it began (getting up beside the chair) puts the
+   * avatar where the body is, with no cross-fade (animacoes_bar.js reenraizar); the avatar then walks on to the room's
+   * position, if that is elsewhere. An action cut short blends back from the place.
+   */
+  private leaveBarAction(avatar: Avatar): void {
+    const last = avatar.bar!, info = BAR_ANIMATIONS.clips[last.clip], { root, actor } = avatar;
+    avatar.bar = undefined; avatar.barRelease = .3; avatar.barFinished = !info.loop && last.time >= info.duration - .05;
+    if (avatar.barFinished && barEndOffset(last.clip) > .05) {
+      const end = inFrame(last.space, info.end);
+      root.setPosition(end.x, end.y, end.z); avatar.yaw = end.rotation * RAD_TO_DEG; avatar.barRelease = 0;
+    }
+    const p = root.getPosition();
+    avatar.glideFrom.copy(p); avatar.glideAt = this.elapsed;
+    avatar.glide = Math.max(.3, Math.hypot(actor.x - p.x, actor.z - p.z) / 1.2);
+  }
+
+  /**
+   * Moving things kept out of the lamps' cached shadow maps (EnvironmentLighting.redrawLampShadows): avatars with what
+   * they hold and carry, and what is served on the tables (it comes and goes).
+   */
+  private *dynamicCasters(): Iterable<pc.MeshInstance> {
+    for (const avatar of this.actors.values()) for (const render of avatar.root.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
+    for (const entry of this.servedItems.values()) if (entry.entity) for (const render of entry.entity.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
+    if (this.barAnimations) yield* this.barAnimations.casters();
+  }
+
+  /** A soft dark disc on the floor under an avatar (the lamps' shadow maps leave people out). */
+  private contactShadow(root: pc.Entity): pc.Entity {
+    // Black, fading out from the middle; drawn on top of the floor without writing depth. Unlit: nothing tints it.
+    this.contactMaterial ??= (() => {
+      const material = new pc.ShaderMaterial({ uniqueName: 'Boteco contact shadow', attributes: { aPosition: pc.SEMANTIC_POSITION, aUv0: pc.SEMANTIC_TEXCOORD0 },
+        vertexGLSL: CONTACT_VERTEX, fragmentGLSL: CONTACT_FRAGMENT });
+      // Darkens the colour only: the canvas is transparent (alpha) and a lowered alpha would let the page show through.
+      material.blendState = new pc.BlendState(true, pc.BLENDEQUATION_ADD, pc.BLENDMODE_SRC_ALPHA, pc.BLENDMODE_ONE_MINUS_SRC_ALPHA, pc.BLENDEQUATION_ADD, pc.BLENDMODE_ZERO, pc.BLENDMODE_ONE);
+      material.depthWrite = false; material.setParameter('contactOpacity', .5); material.update();
+      return material;
+    })();
+    const entity = new pc.Entity('Contact shadow');
+    entity.addComponent('render', { type: 'plane', material: this.contactMaterial, castShadows: false, receiveShadows: false });
+    entity.setLocalPosition(0, .012, 0); entity.setLocalScale(.9, 1, .9); root.addChild(entity);
+    return entity;
+  }
+  /**
+   * How dark the contact shadow is: full under a roof (inside, the veranda) and at night; in daylight in the open the
+   * sun's own shadow of the avatar does the job, so only a hint stays.
+   */
+  private shadeFeet(avatar: Avatar): void {
+    const p = avatar.root.getPosition(), last = avatar.covered;
+    if (!last || Math.hypot(p.x - last.x, p.z - last.z) > .5) avatar.covered = { x: p.x, z: p.z, value: cameraFraction({ x: p.x, y: p.y + 1.7, z: p.z }, { x: p.x, y: p.y + 30, z: p.z }) < 1 };
+    const opacity = avatar.covered!.value ? .55 : .12 + .43 * (1 - this.environment.daylight);
+    avatar.contact.render?.meshInstances[0]?.setParameter('contactOpacity', opacity);
   }
 
   /** A round aluminium tray with a rolled rim; carryTray puts the order on top. */
@@ -1031,8 +1322,9 @@ export class BarScene {
   }
 
   /**
-   * Tonico while serving: the tray level on his left hand with the order on it. At the table his right hand takes
-   * each item off the tray and sets it on its spot, bowing a little, as the room timed it (ServedItemState.placedAt).
+   * Tonico (or a player working the bar) while serving: the tray level on the left hand with the order on it. At the table
+   * the right hand takes each item off the tray and sets it on its spot, bowing a little, as the room timed it
+   * (ServedItemState.placedAt). Clearing a table, the tray fills with what he takes off it.
    */
   private carryTray(avatar: Avatar, skin: SkinnedRig, now: number): void {
     const { actor, body, root } = avatar, bones = skin.bones, hand = skin.drinkHand;
@@ -1141,7 +1433,7 @@ export class BarScene {
    * The clip sets the base pose; gestures are extra joint turns about the body's own axes,
    * which keeps them independent of each bone's local frame. The model faces +Z, its left on +X.
    */
-  private poseSkin(avatar: Avatar, skin: SkinnedRig, pose: Pose): void {
+  private poseSkin(avatar: Avatar, skin: SkinnedRig, pose: Pose, bar?: BarAction): void {
     const { body, cup, actor, skinId } = avatar;
     const { t, seated, dancing, drinking, waving } = pose;
     const { bones } = skin;
@@ -1151,32 +1443,51 @@ export class BarScene {
     const action = actor.animation;
     const stage=drunkStage(actor.drunk??0);
     // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
-    const show=this.musicianClip(avatar,skin);
-    const requested = show ? show.state : action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+    const show=bar?undefined:this.musicianClip(avatar,skin);
+    // A bar animation (bar-animations.ts) comes before the game's own clips.
+    let requested = bar ? barState(bar.step.clip) : show ? show.state : action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use'
       : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? 'Dance' : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk&&stage>=2?'DrunkIdle':'';
+    // Standing and walking are the bar animations' own, once converted for this skin; running, the cane, the gestures and
+    // a drunk idle keep the game's clips (the module has none of them).
+    const walk = !bar && !show && !actor.oldWalk && !gesture && seated < .5 ? BAR_WALKS[requested] : undefined;
+    const locomotion = walk ? this.barLocomotion(avatar, skin, walk) : undefined;
+    if (locomotion) requested = locomotion;
     const actionImported = !!requested && skin.tracks.has(requested);
     const oldGait=!!actor.oldWalk&&!gesture&&skin.tracks.has('OldCaneWalk')&&skin.tracks.has('OldCaneHold');
     const imported=actionImported||oldGait;
     const clip = actionImported ? requested : oldGait ? (pose.walking?'OldCaneWalk':'OldCaneHold') : pose.walking && seated < 0.5 ? 'Walk' : gesture ? 'Pose' : 'Idle';
     if(skin.cane)skin.cane.enabled=oldGait&&!actionImported;
-    const playbackKey = show ? `${clip}:${show.startedAt}` : `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
+    const playbackKey = bar ? `${clip}:${bar.step.startedAt}` : show ? `${clip}:${show.startedAt}` : locomotion ? clip : `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
     if (skin.clip !== clip || skin.playbackKey !== playbackKey) {
       // The take, start and loop clips follow each other frame to frame; the take and stop clips blend in, as palco_musicos.js does.
-      const blend = show ? show.blend : skin.clip.startsWith('Palco ') ? MUSICIANS.releaseSeconds : clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25;
+      // Bar clips follow each other as barTimeline says (0 from a clip's last frame into the next), enter in 0.3 s and
+      // leave as leaveBarAction decided.
+      // An action's last frame is the bar idle's first (animacoes_bar.js: parado at full weight at once).
+      const fromAction = skin.clip.startsWith('Bar ') && !BAR_LOCOMOTION.has(skin.clip);
+      const blend = bar ? (fromAction ? bar.step.blend : bar.step.blend || .3) : show ? show.blend
+        : fromAction ? (avatar.barRelease === 0 || (avatar.barFinished && clip === barState('parado_loop')) ? 0 : avatar.barRelease ?? .3) : skin.clip.startsWith('Palco ') ? MUSICIANS.releaseSeconds : clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25;
       anim.baseLayer?.transition(clip, skin.clip ? blend : 0);
       skin.clip = clip; skin.playbackKey = playbackKey;
-      if (show && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = musicianTime(show.spot,show.phase,show.startedAt,show.now);
-      else if (actionImported && actor.animationStartedAt && anim.baseLayer) {
+      if (bar && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = bar.step.time;
+      else if (show && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = musicianTime(show.spot,show.phase,show.startedAt,show.now);
+      else if (actionImported && !locomotion && actor.animationStartedAt && anim.baseLayer) {
         const age = Math.max(0, (Date.now() + this.serverClockOffset - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
         anim.baseLayer.activeStateCurrentTime = ['Deal', 'Dance', 'Wait', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) ? age % duration : Math.min(age, duration);
       }
     }
-    anim.speed = clip==='OldCaneWalk'?(skin.oldCaneRate??1):clip==='Walk'?WALK_CLIP_SPEED:clip==='Run'?1.15:1;
+    const cadence = (walked: BarClip) => clamp((avatar.speed ?? 0) / (WALK_PACE[walked] ?? .85), .5, 2.2);
+    anim.speed = clip===barState('andar_loop')?cadence('andar_loop'):clip===barState('andar_bebado_loop')?cadence('andar_bebado_loop')
+      :clip==='OldCaneWalk'?(skin.oldCaneRate??1):clip==='Walk'?WALK_CLIP_SPEED:clip==='Run'?1.15:1;
     if (show) this.musicians!.play(show.spot.id,show.phase,show.startedAt,show.now,show.blend);
+    // The body keeps to the room's clock (a hidden tab, a slow frame): props and chair are drawn at that time too.
+    else if (bar && anim.baseLayer?.activeState === clip) {
+      const duration = BAR_ANIMATIONS.clips[bar.step.clip].duration, drift = Math.abs(anim.baseLayer.activeStateCurrentTime - bar.step.time);
+      if (Math.min(drift, duration - drift) > .2) anim.baseLayer.activeStateCurrentTime = bar.step.time;
+    }
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
       if (SEATED_CLIPS.includes(clip)) {
@@ -1321,12 +1632,16 @@ export class BarScene {
       this.adaptResolution();
     }
     this.frameId++;
+    this.barPlayed.clear();
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
+    // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
+    this.barAnimations?.frame(dt,this.camera.camera,this.app.graphicsDevice.height,this.barPlayed);
     this.placeServed(Date.now()+this.serverClockOffset);
     const bartender=this.actors.get('bartender');
-    this.mapEffects?.update(this.elapsed,bartender?.actor.animation==='bartend'||bartender?.skin?.clip==='Bartend');
+    // The tap runs while the chopp pours (Prop_Jato in Magrão's clip).
+    this.mapEffects?.update(this.elapsed,!!this.barAnimations?.pouring()||bartender?.skin?.clip==='Bartend');
     const player = this.actors.get(this.localId);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
     if(television){
@@ -1334,27 +1649,18 @@ export class BarScene {
       const angle=television.yaw*Math.PI/180,back=Math.max(1.15,television.width*1.1);
       this.camera.setPosition(television.x+Math.sin(angle+this.tvYaw)*back*Math.cos(this.tvPitch),television.y+Math.sin(this.tvPitch)*back,television.z+Math.cos(angle+this.tvYaw)*back*Math.cos(this.tvPitch));
       this.camera.lookAt(television.x,television.y,television.z);
+      this.rig.idle();
     } else if (player && this.enabled) {
-      const p = player.root.getPosition();
-      const smooth = 1 - Math.exp(-10 * dt);
-      this.cameraTarget.set(lerp(this.cameraTarget.x,p.x,smooth),lerp(this.cameraTarget.y,p.y+1.25,smooth),
-        lerp(this.cameraTarget.z, p.z, smooth));
-      const horizontal = Math.cos(this.pitch) * this.distance;
-      let dx = Math.sin(this.yaw) * horizontal;
-      let dz = Math.cos(this.yaw) * horizontal;
-      let dy = Math.sin(this.pitch) * this.distance;
-      const ratio=cameraFraction(this.cameraTarget,{x:this.cameraTarget.x+dx,y:this.cameraTarget.y+dy,z:this.cameraTarget.z+dz});
-      dx *= ratio; dz *= ratio; dy *= ratio;
-      this.camera.setPosition(this.cameraTarget.x + dx, this.cameraTarget.y + dy, this.cameraTarget.z + dz);
-      this.camera.lookAt(this.cameraTarget);
       // Drunk view: the camera rolls slowly (more with each stage).
-      const roll = DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!;
-      if (roll) this.camera.rotateLocal(Math.sin(this.elapsed * 0.7) * roll * 0.3, 0, Math.sin(this.elapsed * 0.45) * roll);
+      this.rig.follow(dt, { feet: player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
+        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
       this.camera.setPosition(18+Math.sin(this.elapsed*.035)*2,9,16);
       this.camera.lookAt(14,1.8,-6);
+      this.rig.idle();
     }
+    this.showOwnHead(player);
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
     this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
@@ -1391,8 +1697,10 @@ export class BarScene {
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
+      if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.('smoke'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
       if (!event.repeat && event.code === 'KeyX') { event.preventDefault(); this.callbacks.onKick?.(); }
+      if (!event.repeat && event.code === 'KeyQ') { event.preventDefault(); this.callbacks.onCameraMode?.(this.rig.cycle()); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }
     });
     listen(window, 'keyup', event => this.keys.delete(event.code));
@@ -1405,8 +1713,7 @@ export class BarScene {
     listen(this.canvas, 'pointermove', event => {
       if ((!this.enabled&&!this.watchingTv) || !this.dragging) return;
       if(this.watchingTv){this.tvYaw=clamp(this.tvYaw-event.movementX*.006,-.8,.8);this.tvPitch=clamp(this.tvPitch+event.movementY*.004,-.25,.25);return;}
-      this.yaw -= event.movementX * 0.006;
-      this.pitch = clamp(this.pitch + event.movementY * 0.004, 0.2, 1.06);
+      this.rig.drag(event.movementX, event.movementY);
     });
     listen(window, 'pointerup', () => { this.dragging = false; });
     listen(this.canvas, 'pointercancel', () => { this.dragging = false; });
@@ -1414,7 +1721,9 @@ export class BarScene {
     listen(this.canvas, 'wheel', event => {
       if (!this.enabled) return;
       event.preventDefault();
-      this.distance = clamp(this.distance + event.deltaY * 0.008, 2.5, 9);
+      // Pages and lines scroll by other units than pixels.
+      const mode = this.rig.wheel(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1));
+      if (mode) this.callbacks.onCameraMode?.(mode);
     }, { passive: false });
   }
 

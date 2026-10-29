@@ -132,6 +132,8 @@ export const INTERACTABLES: readonly Interactable[] = [
   ...DOORS.map(door=>({id:door.id,type:'door' as const,label:door.label,x:door.x,y:door.y,z:door.z,footprint:door.footprint})),
   // The toilets of both floors' restrooms (COL_Mob_Vaso in the map export), used by touching them.
   ...map.colliders.filter(c=>/^COL_Mob_Vaso(\.\d+)?$/.test(c.id)).map((c,i)=>({id:`toilet-${i+1}`,type:'toilet' as const,label:'Usar o banheiro',x:c.x,y:c.minY,z:c.z,footprint:[footprint(c)]})),
+  // The urinals (Mictorio_Lugar_N, 17_lugares_animacao.py): reached standing at the spot in front of them, like a chair.
+  ...map.barAnimations.urinals.map(u=>({id:u.id,type:'urinal' as const,label:'Usar o mictório',x:u.x,y:u.y,z:u.z,rotation:u.yaw})),
   // The stage's steps: touching them, from below or from the deck, opens the pass (the room charges it).
   {id:'stage',type:'stage',label:'Subir no palco',...STAGE_ENTRY,footprint:STAGE.steps.map(footprint)},
   ...STAGE.places.map(place=>({id:`palco-${place.id}`,type:'musician' as const,label:musicianRole(place.id).label,spot:place.id,
@@ -338,26 +340,42 @@ export function standingPosition(position:Position,rotation=0):Position {
   return {...position};
 }
 
-/** Ray/box camera boom clipping, including the veranda ceiling absent from player colliders. */
-export function cameraFraction(start:Required<Position>,end:Required<Position>):number {
-  let ratio=1;
+// What the camera sees through instead of pulling its boom in (the renderer's x-ray window, camera-xray.ts): furniture,
+// props, trees, cars and the stage's gear. Walls, floors, slabs, ceilings, roofs, doors and the stage's deck stop it.
+const SEE_THROUGH=/^(?:COL_(?:Mob|Ext|Int|Palco)_|COL_Predio_(?:Pergolado|Churrasqueira|GuardaCorpo)|blackjack$)/;
+/** Where the segment first enters a solid (0-1 of the way; 1 when it does not), each box grown by `pad`. */
+function firstHit(start:Required<Position>,end:Required<Position>,pad:number,seeThrough:boolean):number {
+  let first=1;
   const candidates=[...solidsBetween(start.x,start.z,end.x,end.z),...(map.cameraCeilings as Collider[])];
   for(const c of candidates){
     // Posts, trunks and pillars are too thin to hide the player; letting the boom pass them avoids the
     // camera snapping onto the avatar (the spawn marker stands in front of a street lamp).
-    if(c.ramp||(c.hx<.2&&c.hz<.2))continue;
+    if(c.ramp||(c.hx<.2&&c.hz<.2)||(seeThrough&&SEE_THROUGH.test(c.id)))continue;
     let enter=0,exit=1;
-    const min=[c.x-c.hx-.14,(c.minY??0)-.14,c.z-c.hz-.14];
-    const max=[c.x+c.hx+.14,(c.maxY??3)+.14,c.z+c.hz+.14];
+    const min=[c.x-c.hx-pad,(c.minY??0)-pad,c.z-c.hz-pad];
+    const max=[c.x+c.hx+pad,(c.maxY??3)+pad,c.z+c.hz+pad];
     const from=[start.x,start.y,start.z],to=[end.x,end.y,end.z];
     // A seated avatar's target can start just inside a tabletop; ignore only that volume.
-    if(from.every((v,i)=>v>=min[i]&&v<=max[i]))continue;
+    if(from.every((v,i)=>v>=min[i]!&&v<=max[i]!))continue;
     for(let axis=0;axis<3;axis++){
-      const d=to[axis]-from[axis];
-      if(Math.abs(d)<1e-8){if(from[axis]<min[axis]||from[axis]>max[axis]){enter=2;break;}}
-      else {const a=(min[axis]-from[axis])/d,b=(max[axis]-from[axis])/d;enter=Math.max(enter,Math.min(a,b));exit=Math.min(exit,Math.max(a,b));}
+      const d=to[axis]!-from[axis]!;
+      if(Math.abs(d)<1e-8){if(from[axis]!<min[axis]!||from[axis]!>max[axis]!){enter=2;break;}}
+      else {const a=(min[axis]!-from[axis]!)/d,b=(max[axis]!-from[axis]!)/d;enter=Math.max(enter,Math.min(a,b));exit=Math.min(exit,Math.max(a,b));}
     }
-    if(enter<=exit&&enter>=0&&enter<ratio)ratio=Math.max(.03,enter-.02);
+    if(enter<=exit&&enter>=0&&enter<first)first=enter;
   }
-  return ratio;
+  return first;
+}
+/**
+ * Ray/box camera boom clipping, including the veranda ceiling absent from player colliders. `seeThrough`: only the
+ * building stops the boom; furniture and props are drawn see-through instead (SEE_THROUGH).
+ */
+export function cameraFraction(start:Required<Position>,end:Required<Position>,seeThrough=false):number {
+  const hit=firstHit(start,end,.14,seeThrough);
+  return hit<1?Math.max(.03,hit-.02):1;
+}
+/** Whether something solid hides `to` from `from` (the camera and a point of the body), the last `spare` metres aside. */
+export function sightBlocked(from:Required<Position>,to:Required<Position>,spare=.3):boolean {
+  const length=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z);
+  return length>spare&&firstHit(from,to,0,false)<1-spare/length;
 }

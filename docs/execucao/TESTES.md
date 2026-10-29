@@ -117,3 +117,36 @@ Não executados: carga e a suíte E2E completa depois das últimas correções.
 | Painel: Bots de teste | admin de demonstração na stack isolada, pelo SDK e pelo Edge | `admin.bots` acima da capacidade recusado com a mensagem; 10 → 15 → 5 → 0 bots seguiram o pedido, os que saíram levaram o avatar e o processo filho terminou com código 0; no Edge, Aplicar 12, +5 e Remover todos, com o painel atualizado sozinho e sem erros na página. Matando o mundo à força, o processo dos bots saiu junto |
 | Servidor (depois do painel) | `npm run test -w @bar/server` | 52/52 (novo: `bots.test`, nunca em produção) |
 | Servidor / API | `npm run test -w @bar/server`, `npm run test -w @bar/api` | 51/51 e 45 (+1 ignorado), nenhuma falha. Novos: `dev-bots.test` (API) e o bot que leva o avatar ao sair, em `room.integration.test` |
+
+## Mesas, Tonico, ajudante, decoração e sombras — `marco-1/fundacao` @ `bbd50d9` + árvore de trabalho (28/10/2026)
+
+Escopo em [economia](../sistemas/economia.md), [dia e noite](../sistemas/day-night.md) e [objetos do bar](../sistemas/drinks.md).
+
+| Suíte | Comando | Resultado |
+| --- | --- | --- |
+| Typecheck | `npm run typecheck` | passou (API, servidor, web, shared e raiz) |
+| Servidor | `npm run test -w @bar/server` | 58/58. Novos: consumo aos poucos e recolhimento (`served.test`), mesas só quando sujas e pedido do ajudante (`jobs.test`), Tonico recolhendo mesa (`waiter.test`), terraço de qualquer ponto e busca em fatias (`navigation.test`); `economy.integration.test` com levantar recusado, cancelar no balcão e o fluxo completo de pedido ao ajudante |
+| Integração / Ferramentas | `tsx --test tests/integration/*.test.ts`, `node --test tests/tools/*.test.mjs` | 66/67 e 26/26. A falha é `map.test` (mapa publicado igual ao export): o export do BarBoteco foi refeito às 20:57 e ainda não foi importado com `npm run assets:map` |
+| Rota do Tonico | script com 24 pontos de partida em volta do balcão para cada lugar de cada mesa | antes: 2/12 falhas no salão de cima e 7/12 no terraço (mesas 34–39); depois: 0 falhas em 96 buscas por mesa; terraço de ~1,4 s para 0,2–0,4 s |
+| Sombras e decoração | capturas da página `tests/fixtures/environment.html` no Edge com GPU | meio-dia: rua, árvores, postes, carros e pessoas com sombra do sol (antes tudo na sombra do domo do céu); interior à noite: sombra de contato sob os personagens, sem sombras fantasmas depois de saírem; geladeiras, estufa e balcão com os objetos reais |
+
+Não executados: E2E com Playwright e carga.
+
+## Animações do bar e mapa novo — `marco-1/fundacao` @ `bbd50d9` + árvore de trabalho (28/10/2026, noite)
+
+Escopo em [animações do bar](../sistemas/animacoes-bar.md): o export do BarBoteco das 20:57 (`Mictorio_Lugar_*`, `Balcao_Lugar_Magrao`, `Balcao_Entrega`, `Copo_Bandeja`, `Freezer_Bar_Tampa`) e `animacoes_bar.js` portado para PlayCanvas.
+
+| Suíte | Comando | Resultado |
+| --- | --- | --- |
+| Import do mapa | `npm run assets:map` | 124 assentos (cada um com a sua instância de cadeira), 39 mesas, 7 GLBs de animação publicados, 20 clipes validados |
+| Typecheck | `npm run typecheck` | passou (API, servidor, web, shared e raiz) |
+| Todas as suítes | `npm test` | API 45 (+1 ignorado), servidor 60/60, integração 73/73, ferramentas 26/26. Novos: `bar-animations.integration.test` (mictório, levantar, cigarro, Magrão e vômito por WebSocket), `bartender.test` reescrito, `tests/integration/bar-animations.test`. `map.test` voltou a passar com o mapa importado |
+| E2E das animações | `npx playwright test --project=bar-animations` | 2/2 (50 s): todas as ações em seis skins na página de fixture, sem erros nem avisos no console; ao vivo, F acende e apaga pelo servidor e o painel F8 responde |
+| E2E dos músicos (retarget movido para `mixamo-retarget.ts`) | `npx playwright test --project=environment --grep "stage musicians"` | 1/1 |
+| Capturas | fixture no Vite do usuário, Edge com GPU | cadeira puxada 40 cm e de volta, sentado comendo com o garfo, levantando ao lado da cadeira, mictório, fumaça, vômito com poça, caído, pano na quina da mesa, Magrão na chopeira (copo da bandeja escondido), long neck com a tampa do freezer e o chopp deixado no balcão |
+
+Corrigido junto: ao terminar **Limpar a mesa N**, a próxima tarefa podia ser a mesma mesa e trocava sozinha sem avisar o ajudante (`jobs.test`, `economy.integration.test`).
+
+Não executados: carga, bots ao vivo (que agora também fumam e usam o mictório) e a suíte E2E completa.
+
+Depois (29/10, madrugada): idle e andar do módulo no lugar dos do jogo, câmera do mictório e jato mais visível. `npx playwright test --project=bar-animations`: 3/3, com um teste novo ao vivo que anda até o mictório, aperta E e confere `urinar`, o jato, e o andar (`Bar andar_loop`, ritmo 1,5–2,2×) e o idle (`Bar parado_loop`) do módulo. A caminhada até o banheiro pelo helper `walk.ts` encalhou numa quina de mesa em 4 de 7 execuções, também com o andar novo desligado (A/B); o teste repete só a caminhada (até 2 vezes).

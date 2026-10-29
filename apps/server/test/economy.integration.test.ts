@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {INTERACTABLES,JOBS,canInteract,isWalkable,floorHeight,stationInteractable,type JobStation} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {INTERACTABLES,JOBS,ORDER_PREPARATION_MS,barClipMs,canInteract,handOverMs,isWalkable,floorHeight,pickupStation,deliveryStation,stationInteractable,type JobStation} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean,ms=6000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,25));}}
 /** A free spot on the floor from which the station can be touched. */
@@ -12,7 +12,7 @@ function besideStation(station:JobStation){
   }
   throw new Error(`No spot beside ${station.id}`);
 }
-test('economy over real WebSockets: Tonico delivers paid table orders, refunds dropped ones, and job tasks pay with slots and cooldown',{timeout:90000},async()=>{
+test('economy over real WebSockets: Tonico delivers paid table orders, refunds dropped ones, workers take orders and clear tables, and job tasks pay with slots and cooldown',{timeout:120000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
   const wallets=new Map<string,number>([['broke',10]]),applied=new Map<string,number>(),charges:Array<{userId:string;amount:number;reason:string}>=[];
   const api=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;res.setHeader('content-type','application/json');
@@ -51,26 +51,35 @@ test('economy over real WebSockets: Tonico delivers paid table orders, refunds d
     assert.equal(eater.seen.balance.at(-1),960);
     assert.ok(!('owner' in eater.seen.table[0].order)&&!JSON.stringify(eater.seen.table).includes('session-'),'The browser never sees the session an order was charged to');
     await new Promise(r=>setTimeout(r,1050));
-    eater.room.send('table.order',{items:['agua']});await until(()=>eater.seen.errors.some(e=>e.includes('já está com o Tonico')));
+    eater.room.send('table.order',{items:['agua']});await until(()=>eater.seen.errors.some(e=>e.includes('ainda não chegou')));
+    // Ordered, the customer stays at the table until it arrives.
+    eater.room.send('player.interact',{objectId:'stand'});await until(()=>eater.seen.errors.some(e=>e.includes('Espere o seu pedido')||e.includes('a caminho')));
+    assert.equal(eater.player().animationState,'sit');
     await until(()=>room.state.npcs.get('tonico')!.behavior==='serving');
-    const thirst=eater.player().thirst;
     await until(()=>eater.seen.table.some(s=>s.status==='delivered'),60000);
     const tonico=room.state.npcs.get('tonico')!;
     assert.ok(Math.hypot(tonico.x-seat.x,tonico.z-seat.z)<1.6,'Tonico hands the order over at the table');
-    assert.ok(eater.player().thirst>=thirst,'The delivered drink is consumed at the table');
     assert.equal(eater.player().animationState,'sit','The customer stays seated');
     // What he brought stays on the customer's table, for everyone to see.
     await until(()=>(eater.room.state as any).served?.size===2);
-    const onTable=[...(eater.room.state as any).served.values()] as Array<{item:string;table:number;y:number}>;
+    const onTable=[...(eater.room.state as any).served.values()] as Array<{item:string;table:number;y:number;doneAt:number}>;
     assert.deepEqual(onTable.map(i=>i.item).sort(),['coxinha','refrigerante']);
     assert.ok(onTable.every(i=>i.table===seat.table&&i.y>1),'On the table top');
+    assert.ok(onTable.every(i=>!i.doneAt),'Being had, a little at a time');
     assert.equal(tonico.carrying,'','His tray is empty again');
-    // A second order dropped by standing up is refunded once.
-    eater.room.send('table.order',{items:['agua']});await until(()=>eater.seen.table.filter(s=>s.status==='ordered').length===2);
-    eater.room.send('player.interact',{objectId:'stand'});
+    // A second order cancelled while still at the counter is refunded once.
+    await new Promise(r=>setTimeout(r,1050));
+    const before=new Set(eater.seen.table.map(s=>s.order.id)),fresh=()=>eater.seen.table.find(s=>s.status==='ordered'&&!before.has(s.order.id));
+    eater.room.send('table.order',{items:['agua']});await until(()=>!!fresh());
+    eater.room.send('table.cancel',{});
     await until(()=>charges.some(c=>c.reason.startsWith('refund:')));
-    const order=eater.seen.table.filter(s=>s.status==='ordered')[1].order;
+    const order=fresh().order;
     assert.deepEqual(charges.filter(c=>c.reason.startsWith('refund:')).map(c=>[c.amount,c.reason]),[[12,`refund:${order.id}`]]);
+    // Up from the table: getting up (levantar) takes its clip, what was left on the table waits to be collected at once.
+    eater.room.send('player.interact',{objectId:'stand'});await until(()=>eater.player().animationState==='stand-up');
+    await until(()=>[...(eater.room.state as any).served.values()].every((i:any)=>i.doneAt>0));
+    await until(()=>eater.player().animationState==='idle',barClipMs('levantar')+2000);
+    assert.ok(Math.hypot(eater.player().x-seat.x,eater.player().z-seat.z)>.3,'Standing beside the chair, not on it');
     // Someone without enough coins is refused by the wallet and nothing is queued.
     const broke=await join('broke');broke.player().assign({x:seat.x,y:seat.y,z:seat.z});broke.room.send('player.interact',{objectId:seat.id});
     await until(()=>broke.player().animationState==='sit');broke.room.send('table.order',{items:['torresmo']});
@@ -91,16 +100,39 @@ test('economy over real WebSockets: Tonico delivers paid table orders, refunds d
     workers[1]!.room.send('job.start',{jobId:job.id});await until(()=>workers[1]!.seen.jobs.some(j=>j.task));
     workers[2]!.room.send('job.start',{jobId:job.id});await until(()=>workers[2]!.seen.errors.some(e=>e.includes('vagas')));
     await until(()=>workers[2]!.room.state.jobs.get(job.id)?.workers===2); // everyone sees the slots taken
-    // Tables are the trickiest stations (chairs around them): always exercise one, whatever the draw was.
-    const worker=workers[0]!,station=job.stations.find(s=>s.id.startsWith('mesa-'))!;room.jobs.shift('work-a')!.task.station=station;
+    // Tables are the trickiest stations (chairs around them): always exercise one, with something finished on it.
+    const leftover=INTERACTABLES.find(i=>i.type==='seat'&&i.table===1)!,left={id:'left-1',playerId:'gone',seatId:leftover.id,items:['copo' as const]};
+    room['served'].place(left,room['served'].plan(left,()=>false)!,Date.now()-5000);
+    const station=job.stations.find(s=>s.table===1)!;await until(()=>room['served'].isDirty(1));
+    const worker=workers[0]!;room.jobs.shift('work-a')!.task.station=station;
     worker.room.send('job.work',{});await until(()=>worker.seen.errors.some(e=>e.includes('Chegue perto')));
     worker.player().assign(besideStation(station));worker.room.send('job.work',{});
     await until(()=>worker.player().interactionState==='job');
+    assert.equal(worker.player().animationState,'clean','The table is cleared from its corner (limpar_mesa)');
     await until(()=>charges.some(c=>c.userId==='work-a'&&c.reason.startsWith('job:')),station.durationMs+3000);
     const pay=charges.filter(c=>c.userId==='work-a');
     assert.equal(pay.length,1);assert.equal(pay[0]!.amount,job.pay);assert.match(pay[0]!.reason,new RegExp(`^job:${job.id}:[0-9a-f-]+:0$`));
     await until(()=>worker.seen.jobs.at(-1)?.task?.tasks===1);
     assert.notEqual(worker.seen.jobs.at(-1).task.stationId,station.id,'The next task is at another station');
+    // Clearing the table took what was left on it (the state patch follows the job message).
+    await until(()=>![...(worker.room.state as any).served.values()].some((i:any)=>i.table===1));
+
+    // A customer orders from a worker: picked up at the counter, carried on the tray, put on the table, each step paid.
+    const waiterB=workers[1]!,third=INTERACTABLES.filter(i=>i.type==='seat'&&i.table!==seat.table&&i.table!==other.table&&Math.abs((i.y??0)-.3)<.1)[0]!;
+    const guest=await join('guest');guest.player().assign({x:third.x,y:third.y,z:third.z});guest.room.send('player.interact',{objectId:third.id});await until(()=>guest.player().animationState==='sit');
+    guest.room.send('table.order',{items:['garrafa','coxinha'],to:'work-b'});
+    await until(()=>guest.seen.table.some(s=>s.status==='ordered'&&s.order.waiter==='work-b'));
+    await until(()=>waiterB.seen.jobs.at(-1)?.task?.kind==='pickup');
+    waiterB.player().assign(besideStation(pickupStation('guest')));await new Promise(r=>setTimeout(r,200));waiterB.room.send('job.work',{});
+    await until(()=>waiterB.player().carrying==='garrafa,coxinha',ORDER_PREPARATION_MS+3000);
+    await until(()=>guest.seen.table.some(s=>s.status==='ordered'&&s.order.stage==='carrying'));
+    guest.room.send('table.cancel',{});await until(()=>guest.seen.errors.some(e=>e.includes('a caminho')));
+    await until(()=>waiterB.seen.jobs.at(-1)?.task?.kind==='deliver');
+    waiterB.player().assign(besideStation(deliveryStation(third.table!,'guest',2)!));await new Promise(r=>setTimeout(r,200));waiterB.room.send('job.work',{});
+    await until(()=>guest.seen.table.some(s=>s.status==='delivered'),handOverMs(2)+3000);
+    assert.equal(waiterB.player().carrying,'','The tray is empty again');
+    assert.deepEqual([...(guest.room.state as any).served.values()].filter((i:any)=>i.table===third.table).map((i:any)=>i.item).sort(),['coxinha','garrafa']);
+    await until(()=>charges.filter(c=>c.userId==='work-b'&&c.reason.startsWith('job:')).length===2);
     worker.room.send('job.stop',{});await until(()=>worker.seen.jobs.at(-1)?.task===null);
     assert.equal(worker.player().job,'');
     worker.player().assign({...job.start});worker.room.send('job.start',{jobId:job.id});await until(()=>worker.seen.errors.some(e=>e.includes('Descanse')));
