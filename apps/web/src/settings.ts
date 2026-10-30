@@ -1,5 +1,5 @@
 import {readGraphics,defaultGraphics,type GraphicsSettings} from './graphics';
-import {isCameraMode,type CameraMode} from './engine/camera-rig';
+import {DEFAULT_CAMERA_DISTANCE,isCameraMode,readCameraDistance,type CameraMode} from './engine/camera-rig';
 /** Per-browser preferences for sound, proximity voice, graphics and the camera. The jukebox keeps its own volume (jukebox.ts). */
 export interface GameSettings {
   /** Volumes 0–1; the microphone gain is mic × 2 (0.5 = unchanged). */
@@ -8,11 +8,13 @@ export interface GameSettings {
   /** 0 picks up whispers, 1 only loud speech. */
   sensitivity:number;inputDevice:string;
   graphics:GraphicsSettings;
-  /** The camera view (Q and the mouse wheel change it in the game). */
+  /** Q switches between the player's eyes and their chosen third-person distance. */
   camera:CameraMode;
+  /** Last positive third-person distance in metres; preserved while in first person. */
+  cameraDistance:number;
 }
 const KEY='bar:settings:v1';
-export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'default'};
+export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE};
 const unit=(value:unknown,fallback:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 
 export function createSettings(){
@@ -28,12 +30,14 @@ export function createSettings(){
       inputDevice:typeof saved.inputDevice==='string'?saved.inputDevice.slice(0,256):'',
       graphics:readGraphics(saved.graphics),
       camera:isCameraMode(saved.camera)?saved.camera:current.camera,
+      // Older browsers stored one of three fixed third-person views, with no separate distance.
+      cameraDistance:readCameraDistance(saved.cameraDistance,saved.camera==='near'?3:saved.camera==='far'?10.5:current.cameraDistance),
     };
   }catch{/* Private mode or malformed: defaults. */}
   return {
     get():GameSettings{return current;},
     update(patch:Partial<GameSettings>):void{
-      const previous=current;current={...current,...patch};
+      const previous=current;current={...current,...patch,cameraDistance:readCameraDistance(patch.cameraDistance,current.cameraDistance)};
       try{localStorage.setItem(KEY,JSON.stringify(current));}catch{/* Still applies for this visit. */}
       for(const listener of listeners)listener(current,previous);
     },

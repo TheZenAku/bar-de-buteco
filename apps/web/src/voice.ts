@@ -33,6 +33,9 @@ export interface Listener extends Position {yaw:number}
 export class VoiceChat {
   private context?:AudioContext;
   private bus?:GainNode;
+  /** The other end of a phone call, and the telephone band its voice goes through (full volume, any distance). */
+  private callPeer?:string;
+  private callBus?:{input:AudioNode;gain:GainNode};
   private peers=new Map<string,Peer>();
   private muted=new Set<string>();
   private stream?:MediaStream;
@@ -87,7 +90,7 @@ export class VoiceChat {
     this.syncState();
   }
   leave():void {
-    this.inBar=false;this.stopMicrophone();
+    this.inBar=false;this.callPeer=undefined;this.stopMicrophone();
     for(const id of [...this.peers.keys()])this.dropPeer(id);
     this.hooks.changed();
   }
@@ -102,6 +105,13 @@ export class VoiceChat {
   setPushToTalk(down:boolean):void {
     if(this.pushToTalk===down)return;this.pushToTalk=down;
     if(!down)this.gateUntil=0;
+  }
+  /** On a phone call with `id` (undefined when it ends): their voice leaves the proximity mix for the phone's. */
+  setCallPeer(id?:string):void {
+    if(this.callPeer===id)return;
+    const previous=this.callPeer;this.callPeer=id;
+    if(!this.context)return;
+    for(const other of [previous,id])if(other){const peer=this.peers.get(other);if(peer){peer.pan.disconnect();peer.pan.connect(this.route(other));}}
   }
   toggleMute(id:string):boolean {if(this.muted.has(id))this.muted.delete(id);else this.muted.add(id);this.hooks.changed();return this.muted.has(id);}
   isMuted(id:string):boolean {return this.muted.has(id);}
@@ -122,7 +132,8 @@ export class VoiceChat {
     for(const [id,peer] of this.peers){
       const speaker=position(id);
       let gain=0,pan=0;
-      if(listener&&speaker&&!this.muted.has(id)){
+      if(id===this.callPeer)gain=this.muted.has(id)?0:1;
+      else if(listener&&speaker&&!this.muted.has(id)){
         gain=voiceGain(listener,speaker);
         const dx=speaker.x-listener.x,dz=speaker.z-listener.z,d=Math.hypot(dx,dz);
         // The camera's right is (cos yaw, −sin yaw) in world x/z.
@@ -137,9 +148,10 @@ export class VoiceChat {
 
   /** A relayed frame from the server: [speaker id][packet]. */
   receive(frame:Uint8Array):void {
-    if(!this.inBar||!this.context||!this.settings.get().voicesEnabled)return;
+    if(!this.inBar||!this.context)return;
     const message=unwrapVoice(frame),packet=message&&decodeVoicePacket(message.packet);
-    if(!message||!packet)return;
+    // With other voices switched off, only the phone call is still heard.
+    if(!message||!packet||(!this.settings.get().voicesEnabled&&message.speakerId!==this.callPeer))return;
     const peer=this.peer(message.speakerId);
     const wasSpeaking=this.isSpeaking(message.speakerId);
     peer.lastHeard=performance.now();
@@ -160,10 +172,21 @@ export class VoiceChat {
     let peer=this.peers.get(id);
     if(!peer){
       const gain=this.context!.createGain(),pan=this.context!.createStereoPanner();
-      gain.gain.value=0;gain.connect(pan).connect(this.bus!);
+      gain.gain.value=0;gain.connect(pan).connect(this.route(id));
       peer={gain,pan,timestamp:0,nextTime:0,lastHeard:0,played:0};this.peers.set(id,peer);
     }
     return peer;
+  }
+  private route(id:string):AudioNode {
+    if(id!==this.callPeer)return this.bus!;
+    if(!this.callBus){
+      // 300–3400 Hz, the band of a phone line.
+      const context=this.context!,high=context.createBiquadFilter(),low=context.createBiquadFilter(),gain=context.createGain();
+      high.type='highpass';high.frequency.value=300;low.type='lowpass';low.frequency.value=3400;
+      high.connect(low).connect(gain).connect(context.destination);
+      this.callBus={input:high,gain};this.applyVolumes();
+    }
+    return this.callBus.input;
   }
   private decoder(id:string,peer:Peer):AudioDecoder|undefined {
     if(peer.decoder&&peer.decoder.state!=='closed')return peer.decoder;
@@ -201,7 +224,7 @@ export class VoiceChat {
   private apply(next:GameSettings,previous:GameSettings):void {
     this.applyVolumes();
     if(next.voicesEnabled!==previous.voicesEnabled){
-      if(!next.voicesEnabled)for(const id of [...this.peers.keys()])this.dropPeer(id);
+      if(!next.voicesEnabled)for(const id of [...this.peers.keys()])if(id!==this.callPeer)this.dropPeer(id);
       this.syncState();
     }
     if(next.micEnabled!==previous.micEnabled){if(next.micEnabled)void this.startMicrophone();else{this.stopMicrophone();this.syncState();}}
@@ -211,6 +234,7 @@ export class VoiceChat {
   private applyVolumes():void {
     const {master,voice,voicesEnabled}=this.settings.get();
     if(this.bus&&this.context)this.bus.gain.setTargetAtTime(voicesEnabled?master*voice:0,this.context.currentTime,.03);
+    if(this.callBus&&this.context)this.callBus.gain.gain.setTargetAtTime(master*Math.max(voice,.5)*1.4,this.context.currentTime,.03);
   }
 
   private startMicrophone():Promise<void> {

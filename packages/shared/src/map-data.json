@@ -21163,6 +21163,27 @@
           "FX_Fumaca_Boca": "fumaca_boca"
         }
       },
+      "fumar_mixamo": {
+        "file": "bar_fumar_mixamo.glb",
+        "hash": "bc4d38bcf63a",
+        "anchor": null,
+        "height": 1.859,
+        "hipHeight": 1.01,
+        "fps": 30,
+        "props": [
+          "Prop_Maco",
+          "Prop_Cigarro",
+          "Prop_Brasa",
+          "Prop_Isqueiro",
+          "Prop_Chama",
+          "FX_Fumaca_Ponta",
+          "FX_Fumaca_Boca"
+        ],
+        "fx": {
+          "FX_Fumaca_Ponta": "fumaca",
+          "FX_Fumaca_Boca": "fumaca_boca"
+        }
+      },
       "vomitar": {
         "file": "bar_vomitar.glb",
         "hash": "d5ac0ef236ea",
@@ -21486,6 +21507,120 @@
               "Head"
             ]
           ]
+        },
+        "fica": [
+          "Prop_Cigarro"
+        ]
+      },
+      "fumar_mixamo": {
+        "group": "fumar_mixamo",
+        "duration": 17.9,
+        "loop": false,
+        "start": {
+          "x": -0.000876,
+          "z": 0.005624,
+          "yaw": -0.027404
+        },
+        "end": {
+          "x": -0.000874,
+          "z": 0.005625,
+          "yaw": -0.027401
+        },
+        "segue": {
+          "Prop_Maco": [
+            [
+              19,
+              145,
+              "LeftHand"
+            ]
+          ],
+          "Prop_Cigarro": [
+            [
+              37,
+              111,
+              "RightHand"
+            ],
+            [
+              113,
+              252,
+              "Head"
+            ],
+            [
+              256,
+              350,
+              "RightHand"
+            ]
+          ],
+          "Prop_Brasa": [
+            [
+              37,
+              111,
+              "RightHand"
+            ],
+            [
+              113,
+              252,
+              "Head"
+            ],
+            [
+              256,
+              350,
+              "RightHand"
+            ]
+          ],
+          "FX_Fumaca_Ponta": [
+            [
+              37,
+              111,
+              "RightHand"
+            ],
+            [
+              113,
+              252,
+              "Head"
+            ],
+            [
+              256,
+              350,
+              "RightHand"
+            ]
+          ],
+          "Prop_Isqueiro": [
+            [
+              149,
+              244,
+              "LeftHand"
+            ]
+          ],
+          "Prop_Chama": [
+            [
+              149,
+              244,
+              "LeftHand"
+            ]
+          ],
+          "FX_Fumaca_Boca": [
+            [
+              0,
+              537,
+              "Head"
+            ]
+          ]
+        },
+        "mira": {
+          "Prop_Cigarro": {
+            "faixas": [
+              [
+                175,
+                225,
+                "Prop_Chama"
+              ]
+            ],
+            "junto": [
+              "Prop_Brasa",
+              "FX_Fumaca_Ponta"
+            ]
+          }
         },
         "fica": [
           "Prop_Cigarro"

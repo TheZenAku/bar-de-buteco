@@ -20,7 +20,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {config as loadEnvironment} from 'dotenv';
 import {Client,type Room} from '@colyseus/sdk';
 import {internalSecret} from '@bar/shared/tickets';
-import {barClipMs,DRINK_DURATION_MS,DRINK_ITEMS,INTERACTABLES,JOBS,JOB_START_RADIUS,MAP_MARKERS,NEEDS,OLD_CANE_SPEED,RUN_SPEED,STAGE,STAGE_ENTRY,TICK_MS,TV_SPOTS,WALK_SPEED,
+import {barClipMs,DRINK_ITEMS,INTERACTABLES,JOBS,JOB_START_RADIUS,MAP_MARKERS,NEEDS,OLD_CANE_SPEED,RUN_SPEED,STAGE,STAGE_ENTRY,TICK_MS,TV_SPOTS,WALK_SPEED,
   canInteract,canRun,distance,floorHeight,hasStagePass,isConscious,isWalkable,movePlayer,onStage,setDoorStates,swayInput,
   type Interactable,type ItemId,type JobTaskView,type PlayerInput} from '@bar/shared';
 import {walkSegment} from '../../apps/server/src/world/navigation.js';
@@ -102,7 +102,7 @@ const plan=(from:Point,goal:Goal)=>new Promise<Point[]|undefined>(resolve=>{cons
 
 interface Self {id:string;displayName:string;skin:string;oldWalk:boolean;x:number;y:number;z:number;rotation:number;animationState:string;interactionState:string;
   currentTableId:string;lastProcessedInput:number;connected:boolean;hunger:number;thirst:number;bladder:number;drunk:number;stamina:number;exhausted:boolean;
-  condition:string;stageUntil:number}
+  condition:string;stageUntil:number;holding:string}
 interface Entries<T> {get(key:string):T|undefined;values():IterableIterator<T>}
 interface World {players:Entries<Self>;doors:Entries<{id:string;open:boolean}>;musicians:Entries<{playerId:string}>;jobs:Entries<{slots:number;workers:number;enabled:boolean}>;
   tables:Entries<{phase:string;turnPlayerId:string;seats:Iterable<{playerId:string;total:number}>}>;event:{type:string};occupancy:number;capacity:number}
@@ -341,8 +341,8 @@ class Bot {
     try{
       if(!await this.walk(spot?{kind:'point',...spot,radius:.12}:{kind:'object',id:'counter'},{running:chance(.2)}))return;
       if(!await this.act('player.interact',{objectId:'counter',item:pick(DRINK_ITEMS)},me=>me.interactionState==='counter'))return;
-      if(!await this.until(me=>me.animationState==='drink',90_000))return;
-      await this.until(me=>!me.interactionState,DRINK_DURATION_MS+5000);
+      // Served, the drink is in hand and the bot walks on with it.
+      await this.until(me=>!!me.holding,90_000);
     }finally{if(key)claimed.delete(key);await this.standUp();}
   }
   private async toilet():Promise<void>{

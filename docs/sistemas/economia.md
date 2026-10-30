@@ -14,7 +14,7 @@ As moedas são da conta e ficam na API. O mundo só **pede** mudanças. Cada ped
 | Ingresso do palco | 200, vale 30 min | ao comprar na escada do palco | se a pessoa sair de perto da escada (ou mudar de sessão) antes de receber o ingresso |
 | Ajudante do Magrão (emprego) | 6 por tarefa concluída (pegar um pedido no balcão e entregá-lo contam como duas) | ao terminar a tarefa | — |
 
-Pausar, continuar, parar e desligar a mídia são de graça. Os preços estão em `MEDIA_PRICES`, `STAGE_PASS` e `ITEM_CATALOG` (`packages/shared`). Eles podem ser ajustados sem alterar o código, com `PRICE_JUKEBOX`, `PRICE_TV`, `PRICE_TELAO` e `PRICE_STAGE` no ambiente do mundo (`0` torna gratuito). O motivo no extrato do ingresso é `stage:pass`.
+Pausar, continuar, parar e desligar a mídia são de graça. Os valores padrão estão em `MEDIA_PRICES`, `STAGE_PASS`, `ITEM_CATALOG` e `JOBS` (`packages/shared`), e as variáveis `PRICE_JUKEBOX`, `PRICE_TV`, `PRICE_TELAO`, `PRICE_STAGE`, `SKIN_PRICE_*`, `WALLET_INITIAL_COINS` e `WALLET_DAILY_COINS` continuam mudando o padrão. Por cima deles, a administração muda qualquer preço ou pagamento em **Administração → Preços** (ver [admin.md](admin.md#preços)): a tabela efetiva (`packages/shared/src/prices.ts`) vem da API, o mundo cobra e paga com ela e os navegadores mostram os valores novos em poucos segundos (`0` torna gratuito). O motivo no extrato do ingresso é `stage:pass`.
 
 ## Palco
 
@@ -26,7 +26,7 @@ Lá em cima, os quatro lugares de músico (violão, cavaquinho, bateria e vocal)
 
 Pôr vídeo no telão é cobrado à parte (50 moedas por vídeo novo) e não exige ingresso: basta ir ao blip turquesa, no meio da frente do palco, e apertar **E**. De cima do palco, a borda da frente também serve.
 
-Os dois blips do palco (escada e telão) só aparecem para quem está no quintal e embaixo do palco. O quintal é a área do palco (`inStageArea`): fica dentro dos muros do lote, até a parede dos fundos do prédio. No salão, na rua ou no andar de cima, os blips não aparecem.
+Os dois blips do palco (escada e telão) só aparecem para quem está no quintal e embaixo do palco. O quintal é a área do palco (`inStageArea`): fica dentro dos muros do lote, até a parede dos fundos do prédio. No salão, na rua ou no andar de cima, os blips não aparecem. O anel aparece de longe; o selo com o nome e o preço (ingresso ou vídeo no telão) só com o jogador em cima dele.
 
 ## Garantias
 
@@ -42,11 +42,11 @@ No mundo, estornos e pagamentos que a API não aceitou ainda (API fora do ar) fi
 
 ## Pedido na mesa (Tonico ou quem trabalha no bar)
 
-1. Sentado, a pessoa aperta **T** (ou **Pedir na mesa** no painel de ações, ou o botão da mesa) e escolhe até 4 itens. Se alguém estiver trabalhando como *Ajudante do Magrão*, o cardápio mostra, além de **Pedir ao Tonico**, um botão **Pedir para Fulano** por ajudante (`table.order` com `to`).
+1. Sentado, a pessoa aperta **P** (ou **Pedir na mesa** na barra de ações, ou o botão da mesa) e escolhe até 4 itens. Se alguém estiver trabalhando como *Ajudante do Magrão*, o cardápio mostra, além de **Pedir ao Tonico**, um botão **Pedir para Fulano** por ajudante (`table.order` com `to`).
 2. O mundo cobra e coloca o pedido com quem foi escolhido: na fila do Tonico (máximo de 8) ou na lista do ajudante (máximo de 2). É um pedido por pessoa.
 3. **A pessoa fica na mesa até o pedido chegar.** Levantar é recusado com um aviso. Enquanto o pedido ainda está no balcão (na fila, ou sendo buscado e preparado), dá para cancelar, e as moedas voltam. Depois que sai do balcão, não dá mais: ele está a caminho. Cair, sair do bar, desconectar ou a administração cancelar ainda estornam o pedido.
 4. O Tonico sai da ronda e vai até o balcão (`PICKUP_POINT`). Enquanto o Magrão prepara (3,5 s), o caminho até a mesa é procurado. Ele leva o pedido na **bandeja**, com os objetos 3D de cada item em cima. Na mesa, para ao lado de quem pediu, pega um item de cada vez com a mão direita e o põe no tampo (0,3 s de preparo e 0,7 s por item), e volta. Enquanto serve, os eventos não o interrompem. O pedido do ajudante segue o mesmo caminho, feito pelo jogador (veja [Empregos](#empregos)).
-5. **Cada item dura um tempo na mesa** (`CONSUME_MS`): long neck 3 min; chopp e refrigerante 2,5 min; água 2 min; café, coxinha e pastel 1,5 min; torresmo 2,5 min. Com a pessoa sentada, os efeitos do item entram aos poucos, em partes de 5%. Ao terminar, o item fica **vazio** na mesa (salgados deixam só o prato). Se a pessoa levanta antes, o resto fica para trás.
+5. **Cada item dura um tempo na mesa** (`CONSUME_MS`, o mesmo da gelada do balcão e dos itens da mochila): long neck 3 min; chopp e refrigerante 2,5 min; água 2 min; café, coxinha e pastel 1,5 min; torresmo 2,5 min. Com a pessoa sentada, os efeitos do item entram aos poucos, em partes de 5%. Ao terminar, o item fica **vazio** na mesa (salgados deixam só o prato). Se a pessoa levanta antes, o resto fica para trás. Enquanto ela está sentada, cada item tem a sua barra de progresso acima dos avisos de tecla, com o tempo que falta ([interface](interface.md)).
 6. **O que terminou é recolhido.** Os itens terminados ou deixados esperam na mesa (`doneAt`). Com alguém trabalhando no bar, a mesa vira tarefa do ajudante. Sem ninguém trabalhando, o **Tonico** recolhe entre um pedido e outro: vai até a mesa que espera há mais tempo, põe os itens na bandeja um a um (0,5 s cada, no máximo 6 por viagem) e os leva ao balcão. Um pedido novo tem prioridade sobre ir limpar (mas ele termina de levar o que já pegou). Se ninguém recolher, os itens somem sozinhos 10 min depois de terminados (`LEFTOVER_MS`).
 
 ### Bandeja e lugares na mesa
@@ -75,7 +75,7 @@ A busca tem limite. Se não houver caminho, o pedido é estornado com uma mensag
 - **Só mesas com o que recolher:** uma mesa entra nas tarefas apenas quando tem itens terminados ou deixados (`ServedItems.dirtyTables`), a que espera há mais tempo primeiro, e nunca a mesa em que o outro ajudante já está. Se a mesa ficar limpa antes (as sobras vencem, por exemplo), a tarefa troca sozinha, com prazo novo. Sem mesa suja, as tarefas são geladeiras e pia. Ao terminar **Limpar a mesa N**, os itens terminados somem; o que alguém ainda está consumindo fica.
 - **Pedidos para o ajudante:** vêm antes de qualquer estação (no máximo 2 por vez, `MAX_WORKER_ORDERS`). A tarefa vira **Pegar o pedido de Fulano no balcão** (E no balcão, 3,5 s de preparo do Magrão) e depois **Levar o pedido de Fulano à mesa N** (E encostado na mesa). Com o pedido pego, a bandeja aparece na mão do ajudante (`player.carrying`), como a do Tonico, e na mesa ele põe um item de cada vez. Durante a entrega, **E** não interrompe. Essas duas tarefas têm prazo de 90 s. Se o turno do ajudante acabar (parou, ficou parado, caiu, saiu ou a administração encerrou), os pedidos dele passam na frente da fila do Tonico, sem nova cobrança, e o cliente é avisado. A estação de cada tarefa vai junto em `job.state` (`task.station`), porque balcão e entrega não estão em `JOBS`.
 
-- **J** abre os empregos. O turno começa perto do balcão do térreo e mostra a tarefa no painel **Turno** do HUD, que só existe durante o turno. Ele começa no canto inferior direito (acima das ações no celular), longe do centro da tela. Como os outros painéis, pode ser arrastado pelo título, recolhido (o cabeçalho continua mostrando a contagem) e escondido pelo olho do cabeçalho ou pelo menu **Painéis**. O botão **Turno**, no topo, mostra ou esconde o painel. Posição e escolha ficam salvas por conta. O painel é montado quando a tarefa muda; só a contagem e a barra se atualizam no lugar.
+- **J** abre os empregos. O turno começa perto do balcão do térreo e mostra a tarefa no painel **Turno** do HUD, que só existe durante o turno. Ele começa no canto superior direito, embaixo das ferramentas (embaixo do chat no celular), longe do centro da tela. Como os outros painéis, pode ser arrastado pelo título, recolhido (o cabeçalho continua mostrando a contagem) e escondido pelo olho do cabeçalho ou pelo menu **Painéis**. O botão **Turno**, no topo, mostra ou esconde o painel. Posição e escolha ficam salvas por conta. O painel é montado quando a tarefa muda; só a contagem e a barra se atualizam no lugar.
 - **Objetivo no mapa (blip):** a estação da tarefa ganha só um anel verde no chão, que pulsa devagar; um traço fraco dele aparece através de móveis e paredes. Nada flutua acima dele. Na tela, um selo deitado sobre o anel mostra a distância (e *suba*/*desça* quando ela está em outro andar); fora da vista, o selo vai para a borda da tela, com uma seta apontando para ela. O marcador some durante a tarefa e volta na próxima. **Só quem está trabalhando vê o blip:** a sala manda a tarefa (`job.state`) apenas para o próprio trabalhador, e o marcador é desenhado só no navegador dele (`BarScene.setObjective`; o selo em `objective-blip.ts`).
   - O marcador 3D é criado uma vez e movido de tarefa em tarefa. Recriá-lo congelava a tela na tarefa seguinte: o PlayCanvas libera a malha do anel junto com a última instância, e o marcador novo desenhava a malha liberada, com erro em todo quadro.
   - O selo é desenhado num `<canvas>` próprio, só quando muda. Mover um elemento HTML a cada quadro fazia o navegador recalcular estilos e, com serviços de acessibilidade ativos, a árvore de acessibilidade, com quedas de quadro.
@@ -91,14 +91,15 @@ Para criar outro emprego, acrescente uma entrada em `JOBS` com estações tirada
 Em **⚙ Administração → Mundo ao vivo**, a administração vê o estado da sala em tempo real (comando `admin.world`):
 
 - ocupação, evento, créditos pendentes e fila de resultados;
-- empregos: vagas, pagamento, aberto/fechado (editáveis), quem trabalha, em que estação e quanto ganhou, com **Encerrar turno**;
+- empregos: vagas e aberto/fechado (editáveis; o pagamento por tarefa fica em **Preços**), quem trabalha, em que estação e quanto ganhou, com **Encerrar turno**;
 - pedidos do Tonico (fase atual e fila), com **Cancelar e devolver**;
 - quem espera no balcão do Magrão;
 - jukebox, TVs e telão (vídeo, quem escolheu, preço), com **Desligar**;
 - **Bots de teste** (só em desenvolvimento): quantidade com **Aplicar**, **+5**, **+10** e **Remover todos**, o que cada bot está fazendo, o tick do mundo (p95) e, dos últimos 15 s, RTT, inputs por segundo e o event loop do processo dos bots. O mundo roda `tests/load/bots.ts` como processo filho (`apps/server/src/world/bots.ts`), muda a quantidade por IPC e recusa mais bots do que cabem (`ROOM_CAPACITY` menos os jogadores). O painel se atualiza sozinho quando todos entram ou saem. Detalhes em [tools/README.md](../../tools/README.md#bots-de-desempenho);
-- NPCs e uma tabela de jogadores com posição, animação, interação, emprego e saldo.
+- NPCs e uma tabela de jogadores com posição, animação, interação, emprego e saldo, com **Ficha** para abrir o jogador na categoria Jogadores;
+- o processo do mundo: tempo no ar, memória, tick p95, última conversa com a API e se a tabela de preços está sincronizada.
 
-Os comandos conferem o papel `admin` da sessão, que é revalidado a cada rodada de manutenção, e ficam registrados no log do mundo (`admin_job`, `admin_table_cancel`, `admin_media_off`, `admin_bots`; o processo dos bots registra `bots_start`, `bots_output` e `bots_exit`). As alterações de emprego valem para a sala até o mundo reiniciar.
+Os comandos conferem o papel `admin` da sessão, que é revalidado a cada rodada de manutenção, e ficam registrados no log do mundo (`admin_job`, `admin_table_cancel`, `admin_media_off`, `admin_bots`; o processo dos bots registra `bots_start`, `bots_output` e `bots_exit`). As alterações de vagas valem para a sala até o mundo reiniciar. O painel se atualiza a cada 5 segundos.
 
 ## Testes
 

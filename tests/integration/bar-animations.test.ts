@@ -15,7 +15,7 @@ test('the bar animations are published as exported, with every clip the module p
   }
   // animacoes_bar.js GRUPO_DO_CLIPE.
   assert.deepEqual(Object.keys(BAR_ANIMATIONS.clips).sort(), ['andar_bebado_loop', 'andar_loop', 'cair', 'comer_comecar', 'comer_loop', 'comer_terminar', 'fumar_acender',
-    'fumar_apagar', 'fumar_loop', 'levantar', 'levantar_chao', 'limpar_mesa', 'magrao_chopp', 'magrao_chopp_escuro', 'magrao_longneck', 'parado_loop', 'sentado_loop',
+    'fumar_apagar', 'fumar_loop', 'fumar_mixamo', 'levantar', 'levantar_chao', 'limpar_mesa', 'magrao_chopp', 'magrao_chopp_escuro', 'magrao_longneck', 'parado_loop', 'sentado_loop',
     'sentar', 'urinar', 'vomitar']);
   // Como conferir: about 124 chairs, 31 tables, 3 urinals and Magrão's place.
   assert.equal(map.seats.filter(seat => Number.isInteger(seat.chair)).length, 124);
@@ -26,6 +26,25 @@ test('the bar animations are published as exported, with every clip the module p
   assert.equal(URINALS.length, 3);
   assert.deepEqual([MAGRAO_SPOT.x, MAGRAO_SPOT.z], [18.4, -7.75]);
   assert.ok(BAR_ANIMATIONS.clips.magrao_chopp.duration > 13 && BAR_ANIMATIONS.clips.magrao_chopp.duration < 15, 'about 14 s per order');
+});
+
+test('a whole cigarette (bar_fumar_mixamo.glb, 19_fumar_mixamo.py): 538 frames on the Mixamo Smoking skeleton, the butt left, the cigarette aimed at the flame', () => {
+  const group = BAR_ANIMATIONS.groups.fumar_mixamo, clip = BAR_ANIMATIONS.clips.fumar_mixamo;
+  assert.equal(clip.group, 'fumar_mixamo');
+  assert.equal(clip.duration, 537 / 30);
+  assert.equal(clip.loop, false);
+  // Its hips move by the skin's hip height (quadril_m), not by its height.
+  assert.equal(group.hipHeight, 1.01);
+  assert.equal(group.anchor, null);
+  assert.deepEqual(group.props, ['Prop_Maco', 'Prop_Cigarro', 'Prop_Brasa', 'Prop_Isqueiro', 'Prop_Chama', 'FX_Fumaca_Ponta', 'FX_Fumaca_Boca']);
+  assert.deepEqual(group.fx, {FX_Fumaca_Ponta: 'fumaca', FX_Fumaca_Boca: 'fumaca_boca'});
+  assert.deepEqual(clip.fica, ['Prop_Cigarro']);
+  assert.deepEqual(clip.mira, {Prop_Cigarro: {faixas: [[175, 225, 'Prop_Chama']], junto: ['Prop_Brasa', 'FX_Fumaca_Ponta']}});
+  assert.deepEqual(clip.segue.Prop_Cigarro, [[37, 111, 'RightHand'], [113, 252, 'Head'], [256, 350, 'RightHand']]);
+  // The step onto the butt comes back: the body ends where it started, so the avatar stays put.
+  assert.ok(Math.hypot(clip.end.x - clip.start.x, clip.end.z - clip.start.z) < .01);
+  // The older groups keep scaling the hips by the body's height.
+  for (const [name, other] of Object.entries(BAR_ANIMATIONS.groups)) if (name !== 'fumar_mixamo') assert.equal('hipHeight' in other, false, name);
 });
 
 test('getting up leaves the body beside its chair, on free floor for most seats', () => {
@@ -119,6 +138,11 @@ test('the timeline: clips one after the other from the room\'s clock, loops repe
   assert.equal(barTimeline(smoking, 100)!.clip, 'fumar_acender');
   assert.equal(barTimeline(smoking, ms('fumar_acender') + 100)!.blend, 0, 'into the loop from the last frame');
   assert.equal(barTimeline({...smoking, animation: 'smoke-stop', animationStartedAt: ms('fumar_acender')}, 1000)!.clip, 'fumar_acender', 'put out once lit');
+  // A whole cigarette: one clip from the room's clock, entered with the action blend, holding its last frame.
+  const cigarette = {animation: 'cigarette', animationStartedAt: 1000, x: 0, z: 0};
+  assert.deepEqual(barTimeline(cigarette, 1500), {clip: 'fumar_mixamo', time: .5, startedAt: 1000, blend: .3});
+  assert.equal(barTimeline(cigarette, 1000 + ms('fumar_mixamo') + 5000)!.time, ms('fumar_mixamo') / 1000, 'holds the last frame');
+  assert.equal(barFrame(cigarette), undefined, 'where the body stands');
   // Falling holds; getting up from the floor follows the fall without a blend.
   assert.equal(barTimeline({animation: 'fallen', animationStartedAt: 0, x: 0, z: 0}, 60000)!.time, ms('cair') / 1000);
   assert.equal(barTimeline({animation: 'recover', animationStartedAt: 0, x: 0, z: 0}, 10)!.blend, 0);

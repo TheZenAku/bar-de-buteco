@@ -123,6 +123,16 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     await eventually(() => player.animationState === 'idle');
     assert.equal(player.interactionState, '');
     assert.ok(Date.now() - player.animationStartedAt >= 2000);
+    // G draws a new dance each time, and the others receive the draw to play the same clip.
+    // Three emotes: with the kick below, four within the per-second limit.
+    const draws: number[] = [];
+    for (const emote of ['dance', 'idle', 'dance'] as const) {
+      first.send('player.emote', { emote });
+      await eventually(() => second.state.players.get('alice').animationState === emote);
+      if (emote === 'dance') draws.push(second.state.players.get('alice').dance);
+    }
+    assert.equal(draws[1], player.dance, 'Everyone sees the dance drawn by the room');
+    assert.notEqual(draws[0], draws[1], 'Each dance is drawn anew (1 in 65536 to repeat)');
     // Just onto the first stair flight (x 13.25–14.75, rising towards −z from z −11.65).
     player.x=14;player.y=.3;player.z=-11.75;
     first.send('player.input',{seq:35,dx:0,dz:-1,running:false,rotation:Math.PI});

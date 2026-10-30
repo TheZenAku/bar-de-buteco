@@ -34,6 +34,12 @@ export class MetricsRegistry {
     this.counters.set(name, counter);
   }
   counter(name: string, labels?: Labels): number { return this.counters.get(name)?.values.get(key(labels)) ?? 0; }
+  /** A counter summed over its label sets; `where` sees each set as rendered (`status="5xx"`). */
+  sum(name: string, where: (labels: string) => boolean = () => true): number {
+    let total = 0;
+    for (const [labels, value] of this.counters.get(name)?.values ?? []) if (where(labels)) total += value;
+    return total;
+  }
   gauge(name: string, help: string, read: () => number | undefined): void { this.gauges.set(name, { help, read }); }
   observe(name: string, help: string, value: number, size?: number): void {
     const entry = this.windows.get(name) ?? { help, window: new Window(size) };

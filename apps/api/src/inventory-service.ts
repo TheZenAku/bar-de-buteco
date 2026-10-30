@@ -40,7 +40,8 @@ export class InventoryService {
     const item=itemById(itemId);if(!item)throw new InventoryError(400,'Item inválido.');
     if(!user.verified)throw new InventoryError(403,'Confirme seu e-mail antes de comprar.');
     await this.initialize(user.id);
-    const receipt=`inventory-buy:${requestId}`,cost=item.price*quantity;
+    // The live price (Preços in the administration), never the catalogue's default.
+    const receipt=`inventory-buy:${requestId}`,cost=await this.wardrobe.pricing.get(`item:${itemId}`)*quantity;
     await this.db.transaction(async tx=>{
       // Claim the retry key first. Concurrent copies wait on the same unique row, so only one
       // transaction can change the wallet. A rejected purchase rolls this claim back as well.

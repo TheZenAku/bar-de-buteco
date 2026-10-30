@@ -1,14 +1,15 @@
 import * as pc from 'playcanvas';
 import {BAR_ANIMATIONS,CLEANABLE_TABLES,INTERACTABLES,URINALS,seatChair,type BarClip,type BarFrame,type BarGroup,type BarStep} from '@bar/shared';
-import {boneName,convert,readClip,readSource,readTarget,sample,type Clip,type Source,type Target} from './mixamo-retarget';
+import {alignedRest,boneName,convert,readClip,readSource,readTarget,sample,type Clip,type Source,type Target} from './mixamo-retarget';
 
 /**
  * The bar's character animations in PlayCanvas: a port of animacoes_bar.js (assets-bar/map/BarBoteco/export/animacoes),
  * which is written for three.js. As there, the clips of each file (public/animacoes/bar_<group>.glb: a 1.90 m Mixamo
  * skeleton, props and particle emitters) are converted to each skin by the world rotation of every bone
  * (mixamo-retarget.ts); props held in a hand follow the skin's real hand; the map's own chair instance is pulled with
- * Prop_Cadeira; the cup on the tray and the freezer lid hide while their copies are in use; smoke, sickness and the
- * stream are particles; the cigarette butt, the puddle and the delivered drink stay on the map a while.
+ * Prop_Cadeira; a prop can also turn to point at another (`mira`: the cigarette in the mouth at the lighter's flame, which
+ * comes from the other hand); the cup on the tray and the freezer lid hide while their copies are in use; smoke, sickness
+ * and the stream are particles; the cigarette butt, the puddle and the delivered drink stay on the map a while.
  * What plays when comes from the room, through barTimeline (packages/shared/src/bar-animations.ts): this only draws it.
  */
 
@@ -20,8 +21,9 @@ const DELIVERED_SECONDS=2.5;
 export const barState=(clip:BarClip):string=>`Bar ${clip}`;
 
 interface ClipInfo {group:BarGroup;duration:number;loop:boolean;end:{x:number;z:number;yaw:number};
-  segue?:Record<string,[number,number,string][]>;substitui?:Record<string,string>;entrega?:string[];fica?:string[]}
-interface GroupInfo {file:string;hash:string;anchor:string|null;height:number;fps:number;props:string[];fx:Record<string,string>}
+  segue?:Record<string,[number,number,string][]>;mira?:Record<string,{faixas:[number,number,string][];junto?:string[]}>;
+  substitui?:Record<string,string>;entrega?:string[];fica?:string[]}
+interface GroupInfo {file:string;hash:string;anchor:string|null;height:number;hipHeight?:number;fps:number;props:string[];fx:Record<string,string>}
 const clipInfo=(clip:BarClip)=>BAR_ANIMATIONS.clips[clip] as ClipInfo;
 const groupInfo=(group:BarGroup)=>BAR_ANIMATIONS.groups[group] as GroupInfo;
 /** How far a clip leaves the body from where it started (metres): the avatar then stands where the body is. */
@@ -50,8 +52,8 @@ interface ActorView {
 export interface BarPlay {
   /** The clip's space: the place, or the avatar's feet facing its way. */
   space:BarFrame;
-  /** The skin's model (its bones carry the canonical names). */
-  model:pc.Entity;
+  /** The skin's model (its bones carry the canonical names), and the skin. */
+  model:pc.Entity;skin:string;
   /** A seated customer eating what they ordered: the clip's own plate and fries are not drawn, nor left behind. */
   servedFood?:boolean;
   /** The seat whose chair the clip pulls (sentar, levantar). */
@@ -156,6 +158,15 @@ class BarParticles {
   destroy():void {this.entity.destroy();this.mesh.destroy();this.material.destroy();}
 }
 
+/** The 24 turns that take axes onto axes (quarter and half turns, the diagonals' thirds), as unit quaternions. */
+const AXIS_TURNS:pc.Quat[]=[];
+for(let i=0;i<81;i++){
+  const c=[0,1,2,3].map(k=>Math.floor(i/3**k)%3-1),n=c.filter(Boolean).length;
+  if(n===1||n===2||n===4)AXIS_TURNS.push(new pc.Quat(c[0]!/Math.sqrt(n),c[1]!/Math.sqrt(n),c[2]!/Math.sqrt(n),c[3]!/Math.sqrt(n)));
+}
+/** The axis turn nearest to `turn`: how a rig names a bone's axes against the authoring rig (identity for the Mixamo ones). */
+const nearestAxisTurn=(turn:pc.Quat)=>{const dot=(q:pc.Quat)=>Math.abs(q.x*turn.x+q.y*turn.y+q.z*turn.z+q.w*turn.w);return AXIS_TURNS.reduce((best,q)=>dot(q)>dot(best)?q:best);};
+
 /** An instancing buffer's matrices, 16 floats per instance (lock() hands the buffer's own storage). */
 const instanceData=(buffer:pc.VertexBuffer):Float32Array=>{const data=buffer.lock();return data instanceof ArrayBuffer?new Float32Array(data):new Float32Array(data.buffer,data.byteOffset,data.byteLength/4);};
 const frameMatrix=(frame:BarFrame,out=new pc.Mat4())=>out.setTRS(new pc.Vec3(frame.x,frame.y,frame.z),new pc.Quat().setFromEulerAngles(0,frame.yaw*180/Math.PI,0),pc.Vec3.ONE);
@@ -166,6 +177,11 @@ export class BarAnimations {
   private readonly targets=new Map<string,Target>();
   /** A clip converted for a skin (`skin|clip`); null when that failed. */
   private readonly converted=new Map<string,pc.AnimTrack|null>();
+  /**
+   * Per skin and group (`skin|group`), each bone's axes against the authoring bone's, as an axis turn: Nathan's own rig
+   * points them otherwise (about 120° away), and a prop carried by his bone as it is would orbit his hand or head.
+   */
+  private readonly axes=new Map<string,Map<string,pc.Quat>>();
   private readonly actors=new Map<string,ActorView>();
   private readonly particles:BarParticles;
   private readonly leftovers:Array<{entity:pc.Entity;seconds:number}>=[];
@@ -224,9 +240,18 @@ export class BarAnimations {
           const authored=groupInfo(info.group).height;
           if(Math.abs(target.height-authored)>.2)console.warn(`animacoes_bar: personagem ${skinId} com ${target.height.toFixed(2)} m; as animacoes foram feitas para ${authored} m`);
         }
-        const source=view.source,anchored=!!groupInfo(info.group).anchor;
-        // A clip that reaches a place moves the hips by its metres; one in the body's own space, by the body's height.
-        this.converted.set(key,convert(view.clips.get(clip)!,source,target,barState(clip),anchored?1:target.height/groupInfo(info.group).height));
+        const source=view.source,group=groupInfo(info.group);
+        // A clip that reaches a place moves the hips by its metres; one in the body's own space, by the body's height, or
+        // by the hips' height when its skeleton has other proportions than the 1.90 m one (hipHeight: Mixamo's Smoking).
+        const hipScale=group.anchor?1:group.hipHeight?target.hipHeight/group.hipHeight:target.height/group.height;
+        this.converted.set(key,convert(view.clips.get(clip)!,source,target,barState(clip),hipScale));
+        // A posed bone is `delta × aligned` and the authoring one `delta × rest`: between them, a constant local turn.
+        const axesKey=`${skinId}|${info.group}`;
+        if(!this.axes.has(axesKey)){
+          const aligned=alignedRest(source,target),turns=new Map<string,pc.Quat>();
+          for(const [bone,own] of aligned){const rest=source.restW.get(bone);if(rest)turns.set(bone,nearestAxisTurn(own.clone().invert().mul(rest)));}
+          this.axes.set(axesKey,turns);
+        }
       }catch(error){console.warn(`animacoes_bar: não foi possível adaptar ${clip} para ${skinId}.`,error);this.converted.set(key,null);}
     }
     return this.converted.get(key)??undefined;
@@ -236,7 +261,7 @@ export class BarAnimations {
    * This frame `actorId` plays `step` (its body already posed by the anim component): the props in the clip's space,
    * the hand-held ones on the skin's real hands, the chair, the stand-ins hidden, the particles, and what it leaves.
    */
-  play(actorId:string,step:BarStep,{space,model,servedFood,seat}:BarPlay,dt:number):void {
+  play(actorId:string,step:BarStep,{space,model,skin,servedFood,seat}:BarPlay,dt:number):void {
     const info=clipInfo(step.clip),view=this.groups.get(info.group);
     if(!view?.container||!view.source)return;
     const actor=this.actor(actorId);
@@ -255,7 +280,8 @@ export class BarAnimations {
     }
     // The food served at the table stands in for the clip's plate and fries.
     if(servedFood)for(const name of ['Prop_Prato','Prop_Batatas'])kit.props.get(name)?.setLocalScale(0,0,0);
-    this.followHands(actor,info,view.source,clip,kit,spaceMatrix,t*groupInfo(info.group).fps);
+    this.followHands(actor,info,view.source,clip,kit,spaceMatrix,t*groupInfo(info.group).fps,this.axes.get(`${skin}|${info.group}`));
+    this.aimProps(info,kit,t*groupInfo(info.group).fps);
     for(const name of Object.keys(info.substitui??{}))this.hiding.add(name);
     // The map's chair goes where Prop_Cadeira is.
     const chair=kit.props.get('Prop_Cadeira');
@@ -349,9 +375,10 @@ export class BarAnimations {
 
   /**
    * corrigirProps: a prop held by a bone in a frame range follows the skin's bone instead of the authoring one, by the
-   * difference between the two (other proportions), fading in and out over four frames around the range.
+   * difference between the two (other proportions), fading in and out over four frames around the range. `axes` turns
+   * the skin's bone to the authoring bone's axes first (identity on the Mixamo rigs).
    */
-  private followHands(actor:ActorView,info:ClipInfo,source:Source,clip:Clip,kit:Kit,space:pc.Mat4,frame:number):void {
+  private followHands(actor:ActorView,info:ClipInfo,source:Source,clip:Clip,kit:Kit,space:pc.Mat4,frame:number,axes?:Map<string,pc.Quat>):void {
     if(!info.segue||!actor.bones)return;
     const {a,b,c,inverse,p,q,s}=this.temp,t=frame/groupInfo(info.group).fps,world=new Map<string,pc.Mat4>();
     inverse.copy(space).invert();
@@ -364,12 +391,40 @@ export class BarAnimations {
       // S: the authoring bone, T: the skin's, both in the clip's space and without scale.
       const authored=this.authoredBone(canonical,source,clip,t,world);
       authored.getTranslation(p);q.setFromMat4(authored);a.setTRS(p,q,pc.Vec3.ONE).invert();
-      b.mul2(inverse,real.getWorldTransform());b.getTranslation(p);q.setFromMat4(b);b.setTRS(p,q,pc.Vec3.ONE);
+      b.mul2(inverse,real.getWorldTransform());b.getTranslation(p);q.setFromMat4(b);
+      const turn=axes?.get(canonical);if(turn)q.mul(turn);
+      b.setTRS(p,q,pc.Vec3.ONE);
       c.mul2(b,a);
       if(weight<1){c.getTranslation(p).mulScalar(weight);q.setFromMat4(c);q.slerp(pc.Quat.IDENTITY,q,weight);c.setTRS(p,q,pc.Vec3.ONE);}
       a.setTRS(prop.getLocalPosition(),prop.getLocalRotation(),prop.getLocalScale());
       b.mul2(c,a);
       prop.setLocalPosition(b.getTranslation(p));prop.setLocalRotation(q.setFromMat4(b));prop.setLocalScale(b.getScale(s));
+    }
+  }
+
+  /**
+   * mirarProps: once on the skin's hands, a prop turns about its origin so its +Y points at another prop in frame ranges
+   * (the cigarette in the mouth at the lighter's flame, held in the other hand), easing in and out over six frames; the
+   * props `junto` it (the ember, the tip's emitter) turn with it.
+   */
+  private aimProps(info:ClipInfo,kit:Kit,frame:number):void {
+    if(!info.mira)return;
+    const {p,q,s}=this.temp,origin=new pc.Vec3(),axis=new pc.Vec3(),toward=new pc.Vec3(),turn=new pc.Quat();
+    for(const [name,{faixas,junto}] of Object.entries(info.mira)){
+      const prop=kit.props.get(name);if(!prop)continue;
+      for(const [from,to,aimed] of faixas){
+        const weight=Math.min(1,(frame-from)/6,(to-frame)/6),target=kit.props.get(aimed);
+        if(weight<=0||!target||prop.getWorldTransform().getScale(s).x<1e-3)continue;
+        origin.copy(prop.getPosition());
+        prop.getRotation().transformVector(pc.Vec3.UP,axis);
+        toward.sub2(target.getPosition(),origin).normalize();
+        // The turn in the world, as much as the ease allows.
+        turn.setFromDirections(axis,toward).slerp(pc.Quat.IDENTITY,turn,weight);
+        for(const node of [prop,...(junto??[]).map(n=>kit.props.get(n))])if(node){
+          turn.transformVector(p.sub2(node.getPosition(),origin),p).add(origin);
+          node.setPosition(p);node.setRotation(q.mul2(turn,node.getRotation()));
+        }
+      }
     }
   }
 

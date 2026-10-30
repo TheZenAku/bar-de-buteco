@@ -1,0 +1,477 @@
+/* The in-game phone (phone.ts): an iPhone-18-Pro-like device with its own system look (SF-style type, Liquid Glass),
+   scoped under #phone so the game's square neon UI does not leak in, and the other way round. */
+#phone{--phone-scale:.74;position:absolute;right:22px;bottom:14px;z-index:250;width:calc(410px*var(--phone-scale));height:calc(864px*var(--phone-scale));pointer-events:auto;
+  transform:translateY(calc(100% + 60px));transition:transform .42s cubic-bezier(.22,1.1,.36,1);
+  font:400 15px/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color:#fff;letter-spacing:0;text-transform:none;-webkit-font-smoothing:antialiased;user-select:none}
+#phone.open{transform:none}
+#phone.mobile{right:auto;left:50%;bottom:8px;translate:-50% 0}
+#phone *{box-sizing:border-box}
+#phone button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-transform:none;letter-spacing:0;border-radius:0;min-height:0}
+#phone button:focus-visible,#phone input:focus-visible,#phone textarea:focus-visible{outline:2px solid #0a84ff;outline-offset:2px}
+#phone h1,#phone h2,#phone h3{font-family:inherit;text-transform:none;letter-spacing:0;margin:0}
+#phone p{margin:0}
+#phone label{display:block;margin:0;font:inherit;text-transform:none;letter-spacing:0;color:inherit}
+#phone .ui-icon{width:1.25em;height:1.25em;flex:none}
+
+/* The device: natural titanium band, side buttons and the screen inside its bezel. */
+#phone .phone-device{position:relative;width:410px;height:864px;transform:scale(var(--phone-scale));transform-origin:0 0;border-radius:66px;padding:10px;
+  background:linear-gradient(140deg,#a8a49c 0%,#5d5a55 9%,#2a2928 22%,#1a1a1a 50%,#33322f 78%,#8f8b83 94%,#c4c0b8 100%);
+  box-shadow:0 34px 80px rgba(0,0,0,.6),0 4px 16px rgba(0,0,0,.4),inset 0 0 0 1.5px rgba(255,255,255,.28),inset 0 0 0 3.5px #0d0d0d,inset 0 0 0 5px rgba(255,255,255,.08)}
+#phone .ph-btn{position:absolute;width:4px;border-radius:2px;background:linear-gradient(90deg,#77736c,#3a3936)}
+#phone .ph-action{left:-3px;top:150px;height:34px}#phone .ph-vol-up{left:-3px;top:205px;height:62px}#phone .ph-vol-down{left:-3px;top:280px;height:62px}#phone .ph-power{right:-3px;top:230px;height:96px}
+#phone .phone-screen{position:relative;width:390px;height:844px;border-radius:56px;overflow:hidden;background:#000;isolation:isolate;
+  --bg:#f2f2f7;--fg:#000;--card:#fff;--mu:#8a8a8e;--ln:rgba(60,60,67,.18);--fill:rgba(118,118,128,.14);--ac:#0a84ff;--bar:rgba(249,249,249,.82)}
+#phone .phone-screen.dk{--bg:#000;--fg:#f5f5f7;--card:#1c1c1e;--mu:#98989f;--ln:rgba(84,84,88,.6);--fill:rgba(118,118,128,.26);--bar:rgba(22,22,24,.82)}
+#phone .ph-wall{position:absolute;inset:0;transition:background .4s}
+
+/* Status bar, Dynamic Island and the home indicator. */
+#phone .ph-status{position:absolute;top:0;left:0;right:0;height:54px;padding:19px 34px 0 42px;display:flex;justify-content:space-between;align-items:flex-start;font-weight:600;font-size:17px;z-index:60;pointer-events:none;color:#fff;transition:color .2s}
+#phone .in-app:not([data-app="camera"]):not(.on-call) .ph-status{color:var(--fg)}
+#phone .ph-status-right{display:flex;gap:6px;align-items:center;padding-top:2px}#phone .ph-status small{font-size:13px;font-weight:700}
+#phone .ph-signal{display:flex;gap:2px;align-items:flex-end;height:12px}#phone .ph-signal i{width:3px;border-radius:1px;background:currentColor}
+#phone .ph-signal i:nth-child(1){height:4px}#phone .ph-signal i:nth-child(2){height:6px}#phone .ph-signal i:nth-child(3){height:9px}#phone .ph-signal i:nth-child(4){height:12px}
+#phone .ph-wifi{width:17px;height:13px}
+#phone .ph-battery{position:relative;width:27px;height:13px;border:1.5px solid currentColor;border-radius:4px;opacity:.95;padding:1.5px}#phone .ph-battery b{display:block;width:85%;height:100%;border-radius:1.5px;background:currentColor}
+#phone .ph-battery:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;border-radius:0 1px 1px 0;background:currentColor}
+#phone .ph-island{position:absolute;top:11px;left:50%;translate:-50% 0;width:118px;height:35px;border-radius:20px;background:#000;z-index:70;display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+  transition:width .45s cubic-bezier(.3,1.4,.5,1),height .45s;cursor:default;overflow:hidden}
+#phone .ph-island.live{width:212px;cursor:pointer}
+#phone .ph-island-call{display:flex;gap:7px;align-items:center;color:#30d158;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+#phone .ph-wave{display:flex;gap:2px;align-items:center;height:16px}#phone .ph-wave i{width:3px;height:6px;border-radius:2px;background:#30d158;animation:ph-wave .9s ease-in-out infinite}
+#phone .ph-wave i:nth-child(2){animation-delay:.15s}#phone .ph-wave i:nth-child(3){animation-delay:.3s}#phone .ph-wave i:nth-child(4){animation-delay:.45s}
+@keyframes ph-wave{50%{height:16px}}
+#phone .ph-home-bar{position:absolute;bottom:0;left:50%;translate:-50% 0;width:180px;height:28px;z-index:80}
+#phone .ph-home-bar:after{content:"";position:absolute;left:20px;right:20px;bottom:8px;height:5px;border-radius:3px;background:#fff}
+#phone .in-app:not([data-app="camera"]):not(.on-call) .ph-home-bar:after{background:var(--fg)}
+
+/* Home screen: Liquid Glass widgets, the icon grid and the dock. */
+#phone .ph-home{position:absolute;inset:0;padding-top:64px;display:flex;flex-direction:column;text-shadow:0 1px 3px rgba(0,0,0,.35)}
+#phone .ph-home.light-wall{color:#111;text-shadow:none}
+#phone .ph-widgets{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:8px 24px 0}
+#phone .ph-widget,#phone .ph-dock,#phone .ph-banner{background:rgba(255,255,255,.16);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.24),inset 0 1.5px 0 rgba(255,255,255,.4),0 8px 24px rgba(0,0,0,.18)}
+#phone .ph-widget{border-radius:24px;padding:14px 15px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;color:inherit}
+#phone .ph-widget small{display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600;opacity:.85}
+#phone .ph-w-clock{height:162px}#phone .ph-w-clock b{font-size:50px;font-weight:300;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;line-height:1}#phone .ph-w-clock span{font-size:12.5px;opacity:.85}
+#phone .ph-widget-stack{display:grid;gap:14px}#phone .ph-widget-stack .ph-widget{height:74px;padding:10px 14px}
+#phone .ph-widget-stack b{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}#phone .ph-widget-stack span{font-size:11px;opacity:.8}
+#phone .ph-w-bank b{color:#ffd76a}
+#phone .ph-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 0;padding:28px 14px 0;justify-items:center;align-content:start;flex:1}
+#phone .ph-icon{display:flex;flex-direction:column;align-items:center;gap:6px;width:78px;color:inherit}
+#phone .ph-glyph{position:relative;display:grid;place-items:center;width:62px;height:62px;border-radius:15px;background:var(--tint);color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 4px 12px rgba(0,0,0,.28);transition:transform .15s}
+#phone .ph-glyph:before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(165deg,rgba(255,255,255,.42),rgba(255,255,255,0) 46%);pointer-events:none}
+#phone .ph-glyph .ui-icon{width:32px;height:32px;stroke-width:1.9;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2))}
+#phone [data-app="calendario"] .ph-glyph,#phone .ph-banner[data-app="calendario"] .ph-glyph{color:#ff3b30}
+#phone .ph-icon:active .ph-glyph{transform:scale(.9)}
+#phone .ph-label{font-size:12px;font-weight:500;white-space:nowrap}
+#phone .ph-badge{position:absolute;top:-6px;right:-6px;min-width:23px;height:23px;padding:0 6px;border-radius:12px;background:#ff3b30;color:#fff;font:600 13.5px/23px inherit;font-style:normal;text-align:center;text-shadow:none;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+#phone .ph-dock{position:absolute;left:14px;right:14px;bottom:24px;height:94px;border-radius:36px;display:flex;justify-content:space-around;align-items:center;padding:0 6px}
+#phone .ph-dock .ph-icon{width:70px}
+
+/* Apps: the page, headers, lists, inputs and bottom tabs shared by every app. */
+#phone .ph-app-host{position:absolute;inset:0;pointer-events:none;z-index:20}
+#phone .ph-app{position:absolute;inset:0;padding-top:54px;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;pointer-events:auto;text-shadow:none;user-select:text;
+  animation:ph-open .34s cubic-bezier(.2,.9,.3,1);transform-origin:50% 60%;--ac:#0a84ff}
+@keyframes ph-open{from{transform:scale(.88);opacity:0;border-radius:56px}}
+#phone .ph-body{flex:1;overflow:auto;padding-bottom:36px;scrollbar-width:none;overscroll-behavior:contain}
+#phone .ph-body::-webkit-scrollbar{display:none}
+#phone .ph-head{display:flex;align-items:center;gap:8px;min-height:44px;padding:2px 12px 6px;position:relative}
+#phone .ph-head h2{position:absolute;left:90px;right:90px;text-align:center;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#phone .ph-head-right{margin-left:auto;display:flex;gap:6px}
+#phone .ph-back{color:var(--ac);font-size:17px;padding:6px 4px;white-space:nowrap}
+#phone .ph-link{color:var(--ac);font-size:16px;display:inline-flex;align-items:center;gap:4px;padding:6px}
+#phone .ph-link .ui-icon{width:24px;height:24px}
+#phone .ph-link.danger,#phone .danger{color:#ff3b30}
+#phone .ph-large{display:flex;align-items:flex-end;justify-content:space-between;padding:8px 18px 10px}
+#phone .ph-large h1{font-size:33px;font-weight:700;letter-spacing:-.5px;text-transform:capitalize}
+#phone .ph-large h1 small{font-size:20px;font-weight:500;color:var(--mu)}
+#phone .ph-section{font-size:13px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.2px;padding:18px 20px 7px}
+#phone .ph-hint{font-size:13px;color:var(--mu);padding:8px 20px;text-align:center}
+#phone .ph-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 32px;text-align:center;color:var(--mu);font-size:15px;line-height:1.45}
+#phone .ph-empty .ui-icon{width:46px;height:46px;stroke-width:1.3;opacity:.7}
+#phone .ph-empty.small{padding:16px 24px;font-size:14px}
+#phone .ph-search,#phone .ph-input,#phone .ph-note{display:block;width:calc(100% - 32px);margin:0 16px 8px;min-height:0;padding:9px 13px;border:0;border-radius:12px;background:var(--fill);color:var(--fg);font:inherit;font-size:16px;text-transform:none;letter-spacing:0;outline:0}
+#phone input.ph-search::placeholder,#phone .ph-input::placeholder,#phone .ph-note::placeholder{color:var(--mu);opacity:1}
+#phone .ph-input:focus,#phone .ph-search:focus{background:var(--fill);box-shadow:0 0 0 2px var(--ac)}
+#phone .ph-note{flex:1;margin:0 16px 40px;width:auto;resize:none;background:transparent;font-size:17px;line-height:1.45}
+#phone .ph-list{display:flex;flex-direction:column}
+#phone .ph-card{background:var(--card);border-radius:14px;margin:0 16px;overflow:hidden}
+#phone .ph-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;text-align:left;color:var(--fg);position:relative;min-height:52px}
+#phone .ph-row+.ph-row:before{content:"";position:absolute;top:0;left:68px;right:0;height:1px;background:var(--ln)}
+#phone .ph-card .ph-row+.ph-row:before{left:16px}
+#phone .ph-row-main{display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left}
+#phone .fl{flex:1;min-width:0;display:flex;flex-direction:column}
+#phone .fl b{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#phone .fl small{display:flex;gap:3px;align-items:center;color:var(--mu);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#phone .ph-row time,#phone .ph-row>small{color:var(--mu);font-size:14px;font-variant-numeric:tabular-nums}
+#phone .ph-row.accent{color:var(--ac)}#phone .ph-row.danger{color:#ff3b30}
+#phone .ph-row>.ui-icon{color:var(--mu)}
+#phone .ph-mini{display:grid;place-items:center;width:34px;height:34px;border-radius:17px;background:var(--fill);color:var(--ac);flex:none}
+#phone .ph-mini .ui-icon{width:18px;height:18px}#phone .ph-mini.flip .ui-icon{rotate:180deg}#phone .ph-mini:disabled{opacity:.3}
+#phone .ph-avatar{display:grid;place-items:center;flex:none;width:var(--size);height:var(--size);border-radius:50%;background:linear-gradient(160deg,color-mix(in srgb,var(--av) 75%,#fff),var(--av));color:#fff;font-weight:600;font-size:calc(var(--size)*.42);text-shadow:0 1px 2px rgba(0,0,0,.25)}
+#phone .ph-pill-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 20px;border-radius:22px;background:var(--ac);color:#fff;font-weight:600;font-size:16px}
+#phone .ph-pill-btn.soft{background:var(--fill);color:var(--fg)}#phone .ph-pill-btn.danger{background:#ff3b30;color:#fff}
+#phone .ph-pill-btn.wide{display:flex;width:calc(100% - 32px);margin:12px 16px}
+#phone .ph-pill-btn:disabled{opacity:.5}
+#phone .ph-chip{padding:7px 14px;border-radius:16px;background:var(--fill);font-weight:600}
+#phone .ph-count{min-width:21px;height:21px;padding:0 6px;border-radius:11px;background:var(--ac);color:#fff;font:600 12.5px/21px inherit;font-style:normal;text-align:center}
+#phone .ph-tabs{display:flex;padding:7px 8px 28px;background:var(--bar);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:1px solid var(--ln)}
+#phone .ph-tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--mu)}
+#phone .ph-tabs button small{font-size:10.5px;font-weight:500}
+#phone .ph-tabs .ui-icon{width:25px;height:25px}
+#phone .ph-tabs .on{color:var(--ac)}
+#phone .ph-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+#phone .ph-grid3 button{aspect-ratio:3/4;overflow:hidden;background:var(--fill)}
+#phone .ph-grid3 img{width:100%;height:100%;object-fit:cover;display:block}
+#phone .ph-seg{display:flex;margin:0 16px;padding:2px;border-radius:9px;background:var(--fill)}
+#phone .ph-seg button{flex:1;padding:7px;border-radius:7px;font-size:14px;font-weight:500}
+#phone .ph-seg [aria-checked="true"]{background:var(--card);box-shadow:0 2px 6px rgba(0,0,0,.14)}
+#phone .ph-switch{appearance:none;-webkit-appearance:none;position:relative;width:51px;height:31px;border-radius:16px;background:var(--fill);margin:0;flex:none;cursor:pointer;transition:background .2s}
+#phone .ph-switch:after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.18);transition:left .2s}
+#phone .ph-switch:checked{background:#34c759}#phone .ph-switch:checked:after{left:22px}
+#phone input[type=range]{-webkit-appearance:none;appearance:none;width:130px;height:28px;margin:0;background:transparent;cursor:pointer}
+#phone input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--fill)}
+#phone input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--fill)}
+#phone input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--ac)}
+#phone input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-11px;border-radius:50%;background:#fff;border:0;box-shadow:0 2px 6px rgba(0,0,0,.3),0 0 0 .5px rgba(0,0,0,.1)}
+#phone input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#fff;border:0;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#phone .ph-sheet{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,.35);animation:ph-fade .2s}
+#phone .ph-sheet>*{background:var(--card);border-radius:16px 16px 0 0;padding:16px 0 34px;animation:ph-sheet .28s cubic-bezier(.2,.9,.3,1)}
+#phone .ph-sheet-form{padding:16px 16px 34px;display:grid;gap:10px}#phone .ph-sheet-form p{color:var(--mu);font-size:14px}#phone .ph-sheet-form .ph-input{width:100%;margin:0;min-height:90px;resize:none}
+#phone .ph-sheet h3{font-size:17px;font-weight:600}
+#phone .ph-sheet-actions{display:flex;gap:10px;justify-content:flex-end}
+#phone .ph-sheet-list{display:flex;flex-direction:column;padding:8px 0 34px}
+#phone .ph-sheet-list button{display:flex;gap:12px;align-items:center;padding:14px 22px;font-size:16px}
+#phone .ph-sheet-list button+button{border-top:1px solid var(--ln)}
+#phone .ph-sheet.tall>*{height:72%;display:flex;flex-direction:column;padding:0}
+#phone .ph-sheet.tall header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--ln)}
+@keyframes ph-sheet{from{transform:translateY(100%)}}@keyframes ph-fade{from{opacity:0}}
+#phone .ph-action-row{display:flex;gap:8px;justify-content:center;padding:18px 16px}
+#phone .ph-action-tile{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;border-radius:12px;background:var(--card);color:var(--ac)}
+#phone .ph-action-tile small{font-size:12px}
+#phone .ph-group{margin:6px 16px;background:var(--card);border-radius:14px;overflow:hidden}
+
+/* Banners and the call screen. */
+#phone .ph-banners{position:absolute;top:58px;left:10px;right:10px;z-index:65}
+#phone .ph-banner{display:flex;gap:11px;align-items:center;width:100%;padding:11px 13px;border-radius:24px;text-align:left;color:#fff;background:rgba(30,30,32,.7);animation:ph-drop .45s cubic-bezier(.3,1.3,.5,1)}
+#phone .ph-banner .ph-glyph{width:38px;height:38px;border-radius:10px}#phone .ph-banner .ph-glyph .ui-icon{width:22px;height:22px}
+#phone .ph-banner span{display:flex;flex-direction:column;min-width:0}#phone .ph-banner small{font-size:12px;opacity:.7}#phone .ph-banner b{font-size:15px}
+#phone .ph-banner span span{font-size:14px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes ph-drop{from{transform:translateY(-120px)}}
+#phone .ph-call-host{position:absolute;inset:0;z-index:50;pointer-events:none}
+#phone .ph-call{position:absolute;inset:0;pointer-events:auto;display:flex;flex-direction:column;justify-content:space-between;padding:120px 30px 70px;text-align:center;color:#fff;
+  background:radial-gradient(120% 75% at 50% 18%,color-mix(in srgb,var(--av) 60%,#1a1a1f) 0%,#0c0c10 72%);animation:ph-fade .25s}
+#phone .ph-call-top{display:flex;flex-direction:column;align-items:center;gap:8px}
+#phone .ph-call h2{font-size:32px;font-weight:500;margin-top:10px}
+#phone .ph-call p{font-size:17px;opacity:.75;font-variant-numeric:tabular-nums}
+#phone .ph-call .ph-call-note{font-size:13px;opacity:.9;color:#ffd60a;max-width:280px}
+#phone .ph-call-actions{display:flex;justify-content:space-around;align-items:flex-start}
+#phone .ph-round{display:flex;flex-direction:column;align-items:center;gap:8px}
+#phone .ph-round>.ui-icon{box-sizing:content-box;width:30px;height:30px;padding:21px;border-radius:50%;stroke-width:1.8}
+#phone .ph-round small{font-size:13px}
+#phone .ph-round.accept>.ui-icon{background:#30d158;color:#fff}#phone .ph-round.decline>.ui-icon{background:#ff3b30;color:#fff}
+#phone .ph-round.soft>.ui-icon{background:rgba(255,255,255,.18);backdrop-filter:blur(20px)}
+#phone .ph-round.soft.on>.ui-icon{background:#fff;color:#111}
+#phone .ph-call.incoming .accept>.ui-icon{animation:ph-ring 1.4s ease-in-out infinite}
+@keyframes ph-ring{0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,.55)}60%{box-shadow:0 0 0 16px rgba(48,209,88,0)}}
+#phone .ph-call.ended .ph-call-top p{color:#ff9f0a;opacity:1}
+
+/* Telefone and Contatos. */
+#phone .ph-app-telefone,#phone .ph-app-contatos{--ac:#0a84ff}
+#phone .ph-row.missed b{color:#ff3b30}#phone .ph-row.missed>.ui-icon{color:#ff3b30}
+#phone .ph-me{display:flex;gap:12px;align-items:center;padding:12px 14px;margin-bottom:4px}
+#phone .ph-add{display:flex;gap:10px;align-items:flex-end;padding:12px;margin:8px 16px}#phone .ph-add label{flex:1;font-size:13px;color:var(--mu)}#phone .ph-add .ph-input{width:100%;margin:4px 0 0}
+#phone .tel-detail{display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:12px;text-align:center}
+#phone .tel-detail h2{font-size:28px;font-weight:600;margin-top:10px}#phone .tel-detail>p{color:var(--mu)}
+#phone .tel-detail .ph-group{align-self:stretch}
+#phone .tel-keypad{display:flex;flex-direction:column;align-items:center;padding-top:20px}
+#phone .tel-digits{display:block;height:64px;font-size:38px;font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:1px}
+#phone .tel-keys{display:grid;grid-template-columns:repeat(3,80px);gap:16px 28px;margin-top:6px}
+#phone .tel-key{width:80px;height:80px;border-radius:50%;background:var(--fill);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background .1s}
+#phone .tel-key:active{background:var(--mu)}
+#phone .tel-key b{font-size:34px;font-weight:400;line-height:1}#phone .tel-key small{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--mu)}
+#phone .tel-key-actions{display:grid;grid-template-columns:repeat(3,80px);gap:28px;margin-top:18px;align-items:center;justify-items:center}
+#phone .tel-key-actions .ph-round>.ui-icon{padding:24px}
+#phone .tel-erase{color:var(--mu)}#phone .tel-erase .ui-icon{width:30px;height:30px}
+
+/* Highzap. */
+#phone .ph-app-highzap{--ac:#1bb36b;--zap-me:#d9fdd3;--zap-them:#fff;--zap-wall:#efeae2}
+#phone .dk .ph-app-highzap{--zap-me:#005c4b;--zap-them:#202c33;--zap-wall:#0b141a}
+#phone .zap-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}#phone .zap-meta .unread{color:var(--ac)}
+#phone .zap-tick{display:inline-flex;font-style:normal;color:var(--mu)}#phone .zap-tick .ui-icon{width:15px;height:15px}
+#phone .zap-tick.read{color:#53bdeb}#phone .zap-tick.failed{color:#ff3b30;font-weight:700}
+#phone .zap-head{border-bottom:1px solid var(--ln);gap:10px}#phone .zap-head .ph-back{font-size:26px;padding:0 6px 4px}
+#phone .zap-messages{background:var(--zap-wall);background-image:radial-gradient(color-mix(in srgb,var(--fg) 6%,transparent) 1px,transparent 1.5px);background-size:22px 22px;padding:10px 0 16px;display:flex;flex-direction:column;gap:3px}
+#phone .zap-bubble{align-self:flex-start;max-width:78%;margin:0 12px;padding:6px 9px 5px 10px;border-radius:12px 12px 12px 4px;background:var(--zap-them);font-size:15.5px;line-height:1.35;box-shadow:0 1px .5px rgba(0,0,0,.13);display:flex;flex-wrap:wrap;align-items:flex-end;gap:2px 8px;overflow-wrap:anywhere}
+#phone .zap-bubble.me{align-self:flex-end;background:var(--zap-me);border-radius:12px 12px 4px 12px}
+#phone .zap-bubble small{margin-left:auto;display:inline-flex;gap:3px;align-items:center;font-size:11px;color:var(--mu)}
+#phone .zap-day{align-self:center;margin:8px 0;padding:4px 10px;border-radius:8px;background:var(--card);color:var(--mu);font-size:12px}#phone .zap-day::first-letter{text-transform:uppercase}
+#phone .zap-compose{display:flex;gap:8px;align-items:center;padding:8px 10px 30px;background:var(--bar);border-top:1px solid var(--ln)}
+#phone .zap-compose .ph-input{margin:0;flex:1;width:auto;border-radius:20px}
+#phone .zap-send{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--ac);color:#fff;flex:none}
+#phone .zap-send .ui-icon{width:20px;height:20px}
+
+/* Highgram. */
+#phone .ph-app-highgram{--ac:#0095f6}
+#phone .gr-logo{font:italic 600 26px/1 "Snell Roundhand","Segoe Script","Brush Script MT",cursive!important;position:static!important;text-align:left!important;letter-spacing:.5px!important}
+#phone .gr-head{justify-content:space-between;padding-left:16px}
+#phone .gr-post{border-bottom:1px solid var(--ln);padding-bottom:10px}
+#phone .gr-post header{display:flex;align-items:center;gap:8px;padding:8px 12px}
+#phone .gr-author{display:flex;gap:9px;align-items:center;flex:1;min-width:0;font-weight:600;font-size:14px}
+#phone .gr-post time{color:var(--mu);font-size:13px}
+#phone .gr-post .ph-mini{background:none;color:var(--fg)}
+#phone .gr-photo{position:relative;aspect-ratio:3/4;background:var(--fill);overflow:hidden}
+#phone .gr-photo img{display:block;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none}
+#phone .gr-pop{position:absolute;left:50%;top:50%;translate:-50% -50%;color:#fff;opacity:0;pointer-events:none;filter:drop-shadow(0 4px 12px rgba(0,0,0,.3))}
+#phone .gr-pop .ui-icon{width:96px;height:96px;fill:#fff;stroke:#fff}
+#phone .gr-photo.popped .gr-pop{animation:gr-pop .9s ease-out}
+@keyframes gr-pop{15%{opacity:1;scale:1.2}30%{scale:.95}45%{scale:1}80%{opacity:1}100%{opacity:0;scale:1}}
+#phone .gr-actions{display:flex;gap:14px;padding:9px 12px 4px}#phone .gr-actions .ui-icon{width:27px;height:27px;stroke-width:1.7}
+#phone .gr-like.on{color:#ff3040}#phone .gr-like.on .ui-icon{fill:#ff3040;animation:gr-like .35s}
+@keyframes gr-like{50%{scale:1.25}}
+#phone .gr-likes{padding:0 12px;font-weight:600;font-size:14px}
+#phone .gr-caption{padding:3px 12px;font-size:14px;overflow-wrap:anywhere}
+#phone .gr-more{padding:3px 12px;color:var(--mu);font-size:14px}
+#phone .gr-tabs{padding-top:9px}#phone .gr-tabs .ph-avatar{box-shadow:0 0 0 2px var(--bg)}
+#phone .gr-tabs .on .ph-avatar{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--fg)}
+#phone .gr-tabs .on{color:var(--fg)}
+#phone .gr-profile{display:flex;align-items:center;justify-content:space-around;padding:14px 18px 8px;text-align:center}
+#phone .gr-profile div{display:flex;flex-direction:column}#phone .gr-profile b{font-size:18px}#phone .gr-profile small{font-size:13px;color:var(--mu)}
+#phone .gr-profile .ph-avatar{box-shadow:0 0 0 3px var(--bg),0 0 0 5.5px #d62976}
+#phone .gr-bio{padding:4px 18px 10px;font-size:14px}
+#phone .gr-profile-actions{display:flex;gap:8px;padding:0 16px 12px}#phone .gr-profile-actions .ph-pill-btn{flex:1;min-height:34px;border-radius:9px;font-size:14px}
+#phone .gr-comments{flex:1;overflow:auto;padding:8px 0}
+#phone .gr-comment{display:flex;gap:10px;align-items:flex-start;padding:8px 16px}
+#phone .gr-comment p{flex:1;font-size:14px;overflow-wrap:anywhere}#phone .gr-comment small{display:block;color:var(--mu);font-size:12px;margin-top:2px}
+#phone .gr-comment .ph-mini{width:28px;height:28px;color:var(--mu);background:none}
+#phone .gr-compose{display:flex;flex-direction:column}
+#phone .gr-preview{display:block;width:62%;aspect-ratio:3/4;object-fit:cover;margin:12px auto;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#phone .gr-compose .ph-input{min-height:84px;resize:none;margin-top:4px}
+
+/* Câmera and Fotos. */
+#phone .ph-app-camera{background:#000;color:#fff;padding-top:54px}
+#phone .cam-finder{position:relative;flex:1;margin:0 8px;border-radius:26px;overflow:hidden;background:#111}
+#phone .cam-finder video{width:100%;height:100%;object-fit:cover;display:block}
+#phone .selfie .cam-finder video{transform:scaleX(-1)}
+#phone .cam-grid{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 33.2%,rgba(255,255,255,.25) 33.3%,transparent 33.5%,transparent 66.5%,rgba(255,255,255,.25) 66.6%,transparent 66.8%),linear-gradient(transparent 33.2%,rgba(255,255,255,.25) 33.3%,transparent 33.5%,transparent 66.5%,rgba(255,255,255,.25) 66.6%,transparent 66.8%)}
+#phone .cam-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;font-size:14px;opacity:.75}
+#phone .cam-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}#phone .cam-flash.on{animation:cam-flash .35s ease-out}
+@keyframes cam-flash{0%{opacity:.9}100%{opacity:0}}
+#phone .cam-close{position:absolute;top:12px;left:14px;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.4);backdrop-filter:blur(10px);font-size:15px}
+#phone .cam-modes{display:flex;justify-content:center;gap:24px;padding:14px 0 8px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+#phone .cam-modes button{color:rgba(255,255,255,.6)}#phone .cam-modes [aria-checked="true"]{color:#ffd60a}
+#phone .cam-bar{display:flex;justify-content:space-around;align-items:center;padding:8px 20px 44px}
+#phone .cam-thumb{width:50px;height:50px;border-radius:10px;background:#222 center/cover;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+#phone .cam-shutter{width:78px;height:78px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 4px #000,0 0 0 4px #fff;transition:transform .1s}
+#phone .cam-shutter:active{transform:scale(.9)}
+#phone .cam-flip{display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.16)}#phone .cam-flip .ui-icon{width:26px;height:26px}
+#phone .foto-view{display:flex;flex-direction:column;align-items:center;background:var(--bg)}
+#phone .foto-view img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#000;margin-top:8px}
+#phone .foto-nav{display:flex;gap:24px}
+#phone .foto-actions{color:var(--ac)}#phone .foto-actions button{color:var(--ac)}#phone .foto-actions button:last-child{color:#ff3b30}
+
+/* Mapas. */
+#phone .ph-app-mapas{padding-top:0;--ac:#0a84ff}
+#phone .map-view{position:relative;flex:1;overflow:hidden}
+#phone .map-view canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#phone .map-search{position:absolute;top:56px;left:12px;right:12px}
+#phone .map-search .ph-search{width:100%;margin:0;background:var(--bar);backdrop-filter:blur(20px);box-shadow:0 4px 16px rgba(0,0,0,.18)}
+#phone .map-results{margin-top:6px;border-radius:12px;overflow:hidden;background:var(--card);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+#phone .map-results:empty{display:none}
+#phone .map-results button{display:flex;gap:10px;align-items:center;width:100%;padding:11px 14px;text-align:left}#phone .map-results button+button{border-top:1px solid var(--ln)}
+#phone .map-results .ui-icon{color:#ff3b30}
+#phone .map-zoom{position:absolute;right:12px;top:118px;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--bar);backdrop-filter:blur(20px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+#phone .map-zoom button{display:grid;place-items:center;width:44px;height:44px;color:var(--ac)}#phone .map-zoom button+button{border-top:1px solid var(--ln)}
+#phone .map-card{position:absolute;left:12px;right:12px;bottom:34px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;padding:12px 14px;border-radius:18px;background:var(--bar);backdrop-filter:blur(20px);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+#phone .map-card b{font-size:16px}#phone .map-card small{grid-column:1;color:var(--mu);font-size:13px}#phone .map-card .ph-mini{grid-row:1/3;grid-column:2}
+
+/* HighBank. */
+#phone .ph-app-highbank{--ac:#8a5cf6}
+#phone .bank-hello{display:flex;align-items:center;gap:10px;padding:10px 18px;font-size:16px}#phone .bank-hello>span:not(.ph-avatar){flex:1}
+#phone .bank-card{margin:8px 16px;padding:22px;border-radius:22px;color:#fff;background:radial-gradient(120% 140% at 0% 0%,#ea2fdc 0%,transparent 55%),linear-gradient(140deg,#4b2aa6,#1b0f3d);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15),0 10px 30px rgba(75,42,166,.35)}
+#phone .bank-card small{font-size:13px;opacity:.8}#phone .bank-card b{display:block;font-size:40px;font-weight:600;letter-spacing:-.5px;color:#ffd76a;font-variant-numeric:tabular-nums}#phone .bank-card span{font-size:13px;opacity:.8}
+#phone .bank-actions{display:flex;gap:10px;padding:12px 16px}
+#phone .bank-actions button{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0;border-radius:16px;background:var(--card);color:var(--ac)}
+#phone .bank-actions small{font-size:13px;color:var(--fg)}
+#phone .bank-dir{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--fill);font-style:normal;flex:none}
+#phone .bank-dir.in{color:#30a46c}#phone .bank-dir.out{color:var(--mu)}#phone .bank-dir .ui-icon{width:18px;height:18px}
+#phone .bank-amount{font-variant-numeric:tabular-nums;font-size:15px}#phone .bank-amount.in{color:#30a46c}
+#phone .bank-number{padding:14px;margin-top:14px;display:grid;gap:10px}#phone .bank-number label{font-size:13px;color:var(--mu)}#phone .bank-number .ph-input{width:100%;margin:6px 0 0}
+#phone .bank-pix{display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:16px;text-align:center}
+#phone .bank-pix form{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+#phone .bank-value{width:220px;border:0;background:none;color:var(--fg);font:600 46px/1.1 inherit;text-align:center;outline:0;padding:0;margin:0;min-height:0;font-variant-numeric:tabular-nums}
+#phone .bank-value::-webkit-inner-spin-button{display:none}
+#phone .bank-chips{display:flex;gap:8px}
+#phone .bank-big{font-size:44px;font-weight:600}#phone .bank-big small{font-size:18px;color:var(--mu)}
+#phone .bank-to{display:flex;gap:12px;align-items:center;padding:12px 14px;align-self:stretch;text-align:left}
+#phone .bank-done{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;text-align:center}
+#phone .bank-ok{display:grid;place-items:center;width:86px;height:86px;border-radius:50%;background:#30d158;color:#fff;font-style:normal;animation:gr-like .4s}
+#phone .bank-ok .ui-icon{width:46px;height:46px;stroke-width:2.4}#phone .bank-done h2{font-size:26px}#phone .bank-done p{color:var(--mu)}
+
+/* Notas, Calendário, Relógio, Calculadora and Ajustes. */
+#phone .ph-app-notas{--ac:#e0a800}
+#phone .ph-app-calendario{--ac:#ff3b30}
+#phone .cal-head span{display:flex;gap:8px}
+#phone .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 0;padding:0 12px;text-align:center}
+#phone .cal-grid small{font-size:12px;color:var(--mu);font-weight:600;padding-bottom:4px}
+#phone .cal-grid button{position:relative;width:40px;height:40px;margin:auto;border-radius:50%;font-size:18px}
+#phone .cal-grid .today{color:var(--ac);font-weight:700}#phone .cal-grid .on{background:var(--fg);color:var(--bg)}#phone .cal-grid .on.today{background:var(--ac);color:#fff}
+#phone .cal-grid .has:after{content:"";position:absolute;left:50%;bottom:3px;translate:-50% 0;width:5px;height:5px;border-radius:50%;background:var(--mu)}
+#phone .cal-dot{width:4px;height:28px;border-radius:2px;background:var(--ac);flex:none}
+#phone .cal-add{background:none;border:0;padding:10px 16px}
+#phone .ph-app-relogio{--ac:#ff9f0a}
+#phone .clock-row time{font-size:40px;font-weight:300;color:var(--fg);letter-spacing:-.5px}
+#phone .clock-row.bar time{color:#ea2fdc}
+#phone .stopwatch{display:flex;flex-direction:column;align-items:center;padding-top:40px}
+#phone .stopwatch output{font-size:64px;font-weight:200;font-variant-numeric:tabular-nums}
+#phone .stopwatch-actions{display:flex;justify-content:space-between;width:100%;padding:26px 24px}
+#phone .stopwatch-actions .ph-round{width:86px;height:86px;border-radius:50%;justify-content:center;background:var(--fill)}
+#phone .stopwatch-actions .ph-round.accept{background:rgba(48,209,88,.22);color:#30d158}#phone .stopwatch-actions .ph-round.decline{background:rgba(255,59,48,.22);color:#ff453a}
+#phone .stopwatch-actions .ph-round small{font-size:17px}
+#phone .stopwatch .ph-list{align-self:stretch}
+#phone .ph-app-calculadora{background:#000;color:#fff}
+#phone .calc{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:0 16px 40px}
+#phone .calc output{display:block;text-align:right;font-weight:300;line-height:1.1;padding:0 8px 10px;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+#phone .calc-keys{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+#phone .calc-keys button{height:80px;border-radius:40px;background:#333;font-size:34px}
+#phone .calc-keys .fn{background:#a5a5a5;color:#000;font-size:28px}#phone .calc-keys .op{background:#ff9f0a;font-size:38px}#phone .calc-keys .op.on{background:#fff;color:#ff9f0a}
+#phone .calc-keys .zero{grid-column:span 2;text-align:left;padding-left:30px}
+#phone .calc-keys button:active{filter:brightness(1.35)}
+#phone .ph-app-ajustes{--ac:#0a84ff}
+#phone .set-me{display:flex;gap:14px;align-items:center;padding:12px 14px;margin-bottom:22px}
+#phone .set-row{cursor:pointer}
+#phone .set-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--tint);color:#fff;font-style:normal;flex:none}#phone .set-icon .ui-icon{width:18px;height:18px}
+#phone .set-walls{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px}
+#phone .set-walls button{aspect-ratio:9/16;border-radius:12px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;color:#fff;font-size:11px;text-shadow:0 1px 3px rgba(0,0,0,.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+#phone .set-walls .on{box-shadow:0 0 0 3px var(--ac)}
+#phone .ph-row .ui-icon:last-child:not(:first-child){color:var(--ac)}
+
+/* Outside the phone: the call pill on the HUD, the hotbar badge and the label of who is on a call. */
+.phone-pill{position:absolute;top:66px;right:16px;z-index:99;display:flex;align-items:center;gap:6px;padding:5px;border-radius:999px;background:rgba(10,10,12,.92);color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 8px 24px rgba(0,0,0,.4);pointer-events:auto;
+  font:500 13px/1.2 -apple-system,"Segoe UI",Roboto,sans-serif;text-transform:none;letter-spacing:0;animation:ph-drop .45s cubic-bezier(.3,1.3,.5,1)}
+.phone-pill[hidden]{display:none}
+.phone-pill-main{display:flex;align-items:center;gap:8px;padding:0 10px 0 0;text-align:left;color:inherit;background:none;font:inherit;text-transform:none;letter-spacing:0}
+.phone-pill-main span{display:flex;flex-direction:column}.phone-pill-main small{color:#30d158;font-variant-numeric:tabular-nums}
+.phone-pill .ph-avatar{display:grid;place-items:center;width:var(--size);height:var(--size);border-radius:50%;background:var(--av);font-weight:600}
+.phone-pill-btn{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;color:#fff;padding:0}
+.phone-pill-btn.accept{background:#30d158;animation:ph-ring 1.4s ease-in-out infinite}.phone-pill-btn.decline{background:#ff3b30}
+.phone-pill-btn .ui-icon{width:18px;height:18px}
+.phone-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#ff3b30;color:#fff;font:700 10px/17px var(--font-mono);font-style:normal;text-align:center;letter-spacing:0}
+.action-bar [data-action="phone"]{position:relative}
+.label-phone{display:inline-flex;color:#30d158;margin-right:4px;vertical-align:-2px}.label-phone .ui-icon{width:13px;height:13px}
+@media(prefers-reduced-motion:reduce){#phone,#phone *{animation:none!important;transition:none!important}}
+
+/* Profile photos (Highgram) wherever the phone shows a person; the initial stays behind while it loads. */
+#phone .ph-avatar.has-photo{position:relative;overflow:hidden}
+#phone .ph-avatar.has-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#phone .ph-link.danger{color:#ff3b30}
+#phone .ph-grid3 button{position:relative}
+#phone .ph-grid3 video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+#phone .ph-grid3 button>small{position:absolute;right:5px;bottom:4px;display:flex;gap:2px;align-items:center;color:#fff;font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+#phone .ph-grid3 button>small .ui-icon{width:11px;height:11px;fill:#fff}
+#phone .foto-view video{width:100%;aspect-ratio:3/4;background:#000;margin-top:8px}
+
+/* Câmera: zoom, video mode and the recording timer. */
+#phone .cam-zoom{position:absolute;left:50%;bottom:14px;translate:-50% 0;display:flex;gap:4px;padding:4px;border-radius:20px;background:rgba(0,0,0,.35);backdrop-filter:blur(10px)}
+#phone .cam-zoom button{min-width:34px;height:34px;padding:0 6px;border-radius:17px;color:#fff;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+#phone .cam-zoom [aria-pressed="true"]{color:#ffd60a;background:rgba(0,0,0,.45);font-size:13px}
+#phone .cam-rec{position:absolute;top:12px;left:50%;translate:-50% 0;display:flex;gap:6px;align-items:center;padding:4px 10px;border-radius:7px;background:#ff3b30;color:#fff;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+#phone .cam-rec[hidden]{display:none}
+#phone .cam-rec i{width:8px;height:8px;border-radius:50%;background:#fff;animation:cam-blink 1s steps(2) infinite}
+@keyframes cam-blink{50%{opacity:0}}
+#phone .cam-shutter{position:relative}
+#phone .video-mode .cam-shutter:after{content:"";position:absolute;inset:7px;border-radius:50%;background:#ff3b30;transition:inset .2s,border-radius .2s}
+#phone .recording .cam-shutter:after{inset:23px;border-radius:7px}
+#phone .recording .cam-modes,#phone .recording .cam-thumb{visibility:hidden}
+#phone .cam-thumb.video{background:#333}
+
+/* Highzap: strangers by number, attachments, voice notes and the recorder. */
+#phone .zap-push{font-style:normal;font-weight:400;font-size:13px;color:var(--mu);margin-left:4px}
+#phone .zap-threads small .ui-icon{width:15px;height:15px;flex:none}
+#phone .zap-unknown{display:flex;align-items:center;gap:10px;padding:8px 14px;background:color-mix(in srgb,#ffd60a 16%,var(--card));font-size:13px;border-bottom:1px solid var(--ln)}
+#phone .zap-unknown span{flex:1}#phone .zap-unknown .ui-icon{width:18px;height:18px;flex:none}#phone .zap-unknown .ph-pill-btn{min-height:30px;padding:4px 14px;font-size:14px}
+#phone .zap-sheet-host{display:contents}
+#phone .zap-attach{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;color:var(--ac);flex:none}
+#phone .zap-attach .ui-icon{width:24px;height:24px}
+#phone .zap-mic{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--ac);color:#fff;flex:none}
+#phone .zap-mic .ui-icon{width:20px;height:20px}
+#phone .zap-compose:not(.typing) .zap-send,#phone .zap-compose.typing .zap-mic{display:none}
+#phone .zap-recording{display:flex;align-items:center;gap:10px;padding:8px 10px 30px;background:var(--bar);border-top:1px solid var(--ln)}
+#phone .zap-recording b{font-variant-numeric:tabular-nums;font-weight:600}#phone .zap-recording span{flex:1;color:var(--mu)}
+#phone .zap-rec-dot{width:10px;height:10px;border-radius:50%;background:#ff3b30;animation:cam-blink 1s steps(2) infinite}
+#phone .zap-bubble.media{flex-direction:column;align-items:stretch;padding:4px 4px 5px}
+#phone .zap-bubble.media>small{padding:0 5px}
+#phone .zap-photo{display:block;width:200px;aspect-ratio:3/4;border-radius:9px;overflow:hidden;background:var(--fill)}
+#phone .zap-photo img{display:block;width:100%;height:100%;object-fit:cover}
+#phone .zap-photo img:not([src]){visibility:hidden}
+#phone .zap-audio{display:flex;align-items:center;gap:10px;width:220px;padding:6px 6px 2px}
+#phone .zap-play{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--ac);color:#fff;flex:none}
+#phone .zap-play .ui-icon{width:16px;height:16px;fill:currentColor}
+#phone .zap-track{flex:1;height:4px;border-radius:2px;background:color-mix(in srgb,var(--fg) 18%,transparent);overflow:hidden}
+#phone .zap-track i{display:block;width:0;height:100%;background:var(--ac)}
+#phone .zap-audio time{min-width:34px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
+#phone .zap-video{position:relative;width:200px;aspect-ratio:3/4;border-radius:9px;overflow:hidden;background:#000}
+#phone .zap-video video{display:block;width:100%;height:100%;object-fit:cover}
+#phone .zap-play.big{position:absolute;left:50%;top:50%;translate:-50% -50%;width:54px;height:54px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+#phone .zap-play.big .ui-icon{width:22px;height:22px}
+#phone .zap-video>small{position:absolute;left:8px;bottom:6px;display:flex;gap:4px;align-items:center;color:#fff;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+#phone .zap-video>small .ui-icon{width:14px;height:14px}
+#phone .zap-video.playing .zap-play,#phone .zap-video.playing>small{display:none}
+#phone .zap-gone{display:flex;gap:6px;align-items:center;padding:4px 6px;color:var(--mu);font-size:14px;font-style:italic}
+#phone .zap-gone .ui-icon{width:16px;height:16px;flex:none}
+#phone .zap-viewer{position:absolute;inset:0;z-index:40;display:grid;place-items:center;background:#000;animation:ph-fade .2s}
+#phone .zap-viewer img{max-width:100%;max-height:100%;object-fit:contain}
+#phone .zap-viewer .ph-mini{position:absolute;top:58px;right:14px;background:rgba(255,255,255,.18);color:#fff}
+#phone .zap-stage img,#phone .zap-stage video{display:block;flex:1;min-height:0;width:calc(100% - 32px);margin:12px 16px 0;object-fit:contain;border-radius:12px;background:#000}
+#phone .zap-roll{overflow:auto;padding:2px}
+
+/* Highgram: suggestions, follows, search, filters and the profile editor. */
+#phone .gr-suggest{padding:4px 0 12px;border-bottom:1px solid var(--ln)}
+#phone .gr-suggest h3{display:flex;justify-content:space-between;align-items:center}#phone .gr-suggest h3 .ph-link{font-size:14px;text-transform:none;letter-spacing:0}
+#phone .gr-suggest-row{display:flex;gap:8px;overflow-x:auto;padding:4px 12px;scrollbar-width:none;overscroll-behavior:contain}
+#phone .gr-suggest-card{flex:none;width:136px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--ln);text-align:center}
+#phone .gr-suggest-card>button:first-child{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;min-width:0;color:var(--fg)}
+#phone .gr-suggest-card b{max-width:100%;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#phone .gr-suggest-card small{font-size:12px;color:var(--mu);line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px}
+#phone .gr-follow{min-height:32px;padding:6px 14px;border-radius:9px;background:var(--ac);color:#fff;font-weight:600;font-size:14px;flex:none}
+#phone .gr-follow.on{background:var(--fill);color:var(--fg)}
+#phone .gr-follow.wide{flex:1;min-height:34px}
+#phone .gr-suggest-card .gr-follow{width:100%}
+#phone .gr-person .fl b{font-size:15px}
+#phone .gr-badge{display:inline-block;padding:1px 6px;border-radius:5px;background:var(--fill);color:var(--mu);font-size:11px;font-weight:600;vertical-align:1px}
+#phone .gr-profile>button{display:flex;flex-direction:column;color:var(--fg)}
+#phone .gr-search-head{padding:4px 12px 8px}#phone .gr-search-head .ph-search{width:100%;margin:0}
+#phone .gr-explore .ph-grid3{margin-top:4px}
+#phone .gr-edit{display:flex;flex-direction:column}
+#phone .gr-canvas{display:block;width:70%;aspect-ratio:3/4;margin:8px auto 6px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#phone .gr-filters{display:flex;gap:10px;overflow-x:auto;padding:6px 14px 8px;scrollbar-width:none;overscroll-behavior:contain}
+#phone .gr-filters button{flex:none;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--mu)}
+#phone .gr-filters canvas{display:block;width:58px;height:77px;border-radius:6px;background:var(--fill)}
+#phone .gr-filters [aria-checked="true"]{color:var(--fg);font-weight:600}#phone .gr-filters [aria-checked="true"] canvas{box-shadow:0 0 0 2px var(--fg)}
+#phone .gr-strength{display:flex;align-items:center;gap:10px;padding:0 16px 4px;font-size:13px;color:var(--mu)}
+#phone .gr-strength[hidden]{display:none}
+#phone .gr-strength input{flex:1}#phone .gr-strength output{min-width:38px;font-variant-numeric:tabular-nums}
+#phone .gr-edit form{display:flex;flex-direction:column}
+#phone .gr-edit textarea{width:auto;margin:6px 16px 0;min-height:60px;resize:none}
+#phone .gr-edit-photo{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 10px}
+#phone .gr-edit-photo .ph-link{font-size:15px;font-weight:600}
+#phone .gr-profile-form{display:grid;gap:12px;padding:14px}
+#phone .gr-profile-form label{display:grid;gap:5px;font-size:13px;color:var(--mu)}
+#phone .gr-profile-form .ph-input{width:100%;margin:0}#phone .gr-profile-form textarea{min-height:74px;resize:none}
+#phone .gr-profile-form .ph-pill-btn.wide{width:100%;margin:4px 0 0}
+#phone .gr-pick{flex:1;overflow:auto}#phone .gr-pick .ph-pill-btn.wide{margin:12px 16px}
+
+/* Video calls: the other end fills the screen, your camera sits in the corner. */
+#phone .ph-call.video{padding-top:70px}
+#phone .ph-call-remote{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;background:#000}
+#phone .ph-call.video .ph-call-top,#phone .ph-call.video .ph-call-actions{position:relative;z-index:1}
+#phone .ph-call.video.remote .ph-call-top .ph-avatar{display:none}
+#phone .ph-call.video.remote h2{font-size:22px;margin-top:0;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+#phone .ph-call.video.remote p{text-shadow:0 1px 6px rgba(0,0,0,.7)}
+#phone .ph-call-self{position:absolute;top:58px;right:14px;z-index:2;width:92px;aspect-ratio:3/4;object-fit:cover;border-radius:14px;background:#111;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+#phone .ph-call-self.front{transform:scaleX(-1)}
+#phone .ph-call.active .ph-call-actions{flex-wrap:wrap;gap:16px 4px}
+#phone .ph-call.active .ph-round{min-width:62px}
+#phone .ph-call.active .ph-round>.ui-icon{padding:17px;width:26px;height:26px}

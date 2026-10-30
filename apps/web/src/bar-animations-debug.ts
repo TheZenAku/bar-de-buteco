@@ -5,7 +5,7 @@ import {BarScene} from './engine/BarScene';
  * local player and on Magrão without the room (BarScene.debugBarAnimation), and shows what the module found in the map.
  */
 const LABELS:Record<typeof BarScene.BAR_DEBUG_ACTIONS[number],string>={
-  fumar:'Fumar','parar-fumar':'Parar de fumar',vomitar:'Vomitar',cair:'Cair','levantar-chao':'Levantar do chão',
+  fumar:'Fumar','parar-fumar':'Parar de fumar',cigarro:'Cigarro inteiro',vomitar:'Vomitar',cair:'Cair','levantar-chao':'Levantar do chão',
   sentar:'Sentar (cadeira mais perto)',comer:'Comer','parar-comer':'Parar de comer',levantar:'Levantar',
   'limpar-mesa':'Limpar a mesa (mais perto)',urinar:'Urinar (mictório mais perto)',
   chopp:'Magrão · chopp','chopp-escuro':'Magrão · chopp escuro',longneck:'Magrão · long neck',parar:'Voltar ao servidor',

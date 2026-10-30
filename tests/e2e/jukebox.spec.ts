@@ -101,7 +101,7 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
     await expect.poll(async()=>['playing','blocked'].includes((await telemetry(other))[0]?.status),{timeout:30000}).toBe(true);
     if((await telemetry(other))[0]?.status==='blocked')await other.locator('#world').click({position:{x:320,y:240}});
     await expect.poll(async()=>(await telemetry(other))[0]?.status,{timeout:30000}).toBe('playing');
-    await other.getByRole('button',{name:'Sua conta',exact:true}).click();await page.bringToFront();
+    await other.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await other.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.bringToFront();
     const near=(await telemetry())[0].volume,far=(await telemetry(other))[0].volume;expect(near).toBeGreaterThan(far);
     await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await telemetry(other))[0]?.status).toBe('paused');
     await page.getByRole('button',{name:'Continuar',exact:true}).click();await expect.poll(async()=>(await telemetry(other))[0]?.status).toBe('playing');

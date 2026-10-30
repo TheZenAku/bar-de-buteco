@@ -20,7 +20,7 @@ O importador recusa uma folha que não seja nó raiz ou que gire em outro eixo. 
 
 ## Colisão
 
-As folhas deixaram de ser colisores fixos. A física compartilhada (`solidColliders` em `packages/shared/src/world.ts`) põe a caixa de cada folha onde o estado da porta manda: no vão quando fechada, encostada na parede quando aberta. O servidor e a previsão de movimento do cliente usam o mesmo estado (`setDoorStates`, aplicado pela rede a cada atualização), então não há barreira invisível nem porta que se atravessa. A câmera também esbarra nas folhas.
+As folhas deixaram de ser colisores fixos. A física compartilhada (`solidColliders` em `packages/shared/src/world.ts`) põe a caixa de cada folha onde o estado da porta manda: no vão quando fechada, encostada na parede quando aberta. O servidor e a previsão de movimento do cliente usam o mesmo estado (`setDoorStates`, aplicado pela rede a cada atualização), então não há barreira invisível nem porta que o personagem atravesse quando fechada. A câmera atravessa as folhas sem alterar a distância escolhida ([câmera](camera.md)).
 
 Os vãos do mapa têm 0,80 m para um corpo de 0,68 m, e a folha aberta a 95° ocupa parte dessa largura. Para ninguém ficar preso no batente, dentro do vão de uma porta aberta o corpo passa de lado: colide com raio de 0,25 m em vez de 0,34 m. Ao empurrar contra o batente, ele desliza para o centro do vão. Porta fechada bloqueia por inteiro. As 15 portas são atravessadas nos dois sentidos, mesmo fora do centro.
 

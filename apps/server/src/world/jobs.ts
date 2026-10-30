@@ -140,7 +140,7 @@ export class JobDirector {
   /** Administration: open/close a job, change its pay or slots. Workers above a reduced slot count keep their shift. */
   configure(jobId: string, patch: Partial<Settings>): void {
     const s = this.settings.get(jobId); if (!s) throw new Error('Emprego desconhecido.');
-    if (patch.pay !== undefined) s.pay = Math.max(0, Math.min(100, Math.round(patch.pay)));
+    if (patch.pay !== undefined) s.pay = Math.max(0, Math.min(1000, Math.round(patch.pay)));
     if (patch.slots !== undefined) s.slots = Math.max(0, Math.min(16, Math.round(patch.slots)));
     if (patch.enabled !== undefined) s.enabled = patch.enabled;
   }

@@ -1,34 +1,65 @@
-/* Needs: status panel meters, faint overlay and drunk screen effects (nova-ui tokens). */
-.needs{display:grid;gap:7px;margin:4px 0 12px}
-.need{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:8px;font-size:12px}
-.need>span{display:flex;align-items:center;gap:6px;color:var(--muted-foreground)}
-.need .ui-icon{width:15px;height:15px;color:var(--primary)}
-.need>b{font-size:11px;font-variant-numeric:tabular-nums;color:var(--foreground)}
-.need-track{grid-column:1/-1;height:8px;border:2px solid var(--border);border-radius:20px;background:var(--background);overflow:hidden;margin-top:3px}
-.need-track i{display:block;height:100%;width:100%;border-radius:20px;background:var(--primary);transition:width .4s,background .3s}
-.need[data-need=hp] i{background:var(--neon-red)}
-.need[data-need=stamina] i{background:var(--neon-green)}
-.need[data-need=thirst] i{background:var(--neon-teal)}
-.need[data-need=bladder] i{background:oklch(.85 .15 95)}
-.need[data-need=drunk] i{background:var(--accent)}
-.need.critical>span,.need.critical>b{color:var(--neon-red)}
-.need.critical .ui-icon{color:var(--neon-red)}
-.need.critical .need-track{border-color:var(--neon-red);animation:need-pulse 1.2s ease-in-out infinite}
-@keyframes need-pulse{50%{box-shadow:0 0 0 3px oklch(.78 .15 22 / .35)}}
+/* Needs: the player's state in the bottom-right corner. No panel behind it: the reference's mono text and thin bars
+   straight over the scene, each meter in its own colour. Then the faint overlay and drunk screen effects. */
+.status-hud{position:absolute;bottom:16px;right:16px;display:grid;justify-items:end;gap:8px;pointer-events:none;text-shadow:0 1px 6px oklch(0 0 0 / 85%)}
+.needs{display:grid;grid-template-columns:auto 96px auto;align-items:center;gap:7px 8px}
+/* A row keeps the shared columns (bars line up whatever the widest value) and its tooltip names the meter. */
+.need{--need:var(--vw-pink);display:grid;grid-column:1/-1;grid-template-columns:subgrid;align-items:center;font:500 11px var(--font-mono);text-transform:uppercase;pointer-events:auto}
+.need>.ui-icon{width:14px;height:14px;color:var(--need);filter:drop-shadow(0 1px 3px oklch(0 0 0 / 80%))}
+.need>b{min-width:3ch;font-weight:500;text-align:right;font-variant-numeric:tabular-nums;color:var(--foreground)}
+.need-track{height:3px;background:oklch(.12 .045 300 / 75%);box-shadow:0 0 0 1px oklch(0 0 0 / 30%);overflow:hidden}
+.need-track i{display:block;height:100%;width:100%;background:var(--need);transition:width .4s,background .3s}
+.need[data-need=stamina]{--need:var(--vw-mint)}
+.need[data-need=hunger]{--need:var(--vw-peach)}
+.need[data-need=thirst]{--need:var(--vw-cyan)}
+.need[data-need=bladder]{--need:var(--vw-lilac)}
+.need[data-need=drunk] i{background:var(--gradient-line)}
+.need.critical{--need:var(--destructive)}
+.need.critical>b{color:var(--destructive)}
+.need.critical .need-track i{background:var(--destructive)}
+.need.critical .need-track{animation:need-pulse 1.2s ease-in-out infinite}
+@keyframes need-pulse{50%{box-shadow:0 0 0 2px oklch(.65 .15 20 / .35)}}
 
-.faint-overlay{position:absolute;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:radial-gradient(circle,oklch(.1 .02 40 / .55),oklch(.08 .02 40 / .92));pointer-events:none;text-align:center;animation:faint-in 1.4s ease-out}
-.faint-overlay>div{max-width:380px}
-.faint-overlay small{font:12px var(--font-display);letter-spacing:2px;color:var(--neon-red)}
-.faint-overlay h2{font:30px/1.1 var(--font-display);margin:6px 0 10px;color:var(--foreground)}
-.faint-overlay p{font-size:14px;color:var(--muted-foreground);margin:0 0 14px}
-.faint-overlay b{display:inline-block;padding:6px 14px;border-radius:20px;background:var(--secondary);color:var(--primary);font-variant-numeric:tabular-nums}
+/* Consuming (consuming-hud.ts): one progress bar per drink, snack or item being had, above the key prompts. The item's
+   picture, a verb in the logo's magenta, its name, the time left and the logo's line filling up. */
+.consuming{position:relative;display:grid;gap:10px;width:min(320px,calc(100vw - 20px));padding:10px 12px 12px;background:var(--panel)}
+.consuming::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.consume-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:6px 10px}
+.consume-icon{display:grid;place-items:center;width:32px;height:32px;background:oklch(1 0 0 / 5%)}
+.consume-text{min-width:0}
+.consume-text small{display:block;font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.consume-text b{display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.consume-time{font:500 12px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--soft)}
+.consume-track{grid-column:1/-1;height:4px;background:var(--secondary);overflow:hidden}
+.consume-track i{display:block;width:0;height:100%;background:var(--gradient-line);transition:width .1s linear}
+
+.faint-overlay{position:absolute;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:radial-gradient(circle,oklch(.08 .02 300 / .6),oklch(.04 .01 300 / .94));pointer-events:none;text-align:center;animation:faint-in 1.4s ease-out}
+.faint-overlay::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,oklch(0 0 0 / 18%) 0 1px,transparent 1px 3px)}
+.faint-overlay>div{position:relative;max-width:380px}
+.faint-overlay small{font:400 11px var(--font-mono);letter-spacing:.3em;color:var(--destructive)}
+.faint-overlay h2{font-size:28px;line-height:1.1;margin:8px 0 10px}
+.faint-overlay p{font-size:14px;color:var(--muted-foreground);margin:0 0 16px}
+.faint-overlay b{display:inline-block;padding:6px 14px;background:var(--panel);font:400 12px var(--font-mono);text-transform:uppercase;color:var(--vw-cyan);font-variant-numeric:tabular-nums}
 @keyframes faint-in{from{opacity:0}}
 
 /* Drunkenness on screen: a warm vignette, then a slow sway and blur. The 3D camera wobbles as well. */
-body.drunk-1 .vignette{box-shadow:inset 0 0 160px oklch(.6 .15 60 / .35)}
+body.drunk-1 .vignette{box-shadow:inset 0 0 160px oklch(.6 .12 350 / .3)}
 body.drunk-2 #world{animation:drunk-sway 7s ease-in-out infinite}
 body.drunk-3 #world,body.drunk-4 #world{animation:drunk-sway 4.5s ease-in-out infinite;filter:blur(.8px) saturate(1.2)}
-body.drunk-2 .vignette,body.drunk-3 .vignette,body.drunk-4 .vignette{box-shadow:inset 0 0 200px oklch(.5 .18 40 / .55)}
+body.drunk-2 .vignette,body.drunk-3 .vignette,body.drunk-4 .vignette{box-shadow:inset 0 0 200px oklch(.5 .14 330 / .5)}
 @keyframes drunk-sway{0%,100%{transform:scale(1.03) rotate(0)}30%{transform:scale(1.04) rotate(.7deg) translateX(.6%)}70%{transform:scale(1.035) rotate(-.6deg) translateX(-.5%)}}
 @media(prefers-reduced-motion:reduce){body[class*=drunk-] #world{animation:none}}
-@media(max-width:760px){.needs{gap:4px}.need{font-size:11px}.need-track{height:6px}.faint-overlay h2{font-size:23px}}
+/* Sitting at the blackjack table, its panel (top right) stops above the meters on wide screens and covers them elsewhere. */
+@media(min-width:1101px){.blackjack{max-height:calc(100dvh - 82px - 190px)}}
+@media(max-width:1100px){.game:has(#blackjack:not(.hidden)) .status-hud{display:none}}
+/* Phones: one row of icons and bars right above the hotbar (two rows of tiles), without the values. */
+@media(max-width:760px){
+  .status-hud{bottom:120px;right:10px;left:10px}
+  .needs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px 12px}
+  .need{display:flex;gap:5px}
+  .need>.ui-icon{width:13px;height:13px}
+  .need-track{width:34px}
+  .need>b{display:none}
+  .faint-overlay h2{font-size:22px}
+}
+/* Low phone screens: the hotbar's tiles are shorter, so the row of meters comes down with it. */
+@media(max-width:760px) and (max-height:579px){.status-hud{bottom:104px}}

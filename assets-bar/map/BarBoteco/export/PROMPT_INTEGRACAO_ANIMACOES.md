@@ -5,7 +5,7 @@ Preciso que você integre no jogo (three.js) o mapa novo do Highland Bar e as an
 - `integracao_highland.js`: integração do mapa que o jogo já usa (`prepararMapa(gltf.scene)`: mesas, jukebox, telão, palco). Não mudou.
 - pasta `animacoes/`:
   - `animacoes_bar.js`: módulo novo; é ele que faz tudo funcionar. Leia o cabeçalho do arquivo inteiro antes de começar.
-  - `bar_locomocao.glb`, `bar_fumar.glb`, `bar_vomitar.glb`, `bar_cadeira.glb`, `bar_mesa.glb`, `bar_banheiro.glb`, `bar_magrao.glb`: clipes + props + emissores de partícula.
+  - `bar_locomocao.glb`, `bar_fumar.glb`, `bar_fumar_mixamo.glb`, `bar_vomitar.glb`, `bar_cadeira.glb`, `bar_mesa.glb`, `bar_banheiro.glb`, `bar_magrao.glb`: clipes + props + emissores de partícula.
   - `fbx/*.fbx`: um FBX por clipe (só esqueleto). Não precisa usar; o módulo usa os GLBs.
   - `palco_musicos.js` + `palco_*.glb`: músicos do palco, de uma entrega anterior. Se ainda não estiverem integrados, integre também (`criarPalco(mapa, { pasta })`, ver o cabeçalho).
 
@@ -14,7 +14,7 @@ Arrume os caminhos conforme a estrutura do projeto (pasta pública/static de ass
 ## O que tem nas animações
 Esqueleto Mixamo (ossos `mixamorig...`, qualquer prefixo), autorado com 1,90 m (é a altura do `rafael-mixamo.fbx` no three.js). O módulo converte para qualquer personagem com SkinnedMesh Mixamo, com ou sem escala, FBX ou GLB.
 - Locomoção no lugar (o jogo move o objeto): parado, andar 0,85 m/s, andar bêbado 0,55 m/s. O módulo ajusta o ritmo do passo pela velocidade.
-- Ações: fumar (acender, loop, apagar/pisar a bituca), vomitar (poça fica no chão), cair, levantar do chão, sentar na cadeira (puxa a cadeira real do mapa), sentado em loop, comer (garfo e batata), levantar, limpar a mesa (pela quina mais perto), urinar no mictório, e o magrão no balcão (`chopp`, `chopp_escuro`, `longneck`): vai até a chopeira ou o freezer e deixa a bebida no balcão.
+- Ações: fumar (acender, loop, apagar/pisar a bituca), fumar um cigarro inteiro de uma vez (`p.fumarCigarro()`, 18 s, animação "Smoking" do Mixamo: maço, isqueiro, baforada, joga e pisa; a bituca fica no chão), vomitar (poça fica no chão), cair, levantar do chão, sentar na cadeira (puxa a cadeira real do mapa), sentado em loop, comer (garfo e batata), levantar, limpar a mesa (pela quina mais perto), urinar no mictório, e o magrão no balcão (`chopp`, `chopp_escuro`, `longneck`): vai até a chopeira ou o freezer e deixa a bebida no balcão.
 - Fumaça, vômito e jato de urina são partículas do próprio módulo (THREE.Points); a escala dos nós `FX_*` é a intensidade.
 
 ## O que o mapa novo tem (o módulo procura por nome)
@@ -42,7 +42,7 @@ Esqueleto Mixamo (ossos `mixamorig...`, qualquer prefixo), autorado com 1,90 m (
    - perto de uma cadeira de mesa: `p.sentar(anim.maisPerto(anim.cadeiras, pos, 1.5))`; sentado: `p.comer()`, `p.pararDeComer()`, `p.levantar()`;
    - perto de uma mesa: `p.limparMesa(anim.maisPerto(anim.mesas, pos, 1.5))`;
    - no banheiro: `p.urinar(anim.maisPerto(anim.mictorios, pos, 1.5))`;
-   - livres: `p.fumar()` / `p.pararDeFumar()`, `p.vomitar()`, `p.cair()` / `p.levantarDoChao()`; ligue isso ao sistema de bebedeira/status do jogo, se existir.
+   - livres: `p.fumar()` / `p.pararDeFumar()`, `p.fumarCigarro()`, `p.vomitar()`, `p.cair()` / `p.levantarDoChao()`; ligue isso ao sistema de bebedeira/status do jogo, se existir.
    Todas devolvem Promise: as que entram em loop (fumar, sentar, comer) resolvem quando o loop começa, as outras quando o personagem fica livre.
 8. Magrão: crie um NPC com uma skin Mixamo parado em `anim.balcao`. Quando um cliente pedir no balcão (perto do `Ponto_Balcao` ou da `Balcao_Entrega`), chame `const bebida = await magrao.atender('chopp' | 'chopp_escuro' | 'longneck')`. `bebida` é um Object3D no balcão (`userData.bebida`); entregue ao cliente do jeito que o jogo fizer sentido e remova depois. Faça uma fila se chegarem dois pedidos ao mesmo tempo (o magrão faz um de cada vez; cada atendimento leva cerca de 14 s).
 9. Multiplayer, se houver: replique a chamada (nome do método + nome do lugar: `cadeira.name`, `mesa.name`, `mictorio.name`) para os outros clientes chamarem o mesmo método no personagem remoto. Os nomes das cadeiras são determinísticos para o mesmo mapa.

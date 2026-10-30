@@ -5,7 +5,7 @@ import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';
 import {WebSocketTransport} from '@colyseus/ws-transport';
 import {Client,type Room} from '@colyseus/sdk';
-import {INVENTORY_CAPACITY,type InventoryStack} from '@bar/shared';
+import {consumeMs,INVENTORY_CAPACITY,SHOP_SPOT,type InventoryStack} from '@bar/shared';
 import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 
@@ -43,17 +43,27 @@ test('room keeps inventory private, removes through the API and applies an item 
     assert.equal('inventory' in room.state,false,'private inventory must not be exposed in the room schema');
 
     const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=10;
+    // A snack goes into the hand: had over the same time as at a table, the player free to move meanwhile.
     room.send('inventory.use',{itemId:'coxinha'});
-    await until(()=>inventoryCalls===1&&player.interactionState==='inventory');
-    assert.equal(player.animationState,'use');assert.ok(needs.hunger<=10&&needs.hunger>9.9,'only passive decay runs before the synced action finishes');
+    await until(()=>inventoryCalls===1&&player.holding==='coxinha');
+    assert.equal(player.interactionState,'');assert.equal(player.holdingUntil-player.holdingSince,consumeMs('coxinha'));
     await until(()=>results.some(result=>result.action==='use'),4000);
-    assert.ok(needs.hunger>=44&&needs.hunger<=46);assert.equal(player.interactionState,'');
+    assert.ok(needs.hunger<12,'its effects come in as it goes');
+    player.holdingUntil=Date.now();await until(()=>player.holding==='');
+    assert.ok(needs.hunger>=44&&needs.hunger<=46,`all of it once finished: ${needs.hunger}`);
     assert.equal(states.at(-1).stacks.some((stack:any)=>stack.itemId==='coxinha'),false);
 
     room.send('inventory.use',{itemId:'coxinha'});await until(()=>errors.some(error=>error.toLowerCase().includes('mochila')));
     assert.equal(inventoryCalls,1,'an absent item is rejected before reaching the API');
     room.send('inventory.discard',{itemId:'agua',quantity:1});await until(()=>results.some(result=>result.action==='discard'));
     assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1}]);
+
+    // The house's shop opens only for someone standing on its blip: the room checks the reach.
+    const opened:unknown[]=[];room.onMessage('shop.open',message=>opened.push(message));
+    player.assign({x:SHOP_SPOT.x+2,y:SHOP_SPOT.y,z:SHOP_SPOT.z});room.send('player.interact',{objectId:'shop'});
+    await until(()=>errors.some(error=>error.includes('Chegue mais perto')));assert.equal(opened.length,0);
+    player.assign({x:SHOP_SPOT.x,y:SHOP_SPOT.y,z:SHOP_SPOT.z});room.send('player.interact',{objectId:'shop'});
+    await until(()=>opened.length===1);
   }finally{
     if(room?.connection?.isOpen)await room.leave();await server.gracefullyShutdown(false);await new Promise<void>(resolve=>api.close(()=>resolve()));
     if(previous===undefined)delete process.env.API_INTERNAL_URL;else process.env.API_INTERNAL_URL=previous;

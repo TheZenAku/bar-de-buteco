@@ -28,7 +28,8 @@ export const TABLE_ORDER_MAX_ITEMS=4;
 /** `to`: a player working the bar who takes the order instead of Tonico. */
 export const tableOrderSchema=z.object({items:z.array(z.enum(ITEM_IDS)).min(1).max(TABLE_ORDER_MAX_ITEMS),to:z.string().max(64).optional()}).strict()
   .refine(order=>order.items.every(id=>TABLE_MENU.includes(id)),{message:'Item fora do cardápio da mesa.'});
-export const orderTotal=(items:readonly ItemId[])=>items.reduce((sum,id)=>sum+(itemById(id)?.price??0),0);
+/** `price`: the live price of an item (prices.ts); the catalogue's by default. */
+export const orderTotal=(items:readonly ItemId[],price:(id:ItemId)=>number=id=>itemById(id)?.price??0)=>items.reduce((sum,id)=>sum+price(id),0);
 /** Where Tonico picks orders up: the customers' side of the counter, beside the bar stools. */
 export const PICKUP_POINT:Required<Position>={x:map.markers.Ponto_Balcao.x-.6,y:map.markers.Ponto_Balcao.y,z:map.markers.Ponto_Balcao.z+1.4};
 export const ORDER_PREPARATION_MS=3500;
@@ -40,14 +41,18 @@ export const SERVE_LEAD_MS=300;
 export const SERVE_ITEM_MS=700;
 export const handOverMs=(items:number)=>SERVE_LEAD_MS*2+items*SERVE_ITEM_MS;
 /**
- * How long a customer takes to finish each thing served at the table, seated. Its effects (CONSUMABLES) are taken in
- * as it goes; getting up leaves the rest. A finished item (or one left behind) waits on the table to be collected.
+ * How long anyone takes to finish each thing, wherever it comes from: served at the table (seated), a drink from Magrão
+ * at the counter or anything from the backpack (in hand, walking around: PlayerState.holding). Its effects
+ * (CONSUMABLES) are taken in as it goes. At a table, getting up leaves the rest, and a finished item (or one left
+ * behind) waits on the table to be collected.
  */
 export const CONSUME_MS:Readonly<Partial<Record<ItemId,number>>>={
   garrafa:180_000,copo:150_000,refrigerante:150_000,agua:120_000,cafe:90_000,
   coxinha:90_000,pastel:90_000,torresmo:150_000,
 };
 export const consumeMs=(item:string)=>CONSUME_MS[item as ItemId]??120_000;
+/** Had over time (CONSUME_MS), in hand or at a table; anything else (a bandage) is used at once. */
+export const consumedOverTime=(item:string)=>CONSUME_MS[item as ItemId]!==undefined;
 /**
  * Finished items are collected by whoever works the bar (Limpar a mesa N) or, with nobody working, by Tonico. If neither
  * gets there (no path, nobody around), they go on their own this long after they were finished.

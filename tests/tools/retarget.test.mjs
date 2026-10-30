@@ -4,7 +4,8 @@ import {AnimationClip,AnimationMixer,QuaternionKeyframeTrack,VectorKeyframeTrack
 import {readGlb,objects,retargetBase} from '../../tools/assets/lib/character-gltf.mjs';
 import {createRetarget} from '../../tools/assets/lib/animation-retarget.mjs';
 const publicRoot=new URL('../../apps/web/public/',import.meta.url);
-const load=(id,bank=false)=>readGlb(new URL(`${bank?'animations':'models'}/${id}.glb`,publicRoot));
+// bank: the action bank (true) or the dance bank ('dances') instead of the model.
+const load=(id,bank=false)=>readGlb(new URL(`${bank?'animations':'models'}/${id}${bank==='dances'?'-dances':''}.glb`,publicRoot));
 function values(g,index){const a=g.json.accessors[index],v=g.json.bufferViews[a.bufferView],size={SCALAR:1,VEC3:3,VEC4:4,MAT4:16}[a.type];assert.ok(size);return Array.from({length:a.count*size},(_,i)=>g.bin.readFloatLE((v.byteOffset??0)+(a.byteOffset??0)+i*4));}
 function animate(model,bank,name){
   const nodes=objects(model.json),raw=bank.json.animations.find(a=>a.name===name);assert.ok(raw);
@@ -17,8 +18,9 @@ for(const id of ['leandro','rafael','read','magrao','gilmar-gordo']){
   test(`${id}: native limbs follow the source motion across different A/T poses without stretching`,()=>{
     const model=load(id),reference=load('nathan'),rig=createRetarget(objects(model.json),objects(reference.json));
     const rest=objects(model.json),lengths=rest.map(n=>n.parent?n.getWorldPosition(new Vector3()).distanceTo(n.parent.getWorldPosition(new Vector3())):0);
-    for(const name of ['Idle','Walk','Dance','Drink','CardsSit','Sit']){
-      const action=['Idle','Walk'].includes(name)?model:load(id,true),source=['Idle','Walk'].includes(name)?reference:load('nathan',true);
+    for(const name of ['Idle','Walk','Dance Samba Dancing','Drink','CardsSit','Sit']){
+      const bank=name.startsWith('Dance ')?'dances':true;
+      const action=['Idle','Walk'].includes(name)?model:load(id,bank),source=['Idle','Walk'].includes(name)?reference:load('nathan',bank);
       const a=animate(model,action,name),b=animate(reference,source,name);
       for(const time of [.1,.6,1.1]){
         a.at(time);b.at(time);

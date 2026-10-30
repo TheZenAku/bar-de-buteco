@@ -1,6 +1,7 @@
 import map from './map-data.json';
 import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } from './index.js';
 import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
+import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 
 export const WALK_SPEED = 3.5;
@@ -123,6 +124,12 @@ export const musicianRole=(spot:string)=>MUSICIAN_ROLES[spot]??{label:'Tocar no 
 /** The ground-floor L-shaped counter (the lounge upstairs has its own, unattended). */
 export const COUNTER_FOOTPRINT:readonly Footprint[]=map.colliders
   .filter(c=>c.id.startsWith('COL_Mob_Balcao')&&Math.abs((c.minY??0)-map.markers.Ponto_Balcao.y)<.1).map(footprint);
+/**
+ * The house's shop, on the backyard floor: the spot the admin chose standing there (2026-10-30). It is used standing on
+ * its blip, a gold ring like the others: within SHOP_REACH metres of its centre.
+ */
+export const SHOP_SPOT:Required<Position>={x:18.79,y:.3,z:-15.45};
+export const SHOP_REACH=.7;
 export const INTERACTABLES: readonly Interactable[] = [
   {id:'blackjack-1',type:'blackjack',label:'Jogar blackjack',...BLACKJACK_TABLE,footprint:[footprint(BLACKJACK_COLLIDER)]},
   {id:'counter',type:'counter',label:'Pedir uma bebida',...map.markers.Ponto_Balcao,footprint:[...COUNTER_FOOTPRINT]},
@@ -136,6 +143,9 @@ export const INTERACTABLES: readonly Interactable[] = [
   ...map.barAnimations.urinals.map(u=>({id:u.id,type:'urinal' as const,label:'Usar o mictório',x:u.x,y:u.y,z:u.z,rotation:u.yaw})),
   // The stage's steps: touching them, from below or from the deck, opens the pass (the room charges it).
   {id:'stage',type:'stage',label:'Subir no palco',...STAGE_ENTRY,footprint:STAGE.steps.map(footprint)},
+  {id:'shop',type:'shop',label:'Comprar na loja da casa',...SHOP_SPOT,reach:SHOP_REACH},
+  // The light desk, up on the deck by the sound desk: standing on its blip opens the stage show's controls.
+  {id:'light-desk',type:'lights',label:'Mexer na mesa de luz',x:LIGHT_DESK.x,y:LIGHT_DESK.y,z:LIGHT_DESK.z,rotation:LIGHT_DESK.rotation,reach:LIGHT_DESK_REACH},
   ...STAGE.places.map(place=>({id:`palco-${place.id}`,type:'musician' as const,label:musicianRole(place.id).label,spot:place.id,
     x:place.x,y:place.y,z:place.z,reach:MUSICIAN_REACH})),
 ];

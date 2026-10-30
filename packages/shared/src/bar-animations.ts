@@ -3,9 +3,10 @@ import type {Position} from './index.js';
 import {floorHeight,isWalkable} from './world.js';
 
 /**
- * The characters' bar animations (18_animacoes_bar.py, export/animacoes/bar_<group>.glb): smoking, vomiting, falling and
- * getting up from the floor, sitting down at a table (pulling the map's own chair), eating, getting up, clearing a table
- * from its nearest corner, using a urinal, and Magrão pouring a chopp or fetching a long neck at the counter.
+ * The characters' bar animations (18_animacoes_bar.py, export/animacoes/bar_<group>.glb): smoking, smoking a whole
+ * cigarette (19_fumar_mixamo.py), vomiting, falling and getting up from the floor, sitting down at a table (pulling the
+ * map's own chair), eating, getting up, clearing a table from its nearest corner, using a urinal, and Magrão pouring a
+ * chopp or fetching a long neck at the counter.
  * The room syncs who does what and since when (animationState, animationStartedAt); every browser derives the clip and
  * its time from that with barTimeline, and the place it happens at with barFrame, so the bodies, the props and the
  * chairs move alike for everyone, and somebody arriving in the middle sees the action where it is.
@@ -80,7 +81,7 @@ export function nearestCorner(table:(typeof map.tables)[number],position:Positio
 export const cornerSpot=(frame:BarFrame)=>inFrame(frame,BAR_ANIMATIONS.clips.limpar_mesa.start);
 
 /** The room's states for the bar animations (AnimationState in index.ts). */
-export const BAR_STATES=['stand-up','urinate','smoke','smoke-stop','vomit','clean',...Object.keys(SERVE_STATES) as ServeState[]] as const;
+export const BAR_STATES=['stand-up','urinate','smoke','smoke-stop','cigarette','vomit','clean',...Object.keys(SERVE_STATES) as ServeState[]] as const;
 interface Actor {animationState?:string;animation?:string;animationStartedAt?:number;interactionState?:string;currentTableId?:string;x:number;y?:number;z:number}
 const stateOf=(actor:Actor)=>actor.animationState??actor.animation??'';
 
@@ -152,6 +153,8 @@ export function barTimeline(actor:Actor,now:number,npcId='',meal?:Meal):BarStep|
     case 'smoke':return chain(['fumar_acender','fumar_loop'],from,now,ENTER);
     // Asked to stop while still lighting up: the cigarette goes out once it is lit.
     case 'smoke-stop':return now<from?chain(['fumar_acender'],from-barClipMs('fumar_acender'),now,ENTER):chain(['fumar_apagar'],from,now,FROM_LOOP);
+    // A whole cigarette, from the pack in the pocket to the butt stepped on (animacoes_bar.js fumarCigarro).
+    case 'cigarette':return chain(['fumar_mixamo'],from,now,ENTER);
     case 'vomit':return chain(['vomitar'],from,now,ENTER);
     case 'fallen':return chain(['cair'],from,now,FALL);
     case 'recover':return chain(['levantar_chao'],from,now,0);

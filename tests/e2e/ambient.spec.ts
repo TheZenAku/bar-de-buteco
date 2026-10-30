@@ -100,7 +100,7 @@ test('in-game ambience starts on entry, follows settings, leaves voice independe
   await page.keyboard.press('Escape');await page.locator('#audio-button').click();await expect.poll(async()=>(await ambient()).context).toBe('suspended');
   expect((await ambient()).enabled).toBe(false);await page.locator('#audio-button').click();
   await expect.poll(async()=>(await ambient()).decks.some((d:any)=>!d.paused)).toBe(true);
-  await page.getByRole('button',{name:'Sua conta',exact:true}).click();await page.locator('#modal [data-action="leave"]').click();
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
   await expect(page.locator('#lobby')).toBeVisible();await expect.poll(async()=>(await ambient()).context).toBe('suspended');
   expect((await ambient()).decks.every((d:any)=>!d.id&&d.paused)).toBe(true);expect(errors).toEqual([]);
 });

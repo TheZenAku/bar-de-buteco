@@ -133,7 +133,7 @@ test('PostgreSQL 17 separa owner, migrador concorrente e runtime sem DDL',{
       const client=await runtime.connect();
       try{
         assert.equal((await client.query<{search_path:string}>('SHOW search_path')).rows[0]!.search_path,'pg_catalog, public');
-        assert.equal((await client.query<{count:number}>('SELECT count(*)::int AS count FROM bar_schema_migrations')).rows[0]!.count,5);
+        assert.equal((await client.query<{count:number}>('SELECT count(*)::int AS count FROM bar_schema_migrations')).rows[0]!.count,6);
         await expectPermissionDenied(client,'CREATE TABLE runtime_must_not_create (id integer)');
         await expectPermissionDenied(client,'ALTER TABLE users ADD COLUMN runtime_must_not_alter integer');
         await expectPermissionDenied(client,`INSERT INTO bar_schema_migrations (name,checksum) VALUES ('999_forbidden.sql','${'f'.repeat(64)}')`);

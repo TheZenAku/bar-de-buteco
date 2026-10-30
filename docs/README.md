@@ -30,13 +30,14 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 - [Administração](sistemas/admin.md)
 - [Câmera: primeira e terceira pessoa, suavização e raio-X](sistemas/camera.md)
+- [Celular: ligações, Highzap, Highgram, câmera e HighBank](sistemas/celular.md)
 - [Som ambiente](sistemas/ambient.md)
 - [Ciclo de dia e noite](sistemas/day-night.md)
 - [Economia: moedas, balcão, mesa, empregos e mídia](sistemas/economia.md)
 - [Configurações gráficas](sistemas/graficos.md)
 - [Portas](sistemas/doors.md)
 - [Cerveja: garrafa e copo de chopp](sistemas/drinks.md)
-- [Interface Boteco Social](sistemas/interface.md)
+- [Interface Midnight Neon](sistemas/interface.md)
 - [Inventário](sistemas/inventory.md)
 - [Jukebox e TVs](sistemas/jukebox.md)
 - [Necessidades do personagem](sistemas/needs.md)
@@ -49,6 +50,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Animações](assets/animations.md)
 - [Mapa BarBoteco](assets/map.md)
 - [Animações nos esqueletos nativos](assets/native-rigs.md)
+- [Diagnóstico e estabilização de rigs](assets/rig-troubleshooting.md)
 - [Skins Mixamo](assets/skins-mixamo.md)
 - [Caminhada com bengala](assets/old-cane.md)
 

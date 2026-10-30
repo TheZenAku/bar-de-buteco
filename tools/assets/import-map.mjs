@@ -266,23 +266,25 @@ const cameraCeilings = [
 ];
 /**
  * The characters' bar animations (18_animacoes_bar.py: export/animacoes/bar_<group>.glb, a 1.90 m Mixamo skeleton, props and
- * particle emitters) and the places in the map they happen at (17_lugares_animacao.py). The GLBs are served as they are
- * (public/animacoes); the client converts the clips to each skin, and the room times the actions by their length and
- * puts the body where each clip leaves it (`end`: the hips on the floor, in the clip's space, facing +Z).
+ * particle emitters; 19_fumar_mixamo.py: bar_fumar_mixamo.glb, Mixamo's own "Smoking" skeleton) and the places in the map
+ * they happen at (17_lugares_animacao.py). The GLBs are served as they are (public/animacoes); the client converts the
+ * clips to each skin, and the room times the actions by their length and puts the body where each clip leaves it (`end`:
+ * the hips on the floor, in the clip's space, facing +Z).
  */
 function readBarAnimations(){
   const destination=path.join(root,'apps/web/public/animacoes');
   fs.mkdirSync(destination,{recursive:true});
   const groups={},clips={};
-  for(const group of ['locomocao','fumar','vomitar','cadeira','mesa','banheiro','magrao']){
+  for(const group of ['locomocao','fumar','fumar_mixamo','vomitar','cadeira','mesa','banheiro','magrao']){
     const file=`bar_${group}.glb`,glb=read(path.join('animacoes',file)),json=glb.json;
     const info=JSON.parse(json.scenes[json.scene??0].extras?.bar_animacoes??'null');
     if(info?.grupo!==group)throw new Error(`${file} lacks its bar_animacoes extras`);
     const node=name=>json.nodes.findIndex(n=>n.name===name);
-    const skeleton=node('Personagem'),hips=json.nodes.findIndex(n=>/mixamorig\d*:?Hips$/.test(n.name));
-    if(skeleton<0||hips<0||!json.nodes[skeleton].children?.includes(hips))throw new Error(`${file}: Personagem must hold mixamorig:Hips`);
+    // What holds the hips is the armature: Personagem (18_animacoes_bar.py), or Mixamo's Armature in centimetres, scaled 0.01.
+    const hips=json.nodes.findIndex(n=>/mixamorig\d*:?Hips$/.test(n.name)),skeleton=json.nodes.findIndex(n=>n.children?.includes(hips));
+    if(hips<0||skeleton<0)throw new Error(`${file}: mixamorig:Hips must hang from an armature node`);
     for(const prop of info.props)if(node(prop)<0)throw new Error(`${file} lacks its prop ${prop}`);
-    const holder=json.nodes[skeleton],holderMatrix=new Matrix4().compose(new Vector3(...(holder.translation??[0,0,0])),new Quaternion(...(holder.rotation??[0,0,0,1])),new Vector3(1,1,1));
+    const holder=json.nodes[skeleton],holderMatrix=new Matrix4().compose(new Vector3(...(holder.translation??[0,0,0])),new Quaternion(...(holder.rotation??[0,0,0,1])),new Vector3(...(holder.scale??[1,1,1])));
     const holderTurn=new Quaternion(...(holder.rotation??[0,0,0,1])),restTurn=holderTurn.clone().multiply(new Quaternion(...(json.nodes[hips].rotation??[0,0,0,1])));
     for(const [name,clip] of Object.entries(info.clipes)){
       const animation=json.animations.find(a=>a.name===name);
@@ -297,11 +299,14 @@ function readBarAnimations(){
         return {x:round(p.x),z:round(p.z),yaw:round(Math.atan2(front.x,front.z))};
       };
       // What the client needs of the extras (PlayCanvas drops a scene's extras): props held by a bone in frame ranges
-      // (segue), map nodes the GLB's copy stands in for (substitui), and props left on the map at the end (entrega, fica).
-      const extra=Object.fromEntries(['segue','substitui','entrega','fica','bebida'].filter(key=>clip[key]!==undefined).map(key=>[key,clip[key]]));
+      // (segue), props turned to point at another in frame ranges (mira), map nodes the GLB's copy stands in for
+      // (substitui), and props left on the map at the end (entrega, fica).
+      const extra=Object.fromEntries(['segue','mira','substitui','entrega','fica','bebida'].filter(key=>clip[key]!==undefined).map(key=>[key,clip[key]]));
       clips[name]={group,duration,loop:!!clip.loop,start:at(0),end:at(moves.length-1),...extra};
     }
-    groups[group]={file,hash:glb.hash.slice(0,12),anchor:info.ancora??null,height:info.altura_m,fps:info.fps,props:info.props,fx:info.fx,...info.velocidade?{speeds:info.velocidade}:{}};
+    // hipHeight (quadril_m): a skeleton of other proportions than the 1.90 m one; the hips then move by the skin's hip height.
+    groups[group]={file,hash:glb.hash.slice(0,12),anchor:info.ancora??null,height:info.altura_m,...info.quadril_m?{hipHeight:info.quadril_m}:{},
+      fps:info.fps,props:info.props,fx:info.fx,...info.velocidade?{speeds:info.velocidade}:{}};
     fs.copyFileSync(path.join(source,'animacoes',file),path.join(destination,file));
   }
   const place=name=>{

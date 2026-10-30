@@ -1,40 +1,101 @@
-# Interface Boteco Social
+# Interface Midnight Neon
 
-A interface ativa substitui o tema anterior pela referência visual Boteco Social (o protótipo de origem, `assets-bar/ui/nova-ui`, saiu do repositório e continua no histórico do git). Foram portados os seis painéis, a paleta marrom com detalhes neon, os ícones de contorno, as fontes Lilita One e Nunito e as notificações em formato de comanda. A imagem fornecida aparece na entrada; o fundo da partida continua sendo o mapa PlayCanvas interativo.
+A interface segue a referência **Midnight Neon Menu** (`assets-bar/ui/midnight-neon-menu-main`), um conceito minimalista inspirado nos menus do GTA Online: painéis escuros, cantos retos e tipografia limpa. As cores são as da logo do **Highland Bar**. Ela substitui por completo o tema anterior, Boteco Social (marrom com neon, Lilita One e Nunito), que continua no histórico do git. O fundo da partida continua sendo o mapa PlayCanvas interativo.
 
-A marca é a logo **Highland Bar** (`assets-bar/logo/logo.png`, a mesma do letreiro da fachada). Ela aparece em destaque na entrada, na tela de espera e no topo do HUD. As versões web são reduzidas da original: `apps/web/public/ui/logo-highland.webp` (480 px, entrada e espera), `ui/logo-highland-hud.webp` (128 px, HUD), `favicon-32.png`, `favicon-192.png` e `apple-touch-icon.png` (180 px sobre fundo escuro). Ao trocar a logo, gere esses arquivos de novo nos mesmos tamanhos.
+A referência é um protótipo React, Tailwind e TanStack. A integração reproduz o seu vocabulário no cliente TypeScript/DOM existente, sem adicionar outro aplicativo, roteador ou renderizador. O diretório de referência permanece intacto. O que a referência não tem (painéis do jogo, janelas, mochila, blackjack, configurações) foi feito com os mesmos elementos dela.
 
-O protótipo original usa React, Tailwind e Sonner. A integração reproduz seus componentes no cliente TypeScript/DOM existente, sem adicionar outro aplicativo, roteador ou renderizador. O diretório de referência permanece intacto. Fontes, licenças e imagem são distribuídas localmente; jogar não depende de Google Fonts ou de outros serviços de interface.
+## Identidade
 
-## Painéis
+| Elemento | Na referência | No jogo |
+| --- | --- | --- |
+| Cores | Tokens oklch de `src/styles.css`: fundo arroxeado, painel preto a 90%, rosa, ciano e lilás suaves | As da logo do Highland (tiradas de `favicon-192.png`): magenta `#ea2fdc`, ciano `#17d4f4`, azul elétrico `#0386f0`, dourado `#fac416` e laranja `#f59847`, sobre uma noite violeta. Painéis violeta-escuros a 90% com a linha neon da logo (magenta, azul, ciano) no topo; o que está ativo ou selecionado fica magenta (`#b90eb2`, texto branco) com brilho; dinheiro em dourado; foco em ciano. Menta continua no microfone ligado e no turno de trabalho; o laranja, no medidor de fome |
+| Fontes | Chakra Petch e JetBrains Mono | Servidas localmente (`assets/fonts`, subconjunto latino, licença OFL). Jogar não depende do Google Fonts |
+| Ícones | Lucide, sem emoji | Lucide (`lucide-static` 1.64.0, ISC), embutidos em `ui-icons.ts`. Moedas usam o ícone de moedas em vez da imagem dourada |
+| Cabeçalho | Rótulo mono espaçado e título grande em caixa alta | "O seu bar · A sua galera / Highland Bar" na entrada; no jogo, a logo pequena no canto superior esquerdo |
+| Abas | Fundo preto; a ativa em branco com texto preto; linha em gradiente rosa, lilás e ciano por baixo | Entrada, administração e janelas como Pessoas no bar; a ativa fica magenta e a linha segue a logo |
+| Lista | Ícone, rótulo em caixa alta e seta; o item ativo fica branco | Opções de acesso, "O Bar", "Controles" e o menu de painéis; o item ativo fica magenta |
+| Cartão de detalhe | Título com ícone rosa, conteúdo, rodapé mono com a posição na lista | Painéis do HUD e o detalhe da entrada |
+| Painel de dinheiro | Mono, alinhado à direita, saldo em ciano | Carteira num chip próprio no fim do topo, à direita, com o saldo em dourado |
+| Dicas de tecla | Chips pretos com a tecla contornada | Rodapé da entrada e os avisos "E" e "P" do jogo |
+| Fundo | Céu em degradê, grade em perspectiva, sol desfocado e scanlines | Entrada e tela de espera (a grade corre em direção a quem olha) e, só as scanlines, o fundo das janelas |
+
+A logo (`assets-bar/logo/logo.png`, a do letreiro da fachada) está nos favicons (`favicon-32.png`, `favicon-192.png` e `apple-touch-icon.png`), na entrada como letreiro animado (`ui/logo-highland.webp`, 720 px, veja abaixo), na tela de espera (132 px, flutuando) e, no jogo, no canto superior esquerdo (`ui/logo-highland-hud.webp`, 128 px, mostrada com 56 px; 48 px em telas compactas e 40 px no celular). O título **Highland Bar** da entrada é um neon que falha de vez em quando.
+
+Os marcadores do mundo mantêm a cor do seu anel na cena: verde no objetivo do trabalho, magenta na escada do palco, turquesa no telão, dourado na loja da casa e violeta na mesa de luz, em cima do palco (`--blip-job`, `--blip-stage`, `--blip-telao`, `--blip-shop` e `--blip-desk`). O crachá desenhado sobre eles segue a interface: chip preto, cantos retos e texto mono. O do trabalho mostra sempre a distância (e fica na borda da tela quando a estação sai de vista); os do palco e do telão só aparecem com o jogador em cima do anel, com o nome e o preço, logo abaixo dos pés. De longe, o anel basta.
+
+## Entrada
+
+Três abas, como na referência:
+
+- **Conta**: Entrar, Criar conta e Recuperar senha (ou Nova senha, pelo link do e-mail). Com a sessão ativa, Continuar e Usar outra conta.
+- **O Bar**: galera, blackjack, jukebox e TVs, palco, mesa e balcão e trabalho, com preços e limites lidos de `@bar/shared`. Nada é inventado.
+- **Controles**: as teclas por grupo. A ajuda do jogo (`?`) lê a mesma lista (`CONTROLS` em `lobby-menu.ts`).
+
+Apontar ou focar um item de O Bar e de Controles mostra o seu detalhe. As setas esquerda e direita trocam de aba; para cima e para baixo percorrem a lista.
+
+### A logo na entrada
+
+Ao lado do menu fica a logo grande, como um letreiro de neon vivo (`lobby-hero.ts` e `lobby-hero.css`):
+
+- **Entrada**: cai girando, quica e acende com uma onda de choque e um clarão.
+- **O tempo todo**: flutua e balança; dá um pulinho a cada 9 s; o neon falha de vez em quando; um brilho passa por ela; às vezes dá uma falha de imagem em ciano e magenta. Atrás, raios girando nos dois sentidos, um halo que pulsa no compasso de 124 BPM (o mesmo do [show do palco](palco.md#show-de-luzes)), um anel de neon nas cores da logo, quatro faíscas em órbita e quatro holofotes varrendo o céu. Embaixo, um equalizador de 18 barras.
+- **Com o mouse**: a logo se inclina na direção do ponteiro, em qualquer ponto da entrada, e cresce um pouco quando o ponteiro passa por cima.
+- **Com um clique, um brinde**: a logo amassa e estica, solta bolhas, estrelas e confetes, toca um tim-tim de copo (sintetizado, sem arquivo de som) e mostra o grito da rodada. Cliques seguidos, a menos de 1,3 s um do outro, continuam a rodada: *Saúde!*, *Tim-tim!*, *Mais uma! ×3*, *Ô loco! ×4*, *Desce redondo! ×5*, *Saideira! ×6*.
+- **Fundo**: bolhas de cerveja sobem pela entrada inteira, cada uma com tamanho, velocidade e balanço próprios.
+
+Em telas a partir de 1280 px, a logo fica à direita do menu (até 480 px) e a luz dela passa por trás dos painéis. Abaixo disso, ela fica entre o título e as abas, menor (150 a 230 px), e no celular os holofotes e a dica somem. Tudo se move com `transform` e `opacity`; os desfoques e as máscaras são desenhados uma vez só, o que pesa pouco mesmo com a composição por software do navegador. Com *reduzir movimento* ligado no sistema, nada se mexe e o brinde mostra só o grito (com o tim-tim).
+
+## Na tela
+
+A tela mostra só o que é usado o tempo todo. O resto abre por tecla ou pelo topo: a mochila (I ou Mochila, nas ações), as pessoas (botão Pessoas no bar) e a ajuda, que lista todas as teclas. Não há dicas de teclas fixas na tela, e a caixa de e-mail local (só em desenvolvimento) aparece apenas na entrada.
+
+| Lugar | O que fica ali |
+| --- | --- |
+| Superior esquerdo | A logo e, embaixo, o **Papo no Balcão** |
+| Superior direito | Ferramentas (turno, painéis, pessoas no bar, som, microfone, vozes, configurações, ajuda) e, por último, a carteira. O painel **Turno** abre embaixo delas |
+| Inferior central | A barra de ações; acima dela, os avisos de tecla (**E** perto de algo e **P** sentado à mesa) e, acima deles, o que está sendo consumido |
+| Inferior direito | **Seu estado** |
+
+No celular, a primeira linha do topo traz a logo e a carteira, e a segunda, as ferramentas. O chat vem embaixo; a barra de ações ocupa a largura do rodapé em duas linhas, com os medidores logo acima.
+
+**Consumindo:** enquanto o personagem bebe ou come, uma barra de progresso por item mostra a foto do item, o verbo (bebendo, comendo, usando), o nome e o tempo que falta, enchendo com a linha da logo. Cada coisa dura o mesmo tempo de onde vier (`CONSUME_MS`, de 1,5 a 3 min): o que está na mão (a gelada do Magrão, a bebida ou a comida da mochila), enquanto você anda ou faz outra coisa, e cada item servido no seu assento, enquanto você está sentado. O curativo mostra o seu uso rápido (2 s). Tudo vem do estado da sala e do relógio do servidor (`consumption.ts`; o desenho em `consuming-hud.ts` só mexe em uma barra quando o valor muda). A barra some quando o item termina; a da mesa, também quando você levanta.
+
+**Seu estado** não é um painel: fica no canto inferior direito, sem fundo. Cada medidor é um ícone na cor dele, uma barra fina e o valor (vida, fôlego, fome, sede e bexiga; a embriaguez só aparece quando há álcool). O nome de cada medidor aparece ao passar o mouse e é o rótulo acessível da barra. No estado crítico, ícone, barra e valor ficam vermelhos e a barra pulsa. No celular, os medidores viram uma linha só de ícones e barras, logo acima da barra de ações. Sentado no blackjack, a mesa (no alto, à direita) termina acima dos medidores em telas largas e os cobre nas menores.
+
+O botão **Pessoas no bar** abre uma janela com duas abas. **Quem está por perto** traz a lotação do bar (pessoas/capacidade, com a barra), a sua conexão (estado e latência, atualizada no lugar enquanto a janela está aberta) e a lista de pessoas, com silenciar, bloqueio e denúncia. **Seu lugar no bar** é a conta: nome, visual, e-mail, rodadas de blackjack, voltar à entrada e sair da conta.
 
 | Painel | Dados e ações reais |
 | --- | --- |
-| Seu Estado | Lotação/capacidade, conexão, latência, atividade e saldo da carteira |
-| Ações | Bebida, dança, aceno, chat, visual, interação, som e o golpe exclusivo do Rafael |
-| Papo no Balcão | Chat de proximidade, histórico e comandos, incluindo `/velho` |
-| Galera no Bar | Jogadores próximos, presença e atividade dos NPCs; acesso aos bloqueios e denúncias |
-| Bolso | Atalhos dos itens carregados; acesso à mochila, venda da casa e histórico |
-| Pelo Bar | Balcão, jukebox, blackjack e assentos, com distância e indicação de alcance |
+| Ações | Uma barra de ícones no rodapé, com a tecla no canto de cada botão; o nome aparece ao passar o mouse ou focar. Interagir (E), gelada no balcão (E), pedido na mesa (P), dança (G), aceno (V), cigarro (F), cigarro inteiro (Shift+F), chat (T), mochila (I), visual (C), trabalho (J) e o golpe exclusivo do Rafael (X). O som fica só no botão do topo. Arraste-a pela faixa da esquerda, que também a recolhe |
+| Papo no Balcão | Chat de proximidade, histórico e comandos, incluindo `/velho`. Abre no canto superior esquerdo, embaixo da logo |
 | Turno | Só durante um turno de trabalho: tarefa, contagem, tarefas feitas, ganhos e fim do turno. O botão **Turno** do topo mostra ou esconde o painel ([economia](economia.md)) |
 
-A carteira é consultada na API ao entrar e atualizada periodicamente, incluindo alterações feitas pela administração. Comprar uma skin atualiza saldo e coleção; vestir troca o visual na hora para todos. Os botões de lugares continuam exigindo proximidade e validação do servidor. Não teleportam o personagem.
+A carteira fica no fim do topo, à direita; a conexão, na janela Pessoas no bar. A carteira é consultada na API ao entrar e atualizada periodicamente, incluindo alterações feitas pela administração. Comprar uma skin atualiza saldo e coleção; vestir troca o visual na hora para todos. Os lugares do bar (balcão, jukebox, TVs, mesas, palco) são usados chegando perto e apertando **E**, com validação do servidor.
 
-Álcool, necessidades, carteira e inventário agora usam dados reais. A interface não inventa saldo, ganhos, consumo ou jogadores. Sinuca, dardos, humor e mensagens periódicas do protótipo continuam fora do jogo; o blackjack usa cartas, turnos e resultados reais, sem apostas.
+Álcool, necessidades, carteira e inventário usam dados reais. A interface não inventa saldo, ganhos, consumo ou jogadores. Sinuca, dardos, humor e mensagens periódicas continuam fora do jogo; o blackjack usa cartas, turnos e resultados reais, sem apostas.
 
 ## Organizar a interface
 
-Arraste o cabeçalho de um painel para movê-lo. O botão do cabeçalho recolhe ou expande seu conteúdo. **Painéis** permite ocultar e reexibir cada painel e restaurar a disposição inicial. **Livre/Travado** bloqueia a movimentação. Também é possível focar um cabeçalho e usar as setas; Shift aumenta o deslocamento.
+Arraste o cabeçalho de um painel para movê-lo. O botão do cabeçalho recolhe ou expande seu conteúdo. **Painéis** abre um menu com **Tela cheia** (veja abaixo), **Travar painéis** (bloqueia a movimentação; vira **Destravar painéis**), a opção de ocultar e reexibir cada painel e a de restaurar a disposição inicial. Também é possível focar um cabeçalho e usar as setas; Shift aumenta o deslocamento.
 
-Posição, visibilidade, recolhimento e trava são salvos por conta e faixa de largura em `localStorage`, neste navegador. JSON inválido é ignorado. O redimensionamento mantém os painéis dentro da tela, e telas estreitas usam uma disposição própria. Em telas baixas, o chat e as ações ficam compactos e painéis secundários podem ser reabertos pelo menu. Resenhar e Enter reabrem o chat mesmo se ele estiver oculto.
+Posição, visibilidade, recolhimento e trava são salvos por conta e faixa de largura em `localStorage`, neste navegador (a chave é `bar:nova-ui:hud:v3`). Cada painel guarda a distância até os lados da tela mais próximos de onde foi solto: esquerda, direita ou o meio, na largura (o terço da tela em que está o centro dele), e topo ou base, na altura. Assim ele acompanha as bordas quando a janela muda de tamanho: a barra de ações continua centralizada a 12 px da base, e um painel posto à direita continua à mesma distância da borda direita. Uma janela menor só aperta o painel para dentro da tela; a posição escolhida volta quando a janela cresce de novo. As disposições da `v2` (em pixels) são convertidas na primeira leitura, e as da `v1` deixaram de valer quando o chat foi para baixo da logo. JSON inválido é ignorado. Telas estreitas usam uma disposição própria. Em telas largas, um painel sobe o necessário para caber inteiro; nas compactas e no celular ele fica no lugar e rola. A barra de ações sempre sobe o necessário, também quando quebra em duas linhas. Em telas baixas, o chat e as ações ficam compactos. Resenhar, Enter e T reabrem o chat mesmo se ele estiver oculto.
+
+### Tela cheia
+
+O jogo funciona nas duas telas cheias:
+
+- **F11**, a do navegador. A página vê que ocupa a tela inteira e o menu mostra **Sair da tela cheia**. Uma página não consegue sair dessa tela cheia, então o botão avisa: aperte F11 de novo.
+- **Painéis → Tela cheia**, a da própria página (Fullscreen API), com o documento inteiro, então janelas, avisos e o celular continuam visíveis. O mesmo item vira **Sair da tela cheia**. Quando o navegador permite (Edge e Chrome), o Esc continua sendo do jogo, fechando janelas como sempre, e é preciso segurar o Esc para sair da tela cheia.
+
+Nos dois casos o cenário 3D ocupa a tela inteira. O PlayCanvas, por padrão, mantinha a proporção do primeiro tamanho da janela, e por isso sobrava uma faixa vazia embaixo depois do F11. Agora a cena segue o tamanho da janela (`FILLMODE_NONE` e o `resize` da janela em `BarScene`). A barra de ações também tinha um erro: medida "apertada" na primeira montagem, ela crescia 1 px a cada redimensionamento. Agora é medida na altura natural, a da fileira de botões (52 px).
 
 O movimento permanece por teclado. Arrastar painéis não gira a câmera, e arrastar sobre o HUD não seleciona texto (só o chat e os campos permitem seleção). Modais mantêm foco e navegação por teclado, e a interface respeita a preferência por movimento reduzido.
 
-## Comandas / toasts
+## Avisos
 
-As notificações mantêm o formato da referência: canhoto colorido, linha perfurada, título, ícone ou inicial do remetente, fechamento e barra de duração. Há no máximo quatro avisos ativos. Avisos com o mesmo identificador são deduplicados enquanto estão na tela. Passar o mouse ou focar um aviso pausa tanto sua barra quanto sua expiração.
+Cada aviso é um painel preto com uma faixa lateral na cor do tipo, rótulo mono, título em caixa alta, fechamento e uma linha de duração na base. Tipos: recado (ciano), no bar (rosa), fique de olho (vermelho suave) e conquista (lilás). Há no máximo quatro avisos ativos. Avisos com o mesmo identificador são deduplicados enquanto estão na tela. Passar o mouse ou focar um aviso pausa tanto sua linha quanto sua expiração. As classes `comanda` do tema anterior foram mantidas.
 
-Só o essencial vira aviso; o que já aparece em outro lugar da tela não gera comanda.
+Só o essencial vira aviso; o que já aparece em outro lugar da tela não gera aviso.
 
 - **Fique de olho:** erros da API, do servidor ou da conexão; ações recusadas (longe demais, item que sumiu, golpe em andamento); microfone indisponível ou desconectado; vida baixa; item levado durante um desmaio.
 - **No bar:** denúncia registrada e mudança na própria permissão de administração.
@@ -47,20 +108,20 @@ Não viram aviso:
 - compras, uso e descarte de itens, que aparecem na mochila;
 - troca de visual, chegada ao bar e ações do próprio personagem;
 - confirmações de som e microfone;
-- os demais medidores do painel **Seu Estado**.
+- os demais medidores do canto da tela (**Seu estado**).
 
-Textos de jogadores são inseridos como texto, inclusive nos toasts. HTML enviado pelo chat não vira marcação executável. Não existem mensagens automáticas demonstrativas. Sair do bar limpa os avisos da sessão anterior.
+Textos de jogadores são inseridos como texto, inclusive nos avisos. HTML enviado pelo chat não vira marcação executável. Não existem mensagens automáticas demonstrativas. Sair do bar limpa os avisos da sessão anterior.
 
 ## Arquivos e verificação
 
-`game-ui.ts` define as telas; `nova-ui.css` contém o tema e os estilos da comanda; `hud-panels.ts` controla o layout; `live-hud.ts` apresenta o estado; `notifications.ts` controla os avisos. `main.ts` continua conectando contas, API, multiplayer, modais e ações. `economy.css` e `admin.css` usam a nova identidade.
+`neon-ui.css` contém os tokens e os estilos da entrada, do HUD, das janelas e dos avisos; `assets/fonts/neon-ui.css` declara as fontes. `game-ui.ts` define as telas; `lobby-menu.ts` as abas O Bar e Controles; `lobby-hero.ts` e `lobby-hero.css` a logo animada da entrada e as bolhas; `ui-icons.ts` os ícones; `hud-panels.ts` controla o layout dos painéis; `needs-hud.ts` e `needs.css`, os medidores do canto; `notifications.ts` controla os avisos. `main.ts` continua conectando contas, API, multiplayer, modais e ações. `economy.css`, `needs.css`, `jukebox.css`, `voice.css` e `admin.css` usam a mesma identidade.
 
-Os testes de `tests/e2e/nova-ui.spec.ts` verificam arrastar, trava, persistência, armazenamento inválido, limites da tela, carteira, chat entre clientes, bloqueio de notificações, segurança do texto e o ciclo de vida das comandas. Os testes existentes cobrem contas, skins, administração, moderação, mapa, blackjack, eventos, animações e `/velho`, em serviços e banco isolados.
+Os testes de `tests/e2e/nova-ui.spec.ts` verificam logo e chat no canto superior esquerdo, a carteira no fim do topo, conexão e conta na janela de pessoas, a trava dentro de Painéis, a barra de ações em uma linha no rodapé, os medidores no canto inferior direito (fora dos painéis em todas as larguras), a ausência das dicas de tecla e da caixa de e-mail no jogo, a lotação na janela de pessoas, arrastar, trava, persistência, armazenamento inválido, limites da tela, carteira, chat entre clientes, bloqueio de notificações, segurança do texto e o ciclo de vida dos avisos. Em tela cheia, verificam o item Tela cheia de Painéis (entrar e sair), a cena ocupando a janela em 1920 × 1080, 1366 × 768 e de volta, a barra de ações centralizada a 12 px da base, o chat posto à direita mantendo a distância da borda e o aviso de F11 quando a janela é a tela inteira. Na entrada, verificam a logo animada ao lado do menu em 1440 px (720 px de imagem, mostrada com 480), o brinde e a rodada de cliques, os confetes que somem sozinhos, a logo entre o título e as abas em 1100, 760 e 390 px sem rolagem lateral e o brinde com movimento reduzido. Os testes existentes cobrem contas, skins, administração, moderação, mapa, blackjack, eventos, animações e `/velho`, em serviços e banco isolados.
 
 O painel administrativo bloqueia a edição durante buscas, impedindo que uma resposta atrasada recrie o formulário no meio de uma escolha de operação.
 
-`npm run test:e2e` organiza os fluxos em três grupos de clientes locais para respeitar os limites de cadastro por endereço. Matchmaking e WebSocket passam pelo proxy de mesma origem do ambiente de testes. API, mundo, banco e fundos continuam isolados do desenvolvimento; os limites e as permissões de produção permanecem ativos.
+`npm run test:e2e` organiza os fluxos em grupos de clientes locais para respeitar os limites de cadastro por endereço. Matchmaking e WebSocket passam pelo proxy de mesma origem do ambiente de testes. API, mundo, banco e fundos continuam isolados do desenvolvimento; os limites e as permissões de produção permanecem ativos.
 
-Validação em 22/10/2026: os 14 testes de navegador passaram em 9,8 minutos; typecheck e build aprovados. Foram verificados os fluxos de administração, conta e recuperação, chat e reconexão, mapa e blackjack, roupas, skins, animações, `/velho`, organização dos painéis e comandas.
+Validação em 29/10/2026: typecheck e build aprovados. Passaram os projetos `interface` (4/4), `game` e `world` (11/12: contas, recuperação de senha, administração, mochila, economia e blackjack), `voice` e os quatro testes da jukebox com API dublê. Duas falhas não envolvem a interface: `bar.spec.ts:86` diverge na contagem do mapa 3D (`cartRenders` 2 em vez de 1) e o teste da jukebox com YouTube real não chega a abrir a janela, porque a caminhada esbarra no colisor da jukebox. Telas conferidas em 1440, 1100, 960, 760 e 390 px de largura: entrada, espera, HUD, avisos, ajuda, configurações, mochila, skins, conta, pessoas, cardápio da mesa, trabalhos, palco, turno, blackjack e banner de evento.
 
-Prévias: [entrada](../previews/nova-ui-lobby.png), [desktop](../previews/nova-ui-desktop.png), [tela estreita](../previews/nova-ui-mobile.png) e [comanda no jogo](../previews/nova-ui-toast.png).
+Prévias: [entrada](../previews/nova-ui-lobby.png), [desktop](../previews/nova-ui-desktop.png), [tela estreita](../previews/nova-ui-mobile.png) e [aviso no jogo](../previews/nova-ui-toast.png).

@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {DRINK_DURATION_MS,INTERACTABLES,MAP_MARKERS,NEEDS,distance} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {INTERACTABLES,MAP_MARKERS,NEEDS,consumeMs,distance} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean,ms=4000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -35,10 +35,10 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     assert.ok(tired.has('walk'));
     await until(()=>seen()?.exhausted===true);
 
-    // Beer: drunkenness and bladder change separately; half a drink counts half.
-    player.assign({interactionState:'counter',animationState:'drink',drinkItem:'garrafa',animationStartedAt:Date.now()-DRINK_DURATION_MS/2});
-    a.send('player.interact',{objectId:'stand'});
-    await until(()=>player.drinkItem===''&&(seen()?.drunk??0)>0);
+    // Beer: drunkenness and bladder change separately; half a drink in hand counts half (then it is dropped).
+    const since=Date.now()-consumeMs('garrafa')/2;
+    player.assign({holding:'garrafa',holdingSince:since,holdingUntil:since+consumeMs('garrafa')});
+    await until(()=>(seen()?.drunk??0)>0);player.assign({holding:'',holdingSince:0,holdingUntil:0});
     assert.ok(Math.abs(needs.drunk-6)<1.5,`half a long neck: ${needs.drunk}`);
     assert.ok(Math.abs(needs.bladder-9)<1.5,`bladder ${needs.bladder}`);
     assert.equal(seen()?.bladder,Math.round(needs.bladder));

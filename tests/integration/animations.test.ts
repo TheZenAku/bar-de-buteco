@@ -11,16 +11,23 @@ function glb(file: string) {
   return { json: JSON.parse(bytes.subarray(20, 20 + length).toString()), bin: bytes.subarray(28 + length) };
 }
 
+// assets-bar/anim/dance without the files that repeat another dance and the one-frame poses.
+const DANCES = ['Dancing', 'Dancing Twerk', 'Hip Hop Dancing', 'Hip Hop Dancing (1)', 'Hip Hop Dancing (2)', 'Hip Hop Dancing (3)',
+  'Hip Hop Dancing (8)', 'Salsa Dancing', 'Salsa Dancing (2)', 'Samba Dancing', 'Swing Dancing', 'Twist Dance', 'Wave Hip Hop Dance'].map(name => `Dance ${name}`);
+
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo']) {
-    const { json, bin } = glb(`animations/${skin}.glb`);
+  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo']) for (const file of [skin, `${skin}-dances`]) {
+    const { json, bin } = glb(`animations/${file}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
     assert.equal(json.meshes, undefined, 'Animation banks must not duplicate character geometry');
     const names = json.animations.map((animation: any) => animation.name);
-    for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Dance', 'Sit', 'Wave', 'Use', 'Wait', 'Recover']) assert.ok(names.includes(clip));
-    assert.equal(names.includes('Kick'), skin === 'rafael');
-    assert.equal(names.includes('Bartend'), skin === 'magrao', 'Bartending belongs to Seu Zé (Magrão)');
+    if (file === skin) {
+      for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Sit', 'Wave', 'Use', 'Wait', 'Recover']) assert.ok(names.includes(clip));
+      assert.ok(!names.some((name: string) => name.startsWith('Dance')), 'The dances have a bank of their own');
+    } else assert.deepEqual(names, DANCES, 'Every distinct dance of assets-bar/anim/dance, in file order');
+    assert.equal(names.includes('Kick'), skin === 'rafael' && file === skin);
+    assert.equal(names.includes('Bartend'), skin === 'magrao' && file === skin, 'Bartending belongs to Seu Zé (Magrão)');
     for (const animation of json.animations) {
       for (const channel of animation.channels) {
         assert.ok(model.nodes[channel.target.node], 'Every track must target an existing model node');
@@ -28,14 +35,24 @@ test('generated animations bind to existing skins and contain valid skeletal rot
         const input = json.accessors[sampler.input];
         if (animation.name === 'Kick') assert.equal(Math.round(input.max[0] * 1000), KICK_DURATION_MS);
         if (animation.name === 'Drink') assert.equal(Math.round(input.max[0] * 1000), DRINK_DURATION_MS);
-        if (animation.name === 'Sit') assert.equal(Math.round(input.max[0] * 1000), 4167, 'The neutral seated loop, without an invisible drink');
+        if (animation.name === 'Idle') assert.equal(Math.round(input.max[0] * 1000), 4000, 'The trimmed Mixamo idle replaces the model\'s original idle');
+        if (animation.name === 'AngrySit') assert.equal(Math.round(input.max[0] * 1000), 3333, 'The seated loss reaction uses Sitting Angry');
+        if (animation.name === 'Sit') assert.equal(Math.round(input.max[0] * 1000), 1167, 'The seated loop is Sitting.fbx');
+        if (animation.name === 'Run') assert.equal(Math.round(input.max[0] * 1000), 733, 'The run is Standard Run.fbx');
         if (animation.name === 'Wave') assert.equal(Math.round(input.max[0] * 1000), WAVE_DURATION_MS);
         if (animation.name === 'Use') assert.equal(Math.round(input.max[0] * 1000), USE_DURATION_MS);
         if (animation.name === 'Recover') assert.equal(Math.round(input.max[0] * 1000), RECOVER_DURATION_MS);
         const accessor = json.accessors[sampler.output], view = json.bufferViews[accessor.bufferView];
         assert.equal(accessor.count, input.count);
+        const looped = ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Sit','Wait'].includes(animation.name) || animation.name.startsWith('Dance ');
+        if (looped && channel.target.path === 'translation') {
+          // Standard Run travels forward in its file (root motion): the loop must come back to where it started.
+          const at = (frame: number) => Array.from({ length: 3 }, (_, c) => bin.readFloatLE((view.byteOffset ?? 0) + (accessor.byteOffset ?? 0) + frame * 12 + c * 4));
+          const [first, last] = [at(0), at(accessor.count - 1)];
+          assert.ok(Math.hypot(...first.map((value, c) => value - last[c]!)) <= 1e-3 * Math.max(1, Math.hypot(...first)), `${skin}/${animation.name} must loop in place`);
+        }
         if (channel.target.path !== 'rotation') continue;
-        if (['Walk','Run','DrunkIdle','DrunkWalk','Dance','Sit','Wait'].includes(animation.name)) {
+        if (looped) {
           const at = (frame: number) => Array.from({ length: 4 }, (_, c) => bin.readFloatLE((view.byteOffset ?? 0) + (accessor.byteOffset ?? 0) + frame * 16 + c * 4));
           const [first, last] = [at(0), at(accessor.count - 1)];
           assert.ok(Math.abs(first.reduce((sum, value, c) => sum + value * last[c]!, 0)) > 0.999, `${skin}/${animation.name} must loop without a seam`);

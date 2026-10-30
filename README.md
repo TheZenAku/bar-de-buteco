@@ -44,9 +44,10 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | E | Usar o objeto próximo; levantar ao estar sentado |
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
-| I | Abrir ou fechar a mochila, usar itens e acessar a venda da casa |
+| I | Abrir ou fechar a mochila, usar e descartar itens |
 | T | Sentado à mesa: pedir comida e bebida ao Tonico |
 | J | Trabalhar no bar (Ajudante do Magrão) e ganhar moedas |
+| K | Celular: ligar para outros jogadores, Highzap, Highgram, câmera, HighBank e mais ([celular](docs/sistemas/celular.md)) |
 | C | Escolher o visual (skin); todos veem a troca na hora |
 | X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
 | Enter | Abrir o chat de proximidade (12 m) |
@@ -59,21 +60,21 @@ A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube,
 
 As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo de chopp**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
 
-A **economia** usa moedas do jogo, sem dinheiro real. Sentado a uma mesa, aperte **T** e o **Tonico** busca o pedido no balcão e leva até você, por um caminho calculado no mapa. A jukebox, as TVs e o **telão do palco** cobram por vídeo novo, e o balcão cobra a bebida. Pedido cancelado volta para a carteira. As moedas vêm do emprego de **Ajudante do Magrão** (**J**), com poucas vagas, tarefas por estação e limite diário. A administração acompanha e ajusta tudo em **⚙ → Mundo ao vivo**. Veja [economia](docs/sistemas/economia.md). Os gráficos têm presets, resolução dinâmica, sombras, névoa e limite de FPS em **Configurações** ([gráficos](docs/sistemas/graficos.md)). O que falta da lista de funcionalidades e o plano estão em [funcionalidades](docs/projeto/funcionalidades.md).
+A **economia** usa moedas do jogo, sem dinheiro real. Sentado a uma mesa, aperte **P** e o **Tonico** busca o pedido no balcão e leva até você, por um caminho calculado no mapa. A jukebox, as TVs e o **telão do palco** cobram por vídeo novo, e o balcão cobra a bebida. Pedido cancelado volta para a carteira. As moedas vêm do emprego de **Ajudante do Magrão** (**J**), com poucas vagas, tarefas por estação e limite diário. A administração acompanha e ajusta tudo em **⚙ → Mundo ao vivo**. Veja [economia](docs/sistemas/economia.md). Os gráficos têm presets, resolução dinâmica, sombras, névoa e limite de FPS em **Configurações** ([gráficos](docs/sistemas/graficos.md)). O que falta da lista de funcionalidades e o plano estão em [funcionalidades](docs/projeto/funcionalidades.md).
 
-O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no painel **Seu Estado**. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/sistemas/needs.md).
+O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no canto inferior direito da tela. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/sistemas/needs.md).
 
-A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com atalhos no painel **Bolso**, loja, histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Veja [inventário](docs/sistemas/inventory.md).
+A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com histórico e kit inicial. Compras, uso, descarte e perdas são validados no servidor e continuam salvos entre sessões. Abra com **I**. Bebidas e comidas, da mochila ou a gelada do Magrão, ficam na mão: dá para andar bebendo (o braço leva a garrafa à boca), e cada coisa dura o mesmo tempo que na mesa. Veja [inventário](docs/sistemas/inventory.md).
 
 O comando `/velho` mantém a skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a skin salva na conta. Veja [a importação e a validação da bengala](docs/assets/old-cane.md).
 
-Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de engrenagem. Eventos não alteram as regras nem cancelam rodadas.
+Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de escudo. Eventos não alteram as regras nem cancelam rodadas.
 
 O painel de pessoas permite bloquear mensagens e denunciar jogadores. A administração consulta denúncias e histórico, expulsa e bane contas. Banimento e redefinição de senha revogam sessões.
 
-O menu **⚙ Administração** também permite buscar jogadores e adicionar, remover ou definir moedas para testes. A conta principal `rafaelrodrigues-2017@hotmail.com` pode conceder e remover administradores pelo próprio jogo. Veja [permissões, carteiras e moderação](docs/sistemas/admin.md).
+O menu **Administração** também permite buscar jogadores e adicionar, remover ou definir moedas para testes. A conta principal `rafaelrodrigues-2017@hotmail.com` pode conceder e remover administradores pelo próprio jogo. Veja [permissões, carteiras e moderação](docs/sistemas/admin.md).
 
-A interface segue a referência visual **Boteco Social**: seis painéis móveis, recolhíveis e ocultáveis, layout salvo por conta neste navegador, cores neon e notificações em formato de comanda. Carteira, coleção, pessoas, chat e interações usam os dados reais do jogo. Veja [interface e integração dos controles](docs/sistemas/interface.md).
+A interface segue a referência visual **Midnight Neon Menu**: painéis pretos de cantos retos, cores vaporwave discretas, Chakra Petch e JetBrains Mono e ícones Lucide. São seis painéis móveis, recolhíveis e ocultáveis, com layout salvo por conta neste navegador. Carteira, coleção, pessoas, chat e interações usam os dados reais do jogo. Veja [interface e integração dos controles](docs/sistemas/interface.md).
 
 ## Estrutura e execução
 
@@ -113,6 +114,8 @@ Consulte [resultados e limites da validação](docs/validacao/validation.md), [a
 As animações de `assets-bar/anim`, seus usos e a conversão para os modelos estão descritos em [animações](docs/assets/animations.md). Para regenerar os bancos GLB, execute `npm run assets:animations`.
 
 Cada skin mantém seu esqueleto nativo, com calibração própria de pose e ossos auxiliares. Para recalibrar os modelos existentes e regenerar todos os clipes, execute `npm run assets:retarget`. Veja [esqueletos nativos e adaptação de animações](docs/assets/native-rigs.md).
+
+Para conferir os personagens sem o mapa, abra **`/rigs.html`** no endereço do cliente em desenvolvimento. A tela permite comparar as seis skins, clipes, poses e esqueletos. Veja o [diagnóstico de rigs e o fluxo para estabilizar animações](docs/assets/rig-troubleshooting.md) antes de reimportar modelos.
 
 O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/assets/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
 

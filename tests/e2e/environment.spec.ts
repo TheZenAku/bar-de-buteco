@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {DAY_NIGHT,gameHour} from '../../apps/web/src/engine/day-night';
 import type {EnvironmentLighting} from '../../apps/web/src/engine/environment-lighting';
 import {previewPath} from './preview-path';
+import {SHOW_PROGRAMS} from '../../packages/shared/src/stage-show';
 type EnvironmentStatus=ReturnType<EnvironmentLighting['telemetry']>;
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
 
@@ -165,7 +166,7 @@ test('every stage light follows the telão\'s video, its screen opens for the pl
   const projected=(id:string)=>page.evaluate(id=>(window as any).fixture.scene.projectStageBlip(id),id);
   await page.evaluate(()=>{const f=(window as any).fixture;f.scene.setEnabled(true);f.view([24.5,2.8,-16.2],[20.6,1.2,-22.8]);});
   await expect.poll(async()=>(await projected('entry'))?.onScreen).toBe(true);
-  expect(await blips()).toMatchObject({entry:{visible:true,y:.3},telao:{visible:true,x:26.65,y:.3}});
+  expect(await blips()).toMatchObject({entry:{visible:true,y:.3},telao:{visible:true,x:26.65,y:.3},shop:{visible:true,x:18.79,y:.3,z:-15.45}});
   await page.screenshot({path:previewPath('stage-blip.png')});
   await page.evaluate(()=>(window as any).fixture.view([25.2,2.6,-15.6],[26.65,.8,-21.1]));
   await expect.poll(async()=>(await projected('telao'))?.onScreen).toBe(true);
@@ -173,11 +174,61 @@ test('every stage light follows the telão\'s video, its screen opens for the pl
   // In the hall, 15 m from the stage, neither shows. The local avatar follows prediction, not the snapshot.
   await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:14,y:.3,z:-9}));
   await expect.poll(async()=>[await projected('entry'),await projected('telao')]).toEqual([null,null]);
-  expect(await blips()).toMatchObject({entry:{visible:false},telao:{visible:false}});
+  expect(await blips()).toMatchObject({entry:{visible:false},telao:{visible:false},shop:{visible:false}});
   await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:22,y:.3,z:-16}));
   await expect.poll(async()=>(await projected('telao'))?.onScreen).toBe(true);
   await page.evaluate(()=>(window as any).fixture.scene.setLocal({x:26,y:.9,z:-23.5}));
   await expect.poll(async()=>[await projected('entry'),await projected('telao')]).toEqual([null,null]);
+  expect(errors).toEqual([]);
+  await page.evaluate(()=>(window as any).fixture.scene.destroy());
+});
+
+test('the stage show runs lasers, moving heads, the strobe and laser drawings while something plays on the stage, in sixteen programs on a shared beat, and goes dark when it stops',async({page})=>{
+  test.setTimeout(300000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  const show=()=>page.evaluate(()=>(window as any).fixture.scene.getMapStatus().show);
+  // `telao`: the screen's status (undefined: off); `phase`: someone at the violão spot, in that phase.
+  const sync=(telao:string|undefined,phase?:string)=>page.evaluate(([telao,phase])=>{const f=(window as any).fixture,now=f.now();
+    f.scene.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:now,jukeboxes:{},
+      televisions:telao?{telao:{id:'telao',videoId:'M7lc1UVf-VE',status:telao,position:30,updatedAt:now,updatedBy:'fixture',revision:1}}:{},
+      musicians:{violao:{id:'violao',playerId:phase?'musico':'',phase:phase??'',startedAt:phase?now:0,stopping:false}}},'');},[telao,phase] as const);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.hour(21);f.view([24,9.5,-11],[26.5,1.2,-21]);});
+  // Nothing on the stage: no show.
+  await sync(undefined);await page.waitForTimeout(500);
+  expect(await show()).toMatchObject({live:false,level:0,lasers:0,heads:0,flash:0});
+  // A video on the telão: the show fades in. With the house's desk settings, the sixteen programs take turns every eight
+  // bars of 124 BPM counted from the server clock; 3 s into each, its lasers land on the map (each with a dot), or the
+  // laser draws on the telão (which dims for it), and the four moving heads are lit.
+  await sync('playing');
+  await expect.poll(async()=>(await show()).level,{timeout:10000}).toBeGreaterThan(.97);
+  const PROGRAM_MS=8*4*60/124*1000,programs=new Set<string>(),palettes=new Set<string>();let before=(await show()).program;
+  for(let k=0;k<SHOW_PROGRAMS.length;k++){
+    await page.evaluate(ms=>{const f=(window as any).fixture,now=f.now();f.advance((Math.floor(now/ms)+1)*ms+3000-now);},PROGRAM_MS);
+    await sync('playing');
+    // Each lands 3 s into its program (the same beat): wait for the frame that drew the new one.
+    await expect.poll(async()=>(await show()).program,{timeout:5000}).not.toBe(before);
+    const now=await show();before=now.program;programs.add(now.program);palettes.add(now.palette);expect(now.beat).toBeCloseTo(3000/(60000/124),1);
+    expect(now,now.program).toMatchObject({live:true,heads:4});
+    // The telão eases in and out of its dim in about half a second.
+    const drawing=['letreiro','desenhos'].includes(now.program);
+    if(drawing)expect(now.drawn,now.program).toBeGreaterThan(0);else{expect(now.lasers,now.program).toBeGreaterThan(0);expect(now.hits,now.program).toBeGreaterThan(0);}
+    await expect.poll(async()=>(await show()).dim>.5,{message:now.program}).toBe(drawing);
+    if(now.program==='leque')await page.screenshot({path:previewPath('stage-show.png')});
+    if(now.program==='letreiro')await page.screenshot({path:previewPath('stage-show-letreiro.png')});
+  }
+  expect([...programs].sort()).toEqual(SHOW_PROGRAMS.map(p=>p.id).sort());
+  expect(palettes.size).toBeGreaterThan(2);
+  // A new program comes in with a flash.
+  await page.evaluate(ms=>{const f=(window as any).fixture,now=f.now();f.advance((Math.floor(now/ms)+1)*ms+20-now);},PROGRAM_MS);
+  await sync('playing');await expect.poll(async()=>(await show()).flash).toBeGreaterThan(.5);
+  // Paused, the show goes dark.
+  await sync('paused');
+  await expect.poll(async()=>(await show()).level,{timeout:10000}).toBe(0);
+  expect(await show()).toMatchObject({live:false,lasers:0,heads:0,flash:0});
+  // A musician plays it too, without a video: not while picking up the instrument, from the first notes on.
+  await sync(undefined,'entrando');await page.waitForTimeout(400);expect((await show()).live).toBe(false);
+  await sync(undefined,'loop');await expect.poll(async()=>(await show()).level,{timeout:10000}).toBeGreaterThan(.97);
   expect(errors).toEqual([]);
   await page.evaluate(()=>(window as any).fixture.scene.destroy());
 });
@@ -256,7 +307,7 @@ test('the live game follows the server clock and keeps the cycle when returning 
   // The 12.5 MB neighbourhood can briefly delay the first rendered sample behind the latest world packet.
   expect(Math.abs(hour-gameHour(world.serverTime))).toBeLessThan(.06);
   const before=await page.evaluate(()=>({hour:(window as any).barDebug.environment().hour,time:Date.now()}));
-  await page.getByRole('button',{name:'Sua conta',exact:true}).click();await page.locator('#modal [data-action="leave"]').click();
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
   await expect(page.locator('#lobby')).toBeVisible();
   const after=await page.evaluate(()=>({hour:(window as any).barDebug.environment().hour,time:Date.now()}));
   const expected=(before.hour+(after.time-before.time)/DAY_NIGHT.durationMs*24)%24,difference=Math.abs(after.hour-expected);

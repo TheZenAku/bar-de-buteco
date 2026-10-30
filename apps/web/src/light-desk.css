@@ -1,0 +1,82 @@
+/* The stage's light desk (light-desk.ts): docked on the right over a clear backdrop, so the show stays in view and the
+   camera (BarScene.watchStage) can still be dragged; a bottom sheet on narrow screens. */
+.modal-backdrop.desk-backdrop{justify-content:flex-end;align-items:stretch;padding:16px;background:transparent;pointer-events:none}
+.modal-backdrop.desk-backdrop::before{display:none}
+.modal.desk-modal{width:440px;max-height:calc(100dvh - 32px);pointer-events:auto;background:oklch(.12 .045 300 / 92%)}
+.desk-modal .modal-header{position:sticky;top:0;z-index:2;background:oklch(.12 .045 300)}
+/* While the desk is open the HUD steps aside, as when watching a TV. */
+.at-light-desk .game,.at-light-desk #labels,.at-light-desk .vignette{visibility:hidden}
+.desk{display:flex;flex-direction:column;gap:14px;padding:4px 20px 16px}
+.desk-now{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:10px 12px;border:1px solid var(--border);background:oklch(1 0 0 / 3%)}
+.desk-led{width:12px;height:12px;flex:none;background:var(--hl-magenta);box-shadow:0 0 10px var(--hl-magenta)}
+@keyframes desk-beat{0%{opacity:1;transform:scale(1.2)}30%{opacity:.4;transform:scale(1)}100%{opacity:.2}}
+.desk.dark .desk-led{background:var(--muted-foreground);box-shadow:none;animation:none!important;opacity:.4}
+.desk-now-text{display:grid;flex:1;min-width:0}
+.desk-now-text small{font:500 10px var(--font-mono);letter-spacing:.2em;text-transform:uppercase;color:var(--hl-magenta)}
+.desk.dark .desk-now-text small{color:var(--muted-foreground)}
+.desk-now-text b{overflow:hidden;font:600 18px var(--font-display);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;text-overflow:ellipsis}
+.desk-now-text span{overflow:hidden;font:400 11px var(--font-mono);color:var(--muted-foreground);white-space:nowrap;text-overflow:ellipsis}
+.desk-seg{display:flex;flex-wrap:wrap;gap:1px}
+.desk-seg button{padding:6px 10px;background:var(--secondary);color:var(--muted-foreground);font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
+.desk-seg button:hover{color:var(--foreground)}
+.desk-power{width:100%}
+.desk-power button{flex:1}
+.desk-seg [aria-pressed=true],.desk-seg [aria-pressed=true]:hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
+.desk-pads{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.desk-pad{position:relative;display:grid;justify-items:center;gap:4px;min-width:0;padding:12px 4px 8px;border:1px solid var(--border);background:oklch(1 0 0 / 4%);color:var(--foreground);font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase}
+.desk-pad .ui-icon{width:20px;height:20px;color:var(--hl-cyan)}
+.desk-pad kbd{position:absolute;top:3px;right:4px;font-size:9px;color:var(--dim)}
+.desk-pad:hover{border-color:var(--hl-magenta)}
+.desk-pad.firing{border-color:var(--hl-magenta);background:var(--active);box-shadow:var(--active-glow)}
+.desk-pad.firing .ui-icon{color:#fff}
+.desk-tap .ui-icon,.desk-tap b{color:var(--hl-gold)}
+.desk-tabs button{flex:1;padding:8px 4px;font-size:12px}
+.desk-tabs+.menu-line{margin-top:-14px}
+.desk-body section{display:grid;gap:12px}
+.desk-body section[hidden]{display:none}
+.modal .desk-hint{margin:0;font:400 11px/1.6 var(--font-mono);color:var(--muted-foreground)}
+.desk-sub{margin-top:6px;font-size:13px}
+.desk-list{display:grid;gap:6px}
+.desk-scene,.desk-program,.desk-palette{display:grid;gap:2px;width:100%;padding:10px 12px;border:1px solid var(--border);background:oklch(1 0 0 / 3%);color:var(--foreground);text-align:left}
+.desk-scene b,.desk-program b,.desk-palette b{font:600 13px var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+.desk-scene small,.desk-program small,.desk-palette small{font:400 11px/1.45 var(--font-mono);color:var(--muted-foreground)}
+.desk-scene:hover,.desk-program:hover,.desk-palette:hover{border-color:var(--hl-magenta)}
+.desk-scene[aria-pressed=true],.desk-program[aria-pressed=true],.desk-palette[aria-pressed=true],.desk-scene.mine>[aria-pressed=true]{border-color:var(--hl-magenta);background:oklch(.45 .2 330 / 22%)}
+.desk-scene.mine{display:flex;gap:0;padding:0}
+.desk-scene.mine>button:first-child{display:grid;flex:1;gap:2px;padding:10px 12px;color:inherit;text-align:left}
+.desk-forget{display:grid;place-items:center;width:40px;color:var(--muted-foreground);border-left:1px solid var(--border)}
+.desk-forget:hover{color:var(--destructive)}
+.desk-save{display:flex;gap:6px}
+.desk-save input{flex:1;min-width:0;margin:0}
+.desk-save .button{flex:none;white-space:nowrap}
+.desk-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.desk-label{font:500 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}
+.desk-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.desk-program{position:relative;align-content:start}
+.desk-programs-cycle .desk-program[aria-pressed=false]{opacity:.55}
+.desk-program.live::after{content:'no ar';position:absolute;top:6px;right:6px;padding:1px 5px;background:var(--hl-cyan);color:oklch(.12 .03 300);font:600 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+.desk-palettes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.desk-swatches{display:flex;height:14px;margin-bottom:6px}
+.desk-swatches i{flex:1}
+.desk-swatches.auto{background:linear-gradient(90deg,#ff2bd6,#17d4f4,#2bff5a,#ffd21c,#ff2a3a,#3d7bff)}
+.desk-slider label{display:flex;justify-content:space-between;margin-bottom:6px}
+.desk-slider output{color:var(--foreground)}
+.desk-slider input{width:100%}
+.desk-actions{display:flex;flex-wrap:wrap;gap:6px}
+.desk-actions .button{flex:1;white-space:nowrap}
+.desk-actions[hidden]{display:none}
+.desk-text{display:grid;gap:10px}
+.desk-text label{margin:0}
+.desk-text input{margin:0;font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.desk-chips{display:flex;flex-wrap:wrap;gap:6px}
+.desk-chips button{padding:5px 9px;border:1px solid var(--border);color:var(--muted-foreground);font:500 11px var(--font-mono);letter-spacing:.08em}
+.desk-chips button:hover{border-color:var(--hl-magenta);color:var(--foreground)}
+.desk-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid var(--border);font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.desk-keys kbd{margin-left:6px;padding:1px 4px;border:1px solid var(--key)}
+@media (max-width:760px){
+  .modal-backdrop.desk-backdrop{align-items:flex-end;padding:8px}
+  .modal.desk-modal{width:100%;max-height:58dvh}
+  .desk{padding:0 12px 12px}
+  .desk-pads{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .desk-pad kbd,.desk-keys{display:none}
+}

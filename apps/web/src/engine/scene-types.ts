@@ -24,8 +24,12 @@ export interface SceneActor {
   /** Player model id (see SKINS); NPCs keep the box avatar. */
   skin?: string;
   oldWalk?: boolean;
-  /** The drink held while drinking (HELD_DRINKS: ordered at the counter or taken from the backpack). */
+  /** The drink in hand for the Drink clip (NPCs; players drink with `holding`). */
   drinkItem?: string;
+  /** What a player has in hand and is having, since/until when (server clock): a drink is raised and sipped over the body. */
+  holding?: string;
+  holdingSince?: number;
+  holdingUntil?: number;
   /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
   carrying?: string;
   carryingOrder?: string;
@@ -33,6 +37,8 @@ export interface SceneActor {
   connected?: boolean;
   /** Drunkenness 0-100 (packages/shared/src/needs.ts): the body sways by stage. */
   drunk?: number;
+  /** Which dance clip G plays, drawn by the room each time the player starts dancing (taken modulo the dance clips). */
+  dance?: number;
   /** The stage spot this player plays at, as the room syncs it (packages/shared/src/musicians.ts). */
   musician?: MusicianState;
 }
@@ -62,11 +68,13 @@ export interface SceneLabel {
 
 export interface SceneCallbacks {
   onInteract?: () => void;
-  onEmote?: (emote: 'dance' | 'wave' | 'smoke') => void;
+  onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette') => void;
   onChat?: () => void;
   onSkins?: () => void;
   onKick?: () => void;
   onMediaFrame?: () => void;
-  /** The player switched the camera view (Q or the mouse wheel). */
-  onCameraMode?: (mode: CameraMode) => void;
+  /** The player changed the view or zoom; distance is the last positive third-person distance. */
+  onCameraChange?: (mode: CameraMode, distance: number) => void;
+  /** A click (not a drag) on another player in the view: their player card. */
+  onPlayerClick?: (id: string) => void;
 }

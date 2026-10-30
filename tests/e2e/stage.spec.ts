@@ -1,6 +1,8 @@
 import {test,expect,type Browser,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
+import {readFileSync} from 'node:fs';
 import {walk} from './walk';
+import {previewPath} from './preview-path';
 
 const password='PalcoBrowser2026!';
 test.beforeEach(async({request})=>{
@@ -22,7 +24,7 @@ async function player(browser:Browser,baseURL:string|undefined,name:string){
   await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId]?.connected;})).toBe(true);
   await page.evaluate(`Promise.all([import(${JSON.stringify(source('../../packages/shared/src/index.ts'))}),import(${JSON.stringify(source('../../apps/server/src/world/navigation.ts'))})]).then(([shared,navigation])=>{
     const object=id=>shared.INTERACTABLES.find(i=>i.id===id);
-    const reaches=(id,p,slack)=>shared.canInteract(object(id),p,slack)&&(object(id).type!=='musician'||shared.onStage(p));
+    const reaches=(id,p,slack)=>shared.canInteract(object(id),p,slack)&&(!['musician','lights'].includes(object(id).type)||shared.onStage(p));
     const here=()=>{const d=window.barDebug.snapshot(),p=d.world.players[d.localId];return {x:p.x,y:p.y,z:p.z};};
     // A straight walk from here that never changes floor (see walk.ts).
     const flat=to=>{const from=here(),end=navigation.walkSegment(from,to);return !!end&&Math.abs(end.y-from.y)<.05;};
@@ -126,4 +128,96 @@ test('on the stage: one player takes the guitar and plays, another arriving late
     await expect(fan.page.locator('#context-label')).toHaveText('Tocar violão');
     expect(musician.errors).toEqual([]);expect(fan.errors).toEqual([]);
   }finally{await musician.context.close();await fan.context.close();}
+});
+
+test('the light desk: up on the stage, E opens the panel over the show; a scene, the letreiro and a cue change the show',async({browser,baseURL})=>{
+  test.setTimeout(360000);
+  const dj=await player(browser,baseURL,'DJ');
+  const {page}=dj,show=()=>page.evaluate(()=>(window as any).barDebug.map().show);
+  const desk=()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world.stageShow;});
+  try{
+    await dj.climb();
+    await walk(page,'light-desk');
+    await expect(page.locator('#context-label')).toHaveText('Mexer na mesa de luz');
+    await page.keyboard.press('KeyE');
+    // The panel docks on the right over a clear backdrop and the HUD steps aside: the stage stays in view.
+    await expect(page.locator('#modal-title')).toHaveText('Mesa de luz');
+    await expect(page.locator('#modal')).toHaveClass(/desk-backdrop/);
+    await expect(page.locator('#game')).toBeHidden();
+    await expect(page.locator('.desk-scene[data-desk-preset="casa"]')).toHaveAttribute('aria-pressed','true');
+    // A ready-made scene: the letreiro writes HIGHLAND on the telão, which dims for it.
+    await page.locator('[data-desk-preset="abertura"]').click();
+    await expect.poll(async()=>(await desk())?.preset).toBe('abertura');
+    await expect.poll(async()=>{const s=await show();return s.program==='letreiro'&&s.live&&s.drawn>0&&s.dim>.5;},{timeout:20000}).toBe(true);
+    await page.waitForTimeout(6000);
+    await page.screenshot({path:previewPath('light-desk.png')});
+    // The letreiro's own text, cleaned up for the laser's font.
+    await page.locator('[data-desk-tab="letreiro"]').click();
+    await page.locator('#desk-text').fill('Boteco <3');
+    await expect(page.locator('[data-desk="text-preview"]')).toHaveText('No telão: BOTECO ♥');
+    await page.locator('.desk-text button[type="submit"]').click();
+    await expect.poll(async()=>(await desk())?.text).toBe('BOTECO ♥');
+    await expect.poll(async()=>(await show()).text).toBe('BOTECO ♥');
+    // Tempo: Space taps; two taps half a second apart (plus the page's own latency) move the house's 124 BPM to theirs.
+    await page.locator('[data-desk-tab="ritmo"]').click();
+    await page.keyboard.press('Space');await page.waitForTimeout(500);await page.keyboard.press('Space');
+    await expect.poll(async()=>(await desk())?.bpm).not.toBe(124);
+    expect((await desk()).bpm).toBeGreaterThanOrEqual(80);expect((await desk()).bpm).toBeLessThanOrEqual(124);
+    // 3 fires the Drop for everyone; Escape closes the panel and gives the camera back.
+    await page.keyboard.press('Digit3');
+    await expect.poll(async()=>(await desk())?.cue).toBe('drop');
+    await expect.poll(async()=>(await show()).program).toBe('drop');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#modal')).toBeHidden();
+    await expect(page.locator('#game')).toBeVisible();
+    expect(dj.errors).toEqual([]);
+  }finally{await dj.context.close();}
+});
+
+test('stage fixture: four musicians follow the shared clock, carry their props and return the instruments',async({page})=>{
+  test.setTimeout(120000);
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  const spots=JSON.parse(readFileSync(new URL('../../packages/shared/src/map-data.json',import.meta.url),'utf8')).stage.places as Array<{
+    id:string;x:number;y:number;z:number;yaw:number;instrument:string;animation:{durations:number[]};
+  }>;
+  await page.goto(source('../fixtures/environment.html'));
+  await page.evaluate(()=>(window as any).fixture.ready);
+  await page.evaluate(()=>(window as any).fixture.view([26.65,4,-17],[26.65,1.8,-23.5]));
+
+  const sync=(phase:string)=>page.evaluate(([spots,phase])=>{
+    const fixture=(window as any).fixture,now=fixture.now(),skins=['rafael','leandro','read','nathan'];
+    const players=Object.fromEntries(spots.map((spot,index)=>{const id=`fixture-${spot.id}`;return [id,{
+      id,displayName:spot.id,color:'#fff',skin:skins[index],x:spot.x,y:spot.y,z:spot.z,rotation:spot.yaw*Math.PI/180,
+      animationState:'idle',animationStartedAt:now,interactionState:'',currentTableId:'',lastProcessedInput:0,connected:true,
+    }];}));
+    const musicians=Object.fromEntries(spots.map(spot=>[spot.id,{id:spot.id,playerId:`fixture-${spot.id}`,phase,startedAt:now,stopping:false}]));
+    fixture.scene.setWorld({players,npcs:{},tables:{},musicians,event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:4,capacity:32,serverTime:now},'');
+  },[spots,phase] as const);
+  const clips=()=>page.evaluate(()=>Object.fromEntries((window as any).fixture.scene.getAnimations().map((actor:any)=>[actor.id,actor.clip])));
+  const props=()=>page.evaluate(()=>(window as any).fixture.scene.getMapStatus().musicians);
+  const expected=(phase:string)=>Object.fromEntries(spots.map(spot=>[`fixture-${spot.id}`,`Palco ${spot.id} ${phase}`]));
+  const instruments=(playing:boolean)=>Object.fromEntries(spots.filter(spot=>spot.instrument).map(spot=>[spot.id,{loaded:true,instrument:!playing,props:playing}]));
+
+  await sync('entrando');
+  await expect.poll(clips,{timeout:60000}).toEqual(expected('entrando'));
+  await expect.poll(props).toMatchObject(instruments(true));
+  const afterTake=Math.max(...spots.map(spot=>spot.animation.durations[0]!))*1000+50;
+  await page.evaluate(ms=>(window as any).fixture.advance(ms),afterTake);
+  await expect.poll(clips).toEqual(expected('comecando'));
+  await expect.poll(props).toMatchObject(instruments(true));
+  const afterStart=Math.max(...spots.map(spot=>spot.animation.durations[0]!+spot.animation.durations[1]!))*1000+100;
+  await page.evaluate(ms=>(window as any).fixture.advance(ms),afterStart-afterTake);
+  await expect.poll(clips).toEqual(expected('loop'));
+  await expect.poll(props).toMatchObject(instruments(true));
+  for(const spot of spots.filter(spot=>spot.instrument))expect((await props())[spot.id].propState).toBe(`Palco ${spot.id} loop`);
+
+  await sync('saindo');
+  await expect.poll(clips).toEqual(expected('saindo'));
+  await expect.poll(props).toMatchObject(instruments(true));
+  await page.evaluate(ms=>(window as any).fixture.advance(ms),Math.max(...spots.map(spot=>spot.animation.durations[3]!))*1000+100);
+  await expect.poll(clips).toEqual(Object.fromEntries(spots.map(spot=>[`fixture-${spot.id}`,'Idle'])));
+  await expect.poll(props).toMatchObject(instruments(false));
+  expect(errors).toEqual([]);
 });

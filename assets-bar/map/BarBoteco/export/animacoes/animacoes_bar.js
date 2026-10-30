@@ -11,6 +11,8 @@
 //   p.locomover(velocidade, { bebado: false })   // m/s; 0 = parado. Ajusta o ritmo do passo para o pe nao escorregar
 // Acoes (cada uma devolve uma Promise que resolve quando o personagem fica livre de novo):
 //   p.fumar()            acende e fica fumando (loop)        -> p.pararDeFumar()   joga a bituca no chao e pisa
+//   p.fumarCigarro()     cigarro inteiro, 18 s (Mixamo "Smoking", bar_fumar_mixamo.glb do 19_fumar_mixamo.py): tira o
+//                        maco do bolso, acende com o isqueiro, traga, solta a baforada, joga no chao e pisa (bituca fica)
 //   p.vomitar()          -> poca verde fica no chao (opcoes.restos segundos, padrao 60)
 //   p.cair()             cai e fica deitado                  -> p.levantarDoChao()
 //   p.sentar(cadeira)    puxa a cadeira, senta (loop)        -> p.comer() / p.pararDeComer() / p.levantar()
@@ -30,14 +32,15 @@
 // Como funciona: os clipes foram feitos no esqueleto Mixamo do rafael-mixamo (1,90 m) e sao convertidos para o esqueleto
 // do personagem pela rotacao de cada osso no mundo (qualquer prefixo mixamorig), entao servem para FBX ou GLB, com ou sem
 // escala. Props (cigarro, garfo, copo...) vem nos GLBs e sao corrigidos pela mao/cabeca real do personagem enquanto estao
-// seguros (proporcoes diferentes da autoria). FX_* sao emissores: a escala do no e a intensidade da particula.
+// seguros (proporcoes diferentes da autoria). Props com "mira" nos extras (cigarro na boca ao acender) ainda giram para
+// apontar o alvo (a chama, que vem da outra mao). FX_* sao emissores: a escala do no e a intensidade da particula.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const GRUPOS = ['locomocao', 'fumar', 'vomitar', 'cadeira', 'mesa', 'banheiro', 'magrao'];
+const GRUPOS = ['locomocao', 'fumar', 'fumar_mixamo', 'vomitar', 'cadeira', 'mesa', 'banheiro', 'magrao'];
 const GRUPO_DO_CLIPE = {
   parado_loop: 'locomocao', andar_loop: 'locomocao', andar_bebado_loop: 'locomocao', cair: 'locomocao', levantar_chao: 'locomocao',
-  fumar_acender: 'fumar', fumar_loop: 'fumar', fumar_apagar: 'fumar', vomitar: 'vomitar',
+  fumar_acender: 'fumar', fumar_loop: 'fumar', fumar_apagar: 'fumar', fumar_mixamo: 'fumar_mixamo', vomitar: 'vomitar',
   sentar: 'cadeira', sentado_loop: 'cadeira', comer_comecar: 'cadeira', comer_loop: 'cadeira', comer_terminar: 'cadeira', levantar: 'cadeira',
   limpar_mesa: 'mesa', urinar: 'banheiro', magrao_chopp: 'magrao', magrao_chopp_escuro: 'magrao', magrao_longneck: 'magrao',
 };
@@ -110,7 +113,8 @@ function lerAlvo(personagem) {
     y0 = Math.min(y0, _p.y); y1 = Math.max(y1, _p.y);
   }
   const escala = personagem.getWorldScale(new THREE.Vector3()).y;
-  return { ossos, ordem, rest, paiDe, paiFixo, quadril: ossos.get('Hips'), piso: y0, altura: (y1 - y0) * escala, escala };
+  return { ossos, ordem, rest, paiDe, paiFixo, quadril: ossos.get('Hips'), piso: y0, altura: (y1 - y0) * escala, escala,
+           alturaQuadril: (rest.get('Hips').p.y - y0) * escala };
 }
 
 // ---------------------------------------------------------------- conversao de um clipe para o personagem
@@ -380,7 +384,10 @@ export function criarAnimacoesBar(mapa, opcoes = {}) {
       const F = fontes[g];
       if (!F) throw new Error(`animacoes_bar: carregue o grupo '${g}' antes (bar.carregar('${g}'))`);
       const ancorado = !!F.info.ancora;
-      const conv = converter(F.clipes[nome], F, A, ancorado ? 1 : A.altura / ALTURA_AUTORIA);
+      // deslocamento do quadril na proporcao do personagem: pela altura do quadril quando o esqueleto de autoria e outro
+      // (quadril_m, ex.: Mixamo Smoking), senao pela altura total
+      const fq = F.info.quadril_m ? A.alturaQuadril / F.info.quadril_m : A.altura / ALTURA_AUTORIA;
+      const conv = converter(F.clipes[nome], F, A, ancorado ? 1 : fq);
       const acao = mixer.clipAction(conv.corpo);
       const loop = !!F.info.clipes?.[nome]?.loop;
       acao.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
@@ -591,6 +598,7 @@ export function criarAnimacoesBar(mapa, opcoes = {}) {
 
     c.fumar = () => { c.estado = 'fumando'; return seq(['fumar_acender', 'fumar_loop']); };
     c.pararDeFumar = () => depoisDoLoop('fumar_apagar');
+    c.fumarCigarro = () => { c.estado = 'ocupado'; return seq(['fumar_mixamo']); };
     c.vomitar = () => { c.estado = 'ocupado'; return seq(['vomitar']); };
     c.cair = () => { c.estado = 'caido'; return seq(['cair'], { manter: true, fade: 0.15 }); };
     c.levantarDoChao = () => { c.estado = 'ocupado'; return seq(['levantar_chao'], { fade: 0 }); };
@@ -637,6 +645,7 @@ export function criarAnimacoesBar(mapa, opcoes = {}) {
         a.af.time = t; k.mixerFonte.update(0);
         k.grupo.updateMatrixWorld(true);
         corrigirProps(a, t);
+        mirarProps(a, t);
         if (a.cadeira) {
           const pc = k.grupo.getObjectByName('Prop_Cadeira');
           const u = a.cadeira.userData;
@@ -683,12 +692,48 @@ export function criarAnimacoesBar(mapa, opcoes = {}) {
         _C.multiplyMatrices(_T, _S.invert());
         if (w < 1) {
           _C.decompose(_p, _q, _s);
-          _p.multiplyScalar(w); _q.slerpQuaternions(new THREE.Quaternion(), _q, w);
+          _p.multiplyScalar(w); _q.copy(_q1.identity().slerp(_q, w));     // (slerpQuaternions(id, _q, w) em _q zerava o giro)
           _C.compose(_p, _q, _um);
         }
         p.updateMatrix();
         _m.multiplyMatrices(_C, p.matrix).decompose(p.position, p.quaternion, p.scale);
         p.updateMatrixWorld(true);
+      }
+    }
+
+    // props que apontam para outro depois da correcao (cigarro na boca mirando a chama do isqueiro, que veio de outra mao):
+    // gira em torno da origem do prop; os de "junto" (brasa, emissor da ponta) giram com ele
+    const _A = new THREE.Vector3(), _B = new THREE.Vector3(), _O = new THREE.Vector3();
+    const _qm = new THREE.Quaternion(), _q1 = new THREE.Quaternion();
+    function mirarProps(a, t) {
+      const mira = a.x.info.mira;
+      if (!mira) return;
+      const f = t * FPS;
+      for (const [nome, m] of Object.entries(mira)) {
+        const p = a.kit.grupo.getObjectByName(nome);
+        if (!p) continue;
+        for (const [f0, f1, alvoNome] of m.faixas) {
+          const w = Math.min(1, (f - f0) / 6, (f1 - f) / 6);
+          const alvo = a.kit.grupo.getObjectByName(alvoNome);
+          if (w <= 0 || !alvo) continue;
+          p.updateMatrixWorld(true);
+          alvo.updateMatrixWorld(true);
+          p.matrixWorld.decompose(_O, _q, _s);
+          if (_s.x < 1e-3) continue;
+          _A.set(0, 1, 0).applyQuaternion(_q);                     // eixo do prop (+Y no glTF = +Z no Blender)
+          _B.setFromMatrixPosition(alvo.matrixWorld).sub(_O).normalize();
+          _qm.setFromUnitVectors(_A, _B);
+          _qm.copy(_q1.identity().slerp(_qm, w));                  // giro no mundo
+          for (const o of [p, ...(m.junto || []).map(n => a.kit.grupo.getObjectByName(n)).filter(Boolean)]) {
+            o.updateMatrixWorld(true);
+            o.matrixWorld.decompose(_p, _q, _s);
+            _p.sub(_O).applyQuaternion(_qm).add(_O);
+            _q.premultiply(_qm);
+            _m.compose(_p, _q, _s).premultiply(_m2.copy(a.kit.grupo.matrixWorld).invert());
+            _m.decompose(o.position, o.quaternion, o.scale);
+            o.updateMatrixWorld(true);
+          }
+        }
       }
     }
 

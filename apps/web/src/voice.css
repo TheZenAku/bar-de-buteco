@@ -2,49 +2,47 @@
 .voice-tools{display:inline-flex;gap:inherit}
 .voice-btn{--level:0}
 .voice-btn .voice-icon{display:grid;place-items:center}
-.voice-btn.on{color:var(--neon-green)}
-.voice-btn.off{color:var(--neon-red)}
+.voice-btn.on{color:var(--vw-mint)}
+.voice-btn.off{color:var(--destructive)}
 /* Input level under the microphone icon; brighter while transmitting. */
-.voice-level{position:absolute;left:8px;right:8px;bottom:5px;height:3px;border-radius:2px;background:var(--neon-green);opacity:.35;transform-origin:left;transform:scaleX(var(--level));transition:transform 60ms linear}
+.voice-level{position:absolute;left:8px;right:8px;bottom:5px;height:2px;background:var(--vw-mint);opacity:.35;transform-origin:left;transform:scaleX(var(--level));transition:transform 60ms linear}
 .voice-btn:not(.on) .voice-level{display:none}
-.voice-btn.transmitting{box-shadow:0 0 0 2px var(--neon-green),0 0 14px -2px var(--neon-green)}
+.voice-btn.transmitting{box-shadow:inset 0 -2px var(--vw-mint)}
 .voice-btn.transmitting .voice-level{opacity:1}
 
 .world-label{display:inline-flex;align-items:center;gap:4px}
 .label-mic{display:inline-grid;color:var(--muted-foreground)}
 .label-mic .ui-icon{width:11px;height:11px}
-.world-label.speaking{border-color:var(--neon-green);box-shadow:0 0 0 1px var(--neon-green),0 0 12px -2px var(--neon-green)}
-.world-label.speaking .label-mic{color:var(--neon-green)}
+.world-label.speaking{box-shadow:inset 2px 0 var(--vw-mint);color:var(--vw-mint)}
+.world-label.speaking .label-mic{color:var(--vw-mint)}
 
-.settings-panel{display:grid;gap:18px}
+.settings-panel{display:grid;gap:22px}
 .settings-panel section{display:grid;gap:10px}
-.settings-panel h3{display:flex;align-items:center;gap:8px;margin:0;font:18px var(--font-display);letter-spacing:.3px}
-.settings-panel h3 .ui-icon{width:18px;height:18px;color:var(--primary)}
+.settings-panel h3{display:flex;align-items:center;gap:8px;margin:0 0 2px;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:13px;letter-spacing:.14em;color:var(--foreground)}
+.settings-panel h3 .ui-icon{width:16px;height:16px;stroke-width:1.25;color:var(--vw-pink)}
 .settings-panel .fine-print{margin:0}
-.setting-row{display:grid;grid-template-columns:minmax(110px,9rem) 1fr 3.2rem;align-items:center;gap:10px;font-size:13px;color:var(--foreground)}
-.setting-row input[type=range]{width:100%;min-height:24px;padding:0;accent-color:var(--primary)}
-.setting-row input[type=range]:disabled{opacity:.4}
+.setting-row{display:grid;grid-template-columns:minmax(110px,9rem) 1fr 3.2rem;align-items:center;gap:12px;margin:0;font:400 11px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--soft)}
 .setting-row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted-foreground)}
-.setting-row select{width:100%;min-height:36px;padding:6px 10px;border:2px solid var(--border);border-radius:10px;background:var(--input);color:var(--foreground)}
+.setting-row select,.setting-row input[type=number]{margin:0;min-height:34px;padding:5px 10px}
 .device-row{grid-template-columns:minmax(110px,9rem) 1fr}
-.setting-toggle{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:var(--muted);cursor:pointer}
-.setting-toggle b{display:block;font-size:14px}
-.setting-toggle small{display:block;font-size:11px;color:var(--muted-foreground)}
+.setting-toggle{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 12px;background:oklch(1 0 0 / 3%);font:400 14px var(--font-sans);text-transform:none;letter-spacing:normal;color:var(--foreground);cursor:pointer;transition:background-color .15s}
+.setting-toggle:hover{background:var(--secondary)}
+.setting-toggle b{display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.setting-toggle small{display:block;font:400 11px var(--font-mono);color:var(--muted-foreground)}
 .setting-toggle input{position:absolute;opacity:0;width:1px;height:1px}
-.setting-toggle i{flex:none;position:relative;width:44px;height:24px;border-radius:12px;background:var(--secondary);border:2px solid var(--border);transition:background .15s}
-.setting-toggle i::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--muted-foreground);transition:transform .15s,background .15s}
-.setting-toggle input:checked+i{background:oklch(.55 .14 145)}
-.setting-toggle input:checked+i::after{transform:translateX(20px);background:var(--foreground)}
-.setting-toggle input:focus-visible+i{outline:3px solid var(--neon-teal);outline-offset:3px}
+.setting-toggle i{flex:none;position:relative;width:40px;height:20px;background:var(--secondary);border:1px solid var(--key);transition:background-color .15s}
+.setting-toggle i::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;background:var(--muted-foreground);transition:transform .15s,background-color .15s}
+.setting-toggle input:checked+i{background:var(--active);border-color:var(--active)}
+.setting-toggle input:checked+i::after{transform:translateX(20px);background:var(--active-foreground)}
+.setting-toggle input:focus-visible+i{outline:2px solid var(--ring);outline-offset:2px}
 .setting-toggle input:disabled+i{opacity:.4}
 .setting-toggle:has(input:disabled){cursor:not-allowed}
-.setting-choice{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;border:0}
-.setting-choice legend{width:100%;margin-bottom:6px;font-size:13px}
-.setting-choice label{display:flex;align-items:center;gap:6px;padding:6px 12px;border:2px solid var(--line);border-radius:999px;font-size:13px;cursor:pointer}
-.setting-choice label:has(input:checked){border-color:var(--primary);background:var(--muted)}
-.setting-choice input{accent-color:var(--primary)}
-.mic-meter{position:relative;height:10px;border-radius:5px;background:var(--secondary);border:1px solid var(--line);overflow:hidden}
+.setting-choice{display:flex;flex-wrap:wrap;gap:1px;margin:0;padding:0;border:0}
+.setting-choice legend{width:100%;margin-bottom:8px;font:400 11px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--soft)}
+.setting-choice label{display:flex;align-items:center;gap:8px;margin:0;padding:7px 14px;background:var(--secondary);font:600 12px var(--font-sans);letter-spacing:.08em;color:var(--soft);cursor:pointer}
+.setting-choice label:has(input:checked){background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
+.mic-meter{position:relative;height:4px;background:var(--secondary);overflow:visible}
 .mic-meter i{position:absolute;inset:0 auto 0 0;width:0;background:var(--muted-foreground);transition:width 60ms linear}
-.mic-meter i.open{background:var(--neon-green)}
-.mic-meter b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--primary)}
+.mic-meter i.open{background:var(--vw-mint)}
+.mic-meter b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--vw-pink)}
 @media (max-width:560px){.setting-row{grid-template-columns:1fr 3.2rem}.setting-row span{grid-column:1/-1}.device-row{grid-template-columns:1fr}}

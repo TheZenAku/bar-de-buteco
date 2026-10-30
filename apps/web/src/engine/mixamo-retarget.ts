@@ -2,8 +2,8 @@ import * as pc from 'playcanvas';
 
 /**
  * Clips authored on a Mixamo skeleton (the exports of palco_musicos.js and animacoes_bar.js, written for three.js) played on
- * any of the bar's skins: each bone's world rotation away from the authoring rest pose is applied to the skin's bind
- * pose, and the hips move by the clip's metres from the skin's own. Used by the stage's musicians and the bar animations.
+ * any of the bar's skins: each bone's world rotation away from the authoring rest pose is applied to the skin's
+ * calibrated rest pose, and the hips move by the clip's metres from the skin's own. Used by the stage's musicians and the bar animations.
  */
 
 // Mixamo joint names, with any mixamorig prefix, to the canonical ones every skin carries (tools/assets/lib/mixamo-names.mjs).
@@ -22,6 +22,8 @@ export interface Clip {name:string;duration:number;bones:Map<string,Curve>}
 /** The authoring skeleton of a clip file at rest, and its clips. */
 export interface Source {
   order:string[];parent:Map<string,string|null>;restL:Map<string,pc.Quat>;restW:Map<string,pc.Quat>;
+  /** Joint positions in the authoring rest pose, for aligning different A/T poses. */
+  restP:Map<string,pc.Vec3>;
   /** Local position and scale of each bone at rest (forward kinematics of the authoring skeleton). */
   restT:Map<string,pc.Vec3>;restS:Map<string,pc.Vec3>;
   /** World rotation of what holds each bone without a parent bone (the armature). */
@@ -35,6 +37,8 @@ export interface Target {
   above:Map<string,pc.Mat4>;hipParentInverse:pc.Mat4;
   /** The entity path of each bone in the skin's own clips, so the converted ones bind the same way. */
   paths:Map<string,string[]>;names:Map<string,string>;height:number;
+  /** The hips above the floor in the bind pose (animacoes_bar.js alturaQuadril). */
+  hipHeight:number;
 }
 
 export function sample(curve:Curve,t:number,out:number[]):number[] {
@@ -79,14 +83,15 @@ export function readSource(root:pc.GraphNode,clips:Clip[]):Source {
   const hip=bones.get('hip');
   if(!hip?.parent)throw new Error('o esqueleto não tem mixamorig:Hips');
   const parent=new Map<string,string|null>(),restL=new Map<string,pc.Quat>(),restW=new Map<string,pc.Quat>(),above=new Map<string,pc.Quat>();
-  const restT=new Map<string,pc.Vec3>(),restS=new Map<string,pc.Vec3>();
+  const restT=new Map<string,pc.Vec3>(),restS=new Map<string,pc.Vec3>(),restP=new Map<string,pc.Vec3>();
   for(const name of order){
     const node=bones.get(name)!,up=node.parent,upName=up&&bones.get(boneName(up.name))===up?boneName(up.name):null;
     parent.set(name,upName);restL.set(name,node.getLocalRotation().clone());restW.set(name,node.getRotation().clone());
+    restP.set(name,node.getPosition().clone());
     restT.set(name,node.getLocalPosition().clone());restS.set(name,node.getLocalScale().clone());
     if(!upName)above.set(name,up?up.getRotation().clone():new pc.Quat());
   }
-  return {order,parent,restL,restW,restT,restS,above,hipParent:hip.parent.getWorldTransform().clone(),hipRest:hip.getPosition().clone(),clips};
+  return {order,parent,restL,restW,restP,restT,restS,above,hipParent:hip.parent.getWorldTransform().clone(),hipRest:hip.getPosition().clone(),clips};
 }
 
 /** lerAlvo: the bind pose of the skin's joints, from the inverse bind matrices the renderer skins with. */
@@ -129,11 +134,37 @@ export function readTarget(model:pc.Entity,tracks:readonly pc.AnimTrack[]):Targe
     const node=path.entityPath[path.entityPath.length-1];
     if(node&&!paths.has(boneName(node)))paths.set(boneName(node),path.entityPath);
   }
-  return {order,parent,rest,above,hipParentInverse:hipParent.clone().invert(),paths,names,height:high-low};
+  return {order,parent,rest,above,hipParentInverse:hipParent.clone().invert(),paths,names,height:high-low,hipHeight:rest.get('hip')!.p.y-low};
 }
 
 /**
- * converter: the same world delta from the authoring rest pose, applied to each joint's bind pose; joints the clip
+ * Each joint's bind pose (model space) turned so its limb points as the authoring rest pose's does, as the offline
+ * converter aligns them: the clips' world deltas are applied to this, and a joint posed by a clip is `delta × aligned`.
+ */
+export function alignedRest(source:Source,target:Target):Map<string,pc.Quat> {
+  // A world rotation delta alone preserves the target's A/T pose difference. Align each limb's real
+  // rest direction first, as the offline converter does, without changing the skin or its bind matrices.
+  const ends:Record<string,string>={hip:'spine_01',spine_01:'spine_02',spine_02:'spine_03',spine_03:'neck',neck:'head'};
+  for(const side of ['l','r'])for(const [bone,end] of Object.entries({shoulder:'upperarm',upperarm:'lowerarm',lowerarm:'hand',upperleg:'lowerleg',lowerleg:'foot'}))
+    ends[`${bone}_${side}`]=`${end}_${side}`;
+  const correction=new Map<string,pc.Quat>(),aligned=new Map<string,pc.Quat>();
+  for(const bone of target.order){
+    const up=target.parent.get(bone),end=ends[bone],targetEnd=end&&target.rest.get(end),sourceEnd=end&&source.restP.get(end),sourceStart=source.restP.get(bone);
+    let swing:pc.Quat|undefined;
+    // Faces and soles keep their native orientation; hands and fingers inherit the forearm's alignment.
+    if(bone==='head'||/^(foot|toe)_[lr]$/.test(bone))swing=new pc.Quat();
+    else if(targetEnd&&sourceEnd&&sourceStart){
+      const from=new pc.Vec3().sub2(targetEnd.p,target.rest.get(bone)!.p).normalize(),to=new pc.Vec3().sub2(sourceEnd,sourceStart).normalize();
+      if(from.lengthSq()>.5&&to.lengthSq()>.5)swing=new pc.Quat().setFromDirections(from,to);
+    }
+    swing??=up?correction.get(up)!.clone():new pc.Quat();
+    correction.set(bone,swing);aligned.set(bone,swing.clone().mul(target.rest.get(bone)!.q).normalize());
+  }
+  return aligned;
+}
+
+/**
+ * converter: the same world delta from the authoring rest pose, applied to each joint's aligned bind pose; joints the clip
  * does not have keep their bind pose under their parent. The hips move by the clip's metres from its rest (times
  * `hipScale`: 1 where the clip must reach a place, the body's height ratio where it moves in its own space).
  */
@@ -144,6 +175,7 @@ export function convert(clip:Clip,source:Source,target:Target,name:string,hipSca
   const aboveTurn=new Map([...target.above].map(([bone,matrix])=>[bone,new pc.Quat().setFromMat4(matrix)]));
   const restLocal=new Map(target.order.map(bone=>{const up=target.parent.get(bone);
     return [bone,(up?target.rest.get(up)!.q:aboveTurn.get(bone)!).clone().invert().mul(target.rest.get(bone)!.q)];}));
+  const aligned=alignedRest(source,target);
   const turns=new Map(target.order.map(bone=>[bone,new Float32Array(frames*4)])),hips=new Float32Array(frames*3);
   const world=new Map<string,pc.Quat>(),delta=new Map<string,pc.Quat>(),posed=new Map<string,pc.Quat>();
   const value:number[]=[],local=new pc.Quat(),inverse=new pc.Quat(),hip=new pc.Vec3();
@@ -158,7 +190,7 @@ export function convert(clip:Clip,source:Source,target:Target,name:string,hipSca
     }
     for(const bone of target.order){
       const up=target.parent.get(bone),above=up?posed.get(up)!:aboveTurn.get(bone)!,turn=posed.get(bone)??new pc.Quat();
-      if(delta.has(bone))turn.mul2(delta.get(bone)!,target.rest.get(bone)!.q);else turn.mul2(above,restLocal.get(bone)!);
+      if(delta.has(bone))turn.mul2(delta.get(bone)!,aligned.get(bone)!);else turn.mul2(above,restLocal.get(bone)!);
       posed.set(bone,turn);
       const out=inverse.copy(above).invert().mul(turn).normalize(),data=turns.get(bone)!,k=frame*4;
       // Neighbouring keys on the same side of the sphere, so the engine's blend between them never spins.

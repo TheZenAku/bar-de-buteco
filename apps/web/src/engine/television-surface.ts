@@ -17,6 +17,8 @@ export class TelevisionSurface {
   private visible=false;
   /** The map's own picture on this screen (the stage's standby art): shown instead of the dark aperture while no video plays. */
   private standby?:pc.Entity;
+  private standbyGlow:Array<{instance:pc.MeshInstance;intensity:number}>=[];
+  private dimmed=0;
   readonly right:pc.Vec3;
   readonly normal:pc.Vec3;
   constructor(private app:pc.Application,readonly definition:TvDefinition) {
@@ -24,7 +26,8 @@ export class TelevisionSurface {
     this.right=new pc.Vec3(Math.cos(angle),0,-Math.sin(angle));this.normal=new pc.Vec3(Math.sin(angle),0,Math.cos(angle));
     this.material=new pc.ShaderMaterial({uniqueName:'YouTube screen alpha aperture',attributes:{aPosition:pc.SEMANTIC_POSITION},
       vertexGLSL:'attribute vec3 aPosition;uniform mat4 matrix_model;uniform mat4 matrix_viewProjection;void main(){gl_Position=matrix_viewProjection*matrix_model*vec4(aPosition,1.0);}',
-      fragmentGLSL:'void main(){gl_FragColor=vec4(0.0);}' });
+      fragmentGLSL:'precision highp float;uniform float screenDim;void main(){gl_FragColor=vec4(0.0,0.0,0.0,screenDim);}' });
+    this.material.setParameter('screenDim',0);
     this.material.blendType=pc.BLEND_NONE;this.material.depthWrite=true;this.material.depthTest=true;this.material.cull=pc.CULLFACE_NONE;
     this.offMaterial=new pc.StandardMaterial();this.offMaterial.useLighting=false;this.offMaterial.diffuse.set(0,0,0);this.offMaterial.emissive.set(.008,.008,.008);this.offMaterial.cull=pc.CULLFACE_NONE;this.offMaterial.update();
     this.plane=new pc.Entity(`YouTube aperture ${definition.id}`);
@@ -33,7 +36,21 @@ export class TelevisionSurface {
     app.root.addChild(this.plane);
   }
   show(value:boolean):void {if(this.visible!==value){this.visible=value;for(const mesh of this.plane.render!.meshInstances)mesh.material=value?this.material:this.offMaterial;this.showStandby();this.app.renderNextFrame=true;}}
-  setStandby(entity:pc.Entity|undefined):void {this.standby=entity;this.showStandby();}
+  setStandby(entity:pc.Entity|undefined):void {
+    this.standby=entity;this.dimmed=-1;
+    this.standbyGlow=((entity?.findComponents('render') as pc.RenderComponent[]|undefined)??[]).flatMap(render=>render.meshInstances)
+      .map(instance=>({instance,intensity:(instance.material as pc.StandardMaterial).emissiveIntensity??1}));
+    this.showStandby();
+  }
+  /**
+   * Darkens the screen by `amount` (0–1), as an LED wall blacks out for the lasers: the video through the aperture (its
+   * alpha lets that much black over it) and the standby art's own glow.
+   */
+  setDim(amount:number):void {
+    if(Math.abs(amount-this.dimmed)<.005)return;
+    this.dimmed=amount;this.material.setParameter('screenDim',amount);
+    for(const glow of this.standbyGlow)glow.instance.setParameter('material_emissiveIntensity',glow.intensity*(1-amount));
+  }
   private showStandby():void {if(!this.standby)return;this.standby.enabled=!this.visible;this.plane.enabled=this.visible;}
   /**
    * The video always stays on its screen, at any size and even when partly outside the view; the

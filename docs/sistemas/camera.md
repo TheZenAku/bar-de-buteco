@@ -1,29 +1,31 @@
 # Câmera
 
-O jogador escolhe entre quatro visões. **Q** passa para a próxima, a **rodinha do mouse** aproxima ou afasta uma visão por vez (de *longe* até a *primeira pessoa*) e **Configurações → Câmera** escolhe direto. A escolha fica salva no navegador (`bar:settings:v1`, campo `camera`) e um aviso curto mostra o nome da visão ao trocar.
+O jogador escolhe livremente a distância com a **rodinha do mouse**, em zoom contínuo: movimentos pequenos produzem ajustes pequenos, sem saltar entre distâncias predefinidas. **Q** alterna entre primeira e terceira pessoa e conserva a última distância escolhida em terceira pessoa. Nenhuma dessas ações mostra aviso ou toast.
+
+Em **Configurações → Câmera**, o campo **Distância (m)** aceita um valor exato, com ajuste de 0,05 m pelos controles do campo e sem máximo predefinido. Zero entra em primeira pessoa; um valor positivo volta à terceira pessoa. A escolha fica salva no navegador (`bar:settings:v1`): `camera` guarda `first` ou `third`, e `cameraDistance` guarda a última distância positiva, inclusive ao entrar em primeira pessoa.
 
 | Visão | Como fica |
 | --- | --- |
 | Primeira pessoa | Nos olhos do personagem: logo acima e à frente da articulação da cabeça, então acompanha o corpo sentado, no mictório ou fumando. A cabeça do próprio personagem some (a articulação é encolhida depois que os clipes posam o corpo), mas mãos, braços e o que elas seguram aparecem. Parado, o corpo vira junto com a visão. O nome e o anel do próprio jogador não aparecem. |
-| Terceira pessoa · próxima | Braço de 3 m, olhando na altura dos ombros (1,45 m). |
-| Terceira pessoa · padrão | Braço de 6,4 m, olhando a 1,25 m. É a visão de quem entra pela primeira vez. |
-| Terceira pessoa · longe | Braço de 10,5 m, olhando a 1,1 m: mais cenário em volta. |
+| Terceira pessoa | Distância escolhida pelo jogador, olhando a 1,25 m acima dos pés. A menos de 1 m, o ponto de órbita sobe gradualmente até os olhos para evitar entrar no peito; a cabeça some no zoom bem próximo. Quem entra pela primeira vez começa a 6,4 m. |
 
-Arrastar o mouse gira a visão. Em terceira pessoa, arrastar para cima e para baixo sobe e desce o braço; em primeira pessoa, olha para cima e para baixo.
+Preferências antigas são migradas: `near`, `default` e `far` viram terceira pessoa a 3 m, 6,4 m e 10,5 m, respectivamente, quando ainda não existe distância salva.
+
+Arrastar o mouse gira a visão livremente nos eixos horizontal e vertical, em ambas as visões. A câmera pode passar por cima e por baixo do personagem e completar voltas, sem limite de inclinação. Um vetor de orientação acompanha o giro vertical, mantendo o movimento contínuo ao cruzar os polos. Assistindo a uma TV ou ao telão, o enquadramento próprio da tela também permite giro sem limites.
 
 ## Movimento suave
 
 Tudo é suavizado por amortecimento exponencial (`camera-rig.ts`):
 
 - o giro e a inclinação seguem o mouse um pouco atrás da mão;
-- trocar de visão desliza o braço até o novo comprimento, e entrar ou sair da primeira pessoa leva a câmera dos olhos para trás do personagem (e vice-versa) em cerca de meio segundo;
+- o zoom desliza até a distância escolhida, e entrar ou sair da primeira pessoa leva a câmera dos olhos para a órbita ao redor do personagem (e vice-versa) suavemente;
 - o ponto que a câmera olha segue o corpo com um pequeno atraso; um salto grande (renascer, ser levado de volta) muda direto;
-- uma parede encolhe o braço em poucos quadros, e ele volta devagar quando o caminho fica livre;
-- no mictório a câmera gira até o lado com mais espaço, também deslizando.
+- paredes, lajes, portas, móveis e demais colisores não encurtam a distância escolhida;
+- ações como usar o mictório conservam a orientação escolhida pelo jogador, sem giro automático.
 
 ## Raio-X
 
-Só o prédio e a vizinhança param o braço da câmera: paredes, lajes, forros, telhados, portas e o tablado do palco. Móveis, objetos, árvores, carros e o equipamento do palco não puxam a câmera para perto do personagem (`cameraFraction(…, true)` em `packages/shared/src/world.ts`).
+A câmera atravessa os colisores do cenário em qualquer direção. Isso só altera a câmera: as colisões do personagem e as regras de circulação continuam valendo. `cameraFraction` permanece disponível para consultas de geometria, como a sombra de contato, mas não controla o zoom.
 
 Quando alguma coisa sólida fica entre a câmera e o corpo (um teste de visão até a cabeça, o peito e o quadril, `sightBlocked`), abre-se uma janela em volta do personagem: tudo o que está na frente dele, dentro dessa janela, deixa de ser desenhado, do mesmo jeito para qualquer material. A janela tem o formato do corpo (0,8 m para cada lado e 40% mais alta que larga), o miolo totalmente aberto e uma borda fina pontilhada para não ter corte seco. Ela abre em cerca de um décimo de segundo e fecha em um quarto de segundo quando a visão fica livre.
 
@@ -40,10 +42,10 @@ O recorte é um trecho de shader (`litUserMainStartPS`) aplicado a todos os mate
 
 | Arquivo | Papel |
 | --- | --- |
-| `apps/web/src/engine/camera-rig.ts` | Visões, suavização, braço contra o prédio e quando abrir o raio-X |
+| `apps/web/src/engine/camera-rig.ts` | Zoom contínuo, visões, giro livre, suavização e quando abrir o raio-X |
 | `apps/web/src/engine/camera-xray.ts` | O recorte no shader e seus parâmetros |
 | `apps/web/src/engine/BarScene.ts` | Liga a câmera à cena: Q, rodinha, arrasto, cabeça escondida, nome e anel do jogador |
-| `packages/shared/src/world.ts` | `cameraFraction` (o que para o braço) e `sightBlocked` (o que esconde o jogador) |
-| `apps/web/src/settings.ts`, `apps/web/src/main.ts` | Preferência salva, opção em Configurações e o aviso ao trocar |
+| `packages/shared/src/world.ts` | Consultas de geometria (`cameraFraction`) e de visibilidade do jogador (`sightBlocked`) |
+| `apps/web/src/settings.ts`, `apps/web/src/main.ts` | Distância e visão salvas, migração de preferências e controles em Configurações |
 
-`tests/integration/map.test.ts` confere que o braço atravessa o balcão mas não a laje nem as paredes, e que o balcão esconde o quadril de quem está atrás dele.
+`tests/integration/camera.test.ts` cobre o zoom fino, a conservação da distância, o giro livre e a passagem da câmera por paredes. `tests/integration/camera-settings.test.ts` cobre a persistência e a migração das preferências. `tests/integration/map.test.ts` continua verificando as consultas de geometria e visibilidade, além das colisões do jogador.

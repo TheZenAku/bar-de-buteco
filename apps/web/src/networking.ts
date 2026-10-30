@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,TICK_MS,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,TICK_MS,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import {api} from './api';
 
 export interface NetworkHooks {
@@ -13,6 +13,10 @@ export interface NetworkHooks {
   television?:(id:string)=>void;
   /** The stage's steps were touched (`open`: show the pass panel), or the pass changed: bought, or ran out (`message`). */
   stage?:(update:{open?:boolean;until:number;price?:number;message?:string})=>void;
+  /** Standing on the shop's blip, E: the room let this browser open the house's shop. */
+  shop?:()=>void;
+  /** At the light desk, E: the room let this browser open the stage show's panel. */
+  lights?:()=>void;
   /** A proximity voice frame relayed by the server. */
   voice?:(frame:Uint8Array)=>void;
   removed?:(kind:'kick'|'ban',reason:string)=>void;
@@ -25,6 +29,13 @@ export interface NetworkHooks {
   table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
   adminWorld?:(snapshot:unknown)=>void;
+  /** The price table (packages/shared/src/prices.ts), on entering and when the administration changes it. */
+  prices?:(table:unknown)=>void;
+  /** The phone: a call changed (rings, answered, ended), or another player sent something new (Highzap, Highgram, Pix). */
+  phoneCall?:(call:PhoneCallView)=>void;
+  phonePing?:(ping:PhonePing)=>void;
+  /** A frame of the other end's camera on a video call. */
+  phoneVideo?:(bytes:Uint8Array)=>void;
 }
 /** `waiter`: who brings it (Tonico or a worker's name); `stage`: still at the counter, or on its way to the table. */
 export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number;waiter?:string;stage?:'queued'|'carrying'}
@@ -89,6 +100,8 @@ export class BarNetwork {
     room.onMessage('tv.open',(message:{id:string})=>this.hooks.television?.(message.id));
     room.onMessage('tv.result',()=>{});
     room.onMessage('stage.open',(message:{until:number;price:number})=>this.hooks.stage?.({...message,open:true}));
+    room.onMessage('shop.open',()=>this.hooks.shop?.());
+    room.onMessage('lights.open',()=>this.hooks.lights?.());
     room.onMessage('stage.state',(message:{until:number;price?:number;message?:string})=>this.hooks.stage?.(message));
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
@@ -98,6 +111,10 @@ export class BarNetwork {
     room.onMessage('table.state',(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>this.hooks.table?.(update));
     room.onMessage('job.state',(update:{task?:JobTaskView|null;message?:string})=>this.hooks.job?.(update));
     room.onMessage('admin.world',(snapshot:unknown)=>this.hooks.adminWorld?.(snapshot));
+    room.onMessage('prices',(message:{prices:unknown})=>this.hooks.prices?.(message.prices));
+    room.onMessage('phone.call',(call:PhoneCallView)=>this.hooks.phoneCall?.(call));
+    room.onMessage('phone.ping',(ping:PhonePing)=>this.hooks.phonePing?.(ping));
+    room.onMessage('phone.video',(bytes:Uint8Array)=>this.hooks.phoneVideo?.(bytes));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));

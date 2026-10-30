@@ -1,15 +1,15 @@
 import {randomUUID} from 'node:crypto';
-import {and,desc,eq,gt,ilike,inArray,isNull,or,sql} from 'drizzle-orm';
+import {and,asc,desc,eq,gt,ilike,inArray,isNull,or,sql,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {MAX_COIN_BALANCE,type PublicUser} from '@bar/shared';
+import {MAX_COIN_BALANCE,type AdminPlayerFilter,type AdminPlayerSort,type PublicUser} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {users,profiles,wallets,currencyLedger,moderationActions,reports,controls,sessions} from './database/schema.js';
 import {isOwnerEmail} from './admin-policy.js';
 import type {WardrobeService} from './wardrobe.js';
 
-type Transaction=Parameters<Parameters<Database['transaction']>[0]>[0];
+export type Transaction=Parameters<Parameters<Database['transaction']>[0]>[0];
 export class AdminError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
-const activeBans=()=>and(eq(moderationActions.action,'ban'),isNull(moderationActions.revokedAt),or(isNull(moderationActions.expiresAt),gt(moderationActions.expiresAt,new Date())));
+export const activeBans=()=>and(eq(moderationActions.action,'ban'),isNull(moderationActions.revokedAt),or(isNull(moderationActions.expiresAt),gt(moderationActions.expiresAt,new Date())));
 export interface WalletAdjustment {playerId:string;operation:'add'|'remove'|'set';amount:number;reason:string;requestId:string;expectedBalance?:number}
 export interface ModerationCommand {action:'kick'|'ban'|'unban'|'unkick'|'event';playerId?:string;reason?:string;eventType?:'BLACKOUT'|'DRUNK_NPC'|'PARTY'}
 const roleActions=['admin-grant','admin-revoke','undo-admin-grant','undo-admin-revoke'];
@@ -17,12 +17,12 @@ const reversalLabels:Record<string,string>={kick:'Desfazer expulsão',ban:'Desba
 
 export class AdminService {
   constructor(private db:Database,private wardrobe:WardrobeService){}
-  private async actor(tx:Transaction,id:string){
+  async actor(tx:Transaction,id:string){
     const [actor]=await tx.select().from(users).where(eq(users.id,id)).for('share');
     if(!actor?.verified||actor.role!=='admin')throw new AdminError(403,'Acesso exclusivo da administração.');
     return actor;
   }
-  private permissions(actor:Pick<PublicUser,'id'|'email'>,target:{id:string;email:string;role:string;verified:boolean;banned:boolean}){
+  permissions(actor:Pick<PublicUser,'id'|'email'>,target:{id:string;email:string;role:string;verified:boolean;banned:boolean}){
     const owner=isOwnerEmail(target.email),primary=isOwnerEmail(actor.email);
     return {owner,canModerate:target.id!==actor.id&&!owner&&(primary||target.role!=='admin'),
       canEditWallet:primary||target.id===actor.id||target.role!=='admin',
@@ -37,49 +37,70 @@ export class AdminService {
     if(action.startsWith('admin-'))return permissions.canChangeRole?'':'Somente a conta principal pode reverter esta permissão.';
     return permissions.canModerate?'':'Esta conta está protegida contra essa ação.';
   }
-  async overview(actor:PublicUser,query:{search:string;offset:number;limit:number}){
-    const term=query.search.replace(/[\\%_]/g,'\\$&');
-    const filter=term?or(ilike(users.email,`%${term}%`),ilike(users.username,`%${term}%`),ilike(profiles.displayName,`%${term}%`)):undefined;
+  /** Administrative actions (newest first, `where` narrows them) with what each one's reversal would need. */
+  async audits(actor:Pick<PublicUser,'id'|'email'>,where:SQL|undefined,limit:number){
     const auditActor=alias(profiles,'audit_actor'),auditTarget=alias(profiles,'audit_target');
+    const logs=await this.db.select({id:moderationActions.id,actorId:moderationActions.actorId,userId:moderationActions.userId,actorName:auditActor.displayName,targetName:auditTarget.displayName,
+      action:moderationActions.action,reason:moderationActions.reason,createdAt:moderationActions.createdAt,revokedAt:moderationActions.revokedAt}).from(moderationActions)
+      .leftJoin(auditActor,eq(moderationActions.actorId,auditActor.userId)).leftJoin(auditTarget,eq(moderationActions.userId,auditTarget.userId)).where(where)
+      .orderBy(desc(moderationActions.createdAt),desc(moderationActions.id)).limit(limit);
+    const targetIds=[...new Set(logs.flatMap(log=>log.userId?[log.userId]:[]))];
+    const [targets,roles,ledger]=await Promise.all([
+      targetIds.length?this.db.select().from(users).where(inArray(users.id,targetIds)):[],
+      targetIds.length?this.db.select().from(moderationActions).where(and(inArray(moderationActions.userId,targetIds),inArray(moderationActions.action,roleActions))).orderBy(desc(moderationActions.createdAt),desc(moderationActions.id)):[],
+      logs.some(log=>log.action.startsWith('coins-'))?this.db.select({id:currencyLedger.id}).from(currencyLedger).where(inArray(currencyLedger.id,logs.filter(log=>log.action.startsWith('coins-')).map(log=>log.id))):[],
+    ]);
+    return logs.map(log=>{
+      let revertReason=log.revokedAt?'Esta ação já foi desfeita.':this.reversalAccess(actor,log.action,targets.find(target=>target.id===log.userId));
+      if(!revertReason&&log.action.startsWith('admin-')&&roles.find(role=>role.userId===log.userId)?.id!==log.id)revertReason='Há uma alteração de permissão mais recente.';
+      if(!revertReason&&log.action.startsWith('coins-')&&!ledger.some(entry=>entry.id===log.id))revertReason='O lançamento original não está disponível.';
+      return {...log,createdAt:log.createdAt.toISOString(),revokedAt:log.revokedAt?.toISOString()??null,canRevert:!revertReason,revertLabel:reversalLabels[log.action]??'Reverter',revertReason};
+    });
+  }
+  /** Bans in force, kicks still on record and what this administrator may do, for the given accounts. */
+  async accountStates(actor:Pick<PublicUser,'id'|'email'>,accounts:Array<{id:string;email:string;role:string;verified:boolean}>){
+    const ids=accounts.map(a=>a.id);
+    const [bans,kicks]=ids.length?await Promise.all([
+      this.db.select({userId:moderationActions.userId}).from(moderationActions).where(and(activeBans(),inArray(moderationActions.userId,ids))),
+      this.db.select().from(moderationActions).where(and(inArray(moderationActions.userId,ids),eq(moderationActions.action,'kick'),isNull(moderationActions.revokedAt))).orderBy(desc(moderationActions.createdAt),desc(moderationActions.id)),
+    ]):[[],[]];
+    const bannedIds=new Set(bans.map(b=>b.userId));
+    return new Map(accounts.map(a=>{const target={...a,role:a.role==='admin'?'admin' as const:'user' as const,banned:bannedIds.has(a.id)};
+      return [a.id,{role:target.role,banned:target.banned,kickId:kicks.find(k=>k.userId===a.id)?.id??null,...this.permissions(actor,target)}];}));
+  }
+  async overview(actor:PublicUser,query:{search:string;offset:number;limit:number;filter?:AdminPlayerFilter;sort?:AdminPlayerSort;online?:string[]}){
+    const term=query.search.replace(/[\\%_]/g,'\\$&');
+    const initialCoins=await this.wardrobe.pricing.get('reward:initial');
+    const filters:Record<AdminPlayerFilter,SQL|undefined>={all:undefined,admins:eq(users.role,'admin'),unverified:eq(users.verified,false),
+      banned:sql`exists (select 1 from ${moderationActions} where ${moderationActions.userId}=${users.id} and ${moderationActions.action}='ban' and ${moderationActions.revokedAt} is null and (${moderationActions.expiresAt} is null or ${moderationActions.expiresAt}>now()))`,
+      online:query.online?.length?inArray(users.id,query.online):sql`false`};
+    const filter=and(term?or(ilike(users.email,`%${term}%`),ilike(users.username,`%${term}%`),ilike(profiles.displayName,`%${term}%`)):undefined,filters[query.filter??'all']);
+    const balance=sql<number>`coalesce(${wallets.balance},${initialCoins})`.mapWith(Number);
+    const order=query.sort==='name'?[asc(sql`lower(${profiles.displayName})`),users.id]:query.sort==='balance'?[desc(balance),users.id]:[desc(users.createdAt),users.id];
     const reporter=alias(profiles,'reporter'),reported=alias(profiles,'reported');
     const [accounts,[count],logs,reportList]=await Promise.all([
-      this.db.select({id:users.id,username:users.username,email:users.email,role:users.role,verified:users.verified,displayName:profiles.displayName,
-        balance:sql<number>`coalesce(${wallets.balance},${this.wardrobe.economy.initialCoins})`.mapWith(Number)})
+      this.db.select({id:users.id,username:users.username,email:users.email,role:users.role,verified:users.verified,displayName:profiles.displayName,balance,createdAt:users.createdAt})
         .from(users).innerJoin(profiles,eq(users.id,profiles.userId)).leftJoin(wallets,eq(users.id,wallets.userId)).where(filter)
-        .orderBy(desc(users.createdAt),users.id).limit(query.limit).offset(query.offset),
+        .orderBy(...order).limit(query.limit).offset(query.offset),
       this.db.select({total:sql<number>`count(*)`.mapWith(Number)}).from(users).innerJoin(profiles,eq(users.id,profiles.userId)).where(filter),
-      this.db.select({id:moderationActions.id,actorId:moderationActions.actorId,userId:moderationActions.userId,actorName:auditActor.displayName,targetName:auditTarget.displayName,
-        action:moderationActions.action,reason:moderationActions.reason,createdAt:moderationActions.createdAt,revokedAt:moderationActions.revokedAt}).from(moderationActions)
-        .leftJoin(auditActor,eq(moderationActions.actorId,auditActor.userId)).leftJoin(auditTarget,eq(moderationActions.userId,auditTarget.userId)).orderBy(desc(moderationActions.createdAt)).limit(100),
+      this.audits(actor,undefined,100),
       this.db.select({id:reports.id,reason:reports.reason,reporterName:reporter.displayName,targetName:reported.displayName,createdAt:reports.createdAt}).from(reports)
         .leftJoin(reporter,eq(reports.reporterId,reporter.userId)).leftJoin(reported,eq(reports.userId,reported.userId)).orderBy(desc(reports.createdAt)).limit(100),
     ]);
-    const bans=accounts.length?await this.db.select({userId:moderationActions.userId}).from(moderationActions).where(and(activeBans(),inArray(moderationActions.userId,accounts.map(a=>a.id)))):[];
-    const bannedIds=new Set(bans.map(b=>b.userId));
-    const targetIds=[...new Set([...accounts.map(a=>a.id),...logs.flatMap(log=>log.userId?[log.userId]:[])])];
-    const [targets,kicks,roles,ledger]=await Promise.all([
-      targetIds.length?this.db.select().from(users).where(inArray(users.id,targetIds)):[],
-      accounts.length?this.db.select().from(moderationActions).where(and(inArray(moderationActions.userId,accounts.map(a=>a.id)),eq(moderationActions.action,'kick'),isNull(moderationActions.revokedAt))).orderBy(desc(moderationActions.createdAt),desc(moderationActions.id)):[],
-      targetIds.length?this.db.select().from(moderationActions).where(and(inArray(moderationActions.userId,targetIds),inArray(moderationActions.action,roleActions))).orderBy(desc(moderationActions.createdAt),desc(moderationActions.id)):[],
-      logs.length?this.db.select({id:currencyLedger.id}).from(currencyLedger).where(inArray(currencyLedger.id,logs.filter(log=>log.action.startsWith('coins-')).map(log=>log.id))):[],
-    ]);
-    return {users:accounts.map(a=>{const target={...a,role:a.role==='admin'?'admin' as const:'user' as const,banned:bannedIds.has(a.id)};return {...target,kickId:kicks.find(k=>k.userId===a.id)?.id??null,...this.permissions(actor,target)};}),
-      total:count.total,offset:query.offset,limit:query.limit,canManageAdmins:isOwnerEmail(actor.email),logs:logs.map(log=>{
-        let revertReason=log.revokedAt?'Esta ação já foi desfeita.':this.reversalAccess(actor,log.action,targets.find(target=>target.id===log.userId));
-        if(!revertReason&&log.action.startsWith('admin-')&&roles.find(role=>role.userId===log.userId)?.id!==log.id)revertReason='Há uma alteração de permissão mais recente.';
-        if(!revertReason&&log.action.startsWith('coins-')&&!ledger.some(entry=>entry.id===log.id))revertReason='O lançamento original não está disponível.';
-        return {...log,canRevert:!revertReason,revertLabel:reversalLabels[log.action]??'Reverter',revertReason};
-      }),reports:reportList};
+    const states=await this.accountStates(actor,accounts);
+    return {users:accounts.map(a=>({...a,...states.get(a.id)!,createdAt:a.createdAt.toISOString()})),
+      total:count.total,offset:query.offset,limit:query.limit,canManageAdmins:isOwnerEmail(actor.email),logs,reports:reportList};
   }
   async adjustWallet(actorId:string,body:WalletAdjustment){
     const [target]=await this.db.select().from(users).where(eq(users.id,body.playerId));
     if(!target)throw new AdminError(404,'Jogador não encontrado.');
+    const initialCoins=await this.wardrobe.pricing.get('reward:initial');
     return this.db.transaction(async tx=>{
       const actor=await this.actor(tx,actorId);
       const [currentTarget]=await tx.select().from(users).where(eq(users.id,target.id)).for('share');
       if(!this.permissions(actor,{...currentTarget,banned:false}).canEditWallet)throw new AdminError(403,'Somente a conta principal pode alterar moedas de outro administrador.');
-      const inserted=await tx.insert(wallets).values({userId:target.id,balance:this.wardrobe.economy.initialCoins}).onConflictDoNothing().returning();
-      if(inserted.length)await tx.insert(currencyLedger).values({id:`welcome:${target.id}`,userId:target.id,amount:this.wardrobe.economy.initialCoins,reason:'welcome'});
+      const inserted=await tx.insert(wallets).values({userId:target.id,balance:initialCoins}).onConflictDoNothing().returning();
+      if(inserted.length)await tx.insert(currencyLedger).values({id:`welcome:${target.id}`,userId:target.id,amount:initialCoins,reason:'welcome'});
       const [wallet]=await tx.select().from(wallets).where(eq(wallets.userId,target.id)).for('update');
       const id=`admin-wallet:${body.requestId}`;
       const [previous]=await tx.select().from(currencyLedger).where(eq(currencyLedger.id,id));

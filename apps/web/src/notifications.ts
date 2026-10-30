@@ -7,14 +7,14 @@ export interface NotificationScheduler {
   clearTimeout:(timer:ReturnType<typeof setTimeout>)=>void;
   queueMicrotask:(callback:()=>void)=>void;
 }
-const meta={mensagem:{label:'Recado no balcão',tone:'var(--neon-teal)',icon:'chat'},acao:{label:'No bar',tone:'var(--primary)',icon:'sparkles'},aviso:{label:'Fique de olho',tone:'var(--neon-red)',icon:'alert'},conquista:{label:'Conquista',tone:'var(--accent)',icon:'party'}};
+const meta={mensagem:{label:'Recado no balcão',tone:'var(--vw-cyan)',icon:'chat'},acao:{label:'No bar',tone:'var(--vw-pink)',icon:'sparkles'},aviso:{label:'Fique de olho',tone:'var(--destructive)',icon:'alert'},conquista:{label:'Conquista',tone:'var(--vw-lilac)',icon:'party'}};
 const browserScheduler:NotificationScheduler={
   now:()=>performance.now(),
   setTimeout:(callback,delay)=>setTimeout(callback,delay),
   clearTimeout:timer=>clearTimeout(timer),
   queueMicrotask:callback=>queueMicrotask(callback),
 };
-/** Port of nova-ui's Comanda: live game notices, bounded stack, dismiss and hover/focus pause. */
+/** Live game notices (the comanda: tone stub, eyebrow, title, close and timer), bounded stack, dismiss and hover/focus pause. */
 export function createNotifications(host:HTMLElement,scheduler:NotificationScheduler=browserScheduler){
   const active=new Map<string,()=>void>();let sequence=0;
   function show(notice:Notice):void{

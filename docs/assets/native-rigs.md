@@ -2,6 +2,8 @@
 
 Cada personagem tem o próprio esqueleto Mixamo, auto-rigado no próprio corpo (veja [skins Mixamo](skins-mixamo.md)); o Nathan mantém o rig original. Todos usam os mesmos nomes canônicos de juntas (`hip`, `spine_01`, `upperarm_l`...). Compartilhamos os movimentos de origem; cada modelo recebe clipes adaptados ao seu esqueleto.
 
+Para investigar deformações e transições, use o [diagnóstico de rigs](rig-troubleshooting.md), com a tela de inspeção e o fluxo para corrigir uma skin por vez.
+
 | Modelo | Esqueleto | Juntas da malha | Pesos |
 | --- | --- | --- | --- |
 | Nathan | Nathan | 88 | Originais |

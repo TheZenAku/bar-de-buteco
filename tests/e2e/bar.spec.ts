@@ -8,14 +8,15 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   test.setTimeout(120000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`ui_${Date.now().toString(36)}`);
-  await expect(page.locator('#hud-name')).not.toHaveText('Chegando…');
-  await expect(page.locator('#hud-status')).toHaveText('Na área!');
-  await expect(page.locator('#occupancy')).toContainText('/ 32');
+  // Connection and occupancy in the people window; the player's name in its "Seu lugar no bar" tab.
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();
+  await expect(page.locator('#hud-status')).toHaveText('Na área!');await expect(page.locator('#ping')).toHaveText(/\d+ ms|— ms/);await expect(page.locator('#occupancy')).toContainText('/ 32');
+  await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await expect(page.locator('#hud-name')).not.toHaveText('Chegando…');
+  await page.getByRole('button',{name:'Fechar janela'}).click();
   await page.getByRole('button',{name:/Pedir gelada/}).click();
   await expect(page.locator('#toasts')).toContainText('Chegue ao balcão');
   await page.getByRole('button',{name:/Dançar/}).click();
   await expect(page.locator('#dance-button')).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#hud-activity')).toHaveText('No passinho');
   await page.getByRole('button',{name:/Dançar/}).click();
   await expect(page.locator('#dance-button')).toHaveAttribute('aria-pressed','false');
   await page.locator('#dance-button').focus();await page.keyboard.press('Enter');
@@ -32,8 +33,9 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   await expect(page.locator('#chat-input')).toHaveValue('wasdx');
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:/Meu visual/}).click();
-  await selectSkin(page,'Rafael');
-  await expect(page.locator('#hud-skin')).toContainText('Rafael');
+  await selectSkin(page,'Rafael');await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await expect(page.locator('#hud-skin')).toContainText('Rafael');await page.getByRole('button',{name:'Fechar janela'}).click();
   await expect(page.locator('#kick-button')).toBeVisible();
   for(let visit=0;visit<2;visit++){
     await page.getByRole('button',{name:'Pessoas no bar'}).click();
@@ -49,8 +51,8 @@ test('Boteco interface uses live state and its action bar works at desktop and n
     }
   }
   await page.locator('#kick-button').click();
-  await expect(page.locator('#hud-activity')).toHaveText('Karatê!');
-  await page.getByRole('button',{name:'Sua conta',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world.players[d.localId].animationState;})).toBe('kick');
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button',{name:'Voltar à entrada'}).click();
   await expect(page.locator('#lobby')).toBeVisible();
@@ -115,18 +117,21 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await expect(page.locator('#context-label')).toHaveText('Cancelar pedido');
   await expect.poll(async()=>(await bartender())?.clip,{timeout:15000}).toBe('Bartend');
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(true);
-  const ownClip=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.clip;});
-  expect(await ownClip()).not.toBe('Drink');
-  await expect.poll(ownClip,{timeout:30000}).toBe('Drink');
-  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId)?.drink?.item;})).toBe('garrafa');
+  // Served, the beer goes into the hand: the body keeps its own clip (the hand layer raises and sips it) and the player
+  // walks away with it, the progress bar showing how much is left.
+  const held=()=>page.evaluate(()=>{const d=(window as any).barDebug,me=d.snapshot().world.players[d.snapshot().localId];return me.holding as string;});
+  await expect.poll(held,{timeout:30000}).toBe('garrafa');
+  const own=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId);});
+  await expect.poll(async()=>(await own())?.drink?.item).toBe('garrafa');expect((await own())?.clip).not.toBe('Drink');
   expect((await bartender())?.clip).not.toBe('Bartend');
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(false);
-  await page.keyboard.press('e');
+  await expect(page.locator('#consuming')).toContainText('Long neck');
   await walkTo(page,14.45,-7.6,.12);
+  expect(await held()).toBe('garrafa');
   await expect(page.locator('#context-label')).toHaveText(/^Sentar · mesa \d+$/);await page.keyboard.press('e');
   await expect(page.locator('#context-label')).toHaveText('Levantar / encerrar');
-  // Common chairs play plain sitting (no glass until there is an inventory).
-  await expect.poll(ownClip).toBe('Sit');
+  // Common chairs play plain sitting; the beer stays in hand meanwhile (still being had), out of sight.
+  await expect.poll(async()=>(await own())?.clip).toBe('Sit');expect(await held()).toBe('garrafa');
   await page.keyboard.press('e');
   await walkTo(page,14.6,-6.6,.18);
   expect(errors).toEqual([]);
@@ -146,7 +151,8 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
     await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin==='Gilmar'?'gilmar-gordo':skin.toLowerCase());
     await expect.poll(()=>page.evaluate((id)=>{
       const tracks=(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks??[];
-      return ['Walk','Run','DrunkIdle','DrunkWalk','Dance','Sit','Wave','Use','Wait','Recover','Drink'].every(name=>tracks.includes(name));
+      // The dances arrive in a second bank, after these.
+      return ['Walk','Run','DrunkIdle','DrunkWalk','Sit','Wave','Use','Wait','Recover','Drink'].every(name=>tracks.includes(name))&&tracks.some((name:string)=>name.startsWith('Dance '));
     },id)).toBe(true);
     if(skin==='Leandro'){
       const height=await page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.height,id);
@@ -161,7 +167,8 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
       await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id]?.animationState,id)).toBe('idle');
       await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.network().pending)).toBe(0);
       await page.keyboard.press('g');
-      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Dance');
+      // One of the dances, the one the room drew.
+      await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toMatch(/^Dance /);
       await page.screenshot({path:'test-results/leandro-accurig.png'});
       await page.keyboard.press('g');
       await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.clip,id)).toBe('Idle');
@@ -268,7 +275,7 @@ test('new accounts wear the free default skin; bought skins persist and other pl
     await page.waitForTimeout(600);
     await page.keyboard.press('c');await selectSkin(page,'Rafael');
     await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
-    await page.getByRole('button',{name:'Sua conta',exact:true}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
+    await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
     await page.getByLabel('E-mail',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByRole('button',{name:'Entrar no bar'}).click();
     await gameReady(page);await expect.poll(()=>skin(page),{timeout:60000}).toBe('rafael');
     expect(errors).toEqual([]);
@@ -285,8 +292,9 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
   const otherContext=await browser.newContext({viewport:{width:640,height:480}});const other=await otherContext.newPage();other.on('pageerror',err=>errors.push(err.message));
   try{
     await createAccount(other,name2);
-    await expect(page.locator('#occupancy')).toHaveText('2 / 32');
-    await expect(other.locator('#occupancy')).toHaveText('2 / 32');
+    // The occupancy lives in the people window.
+    const occupancy=async(client:Page)=>{await client.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await expect(client.locator('#occupancy')).toHaveText('2 / 32');await client.getByRole('button',{name:'Fechar janela'}).click();};
+    await occupancy(page);await occupancy(other);
     await page.getByLabel('Mensagem por proximidade').fill('Boa noite, vizinha!');
     await page.locator('#chat-form').getByRole('button').click();
     await expect(other.locator('#messages')).toContainText('Boa noite, vizinha!');
@@ -304,7 +312,7 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
     await expect(page.locator('#waiting')).toBeHidden();
     await page.context().setOffline(true);await page.waitForTimeout(1000);await page.context().setOffline(false);
     await expect(page.locator('#waiting')).toBeHidden({timeout:20000});
-    await expect(page.locator('#occupancy')).toHaveText('2 / 32');
+    await occupancy(page);
     expect(errors).toEqual([]);
   }finally{
     await Promise.allSettled([page.request.post('/api/auth/logout',{data:{}}),other.request.post('/api/auth/logout',{data:{}})]);
@@ -315,7 +323,7 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
 test('password recovery mail changes the password and permits a fresh login',async({page})=>{
   const name=`rec_${Date.now().toString(36)}`;
   const email=await createAccount(page,name);
-  await page.getByRole('button',{name:'Sua conta'}).click();
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
   await page.getByRole('button',{name:'Esqueci minha senha'}).click();
   await page.getByLabel('E-mail da conta').fill(email);
@@ -364,6 +372,6 @@ test('keyboard movement reaches blackjack, a full round settles and admin events
   const metrics=await page.evaluate(()=>(window as any).barDebug.performance());
   console.log('Browser rendering sample:',JSON.stringify(metrics));
   expect(errors).toEqual([]);
-  await page.getByRole('button',{name:'Sua conta'}).click();
+  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
 });

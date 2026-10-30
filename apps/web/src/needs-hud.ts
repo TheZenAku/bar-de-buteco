@@ -2,7 +2,7 @@ import {NEEDS,drunkStage,type PlayerState} from '@bar/shared';
 import {uiIcon as icon} from './ui-icons';
 import type {Notice} from './notifications';
 
-/** The meters of the status panel. `low` meters are critical when low, the bladder when high. */
+/** The meters in the corner (.status-hud). `low` meters are critical when low, the bladder when high. */
 const METERS=[
   {id:'hp',label:'Vida',icon:'heart',low:true,alertAt:NEEDS.hp.alertAt},
   {id:'stamina',label:'Fôlego',icon:'bolt',low:true,alertAt:20},
@@ -12,19 +12,21 @@ const METERS=[
 ] as const;
 const STAGES=['Sóbrio','Alegrinho','Tonto','Bêbado','Apagando'];
 /**
- * The only meter worth a notice: low life ends in fainting. The others turn critical in the status panel.
+ * The only meter worth a notice: low life ends in fainting. The others turn critical in the corner meters.
  * It alerts once until life gets back to a comfortable level (no spam).
  */
 const LOW_HP={title:'Você não está bem',text:'Sua vida está baixa. Se chegar a zero, você desmaia.'};
 
+/** One row per meter: its icon, a thin bar and the value (the name is the row's tooltip and the meter's label). */
 export function needsMarkup():string{
-  return `<div class="needs" id="hud-needs">${METERS.map(m=>`<div class="need" data-need="${m.id}"><span>${icon(m.icon)}${m.label}</span><b>100</b><div class="need-track" role="meter" aria-label="${m.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div></div>`).join('')}<div class="need drunk-meter" data-need="drunk" hidden><span>${icon('dizzy')}Embriaguez</span><b>Sóbrio</b><div class="need-track" role="meter" aria-label="Embriaguez" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div></div></div>`;
+  const row=(id:string,label:string,name:string,value:string,now:number,hidden=false)=>`<div class="need" data-need="${id}" title="${label}"${hidden?' hidden':''}>${icon(name)}<div class="need-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${now}"><i></i></div><b>${value}</b></div>`;
+  return `<div class="needs" id="hud-needs">${METERS.map(m=>row(m.id,m.label,m.icon,'100',100)).join('')}${row('drunk','Embriaguez','dizzy','Sóbrio',0,true)}</div>`;
 }
 export function faintMarkup():string{
   return `<div id="faint-overlay" class="faint-overlay hidden" role="alert" aria-live="assertive"><div><small id="faint-kicker">APAGOU</small><h2 id="faint-title"></h2><p id="faint-text"></p><b id="faint-timer"></b></div></div>`;
 }
 
-/** Status panel meters, threshold alerts, the faint overlay and the screen effects of drunkenness. */
+/** The corner meters, threshold alerts, the faint overlay and the screen effects of drunkenness. */
 export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,serverNow:()=>number){
   let warned=false,shownKey='',timer:ReturnType<typeof setInterval>|undefined,last:PlayerState|undefined;
   const overlay=root.querySelector<HTMLElement>('#faint-overlay')!;
@@ -54,9 +56,9 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
         const node=root.querySelector<HTMLElement>(`[data-need="${meter.id}"]`)!,value=values[meter.id]!,max=meter.id==='hp'?hpMax:100;
         const critical=meter.low?value<=meter.alertAt:value>=meter.alertAt;
         node.classList.toggle('critical',critical||(meter.id==='stamina'&&!!self.exhausted));
-        node.querySelector('b')!.textContent=meter.id==='drunk'?STAGES[stage]!:meter.id==='hp'?`${value}/${max}`:String(value);
+        node.querySelector('b')!.textContent=meter.id==='drunk'?STAGES[stage]!:String(value);
         node.querySelector<HTMLElement>('i')!.style.width=`${Math.min(100,value/max*100)}%`;
-        node.querySelector('.need-track')!.setAttribute('aria-valuenow',String(value));
+        const track=node.querySelector('.need-track')!;track.setAttribute('aria-valuenow',String(value));track.setAttribute('aria-valuemax',String(max));
       }
       root.querySelector<HTMLElement>('[data-need="drunk"]')!.hidden=values.drunk!<=0;
       for(let s=1;s<=4;s++)document.body.classList.toggle(`drunk-${s}`,stage===s);
@@ -64,16 +66,6 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
     alert(values.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',values.hp!>NEEDS.hp.alertAt+15);
     countdown();
   }
-  /** What the "Agora" card says when a need is in charge; undefined when nothing special. */
-  function activity(self:PlayerState|undefined):string|undefined{
-    if(!self)return;
-    if(self.condition==='fainted')return 'Desacordado';
-    if(self.condition==='stumbling')return 'Cambaleando';
-    if(self.condition==='recovering')return 'Recuperando';
-    if(self.interactionState?.startsWith('toilet-'))return 'No banheiro';
-    if(self.exhausted&&['walk','run','idle'].includes(self.animationState))return 'Sem fôlego';
-    if(drunkStage(self.drunk??0)>=2&&self.animationState==='walk')return 'Trançando as pernas';
-  }
   function reset():void{warned=false;shownKey='';last=undefined;countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}
-  return {update,activity,reset};
+  return {update,reset};
 }

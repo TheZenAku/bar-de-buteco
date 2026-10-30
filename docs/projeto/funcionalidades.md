@@ -6,7 +6,7 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | --- | --- | --- |
 | Bar multiplayer | Pronto | Colyseus autoritativo, AOI de 18 m, predição e reconciliação ([rede](../arquitetura/networking.md)) |
 | Sentar nas mesas | Pronto | 172 lugares: 124 cadeiras nos dois andares e, desde 29/10, os bancos das 8 mesas de piquenique do quintal (24–31, 6 lugares cada), com pedido, entrega e limpeza como nas outras ([mapa](../assets/map.md#mesas-numeradas)) |
-| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto** | [economia](../sistemas/economia.md): cardápio (T), cobrança, A* do balcão até a mesa, entrega na bandeja e estorno. Desde 28/10 (noite): cada item dura minutos na mesa e faz efeito aos poucos; quem pede fica na mesa até chegar (cancela só enquanto está no balcão); o que termina é recolhido pelo ajudante ou, sem ninguém trabalhando, pelo Tonico; dá para pedir a quem trabalha no bar, que pega no balcão e leva na bandeja; o Tonico acha o caminho até o terraço de qualquer ponto |
+| Pedir comida e bebida sentado, pagar, e o Tonico entregar | **Pronto** | [economia](../sistemas/economia.md): cardápio (P), cobrança, A* do balcão até a mesa, entrega na bandeja e estorno. Desde 28/10 (noite): cada item dura minutos na mesa e faz efeito aos poucos; quem pede fica na mesa até chegar (cancela só enquanto está no balcão); o que termina é recolhido pelo ajudante ou, sem ninguém trabalhando, pelo Tonico; dá para pedir a quem trabalha no bar, que pega no balcão e leva na bandeja; o Tonico acha o caminho até o terraço de qualquer ponto |
 | Objetos do bar no cenário | **Pronto (novo)** | [decoração](../sistemas/drinks.md#decoração-do-bar): geladeiras de cerveja com porta de vidro e long necks, águas e refris reais; coxinhas e pastéis na estufa; copos na chopeira e cafés no caixa |
 | Sombras | **Corrigido (28/10)** | [dia e noite](../sistemas/day-night.md): o céu panorâmico fazia sombra no mapa inteiro (de dia nada tinha sombra do sol); pessoas deixavam sombras "fantasmas" nas lâmpadas; agora têm sombra de contato e sombra real ao sol |
 | Magrão no balcão prepara e cobra | **Pronto (animado, 28/10)** | O balcão cobra o preço do item e estorna o pedido que cair. Desde 28/10 (noite), o Magrão tira o chopp na chopeira e busca a long neck no freezer, com os clipes do mapa, e deixa a bebida no balcão ([animações do bar](../sistemas/animacoes-bar.md)) |
@@ -14,15 +14,18 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | TV com YouTube para todos, custando moedas | **Pronto (cobrança nova)** | 25 moedas por vídeo |
 | Telão na área de show | **Pronto (palco novo, 28/10)** | O telão de LED do mapa (`Telao_Tela`, 5,76 × 3,24 m) no fundo do palco, controlado no blip turquesa da frente do palco (ou na borda da frente, de cima dele); som pelo quintal todo, sem tocar por cima da jukebox e das TVs; 50 moedas por vídeo ([jukebox e TVs](../sistemas/jukebox.md)) |
 | Palco com acesso pago | **Pronto (novo, 28/10)** | Ingresso de 200 moedas, vale 30 min, comprado na escada (blip magenta; os blips do palco só aparecem no quintal). Todas as luzes do palco (lentes, fita de LED, contraluz, spots da treliça, luz frontal e luz de festa) com as cores do vídeo do telão ([economia](../sistemas/economia.md)) |
+| Show de luzes no palco | **Pronto (novo, 30/10)** | Lasers, moving heads com luz de verdade, blinders, estrobo e desenhos a laser no telão enquanto o telão toca ou alguém toca no palco: dezesseis programas (entre eles o Letreiro, que escreve HIGHLAND, e os Desenhos) e oito paletas no compasso do relógio do servidor, iguais para todos ([show de luzes](../sistemas/palco.md#show-de-luzes)) |
+| Mesa de luz do palco | **Pronto (novo, 30/10)** | Blip violeta em cima do palco, ao lado da mesa de som: painel com cenas prontas e salvas, rodízio ou programa fixo, paletas, tap tempo, níveis, texto do letreiro e efeitos (flash, blackout, drop, letreiro), valendo para todo mundo; câmera de plateia enquanto o painel está aberto ([mesa de luz](../sistemas/palco.md#mesa-de-luz)) |
+| Tela de entrada com a logo animada | **Pronto (novo, 30/10)** | Letreiro de neon vivo ao lado do menu, com brinde no clique e bolhas de cerveja ([interface](../sistemas/interface.md#a-logo-na-entrada)) |
 | Músicos no palco | **Pronto (novo, 28/10)** | Violão, cavaquinho, bateria e vocal: um jogador por lugar, E para tocar e para parar, instrumento na mão, servidor dono das fases, quem chega no meio vê o show ([músicos do palco](../sistemas/palco.md)) |
 | Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno, karatê. Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
-| Fumar, beber e comer com props | **Pronto (28/10, noite)** | Beber com o objeto real na mão ([bebidas e comidas em 3D](../sistemas/drinks.md)). [Animações do bar](../sistemas/animacoes-bar.md): fumar (F, cigarro, brasa e fumaça), comer com garfo o que foi servido na mesa, sentar puxando a cadeira do mapa, levantar, urinar no mictório, vomitar ao beber demais, cair e levantar do chão, limpar a mesa pela quina. Falta o cigarro como item da mochila |
+| Fumar, beber e comer com props | **Pronto (28/10, noite)** | Beber com o objeto real na mão ([bebidas e comidas em 3D](../sistemas/drinks.md)). [Animações do bar](../sistemas/animacoes-bar.md): fumar (F, cigarro, brasa e fumaça), fumar um cigarro inteiro (Shift+F, do maço à bituca pisada, 29/10), comer com garfo o que foi servido na mesa, sentar puxando a cadeira do mapa, levantar, urinar no mictório, vomitar ao beber demais, cair e levantar do chão, limpar a mesa pela quina. Falta o cigarro como item da mochila |
 | Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
-| Câmera em primeira e terceira pessoa | **Pronto (novo, 29/10)** | Q ou a rodinha alternam primeira pessoa e terceira pessoa próxima, padrão e longe; tudo suavizado; móveis e paredes entre a câmera e o jogador ficam transparentes em volta dele (raio-X). Os blips agora são só o anel no chão ([câmera](../sistemas/camera.md)) |
+| Câmera em primeira e terceira pessoa | **Pronto (atualizado, 29/10)** | Rodinha com zoom contínuo fino e distância exata nas configurações; Q alterna primeira/terceira pessoa preservando o zoom, sem toast. Giro horizontal e vertical livre; a câmera atravessa os colisores sem encurtar a distância, com raio-X em volta do personagem. Preferências salvas no navegador ([câmera](../sistemas/camera.md)) |
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
 | Minigame de entrega (moto, mapa procedural) | Falta | Plano abaixo |
-| Celular com apps paródia | Falta | Plano abaixo |
+| Celular com apps paródia | **Pronto (29/10, ampliado 30/10)** | [Celular](../sistemas/celular.md) estilo iPhone 18 Pro na tecla K: ligações e chamadas de vídeo, Highzap com fotos, áudios e vídeos, Highgram com perfis, filtros, seguir e sugestões, HighBank com Pix, câmera com zoom, selfie e vídeo, mapa do bairro e os apps de sempre. Os números vêm da ficha do jogador (clique na pessoa no bar) |
 | Pôquer | Falta | Plano abaixo, com uma ressalva legal |
 | Emprego no espetinho, cardápio e preço do jogador | Falta | Plano abaixo; o mapa já tem o `Carrinho_Espeto` |
 | Emprego no bar com poucas vagas | **Pronto (novo)** | Ajudante do Magrão: 2 vagas, tarefas por estação, pagamento por tarefa, teto diário |
@@ -37,7 +40,7 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 
 A ordem segue o que destrava mais coisas: as próximas três reaproveitam a carteira, o A* e o framework de empregos desta entrega.
 
-### 1. Controle por toque (pré-requisito do celular)
+### 1. Controle por toque
 
 Joystick virtual à esquerda e botões contextuais (E, T, J, correr) à direita, ligados ao mesmo `getInput()` da cena, com a câmera arrastada no lado direito. Sem isso, o jogo abre no celular mas não se joga.
 
@@ -46,7 +49,7 @@ Joystick virtual à esquerda e botões contextuais (E, T, J, correr) à direita,
 - **Estação:** o `Carrinho_Espeto` vira um emprego com 1 vaga, do tipo "loja do jogador".
 - **Ingredientes:** catálogo compartilhado com itens comuns (carne, frango, queijo coalho, linguiça) e engraçados (rato, cigarro, chiclete, meia), cada um com efeitos nas necessidades. Montar um espeto escolhe de 1 a 4 ingredientes e gera um item `espeto:<hash dos ingredientes>` com o nome que o vendedor der.
 - **Cardápio e preço livres:** o vendedor publica até 8 receitas com preço entre 1 e 500. Os nomes passam por um filtro de palavrões e limite de tamanho, e a administração pode ocultá-los.
-- **Troca entre jogadores:** a carteira ganha a operação `transfer` na API, que debita o comprador e credita o vendedor na mesma transação, com `requestId` único e taxa opcional da casa como sink. É a mesma peça que o Nubank do celular vai usar.
+- **Troca entre jogadores:** a transação entre carteiras já existe (o Pix do HighBank, `PhoneService.pix`: debita e credita na mesma transação, uma vez por `requestId`). O espetinho a reaproveita, com uma taxa opcional da casa como sink.
 - **Preparo:** cada pedido exige que o vendedor fique na churrasqueira por alguns segundos (estação com animação), para não virar clique infinito.
 
 ### 3. Pôquer (Texas Hold'em)
@@ -55,19 +58,19 @@ Joystick virtual à esquerda e botões contextuais (E, T, J, correr) à direita,
 - **Ressalva:** se as moedas puderem ser compradas com dinheiro real, apostar essas moedas em jogo de azar cria risco jurídico no Brasil (e nas lojas de apps). A recomendação é usar **fichas de mesa gratuitas e não conversíveis**: todo mundo senta com o mesmo número de fichas, e o ranking e as conquistas são o prêmio. Apostas em moedas só depois de uma avaliação jurídica.
 - Peças a reaproveitar: interface `Activity` (join, leave, start, command, tick, visões pública e privada, resultado), outbox de resultados e as estatísticas.
 
-### 4. Celular no jogo
+### 4. Celular no jogo (pronto em 29/10)
 
-A tecla **P** abre o aparelho na tela, sem sair do mundo. Os apps ficam numa pasta própria (`apps/web/src/phone/`), cada um um módulo:
+Entregue como um aparelho no estilo do iPhone 18 Pro, aberto com **K** (a tecla P ficou com o pedido na mesa), com os apps em `apps/web/src/phone/` ([celular](../sistemas/celular.md)):
 
-| App | Paródia de | Primeira versão |
+| App | Paródia de | Situação |
 | --- | --- | --- |
-| Zap | WhatsApp | Conversas 1:1 e de grupo entre jogadores, persistidas na API, com bloqueio e denúncia reaproveitados |
-| Busão | Nubank | Saldo, extrato (livro-caixa) e Pix entre jogadores (operação `transfer`) |
-| Botecogram | Instagram | Câmera: captura do canvas com filtros pré-definidos (sépia, neon, VHS, P&B) em shader ou canvas 2D, legenda e postagem no feed do bar |
-| Crush | Tinder | Perfis do personagem com "chegar junto" e "passar"; um match abre conversa no Zap |
-| Ligação e áudio | — | Chamada é voz por proximidade que ignora a distância entre dois jogadores que aceitaram. O áudio usa o mesmo codec da voz, gravado até 30 s |
+| Telefone | — | Ligações e chamadas de vídeo entre jogadores, voz a qualquer distância entre quem atendeu, recentes, agenda e teclado com números de 9 dígitos. A agenda só tem quem você salvou pela ficha do jogador ou pelo número |
+| Highzap | WhatsApp | Conversas de um para um com os contatos salvos, fotos, mensagens de voz, vídeos, tiques de enviada e lida, chamada de vídeo, avisos em tempo real pela sala |
+| Highgram | Instagram | Perfil com nome, @, bio e foto; seguir, buscar e sugestões; Início com quem você segue e Explorar; fotos da câmera do jogo com 12 filtros, curtidas, comentários, apagar e denunciar |
+| HighBank | Nubank | Saldo e extrato reais e Pix para um contato salvo ou um número digitado (operação `transfer` na API, com limites por Pix e por dia) |
+| Câmera, Fotos, Mapas, Contatos, Notas, Calendário, Relógio, Calculadora, Ajustes | — | Funções normais de um celular, com dados reais do jogo onde existem |
 
-Moderação e custo: fotos e áudios precisam de armazenamento (S3 compatível ou disco com limite por conta), limite de envio e denúncia. O feed começa visível só para quem está no bar. Não usar nomes ou marcas reais.
+Falta, do plano original: Crush (Tinder), conversas em grupo e o personagem segurando o celular (precisa do clipe e do modelo do aparelho). As fotos, áudios e vídeos ficam no Postgres (60 publicações e 150 MB de mídia do Highzap por conta); com muitos jogadores, o próximo passo é um armazenamento S3 compatível, e para muitas chamadas de vídeo, WebRTC.
 
 ### 5. Entregas de moto (minigame)
 

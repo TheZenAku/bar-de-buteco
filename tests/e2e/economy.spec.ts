@@ -26,8 +26,8 @@ test('jobs, the table menu and the graphics options are wired to the live room a
   await page.getByRole('button',{name:'Começar turno'}).click();
   await expect(page.locator('#toasts')).toContainText('balcão');
   await expect(page.locator('[data-panel="job"]')).toBeHidden();await expect(page.locator('.game-tools [data-hud-visible="job"]')).toBeHidden();
-  // Standing, T explains how to order from Tonico instead of opening the menu.
-  await page.keyboard.press('KeyT');
+  // Standing, P explains how to order from Tonico instead of opening the menu.
+  await page.keyboard.press('KeyP');
   await expect(page.locator('#toasts')).toContainText('Sente-se');
   await expect(page.locator('#modal')).toBeHidden();
   await expect(page.locator('#table-cta')).toBeHidden();

@@ -7,11 +7,14 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {skinMessageSchema,ITEM_IDS,MAX_COIN_BALANCE,WALLET_REASON,type PublicUser} from '@bar/shared';
+import {skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
+import {PhoneService} from './phone-service.js';
 import {AdminService} from './admin-service.js';
+import {AdminConsole} from './admin-console.js';
+import {PricingService} from './pricing-service.js';
 import {DevBots} from './dev-bots.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
@@ -45,9 +48,11 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   if(options.migrate&&config.production)throw new Error('A API de produção não pode executar migrações; use o job migrate.');
   const connection = options.database ? null : await (options.migrate?connectMigratedDatabase:connectDatabase)({ url: config.databaseUrl, path: config.dataPath });
   const db = options.database ?? connection!.db;
-  const wardrobe=new WardrobeService(db);
+  const pricing=new PricingService(db);
+  const wardrobe=new WardrobeService(db,pricing);
   const inventory=new InventoryService(db,wardrobe);
   const wallet=new WalletService(db,wardrobe);
+  const phone=new PhoneService(db,wardrobe);
   const administration=new AdminService(db,wardrobe);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
@@ -59,6 +64,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     // Correlation: the caller's x-request-id (the world sends one per internal call) or a new id, logged as requestId.
     genReqId: requestIdFor, logController: new LogController({ requestIdLogLabel: 'requestId' }) });
   const metrics = createApiMetrics();
+  const adminConsole = new AdminConsole(db, administration, pricing, { driver: connection?.driver ?? 'injected', dataPath: config.dataPath, metrics: metrics.registry });
   app.addHook('onSend', async (request, reply) => { reply.header('x-request-id', request.id); });
   app.addHook('onResponse', async (request, reply) => { metrics.record(request.method, request.routeOptions.url, reply.statusCode, reply.elapsedTime); });
   app.decorateRequest('auth', null);
@@ -120,6 +126,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   app.get('/api/internal/metrics', internalOptions, async (_request, reply) => reply.type('text/plain; version=0.0.4').send(metrics.registry.render()));
   app.get('/api/auth/config', async () => ({ emailVerificationRequired: !config.autoVerifyEmail }));
+  // What everything costs and pays now (packages/shared/src/prices.ts, Preços in the administration).
+  app.get('/api/prices', async () => ({ prices: await pricing.table() }));
   app.post('/api/auth/register', { config: { rateLimit: { max: 8, timeWindow: '15 minutes' } } }, async (request, reply) => {
     const body = z.object({ email: emailSchema, username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/, 'Use 3 a 24 letras, números ou sublinhado.'),
       displayName: z.string().trim().min(2).max(32).regex(/^[^\u0000-\u001f\u007f<>]+$/u), password: passwordSchema }).strict().parse(request.body);
@@ -172,18 +180,20 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const { email, password } = z.object({ email: emailSchema, password: z.string().min(1).max(128) }).strict().parse(request.body);
     const [account] = await db.select().from(tables.users).where(eq(tables.users.email, email));
     const correct = await argon2.verify(account?.passwordHash ?? dummyHash, password);
-    if (!account || !correct) { request.log.warn({ event: 'login_failure', ip: request.ip }, 'Falha de autenticação'); throw new HttpError(401, 'E-mail ou senha incorretos.'); }
+    if (!account || !correct) { request.log.warn({ event: 'login_failure', ip: request.ip }, 'Falha de autenticação'); if (account) void adminConsole.record([{ source: 'api', event: 'login_failed', userId: account.id }]); throw new HttpError(401, 'E-mail ou senha incorretos.'); }
     if (await isBanned(db, account.id)) throw new HttpError(403, 'Esta conta está banida do bar.');
     // Rotate an existing browser session on sign-in.
     if (request.cookies[cookieName]) await db.delete(tables.sessions).where(eq(tables.sessions.tokenHash, hashToken(request.cookies[cookieName]!)));
     const { token, expiresAt } = await createSession(db, account.id);
     reply.setCookie(cookieName, token, { ...cookieSettings, maxAge: SESSION_DAYS * 86_400, expires: expiresAt });
+    void adminConsole.record([{ source: 'api', event: 'login', userId: account.id }]);
     return { user: await getUser(db, account.id) };
   });
   app.get('/api/auth/me', { preHandler: authenticated }, async (request) => ({ user: request.auth!.user }));
   app.post('/api/auth/logout', async (request, reply) => {
     const token = request.cookies[cookieName];
-    if (token) await db.delete(tables.sessions).where(eq(tables.sessions.tokenHash, hashToken(token)));
+    const [ended] = token ? await db.delete(tables.sessions).where(eq(tables.sessions.tokenHash, hashToken(token))).returning({ userId: tables.sessions.userId }) : [];
+    if (ended) void adminConsole.record([{ source: 'api', event: 'logout', userId: ended.userId }]);
     reply.clearCookie(cookieName, cookieSettings);
     return { message: 'Até a próxima rodada.' };
   });
@@ -203,13 +213,15 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/auth/reset', authLimit, async (request, reply) => {
     const { token, password } = z.object({ token: tokenSchema, password: passwordSchema }).strict().parse(request.body);
     const passwordHash = await hashPassword(password);
-    await db.transaction(async (tx) => {
+    const userId = await db.transaction(async (tx) => {
       const [reset] = await tx.delete(tables.passwordResets).where(and(eq(tables.passwordResets.tokenHash, hashToken(token)), gt(tables.passwordResets.expiresAt, new Date()))).returning();
       if (!reset) throw new HttpError(400, 'Link inválido ou expirado. Solicite outro e-mail.');
       await tx.update(tables.users).set({ passwordHash }).where(eq(tables.users.id, reset.userId));
       await tx.delete(tables.sessions).where(eq(tables.sessions.userId, reset.userId));
       await tx.delete(tables.passwordResets).where(eq(tables.passwordResets.userId, reset.userId));
+      return reset.userId;
     });
+    void adminConsole.record([{ source: 'api', event: 'password_reset', userId }]);
     reply.clearCookie(cookieName, cookieSettings);
     return { message: 'Senha alterada. Entre novamente na sua conta.' };
   });
@@ -256,10 +268,135 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await db.insert(tables.reports).values({ id: randomUUID(), reporterId: request.auth!.user.id, userId: playerId, reason });
     return reply.code(201).send({ message: 'Denúncia recebida pela administração.' });
   });
-  app.get('/api/admin/overview', { preHandler: administrator }, request => {
-    const query=z.object({search:z.string().trim().max(100).default(''),offset:z.coerce.number().int().min(0).max(1000000).default(0),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict().parse(request.query);
-    return administration.overview(request.auth!.user,query);
+  // The in-game phone (apps/api/src/phone-service.ts). The room only forwards "something new" pings between players;
+  // what changed is always read here, so a forged ping shows nothing that is not true.
+  async function phoneUser(request: FastifyRequest) {
+    await authenticated(request);
+    if (!request.auth!.user.verified) throw new HttpError(403, 'Confirme seu e-mail para usar o celular.');
+    if (request.method !== 'GET' && await isBanned(db, request.auth!.user.id)) throw new HttpError(403, 'Sua conta está suspensa.');
+  }
+  const me = (request: FastifyRequest) => request.auth!.user.id;
+  const phoneTarget = z.object({ userId: uuidSchema.optional(), number: z.string().regex(/^\d{9}$/, 'Digite um número de 9 dígitos.').optional() }).strict()
+    .refine(target => !!target.userId !== !!target.number, 'Escolha um contato ou digite um número.');
+  const idParams = z.object({ id: uuidSchema });
+  const beforeQuery = z.object({ before: z.coerce.number().int().positive().optional() }).strict();
+  const feedQuery = z.object({ before: z.coerce.number().int().positive().optional(), scope: z.enum(['following', 'all']).default('all') }).strict();
+  // Highzap media arrive as the recorded bytes, not JSON (POST /api/phone/zap/:id/media).
+  app.addContentTypeParser([...new Set(Object.values(PHONE_MEDIA_TYPES).flat())], { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+  app.get('/api/phone', { preHandler: phoneUser }, request => phone.profile(me(request)));
+  // The player card (clicking someone in the bar): the way to get a number to save.
+  app.get('/api/phone/card/:id', { preHandler: phoneUser }, request => phone.card(me(request), idParams.parse(request.params).id));
+  app.get('/api/phone/lookup', { preHandler: phoneUser }, request => phone.resolve({ number: z.object({ number: z.string().regex(/^\d{9}$/, 'Digite um número de 9 dígitos.') }).strict().parse(request.query).number }));
+  app.post('/api/phone/contacts', { preHandler: phoneUser }, request => phone.addContact(me(request), phoneTarget.parse(request.body)));
+  app.delete('/api/phone/contacts/:id', { preHandler: phoneUser }, request => phone.removeContact(me(request), idParams.parse(request.params).id));
+  app.get('/api/phone/zap', { preHandler: phoneUser }, async request => ({ threads: await phone.threads(me(request)) }));
+  app.get('/api/phone/zap/:id', { preHandler: phoneUser }, request => phone.thread(me(request), idParams.parse(request.params).id, beforeQuery.parse(request.query).before));
+  app.post('/api/phone/zap/:id', { preHandler: phoneUser, config: { rateLimit: { max: 40, timeWindow: '1 minute' } } }, request => {
+    const body = z.object({ text: z.string().max(PHONE.messageMax * 2), requestId: uuidSchema.toLowerCase() }).strict().parse(request.body);
+    return phone.send(me(request), idParams.parse(request.params).id, body.text, body.requestId);
   });
+  app.get('/api/phone/gram', { preHandler: phoneUser }, async request => { const query = feedQuery.parse(request.query); return { posts: await phone.feed(me(request), query.before, query.scope) }; });
+  app.patch('/api/phone/gram/me', { preHandler: phoneUser, bodyLimit: Math.ceil(PHONE.avatarMaxBytes * 1.4) + 4096, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, request => {
+    const body = z.object({ name: z.string().max(PHONE.gramNameMax * 2).optional(), handle: z.string().max(48).optional(), bio: z.string().max(PHONE.bioMax * 2).optional(),
+      photo: z.string().max(Math.ceil(PHONE.avatarMaxBytes * 1.4)).nullable().optional() }).strict().parse(request.body);
+    return phone.updateGram(me(request), body);
+  });
+  // The URL carries the photo's version (?v=), so a new photo is a new URL.
+  app.get('/api/phone/gram/avatars/:id', { preHandler: phoneUser, config: { rateLimit: { max: 900, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const photo = await phone.avatar(me(request), idParams.parse(request.params).id);
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type('image/jpeg').send(photo);
+  });
+  app.get('/api/phone/gram/search', { preHandler: phoneUser }, async request => ({ people: await phone.search(me(request), z.object({ q: z.string().max(80) }).strict().parse(request.query).q) }));
+  // `here`: who the phone sees in the bar (ids from the room), to suggest them; only real accounts count.
+  app.get('/api/phone/gram/suggestions', { preHandler: phoneUser }, async request => {
+    const { here } = z.object({ here: z.string().max(64 * 37).default('') }).strict().parse(request.query);
+    return { people: await phone.suggestions(me(request), here.split(',').filter(id => uuidSchema.safeParse(id).success)) };
+  });
+  app.post('/api/phone/gram/users/:id/follow', { preHandler: phoneUser, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, request =>
+    phone.follow(me(request), idParams.parse(request.params).id, z.object({ followed: z.boolean() }).strict().parse(request.body).followed));
+  app.get('/api/phone/gram/users/:id/:list', { preHandler: phoneUser }, async request => {
+    const params = z.object({ id: uuidSchema, list: z.enum(['followers', 'following']) }).parse(request.params);
+    return { people: await phone.followList(me(request), params.id, params.list) };
+  });
+  app.post('/api/phone/zap/:id/media', { preHandler: phoneUser, bodyLimit: PHONE.videoMaxBytes, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, request => {
+    const query = z.object({ kind: z.enum(PHONE_MEDIA_KINDS), ms: z.coerce.number().int().min(0).max(600_000).optional(), requestId: uuidSchema.toLowerCase() }).strict().parse(request.query);
+    if (!Buffer.isBuffer(request.body)) throw new HttpError(415, 'Formato de arquivo não aceito.');
+    return phone.sendMedia(me(request), idParams.parse(request.params).id, { kind: query.kind, type: mediaBaseType(request.headers['content-type'] ?? ''), bytes: request.body, ms: query.ms }, query.requestId);
+  });
+  // Only the two ends of the conversation; a file never changes, so the browser keeps it.
+  app.get('/api/phone/zap/media/:id', { preHandler: phoneUser, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const media = await phone.media(me(request), idParams.parse(request.params).id);
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type(media.type).send(media.bytes);
+  });
+  app.get('/api/phone/gram/users/:id', { preHandler: phoneUser }, request => phone.gramProfile(me(request), idParams.parse(request.params).id));
+  // A photo is about 60–150 kB of JPEG; as a data URL in JSON it is a third larger.
+  app.post('/api/phone/gram/posts', { preHandler: phoneUser, bodyLimit: Math.ceil(PHONE.photoMaxBytes * 1.4) + 4096, config: { rateLimit: { max: 8, timeWindow: '10 minutes' } } }, request => {
+    const body = z.object({ image: z.string().max(Math.ceil(PHONE.photoMaxBytes * 1.4)), caption: z.string().max(PHONE.captionMax * 2).default(''), requestId: uuidSchema.toLowerCase() }).strict().parse(request.body);
+    return phone.createPost(me(request), body.image, body.caption, body.requestId);
+  });
+  // Photos never change (a new post is a new id): the browser keeps them.
+  app.get('/api/phone/gram/photos/:id', { preHandler: phoneUser, config: { rateLimit: { max: 900, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const photo = await phone.photo(me(request), idParams.parse(request.params).id);
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type('image/jpeg').send(photo);
+  });
+  app.delete('/api/phone/gram/posts/:id', { preHandler: phoneUser }, async request => {
+    const user = request.auth!.user;
+    await phone.deletePost(user.id, idParams.parse(request.params).id, user.verified && user.role === 'admin');
+    return { deleted: true };
+  });
+  app.post('/api/phone/gram/posts/:id/like', { preHandler: phoneUser, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, request =>
+    phone.like(me(request), idParams.parse(request.params).id, z.object({ liked: z.boolean() }).strict().parse(request.body).liked));
+  app.get('/api/phone/gram/posts/:id/comments', { preHandler: phoneUser }, async request => ({ comments: await phone.comments(me(request), idParams.parse(request.params).id) }));
+  app.post('/api/phone/gram/posts/:id/comments', { preHandler: phoneUser, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, request => {
+    const body = z.object({ text: z.string().max(PHONE.commentMax * 2), requestId: uuidSchema.toLowerCase() }).strict().parse(request.body);
+    return phone.comment(me(request), idParams.parse(request.params).id, body.text, body.requestId);
+  });
+  app.delete('/api/phone/gram/comments/:id', { preHandler: phoneUser }, async request => { await phone.deleteComment(me(request), idParams.parse(request.params).id); return { deleted: true }; });
+  app.get('/api/phone/bank', { preHandler: phoneUser }, request => phone.bank(me(request)));
+  app.post('/api/phone/bank/pix', { preHandler: phoneUser, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, request => {
+    const body = z.object({ userId: uuidSchema.optional(), number: z.string().regex(/^\d{9}$/, 'Digite um número de 9 dígitos.').optional(), amount: z.number().int(), requestId: uuidSchema.toLowerCase() }).strict()
+      .refine(target => !!target.userId !== !!target.number, 'Escolha um contato ou digite um número.').parse(request.body);
+    return phone.pix(me(request), body.userId ? { userId: body.userId } : { number: body.number }, body.amount, body.requestId);
+  });
+  app.get('/api/admin/overview', { preHandler: administrator }, request => {
+    const query=z.object({search:z.string().trim().max(100).default(''),offset:z.coerce.number().int().min(0).max(1000000).default(0),limit:z.coerce.number().int().min(1).max(100).default(25),
+      filter:z.enum(ADMIN_PLAYER_FILTERS).default('all'),sort:z.enum(ADMIN_PLAYER_SORTS).default('recent'),online:z.string().max(128*37).default('')}).strict().parse(request.query);
+    return administration.overview(request.auth!.user,{...query,online:query.online.split(',').filter(id=>uuidSchema.safeParse(id).success)});
+  });
+  app.get('/api/admin/summary',{preHandler:administrator},request=>adminConsole.summary(request.auth!.user));
+  app.get('/api/admin/players/:id',{preHandler:administrator},request=>adminConsole.player(request.auth!.user,idParams.parse(request.params).id));
+  app.post('/api/admin/player',{preHandler:administrator},async request=>{
+    const base={playerId:uuidSchema,reason:reasonSchema};
+    const body=z.discriminatedUnion('op',[
+      z.object({...base,op:z.literal('rename'),displayName:z.string().max(64)}).strict(),
+      z.object({...base,op:z.literal('verify')}).strict(),
+      z.object({...base,op:z.literal('logout')}).strict(),
+      z.object({...base,op:z.literal('item'),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(-100).max(100)}).strict(),
+      z.object({...base,op:z.literal('skin'),skinId:z.string().max(32),grant:z.boolean()}).strict(),
+    ]).parse(request.body);
+    const {playerId,reason,...operation}=body;
+    const result=await adminConsole.changePlayer(request.auth!.user.id,playerId,operation,reason);
+    request.log.info({actorId:request.auth!.user.id,op:operation.op,playerId},'Ação administrativa');
+    return result;
+  });
+  app.get('/api/admin/reports',{preHandler:administrator},async request=>({reports:await adminConsole.reports(z.object({status:z.enum(['open','resolved','all']).default('open')}).strict().parse(request.query).status)}));
+  app.post('/api/admin/reports/resolve',{preHandler:administrator},request=>{
+    const body=z.object({reportId:z.string().min(1).max(128),resolution:reasonSchema.nullable()}).strict().parse(request.body);
+    return adminConsole.resolveReport(request.auth!.user.id,body.reportId,body.resolution);
+  });
+  app.get('/api/admin/logs',{preHandler:administrator},request=>{
+    const query=z.object({categories:z.string().max(200).default(ADMIN_LOG_CATEGORIES.join(',')),player:uuidSchema.optional(),q:z.string().trim().max(100).optional(),
+      since:z.iso.datetime().optional(),before:z.iso.datetime().optional(),limit:z.coerce.number().int().min(1).max(200).default(60)}).strict().parse(request.query);
+    const categories=ADMIN_LOG_CATEGORIES.filter(category=>query.categories.split(',').includes(category));
+    return adminConsole.logs({categories,playerId:query.player,q:query.q,since:query.since?new Date(query.since):undefined,before:query.before?new Date(query.before):undefined,limit:query.limit});
+  });
+  app.get('/api/admin/economy',{preHandler:administrator},request=>adminConsole.economy(Number(z.object({days:z.enum(['7','30','90']).default('30')}).strict().parse(request.query).days)));
+  app.get('/api/admin/prices',{preHandler:administrator},async request=>({rows:await pricing.rows(),changes:await administration.audits(request.auth!.user,eq(tables.moderationActions.action,'price-set'),20)}));
+  app.post('/api/admin/prices',{preHandler:administrator},request=>{
+    const body=z.object({changes:z.array(z.object({key:z.string().min(1).max(64),value:z.number().int().nullable()}).strict()).min(1).max(64),reason:reasonSchema}).strict().parse(request.body);
+    return pricing.change(request.auth!.user.id,body.changes,body.reason);
+  });
+  app.get('/api/admin/server',{preHandler:administrator},()=>adminConsole.serverInfo());
   app.post('/api/admin/wallet',{preHandler:administrator},request=>{
     const body=z.object({playerId:uuidSchema,operation:z.enum(['add','remove','set']),amount:z.number().int().min(0).max(MAX_COIN_BALANCE),reason:reasonSchema,
       requestId:uuidSchema.toLowerCase(),expectedBalance:z.number().int().min(0).max(MAX_COIN_BALANCE).optional()}).strict()
@@ -311,6 +448,13 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if(!user?.verified||await isBanned(db,userId))throw new HttpError(401,'Sessão encerrada.');
     await wardrobe.equip(user,skin);
     return {valid:true,role:user.role,blocked:await blockedIds(db,userId),...await wardrobe.access({...user,equippedSkin:skin})};
+  });
+  app.get('/api/internal/prices', internalOptions, async () => ({ prices: await pricing.table() }));
+  // The world's events for the administration's log (WORLD_LOG_EVENTS), in batches.
+  app.post('/api/internal/logs', { ...internalOptions, bodyLimit: 262_144 }, async (request) => {
+    const { events } = z.object({ events: z.array(z.object({ event: z.string().min(1).max(64), userId: z.string().max(64).optional(), details: z.record(z.string(), z.unknown()).optional(), at: z.number().int().positive() }).strict()).max(200) }).strict().parse(request.body);
+    await adminConsole.record(events.map(event => ({ ...event, source: 'world' as const })));
+    return { recorded: events.length };
   });
   // Previous world versions: each control delivered once, as before (no confirmation).
   app.get('/api/internal/controls', internalOptions, async () => ({ controls: await claimControlsOnce(db) }));

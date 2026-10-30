@@ -1,34 +1,29 @@
-/* Coins in the room: media prices, Tonico's table menu, jobs, the live world administration (economy-ui.ts). */
-/* Item and coin pictures (ui-icons.ts itemImage, coinImage), in the boxes that held emoji. */
-.item-img{display:block;width:86%;height:86%;object-fit:contain;pointer-events:none}.inventory-item>i{display:grid;place-items:center;width:38px;height:38px}
-.coin{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.28em;object-fit:contain}.coins{white-space:nowrap}
-.media-price{margin:0 0 12px;padding:9px 12px;border:2px dashed var(--border);border-radius:10px;font-size:13px;color:var(--muted-foreground)}.media-price b{color:var(--primary)}
-.table-cta{left:auto;right:16px;transform:none;border-color:var(--accent)}.table-cta kbd{background:var(--accent)}
-.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin:12px 0}
-.menu-item{display:grid;grid-template-columns:auto 42px 1fr auto;align-items:center;gap:9px;padding:8px 10px;border:2px solid var(--border);border-radius:12px;background:var(--secondary);cursor:pointer}
-.menu-item:has(input:checked){border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}.menu-item:has(input:disabled){opacity:.5;cursor:default}
-.menu-item input{width:18px;height:18px;accent-color:var(--primary)}.menu-item .item-icon{width:42px;height:42px;font-size:24px}
-.menu-item b{display:block;font-size:13px}.menu-item small{display:block;font-size:11px;color:var(--muted-foreground)}
-.menu-total{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 0 12px}.menu-total b{font:22px var(--font-display);color:var(--primary)}.menu-total small{color:var(--muted-foreground)}
-.menu-submit{display:grid;gap:8px}.menu-submit small{font-weight:400;opacity:.75}
-.job-list{display:grid;gap:10px;margin-top:12px}.job-card{display:grid;gap:9px;padding:14px;border:2px solid var(--border);border-radius:14px;background:var(--secondary)}.job-card.active{border-color:var(--neon-green)}
-.job-card b{font:20px var(--font-display);color:var(--primary)}.job-card small{display:block;color:var(--muted-foreground)}.job-meta{display:flex;flex-wrap:wrap;gap:6px}.job-meta span{font-size:12px;padding:4px 8px;border-radius:20px;background:var(--background)}
+/* Coins in the room: media prices, Tonico's table menu and jobs (economy-ui.ts). The administration is admin.css. */
+/* Item pictures (ui-icons.ts itemImage) and the coin mark (coinImage) after amounts. */
+.item-img{display:block;width:86%;height:86%;object-fit:contain;pointer-events:none}
+.coin{width:1.05em;height:1.05em;vertical-align:-.15em}.coins{white-space:nowrap;font-variant-numeric:tabular-nums}
+.media-price{margin:0 0 14px;padding:9px 12px;border-left:2px solid var(--vw-cyan);background:oklch(1 0 0 / 4%);font:400 12px/1.6 var(--font-mono)!important;color:var(--muted-foreground)}.media-price b{font-weight:500;color:var(--vw-cyan)}
+.table-cta small{color:var(--vw-cyan)}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1px;margin:12px 0}
+.menu-item{display:grid;grid-template-columns:auto 42px 1fr auto;align-items:center;gap:10px;margin:0;padding:8px 10px;background:oklch(1 0 0 / 3%);font:400 13px var(--font-sans);text-transform:none;letter-spacing:normal;color:var(--foreground);cursor:pointer;transition:background-color .15s}
+.menu-item:hover{background:var(--secondary)}
+.menu-item:has(input:checked){outline:1px solid var(--hl-magenta);outline-offset:-1px}.menu-item:has(input:disabled){opacity:.45;cursor:default}
+.menu-item input{width:16px;height:16px}.menu-item .item-icon{width:42px;height:42px}
+.menu-item b{display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.menu-item small{display:block;font-size:11px;color:var(--muted-foreground)}
+.menu-total{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 0 14px;font:400 12px var(--font-mono);text-transform:uppercase;color:var(--muted-foreground)}.menu-total b{font:500 20px var(--font-mono);color:var(--money)}
+.menu-submit{display:grid;gap:1px}.menu-submit small{font-weight:400;opacity:.75;text-transform:none;letter-spacing:normal}
+.job-list{display:grid;gap:1px;margin-top:14px}.job-card{display:grid;gap:10px;padding:14px;background:oklch(1 0 0 / 3%)}.job-card.active{outline:1px solid var(--vw-mint);outline-offset:-1px}
+.job-card b{font-size:17px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.job-card small{display:block;margin-top:2px;color:var(--muted-foreground)}.job-meta{display:flex;flex-wrap:wrap;gap:1px}.job-meta span{padding:4px 8px;background:var(--secondary);font:400 11px var(--font-mono);text-transform:uppercase}
+.job-card .fine-print{margin:0}
 /* The job panel: a HUD panel (hud-panels.ts) shown during a shift, with its summary in the header when collapsed. */
-[data-panel=job]{border-color:var(--neon-green)}[data-panel=job] .panel-heading>.ui-icon,.job-toggle .ui-icon{color:var(--neon-green)}.job-toggle{border-color:var(--neon-green)}
-.panel-summary{font-size:12px;font-weight:800;color:var(--neon-green);white-space:nowrap}.hud-panel:not(.is-collapsed) .panel-summary{display:none}
-.job-task small{display:block;font-size:10px;color:var(--neon-green);letter-spacing:.5px;text-transform:uppercase}.job-task b{display:block;font:19px var(--font-display)}
-.job-task p{font-size:12px;color:var(--muted-foreground);margin:6px 0}.job-task .hud-track{margin:8px 0}.job-task .hud-track i{background:var(--neon-green);transition:width .1s linear}
-.job-hud-foot{display:flex;align-items:center;gap:10px;font-size:12px}.job-hud-foot span:nth-child(2){display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-weight:800;margin-right:auto}.job-hud-foot span{white-space:nowrap}
+[data-panel=job] .panel-heading>.ui-icon,.job-toggle .ui-icon{color:var(--vw-mint)}[data-panel=job]{box-shadow:inset 2px 0 var(--vw-mint)}
+.panel-summary{font:500 11px var(--font-mono);color:var(--vw-mint);white-space:nowrap}.hud-panel:not(.is-collapsed) .panel-summary{display:none}
+.job-task small{display:block;font:400 10px var(--font-mono);letter-spacing:.15em;text-transform:uppercase;color:var(--vw-mint)}.job-task b{display:block;margin-top:2px;font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.job-task p{margin:6px 0;font:400 11px var(--font-mono);color:var(--muted-foreground)}.job-task kbd{border:1px solid var(--key);padding:0 4px;color:var(--foreground)}.job-task .hud-track{margin:8px 0}.job-task .hud-track i{background:var(--vw-mint);transition:width .1s linear}
+.job-hud-foot{display:flex;align-items:center;gap:10px;margin:10px -14px -12px;padding:8px 8px 8px 14px;border-top:1px solid var(--border);font:400 11px var(--font-mono);text-transform:uppercase;color:var(--muted-foreground)}.job-hud-foot span:nth-child(2){display:inline-flex;align-items:center;gap:3px;color:var(--vw-cyan);margin-right:auto}.job-hud-foot span{white-space:nowrap}
 /* The worker's objective (objective-blip.ts), drawn on this canvas over the scene. */
 .job-blip{position:absolute;inset:0;width:100%;height:100%;z-index:77;pointer-events:none}
-.admin-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid var(--border)}.admin-tabs button{padding:9px 14px;border-radius:10px 10px 0 0;font-weight:800;color:var(--muted-foreground)}.admin-tabs [aria-selected=true]{background:var(--secondary);color:var(--primary)}
-.world-admin ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:13px}.world-admin li .mini-button{margin-left:6px}
-.world-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.world-stats div{padding:10px;border-radius:10px;background:var(--secondary)}.world-stats small{display:block;color:var(--muted-foreground);font-size:11px}.world-stats b{font:20px var(--font-display)}
-.admin-job{padding:10px;border:2px solid var(--border);border-radius:12px;margin-bottom:8px;display:grid;gap:8px}.admin-job header{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;font-size:13px}
-.admin-job-form,.admin-bots-form{display:flex;flex-wrap:wrap;gap:8px;align-items:end}.admin-job-form label,.admin-bots-form label{display:grid;gap:3px;font-size:11px}.admin-job-form input[type=number],.admin-bots-form input[type=number]{width:80px;padding:6px 8px;border:2px solid var(--border);border-radius:8px;background:var(--input);color:var(--foreground)}
-.admin-job-form .inline-check{display:flex;gap:6px;align-items:center;font-size:13px}
-.world-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;display:block;overflow-x:auto}.world-table th,.world-table td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}.world-table .offline{opacity:.5}
-@media(max-width:760px){.table-cta{bottom:283px;right:10px}.menu-grid{grid-template-columns:1fr}.menu-item{grid-template-columns:auto 36px 1fr auto;padding:7px}}
+@media(max-width:760px){.menu-grid{grid-template-columns:1fr}.menu-item{grid-template-columns:auto 36px 1fr auto;padding:7px}}
 /* Wallet and skin collection (C, main.ts skins()). */
-.wallet{display:flex;align-items:center;justify-content:space-between;padding:15px;background:var(--secondary);color:var(--primary);border:3px solid var(--border);box-shadow:3px 3px 0 var(--piche);border-radius:5px;margin-bottom:20px}.wallet>span{font:11px var(--font-sans)}.wallet>b{font:20px var(--font-display)}.wallet small{font:10px var(--font-sans)}
-.skin-card.locked small{color:var(--espuma)}.skin-card.locked img{opacity:.8}.skin-card.locked:hover img{opacity:1}.modal .skin-grid{margin-bottom:18px}
+.wallet{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding:12px 16px;background:oklch(1 0 0 / 3%);font-family:var(--font-mono)}.wallet>span{font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted-foreground)}.wallet>b{font-size:18px;font-weight:500;color:var(--money)}.wallet small{font-size:11px}
+.skin-card.locked small{color:var(--vw-pink)}.skin-card.locked img{opacity:.75}.skin-card.locked:hover img{opacity:1}.modal .skin-grid{margin-bottom:18px}

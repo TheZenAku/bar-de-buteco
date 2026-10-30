@@ -2,7 +2,7 @@
 
 O cenário ativo é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois arquivos são publicados integralmente em `apps/web/public/maps`.
 
-Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json`. Esse arquivo alimenta a movimentação autoritativa, a previsão do cliente, as colisões da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
+Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json`. Esse arquivo alimenta a movimentação autoritativa, a previsão do cliente, as consultas de visibilidade da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
 
 ## Layout
 
@@ -64,12 +64,12 @@ O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais
 
 ## Câmera e iluminação
 
-A câmera acompanha a altura do jogador e encurta seu braço contra paredes, lajes e o forro da varanda; móveis e objetos ficam transparentes em volta do personagem em vez de puxar a câmera ([câmera](../sistemas/camera.md)). O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
+A câmera acompanha a altura do jogador com zoom contínuo e giro livre em qualquer ângulo. Paredes, lajes, portas e os demais colisores não encurtam a distância escolhida; obstáculos entre a câmera e o personagem abrem uma janela de raio-X em volta dele ([câmera](../sistemas/camera.md)). As colisões do jogador permanecem ativas. O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
 
 O importador glTF separa o sol das 13 luminárias do bar, preservando posições, cores e potências relativas. O ciclo completo de dia e noite dura 40 minutos; céu, lua, ambiente, névoa, luzes externas, festa e apagão permanecem integrados. Para limitar custo de GPU, doze focos externos com sombras atendem o entorno imediato do bar, enquanto o restante do bairro usa materiais emissivos, luz ambiente, lua e névoa.
 
 ## Testes
 
-`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, a numeração 1–39 das mesas e a mesa de cada assento, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e câmera. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
+`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, a numeração 1–39 das mesas e a mesa de cada assento, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e consultas de visibilidade. `tests/integration/camera.test.ts` verifica o zoom e o giro livres da câmera, inclusive através das paredes. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
 
 Veja os [resultados da validação do mapa](../validacao/validation-map.md).

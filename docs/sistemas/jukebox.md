@@ -95,6 +95,8 @@ Para usar, vá ao **blip turquesa** no chão, no meio da frente do palco (`TV_SP
 - os spots brancos da treliça: as lâmpadas do bar (`Lampada`) acima do tablado. O shader troca a emissão só dentro do volume do palco, e as outras lâmpadas do bar ficam como estão;
 - a luz frontal (`Luz_Palco`) e a luz de festa do palco (`Stage party wash`). Elas mantêm o brilho dado pelo dia e noite e pela festa, e só a cor muda.
 
+Por cima disso, enquanto o vídeo toca, o quintal ganha o [show de luzes](palco.md#show-de-luzes) (lasers, moving heads e estrobo), que é separado destas luzes.
+
 Pausado, as cores param e a luz fica fraca. Desligado, as lentes, a fita e a contraluz ficam com um brilho fraco do magenta original, para o palco não ficar morto à noite, e os spots e as luzes brancas voltam ao branco. Todos os navegadores veem as mesmas cores no mesmo momento. A paleta é a mesma da jukebox, então um vídeo de cores claras (como *Big Buck Bunny*) dá luzes claras.
 
 Escolher um vídeo novo custa moedas: 15 na jukebox, 25 nas TVs e 50 no telão. Pausar, continuar, parar e desligar são de graça. O servidor valida o comando antes de cobrar e estorna se ele falhar depois. Subir no palco é outro pagamento (ingresso de 200 moedas). Veja [economia](economia.md#palco).

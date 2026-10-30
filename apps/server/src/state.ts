@@ -1,5 +1,5 @@
 import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
-import { DEFAULT_SKIN } from '@bar/shared';
+import { DEFAULT_SHOW, DEFAULT_SKIN } from '@bar/shared';
 
 export class Player extends Schema {
   @type('string') id = '';
@@ -13,14 +13,23 @@ export class Player extends Schema {
   @type('float32') rotation = 0;
   @type('string') animationState = 'idle';
   @type('number') animationStartedAt = 0;
+  /** Drawn at random each time the player starts dancing; every client plays the same clip of its dance bank with it. */
+  @type('uint16') dance = 0;
   @type('string') interactionState = '';
   @type('string') currentTableId = '';
   @type('int32') lastProcessedInput = -1;
   @type('boolean') connected = true;
   /** Microphone on, so others can show who may speak. */
   @type('boolean') voice = false;
-  /** The drink ordered at the counter, shown in hand while drinking ('' otherwise). */
+  /** The drink ordered at the counter, until Magrão serves it ('' otherwise). */
   @type('string') drinkItem = '';
+  /**
+   * What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
+   * since/until when (server clock): the same time as at a table (consumeMs). '' and 0 with empty hands.
+   */
+  @type('string') holding = '';
+  @type('number') holdingSince = 0;
+  @type('number') holdingUntil = 0;
   // Needs, as whole points (precise values live in NeedsDirector). Everyone sees drunkenness and the
   // condition; the HUD shows the rest to the player.
   @type('uint8') hp = 100;
@@ -42,6 +51,8 @@ export class Player extends Schema {
   /** A worker's tray: the table order picked up for a customer, comma-separated ('' when empty), and its id. */
   @type('string') carrying = '';
   @type('string') carryingOrder = '';
+  /** 'call' while on an answered phone call ('' otherwise), so everyone sees who is on the line. */
+  @type('string') phone = '';
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -131,6 +142,31 @@ export class MusicianSpot extends Schema {
   @type('number') startedAt = 0;
   @type('boolean') stopping = false;
 }
+/** The stage show's settings from the light desk (packages/shared/src/stage-show.ts, StageShowState). */
+export class StageShowState extends Schema {
+  @type('string') power = DEFAULT_SHOW.power;
+  @type('string') mode = DEFAULT_SHOW.mode;
+  @type('string') program = DEFAULT_SHOW.program;
+  /** Comma-separated program ids. */
+  @type('string') playlist = DEFAULT_SHOW.playlist;
+  @type('uint8') bars = DEFAULT_SHOW.bars;
+  @type('string') palette = DEFAULT_SHOW.palette;
+  @type('uint8') bpm = DEFAULT_SHOW.bpm;
+  /** A beat (server ms): the show's beat counts from it. */
+  @type('number') beatAt = DEFAULT_SHOW.beatAt;
+  @type('uint8') speed = DEFAULT_SHOW.speed;
+  @type('uint8') master = DEFAULT_SHOW.master;
+  @type('uint8') lasers = DEFAULT_SHOW.lasers;
+  @type('uint8') heads = DEFAULT_SHOW.heads;
+  @type('uint8') strobe = DEFAULT_SHOW.strobe;
+  @type('string') text = DEFAULT_SHOW.text;
+  @type('string') cue = DEFAULT_SHOW.cue;
+  @type('number') cueAt = DEFAULT_SHOW.cueAt;
+  @type('string') preset = DEFAULT_SHOW.preset;
+  @type('string') updatedBy = DEFAULT_SHOW.updatedBy;
+  @type('number') updatedAt = DEFAULT_SHOW.updatedAt;
+  @type('uint32') revision = DEFAULT_SHOW.revision;
+}
 /** Public occupancy of a job's slots (apps/server/src/world/jobs.ts). */
 export class JobSlotState extends Schema {
   @type('string') id = '';
@@ -150,6 +186,7 @@ export class BarState extends Schema {
   @type({ map: JobSlotState }) jobs = new MapSchema<JobSlotState>();
   @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
   @type({ map: MusicianSpot }) musicians = new MapSchema<MusicianSpot>();
+  @type(StageShowState) stageShow = new StageShowState();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;
   @type('uint16') capacity = 32;

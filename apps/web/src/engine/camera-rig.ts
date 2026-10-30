@@ -1,13 +1,16 @@
 import * as pc from 'playcanvas';
-import {cameraFraction,sightBlocked} from '@bar/shared';
+import {sightBlocked} from '@bar/shared';
 import {CameraXray} from './camera-xray';
 
-/** The local player's views: through their own eyes, or from behind at three distances. */
-export type CameraMode='first'|'near'|'default'|'far';
-/** From the eyes outwards: the mouse wheel steps along it, Q goes round it. */
-export const CAMERA_MODES:readonly CameraMode[]=['first','near','default','far'];
-export const CAMERA_LABELS:Readonly<Record<CameraMode,string>>={first:'Primeira pessoa',near:'Terceira pessoa · próxima',default:'Terceira pessoa · padrão',far:'Terceira pessoa · longe'};
+/** First person, or a freely positioned orbit at the distance chosen by the player. */
+export type CameraMode='first'|'third';
+export const CAMERA_MODES:readonly CameraMode[]=['first','third'];
+export const CAMERA_LABELS:Readonly<Record<CameraMode,string>>={first:'Primeira pessoa',third:'Terceira pessoa'};
 export const isCameraMode=(value:unknown):value is CameraMode=>CAMERA_MODES.includes(value as CameraMode);
+export const DEFAULT_CAMERA_DISTANCE=6.4;
+/** A saved third-person distance must be positive and finite; there is no preset or maximum zoom. */
+export const readCameraDistance=(value:unknown,fallback=DEFAULT_CAMERA_DISTANCE):number=>
+  typeof value==='number'&&Number.isFinite(value)&&value>0?value:fallback;
 
 /** Who the camera follows this frame. */
 export interface CameraSubject {
@@ -22,124 +25,105 @@ export interface CameraSubject {
   elapsed:number;
 }
 
-// Third person: the boom's length (metres) and the height above the feet it looks at (the near view looks over the shoulders).
-const BOOMS:Record<Exclude<CameraMode,'first'>,{length:number;height:number}>={near:{length:3,height:1.45},default:{length:6.4,height:1.25},far:{length:10.5,height:1.1}};
-// Radians: how high over the player the boom may rise; how far up (negative) or down the eyes may look in first person.
-const PITCH={min:.08,max:1.2},LOOK={min:-1.25,max:1.3};
+const TARGET_HEIGHT=1.25;
+// As zoom approaches the eyes, lift the orbit's pivot out of the chest; keep the full chosen radius.
+const EYE_ZOOM=1;
 // A box avatar (its skin still loading) has no head joint: the eyes are this high.
 const EYE_HEIGHT=1.62;
 // The x-ray window: around the middle of the body, .8 m to either side (and taller: camera-xray.ts); the floor under the feet is never cut.
 const BODY_CENTRE=.95,WINDOW_RADIUS=.8,FLOOR_KEPT=.12;
 // Points of the body the camera must see; when a solid hides any of them, the window opens.
 const SIGHT=[1.6,1.1,.6];
-// Wheel travel (pixels) per view step: one notch of a mouse, a short swipe on a touchpad.
-const WHEEL_STEP=60;
+// Continuous wheel travel: fine control near the player, proportional zoom further out, including fractional pixels.
+const ZOOM_RATE=.001;
 /** Exponential smoothing: the part of the way covered in `dt` seconds at `rate` per second. */
 const ease=(rate:number,dt:number)=>1-Math.exp(-rate*dt);
-const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
-const turn=(from:number,to:number)=>Math.atan2(Math.sin(to-from),Math.cos(to-from));
 
 /**
- * The camera of the local player. Every move is smoothed: the mouse turns it a little behind the hand, a change of view
- * glides (into the eyes too), and a wall pulls the boom in within a few frames and lets it out slowly. Only the building
- * stops the boom; furniture and props do not, and whatever hides the player is cut away by the x-ray (camera-xray.ts).
+ * The camera of the local player. Zoom and unrestricted rotation follow the hand smoothly. Geometry never changes
+ * the chosen distance or angle; whatever hides the player is cut away by the visual x-ray (camera-xray.ts).
  */
 export class CameraRig {
-  mode:CameraMode='default';
+  mode:CameraMode='third';
   /** Heading of the view (radians): movement and the listener follow it. The camera sits at +sin/+cos, looking back. */
   yaw=.15;
   private yawGoal=.15;
-  /** Third person: how high the boom rises over the player (radians). */
+  /** Elevation in radians, shared by both views and unrestricted through full vertical turns. */
   pitch=.55;
   private pitchGoal=.55;
-  /** First person: how far down the eyes look (radians, negative up). */
-  private look=.1;
-  private lookGoal=.1;
   /** 0 behind the player, 1 in their eyes. */
   private inside=0;
-  /** The last third-person view: first person glides out of and back into it. */
-  private outside:Exclude<CameraMode,'first'>='default';
-  private boomLength=BOOMS.default.length;
-  private height=BOOMS.default.height;
-  /** The boom as drawn, after the walls. */
-  private boom=BOOMS.default.length;
+  /** First person remembers the exact last third-person distance. */
+  private distanceGoal=DEFAULT_CAMERA_DISTANCE;
+  private boomLength=DEFAULT_CAMERA_DISTANCE;
   private readonly target=new pc.Vec3(0,1.2,3.5);
   private readonly eye=new pc.Vec3();
   private eyeSet=false;
   private xrayOpen=0;
-  private wheelTravel=0;
   private readonly xray:CameraXray;
-  private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3()};
+  private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),up:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3()};
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
 
   /** In the eyes (or nearly): the head is hidden, as are the name and the ring at the feet. */
-  get firstPerson():boolean {return this.inside>.7;}
-  /** Length of the third-person boom chosen now (before the walls). */
-  get reach():number {return BOOMS[this.outside].length;}
+  get firstPerson():boolean {return this.inside>.7||this.boomLength<.5;}
+  /** Exact last third-person distance, retained while looking through the eyes. */
+  get reach():number {return this.distanceGoal;}
+  get distance():number {return this.mode==='first'?0:this.distanceGoal;}
 
   setMode(mode:CameraMode):void {
-    if(mode===this.mode)return;
-    // Into the eyes, they look where the camera was looking; out of them, the boom comes up behind.
-    if(mode==='first')this.look=this.lookGoal=clamp(this.pitch*.35,LOOK.min,LOOK.max);
-    else this.outside=mode;
     this.mode=mode;
+  }
+  /** An exact distance in metres. Zero enters first person without forgetting the previous zoom. */
+  setDistance(distance:number):void {
+    if(!Number.isFinite(distance))return;
+    if(distance<=0){this.mode='first';return;}
+    this.distanceGoal=distance;
+    this.mode='third';
   }
   /** Q: the next view round CAMERA_MODES. */
   cycle():CameraMode {this.setMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.mode)+1)%CAMERA_MODES.length]!);return this.mode;}
-  /** The mouse wheel: rolling towards the screen steps in, away steps out, one view per notch. Returns the new view, if any. */
-  wheel(deltaY:number):CameraMode|undefined {
-    if(Math.sign(deltaY)!==Math.sign(this.wheelTravel))this.wheelTravel=0;
-    this.wheelTravel+=deltaY;
-    if(Math.abs(this.wheelTravel)<WHEEL_STEP)return;
-    const step=Math.sign(this.wheelTravel);this.wheelTravel=0;
-    const next=CAMERA_MODES[clamp(CAMERA_MODES.indexOf(this.mode)+step,0,CAMERA_MODES.length-1)]!;
-    if(next===this.mode)return;
-    this.setMode(next);return next;
+  /** Every wheel delta adjusts the distance; no notches, mode presets or accumulated threshold. */
+  wheel(deltaY:number):boolean {
+    if(!Number.isFinite(deltaY)||deltaY===0)return false;
+    const distance=Math.max(0,(this.distance+1)*Math.exp(deltaY*ZOOM_RATE)-1);
+    if(!Number.isFinite(distance)||distance===this.distance)return false;
+    this.setDistance(distance);return true;
   }
   /** Dragging the mouse: sideways turns, up and down looks up and down (the boom rises as the view looks down). */
   drag(dx:number,dy:number):void {
     this.yawGoal-=dx*.006;
-    if(this.mode==='first')this.lookGoal=clamp(this.lookGoal+dy*.004,LOOK.min,LOOK.max);
-    else this.pitchGoal=clamp(this.pitchGoal+dy*.004,PITCH.min,PITCH.max);
+    this.pitchGoal+=dy*.004;
   }
-  /** Swings the view to a heading (radians), smoothly. */
-  turnTo(yaw:number):void {this.yawGoal=this.yaw+turn(this.yaw,yaw);}
 
   /** Places the camera behind or in the eyes of `subject`, and sets the x-ray window for this frame. */
   follow(dt:number,subject:CameraSubject):void {
-    const {a,b,c,goal,centre}=this.temp,{feet}=subject;
-    this.yaw+=turn(this.yaw,this.yawGoal)*ease(18,dt);
+    const {a,b,c,up,goal,centre}=this.temp,{feet}=subject;
+    this.yaw+=(this.yawGoal-this.yaw)*ease(18,dt);
     this.pitch+=(this.pitchGoal-this.pitch)*ease(18,dt);
-    this.look+=(this.lookGoal-this.look)*ease(18,dt);
     this.inside+=((this.mode==='first'?1:0)-this.inside)*ease(7,dt);
     if(Math.abs(this.inside-Math.round(this.inside))<.002)this.inside=Math.round(this.inside);
-    const boom=BOOMS[this.outside];
-    this.boomLength+=(boom.length-this.boomLength)*ease(5,dt);
-    this.height+=(boom.height-this.height)*ease(5,dt);
+    this.boomLength+=(this.distanceGoal-this.boomLength)*ease(12,dt);
     // Behind the player: the point it looks at trails the body a little; far away (a respawn, a teleport) it jumps.
-    goal.set(feet.x,feet.y+this.height,feet.z);
-    if(this.target.distance(goal)>8){this.target.copy(goal);this.boom=0;}
+    goal.set(feet.x,feet.y+TARGET_HEIGHT,feet.z);
+    if(this.target.distance(goal)>8)this.target.copy(goal);
     else this.target.lerp(this.target,goal,ease(10,dt));
     const flat=Math.cos(this.pitch);
     a.set(Math.sin(this.yaw)*flat,Math.sin(this.pitch),Math.cos(this.yaw)*flat);
-    b.copy(a).mulScalar(this.boomLength).add(this.target);
-    const free=cameraFraction(this.target,b,true)*this.boomLength;
-    // Into a wall within a few frames (the x-ray covers them); back out slowly once it is clear.
-    this.boom+=(free-this.boom)*ease(free<this.boom?30:3,dt);
-    const behind=b.copy(a).mulScalar(this.boom).add(this.target);
     // The eyes: just above and in front of the head joint, steadied a little (the clips bob the head).
     if(subject.head)goal.set(subject.head.x+Math.sin(subject.facing)*.1,subject.head.y+.09,subject.head.z+Math.cos(subject.facing)*.1);
     else goal.set(feet.x,feet.y+EYE_HEIGHT,feet.z);
     if(!this.eyeSet||this.eye.distance(goal)>1){this.eye.copy(goal);this.eyeSet=true;}
     else this.eye.lerp(this.eye,goal,ease(25,dt));
+    const near=Math.max(0,1-this.boomLength/EYE_ZOOM),nearEyes=near*near*(3-2*near);
+    const behind=b.lerp(this.target,this.eye,nearEyes).add(c.copy(a).mulScalar(this.boomLength));
     const w=this.inside*this.inside*(3-2*this.inside);
-    // Where it looks: at the player from behind, along the eyes' heading from inside, turning between the two.
-    c.set(-Math.sin(this.yaw)*Math.cos(this.look),-Math.sin(this.look),-Math.cos(this.yaw)*Math.cos(this.look));
-    a.copy(this.target).sub(behind).normalize().lerp(a,c,w).normalize();
+    // Both views share their direction. Rotating the up vector with the orbit avoids flips and singularities at the poles.
+    a.mulScalar(-1);
+    up.set(-Math.sin(this.yaw)*Math.sin(this.pitch),Math.cos(this.pitch),-Math.cos(this.yaw)*Math.sin(this.pitch));
     const position=b.lerp(behind,this.eye,w);
     this.camera.setPosition(position);
-    this.camera.lookAt(c.copy(position).add(a));
+    this.camera.lookAt(c.copy(position).add(a),up);
     if(subject.roll)this.camera.rotateLocal(Math.sin(subject.elapsed*.7)*subject.roll*.3,0,Math.sin(subject.elapsed*.45)*subject.roll);
     // The x-ray opens while a solid hides part of the body from the camera, and closes once it is clear.
     let hidden=false;
@@ -158,6 +142,6 @@ export class CameraRig {
 
   telemetry() {
     const p=this.camera.getPosition();
-    return {mode:this.mode,inside:+this.inside.toFixed(3),boom:+this.boom.toFixed(3),reach:this.reach,xray:+this.xrayOpen.toFixed(3),yaw:+this.yaw.toFixed(3),pitch:+this.pitch.toFixed(3),position:[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)]};
+    return {mode:this.mode,distance:this.distance,inside:+this.inside.toFixed(3),boom:+this.boomLength.toFixed(3),reach:this.reach,xray:+this.xrayOpen.toFixed(3),yaw:+this.yaw.toFixed(3),pitch:+this.pitch.toFixed(3),position:[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)]};
   }
 }
