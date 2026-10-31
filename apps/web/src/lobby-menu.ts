@@ -1,4 +1,4 @@
-import {BLACKJACK_SEATS,CHAT_RADIUS,JOBS,STAGE_PASS,TABLE_ORDER_MAX_ITEMS,VOICE} from '@bar/shared';
+import {BLACKJACK_SEATS,CHAT_RADIUS,FOOSBALL,FOOSBALL_TABLES,JOBS,STAGE_PASS,TABLE_ORDER_MAX_ITEMS,VOICE} from '@bar/shared';
 import {escape as e} from './api';
 import {price} from './prices';
 import {uiIcon as icon} from './ui-icons';
@@ -15,8 +15,9 @@ export const keyGrid=(keys:ReadonlyArray<readonly [string,string]>)=>`<div class
 /** The entry's O Bar tab: the rules of @bar/shared and the live prices (prices.ts), never invented numbers. */
 const features=()=>[
   {label:'Galera',icon:'users',info:'Encontre a turma e converse com quem está por perto, por texto ou por voz.',rows:[['Chat de texto',`até ${CHAT_RADIUS} m`],['Voz por proximidade',`até ${VOICE.maxDistance} m`]]},
-  {label:'Blackjack',icon:'cards',info:'21 do Baiano: chegue o mais perto de 21 sem passar. É só pela resenha.',rows:[['Jogadores',`até ${BLACKJACK_SEATS.length}`],['Apostas','nenhuma']]},
-  {label:'Jukebox e TVs',icon:'music',info:'Cole um link do YouTube e todo mundo por perto ouve e assiste junto.',rows:[['Jukebox',`${price('media:jukebox')} moedas`],['TV',`${price('media:tv')} moedas`],['Telão do palco',`${price('media:telao')} moedas`]]},
+  {label:'Blackjack',icon:'cards',info:'21 do Baiano: regras de cassino, apostas em moedas do jogo. Blackjack paga 3 para 2.',rows:[['Jogadores',`até ${BLACKJACK_SEATS.length}`],['Apostas',`${price('blackjack:min-bet')} a ${price('blackjack:max-bet')} moedas por mão`],['Jogadas','pedir, parar, dobrar, dividir, desistir e seguro']]},
+  {label:'Pebolim',icon:'ball',info:'Totó de 11 bonecos no salão de jogos, com as regras oficiais. Jogue 1 contra 1, em duplas, contra o Zé do Totó ou valendo moedas.',rows:[['Mesas',`${FOOSBALL_TABLES.length}, no andar de cima`],['Jogadores','1 × 1 ou 2 × 2, o Zé completa'],['Partida',`até ${FOOSBALL.defaultGoals} gols (3 a 10), um set ou melhor de 3`],['Valendo',`${price('foosball:min-bet')} a ${price('foosball:max-bet')} moedas por jogador`]]},
+  {label:'Jukebox e TVs',icon:'music',info:'Cole um link de vídeo, música ou rádio (YouTube, Spotify, SoundCloud, Twitch e outros) e todo mundo por perto ouve e assiste junto.',rows:[['Jukebox',`${price('media:jukebox')} moedas`],['TV',`${price('media:tv')} moedas`],['Telão do palco',`${price('media:telao')} moedas`]]},
   {label:'Palco',icon:'micVocal',info:'Suba no palco do quintal e toque violão, cavaquinho, bateria ou pegue o microfone.',rows:[['Ingresso',`${price('stage:pass')} moedas`],['Validade',`${STAGE_PASS.durationMs/60_000} min`]]},
   {label:'Mesa e balcão',icon:'beer',info:'Peça uma gelada ao Magrão no balcão, ou sente-se e peça comida e bebida ao Tonico.',rows:[['Pedido na mesa',`até ${TABLE_ORDER_MAX_ITEMS} itens`]]},
   {label:'Trabalho',icon:'briefcase',info:'Trabalhe no bar e ganhe moedas: cada tarefa paga na hora.',rows:JOBS.map(job=>[job.name,`${price(`job:${job.id}`)} moedas por tarefa`] as const)},

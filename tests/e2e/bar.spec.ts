@@ -23,12 +23,11 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   await expect(page.locator('#dance-button')).toHaveAttribute('aria-pressed','true');
   await page.keyboard.press('Enter');
   await expect(page.locator('#dance-button')).toHaveAttribute('aria-pressed','false');
-  await page.getByRole('button',{name:'Recolher chat'}).click();
-  await expect(page.locator('#chat-body')).toBeHidden();
-  await expect(page.locator('#chat-toggle')).toHaveAttribute('aria-expanded','false');
+  await page.getByRole('button',{name:'Ocultar chat'}).click();
+  await expect(page.locator('[data-panel="chat"]')).toBeHidden();
   await page.getByRole('button',{name:/Resenhar/}).click();
   await expect(page.locator('#chat-input')).toBeFocused();
-  await expect(page.locator('#chat-toggle')).toHaveAttribute('aria-expanded','true');
+  await expect(page.locator('[data-panel="chat"]')).toHaveClass(/chat-open/);
   await page.keyboard.type('wasdx');
   await expect(page.locator('#chat-input')).toHaveValue('wasdx');
   await page.keyboard.press('Escape');
@@ -118,14 +117,14 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await expect.poll(async()=>(await bartender())?.clip,{timeout:15000}).toBe('Bartend');
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(true);
   // Served, the beer goes into the hand: the body keeps its own clip (the hand layer raises and sips it) and the player
-  // walks away with it, the progress bar showing how much is left.
+  // walks away with it, its tile above the prompts draining as it goes.
   const held=()=>page.evaluate(()=>{const d=(window as any).barDebug,me=d.snapshot().world.players[d.snapshot().localId];return me.holding as string;});
   await expect.poll(held,{timeout:30000}).toBe('garrafa');
   const own=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.animations().find((a:any)=>a.id===d.snapshot().localId);});
   await expect.poll(async()=>(await own())?.drink?.item).toBe('garrafa');expect((await own())?.clip).not.toBe('Drink');
   expect((await bartender())?.clip).not.toBe('Bartend');
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map().effects?.pouring)).toBe(false);
-  await expect(page.locator('#consuming')).toContainText('Long neck');
+  await expect(page.locator('#consuming').getByRole('progressbar',{name:'Bebendo Long neck'})).toBeVisible();
   await walkTo(page,14.45,-7.6,.12);
   expect(await held()).toBe('garrafa');
   await expect(page.locator('#context-label')).toHaveText(/^Sentar · mesa \d+$/);await page.keyboard.press('e');
@@ -340,7 +339,7 @@ test('password recovery mail changes the password and permits a fresh login',asy
   await page.request.post('/api/auth/logout',{data:{}});
 });
 
-test('keyboard movement reaches blackjack, a full round settles and admin events reach the scene',async({page})=>{
+test('keyboard movement reaches blackjack, a bet round settles in coins and admin events reach the scene',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',err=>errors.push(err.message));
   await page.goto('/');
@@ -353,15 +352,28 @@ test('keyboard movement reaches blackjack, a full round settles and admin events
   // Movement arrives in fixed ticks; touch the table edge instead of oscillating around a sub-tick target.
   await page.keyboard.press('d',{delay:150});
   await expect(page.locator('#context-label')).toHaveText('Jogar blackjack');
+  // Coins to bet: the administration adds them and the room rereads the wallet (a sync control).
+  const me=(await (await page.request.get('/api/auth/me')).json()).user.id as string;
+  expect((await page.request.post('/api/admin/wallet',{data:{playerId:me,operation:'add',amount:200,reason:'Fichas do teste de blackjack',requestId:crypto.randomUUID()}})).ok()).toBe(true);
   await page.keyboard.press('e');await expect(page.locator('#blackjack')).toBeVisible();
-  await page.getByRole('button',{name:'Começar rodada'}).click();
-  await expect(page.locator('#blackjack h2')).not.toHaveText('Puxe uma cadeira');
-  const stop=page.getByRole('button',{name:'Parar',exact:true});
-  if(await stop.isVisible())await stop.click();
-  await expect(page.locator('#blackjack h2')).toHaveText('A rodada fechou');
+  const table=page.locator('#blackjack'),status=table.locator('[data-bj="status"]');
+  await expect(table.getByRole('button',{name:'Ficha de 10',exact:true})).toBeEnabled({timeout:20000});
+  await table.locator('[data-bj-bet="clear"]').click({timeout:2000}).catch(()=>{});
+  await table.getByRole('button',{name:'Ficha de 10',exact:true}).click();
+  await table.getByRole('button',{name:'Apostar',exact:true}).click();
+  // Alone at the table the deal comes at once; stand (key 2) on every decision and decline insurance until it settles.
+  const settled=/ganhou|Deu casa|Empate|Rodada encerrada/i;
+  // isVisible answers at once; isEnabled would wait for a button that the next phase no longer has.
+  const stand=table.getByRole('button',{name:/Parar/}),noInsurance=table.getByRole('button',{name:/Sem seguro/});
+  for(const deadline=Date.now()+60000;Date.now()<deadline&&!settled.test(await status.textContent()??'');){
+    if(await noInsurance.isVisible()||(await stand.isVisible()&&await stand.isEnabled()))await page.keyboard.press('2');
+    await page.waitForTimeout(300);
+  }
+  await expect(status).toHaveText(settled);
+  await expect(table.locator('.bj-card').first()).toBeVisible();
   await expect.poll(async()=>{const response=await page.request.get('/api/stats');return (await response.json()).gamesPlayed;}).toBeGreaterThan(0);
   await page.screenshot({path:'test-results/blackjack.png'});
-  await page.getByRole('button',{name:'Sair da mesa'}).click();
+  await table.getByRole('button',{name:'Sair da mesa'}).click();
   for(const [button,title] of [['Apagão','Quem esqueceu de pagar a luz?'],['O inconveniente','O Zé acordou inspirado.'],['Festa','Essa rodada é de dança!']]){
     await page.getByRole('button',{name:'Administração',exact:true}).click();
     await page.getByRole('button',{name:button}).click();

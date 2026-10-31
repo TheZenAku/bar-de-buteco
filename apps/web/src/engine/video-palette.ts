@@ -1,27 +1,34 @@
 /** sRGB, 0–1. */
 export type Rgb = [number, number, number];
 /**
- * The colours of a YouTube video, for the jukebox lights. The player is a cross-origin iframe, so no page may read
- * its pixels. YouTube's own stills can be read (i.ytimg.com answers with CORS): the cover, and the frames YouTube
- * takes at 25 %, 50 % and 75 % of the video. Each still yields its few most vivid colours, dominant first.
+ * The colours of a video, for the jukebox lights. The player is a cross-origin iframe, so no page may read its pixels.
+ * YouTube's own stills can be read (i.ytimg.com answers with CORS): the cover, and the frames YouTube takes at 25 %,
+ * 50 % and 75 % of the video. Other platforms give one cover, when their image server allows it (the same colours for
+ * the whole video). Each still yields its few most vivid colours, dominant first.
  */
 export interface VideoPalette { videoId: string; frames: Rgb[][] }
 /** Where each still sits in the video (the cover stands for the opening). */
 export const PALETTE_KEYS = [0, .25, .5, .75] as const;
-const STILLS = ['mqdefault', 'mq1', 'mq2', 'mq3'];
 const COLOURS = 3;
 const SAMPLE_W = 48, SAMPLE_H = 27;
 const HUE_BINS = 24;
 const cache = new Map<string, Promise<VideoPalette>>();
 
-function still(videoId: string, name: string): Promise<HTMLImageElement> {
+/** The images to read for one video, one per PALETTE_KEYS; none (the prop's own colour) without a cover. */
+export function mediaStills(provider: string, videoId: string, thumb: string | undefined): string[] {
+  // A state from before the platforms existed, or a fixture's, is YouTube's.
+  if (!provider || provider === 'youtube') return ['mqdefault', 'mq1', 'mq2', 'mq3'].map(name => `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/${name}.jpg`);
+  return thumb ? PALETTE_KEYS.map(() => thumb) : [];
+}
+
+function still(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.decoding = 'async';
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Sem a imagem ${name} do vídeo ${videoId}`));
-    image.src = `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/${name}.jpg`;
+    image.onerror = () => reject(new Error(`Sem a imagem ${url}`));
+    image.src = url;
   });
 }
 
@@ -69,10 +76,10 @@ function colours(image: HTMLImageElement): Rgb[] {
 }
 
 /** Loads (once per video) the palette of each still; a still without colour borrows the nearest one that has. */
-export function videoPalette(videoId: string): Promise<VideoPalette> {
+export function videoPalette(videoId: string, stills: string[]): Promise<VideoPalette> {
   let pending = cache.get(videoId);
   if (!pending) {
-    pending = Promise.all(STILLS.map(name => still(videoId, name).then(colours, () => [] as Rgb[]))).then(found => {
+    pending = Promise.all(stills.map(url => still(url).then(colours, () => [] as Rgb[]))).then(found => {
       const frames = found.map((_, i) => {
         for (let d = 0; d < found.length; d++) for (const j of [i - d, i + d]) if (found[j]?.length) return found[j]!;
         return [];

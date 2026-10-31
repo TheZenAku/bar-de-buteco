@@ -87,27 +87,102 @@ export class ServedItem extends Schema {
   /** When the customer finished it or left it behind (0 while they are on it): from then on it waits to be collected. */
   @type('number') doneAt = 0;
 }
+/** A blackjack card (BlackjackCard in @bar/shared); the dealer's hole card is rank '?' until it is turned. */
 export class CardState extends Schema {
   @type('string') rank = '?';
   @type('string') suit = '';
+  @type('uint16') seq = 0;
 }
+export class HandState extends Schema {
+  @type([CardState]) cards = new ArraySchema<CardState>();
+  @type('uint32') bet = 0;
+  @type('uint8') total = 0;
+  @type('boolean') soft = false;
+  @type('boolean') split = false;
+  @type('boolean') doubled = false;
+  @type('string') status = 'playing';
+  @type('string') outcome = '';
+  @type('uint32') payout = 0;
+}
+/** A chair at the blackjack table (BlackjackSeat in @bar/shared). */
 export class SeatState extends Schema {
   @type('string') playerId = '';
   @type('string') displayName = '';
-  @type([CardState]) cards = new ArraySchema<CardState>();
-  @type('uint8') total = 0;
-  @type('string') status = 'waiting';
+  @type('uint8') chair = 0;
+  @type('uint32') bet = 0;
+  @type('uint32') lastBet = 0;
+  @type([HandState]) hands = new ArraySchema<HandState>();
+  @type('uint32') insurance = 0;
+  @type('string') insured = '';
+  @type('uint32') staked = 0;
+  @type('uint32') paid = 0;
+  @type('int32') net = 0;
+  @type('string') status = 'watching';
   @type('string') result = '';
 }
+/** The blackjack table (apps/server/src/minigames/blackjack.ts): never the shoe, never the hole card before it turns. */
 export class TableState extends Schema {
   @type('string') id = 'blackjack-1';
   @type('string') phase = 'waiting';
+  @type('uint32') round = 0;
+  @type('uint32') move = 0;
   @type([SeatState]) seats = new ArraySchema<SeatState>();
   @type([CardState]) dealerCards = new ArraySchema<CardState>();
   @type('uint8') dealerTotal = 0;
+  @type('boolean') dealerSoft = false;
   @type('string') turnPlayerId = '';
+  @type('int8') turnHand = -1;
   @type('number') deadline = 0;
   @type('string') roundId = '';
+  @type('uint32') minBet = 0;
+  @type('uint32') maxBet = 0;
+}
+/** A place at a pebolim table (FoosballSlotView in @bar/shared). */
+export class FoosballSlotState extends Schema {
+  @type('uint8') slot = 0;
+  @type('string') team = 'red';
+  @type('string') role = 'solo';
+  @type('string') playerId = '';
+  @type('string') displayName = '';
+  /** Zé do Totó's level when he holds the place, '' otherwise. */
+  @type('string') cpu = '';
+  @type('boolean') ready = false;
+  @type('boolean') connected = true;
+}
+/**
+ * A pebolim table (apps/server/src/minigames/foosball.ts): places, settings, score and phase. The ball and the rods move
+ * too fast for patches: they go as foosball.frame messages, 30 a second, to whoever is near or watching.
+ */
+export class FoosballState extends Schema {
+  @type('string') id = '';
+  @type('string') phase = 'lobby';
+  @type('string') format = '1x1';
+  @type('uint8') goals = 5;
+  @type('uint8') sets = 1;
+  @type('uint32') stake = 0;
+  @type('string') level = 'medio';
+  @type('string') hostId = '';
+  @type([FoosballSlotState]) slots = new ArraySchema<FoosballSlotState>();
+  @type('uint8') red = 0;
+  @type('uint8') blue = 0;
+  @type('uint8') setsRed = 0;
+  @type('uint8') setsBlue = 0;
+  @type('uint8') set = 1;
+  @type('string') serve = 'red';
+  @type('number') deadline = 0;
+  @type('string') matchId = '';
+  @type('string') message = '';
+  @type('string') goalTeam = '';
+  @type('string') goalBy = '';
+  @type('string') goalRod = '';
+  @type('float32') goalSpeed = 0;
+  @type('string') possTeam = '';
+  @type('string') possRod = '';
+  @type('number') possSince = 0;
+  @type('string') winner = '';
+  @type('uint32') minBet = 0;
+  @type('uint32') maxBet = 0;
+  @type('uint32') revision = 0;
 }
 export class EventState extends Schema {
   @type('string') id = '';
@@ -115,15 +190,34 @@ export class EventState extends Schema {
   @type('number') startedAt = 0;
   @type('number') durationMs = 0;
 }
-/** Playback of one YouTube source: the jukebox, or one TV group (separate maps in BarState). */
+/** A video waiting in a source's queue (MediaQueueEntry in packages/shared/src/jukebox.ts). */
+export class MediaEntry extends Schema {
+  @type('string') key='';
+  @type('string') provider='';
+  @type('string') videoId='';
+  @type('string') title='';
+  @type('string') thumb='';
+  @type('string') by='';
+  @type('string') byName='';
+}
+/** Playback of one source: the jukebox, or one TV group (separate maps in BarState); see JukeboxState. */
 export class Jukebox extends Schema {
   @type('string') id='';
+  @type('string') provider='';
   @type('string') videoId='';
   @type('string') status='off';
   @type('number') position=0;
   @type('number') updatedAt=0;
   @type('string') updatedBy='';
   @type('number') revision=0;
+  @type('string') key='';
+  @type('string') title='';
+  @type('string') thumb='';
+  /** Who controls the video playing ('' when nobody does). */
+  @type('string') by='';
+  @type('string') byName='';
+  @type('boolean') live=false;
+  @type([MediaEntry]) queue=new ArraySchema<MediaEntry>();
 }
 /** A hinged door (one or two leaves), open or closed; clients animate the swing from changedAt. */
 export class DoorState extends Schema {
@@ -141,6 +235,19 @@ export class MusicianSpot extends Schema {
   /** When the phase began (server ms). */
   @type('number') startedAt = 0;
   @type('boolean') stopping = false;
+}
+/** A delivery bike (MotoState in packages/shared/src/moto.ts). */
+export class Moto extends Schema {
+  @type('string') id = '';
+  @type('float32') x = 0;
+  @type('float32') y = 0;
+  @type('float32') z = 0;
+  @type('float32') yaw = 0;
+  @type('float32') pitch = 0;
+  @type('float32') speed = 0;
+  @type('float32') steer = 0;
+  /** '' while parked. */
+  @type('string') riderId = '';
 }
 /** The stage show's settings from the light desk (packages/shared/src/stage-show.ts, StageShowState). */
 export class StageShowState extends Schema {
@@ -180,12 +287,14 @@ export class BarState extends Schema {
   @view() @type({ map: Player }) players = new MapSchema<Player>();
   @view() @type({ map: Npc }) npcs = new MapSchema<Npc>();
   @type({ map: TableState }) tables = new MapSchema<TableState>();
+  @type({ map: FoosballState }) foosball = new MapSchema<FoosballState>();
   @type({ map: Jukebox }) jukeboxes = new MapSchema<Jukebox>();
   @type({ map: Jukebox }) televisions = new MapSchema<Jukebox>();
   @type({ map: DoorState }) doors = new MapSchema<DoorState>();
   @type({ map: JobSlotState }) jobs = new MapSchema<JobSlotState>();
   @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
   @type({ map: MusicianSpot }) musicians = new MapSchema<MusicianSpot>();
+  @type({ map: Moto }) motos = new MapSchema<Moto>();
   @type(StageShowState) stageShow = new StageShowState();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;

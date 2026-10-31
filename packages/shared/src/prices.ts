@@ -1,5 +1,7 @@
 import {ITEM_CATALOG,type ItemId} from './inventory.js';
 import {JOBS,JOB_DAILY_CAP,MEDIA_PRICES,STAGE_PASS,type MediaPriceKind} from './economy.js';
+import {BLACKJACK} from './blackjack.js';
+import {FOOSBALL} from './foosball.js';
 
 /**
  * Everything in the game that costs or pays coins, under one key each ("item:coxinha", "media:tv", "job:bar").
@@ -7,7 +9,7 @@ import {JOBS,JOB_DAILY_CAP,MEDIA_PRICES,STAGE_PASS,type MediaPriceKind} from './
  * in the panel's Preços (apps/api/src/pricing-service.ts keeps the overrides). The API answers the effective table to
  * the browser (GET /api/prices) and to the world, which charges and pays with it and tells the players when it changes.
  */
-export type PriceGroup='itens'|'skins'|'midia'|'palco'|'trabalho'|'recompensas';
+export type PriceGroup='itens'|'skins'|'midia'|'palco'|'jogos'|'trabalho'|'recompensas';
 export interface PriceEntry {
   key:string;group:PriceGroup;label:string;
   /** Where the value is used, in the panel's words. */
@@ -20,6 +22,7 @@ export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:
   {id:'skins',label:'Skins',description:'Personagens da coleção. Quem já comprou continua com a skin.'},
   {id:'midia',label:'Jukebox, TVs e telão',description:'Cobrado a cada vídeo novo colocado no aparelho.'},
   {id:'palco',label:'Palco',description:'Ingresso para subir no palco do quintal.'},
+  {id:'jogos',label:'Jogos',description:'Limites de aposta: no blackjack, por mão (dobrar e dividir repetem a aposta); no pebolim, o que cada jogador põe numa partida valendo moedas.'},
   {id:'trabalho',label:'Trabalho',description:'O que o bar paga por tarefa concluída e o teto diário por jogador.'},
   {id:'recompensas',label:'Recompensas',description:'Moedas que entram na economia sem compra: boas-vindas e bônus diário.'},
 ];
@@ -36,6 +39,10 @@ export function priceEntries():readonly PriceEntry[]{
     ...SKIN_PRICES.map(([id,name,price])=>({key:`skin:${id}`,group:'skins' as const,label:name,hint:'Coleção (C)',defaultValue:price,min:0,max:1_000_000})),
     ...(Object.keys(MEDIA_PRICES) as MediaPriceKind[]).map(kind=>({key:`media:${kind}`,group:'midia' as const,label:MEDIA_LABELS[kind],hint:'Por vídeo novo',defaultValue:MEDIA_PRICES[kind],min:0,max:10_000})),
     {key:'stage:pass',group:'palco',label:'Ingresso do palco',hint:`Vale ${STAGE_PASS.durationMs/60_000} minutos`,defaultValue:STAGE_PASS.price,min:0,max:10_000},
+    {key:'blackjack:min-bet',group:'jogos',label:'Aposta mínima do blackjack',hint:'Menor aposta por rodada',defaultValue:BLACKJACK.minBet,min:1,max:100_000},
+    {key:'blackjack:max-bet',group:'jogos',label:'Aposta máxima do blackjack',hint:'Maior aposta por rodada (nunca abaixo da mínima)',defaultValue:BLACKJACK.maxBet,min:1,max:100_000},
+    {key:'foosball:min-bet',group:'jogos',label:'Aposta mínima do pebolim',hint:'Menor valor por jogador numa partida valendo moedas',defaultValue:FOOSBALL.minBet,min:1,max:100_000},
+    {key:'foosball:max-bet',group:'jogos',label:'Aposta máxima do pebolim',hint:'Maior valor por jogador (nunca abaixo da mínima)',defaultValue:FOOSBALL.maxBet,min:1,max:100_000},
     ...JOBS.map(job=>({key:`job:${job.id}`,group:'trabalho' as const,label:job.name,hint:'Pagamento por tarefa',defaultValue:job.pay,min:0,max:1000})),
     {key:'cap:job-daily',group:'trabalho',label:'Teto diário do trabalho',hint:'Máximo que um jogador ganha trabalhando por dia',defaultValue:JOB_DAILY_CAP,min:0,max:1_000_000},
     {key:'reward:initial',group:'recompensas',label:'Moedas de boas-vindas',hint:'Na primeira vez que a conta abre a carteira',defaultValue:0,min:0,max:1_000_000},

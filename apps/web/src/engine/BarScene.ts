@@ -3,7 +3,7 @@ import {SHOP_SPOT, BLACKJACK_SEATS, BLACKJACK_TABLE, DEFAULT_SKIN, INTERACTABLES
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
 import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
-import type { SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
+import type { MapView, SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
@@ -11,6 +11,7 @@ import {MapEffects,type MapEffectsStatus} from './map-effects';
 import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
 import {StageLights,type StageLightsStatus} from './stage-lights';
 import {StageShow,type StageShowStatus} from './stage-show';
+import {type FoosballFrame} from '@bar/shared';
 import {JUKEBOX_SYSTEMS,LIGHT_DESK,STAGE,STAGE_ENTRY,TV_SPOTS,inStageArea,onStage,type JukeboxState,type StageShowState} from '@bar/shared';
 import {MUSICIAN_REACH,MUSICIANS,STAGE_PHASES,musicianPhase,stageSpot,type MusicianState,type StagePhase,type StageSpot} from '@bar/shared';
 import {StageMusicians,musicianState,musicianTime} from './stage-musicians';
@@ -19,6 +20,9 @@ import {BAR_ANIMATIONS,CLEANABLE_TABLES,ITEM_CATALOG,URINALS,barClipMs,seatChair
 import {BarAnimations,barEndOffset,barState} from './bar-animations';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 import {CameraRig,type CameraMode} from './camera-rig';
+import {Motos,seatRider,type Bike} from './moto-delivery';
+import {NO_MOTO_INTENT,type MotoBody,type MotoIntent} from '@bar/shared';
+import {FoosballBalls} from './foosball-balls';
 import {completeBasePose} from './animation-tracks';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
@@ -54,6 +58,8 @@ interface SkinnedRig {
   sitDrop: number;
   /** The drinking hand (the Drink clip lifts with the left), found in the bind pose. */
   drinkHand?: HandRig;
+  /** The other hand, on a bike's right grip. */
+  rightHand?: HandRig;
   /** The Drink clip on the left arm and the neck only (HAND_LAYER), over the body's clip, for a drink in hand. */
   handLayer?: pc.AnimComponentLayer;
   /** The hips, found on first use (the contact shadow follows them during a bar animation). */
@@ -91,6 +97,8 @@ interface Avatar {
   yaw: number;
   /** Seconds of the next glide, instead of the usual: a musician sliding onto a stage spot or stepping off it. */
   glideNext?: number;
+  /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
+  riding?: boolean;
   /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
   contact: pc.Entity;
   covered?: { x: number; z: number; value: boolean };
@@ -213,6 +221,11 @@ export class BarScene {
   private stageState?:JukeboxState;
   /** Lasers, moving heads and the strobe while something plays on the stage (stage-show.ts), and the spots it watches. */
   private readonly stageShow:StageShow;
+  /** The balls of the pebolim matches on the games hall's tables (foosball-balls.ts). */
+  private readonly foosballBalls:FoosballBalls;
+  /** The delivery bikes (moto-delivery.ts), and whether the camera is following the local player on one. */
+  private readonly motos:Motos;
+  private chasing=false;
   private stageSpots:MusicianState[]=[];
   /** The light desk's settings for the show (BarState.stageShow), and whether its panel has the camera on the stage. */
   private showDesk?:StageShowState;
@@ -324,6 +337,8 @@ export class BarScene {
     this.buildPartyLighting();
     this.environment.addPartyShadows(this.partyLights);
     this.stageShow=new StageShow(this.app);
+    this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
+    this.motos=new Motos(this.app,root=>this.contactShadow(root));
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
     for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.screens.includes(tv.id))))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
@@ -454,9 +469,9 @@ export class BarScene {
   /** Where a prop of a bar animation is now, and where a map chair is drawn (tests and debugging). */
   barProp(actorId:string,name:string):number[]|undefined {return this.barAnimations?.propPosition(actorId,name);}
   barChair(seatId:string):number[]|undefined {const index=seatChair(seatId);return index===undefined?undefined:this.barAnimations?.chairPosition(index);}
-  /** Seconds of the jukebox's video, known by the local YouTube player (0 while loading): paces its colours. */
+  /** Seconds of the jukebox's video, known by the local player (0 while loading): paces its colours. */
   setJukeboxDuration(seconds:number):void {this.jukeboxDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
-  /** Seconds of the telão's video, known by the local YouTube player (0 while loading): paces the stage's colours. */
+  /** Seconds of the telão's video, known by the local player (0 while loading): paces the stage's colours. */
   setStageDuration(seconds:number):void {this.stageDuration=Number.isFinite(seconds)&&seconds>0?seconds:0;}
   /** The local player is near a musician's spot: fetch its clips now, so taking it starts at once. */
   preloadMusician(spot:string):void {this.musicians?.preload(spot);}
@@ -603,7 +618,7 @@ export class BarScene {
     this.hiddenHead = head;
     head?.setLocalScale(HIDDEN_HEAD, HIDDEN_HEAD, HIDDEN_HEAD);
     // The ring at the feet is for finding yourself from behind.
-    if (player) player.ring.enabled = !head;
+    if (player) player.ring.enabled = !head && !player.riding;
   }
 
   /** The phone's front camera: at arm's length in front of the face, looking back at it, until switched off. */
@@ -671,6 +686,36 @@ export class BarScene {
     return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw };
   }
 
+  /**
+   * The minimap (minimap.ts): everyone where they are drawn (smoother than the room's 10 Hz positions), the local avatar's
+   * heading and the camera's, in radians.
+   */
+  mapView(): MapView | undefined {
+    const self = this.actors.get(this.localId);
+    if (!self) return undefined;
+    const p = self.root.getPosition(), others: MapView['others'] = [];
+    for (const [id, avatar] of this.actors) {
+      if (id === this.localId) continue;
+      const q = avatar.root.getPosition();
+      others.push({ id, x: q.x, y: q.y, z: q.z, npc: avatar.npc });
+    }
+    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others };
+  }
+
+  /** The bike the local player rides, as predicted (networking.ts). */
+  predictMoto(id: string, body: MotoBody | undefined): void { this.motos.predict(id, body); }
+  /** W/S: throttle, brake and reverse; A/D: +1 is right; Space: the handbrake. */
+  getMotoInput(): MotoIntent {
+    if (!this.enabled || this.inputHasFocus() || document.hidden) return NO_MOTO_INTENT;
+    const held = (...codes: string[]) => Number(codes.some(code => this.keys.has(code)));
+    return { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space') };
+  }
+  getMotos() {
+    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted }) => ({ id: state.id, riderId: state.riderId, speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
+      position: [entity.getPosition().x, entity.getPosition().y, entity.getPosition().z], yaw: drawn.yaw, front: [-entity.forward.x, -entity.forward.y, -entity.forward.z], rig: rig.telemetry(),
+      points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna'].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
+  }
+
   getInput(): SceneInput {
     // A debug run of a bar animation holds the player, as the room would.
     if (!this.enabled || this.inputHasFocus() || document.hidden || this.barOverrides.has(this.localId)) {
@@ -696,6 +741,7 @@ export class BarScene {
     this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
     this.stageState=world.televisions?.telao;
     this.stageSpots=Object.values(world.musicians??{});
+    this.motos.sync(world.motos);
     this.showDesk=world.stageShow;
     for(const door of this.doorLeaves){
       const state=world.doors?.[door.leaf.group];if(!state)continue;
@@ -706,7 +752,7 @@ export class BarScene {
     this.updateState({
       players: Object.values(world.players).map(player => {
         const seat=world.tables[player.currentTableId]?.seats.find(seat => seat.playerId === player.id);
-        return { ...player, animation: player.animationState,cardResult:seat?.result,cardCount:seat?.cards.length??0,musician:musicians.get(player.id) };
+        return { ...player, animation: player.animationState,cardResult:seat?.result,cardCount:seat?.hands.reduce((most,hand)=>Math.max(most,hand.cards.length),0)??0,musician:musicians.get(player.id) };
       }),
       npcs: Object.values(world.npcs).map(npc => ({ ...npc, animation: npc.animationState, role: npc.behavior })),
       event: world.event,
@@ -779,6 +825,9 @@ export class BarScene {
     if(id){this.enabled=false;this.app.autoRender=true;}
     this.app.renderNextFrame=true;
   }
+
+  /** A frame of a pebolim match (foosball.frame): its ball runs on the 3D table for whoever is near. */
+  foosballFrame(frame:FoosballFrame):void {this.foosballBalls.frame(frame);}
 
   /**
    * The light desk's view: the camera out in the backyard looking at the stage, so its panel's changes show; dragging turns
@@ -909,6 +958,7 @@ export class BarScene {
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
     this.musicians?.destroy();this.musicians=undefined;
     this.barAnimations?.destroy();this.barAnimations=undefined;
+    this.foosballBalls.destroy();
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
@@ -1186,6 +1236,7 @@ export class BarScene {
     }
     if(id)this.attachCane(skin,id);
     skin.drinkHand=findHand(entity,'l');
+    skin.rightHand=findHand(entity,'r');
     return skin;
   }
 
@@ -1391,6 +1442,7 @@ export class BarScene {
     for (const avatar of this.actors.values()) for (const render of avatar.root.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
     for (const entry of this.servedItems.values()) if (entry.entity) for (const render of entry.entity.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
     if (this.barAnimations) yield* this.barAnimations.casters();
+    yield* this.motos.casters();
   }
 
   /** A soft dark disc on the floor under an avatar (the lamps' shadow maps leave people out). */
@@ -1571,7 +1623,7 @@ export class BarScene {
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
-      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use'
+      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'ride' ? 'Sit'
       : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
@@ -1625,7 +1677,8 @@ export class BarScene {
     }
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
-      if (SEATED_CLIPS.includes(clip)) {
+      // (On a bike seatRider puts the hips on its seat, wherever it is.)
+      if (SEATED_CLIPS.includes(clip) && action !== 'ride') {
         // The skins have different pelvis-to-thigh offsets; anchor the actual hip joints to the chair.
         const hipY = (bones.upperleg_l.getPosition().y + bones.upperleg_r.getPosition().y) / 2;
         body.setLocalPosition(0,(actor.y??0)+0.56-hipY,0);
@@ -1769,6 +1822,8 @@ export class BarScene {
     this.frameId++;
     this.barPlayed.clear();
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    this.motos.update(dt);
+    this.placeRiders();
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
     // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
@@ -1804,8 +1859,11 @@ export class BarScene {
       this.camera.lookAt(head.x, head.y + .02, head.z);
       this.rig.idle();
     } else if (player && this.enabled) {
+      const bike = this.motos.ridden(this.localId);
+      if (!!bike !== this.chasing) { this.chasing = !!bike; this.rig.ride(this.chasing); }
+      if (bike) this.rig.chase(bike.drawn.yaw, dt);
       // Drunk view: the camera rolls slowly (more with each stage).
-      this.rig.follow(dt, { feet: player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
+      this.rig.follow(dt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
         roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
@@ -1818,6 +1876,7 @@ export class BarScene {
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
     this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
     const serverNow=Date.now()+this.serverClockOffset;
+    this.foosballBalls.update(serverNow);
     this.stageShow.update(dt,{stage:this.stageLive(serverNow),desk:this.showDesk,serverNow,camera:this.camera,height:this.app.graphicsDevice.height,daylight:this.environment.daylight});
     // The telão darkens under the laser's drawings.
     this.televisions.get('telao')?.setDim(this.stageShow.screenDim);
@@ -1830,6 +1889,24 @@ export class BarScene {
     }
     this.discoBall.rotate(0, dt * (8+party*62), 0);
     this.callbacks.onMediaFrame?.();
+  }
+
+  /** Whoever rides a bike goes where it is drawn, in the riding pose; off it, the avatar's own shadow comes back. */
+  private placeRiders(): void {
+    for (const [id, avatar] of this.actors) {
+      const bike = avatar.skin && avatar.actor.animation === 'ride' ? this.motos.ridden(id) : undefined;
+      if (!!bike !== !!avatar.riding) { avatar.riding = !!bike; avatar.contact.enabled = !bike; }
+      if (!bike || !avatar.skin) continue;
+      this.seat(avatar, avatar.skin, bike);
+      avatar.yaw = bike.drawn.yaw * RAD_TO_DEG;
+      if (id === this.localId) this.lastRotation = bike.drawn.yaw;
+    }
+  }
+  private seat(avatar: Avatar, skin: SkinnedRig, bike: Bike): void {
+    const hip = skin.hip ??= (skin.model.findByName('hip') as pc.Entity | null) ?? undefined;
+    if (!hip) return;
+    avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
+    seatRider(bike.rig, { root: avatar.root, hip, spine: avatar.spine, ...skin.bones, handRigL: skin.drinkHand, handRigR: skin.rightHand });
   }
 
   /** Something plays on the stage: a video on the telão, or a musician at a spot. */
@@ -1853,7 +1930,7 @@ export class BarScene {
       if (!this.enabled || this.inputHasFocus()) return;
       // Let a focused interface button receive its native keyboard activation.
       if ((event.code === 'Enter' || event.code === 'Space') && document.activeElement?.tagName === 'BUTTON') return;
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code) || (event.code === 'Space' && this.chasing)) {
         event.preventDefault(); this.keys.add(event.code);
       }
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }

@@ -34,7 +34,7 @@ export interface WorldSnapshot {
   waiter:{phase:string;current?:WorldOrder;queue:WorldOrder[]};counterQueue:string[];
   jobs:Array<{id:string;name:string;slots:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number;orders?:Array<{customer:string;table:number;picked:boolean}>}>;pay:number;enabled:boolean;tasks?:number;paid?:number}>;
   dirtyTables?:number[];
-  media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number}>;
+  media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number;title:string;by:string;live:boolean;queue:Array<{key:string;videoId:string;title:string;byName:string}>}>;
   bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
     status?:{walking:number;doing:Array<[string,number]>;rttP95?:number;loopP95?:number;inputs?:number;refusals?:Array<[string,number]>}};
   process?:{uptimeS:number;node:string;pid:number;rss:number;heapUsed:number;tickP95?:number;apiOkAt:number;outboxWritable:boolean};

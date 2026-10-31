@@ -201,7 +201,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 /* Ações: a hotbar along the bottom. Icon tiles of the list's language (white when on, quiet hover) with the key in the
    corner; the name shows above a tile on hover or keyboard focus. The heading is a thin strip at the left: grip and collapse. */
 .game>[data-panel=actions]{flex-direction:row}
+/* Clear of the minimap and its cores (bottom left), whatever the width. */
 @media(min-width:761px){.game>[data-panel=actions]{width:max-content!important;max-width:calc(100vw - 380px)}}
+@media(min-width:1101px){.game>[data-panel=actions]{max-width:calc(100vw - 420px)}}
 /* Shorter than the buttons' row, so the row sets the hotbar's height. */
 [data-panel=actions] .panel-heading{flex-direction:column;justify-content:space-between;gap:2px;padding:4px 3px;border-right:1px solid var(--border)}
 [data-panel=actions] .panel-heading>h2,[data-panel=actions] .panel-heading>.ui-icon{display:none}
@@ -217,10 +219,31 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 .action-bar .hud-btn:hover .tip,.action-bar .hud-btn:focus-visible .tip{opacity:1}
 .action-bar [aria-pressed=true],.action-bar [aria-pressed=true]:hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
 .action-bar [aria-pressed=true] kbd{color:var(--active-foreground)}
-/* Papo no Balcão */
-.messages{height:190px;overflow-y:auto;overflow-wrap:anywhere;padding-right:4px;font-size:14px}
-.chat-welcome{font:400 11px/1.6 var(--font-mono);color:var(--muted-foreground);margin-bottom:12px}
-.chat-line{margin-bottom:6px;line-height:1.45;color:var(--soft)}
+/* Papo no Balcão, by the right side halfway down. Idle, only its lines over the scene (no panel; a shadow under the text,
+   older lines fading towards the top) and a quiet header with the button that hides it. T or Enter opens the box (panel,
+   field and footer) to read back and type; Esc or sending closes it. The field keeps its room while hidden, so opening
+   it moves nothing, and idle lines let the pointer through to the scene. */
+.game>[data-panel=chat]{background:transparent;transition:background-color .18s}
+.game>[data-panel=chat]::before{opacity:0;transition:opacity .18s}
+[data-panel=chat] .hud-content{border-top-color:transparent;transition:border-color .18s}
+[data-panel=chat] .panel-heading{opacity:.75;text-shadow:0 1px 6px oklch(0 0 0 / 90%);transition:opacity .18s}
+[data-panel=chat] .panel-heading h2{font-size:12px;letter-spacing:.16em}
+[data-panel=chat] .panel-heading>.ui-icon{filter:drop-shadow(0 1px 4px oklch(0 0 0 / 80%))}
+[data-panel=chat]:hover .panel-heading,[data-panel=chat].chat-open .panel-heading{opacity:1}
+[data-panel=chat]:not(.chat-open) :is(#chat-form,.panel-foot){visibility:hidden}
+[data-panel=chat]:not(.chat-open) .chat-welcome{display:none}
+[data-panel=chat]:not(.chat-open) .messages{overflow:hidden;pointer-events:none;mask-image:linear-gradient(transparent,#000 32%)}
+.game>[data-panel=chat].chat-open{background:var(--panel)}
+.game>[data-panel=chat].chat-open::before{opacity:1}
+[data-panel=chat].chat-open .hud-content{border-top-color:var(--border)}
+/* The newest line at the bottom, by the field (auto margins keep the history scrollable, unlike flex-end). */
+.messages{display:flex;flex-direction:column;height:210px;overflow-y:auto;overflow-wrap:anywhere;padding-right:4px;font-size:14px}
+.chat-welcome{font:400 11px/1.6 var(--font-mono);color:var(--muted-foreground);margin:auto 0 12px}
+[data-panel=chat]:not(.chat-open) .chat-welcome+.chat-line{margin-top:auto}
+.chat-line{margin-bottom:6px;line-height:1.45;color:var(--soft);text-shadow:0 1px 2px oklch(0 0 0 / 95%),0 0 10px oklch(0 0 0 / 75%)}
+[data-panel=chat]:not(.chat-open) .chat-line{color:var(--foreground)}
+.chat-line.fresh{animation:chat-in .35s ease-out}
+@keyframes chat-in{from{opacity:0;translate:16px 0}}
 .chat-line b{color:var(--vw-cyan);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:12px}
 .chat-line b::after{content:' '}
 .chat-line.system b{color:var(--vw-lilac)}
@@ -230,6 +253,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 #chat-form .hud-btn{padding:0 12px;background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
 #chat-form .hud-btn:hover{background:var(--vw-pink)}
 #chat-form .ui-icon{width:16px;height:16px}
+/* A message arrived while the chat was hidden: a dot on the hotbar's Resenhar. */
+.action-bar [data-action=chat][data-unread]::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--hl-magenta);box-shadow:0 0 8px var(--hl-magenta)}
 
 /* Over the scene: the key prompts (E near something, P seated) side by side above the hotbar, with what is being
    consumed above them (needs.css), event, connection and the waiting screen */
@@ -314,34 +339,7 @@ body:has(.dev-mail) .key-hints{padding-bottom:44px}body:has(#game:not(.hidden)) 
 .dev-mail{position:fixed;bottom:6px;right:10px;z-index:200;display:flex;align-items:center;gap:6px;padding:5px 9px;background:var(--panel);font:400 10px var(--font-mono);text-transform:uppercase;color:var(--muted-foreground)}
 .dev-mail .ui-icon{width:12px;height:12px}
 .dev-mail:hover{color:var(--foreground)}
-/* Blackjack */
-.blackjack{position:absolute;right:18px;top:82px;width:375px;max-height:calc(100dvh - 105px);overflow:auto;z-index:80;pointer-events:auto;padding:16px 18px}
-.blackjack-heading{display:flex;align-items:center;justify-content:space-between;font:400 11px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--vw-pink)}
-.blackjack-heading>span{display:flex;align-items:center;gap:8px}
-.blackjack-heading .ui-icon{width:14px;height:14px}
-.blackjack-heading button{display:grid;place-items:center;width:28px;height:28px;color:var(--muted-foreground)}
-.blackjack-heading button:hover{background:var(--secondary);color:var(--foreground)}
-.blackjack h2{font-size:20px;margin:10px 0 16px}
-.dealer-row{display:flex;align-items:center;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
-.dealer-row small{display:block;font:400 10px var(--font-mono);letter-spacing:.2em;color:var(--muted-foreground)}
-.dealer-row b{font:500 26px var(--font-mono)}
-.cards{display:flex;gap:6px;flex-wrap:wrap}
-.playing-card{display:flex;flex-direction:column;justify-content:space-between;width:42px;height:58px;padding:4px;background:oklch(.95 .01 300);color:oklch(.16 .01 300);font:700 15px/1 var(--font-display);border-radius:2px}
-.playing-card.red{color:oklch(.55 .17 10)}
-.playing-card.face-down{display:grid;place-items:center;background:repeating-linear-gradient(45deg,oklch(.8 .09 350 / 55%) 0 3px,oklch(.2 .03 300) 3px 7px);border:1px solid var(--vw-pink);color:var(--foreground)}
-.playing-card i{font-style:normal;align-self:end}
-.empty-cards{font:400 11px var(--font-mono);color:var(--muted-foreground)}
-.table-seats{display:grid;grid-template-columns:1fr 1fr;gap:1px;padding:16px 0}
-.table-seat{min-width:0;padding:10px;background:oklch(1 0 0 / 3%)}
-.table-seat.active{outline:1px solid var(--hl-magenta);outline-offset:-1px}
-.seat-name{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px}
-.seat-name b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
-.seat-name span{font-family:var(--font-mono)}
-.table-seat small{display:block;margin-top:7px;font:400 10px var(--font-mono);text-transform:uppercase;color:var(--muted-foreground)}
-.cards.small .playing-card{width:29px;height:42px;font-size:11px;padding:3px}
-.table-actions{display:flex;gap:1px}
-.table-actions .button{flex:1;padding:10px 8px;font-size:12px}
-.table-footer{display:flex;justify-content:space-between;gap:10px;margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font:400 11px var(--font-mono);color:var(--muted-foreground)}
+/* Blackjack: apps/web/src/blackjack/blackjack.css */
 /* Mochila (I) */
 /* The space in use over its track, the slots (a game inventory: the empty ones show too) and the chosen item's card. */
 .inventory-summary{margin-bottom:16px}
@@ -468,12 +466,12 @@ button.inventory-slot:hover{background:var(--secondary)}
   .messages{height:clamp(60px,calc(100dvh - 620px),140px)}
   .action-bar{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr))}
   .action-bar .hud-btn{width:auto}
-  .prompts{bottom:146px}
+  /* Over the minimap and the cores on its rim. */
+  .prompts{bottom:264px}
   .context{padding:8px 12px 8px 8px}
   .context b{font-size:12px}
   .event-banner{top:104px;width:330px;max-width:calc(100vw - 24px)}
   .event-banner b{font-size:15px}
-  .blackjack{top:104px;left:10px;right:10px;width:auto;max-height:calc(100dvh - 130px)}
   .toasts{top:104px;width:calc(100vw - 24px)}
   .dev-mail{bottom:2px;right:6px;font-size:8px}
 }
@@ -486,7 +484,7 @@ button.inventory-slot:hover{background:var(--secondary)}
   #chat-form{margin-top:4px}
   #chat-input{min-height:34px;height:34px;padding:5px 8px;font-size:12px}
   .action-bar .hud-btn{height:38px}
-  .prompts{bottom:128px}
+  .prompts{bottom:230px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 /* The player card (apps/web/src/player-card.ts): the number to save and the Highgram. */

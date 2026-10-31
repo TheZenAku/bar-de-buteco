@@ -36,6 +36,8 @@ const BODY_CENTRE=.95,WINDOW_RADIUS=.8,FLOOR_KEPT=.12;
 const SIGHT=[1.6,1.1,.6];
 // Continuous wheel travel: fine control near the player, proportional zoom further out, including fractional pixels.
 const ZOOM_RATE=.001;
+// On a bike the view swings behind it this fast (per second), this low (radians), this long (seconds) after the mouse let go.
+const CHASE_TURN=3.2,CHASE_PITCH=.3,CHASE_AFTER_DRAG=1.5;
 /** Exponential smoothing: the part of the way covered in `dt` seconds at `rate` per second. */
 const ease=(rate:number,dt:number)=>1-Math.exp(-rate*dt);
 
@@ -61,6 +63,9 @@ export class CameraRig {
   private eyeSet=false;
   private xrayOpen=0;
   private readonly xray:CameraXray;
+  /** Riding a bike: the view and the elevation to give back getting off, and how long ago the mouse last turned the view. */
+  private beforeRide?:{mode:CameraMode;pitch:number};
+  private sinceDrag=0;
   private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),up:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3()};
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
@@ -92,8 +97,23 @@ export class CameraRig {
   }
   /** Dragging the mouse: sideways turns, up and down looks up and down (the boom rises as the view looks down). */
   drag(dx:number,dy:number):void {
+    this.sinceDrag=0;
     this.yawGoal-=dx*.006;
     this.pitchGoal+=dy*.004;
+  }
+
+  /** Getting on a bike: third person, behind it (chase); getting off: the view the player had. */
+  ride(on:boolean):void {
+    if(on&&!this.beforeRide){this.beforeRide={mode:this.mode,pitch:this.pitchGoal};this.mode='third';this.sinceDrag=CHASE_AFTER_DRAG;}
+    else if(!on&&this.beforeRide){this.mode=this.beforeRide.mode;this.pitchGoal=this.beforeRide.pitch;this.beforeRide=undefined;}
+  }
+  /** Swings the view behind the bike's heading (radians), unless the mouse has just looked somewhere else. */
+  chase(heading:number,dt:number):void {
+    this.sinceDrag+=dt;
+    if(this.sinceDrag<CHASE_AFTER_DRAG)return;
+    const behind=heading+Math.PI,turn=Math.atan2(Math.sin(behind-this.yawGoal),Math.cos(behind-this.yawGoal));
+    this.yawGoal+=turn*ease(CHASE_TURN,dt);
+    this.pitchGoal+=(CHASE_PITCH-this.pitchGoal)*ease(2,dt);
   }
 
   /** Places the camera behind or in the eyes of `subject`, and sets the x-ray window for this frame. */

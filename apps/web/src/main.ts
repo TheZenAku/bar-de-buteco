@@ -9,7 +9,7 @@ import {createFullscreen} from './fullscreen';
 import './lobby-hero.css';
 import {createHudPanels} from './hud-panels';
 import {createNotifications} from './notifications';
-import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type PlayerCard,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type BlackjackTable,type Card,type InventoryView,type ItemId} from '@bar/shared';
+import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type PlayerCard,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene,BLIP_RADIUS} from './engine/BarScene';
 import {CAMERA_LABELS,CAMERA_MODES,isCameraMode} from './engine/camera-rig';
@@ -29,13 +29,18 @@ import {VOICE} from '@bar/shared';
 import './voice.css';
 import './needs.css';
 import {createNeedsHud} from './needs-hud';
+import './minimap.css';
+import {createMinimap} from './minimap';
 import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
+import {NO_MOTO_INTENT,isRidingMoto,nearestFreeMoto} from '@bar/shared';
 import {JOBS,canInteract as touching,stationInteractable,consumedOverTime,consumeMs,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
 import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal} from './economy-ui';
 import './economy.css';
 import {createObjectiveBlip} from './objective-blip';
 import {createConsumingHud} from './consuming-hud';
+import {createBlackjackTable} from './blackjack/table';
+import {createFoosballPanel} from './foosball/panel';
 import {consumptions} from './consumption';
 import {createPhone} from './phone/phone';
 import {playerCardHtml} from './player-card';
@@ -50,7 +55,19 @@ const hud=createHudPanels($('#game'));
 const notices=createNotifications($('#toasts'));
 createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
+const minimap=createMinimap($('#game'));
 const consumingHud=createConsumingHud($('#consuming'));
+// The blackjack table's panel (blackjack/table.ts): it draws the room's table and sends bets and decisions.
+const blackjackUi=createBlackjackTable($('#blackjack'),{send:(type,payload)=>network.send(type,payload),now:()=>serverNow(),
+  balance:()=>wardrobe?.balance??inventory?.balance,volume:()=>settings.get().master,notify:(text,error)=>toast(text,error)});
+// The pebolim panel (foosball/panel.ts): the table of the place taken, or of the one watched from beside it (foosballWatching).
+const foosballUi=createFoosballPanel($('#foosball'),{send:(type,payload)=>network.send(type,payload),now:()=>serverNow(),
+  balance:()=>wardrobe?.balance??inventory?.balance,volume:()=>settings.get().master,notify:(text,error)=>toast(text,error),
+  closed:()=>{foosballWatching='';renderWorld();}});
+let foosballWatching='';
+/** At a pebolim table (playing or watching): the panel takes the keys and the mouse, so the scene steps aside. */
+const atFoosball=()=>!$('#foosball').classList.contains('hidden');
+const sceneActive=()=>inGame&&connected&&!activeModal&&!atFoosball();
 // The backpack item last asked for: the room syncs a drink's prop, not which item a quick use is.
 let usedItem='';
 // What was in hand the last time the backpack was drawn (its Usar buttons wait for an empty hand).
@@ -62,7 +79,7 @@ const serverNow=()=>Date.now()+serverClockOffset;
 let inGame=false,connected=false,authMode:'login'|'register'|'forgot'|'reset'='login';
 let emailVerificationRequired=true;
 let checkingSession=true;
-let resetToken='',activeModal='',tableKey='',peopleKey='',blocked=new Set<string>();
+let resetToken='',activeModal='',peopleKey='',blocked=new Set<string>();
 // The people window: its tab, the player's round statistics (fetched when the account tab opens) and the connection.
 let peopleTab:'people'|'account'='people',accountStats:{gamesPlayed:number;wins:number;losses:number;draws:number}|undefined;
 let netStatus='Conectando…',netPing='— ms';
@@ -97,7 +114,7 @@ const television=new TelevisionController({send:(type,payload)=>network.send(typ
   screen:(id,visible)=>scene?.showTelevision(id,visible),ambient:ambientFor('tv'),mix});
 const media:MediaController[]=[jukebox,television];
 const tvBack=document.createElement('button');tvBack.id='leave-tv';tvBack.className='button secondary';tvBack.textContent='Voltar ao jogo · Esc';tvBack.hidden=true;tvBack.onclick=()=>stopWatchingTv();app.append(tvBack);
-function stopWatchingTv():void {watchingTv=false;document.body.classList.remove('watching-tv');tvBack.hidden=true;scene?.watchTelevision();scene?.setEnabled(inGame&&connected&&!activeModal);}
+function stopWatchingTv():void {watchingTv=false;document.body.classList.remove('watching-tv');tvBack.hidden=true;scene?.watchTelevision();scene?.setEnabled(sceneActive());}
 function openJukebox(id:string):void {
   if(!inGame||!connected||!world?.jukeboxes?.[id])return;
   stopWatchingTv();showModal('JUKEBOX',mediaPriceNote('jukebox',id,inventory?.balance)+jukebox.panelHtml(id),'jukebox');jukebox.attachPanel($('#modal-content'));
@@ -136,8 +153,12 @@ function renderAuth(message=''):void {
   if(checkingSession){$('#lobby-account').querySelectorAll<HTMLInputElement|HTMLButtonElement>('input,button').forEach(control=>control.disabled=true);if(!message)authMessage('Verificando sua conta…');}
 }
 function authMessage(message:string,error=false):void {const node=$('#auth-message');node.className=`form-message ${error?'error':''}`;node.textContent=message;}
-function setChatOpen(open:boolean):void {if(open)hud.open('chat');else hud.collapse('chat',true);}
-function focusChat():void {setChatOpen(true);$('#chat-input').focus();}
+/** T, Enter and Resenhar: shows the chat if hidden and opens its box (a hidden field cannot take the focus, so first). */
+function focusChat():void {
+  hud.open('chat');const panel=$('[data-panel="chat"]'),input=$('#chat-input');
+  panel.classList.add('chat-open');input.focus();
+  if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
+}
 function showModal(title:string,content:string,type:string):void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
@@ -159,6 +180,8 @@ function closeModal():void {closeDesk();modalGeneration++;media.forEach(m=>m.det
 
 const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
+  motoInput:()=>scene?.getMotoInput()??NO_MOTO_INTENT,
+  moto:(id,body)=>scene?.predictMoto(id,body),
   skin:savedSkin,
   position:position=>scene?.setLocal(position),
   state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);media.forEach(m=>m.setWorld(state,user!.id,connected));desk?.update(state.stageShow);renderWorld();},
@@ -177,7 +200,7 @@ const network=new BarNetwork({
   inventoryResult:()=>{},
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
-    renderBalance();
+    renderBalance();blackjackUi.refresh();foosballUi.refresh();
     if(change.reason==='job'&&change.delta)notices.show({variant:'acao',title:'Trabalho feito',text:`+${change.delta} moedas na carteira.`});
     if(change.reason==='refund'&&change.delta)notices.show({variant:'acao',title:'Estorno',text:`${change.delta} moedas voltaram para a carteira.`});
   },
@@ -200,16 +223,21 @@ const network=new BarNetwork({
   phoneCall:call=>phone.call(call),
   phonePing:ping=>phone.ping(ping),
   phoneVideo:bytes=>phone.videoFrame(bytes),
+  foosballOpen:({tableId,watching,reason})=>{foosballWatching=watching?tableId:'';if(watching&&reason)notices.show({variant:'aviso',title:'Pebolim',text:`${reason}`});renderWorld();},
+  foosballFrame:frame=>{foosballUi.frame(frame);scene?.foosballFrame(frame);},
   removed:(kind,reason)=>{void leaveBar().then(()=>{
     if(kind==='ban'){user=undefined;renderAuth();authMessage(`Conta banida. ${reason} Peça a um administrador para remover o banimento.`,true);}
     else authMessage(`Você foi expulso desta participação. ${reason} Sua conta não está banida; pode entrar novamente.`,true);
   });},
-  chat:message=>{if(!inGame||!user)return;chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat();},
+  chat:message=>{
+    if(!inGame||!user)return;chatHistory.push(message);if(chatHistory.length>100)chatHistory.shift();renderChat(true);
+    if(hud.isHidden('chat')&&message.playerId!==user.id&&!blocked.has(message.playerId))$('[data-action="chat"]').toggleAttribute('data-unread',true);
+  },
   // A media panel waiting for its own command shows the refusal itself.
   error:message=>{if(!media.some(m=>m.reject(message)))toast(message,true);},
   ping:ms=>{netPing=`${ms} ms`;renderNet();},
   status:(message,isConnected)=>{
-    connected=isConnected;scene?.setEnabled(inGame&&connected&&!activeModal);audio.setActive(inGame&&connected);
+    connected=isConnected;scene?.setEnabled(sceneActive());audio.setActive(inGame&&connected);
     if(!isConnected&&watchingTv)stopWatchingTv();media.forEach(m=>m.setWorld(world,user?.id??'',connected));
     if(!isConnected)phone.disconnected();
     netStatus=isConnected?'Na área!':'Reconectando…';renderNet();
@@ -268,16 +296,26 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   if(leavingPromise)return leavingPromise;
   const task=(async()=>{
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
-  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
-  $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');tableKey='';closeModal();renderAuth();
+  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
   leavingPromise=tracked;return tracked;
 }
-function renderChat():void {
+/** `arrived`: the last line is a message that just came in (it slides in). */
+function renderChat(arrived=false):void {
   const messages=$('#messages');const atBottom=messages.scrollHeight-messages.scrollTop-messages.clientHeight<50;
-  messages.innerHTML='<div class="chat-welcome">A conversa só chega a quem está por perto.<br>Uma boa noite começa com um oi.</div>'+chatHistory.filter(m=>!blocked.has(m.playerId)).map(m=>`<div class="chat-line ${m.system?'system':''}"><b>${e(m.displayName)}</b><span>${e(m.text)}</span></div>`).join('');
-  if(atBottom)messages.scrollTop=messages.scrollHeight;
+  const lines=chatHistory.filter(m=>!blocked.has(m.playerId));
+  messages.innerHTML='<div class="chat-welcome">A conversa só chega a quem está por perto.<br>Uma boa noite começa com um oi.</div>'+lines.map((m,i)=>`<div class="chat-line${m.system?' system':''}${arrived&&i===lines.length-1&&m===chatHistory.at(-1)?' fresh':''}"><b>${e(m.displayName)}</b><span>${e(m.text)}</span></div>`).join('');
+  if(atBottom||!$('[data-panel="chat"]').classList.contains('chat-open'))messages.scrollTop=messages.scrollHeight;
+}
+/**
+ * Papo no Balcão: idle, only its lines over the scene; focusChat opens the box (panel, field) and it closes once the focus
+ * leaves the chat (Esc, sending, a click on the scene), back at the newest line.
+ */
+{
+  const panel=$('[data-panel="chat"]'),messages=$('#messages');
+  panel.addEventListener('focusout',event=>{if(!panel.contains(event.relatedTarget as Node|null)){panel.classList.remove('chat-open');messages.scrollTop=messages.scrollHeight;}});
 }
 /** The wallet in the money panel; written only when it changes, since the room's patches call this ten times a second. */
 function renderBalance():void {const node=$('#hud-balance'),text=wardrobe?wardrobe.balance.toLocaleString('pt-BR'):'…';if(node.textContent!==text)node.textContent=text;}
@@ -293,21 +331,29 @@ function renderWorld():void {
   $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
   const station=jobStation(),atStation=!!station&&!!self&&!self.interactionState&&!self.currentTableId&&touching(stationInteractable(station),self);
   const interaction=self?nearestObject(self):undefined;
+  const moto=self&&!interaction&&!atStation?freeMotoNear(self):undefined;
   // Near a free spot on the stage: its clips download now, so taking it starts without a wait.
   if(interaction?.type==='musician')scene?.preloadMusician(interaction.spot!);
   const context=$('#context');
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
   $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
-  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation));
-  $('#context-label').textContent=self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||'';
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto));
+  $('#context-label').textContent=isRidingMoto(self?.interactionState)?'para descer':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':'');
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   $('#event-banner').classList.toggle('hidden',!event?.type);
   if(event?.type)$('#event-banner').innerHTML=`<span class="event-spark">${uiIcon('party')}</span><div><small>Aconteceu no bar</small><b>${eventName[event.type]}</b></div><span class="event-time">${Math.max(0,Math.ceil((event.startedAt+event.durationMs-serverNow())/1000))}s</span>`;
   const table=self?.currentTableId?world.tables[self.currentTableId]:undefined;
   $('#blackjack').classList.toggle('hidden',!table);
-  if(table){const key=JSON.stringify(table);if(key!==tableKey){tableKey=key;renderBlackjack(table);}}
-  else tableKey='';
+  if(table)blackjackUi.update(table,user!.id);
+  else blackjackUi.reset();
+  // Pebolim: the table of the place taken; else the one watched (until the player walks away from it).
+  const seatedAt=self?.interactionState?.startsWith('foosball:')?self.interactionState.slice('foosball:'.length):'';
+  if(seatedAt)foosballWatching='';
+  const foosballId=seatedAt||foosballWatching,foosball=foosballId?world.foosball?.[foosballId]:undefined,wasOpen=atFoosball();
+  $('#foosball').classList.toggle('hidden',!foosball);
+  if(foosball)foosballUi.update(foosball,user!.id,!seatedAt);else if(wasOpen)foosballUi.reset();
+  if(wasOpen!==!!foosball)scene?.setEnabled(sceneActive());
   if(activeModal==='people')renderPeopleContent();
   const hand=inHand()??'';if(hand!==handShown){handShown=hand;renderInventory();}
   if(activeModal==='admin')renderAdminPosition();
@@ -325,7 +371,8 @@ let jobPanelKey='';
 function renderJobCard():void {
   const task=inGame?jobTask:null,self=world?.players[user?.id??''],station=jobStation();
   // The objective marker exists only here: the room sends the task to its worker alone, so nobody else can draw it.
-  scene?.setObjective(task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z}:null);
+  const objective=task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z}:null;
+  scene?.setObjective(objective);minimap.setObjective(objective);
   if(!task){jobPanelKey='';hud.setAvailable('job',false);return;}
   // Rebuilt only when the task changes; rewriting it ten times a second made its buttons miss clicks.
   const near=!!station&&!!self&&touching(stationInteractable(station),self),key=`${task.stationId}|${task.startedAt}|${task.tasks}|${task.earned}|${near}`;
@@ -345,7 +392,11 @@ const telaoBlip=createObjectiveBlip($<HTMLCanvasElement>('#telao-blip'),{accent:
 const shopBlip=createObjectiveBlip($<HTMLCanvasElement>('#shop-blip'),{accent:['--blip-shop','#fac416'],edge:false,within:BLIP_RADIUS});
 // The light desk up on the stage, in the logo's violet (--blip-desk): its ring shows in the backyard, on the deck too.
 const deskBlip=createObjectiveBlip($<HTMLCanvasElement>('#desk-blip'),{accent:['--blip-desk','#a77bff'],edge:false,within:BLIP_RADIUS});
-const telaoLabel=()=>world?.televisions?.telao?.status==='playing'?'Telão · trocar o vídeo':`Vídeo no telão · ${livePrice('media:telao')} moedas`;
+const telaoLabel=()=>world?.televisions?.telao?.status==='playing'?`Telão · pôr vídeo na fila · ${livePrice('media:telao')} moedas`:`Vídeo no telão · ${livePrice('media:telao')} moedas`;
+/** The parked delivery bike within reach, on foot and free: E gets on it. Anything else within reach comes first. */
+function freeMotoNear(self:PlayerState){
+  return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}));
+}
 /** What E uses: a stage musician's spot only from up on the stage, and only while nobody plays there; the light desk from up there. */
 function nearestObject(self:PlayerState):Interactable|undefined {
   return nearestInteraction(self,object=>object.type==='lights'?onStage(self):object.type!=='musician'||(onStage(self)&&!world?.musicians?.[object.spot!]?.playerId));
@@ -365,28 +416,20 @@ function openTableMenu():void {
 }
 function renderTableMenu():void {$('#modal-content').innerHTML=tableMenuHtml(inventory?.balance??0,tableOrder,workersOnShift());}
 function openJobs():void {showModal('Trabalhar no bar',jobsHtml(world,jobTask),'jobs');}
-function cardMarkup(card:Card):string {
-  const symbols:Record<string,string>={hearts:'♥',diamonds:'♦',clubs:'♣',spades:'♠',H:'♥',D:'♦',C:'♣',S:'♠','♥':'♥','♦':'♦','♣':'♣','♠':'♠',h:'♥',d:'♦',c:'♣',s:'♠'};
-  if(card.rank==='?')return '<div class="playing-card face-down" aria-label="Carta oculta">?</div>';
-  const suit=symbols[card.suit]||card.suit;
-  return `<div class="playing-card ${['♥','♦'].includes(suit)?'red':''}" aria-label="${e(card.rank)} ${e(suit)}"><b>${e(card.rank)}</b><span>${e(suit)}</span></div>`;
-}
-function renderBlackjack(table:BlackjackTable):void {
-  const me=table.seats.find(seat=>seat.playerId===user?.id),myTurn=table.turnPlayerId===user?.id;
-  const phases={waiting:'Puxe uma cadeira',playing:myTurn?'Sua vez de jogar':'Uma carta pode mudar tudo',dealer:'A vez da casa',results:'A rodada fechou'};
-  const resultNames:Record<string,string>={win:'Você ganhou!',loss:'Deu casa.',draw:'Empate!',blackjack:'Blackjack!',bust:'Estourou',stand:'Parou',playing:'Jogando',turn:'Sua vez',finished:'Rodada encerrada',waiting:'Pronto'};
-  $('#blackjack').innerHTML=`<div class="blackjack-heading"><span>${uiIcon('cards')} 21 do Baiano</span><button data-action="table-leave" aria-label="Sair da mesa">${uiIcon('close')}</button></div><h2>${phases[table.phase]}</h2><div class="dealer-row"><div><small>DEALER</small><b>${table.dealerTotal||'—'}</b></div><div class="cards">${table.dealerCards.map(cardMarkup).join('')||'<span class="empty-cards">Aguardando a próxima rodada</span>'}</div></div><div class="table-seats">${table.seats.map(seat=>`<div class="table-seat ${seat.playerId===table.turnPlayerId?'active':''} ${seat.playerId===user?.id?'you':''}"><div class="seat-name"><b>${e(seat.playerId===user?.id?'Você':seat.displayName)}</b><span>${seat.total||'—'}</span></div><div class="cards small">${seat.cards.map(cardMarkup).join('')}</div><small>${e(resultNames[seat.result]||resultNames[seat.status]||seat.status)}</small></div>`).join('')}</div><div class="table-actions">${table.phase==='waiting'||table.phase==='results'?`<button class="button primary" data-action="table-start">${table.phase==='results'?'Nova rodada':'Começar rodada'} ${uiIcon('chevronRight')}</button>`:`<button class="button primary" data-action="hit" ${!myTurn?'disabled':''}>Comprar carta</button><button class="button secondary" data-action="stand" ${!myTurn?'disabled':''}>Parar</button>`}</div><div class="table-footer"><span>${table.phase==='results'?e(resultNames[me?.result||'']||'Rodada concluída'):'Sem apostas. Só pela resenha.'}</span><span id="turn-timer">${table.deadline?Math.max(0,Math.ceil((table.deadline-serverNow())/1000))+'s':''}</span></div>`;
-}
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
-  if(self.currentTableId){network.send('blackjack.leave');return;}
+  if(self.currentTableId){blackjackUi.requestLeave();return;}
+  if(self.interactionState.startsWith('foosball:')||foosballWatching){foosballUi.requestLeave();return;}
   if(self.interactionState){network.send('player.interact',{objectId:'stand'});return;}
   const station=jobStation();
   if(station&&touching(stationInteractable(station),self)){network.send('job.work');return;}
-  const object=nearestObject(self);if(!object)return;
+  const object=nearestObject(self);
+  if(!object){const moto=freeMotoNear(self);if(moto)network.send('moto.mount',{motoId:moto.id});return;}
   if(object.type==='counter'){orderDrink();return;}
-  if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});else network.send('player.interact',{objectId:object.id});
+  if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});
+  else if(object.type==='foosball')network.send('foosball.join',{tableId:object.id});
+  else network.send('player.interact',{objectId:object.id});
 }
 /** At the counter: choose what Magrão serves. He charges on ordering; the choice travels with the order and shows in the hand. */
 /** What the local player has in hand and is still having, or undefined with empty hands. */
@@ -604,7 +647,7 @@ async function wearSkin(id:string):Promise<void> {
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Chegue perto da mesa, aperte E e inicie uma rodada. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Compre uma carta ou pare. O dealer para em 17, inclusive com ás. Até quatro pessoas jogam juntas, sem dinheiro ou apostas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez; a barra acima dos avisos mostra quanto falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Suba ao salão de jogos, chegue perto da mesa e aperte E. Monte a aposta com as fichas e confirme em Apostar: a primeira aposta abre a rodada para a mesa toda. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Na sua vez: Pedir (1), Parar (2), Dobrar (3), Dividir (4) ou Desistir (5). Blackjack paga 3 para 2; com um ás do dealer à mostra, dá para fazer seguro. O dealer para em 17. As apostas são em moedas da carteira, de ${livePrice('blackjack:min-bet')} a ${livePrice('blackjack:max-bet')} por mão; sair no meio da rodada para as suas mãos onde estão. O ícone de ajuda da mesa mostra todas as regras.</p><h3>Pebolim</h3><p>As duas mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa cheia ou com partida rolando, você assiste. Quem abre a mesa escolhe 1 × 1 ou 2 × 2, quantos gols, um set ou melhor de 3, e pode chamar o Zé do Totó para as vagas (três níveis: tomou todas, na média ou sóbrio) ou marcar a partida valendo moedas (${livePrice('foosball:min-bet')} a ${livePrice('foosball:max-bet')} por jogador; quem vence leva o dobro). Quando todo mundo marca Pronto, a bola rola. Mexa o mouse (ou o dedo) e os bonecos seguem o ponteiro; clique ou Espaço chuta, segurar carrega a bomba; botão direito ou Shift levanta os bonecos para a bola passar. Vale o tempo de posse oficial: 10 s no meio e 15 s nas outras linhas. Sair no meio de uma partida valendo é W.O.; no amistoso, o Zé assume o lugar.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez na mão; na mesa, o pedido inteiro ao mesmo tempo. Cada coisa vira um ícone acima dos avisos, com um anel que esvazia e o tempo que falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -682,10 +725,6 @@ app.addEventListener('click',event=>{
       case 'settings':openSettings();break;
       case 'dance':if(performing())break;network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
-      case 'chat-toggle':setChatOpen(hud.isCollapsed('chat'));break;
-      case 'table-leave':network.send('blackjack.leave');break;
-      case 'table-start':network.send('blackjack.start',{tableId:world?.players[user!.id]?.currentTableId});break;
-      case 'hit':case 'stand':network.send('blackjack.action',{action});break;
       case 'block':{const id=button.dataset.id!;if(blocked.has(id)){await api(`/blocks/${encodeURIComponent(id)}`,undefined,'DELETE');blocked.delete(id);}else{await api('/blocks',{playerId:id});blocked.add(id);}renderPeopleContent();renderChat();break;}
       case 'report':showModal('Denunciar jogador',`<p class="modal-description">Conte o que aconteceu. Sua denúncia será revisada pela administração.</p><form id="report-form" data-id="${e(button.dataset.id)}"><label>Motivo<textarea name="reason" required minlength="5" maxlength="500" placeholder="Descreva a situação"></textarea></label><button class="button primary" type="submit">Enviar denúncia</button></form>`,'report');break;
       case 'mail':await mailbox();break;
@@ -708,7 +747,7 @@ app.addEventListener('submit',event=>{
         else if(authMode==='forgot'){await api('/auth/forgot',data);authMessage('Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.');}
         else {await api('/auth/reset',{token:resetToken,password:data.password});authMode='login';history.replaceState({},'',location.pathname);renderAuth('Senha atualizada. Entre novamente.');}
       }else if(form.id==='chat-form'){
-        const input=$<HTMLInputElement>('#chat-input');const text=input.value.trim();if(text){network.send('chat.send',{text});input.value='';}input.blur();
+        const input=$<HTMLInputElement>('#chat-input');const text=input.value.trim();if(text){network.send('chat.send',{text});input.value='';}(document.activeElement as HTMLElement|null)?.blur();
       }else if(form.id==='report-form'){await api('/reports',{playerId:form.dataset.id,reason:data.reason});closeModal();toast('Denúncia registrada. Obrigado por avisar.');}
       else if(form.id==='table-order'){
         // Which button sent it: Tonico, or one of the players working the bar.
@@ -857,7 +896,7 @@ async function start():Promise<void>{
     onKick:kick,
     onPlayerClick:id=>{if(inGame&&!activeModal)void playerCard(id);},
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
-    onMediaFrame:()=>{media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+    onMediaFrame:()=>{media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
   });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
@@ -870,7 +909,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),motos:()=>scene?.getMotos(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];
@@ -879,6 +918,7 @@ setInterval(()=>{
     return `<span class="world-label${speaking?' speaking':''}" style="left:${label.x}px;top:${label.y}px">${onCall?`<i class="label-phone" title="No celular" aria-hidden="true">${uiIcon('phone')}</i>`:''}${mic?`<i class="label-mic" aria-hidden="true">${uiIcon('mic')}</i>`:''}${e(label.name)}</span>`;
   }).join('');
   if(jobTask)renderJobCard();
+  if(!hud.isHidden('chat'))$('[data-action="chat"]').removeAttribute('data-unread');
   consumingHud.render(consumptions(world,world.players[user?.id||''],usedItem,serverNow()),serverNow());
   const table=world.tables[world.players[user?.id||'']?.currentTableId];
   const timer=document.querySelector('#turn-timer');if(timer&&table?.deadline)timer.textContent=`${Math.max(0,Math.ceil((table.deadline-serverNow())/1000))}s`;

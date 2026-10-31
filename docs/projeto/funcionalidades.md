@@ -10,8 +10,8 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Objetos do bar no cenário | **Pronto (novo)** | [decoração](../sistemas/drinks.md#decoração-do-bar): geladeiras de cerveja com porta de vidro e long necks, águas e refris reais; coxinhas e pastéis na estufa; copos na chopeira e cafés no caixa |
 | Sombras | **Corrigido (28/10)** | [dia e noite](../sistemas/day-night.md): o céu panorâmico fazia sombra no mapa inteiro (de dia nada tinha sombra do sol); pessoas deixavam sombras "fantasmas" nas lâmpadas; agora têm sombra de contato e sombra real ao sol |
 | Magrão no balcão prepara e cobra | **Pronto (animado, 28/10)** | O balcão cobra o preço do item e estorna o pedido que cair. Desde 28/10 (noite), o Magrão tira o chopp na chopeira e busca a long neck no freezer, com os clipes do mapa, e deixa a bebida no balcão ([animações do bar](../sistemas/animacoes-bar.md)) |
-| Jukebox com som 3D, custando moedas | **Pronto (cobrança nova)** | Volume pela distância ([jukebox](../sistemas/jukebox.md)); 15 moedas por vídeo. O YouTube não entra no Web Audio, então não há pan estéreo, só atenuação |
-| TV com YouTube para todos, custando moedas | **Pronto (cobrança nova)** | 25 moedas por vídeo |
+| Jukebox com som 3D, custando moedas | **Pronto (cobrança nova)** | Volume pela distância ([jukebox](../sistemas/jukebox.md)); 15 moedas por vídeo. O áudio dos players não entra no Web Audio, então não há pan estéreo, só atenuação |
+| TV com vídeo para todos, custando moedas | **Pronto (fila nova e várias plataformas, 30/10)** | 25 moedas por vídeo. Aceita YouTube, Vimeo, SoundCloud, Mixcloud, Spotify, TikTok, Twitch e links diretos ([plataformas](../sistemas/jukebox.md#plataformas)). Jukebox, TVs e telão têm fila: com algo tocando, o link entra na fila. Só quem pôs o vídeo controla (pausa, avança, pula) e só essa pessoa vê os controles do YouTube; vídeos que o YouTube não deixa tocar fora do site não entram; lives entram no ao vivo ([fila e controle](../sistemas/jukebox.md#fila-e-controle)) |
 | Telão na área de show | **Pronto (palco novo, 28/10)** | O telão de LED do mapa (`Telao_Tela`, 5,76 × 3,24 m) no fundo do palco, controlado no blip turquesa da frente do palco (ou na borda da frente, de cima dele); som pelo quintal todo, sem tocar por cima da jukebox e das TVs; 50 moedas por vídeo ([jukebox e TVs](../sistemas/jukebox.md)) |
 | Palco com acesso pago | **Pronto (novo, 28/10)** | Ingresso de 200 moedas, vale 30 min, comprado na escada (blip magenta; os blips do palco só aparecem no quintal). Todas as luzes do palco (lentes, fita de LED, contraluz, spots da treliça, luz frontal e luz de festa) com as cores do vídeo do telão ([economia](../sistemas/economia.md)) |
 | Show de luzes no palco | **Pronto (novo, 30/10)** | Lasers, moving heads com luz de verdade, blinders, estrobo e desenhos a laser no telão enquanto o telão toca ou alguém toca no palco: dezesseis programas (entre eles o Letreiro, que escreve HIGHLAND, e os Desenhos) e oito paletas no compasso do relógio do servidor, iguais para todos ([show de luzes](../sistemas/palco.md#show-de-luzes)) |
@@ -24,8 +24,11 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
 | Câmera em primeira e terceira pessoa | **Pronto (atualizado, 29/10)** | Rodinha com zoom contínuo fino e distância exata nas configurações; Q alterna primeira/terceira pessoa preservando o zoom, sem toast. Giro horizontal e vertical livre; a câmera atravessa os colisores sem encurtar a distância, com raio-X em volta do personagem. Preferências salvas no navegador ([câmera](../sistemas/camera.md)) |
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
-| Minigame de entrega (moto, mapa procedural) | Falta | Plano abaixo |
+| Moto de entrega pilotável | **Pronto (novo, 30/10)** | [Moto de entrega](../sistemas/moto.md): estacionada em frente ao bar, E para subir e descer, física arcade no servidor com predição, colisão com o mapa, vista por todos |
+| Minigame de entrega (pedidos, mapa procedural) | Falta | Plano abaixo |
 | Celular com apps paródia | **Pronto (29/10, ampliado 30/10)** | [Celular](../sistemas/celular.md) estilo iPhone 18 Pro na tecla K: ligações e chamadas de vídeo, Highzap com fotos, áudios e vídeos, Highgram com perfis, filtros, seguir e sugestões, HighBank com Pix, câmera com zoom, selfie e vídeo, mapa do bairro e os apps de sempre. Os números vêm da ficha do jogador (clique na pessoa no bar) |
+| Blackjack com apostas | **Pronto (novo, 30/10)** | [Blackjack](../sistemas/blackjack.md): regras de cassino (6 baralhos, S17, 3:2, seguro, dobrar, dividir, desistir), apostas em moedas do jogo com diário em disco e acerto conferido pela API, painel novo com cartas animadas, fichas e teclas 1–5, no PC e no celular |
+| Pebolim | **Pronto (novo, 30/10)** | [Pebolim](../sistemas/pebolim.md): as duas mesas do salão de jogos, 1 × 1 ou 2 × 2, regras da ITSF (saída do meio, tempo de posse de 10 s e 15 s, gol que entra e sai vale), física no servidor a 60 Hz com chute carregado, recuo e levantar, Zé do Totó em três níveis, partidas valendo moedas pelo mesmo diário do blackjack, painel em canvas que gira no celular, bola na mesa 3D |
 | Pôquer | Falta | Plano abaixo, com uma ressalva legal |
 | Emprego no espetinho, cardápio e preço do jogador | Falta | Plano abaixo; o mapa já tem o `Carrinho_Espeto` |
 | Emprego no bar com poucas vagas | **Pronto (novo)** | Ajudante do Magrão: 2 vagas, tarefas por estação, pagamento por tarefa, teto diário |
@@ -74,9 +77,10 @@ Falta, do plano original: Crush (Tinder), conversas em grupo e o personagem segu
 
 ### 5. Entregas de moto (minigame)
 
+A moto já existe e anda pelo bairro do bar, na própria sala ([moto de entrega](../sistemas/moto.md)). Falta o minigame:
+
 - **Sala separada:** `DeliveryRoom` no Colyseus, uma instância por jogador ou por grupo. O bar continua leve, e o minigame pode ter física própria.
 - **Mapa procedural:** uma seed por sessão gera uma grade de quarteirões (ruas, calçadas, casas) a partir de peças modulares de cidade low-poly CC0 ([assets](assets-recomendados.md)). A mesma seed gera colisores no servidor e malhas no cliente, então só a seed trafega.
-- **Moto:** veículo arcade autoritativo no servidor (velocidade, curva, freio), com predição no cliente como a do jogador.
 - **Loop:** pegar o pedido no restaurante, entregar no endereço sorteado dentro de um tempo, receber moedas pelo framework de empregos (`job:delivery:...`) com teto diário. Quantas entregas quiser, sem dinheiro real.
 - **Entrada e saída:** a moto estacionada na rua do bar é um interactable que transfere a pessoa de sala com um ticket novo. Sair do minigame devolve a pessoa ao ponto da moto.
 

@@ -89,6 +89,7 @@ export function ledgerLabel(entry:Pick<BankEntry,'reason'|'amount'|'peer'>):stri
     case 'job':return 'Trabalho no bar';
     case 'stage':return 'Ingresso do palco';
     case 'refund':return 'Estorno';
+    case 'blackjack':return detail==='bet'?'Aposta no blackjack':'Blackjack';
     case 'item':return 'Loja da casa';
     case 'skin':return 'Skin nova';
     case 'daily':return 'Bônus diário';

@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import map from './map-data.json';
 import type {Position} from './index.js';
+import {mediaIsStream,parseMediaLink,type MediaProvider} from './media-links.js';
 
 // The stage's front edge, on the side its screen faces (15_palco.py: the audience side). Touching it, from the backyard
 // floor or from the deck, uses the screen; its control spot is the floor in front of the middle of that edge.
@@ -25,7 +26,7 @@ export const TV_AUDIO = {fullDistance:3,quietDistance:9,maxDistance:14,smoothing
 // The stage screen fills the backyard.
 export const TELAO_AUDIO = {fullDistance:7,quietDistance:20,maxDistance:30,smoothingSeconds:.25};
 /**
- * Independent YouTube sources. The jukebox is sound only; a TV group shows one shared video on every screen
+ * Independent sources (any platform of media-links.ts). The jukebox is sound only; a TV group shows one shared video on every screen
  * it lists. They share helpers, never state: separate maps, messages, players and volumes.
  */
 export interface MediaSystem {
@@ -57,47 +58,124 @@ export function nearestMediaSource(system:MediaSystem,listener:Position):{index:
 }
 // Additional distance beyond the existing touching interaction, on client and server.
 export const JUKEBOX_INTERACTION_SLACK = .2;
-export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-export function youtubeVideoId(input:string):string|null {
-  if(input.length>2048||/[\u0000-\u0020\u007f\\]/.test(input))return null;
-  let url:URL;try{url=new URL(input);}catch{return null;}
-  if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.port)return null;
-  const host=url.hostname.toLowerCase();let id:string|null=null;
-  if(host==='youtu.be') {const match=url.pathname.match(/^\/([A-Za-z0-9_-]{11})\/?$/);id=match?.[1]??null;}
-  else if(['youtube.com','www.youtube.com','m.youtube.com'].includes(host)) {
-    if(url.pathname==='/watch'&&url.searchParams.getAll('v').length===1)id=url.searchParams.get('v');
-    else id=url.pathname.match(/^\/(?:shorts|embed)\/([A-Za-z0-9_-]{11})\/?$/)?.[1]??null;
-  }
-  return id&&VIDEO_ID.test(id)?id:null;
-}
-export type JukeboxStatus='off'|'playing'|'paused'|'stopped'|'ended';
+/** A live broadcast's timeline counts in the stream's own seconds, which can run for days. */
+export const MEDIA_MAX_SECONDS=1e9;
+/** Videos waiting on one source, and how many of them one person may have there. */
+export const MEDIA_QUEUE={max:20,perPlayer:3} as const;
+/** A video waiting its turn. `by` put it in the queue and paid for it. `thumb`: its cover, as its platform gives it. */
+export interface MediaQueueEntry {key:string;provider:MediaProvider|'';videoId:string;title:string;thumb:string;by:string;byName:string}
+export type JukeboxStatus='off'|'playing'|'paused';
 export interface JukeboxState {
-  id:string;videoId:string;status:JukeboxStatus;position:number;updatedAt:number;updatedBy:string;revision:number;
+  id:string;
+  /** The platform of the link playing, and its id there (a direct link's id is its address). */
+  provider:MediaProvider|'';videoId:string;
+  status:JukeboxStatus;position:number;updatedAt:number;updatedBy:string;
+  /** Bumped by every change to the playback (not by the queue): players resync on it, and commands compare-and-swap it. */
+  revision:number;
+  /** The queue entry playing now, its title as its platform gives it (plain text; '' while unknown) and its cover. */
+  key:string;title:string;thumb:string;
+  /**
+   * Who controls the video playing: whoever put it on, from wherever they can hear it. Empty once they leave the bar;
+   * then anyone at the screen takes it over with a command.
+   */
+  by:string;byName:string;
+  /** A live broadcast: the timeline counts in the stream's seconds, and its live edge is the stream's elapsed time. */
+  live:boolean;
+  queue:MediaQueueEntry[];
 }
-export const jukeboxCommandSchema=z.object({id:z.string().max(64),revision:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),action:z.enum(['play','pause','resume','stop','off']),url:z.string().max(2048).optional()}).strict();
+const commandBase={id:z.string().max(64),revision:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)};
+export const jukeboxCommandSchema=z.discriminatedUnion('action',[
+  // A new video: it plays at once on an idle source and waits in the queue otherwise.
+  z.object({...commandBase,action:z.literal('play'),url:z.string().max(2048)}).strict(),
+  // The controller's: pause, resume, the next video (switching off after the last one) and a jump to any moment.
+  z.object({...commandBase,action:z.enum(['pause','resume','skip'])}).strict(),
+  z.object({...commandBase,action:z.literal('seek'),position:z.number().finite().min(0).max(MEDIA_MAX_SECONDS)}).strict(),
+  // One's own video taken out of the queue.
+  z.object({...commandBase,action:z.literal('remove'),entry:z.string().min(1).max(64)}).strict(),
+]);
 export type JukeboxCommand=z.infer<typeof jukeboxCommandSchema>;
-export function initialJukebox(id:string):JukeboxState{return {id,videoId:'',status:'off',position:0,updatedAt:0,updatedBy:'',revision:0};}
+/** Who sends a command, as the queue shows them. */
+export interface MediaActor {id:string;name:string}
+export function initialJukebox(id:string):JukeboxState{return {id,provider:'',videoId:'',status:'off',position:0,updatedAt:0,updatedBy:'',revision:0,key:'',title:'',thumb:'',by:'',byName:'',live:false,queue:[]};}
 export function jukeboxTime(state:JukeboxState,now:number):number {
-  return Math.min(86400,Math.max(0,state.position+(state.status==='playing'?Math.max(0,now-state.updatedAt)/1000:0)));
+  return Math.min(MEDIA_MAX_SECONDS,Math.max(0,state.position+(state.status==='playing'?Math.max(0,now-state.updatedAt)/1000:0)));
 }
-/** Synchronous compare-and-swap: two clients cannot overwrite the same revision. */
-export function commandJukebox(state:JukeboxState,command:JukeboxCommand,userId:string,now:number):JukeboxState {
+function startMedia(state:JukeboxState,entry:MediaQueueEntry,now:number,updatedBy:string):JukeboxState {
+  return {...state,key:entry.key,provider:entry.provider,videoId:entry.videoId,title:entry.title,thumb:entry.thumb,by:entry.by,byName:entry.byName,live:mediaIsStream(entry.provider,entry.videoId),status:'playing',position:0,updatedAt:now,updatedBy,revision:state.revision+1};
+}
+/** The next video in the queue starts from its beginning; after the last one the source switches off. */
+export function advanceMedia(state:JukeboxState,now:number,updatedBy:string):JukeboxState {
+  const [next,...queue]=state.queue;
+  return next?startMedia({...state,queue},next,now,updatedBy)
+    :{...state,queue,key:'',provider:'',videoId:'',title:'',thumb:'',by:'',byName:'',live:false,status:'off',position:0,updatedAt:now,updatedBy,revision:state.revision+1};
+}
+/**
+ * Compare-and-swap for the playback: two people cannot overwrite the same revision. Adding to the queue and taking
+ * one's own video out of it never conflict, so they skip that check. `added`: the new entry's key, and the title and
+ * cover the server checked (the platform's oEmbed), for `play`.
+ */
+export function commandJukebox(state:JukeboxState,command:JukeboxCommand,actor:MediaActor,now:number,added?:{key:string;title:string;thumb?:string}):JukeboxState {
   if(command.id!==state.id)throw new Error('Aparelho desconhecido.');
-  if(command.revision!==state.revision)throw new Error('Outra pessoa alterou a reprodução. Confira o estado e tente novamente.');
-  const next={...state,position:jukeboxTime(state,now),updatedAt:now,updatedBy:userId,revision:state.revision+1};
   if(command.action==='play'){
-    const id=youtubeVideoId(command.url?.trim()??'');if(!id)throw new Error('Cole um link válido de vídeo do YouTube.');
-    next.videoId=id;next.position=0;next.status='playing';
-  } else if(command.action==='off'){next.videoId='';next.position=0;next.status='off';}
-  else {
-    if(!state.videoId)throw new Error('Escolha um vídeo primeiro.');
-    if(command.action==='pause'){if(state.status!=='playing')throw new Error('Nada está tocando agora.');next.status='paused';}
-    else if(command.action==='resume'){next.status='playing';if(state.status==='ended')next.position=0;}
-    else {next.position=0;next.status='stopped';}
+    const link=parseMediaLink(command.url);if('error' in link)throw new Error(link.error);
+    if(state.videoId===link.id||state.queue.some(entry=>entry.videoId===link.id))throw new Error('Este vídeo já está na fila.');
+    const entry={key:added?.key??String(now),provider:link.provider,videoId:link.id,title:added?.title||link.title,thumb:added?.thumb??'',by:actor.id,byName:actor.name};
+    if(state.status==='off')return startMedia(state,entry,now,actor.id);
+    if(state.queue.length>=MEDIA_QUEUE.max)throw new Error(`A fila está cheia (${MEDIA_QUEUE.max} vídeos). Espere ela andar.`);
+    if(state.queue.filter(other=>other.by===actor.id).length>=MEDIA_QUEUE.perPlayer)throw new Error(`Você já tem ${MEDIA_QUEUE.perPlayer} vídeos na fila. Espere um deles tocar.`);
+    return {...state,queue:[...state.queue,entry]};
   }
+  if(command.action==='remove'){
+    const entry=state.queue.find(other=>other.key===command.entry);if(!entry)throw new Error('Este vídeo já saiu da fila.');
+    if(entry.by!==actor.id)throw new Error('Só quem pôs o vídeo na fila pode tirá-lo.');
+    return {...state,queue:state.queue.filter(other=>other!==entry)};
+  }
+  if(command.revision!==state.revision)throw new Error('Outra pessoa alterou a reprodução. Confira o estado e tente novamente.');
+  if(!state.videoId)throw new Error('Nada está tocando agora.');
+  if(state.by&&state.by!==actor.id)throw new Error(`Quem controla este vídeo é ${state.byName||'quem o colocou'}. Ponha o seu na fila.`);
+  if(command.action==='skip')return advanceMedia(state,now,actor.id);
+  // Nobody controls it (whoever put it on left the bar): this command takes it over.
+  const next={...state,by:actor.id,byName:actor.name,position:jukeboxTime(state,now),updatedAt:now,updatedBy:actor.id,revision:state.revision+1};
+  if(command.action==='pause'){if(state.status!=='playing')throw new Error('O vídeo já está pausado.');next.status='paused';}
+  else if(command.action==='resume'){if(state.status!=='paused')throw new Error('O vídeo já está tocando.');next.status='playing';}
+  else if(command.action==='seek')next.position=command.position;
   return next;
 }
-/** Distance attenuation only. YouTube cannot be connected to Web Audio's PannerNode. */
+/** Switches a source off and empties its queue (the administration). */
+export function clearMedia(state:JukeboxState,now:number,updatedBy:string):JukeboxState {return advanceMedia({...state,queue:[]},now,updatedBy);}
+const reportBase={id:z.string().max(64),revision:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),videoId:z.string().min(1).max(2048).regex(/^[^\s<>"\\]+$/)};
+/** `<prefix>.ended`: the video reached its end in the reporter's player. */
+export const mediaEndedSchema=z.object({...reportBase,duration:z.number().finite().positive().max(MEDIA_MAX_SECONDS)}).strict();
+/** `<prefix>.failed`: the platform refused to play it there (an onError code). */
+export const mediaFailedSchema=z.object({...reportBase,code:z.number().int().min(0).max(9999)}).strict();
+/** `<prefix>.live`: it is a live broadcast whose live edge, in the reporter's player, is `edge` seconds into the stream. */
+export const mediaLiveSchema=z.object({...reportBase,edge:z.number().finite().min(0).max(MEDIA_MAX_SECONDS)}).strict();
+/** Errors for a video that cannot play on other sites at all: removed, private, embedding off, bad id (YouTube's codes, which every player in apps/web/src/media speaks). */
+export const PLAYBACK_REFUSED:readonly number[]=[2,100,101,150];
+/** Whoever controls the video tells what its player sees; while nobody does, anyone may. */
+export function mediaReporter(state:JukeboxState,userId:string):boolean {return !state.by||state.by===userId;}
+const reportApplies=(state:JukeboxState,report:{revision:number;videoId:string},userId:string)=>mediaReporter(state,userId)&&state.status!=='off'&&state.revision===report.revision&&state.videoId===report.videoId;
+/** Seconds an end may come before the shared timeline gets there (players load and buffer a little behind it). */
+const END_SLACK=8;
+/** The video ended: the queue moves on. Null for a stale, early or unauthorised report. */
+export function endMedia(state:JukeboxState,report:z.infer<typeof mediaEndedSchema>,userId:string,now:number):JukeboxState|null {
+  if(!reportApplies(state,report,userId)||state.status!=='playing'||jukeboxTime(state,now)<report.duration-END_SLACK)return null;
+  return advanceMedia(state,now,userId);
+}
+/** The platform refused to play the video: the queue moves on. */
+export function failMedia(state:JukeboxState,report:z.infer<typeof mediaFailedSchema>,userId:string,now:number):JukeboxState|null {
+  return reportApplies(state,report,userId)&&PLAYBACK_REFUSED.includes(report.code)?advanceMedia(state,now,userId):null;
+}
+/**
+ * A live broadcast: the shared timeline jumps to its live edge. A video's own seconds start at 0, so a live stream put on
+ * at 0 would play from the beginning of its recording, hours behind the broadcast. YouTube counts a live stream's time
+ * from when it began, the same for every viewer, so the timeline stays in sync from there.
+ */
+export function liveMedia(state:JukeboxState,report:z.infer<typeof mediaLiveSchema>,userId:string,now:number):JukeboxState|null {
+  if(!reportApplies(state,report,userId)||state.live)return null;
+  return {...state,live:true,position:report.edge,updatedAt:now,updatedBy:userId,revision:state.revision+1};
+}
+/** Distance attenuation only. An embedded player cannot be connected to Web Audio's PannerNode. */
 export function jukeboxGain(listener:Position,source:Position,config=JUKEBOX_AUDIO):number {
   const d=Math.hypot(listener.x-source.x,(listener.y??0)-(source.y??0),listener.z-source.z);
   if(d<=config.fullDistance)return 1;if(d>=config.maxDistance)return 0;

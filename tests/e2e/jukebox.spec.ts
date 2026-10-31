@@ -105,7 +105,11 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
     const near=(await telemetry())[0].volume,far=(await telemetry(other))[0].volume;expect(near).toBeGreaterThan(far);
     await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await telemetry(other))[0]?.status).toBe('paused');
     await page.getByRole('button',{name:'Continuar',exact:true}).click();await expect.poll(async()=>(await telemetry(other))[0]?.status).toBe('playing');
-    await page.locator('#jukebox-url').fill('https://www.youtube.com/watch?v=aqz-KE-bpKQ');await page.getByRole('button',{name:'Tocar',exact:true}).click();
+    // With music playing, a new link waits in the queue; skipping plays it on the same player.
+    await page.locator('#jukebox-url').fill('https://www.youtube.com/watch?v=aqz-KE-bpKQ');await page.getByRole('button',{name:'Pôr na fila',exact:true}).click();
+    await expect.poll(async()=>(await shared()).queue.length,{timeout:30000}).toBe(1);await expect(page.locator('#jukebox-queue li')).toHaveCount(1);
+    expect((await shared()).videoId).toBe('M7lc1UVf-VE');expect((await shared(other)).queue.map((entry:any)=>entry.videoId)).toEqual(['aqz-KE-bpKQ']);
+    await page.getByRole('button',{name:'Pular música',exact:true}).click();
     await expect.poll(async()=>(await telemetry())[0]?.videoId).toBe('aqz-KE-bpKQ');await expect.poll(async()=>(await telemetry(other))[0]?.videoId).toBe('aqz-KE-bpKQ');
     await expect.poll(async()=>(await telemetry())[0]?.status,{timeout:40000}).toBe('playing');await expect.poll(async()=>(await telemetry())[0]?.currentTime,{timeout:15000}).toBeGreaterThan(.5);
     expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
@@ -113,24 +117,32 @@ test('real YouTube: jukebox and TV are independent sources, physical interaction
     await expect(page.getByRole('button',{name:'Fechar janela'})).toBeInViewport();
     expect(await page.locator('.jukebox-player iframe').count()).toBe(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:previewPath('jukebox-mobile.png')});await page.setViewportSize({width:960,height:640});
-    await page.getByRole('button',{name:'Parar',exact:true}).click();await expect.poll(async()=>(await shared()).status).toBe('stopped');await expect.poll(async()=>['stopped','paused'].includes((await telemetry())[0]?.status)).toBe(true);
+    // A step forward moves everyone's timeline.
+    const revision=(await shared()).revision;await page.getByRole('button',{name:'+10 s',exact:true}).click();
+    await expect.poll(async()=>(await shared()).revision).toBe(revision+1);expect((await shared()).position).toBeGreaterThan(9);
+    await expect.poll(async()=>(await telemetry())[0]?.currentTime,{timeout:20000}).toBeGreaterThan(9);
     await page.getByRole('button',{name:'Desligar jukebox',exact:true}).click();await expect.poll(()=>telemetry()).toEqual([]);await expect.poll(()=>telemetry(other)).toEqual([]);
     await page.keyboard.press('Escape');await page.keyboard.press('s',{delay:150});const moved=await page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId];});expect(Math.hypot(moved.x-before.x,moved.z-before.z)).toBeGreaterThan(.15);
     expect(errors).toEqual([]);
   }finally{await context.close();}
 });
 
-test('API double: errors, autoplay, volume bounds, local distance, rapid replacement and teardown',async({page})=>{
+test('API double: link check, errors, autoplay, volume bounds, local distance, queue and teardown',async({page})=>{
   const mock=await readFile(new URL('../fixtures/youtube-api-mock.js',import.meta.url),'utf8');
   await page.route('https://www.youtube.com/iframe_api',route=>route.fulfill({contentType:'application/javascript',body:mock}));
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const commands=()=>page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='jukebox.command').map((m:any)=>m.payload));
   await page.goto(controllerFixture);await page.locator('#jukebox-url').fill('https://youtu.be/M7lc1UVf-VE');await page.getByRole('button',{name:'Tocar',exact:true}).click();
   await expect(page.locator('#jukebox-state')).toContainText('Neste navegador: Reproduzindo');
   await expect(page.locator('#jukebox-title')).toContainText('<img src=x>');expect(await page.locator('#jukebox-title img').count()).toBe(0);
-  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(1);
-  for(const [code,message] of [[100,'removido'],[101,'não permite'],[150,'não permite'],[153,'não identificou'],[5,'Não foi possível']] as const){
+  // The link was played muted in an invisible player first (the check), then the jukebox's own player came.
+  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(2);expect(await page.locator('.media-probe').count()).toBe(0);
+  await expect(page.locator('#jukebox-url')).toHaveValue('');await expect(page.locator('#jukebox-owner')).toContainText('Você está no controle');
+  // Errors of this browser only: the video stays (a refusal by YouTube skips it; see the end of this test).
+  for(const [code,message] of [[153,'não identificou'],[5,'Não foi possível']] as const){
     await page.evaluate(code=>(window as any).fixturePlayers.at(-1).options.events.onError({data:code}),code);await expect(page.locator('#jukebox-error')).toContainText(message);
   }
+  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='jukebox.failed').length)).toBe(0);
   await page.getByRole('button',{name:'Tentar conectar novamente'}).click();await expect(page.locator('#jukebox-state')).toContainText('Neste navegador: Reproduzindo');
   expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).options.events.onAutoplayBlocked());await expect(page.getByRole('button',{name:'Ativar reprodução neste navegador',exact:true})).toBeVisible();
@@ -143,15 +155,36 @@ test('API double: errors, autoplay, volume bounds, local distance, rapid replace
   await page.evaluate(()=>(window as any).fixturePlayers.at(-1).unMute());await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.at(-1).isMuted())).toBe(true);
   await page.evaluate(()=>(window as any).fixture.position(15.7,.3,-10.56));
   await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).fixtureAmbient)).toBe(true);
-  await page.locator('#jukebox-url').fill('https://www.youtube.com/shorts/aqz-KE-bpKQ');await page.getByRole('button',{name:'Tocar',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Pausar',exact:true})).toBeHidden();
+  // With music on, a new link waits in the queue; its owner can take it out.
+  await page.locator('#jukebox-url').fill('https://www.youtube.com/shorts/aqz-KE-bpKQ');await page.getByRole('button',{name:'Pôr na fila',exact:true}).click();
+  await expect(page.locator('#jukebox-queue li')).toHaveCount(1);await expect(page.locator('#jukebox-queue li')).toContainText('Próximo · por você');
+  await expect(page.locator('#jukebox-queue-title')).toHaveText('Na fila · 1');
+  expect(await page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].videoId)).toBe('M7lc1UVf-VE');
+  await page.getByRole('button',{name:'Tirar da fila',exact:true}).click();await expect(page.locator('#jukebox-queue li')).toHaveCount(0);await expect(page.locator('#jukebox-queue-title')).toHaveText('Fila vazia');
+  await page.locator('#jukebox-url').fill('https://www.youtube.com/shorts/aqz-KE-bpKQ');await page.getByRole('button',{name:'Pôr na fila',exact:true}).click();
+  await expect(page.locator('#jukebox-queue li')).toHaveCount(1);
+  await page.locator('#jukebox-url').fill('https://youtu.be/aqz-KE-bpKQ');await page.getByRole('button',{name:'Pôr na fila',exact:true}).click();
+  await expect(page.locator('#jukebox-error')).toContainText('já está na fila');
+  // A video YouTube does not let play on other sites fails the check: it never reaches the queue, nothing is sent.
+  await page.evaluate(()=>(window as any).fixtureRefused.add('blockedvid0'));const sentBefore=(await commands()).length;
+  await page.locator('#jukebox-url').fill('https://youtu.be/blockedvid0');await page.getByRole('button',{name:'Pôr na fila',exact:true}).click();
+  await expect(page.locator('#jukebox-error')).toContainText('não permite reprodução em outros sites');
+  expect((await commands()).length).toBe(sentBefore);await expect(page.locator('#jukebox-queue li')).toHaveCount(1);await expect(page.locator('#jukebox-url')).toHaveValue('https://youtu.be/blockedvid0');
+  // Skipping plays the next one on the same player.
+  await page.getByRole('button',{name:'Continuar',exact:true}).click();await page.getByRole('button',{name:'Pular música',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].videoId)).toBe('aqz-KE-bpKQ');
-  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(2); // one explicit retry, no player for replacement
+  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(6); // three checks and one explicit retry, no player for the next video
   await page.evaluate(()=>(window as any).fixture.close());expect(await page.locator('.jukebox-player iframe').count()).toBe(1);
   await page.evaluate(()=>(window as any).fixture.open());await expect(page.locator('#jukebox-title')).toContainText('Vídeo de teste');
   await page.evaluate(()=>(window as any).fixture.connection(false));await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].status)).toBe('hidden');
   await page.evaluate(()=>(window as any).fixture.connection(true));await expect.poll(()=>page.evaluate(()=>(window as any).fixture.controller.telemetry()[0].status)).toBe('playing');
-  await page.getByRole('button',{name:'Desligar jukebox',exact:true}).click();await expect(page.locator('.jukebox-player iframe')).toHaveCount(0);
-  expect(await page.evaluate(()=>(window as any).fixtureDestroyed)).toBe(2);await page.evaluate(()=>(window as any).fixture.teardown());expect(errors).toEqual([]);
+  // YouTube refusing the video while it plays: reported once, and the queue moves on (here, empty: the jukebox goes off).
+  await page.evaluate(()=>(window as any).fixturePlayers.filter((p:any)=>!p.destroyed).at(-1).options.events.onError({data:150}));
+  await expect(page.locator('.jukebox-player iframe')).toHaveCount(0);await expect(page.locator('#jukebox-title')).toHaveText('Nenhuma música tocando');
+  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='jukebox.failed').map((m:any)=>m.payload.code))).toEqual([150]);
+  expect(await page.evaluate(()=>(window as any).fixtureDestroyed)).toBe(await page.evaluate(()=>(window as any).fixtureCreated));
+  await page.evaluate(()=>(window as any).fixture.teardown());expect(errors).toEqual([]);
 });
 
 test('unreachable YouTube API reports connection failure and permits a clean retry',async({page})=>{
@@ -164,21 +197,27 @@ test('unreachable YouTube API reports connection failure and permits a clean ret
   await page.evaluate(()=>(window as any).fixture.teardown());
 });
 
-test('API double: a TV group plays one video on every screen, heard from the nearest, never leaving its screens',async({page})=>{
+test('API double: a TV group plays one video on every screen, heard from the nearest, never leaving its screens, worked by one person',async({page})=>{
   const mock=await readFile(new URL('../fixtures/youtube-api-mock.js',import.meta.url),'utf8');
   await page.route('https://www.youtube.com/iframe_api',route=>route.fulfill({contentType:'application/javascript',body:mock}));
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const tv=()=>page.evaluate(()=>(window as any).fixture.controller.telemetry());
+  const shared=()=>page.evaluate(()=>(window as any).fixture.world.televisions['tv-main']);
+  // The group's three players (the link check's player came first).
+  const muted=()=>page.evaluate(()=>(window as any).fixturePlayers.slice(-3).map((p:any)=>p.muted));
   await page.goto(tvFixture);await page.locator('#tv-url').fill('https://youtu.be/M7lc1UVf-VE');await page.getByRole('button',{name:'Tocar',exact:true}).click();
   // One player per screen of the ground floor, all on the shared video; upstairs stays off.
   await expect.poll(async()=>(await tv()).map((p:any)=>[p.screen,p.videoId,p.status])).toEqual([['tv-hall','M7lc1UVf-VE','playing'],['tv-left','M7lc1UVf-VE','playing'],['tv-counter','M7lc1UVf-VE','playing']]);
-  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(3);
+  expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(4);
+  // Whoever put the video on controls it: YouTube's controls are on their screens, and only those take the pointer.
+  expect((await tv()).map((p:any)=>p.controls)).toEqual([true,true,true]);expect(await page.locator('.tv-player.controls').count()).toBe(3);
+  expect(await page.locator('.tv-player').first().evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('auto');
   // Only the screen nearest to the listener is heard; the others are muted, so the sound never doubles.
   await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([true,false,false]);
-  await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.map((p:any)=>p.muted))).toEqual([false,true,true]);
+  await expect.poll(muted).toEqual([false,true,true]);
   await page.evaluate(()=>(window as any).fixture.stand('tv-counter'));
   await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([false,false,true]);
-  await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.map((p:any)=>p.muted))).toEqual([true,true,false]);
+  await expect.poll(muted).toEqual([true,true,false]);
   // The picture is always on its screen: any projected size, even tiny or partly off the page; no corner card.
   const quad=(x:number,y:number,w:number,h:number)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
   const hall=page.locator('.tv-player[data-screen="tv-hall"]');
@@ -194,11 +233,48 @@ test('API double: a TV group plays one video on every screen, heard from the nea
   await expect.poll(async()=>(await tv())[0].mode).toBe('hidden');expect(await hall.evaluate(element=>element.style.visibility)).toBe('hidden');
   expect((await tv())[0].status).toBe('playing');expect(await page.evaluate(()=>(window as any).fixture.shown['tv-hall'])).toBe(false);
   expect(await page.locator('.tv-dock').count()).toBe(0);
-  // Only the player being heard reports the end of the video.
-  await page.evaluate(()=>{const players=(window as any).fixturePlayers;players[0].emit(0);players[2].emit(0);});
+  // The panel's controls go to everyone: a step forward and a jump on the position bar.
+  await page.getByRole('button',{name:'+10 s',exact:true}).click();await expect.poll(async()=>(await shared()).position).toBeGreaterThan(9);
+  await expect(page.locator('#tv-time')).toContainText('/ 20:00');
+  await page.locator('#tv-position').fill('600');await expect.poll(async()=>(await shared()).position).toBe(600);
+  await expect.poll(async()=>(await tv())[2].currentTime).toBeGreaterThanOrEqual(600);
+  // YouTube's own controls, worked on the screen by the controller (the player has the focus), go to everyone too.
+  await page.evaluate(points=>(window as any).fixture.project('tv-hall',points),quad(120,80,400,225));
+  await expect.poll(async()=>(await tv())[0].mode).toBe('tv');
+  await page.waitForTimeout(2200);
+  await page.evaluate(()=>{const hall=(window as any).fixturePlayers.at(-3);hall.frame.focus();hall.pauseVideo();});
+  await expect.poll(async()=>(await shared()).status).toBe('paused');
+  await page.waitForTimeout(2200);
+  await page.evaluate(()=>(window as any).fixturePlayers.at(-3).seekTo(900));
+  await expect.poll(async()=>(await shared()).position).toBe(900);
+  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
+  // A live broadcast: the timeline jumps to its live edge (the player's length), so nobody watches it from the start.
+  await page.getByRole('button',{name:'Continuar',exact:true}).click();await expect.poll(async()=>(await shared()).status).toBe('playing');
+  await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).forEach((p:any)=>{p.data.isLive=true;p.length=7200;}));
+  await expect.poll(async()=>(await shared()).live).toBe(true);expect((await shared()).position).toBe(7200);
+  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.live').map((m:any)=>m.payload.edge))).toEqual([7200]);
+  await expect.poll(async()=>(await tv()).map((p:any)=>p.currentTime>=7200)).toEqual([true,true,true]);
+  await expect(page.locator('#tv-live')).toBeVisible();await expect(page.locator('#tv-time')).toHaveText('No ao vivo');
+  await expect(page.getByRole('button',{name:'Ir para o ao vivo',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'−30 s',exact:true})).toBeVisible();
+  // Someone else's video waits behind (without a button to take it out).
+  await page.evaluate(()=>(window as any).fixture.queue({key:'q1',videoId:'aqz-KE-bpKQ',title:'Big Buck Bunny',by:'bob',byName:'Bob'}));
+  await expect(page.locator('#tv-queue li')).toContainText(['Próximo · por Bob']);await expect(page.locator('#tv-queue [data-media-remove]')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Pular vídeo',exact:true})).toBeVisible();
+  // Only the player being heard reports the end of the video; the next one plays on the same screens.
+  await page.evaluate(()=>{const players=(window as any).fixturePlayers.slice(-3);players[0].emit(0);players[2].emit(0);});
   expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.ended').length)).toBe(1);
+  // Bob controls it now: here, bare pictures that take no pointer and a panel without its controls.
+  await expect.poll(async()=>(await tv()).map((p:any)=>[p.videoId,p.controls,p.status,p.live])).toEqual(Array(3).fill(['aqz-KE-bpKQ',false,'playing',false]));
+  expect(await page.locator('.tv-player.controls').count()).toBe(0);
+  expect(await page.locator('.tv-player').first().evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('none');
+  await expect(page.locator('#tv-owner')).toContainText('No controle: Bob');await expect(page.locator('#tv-title')).toHaveText('Big Buck Bunny');
+  await expect(page.getByRole('button',{name:'Pausar',exact:true})).toHaveCount(0);await expect(page.locator('#tv-seek')).toBeHidden();
+  await expect(page.getByRole('button',{name:'Pôr na fila',exact:true})).toBeVisible();
+  // Bob left the bar: anyone at the screen takes it over.
+  await page.evaluate(()=>(window as any).fixture.control(''));await expect(page.locator('#tv-owner')).toContainText('saiu do bar');
   await page.getByRole('button',{name:'Desligar TV',exact:true}).click();await expect(page.locator('.tv-player')).toHaveCount(0);
-  expect(await page.evaluate(()=>(window as any).fixtureDestroyed)).toBe(3);await page.evaluate(()=>(window as any).fixture.teardown());expect(errors).toEqual([]);
+  expect(await page.evaluate(()=>(window as any).fixtureDestroyed)).toBe(await page.evaluate(()=>(window as any).fixtureCreated));
+  await page.evaluate(()=>(window as any).fixture.teardown());expect(errors).toEqual([]);
 });
 
 test('saved session resolves before the entry button can submit an empty login form',async({page,request})=>{

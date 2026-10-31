@@ -105,7 +105,7 @@ interface Self {id:string;displayName:string;skin:string;oldWalk:boolean;x:numbe
   condition:string;stageUntil:number;holding:string}
 interface Entries<T> {get(key:string):T|undefined;values():IterableIterator<T>}
 interface World {players:Entries<Self>;doors:Entries<{id:string;open:boolean}>;musicians:Entries<{playerId:string}>;jobs:Entries<{slots:number;workers:number;enabled:boolean}>;
-  tables:Entries<{phase:string;turnPlayerId:string;seats:Iterable<{playerId:string;total:number}>}>;event:{type:string};occupancy:number;capacity:number}
+  tables:Entries<{phase:string;turnPlayerId:string;turnHand:number;move:number;minBet:number;seats:Iterable<{playerId:string;bet:number;insured:string;hands:ArrayLike<{total:number}>}>}>;event:{type:string};occupancy:number;capacity:number}
 interface Route {path:Point[];index:number;running:boolean;pace:number;done:(arrived:boolean)=>void;mark:Point;markAt:number}
 /** The bot's room is gone or it is lying on the floor: the activity ends here. */
 class Interrupted extends Error {}
@@ -395,7 +395,7 @@ class Bot {
     if(me.skin==='rafael'&&chance(.3)){await this.sleep(2500);this.send('player.emote',{emote:'kick'});}
     await this.sleep(rand(3000,8000));
   }
-  /** A few rounds at the blackjack table: hits below 17 (sometimes below 15). */
+  /** A few rounds at the blackjack table: the minimum bet, no insurance, hits below 17 (sometimes below 15). */
   private async blackjack():Promise<void>{
     this.doing='blackjack';
     if(!await this.walk({kind:'object',id:'blackjack-1'},{running:chance(.2)}))return;
@@ -405,11 +405,14 @@ class Bot {
       for(const deadline=Date.now()+240_000;rounds>0&&Date.now()<deadline;){
         const me=this.awake(),table=this.world!.tables.get('blackjack-1');
         if(!table||!me.currentTableId)return;
-        if(table.phase==='waiting'){this.send('blackjack.start',{tableId:'blackjack-1'});await this.sleep(rand(1500,3000));}
+        const seat=[...table.seats].find(s=>s.playerId===me.id);
+        if((table.phase==='waiting'||table.phase==='betting')&&!seat?.bet){this.send('blackjack.bet',{amount:table.minBet||10});await this.sleep(rand(1500,3000));}
+        else if(table.phase==='insurance'&&seat?.insured==='pending'){await this.sleep(rand(600,1500));this.send('blackjack.insurance',{take:false});}
         else if(table.phase==='playing'&&table.turnPlayerId===me.id){
-          const total=[...table.seats].find(seat=>seat.playerId===me.id)?.total??21;
+          const total=seat?.hands[table.turnHand]?.total??21;
           await this.sleep(rand(800,2500));
-          this.send('blackjack.action',{action:total<(chance(.2)?15:17)?'hit':'stand'});
+          const now=this.world!.tables.get('blackjack-1')!;
+          this.send('blackjack.action',{action:total<(chance(.2)?15:17)?'hit':'stand',hand:now.turnHand,move:now.move});
           await this.sleep(800);
         }
         else if(table.phase==='results'){rounds--;await this.until(()=>this.world?.tables.get('blackjack-1')?.phase!=='results',15_000);}

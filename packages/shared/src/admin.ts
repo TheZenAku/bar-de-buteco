@@ -101,11 +101,11 @@ export interface AdminServerInfo {
  */
 export const LEDGER_SOURCES={
   'boas-vindas':'Boas-vindas',bonus:'Bônus diário',trabalho:'Trabalho',estorno:'Estornos',admin:'Administração',pix:'Pix entre jogadores',
-  skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',testes:'Bots de teste',outros:'Outros',
+  skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',blackjack:'Blackjack',pebolim:'Pebolim',testes:'Bots de teste',outros:'Outros',
 } as const;
 export type LedgerSource=keyof typeof LEDGER_SOURCES;
 const PREFIX_SOURCE:Record<string,LedgerSource>={welcome:'boas-vindas',daily:'bonus',job:'trabalho',refund:'estorno',pix:'pix',skin:'skins',item:'mochila',
-  media:'midia',counter:'balcao',table:'mesa',stage:'palco','dev-bots':'testes'};
+  media:'midia',counter:'balcao',table:'mesa',stage:'palco',blackjack:'blackjack',foosball:'pebolim','dev-bots':'testes'};
 export const ledgerSource=(reason:string):LedgerSource=>reason.startsWith('{')?'admin':PREFIX_SOURCE[reason.split(':')[0]!]??'outros';
 const itemName=(id:string|undefined)=>itemById(id??'')?.name??id??'item';
 /** A sentence for one ledger row (`names`: display names by account id, for Pix). */
@@ -127,6 +127,8 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
     case 'counter':return `${itemName(a)} no balcão`;
     case 'table':return `Pedido na mesa: ${(a??'').split('-').map(itemName).join(', ')}`;
     case 'stage':return 'Ingresso do palco';
+    case 'blackjack':return a==='bet'?'Aposta no blackjack':a==='refund'?'Aposta do blackjack devolvida':'Prêmio do blackjack';
+    case 'foosball':return a==='bet'?'Partida de pebolim valendo moedas':a==='refund'?'Moedas do pebolim devolvidas':'Prêmio do pebolim';
     case 'dev-bots':return 'Saldo dos bots de teste';
     default:return reason;
   }
@@ -170,7 +172,12 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_job:d=>({title:'Administração: emprego',detail:[d.endShiftOf?'encerrou um turno':'',d.slots!==undefined?`vagas ${text(d.slots)}`:'',d.enabled!==undefined?(d.enabled?'aberto':'fechado'):''].filter(Boolean).join(' · ')}),
   admin_table_cancel:()=>({title:'Administração: pedido cancelado',detail:'Moedas devolvidas ao cliente.'}),
   admin_media_off:d=>({title:'Administração: aparelho desligado',detail:text(d.id)}),
+  media_refused:d=>({title:'Vídeo pulado: a plataforma não deixou tocar',detail:`${text(d.id)} · ${text(d.videoId)}${d.refunded?' · moedas devolvidas':''}`}),
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
+  blackjack_round:d=>({title:'Rodada de blackjack',detail:`Apostou ${text(d.staked)||0} · recebeu ${text(d.paid)||0}${d.outcomes?` · ${text(d.outcomes)}`:''}`,amount:typeof d.net==='number'?d.net:undefined}),
+  blackjack_settle_refused:d=>({title:'Prêmio do blackjack recusado',detail:`Rodada ${text(d.roundId)}: ${text(d.reason)}`}),
+  foosball_match:d=>({title:'Partida de pebolim',detail:`Mesa ${text(d.table)} · ${text(d.score)} · ${d.result==='win'?'venceu':d.result==='loss'?'perdeu':'sem resultado'}${d.forfeit?' (W.O.)':''}${d.stake?` · valendo ${text(d.stake)}`:''}`,amount:typeof d.net==='number'&&d.net?d.net:undefined}),
+  foosball_settle_refused:d=>({title:'Prêmio do pebolim recusado',detail:`Partida ${text(d.roundId)}: ${text(d.reason)}`}),
   wallet_credit_refused:d=>({title:'Crédito recusado',detail:`A API recusou ${text(d.reason)}.`}),
   wallet_credit_abandoned:d=>({title:'Crédito abandonado',detail:`${text(d.amount)} moedas de ${text(d.reason)} não foram pagas.`}),
 };

@@ -86,6 +86,13 @@ function curl(chain:pc.Entity[],axis:pc.Vec3,palm:pc.Vec3,angles:readonly number
   chain.forEach((joint,i)=>rotateAbout(joint,axis,sign*(angles[i]??0)));
 }
 
+/** Closes the fingers (and a little the thumb) around something held, after the animation ran this frame. */
+export function closeHand(rig:HandRig,angles:readonly number[]):void {
+  const frame=handFrame(rig);
+  for(const name of FINGERS){const chain=rig.fingers[name];if(chain)curl(chain,frame.across,frame.palm,angles);}
+  if(rig.fingers.thumb)curl(rig.fingers.thumb,frame.fingers,frame.palm,[12,18,10]);
+}
+
 /**
  * Places `prop` in the hand after the animation ran this frame. Near the mouth the wrist turns so the
  * bottle or glass reaches its drinking angle; the fingers close around it.

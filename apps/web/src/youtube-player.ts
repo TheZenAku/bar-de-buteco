@@ -5,7 +5,8 @@ export interface YoutubePlayer {
   playVideo():void;pauseVideo():void;stopVideo():void;seekTo(seconds:number,allowSeekAhead:boolean):void;
   getCurrentTime():number;getDuration():number;getPlayerState():number;
   isMuted?():boolean;getVolume?():number;
-  getVideoData?():{title?:string;video_id?:string};
+  /** `isLive`: a live broadcast (not in the documented API, so it may be missing; see MediaController.isLive). */
+  getVideoData?():{title?:string;video_id?:string;isLive?:boolean};
   getIframe():HTMLIFrameElement;setVolume(volume:number):void;mute():void;unMute():void;destroy():void;
 }
 export interface YoutubeEvents {onReady:(event:{target:YoutubePlayer})=>void;onStateChange:(event:{data:number})=>void;onError:(event:{data:number})=>void;onAutoplayBlocked:()=>void;}

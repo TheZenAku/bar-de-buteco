@@ -11,23 +11,47 @@ async function enter(page:Page,prefix:string){
 }
 test.beforeEach(async({request})=>{await expect.poll(async()=>{try{return (await request.get('/api/health')).ok()&&(await request.get('http://localhost:2677/health')).ok();}catch{return false;}},{timeout:30000}).toBe(true);});
 
-test('nova UI lays out logo, wallet, chat, hotbar and meters, persists panel positions, locks and visibility per account, handles broken storage and fits narrow screens',async({page})=>{
+test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists panel positions, locks and visibility per account, handles broken storage and fits narrow screens',async({page})=>{
   test.setTimeout(180000);await page.setViewportSize({width:1440,height:900});
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const id=await enter(page,'Layout');
   try{
     // The hotbar and the chat, plus the job panel that only shows during a shift. The player's state is not a panel: five
-    // meters (drunkenness only when drunk) in the bottom-right corner. The occupancy is in the people window.
+    // small round cores (drunkenness only when drunk) on the rim of the round minimap in the bottom-left corner, as in
+    // Red Dead Online. The occupancy is in the people window.
     await expect(page.locator('[data-panel]')).toHaveCount(3);await expect(page.locator('[data-panel="job"]')).toBeHidden();
     await expect(page.locator('.status-hud .need:visible')).toHaveCount(5);await expect(page.locator('#hud-activity')).toHaveCount(0);
-    const corner=(await page.locator('.status-hud').boundingBox())!;
-    expect(corner.x+corner.width).toBeCloseTo(1440-16,0);expect(corner.y+corner.height).toBeCloseTo(900-16,0);
-    // Top left: the logo and the chat under it. Top right: the toolbar and, last, the wallet. No key hints, mailbox,
-    // account badge or connection chip over the game: the connection and the account are in the people window.
+    const map=(await page.locator('.minimap').boundingBox())!;
+    expect(map.x).toBeCloseTo(16,0);expect(map.y+map.height).toBeCloseTo(900-16,0);expect(map.width).toBeCloseTo(map.height,0);
+    // Life first, then breath, hunger, thirst and the bladder, clockwise along the rim: just outside the ring, over its top.
+    const cores=await page.locator('.status-hud .need:visible').all(),centre={x:map.x+map.width/2,y:map.y+map.height/2};
+    expect(await cores[0]!.getAttribute('data-need')).toBe('hp');let previous:{x:number;y:number;width:number;height:number}|undefined;
+    for(const core of cores){
+      expect(await core.evaluate(el=>getComputedStyle(el).borderRadius)).toBe('50%');
+      const value=Number(await core.getAttribute('aria-valuenow'));expect(value).toBeGreaterThanOrEqual(0);expect(value).toBeLessThanOrEqual(100);
+      const box=(await core.boundingBox())!,distance=Math.hypot(box.x+box.width/2-centre.x,box.y+box.height/2-centre.y);
+      expect(box.width).toBeLessThanOrEqual(36);expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(distance-box.width/2).toBeGreaterThanOrEqual(map.width/2);expect(distance-box.width/2).toBeLessThan(map.width/2+8);
+      expect(box.y+box.height/2).toBeLessThan(centre.y);
+      if(previous){expect(box.x).toBeGreaterThan(previous.x);expect(Math.hypot(box.x-previous.x,box.y-previous.y)).toBeGreaterThanOrEqual(box.width);}
+      previous=box;
+    }
+    expect(await page.locator('#minimap').evaluate(el=>getComputedStyle(el).borderRadius)).toBe('50%');
+    await expect(page.locator('#minimap-zone')).toHaveText(/^(Salão|Quintal|Rua|Andar de cima|Terraço|Praça|Igreja|Campinho|Escola|Ponto de ônibus)$/);
+    // Top left: the logo. Top right: the toolbar and, last, the wallet. The chat by the right side, halfway down. No key
+    // hints, mailbox, account badge or connection chip over the game: the connection and the account are in the people
+    // window.
     const logo=(await page.locator('.boteco-logo img').boundingBox())!,wallet=(await page.locator('.game-header .hud-wallet').boundingBox())!,chat=(await page.locator('[data-panel="chat"]').boundingBox())!;
     expect(await page.locator('.boteco-logo img').evaluate(img=>(img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     expect(logo.x).toBeLessThan(30);expect(logo.height).toBeLessThanOrEqual(60);expect(wallet.x+wallet.width).toBeCloseTo(1440-16,0);expect(wallet.y).toBeLessThan(20);
-    expect(chat.x).toBeLessThan(30);expect(chat.y).toBeGreaterThan(logo.y+logo.height);expect(chat.y).toBeLessThan(120);
+    expect(chat.x+chat.width).toBeCloseTo(1440-16,0);expect(Math.abs(chat.y+chat.height/2-450)).toBeLessThan(2);
+    // Idle, only its lines over the scene; T opens the box with the field, and Esc closes it again.
+    const chatPanel=page.locator('[data-panel="chat"]');
+    expect(await chatPanel.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');await expect(page.locator('#chat-input')).toBeHidden();
+    await page.locator('.boteco-logo').click();await page.keyboard.press('t');await expect(page.locator('#chat-input')).toBeFocused();await expect(chatPanel).toHaveClass(/chat-open/);
+    expect(await chatPanel.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    expect((await chatPanel.boundingBox())!.y).toBeCloseTo(chat.y,0);
+    await page.keyboard.press('Escape');await expect(chatPanel).not.toHaveClass(/chat-open/);await expect(page.locator('#chat-input')).toBeHidden();
     await expect(page.locator('.player-badge,.net-status,#hud-status')).toHaveCount(0);
     await expect(page.locator('.world-hint')).toHaveCount(0);await expect(page.locator('.dev-mail')).toBeHidden();
     // The actions are a one-row hotbar at the bottom centre: names show on hover.
@@ -41,7 +65,7 @@ test('nova UI lays out logo, wallet, chat, hotbar and meters, persists panel pos
     const wardrobe=await(await page.request.get('/api/wardrobe')).json();await expect(page.locator('#hud-balance')).toHaveText(wardrobe.balance.toLocaleString('pt-BR'));
     const panel=page.locator('[data-panel="chat"]'),header=panel.locator('.panel-heading');const before=(await panel.boundingBox())!;
     const drag=async(dx:number,dy:number)=>{const box=(await header.boundingBox())!;await page.mouse.move(box.x+20,box.y+20);await page.mouse.down();await page.mouse.move(box.x+20+dx,box.y+20+dy,{steps:8});await page.mouse.up();};
-    await drag(90,70);const moved=(await panel.boundingBox())!;expect(moved.x).toBeCloseTo(before.x+90,0);expect(moved.y).toBeCloseTo(before.y+70,0);
+    await drag(-90,70);const moved=(await panel.boundingBox())!;expect(moved.x).toBeCloseTo(before.x-90,0);expect(moved.y).toBeCloseTo(before.y+70,0);
     await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);
     expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);expect((await panel.boundingBox())!.y).toBeCloseTo(moved.y,0);
     await expect(page.locator('.game-tools [data-hud-lock]')).toHaveCount(0);
@@ -49,19 +73,24 @@ test('nova UI lays out logo, wallet, chat, hotbar and meters, persists panel pos
     await expect(page.locator('#panel-menu [data-hud-lock]')).toHaveAttribute('aria-pressed','true');await page.keyboard.press('Escape');await drag(40,40);expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
     await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-visible="chat"]').click();await expect(page.locator('[data-panel="chat"]')).toBeHidden();
     await page.locator('.boteco-logo').click();await page.getByRole('button',{name:/Resenhar/}).click();await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
+    // The chat's own header hides it too; T shows it again with the field focused.
+    await page.getByRole('button',{name:'Ocultar chat'}).click();await expect(page.locator('[data-panel="chat"]')).toBeHidden();
+    await page.keyboard.press('t');await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
     await page.screenshot({path:previewPath('nova-ui-desktop.png')});
     for(const width of [960,760,640,390]){
       // Two frames: the page has handled the resize (and laid the panels out again) before anything is measured.
       await page.setViewportSize({width,height:844});await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      // Each width range's default layout leaves the corner meters uncovered.
-      const meters=(await page.locator('.status-hud').boundingBox())!;
+      // Each width range's default layout leaves the minimap and the cores on its rim uncovered, all on screen.
+      const clear=(a:{x:number;y:number;width:number;height:number},b:typeof a)=>a.x>=b.x+b.width||a.x+a.width<=b.x||a.y>=b.y+b.height||a.y+a.height<=b.y;
+      const map=(await page.locator('.minimap').boundingBox())!,cores=await Promise.all((await page.locator('.status-hud .need:visible').all()).map(async core=>(await core.boundingBox())!));
+      expect(cores).toHaveLength(5);for(const core of cores){expect(core.x).toBeGreaterThanOrEqual(0);expect(core.y).toBeGreaterThanOrEqual(0);}
       for(const item of await page.locator('[data-panel]:visible').all()){const box=(await item.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(844);
-        expect(box.x>=meters.x+meters.width||box.x+box.width<=meters.x||box.y>=meters.y+meters.height||box.y+box.height<=meters.y,`a panel covers the meters at ${width}px`).toBe(true);}
+        expect(clear(box,map),`a panel covers the minimap at ${width}px`).toBe(true);for(const core of cores)expect(clear(box,core),`a panel covers a core at ${width}px`).toBe(true);}
     }
     await page.screenshot({path:previewPath('nova-ui-mobile.png')});
     await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-reset]').click();await expect(page.locator('#panel-menu [data-hud-lock]')).toHaveAttribute('aria-pressed','false');
-    await page.evaluate(id=>localStorage.setItem(`bar:nova-ui:hud:v2:${id}:desktop`,'{"panels":{"chat":{"x":"broken"}}'),id);
+    await page.evaluate(id=>localStorage.setItem(`bar:nova-ui:hud:v4:${id}:desktop`,'{"panels":{"chat":{"x":"broken"}}'),id);
     await page.setViewportSize({width:1440,height:900});await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);await expect(page.locator('[data-panel="chat"]')).toBeVisible();await expect(page.locator('.status-hud')).toBeVisible();
     expect(errors).toEqual([]);
   }finally{await page.request.post('/api/auth/logout',{data:{}});}
@@ -143,20 +172,18 @@ test.describe('full screen',()=>{
     await row.click();
     await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName??'none')).toBe('none');
     await expect(row).toHaveAttribute('aria-pressed','false');await page.keyboard.press('Escape');
-    // Moved near the right side, the chat keeps its distance from that side.
-    const start=await box('[data-panel="chat"] .panel-heading');
-    await page.mouse.move(start.x+40,start.y+15);await page.mouse.down();await page.mouse.move(start.x+40+1100,start.y+15+60,{steps:8});await page.mouse.up();await settle();
+    // By the right side, halfway down, the chat keeps its distance from that side and stays halfway down.
     const chat=await box('[data-panel="chat"]'),gap=1600-(chat.x+chat.width);
-    expect(gap).toBeGreaterThan(8);expect(gap).toBeLessThan(400);
+    expect(gap).toBeCloseTo(16,0);expect(Math.abs(chat.y+chat.height/2-430)).toBeLessThan(2);
     // The window grows as with F11, shrinks to a laptop's and grows again: the scene always fills it, the hotbar stays
-    // centred 12 px over the bottom, and the chat keeps its gap to the right side and its height from the top.
+    // centred 12 px over the bottom, and the chat keeps its gap to the right side and its place halfway down.
     for(const [width,height] of [[1920,1080],[1366,768],[1920,1080]] as const){
       await page.setViewportSize({width,height});await settle();
       const world=await box('#world');expect([world.x,world.y,world.width,world.height]).toEqual([0,0,width,height]);
       expect(await page.locator('#world').evaluate((canvas:HTMLCanvasElement)=>canvas.height/canvas.width)).toBeCloseTo(height/width,2);
       const hotbar=await box('[data-panel="actions"]');
       expect(hotbar.y+hotbar.height).toBeCloseTo(height-12,0);expect(Math.abs(hotbar.x+hotbar.width/2-width/2)).toBeLessThan(2);
-      const moved=await box('[data-panel="chat"]');expect(width-(moved.x+moved.width)).toBeCloseTo(gap,0);expect(moved.y).toBeCloseTo(chat.y,0);
+      const moved=await box('[data-panel="chat"]');expect(width-(moved.x+moved.width)).toBeCloseTo(gap,0);expect(Math.abs(moved.y+moved.height/2-height/2)).toBeLessThan(2);
     }
     // Now the window is the screen, as in the browser's full screen: the row says so, and a page cannot leave it.
     await menu.click();await expect(row).toHaveAttribute('aria-pressed','true');await expect(row).toHaveText('Sair da tela cheia');

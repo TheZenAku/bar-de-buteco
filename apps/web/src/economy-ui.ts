@@ -8,7 +8,7 @@ import {itemCost,price as livePrice} from './prices';
 /** Above the jukebox and TV panels: what a new video costs (the room charges it, never the browser). */
 export function mediaPriceNote(kind:'jukebox'|'tv',id:string,balance:number|undefined):string {
   const price=livePrice(mediaPriceKey(kind,id));
-  return `<p class="media-price"><b>${coins(price)}</b> por vídeo novo · pausar, continuar e parar são de graça${balance===undefined?'':` · você tem ${coins(balance)}`}</p>`;
+  return `<p class="media-price"><b>${coins(price)}</b> por vídeo novo · pausar, avançar e pular são de graça${balance===undefined?'':` · você tem ${coins(balance)}`}</p>`;
 }
 
 /** Minutes left on a stage pass (`until`: server clock), at least 1 while it lasts. */

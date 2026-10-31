@@ -21,7 +21,8 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
   const previousApi = process.env.API_INTERNAL_URL, previousCapacity = process.env.BAR_CAPACITY;
   process.env.BAR_CAPACITY = '2';
   const equipped:Record<string,string>={alice:'nathan',bob:'leandro'};
-  const access=(userId:string)=>({valid:true,blocked:[],role:'user',equippedSkin:equipped[userId]??'nathan',ownedSkins:userId==='bob'?['nathan','leandro']:SKINS.map(s=>s.id)});
+  const access=(userId:string)=>({valid:true,blocked:[],role:'user',balance:1000,equippedSkin:equipped[userId]??'nathan',ownedSkins:userId==='bob'?['nathan','leandro']:SKINS.map(s=>s.id)});
+  const bets:Array<{userId:string;amount:number;reason:string}>=[];
   const internal = createServer(async (req, res) => {
     let data = '';
     for await (const chunk of req) data += chunk;
@@ -33,6 +34,8 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
       else {equipped[body.userId]=body.skin;res.end(JSON.stringify(access(body.userId)));}
     }
     else if (req.url === '/api/internal/controls') res.end('{"controls":[]}');
+    else if (req.url === '/api/internal/wallet') { bets.push(body); res.end(JSON.stringify({ balance: 1000 + body.amount, applied: body.amount })); }
+    else if (req.url === '/api/internal/blackjack/settle') res.end(JSON.stringify({ balance: 1000, applied: body.payout }));
     else res.end('{"ok":true}');
   });
   await new Promise<void>(resolve => internal.listen(0, '127.0.0.1', resolve));
@@ -151,12 +154,17 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(player.animationState, 'sit', 'Seated Rafael cannot kick');
     second.send('blackjack.join', { tableId: 'blackjack-1' });
     await eventually(() => first.state.tables.get('blackjack-1').seats.length === 2);
-    first.send('blackjack.start', { tableId: 'blackjack-1' });
-    await eventually(() => first.state.tables.get('blackjack-1').phase !== 'waiting');
+    // Both bet: the window closes at once, the coins are taken through the API, then the cards come.
+    first.send('blackjack.bet', { amount: 5 });
+    await eventually(() => errors.some(message => message.includes('de 10 a 500')));
+    first.send('blackjack.bet', { amount: 20 });
+    second.send('blackjack.bet', { amount: 10 });
+    await eventually(() => first.state.tables.get('blackjack-1').dealerCards.length === 2, 6000);
+    assert.deepEqual(bets.map(b => [b.userId, b.amount, b.reason.split(':').slice(0, 2).join(':')]).sort(), [['alice', -20, 'blackjack:bet'], ['bob', -10, 'blackjack:bet']]);
     const table = first.state.tables.get('blackjack-1');
-    if (table.phase === 'playing') {
-      assert.equal(table.dealerCards[1].rank, '?');
-      assert.equal(table.dealerTotal, 0);
+    if (table.phase !== 'results') {
+      assert.equal(table.dealerCards[1].rank, '?', 'The hole card is not in the synced state');
+      assert.ok(table.dealerTotal <= 11, 'The total shown is the up card alone');
     }
     const originalSession = first.sessionId;
     let resumed = false;

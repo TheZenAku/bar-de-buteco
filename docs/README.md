@@ -29,7 +29,9 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 ## Sistemas do jogo
 
 - [Administração](sistemas/admin.md)
+- [Blackjack: regras de cassino, apostas e o painel da mesa](sistemas/blackjack.md)
 - [Câmera: primeira e terceira pessoa, suavização e raio-X](sistemas/camera.md)
+- [Pebolim: regras oficiais, física, Zé do Totó e partidas valendo moedas](sistemas/pebolim.md)
 - [Celular: ligações, Highzap, Highgram, câmera e HighBank](sistemas/celular.md)
 - [Som ambiente](sistemas/ambient.md)
 - [Ciclo de dia e noite](sistemas/day-night.md)
@@ -41,6 +43,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Inventário](sistemas/inventory.md)
 - [Jukebox e TVs](sistemas/jukebox.md)
 - [Necessidades do personagem](sistemas/needs.md)
+- [Moto de entrega: controles, física e rede](sistemas/moto.md)
 - [Músicos do palco](sistemas/palco.md)
 - [Skins e coleção](sistemas/skins.md)
 - [Chat de voz por proximidade](sistemas/voice.md)

@@ -12,6 +12,7 @@
   "dependencies": {
     "@bar/shared": "*",
     "@colyseus/sdk": "0.18.5",
+    "hls.js": "1.6.15",
     "playcanvas": "2.23.3"
   },
   "devDependencies": {

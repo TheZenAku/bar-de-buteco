@@ -440,6 +440,18 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
     return wallet.change(body);
   });
+  // The end of a blackjack round for one player: paid against the round's bets on the ledger, once (wallet-service.ts).
+  app.post('/api/internal/blackjack/settle',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
+      stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
+    return wallet.settleBlackjack(body);
+  });
+  // The end of a pebolim match for one player: the winners are paid against the match's stakes on the ledger, once.
+  app.post('/api/internal/foosball/settle',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
+      stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
+    return wallet.settleFoosball(body);
+  });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);
     const skin=skinMessageSchema.parse({skin:requestedSkin}).skin;

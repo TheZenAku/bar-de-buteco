@@ -1,8 +1,24 @@
-/* The YouTube players sit under the canvas (#world). A TV's player is projected onto its screen and shows through
+/* The players sit under the canvas (#world). A TV's player is projected onto its screen and shows through
    that screen's transparent aperture; the jukebox's player only provides sound and never shows. */
 #app{isolation:isolate}#world{z-index:1}#labels,.vignette{z-index:2}.game{z-index:3}
-#media-players{display:contents}.media-player{position:fixed;left:0;top:0;z-index:0;width:640px;height:360px;transform-origin:0 0;background:#080808;pointer-events:auto}.media-player iframe{display:block;width:100%;height:100%;border:0}
+/* Only the video's controller can reach its player (its own controls); for everyone else the picture takes no pointer,
+   so nobody pauses or seeks just their own copy. The probe checks a link before it is queued and never shows. */
+#media-players{display:contents}.media-player{position:fixed;left:0;top:0;z-index:0;width:640px;height:360px;transform-origin:0 0;background:#080808;pointer-events:none}.media-player.controls{pointer-events:auto}.media-player iframe{display:block;width:100%;height:100%;border:0}
 .media-player.audio-only{opacity:0;transform:scale(.01);pointer-events:none}
+.media-player.media-probe{width:200px;height:200px;opacity:0;pointer-events:none}
+.media-player video{display:block;width:100%;height:100%;background:#080808;object-fit:contain}.media-player .fb-video,.media-player .fb-video>span{display:block;width:100%!important;height:100%!important}
+/* A platform that plays only fully in sight (Twitch): over the whole game and at its minimum size, however it is moved. */
+.media-player.media-window{left:auto;right:16px;top:72px;z-index:4;width:400px;height:auto;pointer-events:auto;box-shadow:0 8px 32px oklch(0 0 0 / 60%);outline:1px solid var(--vw-pink)}
+.media-window>:last-child{display:block;width:400px;height:300px}.media-window iframe{pointer-events:none}.media-window.controls iframe{pointer-events:auto}
+.media-window-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 10px;background:oklch(.16 .03 300);font:600 12px var(--font-mono);color:var(--foreground);cursor:move;touch-action:none;user-select:none}.media-window-bar .text-button{font-size:12px}
+.media-now{margin:18px 0 6px}.media-heading{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:12px 0 4px}.media-heading .jukebox-title{margin:0}
+.media-live{font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--vw-pink);border:1px solid currentColor;padding:2px 6px}
+.media-owner{font-size:13px;opacity:.85;margin:0 0 6px}.media-platform{font:400 11px var(--font-mono);color:var(--vw-cyan);text-transform:uppercase;letter-spacing:.08em}.media-hint{color:var(--vw-cyan)!important;margin-top:-10px}
+.media-seek{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin:12px 0 0}.media-seek output{font:400 12px var(--font-mono);color:var(--vw-cyan)}.media-seek input[type=range]{margin:0}
+.media-queue{margin:6px 0 18px}.media-queue h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+.media-queue ol{list-style:none;margin:0;padding:0;display:grid;gap:1px;max-height:220px;overflow:auto}
+.media-queue li{display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:center;padding:8px 10px;background:oklch(1 0 0 / 4%)}
+.media-queue-title{overflow-wrap:anywhere}.media-queue li small{grid-column:1;font-size:12px;opacity:.7}.media-queue li .text-button{grid-column:2;grid-row:1 / span 2;font-size:12px}
 .jukebox-panel{max-width:560px}.jukebox-panel form{display:grid;grid-template-columns:1fr auto;align-items:end;gap:1px;margin-bottom:18px}.jukebox-panel form label{margin:0}.jukebox-panel form .button{min-height:42px}.jukebox-title{font-size:18px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:12px 0;overflow-wrap:anywhere;color:var(--foreground)!important}.jukebox-controls{display:flex;gap:1px;flex-wrap:wrap;margin:16px 0}.jukebox-controls .button{font-size:12px;padding:9px 12px}.jukebox-panel label>input[type=range]{margin-top:10px}.jukebox-panel output{float:right;color:var(--vw-pink)}#jukebox-state,#tv-state{font:400 12px var(--font-mono)!important;text-transform:uppercase;color:var(--vw-cyan)!important}#leave-tv{position:fixed;top:16px;left:16px;z-index:360}.watching-tv .game,.watching-tv #labels,.watching-tv .vignette{visibility:hidden}
 @media(max-width:760px){.jukebox-panel form{grid-template-columns:1fr}.jukebox-panel form button{width:100%}}
 .media-active .vignette{background:none}

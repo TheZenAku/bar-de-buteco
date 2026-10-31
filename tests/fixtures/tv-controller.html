@@ -1,18 +1,30 @@
 <!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>TV controller fixture</title><div id="app"><canvas id="world"></canvas><main id="panel"></main></div><script type="module">
 import '/src/assets/fonts/neon-ui.css';import '/src/neon-ui.css';import '/src/jukebox.css';
 import {TelevisionController} from '/src/jukebox.ts';
-import {initialJukebox,commandJukebox,INTERACTABLES} from '../../packages/shared/src/index.ts';
+import {initialJukebox,commandJukebox,endMedia,failMedia,liveMedia,INTERACTABLES} from '../../packages/shared/src/index.ts';
 // The ground floor's group: three screens following one shared state.
 const spot=id=>{const o=INTERACTABLES.find(i=>i.id===id);return {id:'alice',x:o.x,y:o.y,z:o.z};};
 const world={players:{alice:spot('tv-hall')},jukeboxes:{},televisions:{'tv-main':initialJukebox('tv-main'),'tv-upstairs':initialJukebox('tv-upstairs')}};
-const projections={},shown={},sent=[];
-const controller=new TelevisionController({now:()=>Date.now(),send:(type,payload)=>{sent.push({type,payload});if(type==='tv.command'){world.televisions['tv-main']=commandJukebox(world.televisions['tv-main'],payload,'alice',Date.now());controller.setWorld(world,'alice',true);}},
+const projections={},shown={},sent=[],errors=[];
+// The room's reducers, as the server runs them; a refusal comes back as the server's error does.
+const reports={'tv.ended':endMedia,'tv.failed':failMedia,'tv.live':liveMedia};
+const update=()=>controller.setWorld(world,'alice',true);
+const controller=new TelevisionController({now:()=>Date.now(),send:(type,payload)=>{sent.push({type,payload});const current=world.televisions[payload.id];
+  try{
+    if(type==='tv.command')world.televisions[payload.id]=commandJukebox(current,payload,{id:'alice',name:'Alice'},Date.now(),{key:`k${sent.length}`,title:''});
+    else if(reports[type])world.televisions[payload.id]=reports[type](current,payload,'alice',Date.now())??current;
+    else return;
+  }catch(error){errors.push(error.message);controller.reject(error.message);return;}
+  update();},
   project:screen=>projections[screen]??null,clear:()=>true,screen:(screen,visible)=>shown[screen]=visible,ambient:()=>{}});
 const panel=document.querySelector('#panel');panel.style.cssText='position:fixed;inset:0 380px 0 0;overflow:auto;padding:20px;z-index:4';
-panel.innerHTML=controller.panelHtml('tv-main');controller.attachPanel(panel);controller.setWorld(world,'alice',true);
+panel.innerHTML=controller.panelHtml('tv-main');controller.attachPanel(panel);update();
 const timer=setInterval(()=>controller.frame(),50);
-window.fixture={controller,world,sent,shown,
-  stand:id=>{world.players.alice=spot(id);controller.setWorld(world,'alice',true);},
+window.fixture={controller,world,sent,errors,shown,
+  stand:id=>{world.players.alice=spot(id);update();},
   project:(screen,points)=>projections[screen]=points,
+  // Someone else controls the video (by: '' when nobody does), or queues one.
+  control:(by,byName=by)=>{world.televisions['tv-main']={...world.televisions['tv-main'],by,byName};update();},
+  queue:(entry)=>{const state=world.televisions['tv-main'];world.televisions['tv-main']={...state,queue:[...state.queue,entry]};update();},
   teardown:()=>{clearInterval(timer);controller.destroy();}};
 </script></html>

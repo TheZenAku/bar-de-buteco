@@ -3,6 +3,7 @@ import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } f
 import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
 import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
+import {FOOSBALL_TABLES} from './foosball.js';
 
 export const WALK_SPEED = 3.5;
 export const RUN_SPEED = 6;
@@ -61,7 +62,7 @@ function rebuildSolids():void {
 }
 rebuildSolids();
 const solidsAt=(x:number,z:number):readonly Collider[]=>solidGrid.get(cellKey(cell(x),cell(z)))??[];
-function solidsBetween(ax:number,az:number,bx:number,bz:number):readonly Collider[] {
+export function solidsBetween(ax:number,az:number,bx:number,bz:number):readonly Collider[] {
   const found=new Set<Collider>();
   for(let x=cell(Math.min(ax,bx));x<=cell(Math.max(ax,bx));x++)for(let z=cell(Math.min(az,bz));z<=cell(Math.max(az,bz));z++)
     for(const collider of solidGrid.get(cellKey(x,z))??[])found.add(collider);
@@ -132,6 +133,9 @@ export const SHOP_SPOT:Required<Position>={x:18.79,y:.3,z:-15.45};
 export const SHOP_REACH=.7;
 export const INTERACTABLES: readonly Interactable[] = [
   {id:'blackjack-1',type:'blackjack',label:'Jogar blackjack',...BLACKJACK_TABLE,footprint:[footprint(BLACKJACK_COLLIDER)]},
+  // The pebolim tables (foosball.ts), used by touching them: E takes a free place, or watches a full table.
+  ...FOOSBALL_TABLES.map(table=>({id:table.id,type:'foosball' as const,label:`Jogar pebolim · mesa ${table.number}`,x:table.x,y:table.y,z:table.z,
+    footprint:[footprint(map.colliders.find(c=>c.id===table.collider)!)]})),
   {id:'counter',type:'counter',label:'Pedir uma bebida',...map.markers.Ponto_Balcao,footprint:[...COUNTER_FOOTPRINT]},
   // The point is where a player stands touching the jukebox front.
   {id:'jukebox',type:'jukebox',media:'jukebox',label:'Tocar a jukebox',x:JUKEBOX.x,y:JUKEBOX.y,z:JUKEBOX.z+JUKEBOX.hz+PLAYER_RADIUS+.05,footprint:[footprint(JUKEBOX_COLLIDER)]},
@@ -170,6 +174,16 @@ export function floorHeight(x:number,z:number,reference=.3):number|undefined {
     if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest))highest=y;
   }
   return highest;
+}
+
+/** Like floorHeight, but only the streets and pavements: where a bar's or a yard's floor is the support, a vehicle may not go. */
+export function roadHeight(x:number,z:number,reference=0):number|undefined {
+  let highest:number|undefined,road=false;
+  for(const surface of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
+    const y=triangleHeight(surface.points,x,z);
+    if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest)){highest=y;road=surface.id.startsWith('COL_Rua');}
+  }
+  return road?highest:undefined;
 }
 
 // People turn sideways through a doorway: inside an open door's frame the body is this narrow.

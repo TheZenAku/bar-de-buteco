@@ -40,6 +40,12 @@ export class FileOutbox<T = unknown> {
     for (const id of ids) changed = this.records.delete(id) || changed;
     if (changed) this.rewrite();
   }
+  /** In one atomic rewrite, the records `ids` leave and `next` comes in: a crash leaves either all of them or it. */
+  swap(ids: readonly string[], next: { kind: string; id: string; payload: T }, now = Date.now()): void {
+    for (const id of ids) this.records.delete(id);
+    if (!this.records.has(next.id)) this.records.set(next.id, { ...next, createdAt: now });
+    this.rewrite();
+  }
   /** Records the receiver rejected for good go to `<path>.failed` (dead letter) instead of being retried forever. */
   fail(ids: readonly string[], reason: string): void {
     const failed = ids.map(id => this.records.get(id)).filter((record): record is OutboxRecord<T> => !!record);

@@ -5,15 +5,22 @@ import { z } from 'zod';
 import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, internal, validateAccess, type Control } from './internal.js';
-import { BarState, CardState, DoorState, JobSlotState, Player, SeatState, TableState } from './state.js';
-import { BlackjackTable, type Result } from './minigames/blackjack.js';
+import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Player, SeatState, TableState } from './state.js';
+import { MOTO, MOTOS, NO_MOTO_INTENT, canMountMoto, isRidingMoto, motoDismountSpot, motoInputSchema, motoInteraction, motoMountSchema, parkedMoto, stepMoto, type MotoInput } from '@bar/shared';
+import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
+import { BlackjackBank, GameBank, type BankEntry } from './minigames/blackjack-bank.js';
+import { FoosballTable, type FoosballSummary } from './minigames/foosball.js';
+import { betLimits, blackjackActionSchema, blackjackBetSchema, blackjackInsuranceSchema } from '@bar/shared';
+import { FOOSBALL, FOOSBALL_TABLES, TEAM_NAMES, foosballBetLimits, foosballConfigSchema, foosballCpuSchema, foosballExit, foosballInputSchema, foosballJoinSchema, foosballKickSchema,
+  foosballReadySchema, foosballSlotSchema, foosballSpot, foosballWatchSchema, type FoosballFrame } from '@bar/shared';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
 import { BarService } from './world/bartender.js';
 import { NeedsDirector } from './world/needs.js';
 import { NEEDS, MAP_MARKERS, isConscious, swayInput, type NeedsEvent } from '@bar/shared';
-import {JUKEBOX_SYSTEMS,TV_SYSTEMS,initialJukebox,jukeboxCommandSchema,commandJukebox,jukeboxTime,type JukeboxState} from '@bar/shared';
-import {Jukebox} from './state.js';
+import {JUKEBOX_SYSTEMS,TV_SYSTEMS,initialJukebox,jukeboxCommandSchema,commandJukebox,clearMedia,endMedia,failMedia,liveMedia,mediaEndedSchema,mediaFailedSchema,mediaLiveSchema,mediaGain,jukeboxTime,parseMediaLink,MEDIA_PLATFORMS,type JukeboxState,type MediaProvider} from '@bar/shared';
+import {Jukebox,MediaEntry} from './state.js';
+import {VideoCheck} from './world/media-check.js';
 import { readWorldConfig } from './config.js';
 import { FileOutbox } from './world/outbox.js';
 import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
@@ -22,7 +29,7 @@ import { SessionRegistry } from './room/session-registry.js';
 import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
 import { ServedItems, type Seated } from './world/served.js';
 import { JobDirector, type Payment, type WorkerOrder } from './world/jobs.js';
-import { changeWallet, WalletRetries } from './world/wallet.js';
+import { changeWallet, WalletRetries, type WalletOwner } from './world/wallet.js';
 import { JOBS, MAX_WORKER_ORDERS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, consumeMs, consumedOverTime, type MediaPriceKind } from '@bar/shared';
 import { STAGE_PASS, hasStagePass, onStage, musicianRole, stageSpot } from '@bar/shared';
 import { WORLD_LOG_EVENTS, defaultPrices, itemPrice, mediaPriceKey, priceOf, sanitizePrices, type PriceTable } from '@bar/shared';
@@ -35,6 +42,8 @@ import { PHONE, isJpeg, phoneCallIdSchema, phoneCallSchema, phonePingSchema, typ
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
 const INTERACTION_SLACK = 0.3;
+/** A video its platform refuses within its first seconds never really played: its coins go back. */
+const MEDIA_REFUND_WITHIN_S = 30;
 
 interface Presence {
   joinedAt:number;
@@ -42,6 +51,9 @@ interface Presence {
   client: Client;
   blocked: Set<string>;
   queue: PlayerInput[];
+  /** On a delivery bike, its inputs instead (simulated like walking: at most one a tick); when the last one came. */
+  motoQueue: MotoInput[];
+  motoInputAt: number;
   lastReceived: number;
   lastInputAt: number;
   seen: Set<Schema>;
@@ -72,12 +84,14 @@ interface Presence {
   counterCharge?:{requestId:string;amount:number};
   /** A stage pass being charged: a second click meanwhile must not buy (and charge) another. */
   stageBusy?:boolean;
+  /** The pebolim table this player watches from beside it (its frames come to them), '' or undefined otherwise. */
+  watching?:string;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
 /** What is in hand is had 5% at a time, like what is served at a table (served.ts). */
 const HOLDING_SIP = .05;
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
-const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.start', 'blackjack.action', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
+const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
@@ -89,8 +103,6 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** Validated once per room (apps/server/src/config.ts); a bad variable stops the world at start. */
   private readonly config = readWorldConfig();
   private readonly sessions = new SessionRegistry<Presence>();
-  private blackjack = new BlackjackTable('blackjack-1', (roundId, userId, result) => this.recordResult(roundId, userId, result), undefined,
-    this.config.blackjackTurnMs);
   private events = new EventDirector(this.config.eventMinMs, this.config.eventMaxMs);
   private npcs = new NpcDirector();
   private service = new BarService();
@@ -105,6 +117,13 @@ export class BarRoom extends Room<{ state: BarState }> {
   private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated), dirtyTables: () => this.served.dirtyTables(), takeOne: table => this.served.takeOne(table) });
   readonly jobs = new JobDirector({ dirtyTables: () => this.served.dirtyTables(), isDirty: table => this.served.isDirty(table) });
   private walletRetries = new WalletRetries((event, details) => this.log(event, details));
+  /** Whether YouTube lets a video play on other sites, asked before it is queued (world/media-check.ts). */
+  private videoCheck = new VideoCheck(this.config.videoCheckUrl, (event, details) => this.log(event, details));
+  /**
+   * What each queued or playing video cost, by its queue key, with the wallet that paid: given back when its owner takes
+   * it out of the queue, the administration empties the queue, or YouTube refuses to play it.
+   */
+  private mediaPayments = new Map<string, { owner: WalletOwner; amount: number }>();
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
   readonly needs = new NeedsDirector();
   /** How much of what each player holds (Player.holding) they have had so far, 0–1: its effects come in 5% at a time. */
@@ -129,8 +148,43 @@ export class BarRoom extends Room<{ state: BarState }> {
   private botIds = new Set<string>();
   private maintenanceBusy = false;
   private lastTableJson = '';
-  private resultsResetAt = 0;
   private tickCount = 0;
+  /** When each bike was left parked: left alone long enough, it goes back to its spot (MOTOS). */
+  private readonly motoLeftAt = new Map<string, number>();
+  /**
+   * The blackjack table's coins (minigames/blackjack-bank.ts): every bet and every payment is on disk before the API is
+   * asked, so a crash or an outage delays them and never loses them. Declared after the log queue it writes to.
+   */
+  private blackjackBank = new BlackjackBank(new FileOutbox<BankEntry>(this.config.blackjackJournalPath, (event, details) => this.log(event, details)),
+    userId => this.sessions.getByUser(userId)?.ticket, changeWallet, internal, {
+      log: (event, details) => this.log(event, details),
+      wallet: (userId, change) => { const presence = this.sessions.getByUser(userId); if (presence) this.walletChanged(presence, change.balance, change.applied, 'blackjack'); },
+    });
+  private blackjack = new BlackjackTable('blackjack-1', {
+    bank: this.blackjackBank,
+    onResult: (roundId, userId, result) => this.recordResult(roundId, userId, result),
+    onRound: summary => this.logRound(summary),
+    onNotice: (playerId, message) => this.sessions.getByUser(playerId)?.client.send('error', { message }),
+    limits: () => betLimits(this.prices),
+    timing: { turnMs: this.config.blackjackTurnMs },
+  });
+  /** The pebolim tables' coins: stakes and payments journaled like blackjack's (foosball:bet:<match>, /internal/foosball/settle). */
+  private foosballBank = new GameBank('foosball', new FileOutbox<BankEntry>(this.config.foosballJournalPath, (event, details) => this.log(event, details)),
+    userId => this.sessions.getByUser(userId)?.ticket, changeWallet, internal, {
+      log: (event, details) => this.log(event, details),
+      wallet: (userId, change) => { const presence = this.sessions.getByUser(userId); if (presence) this.walletChanged(presence, change.balance, change.applied, 'foosball'); },
+    });
+  /** The pebolim tables of the games hall (minigames/foosball.ts), by id; their physics run at FOOSBALL.tickHz. */
+  private foosball = new Map(FOOSBALL_TABLES.map(place => [place.id, new FoosballTable(place.id, {
+    bank: this.foosballBank,
+    limits: () => foosballBetLimits(this.prices),
+    onNotice: (playerId, message) => this.sessions.getByUser(playerId)?.client.send('error', { message }),
+    onMatch: summary => this.foosballMatch(summary),
+  })] as const));
+  private foosballShown = new Map<string, string>();
+  private foosballTimer?: ReturnType<typeof setInterval>;
+  /** The tables' fixed steps catch up on the timer's real pace (Windows timers run late); frames go 30 times a second. */
+  private foosballClock = { last: 0, owed: 0, frameAt: 0 };
 
   onCreate(): void {
     // The primary bar persists even empty. A locked/full bar must never overflow
@@ -143,9 +197,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.state.capacity = this.maxClients;
     this.setPatchRate(PATCH_MS);
     this.state.tables.set('blackjack-1', new TableState());
+    for (const place of FOOSBALL_TABLES) this.state.foosball.set(place.id, new FoosballState().assign({ id: place.id }));
+    this.syncFoosball();
     // Doors start open, as authored in the map; the shared physics mirrors this room's door states.
     setDoorStates(DOORS.map(door => [door.id, true] as const));
     for (const door of DOORS) this.state.doors.set(door.id, new DoorState().assign({ id: door.id, open: true }));
+    for (const spot of MOTOS) this.state.motos.set(spot.id, new Moto().assign(parkedMoto(spot)));
     for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
@@ -157,6 +214,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     worldMetrics.gauge('bar_world_avatars', 'Avatars in the bar, including those waiting offline', () => this.state.players.size);
     worldMetrics.gauge('bar_world_result_outbox_pending', 'Finished rounds waiting for the API', () => this.results.pending);
     worldMetrics.gauge('bar_world_wallet_credits_pending', 'Refunds and job pay waiting for the API', () => this.walletRetries.size);
+    worldMetrics.gauge('bar_world_blackjack_settlements_pending', 'Blackjack payments waiting for the API', () => this.blackjackBank.pending);
+    worldMetrics.gauge('bar_world_foosball_settlements_pending', 'Pebolim payments waiting for the API', () => this.foosballBank.pending);
+    worldMetrics.gauge('bar_world_foosball_matches', 'Pebolim matches being played', () => [...this.foosball.values()].filter(t => t.inMatch).length);
+    // The pebolim tables' physics: 60 ticks a second, on a timer of their own (the room's clock ticks with its 20 Hz step).
+    this.foosballTimer = setInterval(() => this.foosballTick(), 1000 / FOOSBALL.tickHz);
     worldMetrics.gauge('bar_world_table_orders_pending', 'Table orders waiting for Tonico', () => this.waiter.pending);
     worldMetrics.gauge('bar_world_phone_calls', 'Phone calls ringing or answered', () => this.phoneCalls.size);
     worldMetrics.gauge('bar_world_job_workers', 'Players working a job shift', () => JOBS.reduce((sum, job) => sum + this.jobs.workers(job.id).length, 0));
@@ -195,7 +257,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
+    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -213,7 +275,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.state.players.get(presence.ticket.userId);
     if (player) { player.connected = false; player.voice = false; if (!player.interactionState) player.animationState = 'idle'; }
     if (player && player.animationState !== 'drink') player.drinkItem = '';
-    presence.queue.length = 0;
+    presence.queue.length = 0; presence.motoQueue.length = 0;
+    // A pebolim match waits for its player (paused) until they are back or the wait runs out.
+    for (const table of this.foosball.values()) table.connection(presence.ticket.userId, false);
+    this.syncFoosball();
     // A pending order is dropped with the connection, which would otherwise leave the player waiting forever.
     this.cancelCounter(presence.ticket.userId);
     this.cancelTable(presence.ticket.userId);
@@ -239,9 +304,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!access) this.log('auth_refresh_unavailable', { playerId: presence.ticket.userId });
     if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);if(access.balance!==undefined)presence.balance=access.balance;client.send('wallet.state',{balance:presence.balance});}
     presence.rejectReconnect = undefined;
-    presence.queue.length = 0;
+    presence.queue.length = 0; presence.motoQueue.length = 0;
     const player = this.state.players.get(presence.ticket.userId)!;
     player.connected = true;
+    for (const table of this.foosball.values()) table.connection(player.id, true);
+    this.syncFoosball();
     // Without an answer, the appearance already in the room stays as it is.
     if (access) this.applyAppearance(player,access);
     // Queued movement before a transport interruption must never replay afterward.
@@ -255,7 +322,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const userId = presence.ticket.userId;
     worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
     // Pending orders are refunded while the session is still registered (refunds go to its wallet owner).
-    this.cancelCounter(userId); this.cancelTable(userId); this.dropCall(userId);
+    this.cancelCounter(userId); this.cancelTable(userId); this.dropCall(userId); this.releaseMedia(userId);
     this.sessions.remove(userId, presence);
     const player = this.state.players.get(userId);
     // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
@@ -272,6 +339,8 @@ export class BarRoom extends Room<{ state: BarState }> {
   private park(player: Player): void {
     player.drinkItem = ''; this.dropHolding(player);
     this.blackjack.leave(player.id);
+    // Off the pebolim table (a match with coins on it is lost; a friendly goes on with Zé do Totó).
+    this.leaveFoosball(player);
     this.cancelCounter(player.id);
     this.cancelTable(player.id);
     this.endShift(player, 'Turno encerrado.');
@@ -299,7 +368,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -337,6 +406,15 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.lastInputAt = Date.now();
       p.queue.push(input);
     });
+    this.handle('moto.input', motoInputSchema, 55, (client, input) => {
+      const p = this.forClient(client)!;
+      if (input.seq <= p.lastReceived) return;
+      if (p.motoQueue.length >= 6) p.motoQueue.shift();
+      p.lastReceived = input.seq;
+      p.lastInputAt = Date.now();
+      p.motoQueue.push(input);
+    });
+    this.handle('moto.mount', motoMountSchema, 4, (client, { motoId }) => this.mountMoto(client, motoId));
     this.handle('player.interact', z.object({ objectId: z.string().max(64), item: z.enum(DRINK_ITEMS).optional() }).strict(), 5, (client, command) => this.interact(client, command.objectId, command.item));
     this.handle('inventory.sync',z.object({}).strict(),2,async client=>{await this.syncPresence(this.forClient(client)!);});
     this.handle('inventory.use',z.object({itemId:z.enum(ITEM_IDS)}).strict(),3,(client,{itemId})=>this.useInventory(client,itemId));
@@ -349,26 +427,56 @@ export class BarRoom extends Room<{ state: BarState }> {
     for(const kind of ['jukebox','tv'] as const){
       const states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions;
       this.handle(`${kind}.command`,jukeboxCommandSchema,4,async(client,command)=>{
-        this.requireMedia(kind,client,command.id);
-        const state=states.get(command.id)!,presence=this.forClient(client)!;
-        // Validates the command (revision, link) before any coin moves.
-        commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now());
-        // Choosing a new video costs coins; pausing, resuming, stopping and switching off are free.
-        const price=command.action==='play'?priceOf(this.prices,mediaPriceKey(kind,command.id)):0,requestId=randomUUID();
-        if(price)await this.charge(presence,price,`media:${command.id}`,requestId);
-        try{
-          if(this.forClient(client)!==presence)throw new Error('Sua sessão mudou. Moedas devolvidas.');
+        const schema=states.get(command.id),player=this.player(client),presence=this.forClient(client)!,actor={id:player.id,name:player.displayName};
+        if(!schema)throw new Error('Aparelho desconhecido.');
+        if(command.action==='play'){
           this.requireMedia(kind,client,command.id);
-          state.assign(commandJukebox(state as unknown as JukeboxState,command,this.player(client).id,Date.now()));
-        }catch(error){if(price)this.refund(presence,requestId,price);throw error;}
-        client.send(`${kind}.result`,{id:command.id,revision:state.revision,price});
+          // The link, the queue and its limits are checked before its platform is asked and before any coin moves.
+          commandJukebox(this.media(schema),command,actor,Date.now());
+          const link=parseMediaLink(command.url);if('error' in link)throw new Error(link.error);
+          if(!this.config.mediaProviders.has(link.provider))throw new Error(`Links de ${MEDIA_PLATFORMS[link.provider].label} estão desativados neste bar.`);
+          const {title,thumb}=await this.videoCheck.check(link);
+          // Choosing a new video costs coins; pausing, resuming, seeking and skipping are free.
+          const price=priceOf(this.prices,mediaPriceKey(kind,command.id)),key=randomUUID();
+          if(price)await this.charge(presence,price,`media:${command.id}`,key);
+          try{
+            if(this.forClient(client)!==presence)throw new Error('Sua sessão mudou. Moedas devolvidas.');
+            this.requireMedia(kind,client,command.id);
+            this.assignMedia(schema,commandJukebox(this.media(schema),command,actor,Date.now(),{key,title,thumb}));
+          }catch(error){if(price)this.refund(presence,key,price);throw error;}
+          if(price)this.mediaPayments.set(key,{owner:{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId},amount:price});
+          client.send(`${kind}.result`,{id:command.id,revision:schema.revision,price,queued:schema.key!==key});
+          return;
+        }
+        if(command.action==='remove'){
+          // One's own video, from anywhere: its coins go back.
+          const next=commandJukebox(this.media(schema),command,actor,Date.now());
+          this.refundMedia(command.entry);this.assignMedia(schema,next);
+        } else {
+          this.requireMediaControl(kind,client,command.id);
+          this.assignMedia(schema,commandJukebox(this.media(schema),command,actor,Date.now()));
+        }
+        client.send(`${kind}.result`,{id:command.id,revision:schema.revision,price:0});
       });
-      // End notifications cannot overwrite a newer selection or another controller.
-      this.handle(`${kind}.ended`,z.object({id:z.string().max(64),revision:z.number().int().min(0),videoId:z.string().length(11),duration:z.number().finite().positive().max(86400)}).strict(),2,(client,report)=>{
-        const state=states.get(report.id);
-        if(!state||state.updatedBy!==this.player(client).id||state.revision!==report.revision||state.videoId!==report.videoId||state.status!=='playing')return;
-        if(Math.abs(jukeboxTime(state as unknown as JukeboxState,Date.now())-report.duration)>8)return;
-        state.assign({status:'ended',position:report.duration,updatedAt:Date.now(),revision:state.revision+1});
+      // What the players see (the end, a refusal, a live broadcast) comes from whoever controls the video, or from anyone
+      // while nobody does. A stale report never touches a newer video.
+      this.handle(`${kind}.ended`,mediaEndedSchema,2,(client,report)=>{
+        const schema=states.get(report.id),next=schema&&endMedia(this.media(schema),report,this.player(client).id,Date.now());
+        if(next)this.assignMedia(schema!,next);
+      });
+      this.handle(`${kind}.failed`,mediaFailedSchema,2,(client,report)=>{
+        const schema=states.get(report.id);if(!schema)return;
+        const state=this.media(schema),now=Date.now(),next=failMedia(state,report,this.player(client).id,now);if(!next)return;
+        // A video refused before it really played is given back; one refused midway is not.
+        const refunded=jukeboxTime(state,now)<MEDIA_REFUND_WITHIN_S&&this.mediaPayments.has(state.key);
+        if(refunded)this.refundMedia(state.key);
+        this.assignMedia(schema,next);
+        this.sessions.getByUser(state.by)?.client.send('error',{message:`${MEDIA_PLATFORMS[(state.provider||'youtube') as MediaProvider].named} não deixou ${state.title?`"${state.title}"`:'o seu vídeo'} tocar aqui. Ele foi pulado${refunded?' e as moedas voltaram':''}.`});
+        this.log('media_refused',{playerId:state.by,id:report.id,videoId:report.videoId,code:report.code,refunded});
+      });
+      this.handle(`${kind}.live`,mediaLiveSchema,2,(client,report)=>{
+        const schema=states.get(report.id),next=schema&&liveMedia(this.media(schema),report,this.player(client).id,Date.now());
+        if(next)this.assignMedia(schema!,next);
       });
     }
     // Anyone seated at a table orders from Tonico, or from a player working the bar (`to`), who brings it from the counter.
@@ -470,7 +578,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('admin.media',z.object({kind:z.enum(['jukebox','tv']),id:z.string().max(64)}).strict(),5,(client,{kind,id})=>{
       const admin=this.requireAdmin(client),states=kind==='jukebox'?this.state.jukeboxes:this.state.televisions,state=states.get(id);
       if(!state)throw new Error('Aparelho desconhecido.');
-      state.assign({videoId:'',status:'off',position:0,updatedAt:Date.now(),updatedBy:admin,revision:state.revision+1});
+      // The videos still waiting never played: their coins go back.
+      for(const entry of state.queue)this.refundMedia(entry.key);
+      this.assignMedia(state,clearMedia(this.media(state),Date.now(),admin));
       this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
     });
     // Development bots for performance tests: how many the bar should have (0 takes them out), never more than fit in it.
@@ -551,10 +661,37 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     this.handle('blackjack.join', z.object({ tableId: z.literal('blackjack-1') }).strict(), 3, (client) => this.joinTable(client));
     this.handle('blackjack.leave', z.object({}).strict(), 3, (client) => this.leaveTable(client));
-    this.handle('blackjack.start', z.object({ tableId: z.literal('blackjack-1') }).strict(), 2, (client) => {
-      this.cleanTable(); this.blackjack.start(this.player(client).id); this.syncTable();
+    // Bets and decisions name the player from the session, never from the message; the table checks the rest.
+    this.handle('blackjack.bet', blackjackBetSchema, 4, (client, { amount }) => {
+      const player = this.atTable(client), presence = this.forClient(client)!;
+      if (amount > presence.balance) throw new Error('Moedas insuficientes para essa aposta.');
+      this.blackjack.bet(player.id, amount); this.syncTable();
     });
-    this.handle('blackjack.action', z.object({ action: z.enum(['hit', 'stand']) }).strict(), 5, (client, { action }) => { this.blackjack.act(this.player(client).id, action); this.syncTable(); });
+    this.handle('blackjack.action', blackjackActionSchema, 4, async (client, { action, hand, move }) => {
+      try { await this.blackjack.act(this.atTable(client).id, action, { hand, move }); } finally { this.syncTable(); }
+    });
+    this.handle('blackjack.insurance', blackjackInsuranceSchema, 2, async (client, { take }) => {
+      try { await this.blackjack.insure(this.atTable(client).id, take); } finally { this.syncTable(); }
+    });
+    // Pebolim: E at a table takes a free place (or watches a full one); then the table's lobby, the pointer and the kicks.
+    this.handle('foosball.join', foosballJoinSchema, 3, (client, { tableId, slot }) => this.joinFoosball(client, tableId, slot));
+    this.handle('foosball.watch', foosballWatchSchema, 3, (client, { tableId }) => {
+      const presence = this.forClient(client)!;
+      if (tableId && !this.nearFoosball(this.player(client), tableId)) throw new Error('Chegue mais perto da mesa para assistir.');
+      presence.watching = tableId || undefined;
+    });
+    this.handle('foosball.leave', z.object({}).strict(), 3, client => this.leaveFoosball(this.player(client)));
+    this.handle('foosball.slot', foosballSlotSchema, 4, (client, { slot }) => { const { player, table } = this.atFoosball(client); table.move(player.id, slot); this.syncFoosball(); });
+    this.handle('foosball.config', foosballConfigSchema, 8, (client, patch) => { const { player, table } = this.atFoosball(client); table.configure(player.id, patch); this.syncFoosball(); });
+    this.handle('foosball.cpu', foosballCpuSchema, 4, (client, { slot, on }) => { const { player, table } = this.atFoosball(client); table.cpu(player.id, slot, on); this.syncFoosball(); });
+    this.handle('foosball.ready', foosballReadySchema, 4, async (client, { ready }) => {
+      const { player, table } = this.atFoosball(client), presence = this.forClient(client)!;
+      // Checked here too (the cached wallet), so nobody marks ready for a match they cannot pay; the API decides at the start.
+      if (ready && table.stake > presence.balance) throw new Error(`Esta partida vale ${table.stake} moedas e você tem ${presence.balance}.`);
+      try { await table.ready(player.id, ready); } finally { this.syncFoosball(); }
+    });
+    this.handle('foosball.input', foosballInputSchema, 45, (client, { y, lift }) => { const { player, table } = this.atFoosball(client); table.input(player.id, y, lift); });
+    this.handle('foosball.kick', foosballKickSchema, 10, (client, { power }) => { const { player, table } = this.atFoosball(client); table.kick(player.id, power); });
     this.handle('ping', z.object({ at: z.number().finite() }).strict(), 3, (client, { at }) => client.send('pong', { at }));
   }
 
@@ -611,16 +748,78 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (player.stageUntil && now >= player.stageUntil) this.endStagePass(player, presence);
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
     }
+    this.stepMotos(now);
     for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
     this.syncTable();
-    if (this.resultsResetAt && now >= this.resultsResetAt) { this.blackjack.resetRound(); this.resultsResetAt = 0; this.cleanTable(); this.syncTable(); }
+    this.checkFoosball();
+    this.syncFoosball();
     if (this.events.update(now, this.state.occupancy)) this.syncEvent(now);
     this.serveDrinks(now);
     this.serveTables(now);
     this.runJobs(now);
     this.npcs.update(this.state.npcs.values(), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
     if (++this.tickCount % 2 === 0) this.refreshViews();
+  }
+
+  /**
+   * The delivery bikes. Like walking, the rider's bike moves one input a tick, so it is the same step the browser predicted;
+   * a short gap waits for the next input, a longer one (a frozen tab, a lost connection) lets go of the controls. Anything
+   * that takes the rider off (fainting, leaving, a kick) lets the bike go here, and it stops by itself.
+   */
+  private stepMotos(now: number): void {
+    for (const moto of this.state.motos.values()) {
+      const rider = moto.riderId ? this.state.players.get(moto.riderId) : undefined;
+      const presence = rider ? this.sessions.getByUser(rider.id) : undefined;
+      const riding = !!rider?.connected && !!presence && !presence.revoked && rider.interactionState === motoInteraction(moto.id);
+      if (moto.riderId && !riding) this.freeMoto(moto, rider);
+      let intent = moto.riderId ? NO_MOTO_INTENT : { ...NO_MOTO_INTENT, brake: true };
+      if (riding) {
+        const input = presence.motoQueue.shift();
+        if (input) { intent = input; rider.lastProcessedInput = input.seq; presence.motoInputAt = now; }
+        else if (now - presence.motoInputAt < 250) continue;
+      }
+      if (!moto.speed && !moto.steer && !intent.throttle && !intent.steer) {
+        const spot = MOTOS.find(m => m.id === moto.id), left = this.motoLeftAt.get(moto.id);
+        if (spot && !moto.riderId && left && now - left >= MOTO.RETURN_MS) { moto.assign(parkedMoto(spot)); this.motoLeftAt.delete(moto.id); }
+        continue;
+      }
+      moto.assign(stepMoto(moto, intent, TICK_MS / 1000));
+      if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; }
+    }
+  }
+
+  private mountMoto(client: Client, motoId: string): void {
+    const player = this.player(client), presence = this.forClient(client)!, moto = this.state.motos.get(motoId);
+    if (!moto) throw new Error('Essa moto não está aqui.');
+    if (player.interactionState || player.currentTableId || player.animationState === 'kick' || !isConscious(player)) throw new Error('Encerre a ação atual antes de subir na moto.');
+    if (moto.riderId) throw new Error('Alguém já está nessa moto.');
+    if (!canMountMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
+    moto.riderId = player.id;
+    player.x = moto.x; player.y = moto.y; player.z = moto.z; player.rotation = moto.yaw;
+    player.interactionState = motoInteraction(moto.id); player.animationState = 'ride'; player.animationStartedAt = Date.now(); player.drinkItem = '';
+    presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoInputAt = 0; player.lastProcessedInput = presence.lastReceived;
+    this.motoLeftAt.delete(moto.id);
+  }
+
+  /** The rider gets off on the left and the bike stays there, unless it is still going too fast. */
+  private dismountMoto(player: Player): void {
+    const moto = this.state.motos.get(player.interactionState.slice('moto:'.length));
+    if (!moto) { player.interactionState = ''; player.animationState = 'idle'; return; }
+    if (Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) throw new Error('Diminua a velocidade para descer da moto.');
+    moto.speed = 0; moto.steer = 0;
+    this.freeMoto(moto, player);
+  }
+
+  private freeMoto(moto: Moto, rider?: Player): void {
+    moto.riderId = ''; this.motoLeftAt.set(moto.id, Date.now());
+    if (!rider) return;
+    if (rider.interactionState === motoInteraction(moto.id)) {
+      Object.assign(rider, motoDismountSpot(moto));
+      rider.rotation = moto.yaw; rider.interactionState = ''; rider.animationState = 'idle'; rider.animationStartedAt = Date.now();
+    }
+    const presence = this.sessions.getByUser(rider.id);
+    if (presence) { presence.queue.length = 0; presence.motoQueue.length = 0; rider.lastProcessedInput = presence.lastReceived; }
   }
 
   private serveDrinks(now: number): void {
@@ -642,8 +841,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.player(client), presence = this.forClient(client)!, now = Date.now();
     if (objectId === 'stand') {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+      if (isRidingMoto(player.interactionState)) { this.dismountMoto(player); return; }
       // On the stage, standing up is putting the instrument back: the stop clip plays first.
       if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
+      if (player.interactionState.startsWith('foosball:')) { this.leaveFoosball(player); return; }
       // Already getting up, putting the cigarette out, smoking a whole one or being sick: it ends by itself.
       if (['stand-up', 'smoke-stop', 'cigarette', 'vomit'].includes(player.animationState)) return;
       if (player.interactionState === 'smoke') { this.stopSmoking(player, presence, now); return; }
@@ -669,6 +870,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
+    if (object.type === 'foosball') { this.joinFoosball(client, object.id); return; }
     if(object.type!=='seat'){
       const target=interactionReach(object,player);
       if(Math.hypot(target.x-player.x,target.z-player.z)>.01)player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
@@ -984,6 +1186,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private knockDown(player: Player, presence: Presence): void {
     this.dropHolding(player);
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
+    if (player.interactionState.startsWith('foosball:')) this.leaveFoosball(player);
     if (player.interactionState && player.interactionState !== 'fainted' && player.interactionState !== 'stumbling') Object.assign(player, standingPosition(player, player.rotation));
     // A musician who falls drops out at once: the spot is free and the instrument is back on its stand.
     this.musicians.release(player.id);
@@ -1064,6 +1267,38 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.log('door', { playerId: player.id, door: id, open });
   }
 
+  /** The plain state of a source, for the shared reducers (packages/shared/src/jukebox.ts). */
+  private media(schema:Jukebox):JukeboxState {return schema.toJSON() as JukeboxState;}
+  /**
+   * Writes a reducer's result back. A video whose owner already left the bar starts with nobody controlling it, and a
+   * video that left the source (played, skipped) takes its payment record along.
+   */
+  private assignMedia(schema:Jukebox,next:JukeboxState):void {
+    const before=[schema.key,...schema.queue.map(entry=>entry.key)],{queue,...playback}=next;
+    if(playback.by&&!this.state.players.get(playback.by)?.connected)Object.assign(playback,{by:'',byName:''});
+    schema.assign(playback);
+    if(queue.map(entry=>entry.key).join()!==schema.queue.map(entry=>entry.key).join())schema.queue=new ArraySchema(...queue.map(entry=>new MediaEntry().assign(entry)));
+    const after=new Set([next.key,...queue.map(entry=>entry.key)]);
+    for(const key of before)if(key&&!after.has(key))this.mediaPayments.delete(key);
+  }
+  /** Gives a video's coins back to the wallet that paid them, wherever its owner is now. */
+  private refundMedia(key:string):void {
+    const payment=this.mediaPayments.get(key);if(!payment)return;this.mediaPayments.delete(key);
+    void this.walletRetries.credit(payment.owner,payment.amount,`refund:${key}`,randomUUID(),change=>{const presence=this.sessions.getByUser(payment.owner.userId);if(presence)this.walletChanged(presence,change.balance,change.applied,'refund');});
+  }
+  /** Whoever leaves the bar stops controlling their video: anyone at the screen takes it over. Their queue entries stay. */
+  private releaseMedia(playerId:string):void {
+    for(const states of [this.state.jukeboxes,this.state.televisions])for(const media of states.values())if(media.by===playerId)media.assign({by:'',byName:''});
+  }
+  /**
+   * Pausing, resuming, seeking and skipping. The video's controller does it from anywhere they can hear it, even seated;
+   * while nobody controls it, anyone at the screen takes it over (requireMedia).
+   */
+  private requireMediaControl(kind:'jukebox'|'tv',client:Client,id:string):void {
+    const player=this.player(client),media=(kind==='jukebox'?this.state.jukeboxes:this.state.televisions).get(id),system=(kind==='jukebox'?JUKEBOX_SYSTEMS:TV_SYSTEMS).find(s=>s.id===id);
+    if(!media||!system||!media.by||media.by!==player.id){this.requireMedia(kind,client,id);return;}
+    if(mediaGain(player,system)<=0)throw new Error(`Chegue mais perto d${kind==='jukebox'?'a jukebox':id==='telao'?'o telão':'a TV'} para controlar o vídeo.`);
+  }
   private requireMedia(kind:'jukebox'|'tv',client:Client,id:string):void {
     const name=kind==='jukebox'?'a jukebox':id==='telao'?'o telão':'a TV';
     // A TV group is controlled from any of its screens.
@@ -1117,14 +1352,15 @@ export class BarRoom extends Room<{ state: BarState }> {
       ?'Seu tempo no palco acabou. Pode ficar até descer; para subir de novo, pegue outro ingresso.':'Seu ingresso do palco venceu.'});
   }
 
+  /** Sits at the free chair nearest to where the player stands; a round in play is watched until the next deal. */
   private joinTable(client: Client): void {
     const player = this.player(client);
     const object = INTERACTABLES.find(i => i.id === 'blackjack-1')!;
     if (!canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da mesa.');
     if (player.interactionState && !player.currentTableId) throw new Error('Levante-se primeiro.');
     this.cleanTable();
-    this.blackjack.join(player.id, player.displayName);
-    const seat = BLACKJACK_SEATS[this.blackjack.seats.findIndex(s => s.playerId === player.id)]!;
+    const nearest = BLACKJACK_SEATS.map((seat, chair) => ({ chair, d: Math.hypot(seat.x - player.x, seat.z - player.z) })).sort((a, b) => a.d - b.d)[0]!.chair;
+    const seat = BLACKJACK_SEATS[this.blackjack.join(player.id, player.displayName, nearest)]!;
     player.x = seat.x; player.y = seat.y ?? player.y; player.z = seat.z; player.rotation = seat.rotation;
     player.currentTableId = object.id; player.interactionState = object.id; player.animationState = 'sit';
     this.syncTable();
@@ -1139,9 +1375,19 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cleanTable(); this.syncTable();
   }
 
+  /** Seats whose player is no longer at the table (logged out, knocked down) are given up; coins in play stay settled. */
   private cleanTable(): void {
-    if (this.blackjack.phase === 'playing') return;
-    for (const seat of [...this.blackjack.seats]) if (this.state.players.get(seat.playerId)?.currentTableId !== 'blackjack-1') this.blackjack.leave(seat.playerId);
+    for (const seat of [...this.blackjack.seats]) if (!seat.left && this.state.players.get(seat.playerId)?.currentTableId !== 'blackjack-1') this.blackjack.leave(seat.playerId);
+  }
+  /** The player sitting at the blackjack table, or why they cannot play. */
+  private atTable(client: Client): Player {
+    const player = this.player(client);
+    if (player.currentTableId !== 'blackjack-1') throw new Error('Sente-se à mesa de blackjack primeiro.');
+    return player;
+  }
+  private logRound(summary: RoundSummary): void {
+    for (const { playerId, staked, paid, outcomes } of summary.players)
+      this.log('blackjack_round', { playerId, roundId: summary.roundId, staked, paid, net: paid - staked, outcomes: outcomes.join(', ') });
   }
 
   private syncTable(): void {
@@ -1149,21 +1395,144 @@ export class BarRoom extends Room<{ state: BarState }> {
     const json = JSON.stringify(snapshot);
     if (json === this.lastTableJson) return;
     this.lastTableJson = json;
-    const state = this.state.tables.get('blackjack-1')!;
-    state.phase = snapshot.phase === 'finished' ? 'results' : snapshot.phase;
-    state.roundId = snapshot.roundId; state.turnPlayerId = snapshot.turnPlayerId || ''; state.deadline = snapshot.turnEndsAt; state.dealerTotal = snapshot.dealerTotal || 0;
-    state.dealerCards = new ArraySchema(...snapshot.dealer.map(card => new CardState().assign(card || { rank: '?', suit: '' })));
+    const state = this.state.tables.get('blackjack-1')!, card = (c: { rank: string; suit: string; seq: number }) => new CardState().assign({ rank: c.rank, suit: c.suit, seq: c.seq });
+    state.assign({ phase: snapshot.phase, round: snapshot.round, move: snapshot.move, roundId: snapshot.roundId, deadline: snapshot.deadline,
+      turnPlayerId: snapshot.turnPlayerId, turnHand: snapshot.turnHand, dealerTotal: snapshot.dealerTotal, dealerSoft: snapshot.dealerSoft, minBet: snapshot.minBet, maxBet: snapshot.maxBet });
+    state.dealerCards = new ArraySchema(...snapshot.dealer.map(card));
     state.seats = new ArraySchema(...snapshot.seats.map(seat => new SeatState().assign({
-      playerId: seat.playerId, displayName: seat.displayName, total: seat.total,
-      status: seat.result ? 'finished' : seat.total > 21 ? 'bust' : seat.blackjack ? 'blackjack' : seat.stood ? 'stand' : snapshot.turnPlayerId === seat.playerId ? 'turn' : 'waiting',
-      result: seat.result === 'push' ? 'draw' : seat.result || '',
-      cards: new ArraySchema(...seat.cards.map(card => new CardState().assign(card))),
+      playerId: seat.playerId, displayName: seat.displayName, chair: seat.chair, bet: seat.bet, lastBet: seat.lastBet, insurance: seat.insurance, insured: seat.insured,
+      staked: seat.staked, paid: seat.paid, net: seat.net, status: seat.status, result: seat.result,
+      hands: new ArraySchema(...seat.hands.map(hand => new HandState().assign({ cards: new ArraySchema(...hand.cards.map(card)), bet: hand.bet, total: Math.min(255, hand.total), soft: hand.soft,
+        split: hand.split, doubled: hand.doubled, status: hand.status, outcome: hand.outcome ?? '', payout: hand.payout }))),
     })));
-    if (snapshot.phase === 'finished' && !this.resultsResetAt) this.resultsResetAt = Date.now() + 10_000;
-    if (snapshot.phase !== 'finished') this.resultsResetAt = 0;
     const dealer = this.state.npcs.get('dealer');
-    const animation = snapshot.phase === 'playing' ? 'deal' : snapshot.phase === 'finished' ? 'shuffle' : 'idle';
+    const animation = ['dealing', 'insurance', 'playing', 'dealer'].includes(snapshot.phase) ? 'deal' : snapshot.phase === 'results' ? 'shuffle' : 'idle';
     if (dealer && dealer.animationState !== animation) { dealer.animationState = animation; dealer.animationStartedAt = Date.now(); }
+  }
+
+  // ── Pebolim ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * E at a pebolim table: a free place (the avatar goes to its handles and stays there), or another place at the same
+   * table before the match. A table in a match, or full, is watched from beside it instead (foosball.open says which).
+   */
+  private joinFoosball(client: Client, tableId: string, slot?: number): void {
+    const player = this.player(client), presence = this.forClient(client)!, table = this.foosball.get(tableId);
+    if (!table) throw new Error('Mesa de pebolim desconhecida.');
+    const here = table.seat(player.id);
+    if (!here) {
+      if (!this.nearFoosball(player, tableId)) throw new Error('Chegue mais perto da mesa de pebolim.');
+      if (player.interactionState || player.currentTableId) throw new Error(player.interactionState.startsWith('foosball:') ? 'Você já está em outra mesa de pebolim.' : 'Encerre a ação atual antes de jogar.');
+      if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+    }
+    try {
+      if (here && slot !== undefined) table.move(player.id, slot);
+      else if (!here) table.join(player.id, player.displayName, slot);
+    } catch (error) {
+      if (here) throw error;
+      presence.watching = tableId;
+      client.send('foosball.open', { tableId, watching: true, reason: error instanceof Error ? error.message : '' });
+      return;
+    }
+    presence.watching = undefined;
+    player.interactionState = `foosball:${tableId}`; player.animationState = 'wait'; player.animationStartedAt = Date.now(); player.drinkItem = '';
+    presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    this.syncFoosball();
+    client.send('foosball.open', { tableId, watching: false });
+    if (!here) this.systemMessage(`${player.displayName} chegou na mesa ${FOOSBALL_TABLES.find(t => t.id === tableId)!.number} do pebolim.`, player);
+  }
+
+  /** Off the table (or stops watching): out on the room's side of it, where it was played. */
+  private leaveFoosball(player: Player): void {
+    const presence = this.sessions.getByUser(player.id);
+    if (presence) presence.watching = undefined;
+    if (!player.interactionState.startsWith('foosball:')) return;
+    const id = player.interactionState.slice('foosball:'.length), table = this.foosball.get(id), place = FOOSBALL_TABLES.find(t => t.id === id);
+    table?.leave(player.id);
+    if (place) { const exit = foosballExit(place, player.x); Object.assign(player, isWalkable(exit.x, exit.z, exit.y) ? exit : standingPosition(player, player.rotation)); }
+    player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();
+    if (presence) { presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+    this.syncFoosball();
+  }
+
+  /** Touching the table (to play), or close by on its floor (to watch). */
+  private nearFoosball(player: Player, tableId: string): boolean {
+    const object = INTERACTABLES.find(i => i.id === tableId), place = FOOSBALL_TABLES.find(t => t.id === tableId);
+    if (!object || !place) return false;
+    return canInteract(object, player, INTERACTION_SLACK) || (Math.abs(player.y - place.y) < 1 && Math.hypot(player.x - place.x, player.z - place.z) < 4);
+  }
+
+  /** The player at a pebolim table, and the table, or why they cannot play. */
+  private atFoosball(client: Client): { player: Player; table: FoosballTable } {
+    const player = this.player(client), table = player.interactionState.startsWith('foosball:') ? this.foosball.get(player.interactionState.slice('foosball:'.length)) : undefined;
+    if (!table?.seat(player.id)) throw new Error('Pegue um lugar numa mesa de pebolim primeiro.');
+    return { player, table };
+  }
+
+  /** Each table's places in the room's state, and every player at its handles (a new format or place moves them). */
+  private syncFoosball(): void {
+    for (const [id, table] of this.foosball) {
+      const snapshot = table.snapshot(), json = JSON.stringify(snapshot);
+      if (this.foosballShown.get(id) === json) continue;
+      this.foosballShown.set(id, json);
+      const { slots, ...rest } = snapshot, state = this.state.foosball.get(id)!;
+      state.assign(rest);
+      if (state.slots.length !== slots.length) state.slots = new ArraySchema(...slots.map(slot => new FoosballSlotState().assign(slot)));
+      else slots.forEach((slot, i) => state.slots[i]!.assign(slot));
+      const place = FOOSBALL_TABLES.find(t => t.id === id)!;
+      for (const slot of table.humans) {
+        const player = this.state.players.get(slot.playerId), spot = foosballSpot(place, slot.team, slot.role);
+        if (player && Math.hypot(player.x - spot.x, player.z - spot.z) + Math.abs(player.rotation - spot.rotation) > .01) Object.assign(player, spot);
+      }
+    }
+  }
+
+  /** Places whose player is no longer at the table (moved, knocked down) are given up; avatars left without a place get up. */
+  private checkFoosball(): void {
+    for (const [id, table] of this.foosball) for (const slot of table.humans) {
+      const player = this.state.players.get(slot.playerId);
+      if (!player || player.interactionState !== `foosball:${id}`) table.leave(slot.playerId);
+    }
+    for (const player of this.state.players.values())
+      if (player.interactionState.startsWith('foosball:') && !this.foosball.get(player.interactionState.slice('foosball:'.length))?.seat(player.id)) this.leaveFoosball(player);
+  }
+
+  /** The tables' fixed physics steps, catching up on the timer's real pace, and their frames 30 times a second. */
+  private foosballTick(): void {
+    const now = Date.now(), step = 1000 / FOOSBALL.tickHz, clock = this.foosballClock;
+    clock.owed = Math.min(clock.owed + (clock.last ? now - clock.last : step), step * 6); clock.last = now;
+    const active = [...this.foosball.values()].filter(table => table.phase !== 'lobby');
+    if (!active.length) { clock.owed = 0; return; }
+    while (clock.owed >= step) { clock.owed -= step; for (const table of active) table.tick(now); }
+    if (now - clock.frameAt >= 1000 / 30 - 2) {
+      clock.frameAt = now;
+      for (const table of active) { const frame = table.frame(now); if (frame) this.sendFoosballFrame(frame); }
+    }
+    this.syncFoosball();
+  }
+
+  /** To the table's players, whoever watches it and everyone near it on its floor (the ball on the 3D table). */
+  private sendFoosballFrame(frame: FoosballFrame): void {
+    const place = FOOSBALL_TABLES.find(t => t.id === frame.id)!, table = this.foosball.get(frame.id)!;
+    for (const [id, presence] of this.sessions) {
+      const player = this.state.players.get(id);
+      if (!player?.connected || presence.revoked) continue;
+      const far = Math.abs(player.y - place.y) > 1.5 || Math.hypot(player.x - place.x, player.z - place.z) > AOI_RADIUS;
+      // Whoever walked away stops watching.
+      if (presence.watching === frame.id && Math.hypot(player.x - place.x, player.z - place.z) > 8) presence.watching = undefined;
+      if (!far || presence.watching === frame.id || table.seat(id)) presence.client.send('foosball.frame', frame);
+    }
+  }
+
+  /** A finished match: in the log for each player, and told to the bar around the table. */
+  private foosballMatch(summary: FoosballSummary): void {
+    const place = FOOSBALL_TABLES.find(t => t.id === summary.tableId)!, table = this.foosball.get(summary.tableId)!;
+    for (const p of summary.players) this.log('foosball_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, team: p.team, result: p.result,
+      score: summary.score, forfeit: summary.forfeit, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
+    const origin = this.state.players.get(summary.players[0]?.playerId ?? ''), winner = table.winner;
+    if (!origin || !winner) return;
+    const names = table.slots.filter(s => s.team === winner && (s.playerId || s.cpu)).map(s => s.displayName);
+    this.systemMessage(`Pebolim, mesa ${place.number}: ${names.join(' e ')} (${TEAM_NAMES[winner]}) venceu por ${summary.score}${summary.forfeit ? ', por W.O.' : ''}${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
   }
 
   private syncEvent(now: number): void {
@@ -1181,7 +1550,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       const self = this.state.players.get(id);
       if (!self || !presence.client.view) continue;
       const visible = new Set<Schema>();
-      for (const player of this.state.players.values()) if (player.id === id || distance(self, player) <= AOI_RADIUS) visible.add(player);
+      // A rider is seen as far as the bike is (the bikes have no area of interest), not a bike riding itself.
+      for (const player of this.state.players.values()) if (player.id === id || isRidingMoto(player.interactionState) || distance(self, player) <= AOI_RADIUS) visible.add(player);
       for (const npc of this.state.npcs.values()) if (distance(self, npc) <= AOI_RADIUS) visible.add(npc);
       for (const old of presence.seen) if (!visible.has(old)) presence.client.view.remove(old);
       for (const item of visible) if (!presence.seen.has(item)) presence.client.view.add(item);
@@ -1209,6 +1579,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (failed.length) worldMetrics.inc('bar_world_controls_total', 'Administrative controls confirmed', { outcome: 'failed' }, failed.length);
       for (const id of failed) this.log('event_control_rejected', { id });
       await this.results.flush();
+      await this.blackjackBank.flush();
+      await this.foosballBank.flush();
       await this.walletRetries.flush();
       // Prices and the log never hold up payments and results: they try again next round.
       if (!this.pricesLoaded) await this.reloadPrices().catch((error: unknown) => this.log('prices_unavailable', { message: error instanceof Error ? error.message : String(error) }));

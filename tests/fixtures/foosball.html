@@ -1,0 +1,79 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Pebolim fixture</title>
+<style>body{margin:0;min-height:100dvh;background:radial-gradient(120% 90% at 30% 20%,#3a1d5c,#120726 60%,#07030f)}.game{position:fixed;inset:0}</style></head>
+<body><main id="game" class="game"><section id="foosball" class="foosball hud-panel" aria-label="Mesa de pebolim"></section></main>
+<script type="module">
+// The pebolim panel (apps/web/src/foosball/panel.ts) without a server. A small stand-in for the room runs the real table
+// (the shared physics) and Zé do Totó (the room's CPU) here, so the panel can be seen and played: window.fixture.play()
+// starts a match (the local player red, or Zé on both sides), fixture.lobby() shows the lobby, fixture.set() any state.
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import {createFoosballPanel} from '../../apps/web/src/foosball/panel.ts';
+import {FoosballCpu} from '../../apps/server/src/minigames/foosball-cpu.ts';
+import {FOOSBALL,FOOSBALL_RODS,aimOffset,createSim,encodeFrame,kicksBack,otherTeam,placeBall,rodIndex,rodsOf,slotDefs,startKick,stepSim,stripOf} from '../../packages/shared/src/index.ts';
+
+let balance=1230,view,sim,brains={},human={y:0,lift:false},timer,mode='lobby';
+const sent=[],self='me';
+const ui=createFoosballPanel(document.querySelector('#foosball'),{send:(type,payload)=>{sent.push([type,payload]);room(type,payload);},now:()=>Date.now(),
+  balance:()=>balance,volume:()=>Number(new URLSearchParams(location.search).get('volume')??0),notify:()=>{},closed:()=>{}});
+const slot=(i,team,role,extra={})=>({slot:i,team,role,playerId:'',displayName:'',cpu:'',ready:false,connected:true,...extra});
+function base(){
+  return {id:'pebolim-1',phase:'lobby',format:'1x1',goals:5,sets:1,stake:0,level:'medio',hostId:self,slots:[slot(0,'red','solo',{playerId:self,displayName:'Você'}),slot(1,'blue','solo')],
+    red:0,blue:0,setsRed:0,setsBlue:0,set:1,serve:'red',deadline:0,matchId:'',message:'',goalTeam:'',goalBy:'',goalRod:'',goalSpeed:0,possTeam:'',possRod:'',possSince:0,winner:'',minBet:10,maxBet:500,revision:1};
+}
+const show=(watching=false)=>{view.revision++;ui.update(structuredClone(view),self,watching);};
+/** What the "room" does with the panel's messages. */
+function room(type,payload){
+  if(type==='foosball.input'){human=payload;return;}
+  if(type==='foosball.kick'&&sim){for(const def of rodsOf('red','solo')){const rod=sim.rods[def.index];startKick(rod,payload.power,sim.time,kicksBack(def,rod,sim.ball));}return;}
+  if(!view||view.phase!=='lobby')return;
+  if(type==='foosball.config'){Object.assign(view,payload);if(payload.format)view.slots=slotDefs(payload.format).map(d=>slot(d.slot,d.team,d.role,d.slot===0?{playerId:self,displayName:'Você'}:{}));show();}
+  if(type==='foosball.cpu'){const s=view.slots[payload.slot];Object.assign(s,payload.on?{cpu:view.level,displayName:'Zé do Totó',ready:true}:{cpu:'',displayName:'',ready:false});show();}
+  if(type==='foosball.ready'){view.slots.find(s=>s.playerId===self).ready=payload.ready;show();if(view.slots.every(s=>s.cpu||(s.playerId&&s.ready)))start(true);}
+}
+function kickoff(team,ms=FOOSBALL.kickoffMs){placeBall(sim,rodIndex(team,'midfield'));Object.assign(view,{phase:'kickoff',deadline:Date.now()+ms,serve:team,message:'',possTeam:'',possSince:0});show(mode==='watch');}
+/** A match: red is the local player (or Zé, `watch`), blue is Zé at `level`. */
+function start(local=true,level='medio'){
+  clearInterval(timer);mode=local?'play':'watch';sim=createSim(0);
+  brains={blue:new FoosballCpu(view.slots.find(s=>s.team==='blue')?.cpu||level),...(local?{}:{red:new FoosballCpu(level)})};
+  Object.assign(view,{red:0,blue:0,matchId:'demo',winner:''});kickoff(Math.random()<.5?'red':'blue');
+  let last=Date.now(),owed=0,frameAt=0,pending=[];
+  timer=setInterval(()=>{
+    const now=Date.now();owed=Math.min(owed+now-last,100);last=now;
+    while(owed>=1000/60){owed-=1000/60;
+      for(const team of ['red','blue']){
+        const rods=rodsOf(team,'solo').map(r=>r.index);
+        if(brains[team])brains[team].play(sim,rods,team,1/60);
+        else for(const i of rods){sim.rods[i].target=aimOffset(FOOSBALL_RODS[i],human.y,sim.rods[i].target);sim.rods[i].lift=human.lift;}
+      }
+      stepSim(sim,1/60);
+      const events=sim.events.splice(0);pending.push(...events);
+      const goal=events.find(e=>e.kind==='goal');
+      if(goal&&view.phase==='playing'){view[goal.team]++;Object.assign(view,{phase:'goal',deadline:now+FOOSBALL.goalMs,goalTeam:goal.team,goalBy:goal.team==='red'&&mode==='play'?'Você':'Zé do Totó',goalRod:'attack',goalSpeed:Math.round(goal.speed*10)/10});show(mode==='watch');}
+      if(view.phase==='playing'){const def=FOOSBALL_RODS[stripOf(sim.ball.x)],key=def.team+def.kind;if(view.possKey!==key){view.possKey=key;view.possTeam=def.team;view.possRod=def.kind==='goalie'?'defense':def.kind;view.possSince=now;show(mode==='watch');}}
+      if(view.deadline&&now>=view.deadline){
+        if(view.phase==='kickoff'){sim.frozen=false;sim.ball.vy=(Math.random()<.5?-1:1)*.24;Object.assign(view,{phase:'playing',deadline:0});show(mode==='watch');}
+        else if(view.phase==='goal'){
+          if(view[view.goalTeam]>=view.goals){Object.assign(view,{phase:'finished',winner:view.goalTeam,deadline:now+FOOSBALL.finishedMs,message:`${view.goalTeam==='red'?'Vermelho':'Azul'} venceu!`});show(mode==='watch');}
+          else kickoff(otherTeam(view.goalTeam));
+        }
+        else if(view.phase==='finished'){Object.assign(view,{phase:'lobby',deadline:0,red:0,blue:0});for(const s of view.slots)s.ready=!!s.cpu;show(mode==='watch');clearInterval(timer);}
+      }
+    }
+    if(now-frameAt>=31&&view.phase!=='lobby'&&view.phase!=='finished'){frameAt=now;ui.frame(encodeFrame('pebolim-1',sim,now,pending));pending=[];}
+  },1000/60);
+}
+window.fixture={ui,sent,
+  set:(table,who=self,watching=false)=>{view=table;ui.update(table,who,watching);},
+  setBalance:value=>{balance=value;ui.refresh();},
+  /** The lobby as the host sees it (format, places, settings). */
+  lobby:(patch={})=>{clearInterval(timer);view={...base(),...patch};show();},
+  /** A live match: `local` true puts the player on red; false lets Zé play both sides (`level`). */
+  play:({local=true,level='medio',format='1x1',stake=0}={})=>{clearInterval(timer);view={...base(),format,stake};
+    view.slots=slotDefs(format).map(d=>slot(d.slot,d.team,d.role,d.slot===0&&local?{playerId:self,displayName:'Você',ready:true}:{cpu:level,displayName:'Zé do Totó',ready:true}));
+    start(local,level);},
+  stop:()=>clearInterval(timer),
+  get view(){return view;},
+  get sim(){return sim;},
+};
+fixture.lobby();
+</script></body></html>

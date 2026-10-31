@@ -32,6 +32,7 @@
     "assets:map": "node tools/assets/repair-map-cart.mjs && node tools/assets/import-map.mjs",
     "assets:repair-cart": "node tools/assets/repair-map-cart.mjs",
     "assets:drinks": "node tools/assets/import-drinks.mjs",
+    "assets:moto": "node tools/assets/import-moto.mjs",
     "assets:ambient": "node tools/assets/import-ambient.mjs",
     "assets:icons": "node tools/assets/import-icons.mjs",
     "ops:backup": "node tools/ops/postgres-backup.mjs",

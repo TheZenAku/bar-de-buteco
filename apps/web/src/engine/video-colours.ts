@@ -1,5 +1,5 @@
 import {jukeboxTime,type JukeboxState} from '@bar/shared';
-import {PALETTE_KEYS,videoPalette,type Rgb,type VideoPalette} from './video-palette';
+import {PALETTE_KEYS,mediaStills,videoPalette,type Rgb,type VideoPalette} from './video-palette';
 
 export const toLinear=(c:number)=>Math.pow(c,2.2);
 const brightest=(c:Rgb):Rgb=>{const m=Math.max(...c,1e-4);return [c[0]/m,c[1]/m,c[2]/m];};
@@ -7,7 +7,7 @@ const brightest=(c:Rgb):Rgb=>{const m=Math.max(...c,1e-4);return [c[0]/m,c[1]/m,
 export const hex=(c:Rgb)=>'#'+c.map(v=>Math.round(Math.pow(Math.max(0,Math.min(1,v)),1/2.2)*255).toString(16).padStart(2,'0')).join('');
 
 /**
- * The colours a lit prop shows for a shared YouTube source (jukebox-lights.ts, stage-lights.ts): the colours of the
+ * The colours a lit prop shows for a shared source (jukebox-lights.ts, stage-lights.ts): the colours of the
  * video's stills, cross-faded in the order they appear as the video advances, and eased towards. Everything follows the
  * shared timeline, so every browser shows the same colours at the same moment. Without a video, or for one without
  * colour (black and white, or no network), the prop's own colour.
@@ -29,7 +29,7 @@ export class VideoColours {
     const videoId=state&&state.status!=='off'?state.videoId:'';
     if(videoId&&videoId!==this.requested){
       this.requested=videoId;this.palette=undefined;
-      void videoPalette(videoId).then(palette=>{if(this.requested===palette.videoId)this.palette=palette;}).catch(()=>{});
+      void videoPalette(videoId,mediaStills(state!.provider,videoId,state!.thumb)).then(palette=>{if(this.requested===palette.videoId)this.palette=palette;}).catch(()=>{});
     }
     const time=state?jukeboxTime(state,serverNow):0;
     // Without the duration the stills take turns every 40 s.

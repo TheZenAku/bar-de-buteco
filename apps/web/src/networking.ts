@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,TICK_MS,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type FoosballFrame,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import {api} from './api';
 
 export interface NetworkHooks {
@@ -7,6 +7,10 @@ export interface NetworkHooks {
   chat:(message:ChatMessage)=>void; status:(message:string,connected:boolean)=>void;
   error:(message:string)=>void; ping:(ms:number)=>void;
   input:()=>Omit<PlayerInput,'seq'>;
+  /** W/S, A/D and the handbrake, while riding a delivery bike. */
+  motoInput?:()=>MotoIntent;
+  /** The bike the local player rides, predicted ahead of the room (undefined once off it). */
+  moto?:(id:string,body:MotoBody|undefined)=>void;
   /** Skin to wear on arrival, so the avatar never shows the default first. */
   skin:()=>string;
   jukebox?:(id:string)=>void;
@@ -36,6 +40,10 @@ export interface NetworkHooks {
   phonePing?:(ping:PhonePing)=>void;
   /** A frame of the other end's camera on a video call. */
   phoneVideo?:(bytes:Uint8Array)=>void;
+  /** E at a pebolim table: a place was taken (or, `watching`, the table is full or playing and is watched instead). */
+  foosballOpen?:(message:{tableId:string;watching:boolean;reason?:string})=>void;
+  /** A pebolim table's ball and rods, 30 times a second while a match is on (to its players, watchers and whoever is near). */
+  foosballFrame?:(frame:FoosballFrame)=>void;
 }
 /** `waiter`: who brings it (Tonico or a worker's name); `stage`: still at the counter, or on its way to the table. */
 export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number;waiter?:string;stage?:'queued'|'carrying'}
@@ -47,6 +55,10 @@ export class BarNetwork {
     ? `${location.protocol==='https:'?'wss':'ws'}://${location.host}${import.meta.env.VITE_GAME_URL||'/game'}`
     : import.meta.env.VITE_GAME_URL);
   private pending:PlayerInput[]=[];
+  private pendingMoto:MotoInput[]=[];
+  /** The bike being ridden, as predicted, and its id. */
+  private motoBody?:MotoBody;
+  private motoId='';
   private position:Position={x:0,z:7};
   private seq=0;
   private world?:WorldState;
@@ -76,7 +88,7 @@ export class BarNetwork {
   }
   private attach(room:Room):void {
     let removal:{kind:'kick'|'ban';reason:string}|undefined;
-    this.room=room;this.pending=[];this.seq=0;this.transportReady=true;this.wasMoving=false;
+    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;
     Object.assign(room.reconnection,{minUptime:0,minDelay:500,maxDelay:2000,delay:500,maxRetries:15,maxEnqueuedMessages:0});
     this.hooks.status('Você está no bar',true);
     room.onStateChange((state:any)=>{
@@ -92,6 +104,7 @@ export class BarNetwork {
         this.position={x:self.x,y:self.y,z:self.z};
         if(!self.interactionState&&!self.currentTableId) for(const input of this.pending)this.position=this.predict(input,self);
         this.hooks.position(this.position);
+        this.reconcileMoto(world,self);
       }
     });
     room.onMessage('chat.message',(message:ChatMessage)=>this.hooks.chat(message));
@@ -115,12 +128,14 @@ export class BarNetwork {
     room.onMessage('phone.call',(call:PhoneCallView)=>this.hooks.phoneCall?.(call));
     room.onMessage('phone.ping',(ping:PhonePing)=>this.hooks.phonePing?.(ping));
     room.onMessage('phone.video',(bytes:Uint8Array)=>this.hooks.phoneVideo?.(bytes));
+    room.onMessage('foosball.open',(message:{tableId:string;watching:boolean;reason?:string})=>this.hooks.foosballOpen?.(message));
+    room.onMessage('foosball.frame',(frame:FoosballFrame)=>this.hooks.foosballFrame?.(frame));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));
     room.onError((_code:number,message?:string)=>this.hooks.error(message||'A conexão encontrou um problema.'));
-    room.onDrop(()=>{this.transportReady=false;this.stopTimers();this.pending=[];this.hooks.status('Conexão interrompida. Tentando reconectar…',false);});
-    room.onReconnect(()=>{if(this.stopped)return;this.transportReady=true;this.pending=[];this.startTimers();this.hooks.status('Você está no bar',true);});
+    room.onDrop(()=>{this.transportReady=false;this.stopTimers();this.pending=[];this.pendingMoto=[];this.hooks.status('Conexão interrompida. Tentando reconectar…',false);});
+    room.onReconnect(()=>{if(this.stopped)return;this.transportReady=true;this.pending=[];this.pendingMoto=[];this.startTimers();this.hooks.status('Você está no bar',true);});
     room.onLeave((code:number)=>{if(!this.stopped&&this.room===room){this.transportReady=false;this.stopTimers();this.stopped=true;if(removal&&this.hooks.removed)this.hooks.removed(removal.kind,removal.reason);else this.hooks.status(code===4000?'Sua participação foi encerrada. Volte à entrada para continuar.':'A conexão terminou. Volte à entrada para entrar novamente.',false);}});
     this.startTimers();this.send('inventory.sync');
   }
@@ -128,6 +143,7 @@ export class BarNetwork {
     if(!this.transportReady||!this.room||!this.user||!this.world||this.pending.length>12)return;
     const self=this.world.players[this.user.id];
     if(!self)return;
+    if(isRidingMoto(self.interactionState)){this.wasMoving=false;this.sendMotoInput();return;}
     if(self.interactionState||self.currentTableId){this.wasMoving=false;return;}
     const intention=this.hooks.input();
     const moving=!!(intention.dx||intention.dz);
@@ -136,6 +152,27 @@ export class BarNetwork {
     const input={...intention,seq:++this.seq};
     this.pending.push(input);this.position=this.predict(input,self);this.hooks.position(this.position);this.send('player.input',input);
   }
+  /** A step of the bike per tick, here and in the room; at rest with nothing pressed, nothing to send. */
+  private sendMotoInput():void {
+    const body=this.motoBody;
+    if(!body||this.pendingMoto.length>12)return;
+    const intent=this.hooks.motoInput?.()??NO_MOTO_INTENT;
+    if(!intent.throttle&&!intent.steer&&!body.speed&&!body.steer)return;
+    const input={...intent,seq:++this.seq};
+    this.pendingMoto.push(input);this.motoBody=stepMoto(body,input,TICK_MS/1000);this.hooks.moto?.(this.motoId,this.motoBody);this.send('moto.input',input);
+  }
+  /** The room's bike and the inputs it has not reached yet, like the avatar's position while walking. */
+  private reconcileMoto(world:WorldState,self:PlayerState):void {
+    const moto=isRidingMoto(self.interactionState)?Object.values(world.motos??{}).find(m=>m.riderId===self.id):undefined;
+    if(!moto){
+      if(this.motoBody){this.hooks.moto?.(this.motoId,undefined);this.motoBody=undefined;this.pendingMoto=[];}
+      return;
+    }
+    this.pendingMoto=this.pendingMoto.filter(input=>input.seq>self.lastProcessedInput);
+    let body:MotoBody=moto;
+    for(const input of this.pendingMoto)body=stepMoto(body,input,TICK_MS/1000);
+    this.motoBody=body;this.motoId=moto.id;this.hooks.moto?.(moto.id,body);
+  }
   /**
    * The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts), the stage only with
    * a pass. The raw input is what is sent.
@@ -143,8 +180,8 @@ export class BarNetwork {
   private predict(input:PlayerInput,self:PlayerState):Position {return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self));}
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   sendBytes(type:string,bytes:Uint8Array):void {if(this.room&&!this.stopped&&this.transportReady)this.room.sendBytes(type,bytes);}
-  telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length};}
+  telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length+this.pendingMoto.length};}
   private startTimers():void {this.stopTimers();this.tick=setInterval(()=>this.sendInput(),TICK_MS);this.heartbeat=setInterval(()=>this.send('ping',{at:Date.now()}),3000);}
   private stopTimers():void {clearInterval(this.tick);clearInterval(this.heartbeat);}
-  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
+  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];this.pendingMoto=[];this.motoBody=undefined;if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
 }

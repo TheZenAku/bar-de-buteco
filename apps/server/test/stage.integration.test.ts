@@ -79,7 +79,9 @@ test('the stage over real WebSockets: a paid pass opens its steps, it runs out, 
     singer.room.send('tv.command',{id:'telao',revision:room.state.televisions.get('telao')!.revision,action:'play',url:'https://youtu.be/aqz-KE-bpKQ'});
     await until(()=>singer.seen.tv.length>1||singer.seen.errors.length>errors);
     assert.deepEqual(singer.seen.errors.slice(errors),[]);
-    assert.equal(room.state.televisions.get('telao')!.videoId,'aqz-KE-bpKQ');
+    // With a video playing, the new one waits in the queue, paid as well.
+    assert.equal(room.state.televisions.get('telao')!.videoId,'M7lc1UVf-VE');
+    assert.deepEqual(room.state.televisions.get('telao')!.queue.map(entry=>entry.videoId),['aqz-KE-bpKQ']);
     assert.deepEqual(charges.filter(c=>c.reason==='media:telao').map(c=>c.amount),[-50,-50]);
   }finally{
     await Promise.allSettled(rooms.filter(r=>r.connection?.isOpen).map(r=>r.leave()));

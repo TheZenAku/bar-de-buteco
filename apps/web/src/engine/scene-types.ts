@@ -57,6 +57,16 @@ export interface SceneInput {
   rotation: number;
 }
 
+/** The minimap's view (BarScene.mapView): drawn positions, the avatar's heading and the camera's (radians). */
+export interface MapView {
+  x: number; y: number; z: number;
+  /** The camera's heading: the map turns so that the view points up. */
+  yaw: number;
+  /** Where the avatar faces: atan2(dx, dz), as PlayerState.rotation. */
+  facing: number;
+  others: Array<{ id: string; x: number; y: number; z: number; npc: boolean }>;
+}
+
 export interface SceneLabel {
   id: string;
   name: string;

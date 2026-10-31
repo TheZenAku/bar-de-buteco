@@ -1,0 +1,27 @@
+/* The minimap (minimap.ts): a round radar in the bottom-left corner. A ring in the logo's line (magenta, electric blue,
+   cyan) with its glow, a dark bezel, the map's canvas under a glass shine, and the name of the place in a chip on the
+   ring's foot. It never takes the pointer: dragging over it still turns the camera (the cores on its rim do, for their
+   names). The player's cores (needs.css) sit on an arc just outside the ring, over its top, as in Red Dead Online: --core
+   is their size, --orbit the distance of their centres from the map's, and they go clockwise from --arc-start, one every
+   --arc-step (the first stays clear of the screen's left edge). */
+.minimap{--map:188px;--core:32px;--orbit:calc(var(--map) / 2 + var(--core) / 2 + 3px);--arc-start:-130deg;--arc-step:21deg;
+  position:absolute;left:16px;bottom:16px;width:var(--map);height:var(--map);pointer-events:none}
+.minimap-dial{position:absolute;inset:0;padding:3px;border-radius:50%;
+  background:conic-gradient(from 200deg,var(--hl-magenta),var(--hl-blue),var(--hl-cyan),var(--hl-violet),var(--hl-magenta));
+  box-shadow:0 0 0 1px oklch(0 0 0 / 45%),0 0 24px oklch(.62 .28 330 / 42%),0 10px 28px oklch(0 0 0 / 60%)}
+.minimap-bezel{width:100%;height:100%;padding:4px;border-radius:50%;background:radial-gradient(circle at 34% 24%,oklch(.27 .08 305),oklch(.1 .04 300) 70%)}
+#minimap{display:block;width:100%;height:100%;border-radius:50%}
+.minimap-dial::after{content:'';position:absolute;inset:7px;border-radius:50%;background:linear-gradient(160deg,oklch(1 0 0 / 13%),transparent 36%);box-shadow:inset 0 0 0 1px oklch(1 0 0 / 8%);pointer-events:none}
+.minimap-zone{position:absolute;left:50%;bottom:-9px;translate:-50% 0;max-width:calc(var(--map) + 8px);padding:3px 11px;background:oklch(.12 .045 300 / 95%);
+  border:1px solid oklch(.75 .2 330 / 45%);box-shadow:0 0 12px oklch(.62 .28 330 / 30%);font:600 10px/1.3 var(--font-mono);letter-spacing:.18em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--foreground)}
+.minimap-zone:empty{display:none}
+@media(max-width:1100px){.minimap{--map:152px;--core:28px}}
+@media(max-height:650px) and (min-width:761px){.minimap{--map:148px;--core:28px}}
+/* Phones: smaller, on the left right above the hotbar (two rows of tiles), its cores still on its rim. */
+@media(max-width:760px){
+  .minimap{--map:104px;--core:24px;--arc-step:24deg;left:10px;bottom:124px}
+  .minimap-bezel{padding:3px}
+  .minimap-zone{bottom:-8px;padding:2px 7px;font-size:8px;letter-spacing:.12em}
+}
+@media(max-width:760px) and (max-height:579px){.minimap{--map:88px;--core:22px;--arc-step:25deg;bottom:108px}}

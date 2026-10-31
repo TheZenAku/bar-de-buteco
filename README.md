@@ -41,7 +41,8 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | WASD | Caminhar, em relação à câmera |
 | Shift | Correr |
 | Arrastar o mouse / roda | Girar a câmera / ajustar distância |
-| E | Usar o objeto próximo; levantar ao estar sentado |
+| E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto |
+| W/S, A/D, Espaço (na moto) | Acelerar, frear e dar ré; virar; freio de mão ([moto de entrega](docs/sistemas/moto.md)) |
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
 | I | Abrir ou fechar a mochila, usar e descartar itens |
@@ -56,7 +57,7 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 
 Chegue perto das cadeiras, do balcão, da jukebox ou da mesa para ver a interação. Na mesa, **Começar rodada** inicia blackjack para até quatro pessoas; **Comprar carta** e **Parar** são validados no servidor. O dealer para em 17, incluindo soft 17. Cada turno tem limite de 25 segundos. As estatísticas persistem na conta.
 
-A **jukebox** e as **TVs** são independentes: cada uma com seu link do YouTube, controles, estado compartilhado e volume pela distância até ela. Na jukebox (encostada na parede, ao pé da escada) ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. As três TVs do térreo passam sempre o mesmo vídeo; a do andar de cima tem o seu. O vídeo fica sempre na tela da TV, nunca num card no canto (**Assistir na TV** aproxima a câmera). A jukebox só toca o som, sem vídeo. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
+A **jukebox** e as **TVs** são independentes: cada uma com seu link (YouTube, Vimeo, SoundCloud, Mixcloud, Spotify, TikTok, Twitch ou link direto de vídeo, áudio e rádio), controles, estado compartilhado e volume pela distância até ela. Na jukebox (encostada na parede, ao pé da escada) ou diante de uma TV, pressione **E**, cole um link e clique em **Tocar**. As três TVs do térreo passam sempre o mesmo vídeo; a do andar de cima tem o seu. O vídeo fica sempre na tela da TV, nunca num card no canto (**Assistir na TV** aproxima a câmera). A jukebox só toca o som, sem vídeo. Fechar os controles mantém a reprodução. Consulte [jukebox, TVs, limitações do YouTube e testes](docs/sistemas/jukebox.md).
 
 As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo de chopp**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
 

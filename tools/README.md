@@ -62,6 +62,8 @@ Pelo terminal: `bots.bat` (ou `npm run bots -- 30`) conecta jogadores de verdade
 | `assets/` | Importadores que geram os arquivos de `apps/web/public` a partir de `assets-bar` (chamados pelos scripts `npm run assets:*`), e a biblioteca comum em `assets/lib` |
 | `ops/` | Backup e restore-check do PostgreSQL (`npm run ops:backup`, `npm run ops:restore-check`) e `pseudonym.mjs`, que acha um jogador nos logs |
 
+Para publicar uma nova versão da [moto de entrega](../docs/sistemas/moto.md), exporte-a do Blender para `assets-bar/map/BarBoteco/export/moto` e execute `npm run assets:moto`.
+
 Para trocar os ícones dos itens ou da moeda, substitua a imagem em `assets-bar/icons` (mesmo nome) e execute `npm run assets:icons`. A tabela no início de `assets/import-icons.mjs` liga cada arquivo ao item. Um item novo precisa de uma linha ali e do caminho `icon` no catálogo (`packages/shared/src/inventory.ts`).
 
 Para atualizar os [sons ambientes](../docs/sistemas/ambient.md), adicione gravações em `assets-bar/sound/ambient` e execute `npm run assets:ambient -- "C:\caminho\ffmpeg.exe"`. O importador normaliza o volume, converte para AAC e elimina duplicatas sem alterar os originais.

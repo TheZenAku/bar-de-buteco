@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export * from './admin.js';
 export * from './jukebox.js';
+export * from './media-links.js';
 export * from './voice.js';
 export * from './doors.js';
 export * from './needs.js';
@@ -11,10 +12,16 @@ export * from './bar-animations.js';
 export * from './phone.js';
 export * from './stage-show.js';
 export * from './prices.js';
+export * from './blackjack.js';
+export * from './foosball.js';
+export * from './moto.js';
 import type {JukeboxState} from './jukebox.js';
 import type {JobSlotsView,ServedItemState} from './economy.js';
 import type {MusicianState} from './musicians.js';
 import type {StageShowState} from './stage-show.js';
+import type {BlackjackPhase} from './blackjack.js';
+import type {FoosballTableView} from './foosball.js';
+import type {MotoState} from './moto.js';
 
 export const TICK_MS = 50;
 export const PATCH_MS = 100;
@@ -25,6 +32,8 @@ export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' 
   | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend'
   /** Playing at one of the stage's musicians' spots (BarState.musicians says which, and the phase). */
   | 'stage'
+  /** On a delivery bike (BarState.motos says which). */
+  | 'ride'
   /** The bar animations (bar-animations.ts): getting up from a chair, a urinal, a cigarette lit and put out, a whole
    *  cigarette smoked, being sick, clearing a table from its corner, and Magrão serving at the counter. */
   | 'stand-up' | 'urinate' | 'smoke' | 'smoke-stop' | 'cigarette' | 'vomit' | 'clean' | 'serve-chopp' | 'serve-chopp-dark' | 'serve-longneck';
@@ -75,18 +84,33 @@ export interface NpcState extends Position { id: string; displayName: string; co
   /** Tonico's tray: the order's items, comma-separated ('' when empty), and that order's id. */
   carrying?: string; carryingOrder?: string }
 export interface Card { rank: string; suit: string }
-export interface BlackjackSeat { playerId: string; displayName: string; cards: Card[]; total: number; status: string; result: string }
-export interface BlackjackTable { id: string; phase: 'waiting' | 'playing' | 'dealer' | 'results'; seats: BlackjackSeat[]; dealerCards: Card[]; dealerTotal: number; turnPlayerId: string; deadline: number; roundId: string }
+/** A card on the blackjack table; seq is its place in the round's deal (the browsers key and animate cards by it). The
+ *  dealer's hole card reads rank '?' until it is turned. */
+export interface BlackjackCard extends Card { seq: number }
+/** One hand of a seat (more than one after a split). status: playing, done, bust, blackjack, doubled or surrendered;
+ *  outcome (once settled): blackjack, win, push, loss, bust or surrender, with what came back (payout, stake included). */
+export interface BlackjackHand { cards: BlackjackCard[]; bet: number; total: number; soft: boolean; split: boolean; doubled: boolean; status: string; outcome: string; payout: number }
+/** A chair at the table. status: watching (no bet), betting, playing, turn, done or left. result: win, loss or draw for the
+ *  round as a whole (net), '' until settled. insurance: coins on it; insured: '' (not offered), pending, taken or declined. */
+export interface BlackjackSeat { playerId: string; displayName: string; chair: number; bet: number; lastBet: number; hands: BlackjackHand[];
+  insurance: number; insured: string; staked: number; paid: number; net: number; status: string; result: string }
+/** turnPlayerId/turnHand: whose decision it is; deadline: when the phase (or that decision) ends, on the server clock. */
+export interface BlackjackTable { id: string; phase: BlackjackPhase; round: number; move: number; roundId: string; seats: BlackjackSeat[];
+  dealerCards: BlackjackCard[]; dealerTotal: number; dealerSoft: boolean; turnPlayerId: string; turnHand: number; deadline: number; minBet: number; maxBet: number }
 export interface ActiveEvent { id: string; type: EventType | ''; startedAt: number; durationMs: number }
 export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; jobs?:Record<string,JobSlotsView>; served?:Record<string,ServedItemState>;
   /** The stage's musicians' spots, by spot id (musicians.ts). */
   musicians?:Record<string,MusicianState>;
   /** The stage show's settings from the light desk (stage-show.ts). */
-  stageShow?:StageShowState; event: ActiveEvent; occupancy: number; capacity: number; serverTime: number }
+  stageShow?:StageShowState;
+  /** The pebolim tables, by id (foosball.ts): lobby, score and phase; the ball and the rods come as frames (foosball.frame). */
+  foosball?:Record<string,FoosballTableView>;
+  /** The delivery bikes, by id (moto.ts): seen from anywhere on the map. */
+  motos?:Record<string,MotoState>; event: ActiveEvent; occupancy: number; capacity: number; serverTime: number }
 export interface ChatMessage { id:string; playerId:string; displayName:string; text:string; sentAt:number; system?:boolean }
 /** Collision boxes the player touches to use an object; chairs have none and are reached at their seat point. */
 export type Footprint = Pick<Collider,'id'|'x'|'z'|'hx'|'hz'>;
-export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'; label:string; rotation?:number; footprint?:Footprint[];
+export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'foosball'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'; label:string; rotation?:number; footprint?:Footprint[];
   /** Without a footprint: how far from the point (metres) the player's centre may be; a chair's seat point by default. */
   reach?:number;
   /** A musician's spot on the stage (STAGE_SPOTS id). */

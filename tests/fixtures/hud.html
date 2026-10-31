@@ -1,0 +1,36 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>HUD fixture</title>
+<style>body{margin:0;background:radial-gradient(90% 70% at 40% 35%,#6b3a2a,#2a1530 55%,#0d0716)}#world{opacity:0}</style></head>
+<body><div id="app"></div>
+<script type="module">
+// The in-game HUD without a server: the minimap, the needs' cores and the chat over a plain backdrop.
+// window.fixture.needs({hp,...}) sets the cores as the room would sync them; fixture.map(view) draws the minimap at a
+// MapView (BarScene.mapView); fixture.chat(lines) fills the chat; fixture.objective(position) sets the job's station.
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/needs.css';
+import '../../apps/web/src/minimap.css';
+import {gameUi} from '../../apps/web/src/game-ui.ts';
+import {createHudPanels} from '../../apps/web/src/hud-panels.ts';
+import {createNeedsHud} from '../../apps/web/src/needs-hud.ts';
+import {createMinimap,zoneName} from '../../apps/web/src/minimap.ts';
+document.querySelector('#app').innerHTML=gameUi();
+const game=document.querySelector('#game');
+document.querySelector('#lobby').classList.add('hidden');game.classList.remove('hidden');document.querySelector('#waiting').classList.add('hidden');
+const hud=createHudPanels(game);hud.forUser('fixture');
+const needs=createNeedsHud(game,()=>{},()=>Date.now());
+const minimap=createMinimap(game);
+const self={id:'me',displayName:'Eu',hp:100,hpMax:100,stamina:100,hunger:100,thirst:100,bladder:0,drunk:0};
+let view;
+const frame=()=>{if(view)minimap.render(()=>view);requestAnimationFrame(frame);};requestAnimationFrame(frame);
+window.fixture={hud,zoneName,
+  needs(values){Object.assign(self,values);needs.update({...self});},
+  map(next){view={yaw:0,facing:Math.PI,others:[],...next};},
+  objective(at){minimap.setObjective(at);},
+  chat(lines,open=false){
+    document.querySelector('#messages').innerHTML='<div class="chat-welcome">A conversa só chega a quem está por perto.</div>'+lines.map(([name,text])=>`<div class="chat-line"><b>${name}</b><span>${text}</span></div>`).join('');
+    const box=document.querySelector('#messages');box.scrollTop=box.scrollHeight;
+    document.querySelector('[data-panel="chat"]').classList.toggle('chat-open',open);
+  },
+};
+needs.update({...self});
+</script></body></html>

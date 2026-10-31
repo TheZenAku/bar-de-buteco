@@ -1,0 +1,19 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Blackjack fixture</title>
+<style>body{margin:0;background:radial-gradient(120% 90% at 30% 20%,#3a1d5c,#120726 60%,#07030f)}</style></head>
+<body><main id="game" class="game"><div class="prompts"><section id="consuming" class="consuming hidden" aria-label="Consumindo"></section></div><section id="blackjack" class="blackjack hud-panel" aria-label="Mesa de blackjack"></section></main>
+<script type="module">
+// The blackjack panel (apps/web/src/blackjack/table.ts) and the consumption tiles without a server: window.fixture.set()
+// draws a table state as the room would sync it; sent lists what the panel asked for.
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/needs.css';
+import {createBlackjackTable} from '../../apps/web/src/blackjack/table.ts';
+import {createConsumingHud} from '../../apps/web/src/consuming-hud.ts';
+let now=1_000_000,balance=1230;
+const sent=[];
+const ui=createBlackjackTable(document.querySelector('#blackjack'),{send:(type,payload)=>sent.push([type,payload]),now:()=>now,balance:()=>balance,volume:()=>0,notify:()=>{}});
+const hud=createConsumingHud(document.querySelector('#consuming'));
+window.fixture={ui,hud,sent,now:()=>now,advance:ms=>{now+=ms;},
+  set:(table,self='me')=>ui.update(table,self),setBalance:value=>{balance=value;ui.refresh();},
+  consume:list=>hud.render(list,now)};
+</script></body></html>

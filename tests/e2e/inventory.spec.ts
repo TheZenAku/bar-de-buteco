@@ -36,8 +36,8 @@ test('mochila compra, usa e descarta itens com estado persistido',async({page})=
   await expect(page.locator('#toasts')).toBeEmpty();
 
   await slot('coxinha').click();await detail.getByRole('button',{name:'Usar'}).click();
-  // While eating, a progress bar names it above the key prompts.
-  await expect(page.locator('#consuming')).toContainText('Comendo');await expect(page.locator('#consuming')).toContainText('Coxinha');
+  // While eating, its tile (named by its label) drains above the key prompts.
+  await expect(page.locator('#consuming').getByRole('progressbar',{name:'Comendo Coxinha'})).toBeVisible();
   await page.keyboard.press('i');
   await expect(slot('coxinha')).toHaveCount(0);
   // The snack is in hand, had over the table's time, and the player is free meanwhile; one thing at a time, so the

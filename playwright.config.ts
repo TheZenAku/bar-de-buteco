@@ -11,7 +11,8 @@ export default defineConfig({
     {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
     {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
     {name:'camera',testMatch:'**/camera.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.4'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
-    {name:'media',testMatch:'**/jukebox.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
+    {name:'media',testMatch:['**/jukebox.spec.ts','**/media-platforms.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
+    {name:'media-firefox',testMatch:'**/media-firefox.spec.ts',use:{browserName:'firefox',channel:'',launchOptions:{args:[]}}},
     {name:'doors',testMatch:'**/doors.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'ambient',testMatch:'**/ambient.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'environment',testMatch:'**/environment.spec.ts'},
@@ -19,6 +20,10 @@ export default defineConfig({
     // Two players' worlds at once: drawn on the GPU where the host has one (software rendering starves their input loops).
     // The bar animations: many skinned bodies, props and particles; drawn on the GPU like the stage.
     {name:'bar-animations',testMatch:'**/bar-animations.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
+    // Pebolim: the panel's canvas and the 3D ball at once, drawn on the GPU like the stage.
+    {name:'foosball',testMatch:'**/foosball.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.6'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
+    // The delivery bike: real keys over a real room, two players' worlds, drawn on the GPU like the stage.
+    {name:'moto',testMatch:'**/moto.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'stage',testMatch:'**/stage.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.
     {name:'voice',testMatch:'**/voice.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.2'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
