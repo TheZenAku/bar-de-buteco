@@ -7,11 +7,13 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
+import {achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
 import {PhoneService} from './phone-service.js';
+import {ProfileService} from './profile-service.js';
+import {AchievementService} from './achievement-service.js';
 import {AdminService} from './admin-service.js';
 import {AdminConsole} from './admin-console.js';
 import {PricingService} from './pricing-service.js';
@@ -52,7 +54,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const wardrobe=new WardrobeService(db,pricing);
   const inventory=new InventoryService(db,wardrobe);
   const wallet=new WalletService(db,wardrobe);
-  const phone=new PhoneService(db,wardrobe);
+  const achievements=new AchievementService(db);
+  // A counter that fails must not take the message or the Pix down with it.
+  const phone=new PhoneService(db,wardrobe,(userId,series)=>achievements.add([{userId,series,amount:1}]).catch((error:unknown)=>{app.log.error({err:error,series},'Falha ao contar conquista');}));
+  const profile=new ProfileService(db,phone);
   const administration=new AdminService(db,wardrobe);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
@@ -281,11 +286,22 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const idParams = z.object({ id: uuidSchema });
   const beforeQuery = z.object({ before: z.coerce.number().int().positive().optional() }).strict();
   const feedQuery = z.object({ before: z.coerce.number().int().positive().optional(), scope: z.enum(['following', 'all']).default('all') }).strict();
-  // Highzap media arrive as the recorded bytes, not JSON (POST /api/phone/zap/:id/media).
-  app.addContentTypeParser([...new Set(Object.values(PHONE_MEDIA_TYPES).flat())], { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+  // Highzap media and badge images arrive as the file's bytes, not JSON (POST /api/phone/zap/:id/media, POST /api/admin/badges/images).
+  app.addContentTypeParser([...new Set([...Object.values(PHONE_MEDIA_TYPES).flat(), 'image/png'])], { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   app.get('/api/phone', { preHandler: phoneUser }, request => phone.profile(me(request)));
-  // The player card (clicking someone in the bar): the way to get a number to save.
   app.get('/api/phone/card/:id', { preHandler: phoneUser }, request => phone.card(me(request), idParams.parse(request.params).id));
+  // The profile window (docs/sistemas/perfil.md): anyone's, and what the player edits in their own.
+  app.get('/api/profile/achievements', { preHandler: phoneUser }, async request => ({ achievements: await achievements.view(me(request)) }));
+  app.get('/api/profile/:id', { preHandler: phoneUser }, request => profile.view(me(request), idParams.parse(request.params).id));
+  app.post('/api/profile/status', { preHandler: phoneUser }, request => profile.setStatus(me(request), profileStatusSchema.parse(request.body).status));
+  app.post('/api/profile/badges', { preHandler: phoneUser }, request => profile.showBadges(me(request), profileBadgesSchema.parse(request.body).badges));
+  app.post('/api/profile/skill', { preHandler: phoneUser }, request => profile.setLoadout(me(request), profileSkillSchema.parse(request.body)));
+  const badgeImageId = z.object({ id: z.string().regex(BADGE_IMAGE_ID, 'Imagem inválida.') }).strict();
+  // Named by its contents, so the browser keeps it.
+  app.get('/api/badges/images/:id', { preHandler: authenticated, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const bytes = await profile.image(badgeImageId.parse(request.params).id);
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type('image/png').send(bytes);
+  });
   app.get('/api/phone/lookup', { preHandler: phoneUser }, request => phone.resolve({ number: z.object({ number: z.string().regex(/^\d{9}$/, 'Digite um número de 9 dígitos.') }).strict().parse(request.query).number }));
   app.post('/api/phone/contacts', { preHandler: phoneUser }, request => phone.addContact(me(request), phoneTarget.parse(request.body)));
   app.delete('/api/phone/contacts/:id', { preHandler: phoneUser }, request => phone.removeContact(me(request), idParams.parse(request.params).id));
@@ -414,6 +430,29 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     request.log.info({actorId:request.auth!.user.id,action:body.action,playerId:body.playerId},'Ação administrativa');
     return result;
   });
+  const badgeIdSchema=z.string().min(1).max(40);
+  app.get('/api/admin/badges',{preHandler:administrator},async()=>({badges:await profile.catalog(),images:await profile.images()}));
+  app.post('/api/admin/badges/images',{preHandler:administrator,bodyLimit:PROFILE.badgeImageMaxBytes,config:{rateLimit:{max:30,timeWindow:'10 minutes'}}},async request=>{
+    if(!Buffer.isBuffer(request.body))throw new HttpError(415,'Envie um arquivo PNG.');
+    return {id:await profile.saveImage(request.auth!.user.id,request.body)};
+  });
+  app.post('/api/admin/badges/images/delete',{preHandler:administrator},async request=>{
+    const body=badgeImageId.extend({reason:reasonSchema}).strict().parse(request.body);
+    return {images:await profile.deleteImage(request.auth!.user.id,body.id,body.reason)};
+  });
+  app.get('/api/admin/badges/:id/holders',{preHandler:administrator},async request=>({holders:await profile.holders(z.object({id:badgeIdSchema}).parse(request.params).id)}));
+  app.post('/api/admin/badges',{preHandler:administrator},async request=>{
+    const {id,reason,...badge}=badgeSchema.extend({id:badgeIdSchema.optional(),reason:reasonSchema}).parse(request.body);
+    return {badges:await profile.saveBadge(request.auth!.user.id,badge,reason,id)};
+  });
+  app.post('/api/admin/badges/delete',{preHandler:administrator},async request=>{
+    const body=z.object({id:badgeIdSchema,reason:reasonSchema}).strict().parse(request.body);
+    return {badges:await profile.deleteBadge(request.auth!.user.id,body.id,body.reason)};
+  });
+  app.post('/api/admin/badges/grant',{preHandler:administrator},request=>{
+    const body=z.object({badgeId:badgeIdSchema,playerId:uuidSchema,grant:z.boolean(),reason:reasonSchema}).strict().parse(request.body);
+    return profile.grant(request.auth!.user.id,body.playerId,body.badgeId,body.grant,body.reason);
+  });
   app.post('/api/admin/revert',{preHandler:administrator},request=>{
     const body=z.object({actionId:z.string().min(1).max(128),reason:reasonSchema}).strict().parse(request.body);
     return administration.revert(request.auth!.user.id,body);
@@ -467,6 +506,12 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const { events } = z.object({ events: z.array(z.object({ event: z.string().min(1).max(64), userId: z.string().max(64).optional(), details: z.record(z.string(), z.unknown()).optional(), at: z.number().int().positive() }).strict()).max(200) }).strict().parse(request.body);
     await adminConsole.record(events.map(event => ({ ...event, source: 'world' as const })));
     return { recorded: events.length };
+  });
+  // What the players did since the last report (docs/sistemas/conquistas.md); answers the badges to tell those who are online about.
+  app.post('/api/internal/achievements', { ...internalOptions, bodyLimit: 262_144 }, async (request) => {
+    const { events, online } = achievementReportSchema.parse(request.body);
+    await achievements.add(events);
+    return { unlocked: await achievements.unlocked(online) };
   });
   // Previous world versions: each control delivered once, as before (no confirmation).
   app.get('/api/internal/controls', internalOptions, async () => ({ controls: await claimControlsOnce(db) }));

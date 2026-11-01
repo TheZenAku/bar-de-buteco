@@ -52,7 +52,7 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
     const people=(ctx.profile()?.contacts??[]).filter(person=>!query||person.name.toLowerCase().includes(query.toLowerCase())||person.number.includes(query.replace(/\D/g,'')||'§'));
     view.innerHTML=`${header(mode==='share'?'Enviar para…':'Nova conversa','Conversas')}<div class="ph-body"><input class="ph-search" type="search" placeholder="Nome ou número" value="${e(query)}" data-zap-input="search" aria-label="Buscar contato">
       <div class="ph-list">${people.map(person=>`<button type="button" class="ph-row" data-zap="open" data-id="${e(person.id)}">${avatar(person,40)}<span class="fl"><b>${e(person.name)}</b><small>${e(formatPhoneNumber(person.number))}</small></span></button>`).join('')}</div>
-      ${people.length?'':`<p class="ph-empty small">${query?'Ninguém da agenda com esse nome.':'Sua agenda está vazia. O número de cada pessoa fica na ficha dela: clique em alguém no bar e salve o contato.'}</p><button type="button" class="ph-pill-btn soft wide" data-zap="contacts">${uiIcon('userPlus')} Adicionar um número</button>`}</div>`;
+      ${people.length?'':`<p class="ph-empty small">${query?'Ninguém da agenda com esse nome.':'Sua agenda está vazia. O número de cada pessoa se salva pelo perfil dela: clique com o botão direito em alguém no bar, abra o Perfil e salve o contato.'}</p><button type="button" class="ph-pill-btn soft wide" data-zap="contacts">${uiIcon('userPlus')} Adicionar um número</button>`}</div>`;
   }
   function mediaHtml(message:Shown):string {
     const media=message.media!,id=media.id??'';

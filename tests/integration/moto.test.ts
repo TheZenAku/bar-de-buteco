@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MOTO,MOTOS,MAP_COLLIDERS,canMountMoto,isWalkable,motoDismountSpot,motoSteerAngle,nearestFreeMoto,parkedMoto,solidColliders,stepMoto,type MotoBody,type MotoIntent} from '@bar/shared';
+import {MOTO,MAP_COLLIDERS,canMountMoto,floorHeight,isWalkable,motoDismountSpot,motoSpawnSpot,motoSteerAngle,nearestFreeMoto,parkedMoto,roadHeight,solidColliders,stepMoto,type MotoBody,type MotoIntent} from '@bar/shared';
 
-const spot=MOTOS[0];
+/** The kerb in front of the bar, between the street lamp and the silver car. */
+const spot={id:'moto-1',x:13.6,y:0,z:3.85,yaw:-Math.PI/2};
 const ride=(start:MotoBody,intent:Partial<MotoIntent>,ticks:number,each?:(body:MotoBody)=>void)=>{
   let body=start;
   for(let i=0;i<ticks;i++){body=stepMoto(body,{throttle:0,steer:0,brake:false,...intent});each?.(body);}
@@ -18,6 +19,31 @@ function hullInSolid(body:MotoBody):string|undefined {
     if(solid)return solid.id;
   }
 }
+
+test('a bike spawns on the free street nearest the administrator, pointing the same way when it fits',()=>{
+  const near={x:16,y:0,z:3.85},found=motoSpawnSpot(near,-Math.PI/2,[])!;
+  assert.ok(found,'A street right there');
+  assert.equal(found.yaw,-Math.PI/2);
+  assert.ok(Math.hypot(found.x-near.x,found.z-near.z)<4,`Near: ${found.x},${found.z}`);
+  assert.ok(found.x<near.x,'Ahead of the administrator');
+  const body:MotoBody={...found,speed:0,steer:0};
+  assert.equal(hullInSolid(body),undefined);
+  assert.ok(stepMoto(body,{throttle:1,steer:0,brake:false}).speed>0);
+  // Never on another bike.
+  const second=motoSpawnSpot(near,-Math.PI/2,[found])!;
+  assert.ok(Math.hypot(second.x-found.x,second.z-found.z)>=MOTO.HALF_LENGTH*2);
+  // From inside the bar and from the terrace: the street outside, on the street's own height.
+  for(const inside of [{x:10,y:.3,z:-6},{x:6,y:3.4,z:-8}]){
+    const out=motoSpawnSpot(inside,0,[])!;
+    assert.ok(out,`A street from ${inside.x},${inside.z}`);
+    assert.notEqual(roadHeight(out.x,out.z,out.y+.2),undefined,`On a street from above, at ${out.x},${out.z}`);
+    assert.ok(Math.abs(floorHeight(out.x,out.z,out.y+.2)!-out.y)<.1,`The street is the top floor there, at ${out.x},${out.z}`);
+    assert.equal(hullInSolid({...out,speed:0,steer:0}),undefined);
+    assert.ok(out.y<.3,`On the street: y ${out.y}`);
+  }
+  // Out of the world, nothing to spawn on.
+  assert.equal(motoSpawnSpot({x:2000,y:0,z:2000},0,[]),undefined);
+});
 
 test('the parked spot is free, on the street, and it is reached from the pavement in front of the bar',()=>{
   const parked=parkedMoto(spot);

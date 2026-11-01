@@ -36,7 +36,7 @@ export function traySlots(items:readonly string[]):{x:number;z:number}[] {
 
 const DEG=180/Math.PI;
 /** Turns `bone` (world space, on top of its pose) by the shortest rotation that takes direction `from` to `to`. */
-function aim(bone:pc.Entity,from:pc.Vec3,to:pc.Vec3):void {
+export function aim(bone:pc.Entity,from:pc.Vec3,to:pc.Vec3):void {
   const a=from.clone().normalize(),b=to.clone().normalize(),axis=new pc.Vec3().cross(a,b),sin=axis.length();
   if(sin<1e-6)return;
   const angle=Math.atan2(sin,a.dot(b))*DEG;

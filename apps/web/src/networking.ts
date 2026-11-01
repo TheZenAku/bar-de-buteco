@@ -1,15 +1,19 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type FoosballFrame,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type FoosballFrame,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import type {Badge} from '@bar/shared';
 import {api} from './api';
+import {PredictedRide} from './engine/moto-motion';
 
 export interface NetworkHooks {
+  /** The player just got a badge (docs/sistemas/conquistas.md). */
+  achievement?:(badge:Badge)=>void;
   state:(world:WorldState)=>void; position:(position:Position)=>void;
   chat:(message:ChatMessage)=>void; status:(message:string,connected:boolean)=>void;
   error:(message:string)=>void; ping:(ms:number)=>void;
   input:()=>Omit<PlayerInput,'seq'>;
   /** W/S, A/D and the handbrake, while riding a delivery bike. */
   motoInput?:()=>MotoIntent;
-  /** The bike the local player rides, predicted ahead of the room (undefined once off it). */
+  /** The bike the local player rides as it should be drawn this frame, ahead of the room (undefined once off it). */
   moto?:(id:string,body:MotoBody|undefined)=>void;
   /** Skin to wear on arrival, so the avatar never shows the default first. */
   skin:()=>string;
@@ -26,6 +30,8 @@ export interface NetworkHooks {
   removed?:(kind:'kick'|'ban',reason:string)=>void;
   /** The persistent inventory removed an eligible item when the character fainted. */
   itemLost?:(item:string)=>void;
+  /** A bike ran this player over: the life it took, and who was riding ('' with nobody on it). */
+  motoStruck?:(hit:{hp:number;by:string})=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
   inventoryResult?:(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>void;
   /** Coins after a change made in the room (media, counter, table, job, refund). */
@@ -57,8 +63,10 @@ export class BarNetwork {
   private pending:PlayerInput[]=[];
   private pendingMoto:MotoInput[]=[];
   /** The bike being ridden, as predicted, and its id. */
-  private motoBody?:MotoBody;
+  private ride?:PredictedRide;
   private motoId='';
+  /** What the room last heard of the switches and the brake pedal. */
+  private sentLamps=0;
   private position:Position={x:0,z:7};
   private seq=0;
   private world?:WorldState;
@@ -117,6 +125,8 @@ export class BarNetwork {
     room.onMessage('lights.open',()=>this.hooks.lights?.());
     room.onMessage('stage.state',(message:{until:number;price?:number;message?:string})=>this.hooks.stage?.(message));
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
+    room.onMessage('moto.struck',(hit:{hp:number;by:string})=>this.hooks.motoStruck?.(hit));
+    room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
     room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));
     room.onMessage('voice',(frame:Uint8Array)=>this.hooks.voice?.(frame));
@@ -143,7 +153,8 @@ export class BarNetwork {
     if(!this.transportReady||!this.room||!this.user||!this.world||this.pending.length>12)return;
     const self=this.world.players[this.user.id];
     if(!self)return;
-    if(isRidingMoto(self.interactionState)){this.wasMoving=false;this.sendMotoInput();return;}
+    // On a bike the frames keep the time (rideFrame).
+    if(isRidingMoto(self.interactionState)){this.wasMoving=false;return;}
     if(self.interactionState||self.currentTableId){this.wasMoving=false;return;}
     const intention=this.hooks.input();
     const moving=!!(intention.dx||intention.dz);
@@ -152,26 +163,52 @@ export class BarNetwork {
     const input={...intention,seq:++this.seq};
     this.pending.push(input);this.position=this.predict(input,self);this.hooks.position(this.position);this.send('player.input',input);
   }
+  /**
+   * Each frame, riding: the bike's ticks are counted from the frames' real time and not by a timer, which on a busy page fires
+   * late and unevenly; what is drawn is then exactly as far along as the time that passed.
+   */
+  rideFrame(dt:number):void {
+    const {ride}=this;
+    if(!ride)return;
+    if(this.transportReady)ride.advance(dt,body=>this.stepRide(body));
+    this.hooks.moto?.(this.motoId,ride.pose());
+  }
   /** A step of the bike per tick, here and in the room; at rest with nothing pressed, nothing to send. */
-  private sendMotoInput():void {
-    const body=this.motoBody;
-    if(!body||this.pendingMoto.length>12)return;
+  private stepRide(body:MotoBody):MotoBody {
+    if(this.pendingMoto.length>24)return body;
     const intent=this.hooks.motoInput?.()??NO_MOTO_INTENT;
-    if(!intent.throttle&&!intent.steer&&!body.speed&&!body.steer)return;
+    // A switch thrown at rest still has to reach the others.
+    const lamps=(intent.lights??0)|(intent.brake?16:0),changed=lamps!==this.sentLamps;
+    if(!changed&&!intent.throttle&&!intent.steer&&!body.speed&&!body.steer)return body;
+    this.sentLamps=lamps;
     const input={...intent,seq:++this.seq};
-    this.pendingMoto.push(input);this.motoBody=stepMoto(body,input,TICK_MS/1000);this.hooks.moto?.(this.motoId,this.motoBody);this.send('moto.input',input);
+    this.pendingMoto.push(input);this.send('moto.input',input);
+    return stepMoto(body,input,TICK_MS/1000,this.otherBikes(),this.handling());
+  }
+  /** What this bike's engine and parts allow, the same list the room steps it with. */
+  private handling(){
+    const moto=this.world?.motos?.[this.motoId];
+    return moto?motoHandling(moto):undefined;
+  }
+  /** The other bikes, as something to run into (the same list the room uses, a patch older). */
+  private otherBikes(){
+    const motos=Object.values(this.world?.motos??{}).filter(moto=>moto.id!==this.motoId);
+    return motos.length?motos.map(motoObstacle):[];
   }
   /** The room's bike and the inputs it has not reached yet, like the avatar's position while walking. */
   private reconcileMoto(world:WorldState,self:PlayerState):void {
     const moto=isRidingMoto(self.interactionState)?Object.values(world.motos??{}).find(m=>m.riderId===self.id):undefined;
     if(!moto){
-      if(this.motoBody){this.hooks.moto?.(this.motoId,undefined);this.motoBody=undefined;this.pendingMoto=[];}
+      if(this.ride){this.hooks.moto?.(this.motoId,undefined);this.ride=undefined;this.pendingMoto=[];}
       return;
     }
     this.pendingMoto=this.pendingMoto.filter(input=>input.seq>self.lastProcessedInput);
+    const rideOf=this.motoId;
     let body:MotoBody=moto;
-    for(const input of this.pendingMoto)body=stepMoto(body,input,TICK_MS/1000);
-    this.motoBody=body;this.motoId=moto.id;this.hooks.moto?.(moto.id,body);
+    this.motoId=moto.id;
+    const others=this.otherBikes(),handling=motoHandling(moto);
+    for(const input of this.pendingMoto)body=stepMoto(body,input,TICK_MS/1000,others,handling);
+    if(this.ride&&rideOf===moto.id)this.ride.correct(body);else this.ride=new PredictedRide(body);
   }
   /**
    * The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts), the stage only with
@@ -183,5 +220,5 @@ export class BarNetwork {
   telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length+this.pendingMoto.length};}
   private startTimers():void {this.stopTimers();this.tick=setInterval(()=>this.sendInput(),TICK_MS);this.heartbeat=setInterval(()=>this.send('ping',{at:Date.now()}),3000);}
   private stopTimers():void {clearInterval(this.tick);clearInterval(this.heartbeat);}
-  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];this.pendingMoto=[];this.motoBody=undefined;if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
+  async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];this.pendingMoto=[];this.ride=undefined;if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
 }

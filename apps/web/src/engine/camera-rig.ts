@@ -23,6 +23,10 @@ export interface CameraSubject {
   /** Degrees the view rolls with drink (0 sober). */
   roll:number;
   elapsed:number;
+  /** How many metres of what it is riding reach back past the body: the x-ray stops that much sooner. */
+  clearance?:number;
+  /** Seconds it must stay hidden before the x-ray opens (0: at once). */
+  xrayAfter?:number;
 }
 
 const TARGET_HEIGHT=1.25;
@@ -38,8 +42,20 @@ const SIGHT=[1.6,1.1,.6];
 const ZOOM_RATE=.001;
 // On a bike the view swings behind it this fast (per second), this low (radians), this long (seconds) after the mouse let go.
 const CHASE_TURN=3.2,CHASE_PITCH=.3,CHASE_AFTER_DRAG=1.5;
+// At full speed the view falls back this many metres behind the bike.
+const RUSH_BACK=.5;
 /** Exponential smoothing: the part of the way covered in `dt` seconds at `rate` per second. */
 const ease=(rate:number,dt:number)=>1-Math.exp(-rate*dt);
+/**
+ * The same smoothing towards a goal that moves, solved over the frame: `ease` assumes the goal stands still while the frame lasts,
+ * so its lag behind something moving changes with the frame's length, and at speed the subject shakes in the view. Here a goal moving
+ * steadily is followed at the same distance however long the frames are. `before` is where the goal was last frame.
+ */
+function trail(value:number,goal:number,before:number,rate:number,dt:number):number {
+  if(dt<=0)return value;
+  const steady=(goal-before)/dt/rate;
+  return goal-steady-(before-value-steady)*Math.exp(-rate*dt);
+}
 
 /**
  * The camera of the local player. Zoom and unrestricted rotation follow the hand smoothly. Geometry never changes
@@ -59,6 +75,12 @@ export class CameraRig {
   private distanceGoal=DEFAULT_CAMERA_DISTANCE;
   private boomLength=DEFAULT_CAMERA_DISTANCE;
   private readonly target=new pc.Vec3(0,1.2,3.5);
+  /** Where the point it looks at, the heading and the view's turn were heading last frame (trail). */
+  private readonly targetBefore=new pc.Vec3(0,1.2,3.5);
+  private headingBefore?:number;
+  private yawGoalBefore=.15;
+  /** How long a solid has hidden the body (xrayAfter). */
+  private hiddenFor=0;
   private readonly eye=new pc.Vec3();
   private eyeSet=false;
   private xrayOpen=0;
@@ -66,6 +88,8 @@ export class CameraRig {
   /** Riding a bike: the view and the elevation to give back getting off, and how long ago the mouse last turned the view. */
   private beforeRide?:{mode:CameraMode;pitch:number};
   private sinceDrag=0;
+  /** How much of the fall back at speed applies (rush). */
+  private rushing=0;
   private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),up:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3()};
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
@@ -110,16 +134,22 @@ export class CameraRig {
   /** Swings the view behind the bike's heading (radians), unless the mouse has just looked somewhere else. */
   chase(heading:number,dt:number):void {
     this.sinceDrag+=dt;
+    const turned=this.headingBefore===undefined?0:Math.atan2(Math.sin(heading-this.headingBefore),Math.cos(heading-this.headingBefore));
+    this.headingBefore=heading;
     if(this.sinceDrag<CHASE_AFTER_DRAG)return;
+    // In unwrapped angles: behind the heading, on the turn nearest to the view.
     const behind=heading+Math.PI,turn=Math.atan2(Math.sin(behind-this.yawGoal),Math.cos(behind-this.yawGoal));
-    this.yawGoal+=turn*ease(CHASE_TURN,dt);
+    this.yawGoal=trail(this.yawGoal,this.yawGoal+turn,this.yawGoal+turn-turned,CHASE_TURN,dt);
     this.pitchGoal+=(CHASE_PITCH-this.pitchGoal)*ease(2,dt);
   }
+
+  /** The view pulling back at speed, 0 to 1 (BarScene eases it): added to the chosen distance, never changing it. */
+  rush(amount:number):void {this.rushing=amount;}
 
   /** Places the camera behind or in the eyes of `subject`, and sets the x-ray window for this frame. */
   follow(dt:number,subject:CameraSubject):void {
     const {a,b,c,up,goal,centre}=this.temp,{feet}=subject;
-    this.yaw+=(this.yawGoal-this.yaw)*ease(18,dt);
+    this.yaw=trail(this.yaw,this.yawGoal,this.yawGoalBefore,18,dt);this.yawGoalBefore=this.yawGoal;
     this.pitch+=(this.pitchGoal-this.pitch)*ease(18,dt);
     this.inside+=((this.mode==='first'?1:0)-this.inside)*ease(7,dt);
     if(Math.abs(this.inside-Math.round(this.inside))<.002)this.inside=Math.round(this.inside);
@@ -127,7 +157,8 @@ export class CameraRig {
     // Behind the player: the point it looks at trails the body a little; far away (a respawn, a teleport) it jumps.
     goal.set(feet.x,feet.y+TARGET_HEIGHT,feet.z);
     if(this.target.distance(goal)>8)this.target.copy(goal);
-    else this.target.lerp(this.target,goal,ease(10,dt));
+    else this.target.set(trail(this.target.x,goal.x,this.targetBefore.x,10,dt),trail(this.target.y,goal.y,this.targetBefore.y,10,dt),trail(this.target.z,goal.z,this.targetBefore.z,10,dt));
+    this.targetBefore.copy(goal);
     const flat=Math.cos(this.pitch);
     a.set(Math.sin(this.yaw)*flat,Math.sin(this.pitch),Math.cos(this.yaw)*flat);
     // The eyes: just above and in front of the head joint, steadied a little (the clips bob the head).
@@ -136,7 +167,7 @@ export class CameraRig {
     if(!this.eyeSet||this.eye.distance(goal)>1){this.eye.copy(goal);this.eyeSet=true;}
     else this.eye.lerp(this.eye,goal,ease(25,dt));
     const near=Math.max(0,1-this.boomLength/EYE_ZOOM),nearEyes=near*near*(3-2*near);
-    const behind=b.lerp(this.target,this.eye,nearEyes).add(c.copy(a).mulScalar(this.boomLength));
+    const behind=b.lerp(this.target,this.eye,nearEyes).add(c.copy(a).mulScalar(this.boomLength+this.rushing*RUSH_BACK));
     const w=this.inside*this.inside*(3-2*this.inside);
     // Both views share their direction. Rotating the up vector with the orbit avoids flips and singularities at the poles.
     a.mulScalar(-1);
@@ -151,9 +182,12 @@ export class CameraRig {
       centre.set(feet.x,feet.y+height,feet.z);
       if(sightBlocked(position,centre)){hidden=true;break;}
     }
+    this.hiddenFor=hidden?this.hiddenFor+dt:0;
+    if(hidden&&this.hiddenFor<(subject.xrayAfter??0))hidden=false;
     this.xrayOpen+=((hidden?1:0)-this.xrayOpen)*ease(hidden?8:4,dt);
     if(this.xrayOpen<.002)this.xrayOpen=0;
     centre.set(feet.x,feet.y+BODY_CENTRE,feet.z);
+    if(subject.clearance)centre.add(c.copy(position).sub(centre).normalize().mulScalar(subject.clearance));
     this.xray.set(position,centre,WINDOW_RADIUS,this.xrayOpen*(1-w),feet.y+FLOOR_KEPT);
   }
 

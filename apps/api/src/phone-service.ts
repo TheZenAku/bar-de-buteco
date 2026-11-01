@@ -28,7 +28,8 @@ function jpegBytes(image:string,max:number):Buffer {
  * Highgram posts and the HighBank statement and Pix. Blocks hide people both ways, as in the bar's chat and voice.
  */
 export class PhoneService {
-  constructor(private db:Database,private wardrobe:WardrobeService){}
+  /** `achieved`: the player did something that counts towards a badge (docs/sistemas/conquistas.md). */
+  constructor(private db:Database,private wardrobe:WardrobeService,private achieved:(userId:string,series:string)=>Promise<void>=async()=>{}){}
 
   /** The account's number, drawn the first time it is needed. */
   async line(userId:string):Promise<string>{
@@ -137,9 +138,10 @@ export class PhoneService {
     if(!body||body.length>PHONE.messageMax)throw new PhoneError(400,`A mensagem precisa ter de 1 a ${PHONE.messageMax} caracteres.`);
     const sent=await this.sent(userId,requestId);if(sent)return sent;
     await this.canMessage(userId,peerId);
-    await this.db.insert(phoneMessages).values({id:requestId,senderId:userId,recipientId:peerId,body}).onConflictDoNothing();
+    const inserted=await this.db.insert(phoneMessages).values({id:requestId,senderId:userId,recipientId:peerId,body}).onConflictDoNothing().returning({id:phoneMessages.id});
     const row=await this.sent(userId,requestId);
     if(!row)throw new PhoneError(409,'Este identificador já foi usado.');
+    if(inserted.length)await this.achieved(userId,'fofoqueiro');
     return row;
   }
   /** A message already sent with this requestId (a retry), or a 409 if the id is someone else's. */
@@ -164,12 +166,14 @@ export class PhoneService {
     const longest=kind==='audio'?PHONE.audioMaxMs:kind==='video'?PHONE.videoMaxMs:0;
     const ms=longest&&upload.ms?Math.max(1,Math.min(longest,Math.round(upload.ms))):null;
     const mediaId=randomUUID();
-    await this.db.transaction(async tx=>{
+    const fresh=await this.db.transaction(async tx=>{
       await tx.insert(phoneMedia).values({id:mediaId,ownerId:userId,kind,mime:type,bytes,size:bytes.length,durationMs:ms});
       const inserted=await tx.insert(phoneMessages).values({id:requestId,senderId:userId,recipientId:peerId,body:'',mediaId,mediaKind:kind,mediaMs:ms}).onConflictDoNothing().returning({id:phoneMessages.id});
       // The same requestId raced in twice: the first one stands and this copy of the file is not kept.
       if(!inserted.length)await tx.delete(phoneMedia).where(eq(phoneMedia.id,mediaId));
+      return inserted.length>0;
     });
+    if(fresh)await this.achieved(userId,'fofoqueiro');
     await this.trimMedia(userId);
     const row=await this.sent(userId,requestId);
     if(!row)throw new PhoneError(409,'Este identificador já foi usado.');
@@ -363,7 +367,8 @@ export class PhoneService {
     if(!existing){
       const [{total}]=await this.db.select({total:sql<number>`count(*)::int`}).from(gramPosts).where(eq(gramPosts.authorId,userId)) as [{total:number}];
       if(total>=GRAM_POSTS_PER_ACCOUNT)throw new PhoneError(409,`Seu perfil já tem ${GRAM_POSTS_PER_ACCOUNT} fotos. Apague uma antiga para postar outra.`);
-      await this.db.insert(gramPosts).values({id:requestId,authorId:userId,caption:text,image:bytes.toString('base64')}).onConflictDoNothing();
+      const inserted=await this.db.insert(gramPosts).values({id:requestId,authorId:userId,caption:text,image:bytes.toString('base64')}).onConflictDoNothing().returning({id:gramPosts.id});
+      if(inserted.length)await this.achieved(userId,'influencer');
     }
     const [row]=await this.db.select(this.postColumns).from(gramPosts).where(eq(gramPosts.id,requestId));
     if(!row||row.authorId!==userId)throw new PhoneError(409,'Este identificador já foi usado.');
@@ -436,6 +441,7 @@ export class PhoneService {
     await this.reachable(userId,to.id);
     await this.wardrobe.initialize(userId);await this.wardrobe.initialize(to.id);
     const out=`pix:${requestId}:out`;
+    let moved=false;
     const balance=await this.db.transaction(async tx=>{
       // Both wallets locked in one order, so two Pix crossing each other cannot deadlock.
       const locked=await tx.select().from(wallets).where(inArray(wallets.userId,[userId,to.id])).orderBy(asc(wallets.userId)).for('update');
@@ -453,8 +459,10 @@ export class PhoneService {
       await tx.insert(currencyLedger).values([{id:out,userId,amount:-amount,reason:`pix:out:${to.id}`},{id:`pix:${requestId}:in`,userId:to.id,amount,reason:`pix:in:${userId}`}]);
       await tx.update(wallets).set({balance:mine.balance-amount}).where(eq(wallets.userId,userId));
       await tx.update(wallets).set({balance:theirs.balance+amount}).where(eq(wallets.userId,to.id));
+      moved=true;
       return mine.balance-amount;
     });
+    if(moved)await this.achieved(userId,'pix');
     return {balance,amount,to};
   }
 }

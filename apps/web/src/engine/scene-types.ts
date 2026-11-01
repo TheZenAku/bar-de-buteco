@@ -39,6 +39,8 @@ export interface SceneActor {
   drunk?: number;
   /** Which dance clip G plays, drawn by the room each time the player starts dancing (taken modulo the dance clips). */
   dance?: number;
+  /** The skill being played while `animation` is 'kick' (SKILLS). */
+  skill?: string;
   /** The stage spot this player plays at, as the room syncs it (packages/shared/src/musicians.ts). */
   musician?: MusicianState;
 }
@@ -81,10 +83,15 @@ export interface SceneCallbacks {
   onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette') => void;
   onChat?: () => void;
   onSkins?: () => void;
-  onKick?: () => void;
+  /** A key the game has no use for on foot, pressed in the world: true when it was the active skill's. */
+  onSkillKey?: (code: string) => boolean;
   onMediaFrame?: () => void;
+  /** Each frame, before the bikes are drawn: seconds since the last one. */
+  onFrame?: (dt: number) => void;
   /** The player changed the view or zoom; distance is the last positive third-person distance. */
   onCameraChange?: (mode: CameraMode, distance: number) => void;
-  /** A click (not a drag) on another player in the view: their player card. */
-  onPlayerClick?: (id: string) => void;
+  /** A right click (no drag) on a player (the local one too) or a bike, at this point of the window. */
+  onWorldMenu?: (x: number, y: number, hit: { player?: string; moto?: string }) => void;
+  /** The player's overall volume, for the bikes' engines (0–1). */
+  motoVolume?: () => number;
 }

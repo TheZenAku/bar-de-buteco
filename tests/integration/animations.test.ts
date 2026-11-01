@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { KICK_DURATION_MS, DRINK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS } from '@bar/shared';
+import { AIR_KICK_DURATION_MS, KICK_DURATION_MS, DRINK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS } from '@bar/shared';
 
 function glb(file: string) {
   const bytes = readFileSync(new URL(`../../apps/web/public/${file}`, import.meta.url));
@@ -16,7 +16,7 @@ const DANCES = ['Dancing', 'Dancing Twerk', 'Hip Hop Dancing', 'Hip Hop Dancing 
   'Hip Hop Dancing (8)', 'Salsa Dancing', 'Salsa Dancing (2)', 'Samba Dancing', 'Swing Dancing', 'Twist Dance', 'Wave Hip Hop Dance'].map(name => `Dance ${name}`);
 
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo']) for (const file of [skin, `${skin}-dances`]) {
+  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico']) for (const file of [skin, `${skin}-dances`]) {
     const { json, bin } = glb(`animations/${file}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
@@ -27,6 +27,7 @@ test('generated animations bind to existing skins and contain valid skeletal rot
       assert.ok(!names.some((name: string) => name.startsWith('Dance')), 'The dances have a bank of their own');
     } else assert.deepEqual(names, DANCES, 'Every distinct dance of assets-bar/anim/dance, in file order');
     assert.equal(names.includes('Kick'), skin === 'rafael' && file === skin);
+    assert.equal(names.includes('AirKick'), skin === 'rafael' && file === skin);
     assert.equal(names.includes('Bartend'), skin === 'magrao' && file === skin, 'Bartending belongs to Seu Zé (Magrão)');
     for (const animation of json.animations) {
       for (const channel of animation.channels) {
@@ -34,6 +35,7 @@ test('generated animations bind to existing skins and contain valid skeletal rot
         const sampler = animation.samplers[channel.sampler];
         const input = json.accessors[sampler.input];
         if (animation.name === 'Kick') assert.equal(Math.round(input.max[0] * 1000), KICK_DURATION_MS);
+        if (animation.name === 'AirKick') assert.equal(Math.round(input.max[0] * 1000), AIR_KICK_DURATION_MS);
         if (animation.name === 'Drink') assert.equal(Math.round(input.max[0] * 1000), DRINK_DURATION_MS);
         if (animation.name === 'Idle') assert.equal(Math.round(input.max[0] * 1000), 4000, 'The trimmed Mixamo idle replaces the model\'s original idle');
         if (animation.name === 'AngrySit') assert.equal(Math.round(input.max[0] * 1000), 3333, 'The seated loss reaction uses Sitting Angry');
@@ -70,11 +72,13 @@ test('generated animations bind to existing skins and contain valid skeletal rot
 // Every player skin (and Magrão) has its own Mixamo skeleton, auto-rigged on its body. Canonical names alias the
 // joints, whose Mixamo names stay recorded as sourceBone; `weights` says where the skin weights came from.
 const MIXAMO_SKINS = [
-  {id:'rafael',name:'Rafael',joints:34,weights:'mixamo'},
+  {id:'rafael',name:'Rafael',joints:65,weights:'mixamo'},
   {id:'leandro',name:'Leandro',joints:41,weights:'accurig'},
   {id:'read',name:'Read',joints:41,weights:'accurig'},
   {id:'magrao',name:'Magrao',joints:41,weights:'accurig'},
   {id:'gilmar-gordo',name:'Gilmar',joints:41,weights:'automatic'},
+  {id:'gabriel',name:'Gabriel',joints:34,weights:'mixamo'},
+  {id:'flavio-hipotetico',name:'Flavio Hipotético',joints:65,weights:'mixamo'},
 ] as const;
 for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has its own Mixamo skeleton, normalized ${source} weights and embedded materials`, () => {
   const {json,bin}=glb(`models/${id}.glb`);
@@ -98,7 +102,9 @@ for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has it
       assert.ok(Math.abs(vertex.reduce((a,b)=>a+b,0)-1)<.0001,'Truncated weights must be renormalized');
     }
     const material=json.materials[primitive.material];
-    assert.ok(material.pbrMetallicRoughness.baseColorTexture);assert.ok(material.normalTexture);
+    assert.ok(material.pbrMetallicRoughness.baseColorTexture);
+    // Tripo delivered these three with a colour map only.
+    if(id!=='gabriel'&&id!=='rafael'&&id!=='flavio-hipotetico')assert.ok(material.normalTexture);
     // Mixamo downloads drop the normals; the importer restores them.
     assert.ok(primitive.attributes.NORMAL!==undefined);
     // Simplification must not bridge distant parts (e.g. a fingertip to the hip), which stretch in every pose.

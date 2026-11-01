@@ -25,19 +25,20 @@ function walk(start:Position,waypoints:readonly (readonly [number,number])[],sta
 // aisle, up both stair flights to the upstairs games hall.
 const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.2],[14,-10.2],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
 
-test('published map and collision export match the supplied BarBoteco assets exactly',()=>{
-  for(const [name,hash] of [['bar_boteco.glb',map.visualHash],['bar_boteco_colisao.glb',map.collisionHash]]){
-    const source=readFileSync(new URL(`../../assets-bar/map/BarBoteco/export/${name}`,import.meta.url));
-    const published=readFileSync(new URL(`../../apps/web/public/maps/${name}`,import.meta.url));
-    assert.equal(createHash('sha256').update(published).digest('hex'),hash);
-    assert.ok(source.equals(published),'Import must preserve all supplied geometry and embedded textures');
-  }
-  // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts).
-  assert.equal(map.colliders.length,1557);
+test('published map and collision export match the supplied BarBoteco assets; the hashes describe what is served',()=>{
+  const read=(folder:string,name:string)=>readFileSync(new URL(`../../${folder}/${name}`,import.meta.url));
+  const collision=read('apps/web/public/maps','bar_boteco_colisao.glb');
+  assert.equal(createHash('sha256').update(collision).digest('hex'),map.collisionHash);
+  assert.ok(read('assets-bar/map/BarBoteco/export','bar_boteco_colisao.glb').equals(collision),'The collision export is served as it is');
+  // Only the old sawhorses and cones go from the visual one (city.test.ts holds them to that).
+  assert.equal(createHash('sha256').update(read('apps/web/public/maps','bar_boteco.glb')).digest('hex'),map.visualHash);
+  assert.equal(createHash('sha256').update(read('assets-bar/map/BarBoteco/export','bar_boteco.glb')).digest('hex'),map.visualSourceHash);
+  // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts). The four old boundary walls are out.
+  assert.equal(map.colliders.length,1553);
   assert.equal(map.doors.length,16);
   // 124 chairs and the picnic tables' bench places (8 × 6).
   assert.equal(map.seats.length,172);
-  assert.deepEqual(map.bounds,{minX:-103,maxX:135,minZ:-117,maxZ:91});
+  assert.deepEqual(map.bounds,{minX:-400,maxX:400,minZ:-400,maxZ:400});
   assert.deepEqual(['Ponto_Praca','Ponto_Igreja','Ponto_Campinho','Ponto_Escola','Ponto_Onibus'].map(id=>id in map.markers),[true,true,true,true,true]);
   assert.deepEqual(map.effects.map(effect=>effect.type).sort(),['brasas','fogo','fumaca','luz_jukebox','luz_jukebox_ponto','luz_palco','luz_palco_ponto','torneira','torneira']);
   assert.ok(map.effects.every(effect=>Number.isFinite(effect.x)&&Number.isFinite(effect.y)&&Number.isFinite(effect.z)));

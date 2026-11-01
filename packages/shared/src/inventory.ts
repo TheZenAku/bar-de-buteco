@@ -2,8 +2,8 @@ import {z} from 'zod';
 import type {ConsumableEffects} from './needs.js';
 
 export const INVENTORY_CAPACITY=12;
-export type ItemCategory='bebida'|'comida'|'saude';
-export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo'] as const;
+export type ItemCategory='bebida'|'comida'|'saude'|'peca';
+export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto'] as const;
 export type ItemId=typeof ITEM_IDS[number];
 export interface ItemDefinition {
   id:ItemId;name:string;description:string;category:ItemCategory;price:number;stackMax:number;
@@ -24,11 +24,13 @@ export const ITEM_CATALOG=[
   {id:'pastel',name:'Pastel',description:'Crocante e substancioso.',category:'comida',icon:'ui/items/pastel.png',price:25,stackMax:10,effects:{name:'Pastel',hunger:30,thirst:-2},loseOnFaint:true},
   {id:'torresmo',name:'Porção de torresmo',description:'Enche a barriga, mas dá sede.',category:'comida',icon:'ui/items/torresmo.png',price:28,stackMax:10,effects:{name:'Porção de torresmo',hunger:24,thirst:-6},loseOnFaint:true},
   {id:'curativo',name:'Curativo',description:'Recupera parte da saúde imediatamente.',category:'saude',icon:'ui/items/curativo.png',price:45,stackMax:5,effects:{name:'Curativo',hp:28},loseOnFaint:true},
+  // Placeholder for the real parts: one piece fits anything on the bike (MOTO_REPAIR). Not for using from the backpack: the bike's panel takes it.
+  {id:'peca_moto',name:'Peça de moto',description:'Peça genérica para consertar a moto. Clique com o botão direito na moto e abra as informações do veículo.',category:'peca',icon:'ui/items/peca_moto.png',price:40,stackMax:10,effects:{name:'Peça de moto'},loseOnFaint:false},
 ] as const satisfies readonly ItemDefinition[];
 
 export const itemIdSchema:z.ZodType<ItemId>=z.enum(ITEM_IDS);
 export const itemById=(id:string):ItemDefinition|undefined=>ITEM_CATALOG.find(item=>item.id===id);
-export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1};
+export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0};
 
 export interface InventoryStack {itemId:ItemId;quantity:number}
 export interface InventoryEntry extends InventoryStack {item:ItemDefinition}

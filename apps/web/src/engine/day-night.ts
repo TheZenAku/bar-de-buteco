@@ -1,6 +1,5 @@
 /** One game day per 40 real minutes. Fixed epoch survives reloads and world restarts. */
 export const DAY_NIGHT={durationMs:40*60_000,epochMs:Date.UTC(2026,0,1),offsetHours:8} as const;
-export const EDGE_FOG_WIDTH=8;
 export type Rgb=[number,number,number];
 const rgb=(hex:string):Rgb=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255) as Rgb;
 const clamp=(x:number)=>Math.max(0,Math.min(1,x));
@@ -35,12 +34,5 @@ export function daylightAt(serverTime:number){
     sunDirection,moonDirection:sunDirection.map(v=>-v) as [number,number,number],
     sunIntensity:1.15*smooth(0,.35,sunDirection[1]),moonIntensity:.18*smooth(0,.3,-sunDirection[1]),night,
     top:mix('top'),horizon:mix('horizon'),ambient:mix('ambient'),sunColor:mix('sun'),
-    // The expanded export authors distance fog from 70 to 520 m. Keep the night slightly denser without
-    // reducing visibility to the old single-block map's range.
-    fogStart:70-night*8,fogEnd:520-night*90,exposure:1.08+night*.04};
-}
-
-/** Visibility near the world rim, independent of camera distance. */
-export function edgeVisibility(x:number,z:number,bounds:{minX:number;maxX:number;minZ:number;maxZ:number}):number {
-  return smooth(0,EDGE_FOG_WIDTH,Math.min(x-bounds.minX,bounds.maxX-x,z-bounds.minZ,bounds.maxZ-z));
+    exposure:1.08+night*.04};
 }

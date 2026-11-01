@@ -1,4 +1,4 @@
-import {BLACKJACK_TABLE,FOOSBALL_TABLES,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,type Position} from '@bar/shared';
+import {BLACKJACK_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
 import type {MapView} from './engine/scene-types';
 import {uiIconSource} from './ui-icons';
 
@@ -16,17 +16,18 @@ const C={asphalt:'#0c0617',block:'#1b1130',green:'#12302a',tree:'rgba(70,170,120
   wallFar:'rgba(234,47,220,.22)',player:'#17d4f4',npc:'#fac416',outline:'#0c0617',job:'#5fd86c',magenta:'#ea2fdc',edge:'rgba(8,3,16,.7)'};
 
 type Layer='block'|'green'|'tree'|'house'|'fence'|'car'|'prop'|'lot'|'slab'|'stairs'|'stage'|'furniture'|'wall';
-interface Box {x:number;z:number;hx:number;hz:number;upper:boolean}
+/** `corners`: a turned box (the city's), drawn as it is. */
+interface Box {x:number;z:number;hx:number;hz:number;upper:boolean;corners?:number[]}
 /** What each map collider is on the minimap (map-data.json ids; numbered copies share their name). Posts, bins and doors are left out. */
 function layerOf(id:string):Layer|undefined {
   const name=id.replace(/\.\d+$/,'');
-  if(name==='COL_Rua_Quadra')return 'block';
-  if(name==='COL_Ext_Canteiro')return 'green';
-  if(name==='COL_Ext_Arvore'||name==='COL_Mob_Arvore_Quintal')return 'tree';
-  if(/^COL_Viz_(Casa|Loja|Escola|Igreja)$/.test(name))return 'house';
-  if(/^COL_Viz_(Muro|Muro_Escola|Portao|Adro)$/.test(name)||name==='COL_Ext_Alambrado')return 'fence';
-  if(/^COL_Ext_(Carro|Sedan)_/.test(name))return 'car';
-  if(/^COL_Ext_(Banca|Ponto_Onibus|Arquibancada|Coreto)$/.test(name))return 'prop';
+  if(name==='COL_Rua_Quadra'||/^COL_Cid_(Quadra|Quadra_Faixa|Calcada|Plato|Plataforma)$/.test(name))return 'block';
+  if(name==='COL_Ext_Canteiro'||name==='COL_Cid_Canteiro')return 'green';
+  if(name==='COL_Ext_Arvore'||name==='COL_Mob_Arvore_Quintal'||name==='COL_Cid_Arvore')return 'tree';
+  if(/^COL_Viz_(Casa|Loja|Escola|Igreja)$/.test(name)||/^COL_Cid_(Casa|Loja|Sobrado|Galpao|Escritorio|Guarita|Obra|Viz_Antiga|Supermercado|Conveniencia|UBS|Escola|Prefeitura|Terminal|Vestiario|Quiosque|Casa_Comando)$/.test(name))return 'house';
+  if(/^COL_Viz_(Muro|Muro_Escola|Portao|Adro)$/.test(name)||name==='COL_Ext_Alambrado'||/^COL_Cid_(Muro|Alambrado|Cerca_Ferrovia)$/.test(name))return 'fence';
+  if(/^COL_Ext_(Carro|Sedan)_/.test(name)||/^COL_Cid_(Carro|Carreta)$/.test(name))return 'car';
+  if(/^COL_Ext_(Banca|Ponto_Onibus|Arquibancada|Coreto)$/.test(name)||/^COL_Cid_(Ponto_Onibus|Arquibancada|Doca|Academia|Brinquedo|Banco)$/.test(name))return 'prop';
   if(name==='COL_Predio_Piso')return 'lot';
   if(name==='COL_Predio_Laje')return 'slab';
   if(/^COL_Predio_Escada_(Base|Rampa|Patamar)$/.test(name))return 'stairs';
@@ -39,16 +40,38 @@ for(const c of MAP_COLLIDERS){
   const layer=layerOf(c.id);if(!layer)continue;
   const list=LAYERS.get(layer)??[];list.push({x:c.x,z:c.z,hx:c.hx,hz:c.hz,upper:(c.minY??0)>=3.1});LAYERS.set(layer,list);
 }
+for(const c of CITY_SOLIDS){
+  const layer=layerOf(c.id);if(!layer)continue;
+  const list=LAYERS.get(layer)??[],turn=c.turn;
+  const corners=turn?[-1,-1,1,-1,1,1,-1,1].flatMap((_,i,all)=>i%2?[]:[c.x+turn.ux*turn.lx*all[i]!-turn.uz*turn.lz*all[i+1]!,c.z+turn.uz*turn.lx*all[i]!+turn.ux*turn.lz*all[i+1]!]):undefined;
+  list.push({x:c.x,z:c.z,hx:c.hx,hz:c.hz,upper:false,corners});LAYERS.set(layer,list);
+}
+// The kerbs and lots are floors in the city's data: each floor box comes as two triangles, the second closing its far corner.
+{
+  const blocks=LAYERS.get('block')??[],greens=LAYERS.get('green')??[];
+  for(let i=0;i<CITY_FLOORS.length;i+=2){
+    const first=CITY_FLOORS[i]!,second=CITY_FLOORS[i+1]!,layer=layerOf(first.id);
+    if(layer!=='block'&&layer!=='green')continue;
+    const [p,q,r,s]=[first.points[0]!,first.points[1]!,first.points[2]!,second.points[2]!],xs=[p[0]!,q[0]!,r[0]!,s[0]!],zs=[p[2]!,q[2]!,r[2]!,s[2]!];
+    const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
+    (layer==='block'?blocks:greens).push({x:(minX+maxX)/2,z:(minZ+maxZ)/2,hx:(maxX-minX)/2,hz:(maxZ-minZ)/2,upper:false,corners:[p[0]!,p[2]!,q[0]!,q[2]!,r[0]!,r[2]!,s[0]!,s[2]!]});
+  }
+  LAYERS.set('block',blocks);LAYERS.set('green',greens);
+}
 const LOT=MAP_COLLIDERS.find(c=>c.id==='COL_Predio_Piso')!;
 /** Behind the slabs' back edge is the backyard; past the terrace's wall, upstairs, the terrace. */
 const BACKYARD_Z=Math.min(...(LAYERS.get('slab')??[]).map(s=>s.z-s.hz));
 const TERRACE_X=Math.min(...MAP_COLLIDERS.filter(c=>/^COL_Predio_Terraco/.test(c.id)).map(c=>c.x-c.hx));
 const inLot=(x:number,z:number,margin=0)=>Math.abs(x-LOT.x)<=LOT.hx+margin&&Math.abs(z-LOT.z)<=LOT.hz+margin;
-const PLACES=[[MAP_MARKERS.Ponto_Praca,'Praça'],[MAP_MARKERS.Ponto_Igreja,'Igreja'],[MAP_MARKERS.Ponto_Campinho,'Campinho'],[MAP_MARKERS.Ponto_Escola,'Escola'],[MAP_MARKERS.Ponto_Onibus,'Ponto de ônibus']] as const;
+const CITY_PLACES:Record<string,string>={Ponto_Prefeitura:'Prefeitura',Ponto_Terminal:'Terminal Central',Ponto_Escola_Conceicao:'EMEF Conceição',Ponto_UBS:'UBS',Ponto_Praca_Conceicao:'Praça do Jardim',Ponto_Bosque_Conceicao:'Bosque',
+  Ponto_Lazer_Olaria:'Área de lazer',Ponto_Campo_Olaria:'Campo do Olaria',Ponto_Supermercado:'Supermercado',Ponto_Posto:'Posto',Ponto_Subestacao:'Subestação',Ponto_Transportes:'Transportadora',Ponto_Metalurgica:'Metalúrgica'};
+const PLACES:ReadonlyArray<readonly [{x:number;z:number},string]>=[[MAP_MARKERS.Ponto_Praca,'Praça'],[MAP_MARKERS.Ponto_Igreja,'Igreja'],[MAP_MARKERS.Ponto_Campinho,'Campinho'],[MAP_MARKERS.Ponto_Escola,'Escola'],[MAP_MARKERS.Ponto_Onibus,'Ponto de ônibus'],
+  ...Object.entries(CITY_PLACES).map(([id,place])=>[CITY_MARKERS[id]!,place] as const)];
 /** The name under the map: the part of the bar the player is in, or the nearest landmark outside it. */
 export function zoneName(x:number,y:number,z:number):string {
   if(inLot(x,z))return y>UPPER?(x>=TERRACE_X?'Terraço':'Andar de cima'):z<BACKYARD_Z?'Quintal':'Salão';
-  let name='Rua',best=24;
+  // Away from any landmark, the neighbourhood.
+  let name=cityZone(x,z),best=24;
   for(const [at,place] of PLACES){const d=Math.hypot(at.x-x,at.z-z);if(d<best){best=d;name=place;}}
   return name;
 }
@@ -109,6 +132,7 @@ export function createMinimap(root:HTMLElement){
       ctx.beginPath();
       for(const b of LAYERS.get(layer)??[]){
         if((floor!==undefined&&b.upper!==floor)||!near(b))continue;
+        if(b.corners){const c=b.corners;ctx.moveTo(c[0]!,c[1]!);ctx.lineTo(c[2]!,c[3]!);ctx.lineTo(c[4]!,c[5]!);ctx.lineTo(c[6]!,c[7]!);ctx.closePath();continue;}
         const hx=Math.max(b.hx,thin)+grow,hz=Math.max(b.hz,thin)+grow;ctx.rect(b.x-hx,b.z-hz,hx*2,hz*2);
       }
       ctx.fillStyle=colour;ctx.fill();

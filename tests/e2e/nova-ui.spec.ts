@@ -37,7 +37,7 @@ test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists p
       previous=box;
     }
     expect(await page.locator('#minimap').evaluate(el=>getComputedStyle(el).borderRadius)).toBe('50%');
-    await expect(page.locator('#minimap-zone')).toHaveText(/^(Salão|Quintal|Rua|Andar de cima|Terraço|Praça|Igreja|Campinho|Escola|Ponto de ônibus)$/);
+    await expect(page.locator('#minimap-zone')).toHaveText(/^(Salão|Quintal|Centro|Andar de cima|Terraço|Praça|Igreja|Campinho|Escola|Ponto de ônibus)$/);
     // Top left: the logo. Top right: the toolbar and, last, the wallet. The chat by the right side, halfway down. No key
     // hints, mailbox, account badge or connection chip over the game: the connection and the account are in the people
     // window.
@@ -169,7 +169,12 @@ test.describe('full screen',()=>{
     await row.click();
     await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName)).toBe('HTML');
     await expect(row).toHaveAttribute('aria-pressed','true');await expect(row).toHaveText('Sair da tela cheia');
-    await row.click();
+    // The menu closed and the mouse is held (mouse-capture.spec): the scroll button brings the cursor back to reach the row.
+    await expect(row).toBeHidden();
+    await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('world');
+    await page.mouse.down({button:'middle'});await page.mouse.up({button:'middle'});
+    await expect.poll(()=>page.evaluate(()=>document.pointerLockElement)).toBeNull();
+    await menu.click();await row.click();
     await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName??'none')).toBe('none');
     await expect(row).toHaveAttribute('aria-pressed','false');await page.keyboard.press('Escape');
     // By the right side, halfway down, the chat keeps its distance from that side and stays halfway down.
@@ -187,7 +192,7 @@ test.describe('full screen',()=>{
     }
     // Now the window is the screen, as in the browser's full screen: the row says so, and a page cannot leave it.
     await menu.click();await expect(row).toHaveAttribute('aria-pressed','true');await expect(row).toHaveText('Sair da tela cheia');
-    await row.click();await expect(page.locator('.comanda')).toContainText('aperte F11');
+    await row.click();await expect(page.locator('.comanda').filter({hasText:'aperte F11'})).toBeVisible();
     expect(await page.evaluate(()=>document.fullscreenElement)).toBeNull();
     expect(errors).toEqual([]);
   });

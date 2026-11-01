@@ -106,11 +106,11 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.send('player.skin', { skin: 'naoexiste' });
     await eventually(() => errors.length === 2);
     assert.equal(player.skin, 'rafael');
-    second.send('player.emote', { emote: 'kick' });
-    await eventually(() => secondErrors.includes('O golpe de karatê é exclusivo do Rafael.'));
+    second.send('player.skill', { skill: 'karate' });
+    await eventually(() => secondErrors.includes('Esta skin não tem essa skill.'));
     assert.notEqual(bob.animationState, 'kick');
     first.send('player.input', { seq: 33, dx: 1, dz: 0, running: false, rotation: 0 });
-    first.send('player.emote', { emote: 'kick' });
+    first.send('player.skill', { skill: 'karate' });
     await eventually(() => second.state.players.get('alice').animationState === 'kick');
     assert.equal(player.interactionState, 'kick');
     assert.ok(player.animationStartedAt > 0);
@@ -149,7 +149,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     first.send('blackjack.join', { tableId: 'blackjack-1' });
     await eventually(() => first.state.tables.get('blackjack-1').seats.length === 1);
     const seatedErrors = errors.length;
-    first.send('player.emote', { emote: 'kick' });
+    first.send('player.skill', { skill: 'karate' });
     await eventually(() => errors.length > seatedErrors);
     assert.equal(player.animationState, 'sit', 'Seated Rafael cannot kick');
     second.send('blackjack.join', { tableId: 'blackjack-1' });

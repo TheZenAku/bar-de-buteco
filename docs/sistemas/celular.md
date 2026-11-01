@@ -21,21 +21,21 @@ Cada jogador tem um celular no bolso, no estilo de um iPhone 18 Pro: moldura de 
 
 A home mostra dois widgets com dados reais: a hora do bar com a fase do dia, o saldo do HighBank e as mensagens não lidas do Highzap. A barra de status mostra a hora do bar.
 
-## Números, contatos e a ficha do jogador
+## Números, contatos e o perfil do jogador
 
 Cada conta ganha um número de 9 dígitos começando com 9 (`9XXXX-XXXX`) na primeira vez que usa o celular. O número é sorteado com `crypto.randomInt` e é único (`phone_lines.number`). Ele serve para ligar pelo teclado, salvar contatos e como chave do Pix.
 
 O celular **não lista os jogadores do servidor**. Telefone, Contatos, Highzap e o Pix mostram só a sua agenda. Para alguém entrar na agenda:
 
-1. **Clique na pessoa no bar** (um clique, sem arrastar a câmera) ou use **Pessoas no bar → Ficha**. Abre a *ficha do jogador*: nome, @ e bio do Highgram, fotos, seguidores, seguindo e o **número do celular**.
-2. **Salvar contato** põe o número na agenda. A partir daí a pessoa aparece no Highzap, no Telefone e no Pix, e a ficha ganha Mensagem e Ligar.
+1. **Botão direito na pessoa no bar → Perfil**, ou **Pessoas no bar → Perfil**. Abre o [perfil do jogador](perfil.md).
+2. **Salvar contato** põe o número na agenda. A partir daí a pessoa aparece no Highzap, no Telefone e no Pix, e o perfil ganha Mensagem e Ligar.
 3. Quem tem o número por outro caminho (pediu no chat, por exemplo) digita no app Contatos (+) ou no teclado.
 
-A sua própria ficha fica em **Pessoas no bar → Seu lugar no bar → Sua ficha e seu número**, com Copiar número e Editar perfil.
+O seu próprio perfil fica no botão direito em você ou em **Pessoas no bar → Seu lugar no bar → Seu perfil**, com o número e Copiar. Seguir e editar nome, @ e bio ficam no Highgram.
 
 A API confere a regra: o Highzap só envia para um contato salvo ou para quem já tem uma conversa com você (quem recebeu uma mensagem pode responder sem salvar o número). Numa conversa com alguém fora da agenda, o Highzap mostra o número no lugar do nome, com o nome que a pessoa usa ao lado (`~Nome`), e oferece **Salvar**.
 
-Bloqueios (Pessoas no bar → Bloquear) valem nos dois sentidos, como no chat e na voz: quem bloqueou ou foi bloqueado não aparece no feed, na busca nem nas sugestões, não recebe mensagem, não recebe Pix, não pode ser seguido, a ficha não abre e a ligação não toca (a outra pessoa ouve "Não foi possível completar a chamada").
+Bloqueios (Pessoas no bar → Bloquear) valem nos dois sentidos, como no chat e na voz: quem bloqueou ou foi bloqueado não aparece no feed, na busca nem nas sugestões, não recebe mensagem, não recebe Pix, não pode ser seguido, o perfil não abre e a ligação não toca (a outra pessoa ouve "Não foi possível completar a chamada").
 
 ## Ligações e chamadas de vídeo
 
@@ -45,7 +45,7 @@ Bloqueios (Pessoas no bar → Bloquear) valem nos dois sentidos, como no chat e 
 4. Ligar ou atender liga o microfone se ele estava desligado, e a ligação o desliga ao terminar. *Mudo* desliga o microfone durante a chamada. Sem microfone (navegador sem permissão ou sem HTTPS), a pessoa ouve, mas não é ouvida, e a tela da chamada avisa.
 5. `phone.hangup` encerra. Cair da conexão, sair do bar ou entrar em outra janela também encerra (*A ligação caiu*).
 
-**Vídeo.** Qualquer ligação atendida pode ter vídeo: a chamada de vídeo (botão de câmera no Highzap ou *vídeo* na ficha do contato) começa com a câmera ligada, e numa ligação de voz o botão **Câmera** liga a sua. A câmera do celular é o jogo: na frente, a câmera do jogo vira para o seu rosto, como na selfie; **Virar** manda a sua própria vista do bar. Enquanto a tela da chamada está na sua frente, o celular manda 8 quadros por segundo em JPEG de 168 × 224 (`PHONE.videoFps`, `videoFrameWidth/Height`), cada um abaixo de 7,6 kB para caber numa mensagem do WebSocket (a qualidade do JPEG se ajusta sozinha). A sala repassa o quadro (`phone.video`, binário) só para a outra ponta de uma chamada atendida, só se for um JPEG dentro do limite e no máximo 12 por segundo. A outra ponta vê a sua câmera em tela cheia e a própria no canto; sem quadros por 1,6 s, a tela diz que a câmera do outro lado está desligada. Guardar o celular ou ir para outra tela pausa o envio e devolve a câmera do jogo.
+**Vídeo.** Qualquer ligação atendida pode ter vídeo: a chamada de vídeo (botão de câmera no Highzap ou *vídeo* no contato) começa com a câmera ligada, e numa ligação de voz o botão **Câmera** liga a sua. A câmera do celular é o jogo: na frente, a câmera do jogo vira para o seu rosto, como na selfie; **Virar** manda a sua própria vista do bar. Enquanto a tela da chamada está na sua frente, o celular manda 8 quadros por segundo em JPEG de 168 × 224 (`PHONE.videoFps`, `videoFrameWidth/Height`), cada um abaixo de 7,6 kB para caber numa mensagem do WebSocket (a qualidade do JPEG se ajusta sozinha). A sala repassa o quadro (`phone.video`, binário) só para a outra ponta de uma chamada atendida, só se for um JPEG dentro do limite e no máximo 12 por segundo. A outra ponta vê a sua câmera em tela cheia e a própria no canto; sem quadros por 1,6 s, a tela diz que a câmera do outro lado está desligada. Guardar o celular ou ir para outra tela pausa o envio e devolve a câmera do jogo.
 
 No cliente, a voz da outra ponta sai do mix por proximidade e passa por um canal próprio (`VoiceChat.setCallPeer`): volume cheio, centralizada e filtrada na faixa de telefone (300–3400 Hz). Com o celular guardado, uma pílula embaixo da carteira mostra quem está na linha e o tempo, com atender e encerrar; no celular, a Dynamic Island mostra a ligação quando você sai da tela da chamada. Todos veem um ícone de telefone no nome de quem está numa ligação (`Player.phone === 'call'`).
 
@@ -102,7 +102,7 @@ Todas as rotas exigem sessão com e-mail confirmado; as que alteram dados recusa
 | Rota | Uso |
 | --- | --- |
 | `GET /api/phone` | Seu número, sua agenda, as mensagens não lidas e a versão da sua foto |
-| `GET /api/phone/card/:id` | A ficha do jogador: número, se está na sua agenda e o resumo do Highgram |
+| `GET /api/phone/card/:id` | Número, se está na sua agenda e o resumo do Highgram; o [perfil](perfil.md#api) monta a janela com isto |
 | `GET /api/phone/lookup?number=` | Quem tem esse número |
 | `POST /api/phone/contacts` · `DELETE /api/phone/contacts/:id` | Salvar (por `userId` ou `number`) e apagar contato |
 | `GET /api/phone/zap` · `GET /api/phone/zap/:id` · `POST /api/phone/zap/:id` | Conversas (com `saved`), uma conversa (marca as mensagens como lidas) e enviar texto (40/min) |

@@ -35,7 +35,7 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   await selectSkin(page,'Rafael');await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.locator('#hud-skin')).toContainText('Rafael');await page.getByRole('button',{name:'Fechar janela'}).click();
-  await expect(page.locator('#kick-button')).toBeVisible();
+  await expect(page.locator('#skill-button')).toBeVisible();
   for(let visit=0;visit<2;visit++){
     await page.getByRole('button',{name:'Pessoas no bar'}).click();
     await expect(page.locator('#modal-content')).toContainText('Você vê as pessoas próximas');
@@ -44,12 +44,12 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   for(const width of [1440,960,390]){
     await page.setViewportSize({width,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    for(const selector of ['.game-tools','#kick-button','#dance-button','#chat-input']){
+    for(const selector of ['.game-tools','#skill-button','#dance-button','#chat-input']){
       const box=await page.locator(selector).boundingBox();expect(box).not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(width);
     }
   }
-  await page.locator('#kick-button').click();
+  await page.locator('#skill-button').click();
   await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world.players[d.localId].animationState;})).toBe('kick');
   await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -92,7 +92,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await page.getByLabel('Senha',{exact:true}).fill(process.env.DEMO_PASSWORD||'ButecoDemo2026!');
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await gameReady(page);
-  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,cartRenders:1,lights:14,
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.map())).toMatchObject({loaded:true,colliders:map.colliders.length,surfaces:map.surfaces.length,cartRenders:2,lights:17,
     effects:{fire:true,smoke:true,embers:true,taps:2,particles:19}});
   await page.screenshot({path:'test-results/map-exterior.png'});
   for(const [x,z] of TO_UPSTAIRS)await walkTo(page,x,z,.12);
@@ -110,7 +110,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   await expect.poll(async()=>(await bartender())?.skin).toBe('magrao');
   await page.keyboard.press('e');
   // Bottle or glass: the choice travels with the order and shows in the hand.
-  await expect(page.locator('#modal-title')).toHaveText('PEDIR AO SEU ZÉ');
+  await expect(page.locator('#modal-title')).toHaveText('PEDIR AO MAGRÃO');
   await page.getByRole('button',{name:/Long neck/}).click();
   // He prepares the order facing the player; the drink comes only when he is done.
   await expect(page.locator('#context-label')).toHaveText('Cancelar pedido');
@@ -142,12 +142,12 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`anim_${Date.now().toString(36)}`);
   const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-  for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Read']){
+  for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Gabriel','Flavio Hipotético','Read']){
     await page.keyboard.press('c');
-    // Magrão is Seu Zé's; players choose among the other five.
-    await expect(page.locator('.skin-card')).toHaveCount(5);
+    // Magrão is Seu Zé's; players choose among the others.
+    await expect(page.locator('.skin-card')).toHaveCount(7);
     await selectSkin(page,skin);
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin==='Gilmar'?'gilmar-gordo':skin.toLowerCase());
+    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(({Gilmar:'gilmar-gordo','Flavio Hipotético':'flavio-hipotetico'} as Record<string,string>)[skin]??skin.toLowerCase());
     await expect.poll(()=>page.evaluate((id)=>{
       const tracks=(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks??[];
       // The dances arrive in a second bank, after these.
@@ -179,8 +179,9 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
     await page.waitForTimeout(600);
   }
   await page.keyboard.press('c');await selectSkin(page,'Rafael');
-  await expect(page.locator('#kick-button')).toBeVisible();
-  await page.getByLabel('Mensagem por proximidade').focus();
+  await expect(page.locator('#skill-button')).toBeVisible();
+  // The chat input stays hidden, and refuses focus, until T opens the box.
+  await page.keyboard.press('t');await expect(page.getByLabel('Mensagem por proximidade')).toBeFocused();
   await page.keyboard.press('x');
   expect(await page.evaluate((id)=>(window as any).barDebug.snapshot().world.players[id].animationState,id)).not.toBe('kick');
   await page.keyboard.press('Escape');await page.locator('#chat-input').blur();
@@ -294,7 +295,7 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
     // The occupancy lives in the people window.
     const occupancy=async(client:Page)=>{await client.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await expect(client.locator('#occupancy')).toHaveText('2 / 32');await client.getByRole('button',{name:'Fechar janela'}).click();};
     await occupancy(page);await occupancy(other);
-    await page.getByLabel('Mensagem por proximidade').fill('Boa noite, vizinha!');
+    await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('Boa noite, vizinha!');
     await page.locator('#chat-form').getByRole('button').click();
     await expect(other.locator('#messages')).toContainText('Boa noite, vizinha!');
     await page.getByRole('button',{name:'Pessoas no bar'}).click();

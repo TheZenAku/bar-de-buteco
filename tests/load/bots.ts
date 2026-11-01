@@ -392,7 +392,7 @@ class Bot {
     await this.sleep(300);
     await this.act('player.emote',{emote:'wave'},me=>me.animationState==='wave',2000);
     this.say();
-    if(me.skin==='rafael'&&chance(.3)){await this.sleep(2500);this.send('player.emote',{emote:'kick'});}
+    if(me.skin==='rafael'&&chance(.3)){await this.sleep(2500);this.send('player.skill',{skill:'karate'});}
     await this.sleep(rand(3000,8000));
   }
   /** A few rounds at the blackjack table: the minimum bet, no insurance, hits below 17 (sometimes below 15). */

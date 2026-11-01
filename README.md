@@ -41,8 +41,9 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | WASD | Caminhar, em relação à câmera |
 | Shift | Correr |
 | Arrastar o mouse / roda | Girar a câmera / ajustar distância |
-| E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto |
+| E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto; levantar a moto caída |
 | W/S, A/D, Espaço (na moto) | Acelerar, frear e dar ré; virar; freio de mão ([moto de entrega](docs/sistemas/moto.md)) |
+| Z, C, X, H (na moto) | Seta esquerda, seta direita, pisca-alerta, farol alto |
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
 | I | Abrir ou fechar a mochila, usar e descartar itens |
@@ -50,7 +51,8 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | J | Trabalhar no bar (Ajudante do Magrão) e ganhar moedas |
 | K | Celular: ligar para outros jogadores, Highzap, Highgram, câmera, HighBank e mais ([celular](docs/sistemas/celular.md)) |
 | C | Escolher o visual (skin); todos veem a troca na hora |
-| X | Golpe de karatê exclusivo da skin Rafael (em pé e sem outra interação) |
+| Tecla da skill | Usa a skill ativa da skin; escolha a skill e a tecla no perfil, aba Skill ([perfil](docs/sistemas/perfil.md)) |
+| Botão direito em um jogador ou em você | Abre o menu com **Perfil**: modelo, emblemas e mensagem de status |
 | Enter | Abrir o chat de proximidade (12 m) |
 | `/velho` no chat | Alternar bengala e caminhada lenta (0,475 m/s); repita para voltar ao normal |
 | Esc | Fechar uma janela |
@@ -118,11 +120,11 @@ Cada skin mantém seu esqueleto nativo, com calibração própria de pose e osso
 
 Para conferir os personagens sem o mapa, abra **`/rigs.html`** no endereço do cliente em desenvolvimento. A tela permite comparar as seis skins, clipes, poses e esqueletos. Veja o [diagnóstico de rigs e o fluxo para estabilizar animações](docs/assets/rig-troubleshooting.md) antes de reimportar modelos.
 
-O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/assets/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
+O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`, e a [cidade](docs/sistemas/cidade.md) de `export/cidade`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/assets/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
 
 ## Escopo da versão
 
-Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e o Magrão (bartender) usam modelos animados. Os jogadores começam com Nathan, gratuito, e podem adquirir Leandro, Rafael, Read e Gilmar na loja (`SKINS` em `packages/shared`). Cada personagem tem seu próprio esqueleto Mixamo, auto-rigado no próprio corpo. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; a coleção e a skin vestida ficam salvas na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
+Os sistemas funcionais do MVP estão implementados para execução local. O cenário é o mapa BarBoteco importado integralmente, com rua, varanda, dois pavimentos e escada. Tonico, o dealer e o Magrão (bartender) usam modelos animados. Os jogadores começam com Nathan, gratuito, e podem adquirir Leandro, Rafael, Read, Gilmar, Gabriel e Flavio Hipotético na loja (`SKINS` em `packages/shared`). Cada personagem tem seu próprio esqueleto Mixamo, auto-rigado no próprio corpo. Os bancos de animação são adaptados a cada modelo. As miniaturas ficam em `apps/web/public/skins`; a coleção e a skin vestida ficam salvas na conta. Confira a licença de cada asset antes de publicar. As sessões usam cookies HttpOnly; o servidor autoriza aparência, movimento, interações e cartas. A capacidade é configurável e a sala principal não cria mundos separados quando lota: a interface aguarda uma vaga.
 
 Ficam para homologação do ambiente de publicação: o teste contínuo de duas horas, 30/60 FPS em hardware de referência, latência de rede real, operação do PostgreSQL nativo no Compose e entrega de e-mail SMTP. A expansão para 64+ jogadores não é uma capacidade comprovada desta versão.
 

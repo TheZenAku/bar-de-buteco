@@ -1,4 +1,5 @@
-import { boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
+import type { BadgeRarity } from '@bar/shared';
 
 const date = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -11,6 +12,7 @@ export const users = pgTable('users', {
 export const profiles = pgTable('user_profiles', {
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   displayName: text('display_name').notNull(), avatarConfig: jsonb('avatar_config').notNull().default({ color: '#cf7549' }),
+  statusMessage: text('status_message').notNull().default(''), skillLoadouts: jsonb('skill_loadouts').notNull().default({}),
   equippedSkin:text('equipped_skin').notNull().default('nathan'),
 });
 export const wallets=pgTable('wallets',{
@@ -122,6 +124,25 @@ export const gramFollows=pgTable('gram_follows',{
 export const economyPrices=pgTable('economy_prices',{
   key:text('key').primaryKey(),value:integer('value').notNull(),updatedBy:text('updated_by').references(()=>users.id),updatedAt:date('updated_at').notNull().defaultNow(),
 });
+/** Badges of the profile window (apps/api/src/profile-service.ts); shownAt: where the player put it among the six on show. */
+/** PNGs sent in the administration for badges. The id is the file's SHA-256: the same file is kept once. */
+export const badgeImages=pgTable('badge_images',{
+  id:text('id').primaryKey(),bytes:bytes('bytes').notNull(),size:integer('size').notNull(),createdAt:date('created_at').notNull().defaultNow(),
+});
+export const badges=pgTable('badges',{
+  id:text('id').primaryKey(),name:text('name').notNull(),description:text('description').notNull(),icon:text('icon').notNull(),color:text('color').notNull(),rarity:text('rarity').$type<BadgeRarity>().notNull().default('common'),image:text('image_id').references(()=>badgeImages.id,{onDelete:'set null'}),createdAt:date('created_at').notNull().defaultNow(),
+});
+export const userBadges=pgTable('user_badges',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),badgeId:text('badge_id').notNull().references(()=>badges.id,{onDelete:'cascade'}),
+  shownAt:smallint('shown_at'),grantedAt:date('granted_at').notNull().defaultNow(),
+  /** When the world told the player; null until then (AchievementService.unlocked). */
+  notifiedAt:date('notified_at'),
+},t=>[primaryKey({columns:[t.userId,t.badgeId]})]);
+/** What each player has done, per series of packages/shared/src/achievements.ts, in that series' stored unit. */
+export const userAchievements=pgTable('user_achievements',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),series:text('series').notNull(),
+  value:integer('value').notNull().default(0),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.series]})]);
 /** The event log: logins from the API, entries, shifts and faints from the world (apps/api/src/admin-console.ts). */
 export const gameLogs=pgTable('game_logs',{
   id:text('id').primaryKey(),source:text('source').notNull(),event:text('event').notNull(),userId:text('user_id'),

@@ -20,14 +20,16 @@ const clips = {
   Drink: {filename:'bebendo'}, Fallen: {filename:'bebado-caido'}, Deal: {filename:'carta-distribui'},
   Shuffle: {filename:'carta-recomeco'}, CardsSit: {filename:'carta-sentado'}, AngrySit: misc('Sitting Angry.fbx'),
   Kick: {filename:'karate-kick'}, Bartend: {filename:'Bartending'},
+  // Rafael's jump kick lands away from where it took off: inPlace brings the hip back, the server holds the avatar still.
+  AirKick: {filename:path.join('misc','Drop Kick.fbx'),mixamo:true,inPlace:true},
   // Standard Run was exported with root motion: inPlace removes its forward travel (the server moves the avatar).
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
   Wait: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
 };
-// Clips that only one skin uses: Rafael's karate, Seu Zé's (Magrão) work behind the counter.
-const exclusive = { Kick: 'rafael', Bartend: 'magrao' };
+// Clips that only one skin uses: Rafael's skills (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
+const exclusive = { Kick: 'rafael', AirKick: 'rafael', Bartend: 'magrao' };
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
 // Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,
 // matching the five-second gameplay recovery instead of freezing on the source's trailing frames.
@@ -103,7 +105,7 @@ const knownClips=new Set([...Object.keys(clips),...dances.map(dance=>dance.name)
 const manifest=Object.fromEntries(Object.entries(previousManifest).filter(([name])=>knownClips.has(name)));
 const requested=process.argv.slice(2);
 // Gilmar enters once his Mixamo skin has been imported (tools/assets/import-mixamo.mjs).
-const skins = ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
+const skins = ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
 for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);
   const retargeted = id !== 'nathan';

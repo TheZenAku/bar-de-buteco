@@ -7,11 +7,13 @@ Para investigar deformações e transições, use o [diagnóstico de rigs](rig-t
 | Modelo | Esqueleto | Juntas da malha | Pesos |
 | --- | --- | --- | --- |
 | Nathan | Nathan | 88 | Originais |
-| Rafael | Mixamo | 34 | Do Mixamo |
+| Rafael | Mixamo | 65 | Do próprio FBX (Tripo) |
 | Leandro | Mixamo | 41 | Transferidos do rig AccuRig anterior |
 | Read | Mixamo | 41 | Transferidos do rig AccuRig anterior |
 | Magrão / Seu Zé | Mixamo | 41 | Transferidos do rig AccuRig anterior |
 | Gilmar | Mixamo | 41 | Automáticos |
+| Gabriel | Mixamo | 34 | Do Mixamo |
+| Flavio Hipotético | Mixamo | 65 | Do próprio GLB (Tripo) |
 
 ## Adaptação
 

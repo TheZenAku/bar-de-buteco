@@ -1,6 +1,6 @@
 # Skins e coleção
 
-Os jogadores usam somente skins completas. **Nathan** é gratuito e já pertence a toda conta: é o visual de quem acabou de se cadastrar e o substituto de qualquer skin que a conta não possua. **Leandro**, **Rafael**, **Read** e **Gilmar** são vendidos na loja. Magrão permanece exclusivo do NPC Seu Zé. A lista fica em `SKINS` e a skin gratuita em `DEFAULT_SKIN`, ambos em `packages/shared`.
+Os jogadores usam somente skins completas. **Nathan** é gratuito e já pertence a toda conta: é o visual de quem acabou de se cadastrar e o substituto de qualquer skin que a conta não possua. **Leandro**, **Rafael**, **Read**, **Gilmar**, **Gabriel** e **Flavio Hipotético** são vendidos na loja. Magrão permanece exclusivo do NPC Seu Zé. A lista fica em `SKINS` e a skin gratuita em `DEFAULT_SKIN`, ambos em `packages/shared`.
 
 O cadastro não tem etapa de aparência: com o e-mail confirmado (ou com a ativação automática), a conta entra direto no bar vestindo Nathan. Na partida, **C** abre a coleção, com a carteira e um cartão por skin. Clicar numa skin possuída a veste; numa skin bloqueada, abre a confirmação de compra.
 
@@ -10,7 +10,7 @@ O cadastro não tem etapa de aparência: com o e-mail confirmado (ou com a ativa
 
 `GET /api/wardrobe` retorna seleção, catálogo, preços, posse e saldo da própria conta. `POST /api/wardrobe/buy` compra uma skin; `POST /api/wardrobe/equip` veste uma skin possuída. A posse de Nathan não depende de registro em `skin_inventory`.
 
-O servidor do mundo consulta a API ao entrar e reconectar e revalida durante a partida. A validação interna devolve `{equippedSkin,ownedSkins}`; uma skin vestida que não esteja na coleção vira Nathan. As opções enviadas pelo navegador na entrada não concedem posse nem definem a skin. `player.skin` também exige autorização persistida, via API interna; `player.appearance` apenas solicita sincronização depois de vestir pela API. O patch público transmite somente a skin selecionada, sem expor saldo ou inventário. Trocar de skin não altera movimento, colisões, regras do blackjack, eventos ou moderação. O karatê continua exclusivo de Rafael e a troca visual aguarda o fim do golpe.
+O servidor do mundo consulta a API ao entrar e reconectar e revalida durante a partida. A validação interna devolve `{equippedSkin,ownedSkins}`; uma skin vestida que não esteja na coleção vira Nathan. As opções enviadas pelo navegador na entrada não concedem posse nem definem a skin. `player.skin` também exige autorização persistida, via API interna; `player.appearance` apenas solicita sincronização depois de vestir pela API. O patch público transmite somente a skin selecionada, sem expor saldo ou inventário. Trocar de skin não altera movimento, colisões, regras do blackjack, eventos ou moderação. A troca visual aguarda o fim da skill em andamento. As skills de cada skin, a ativa e a tecla ficam no [perfil](perfil.md).
 
 ## Loja e moeda
 
@@ -24,10 +24,12 @@ A compra é permanente, exige conta confirmada e usa uma transação com bloquei
 | `SKIN_PRICE_RAFAEL` | 1000 |
 | `SKIN_PRICE_READ` | 850 |
 | `SKIN_PRICE_GILMAR_GORDO` | 900 |
+| `SKIN_PRICE_GABRIEL` | 900 |
+| `SKIN_PRICE_FLAVIO_HIPOTETICO` | 900 |
 
 O saldo inicial e o bônus diário estão preparados para futura configuração e permanecem desativados. O fluxo diário não aparece com valor zero. Não há endpoint público que conceda saldo arbitrário. A infraestrutura do futuro bônus usa um lançamento único por conta/data UTC para impedir resgates duplicados.
 
-As contas de demonstração preparadas explicitamente pelo seed recebem a coleção completa para conferir animações. Isso não altera o cadastro normal. O seed continua proibido em produção. Os testes de navegador usam serviços e banco separados e concedem **somente às suas contas de teste** 5.000 moedas para exercitar compras; esse valor não é aplicado ao bar em `localhost:5173`.
+As contas de demonstração preparadas explicitamente pelo seed recebem a coleção completa para conferir animações. Isso não altera o cadastro normal. O seed continua proibido em produção. Os testes de navegador usam serviços e banco separados e concedem **somente às suas contas de teste** 6.000 moedas para exercitar compras; esse valor não é aplicado ao bar em `localhost:5173`.
 
 ## Assets e renderização
 

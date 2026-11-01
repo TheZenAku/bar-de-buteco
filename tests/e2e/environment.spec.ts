@@ -15,7 +15,7 @@ test('the authored skewer cart has visible geometry below its fire and smoke FX'
   await page.evaluate(()=>(window as any).fixture.scene.destroy());
 });
 
-test('full map renders through daylight, dusk and night with correct light directions, shadows and border fog',async({page})=>{
+test('full map renders through daylight, dusk and night with correct light directions and shadows',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
@@ -45,11 +45,6 @@ test('full map renders through daylight, dusk and night with correct light direc
   expect((await status()).moon!.intensity).toBeCloseTo(moonBefore);expect((await status()).lamps.every(l=>l.intensity<.2)).toBe(true);
   await page.evaluate(()=>(window as any).fixture.event('PARTY'));await expect.poll(async()=>(await status()).party,{timeout:20000}).toBeGreaterThan(.95);
   await page.evaluate(()=>(window as any).fixture.event(''));await expect.poll(async()=>(await status()).electrical,{timeout:20000}).toBeGreaterThan(.98);
-  await page.evaluate(()=>{(window as any).fixture.hour(12);(window as any).fixture.view([-101,4,-13],[-112,1,-13]);});
-  await page.screenshot({path:previewPath('day-night-border-fog.png')});
-  const rim:number[]=await page.evaluate(()=>(window as any).fixture.pixels());
-  for(let channel=0;channel<3;channel++)expect(Math.abs(rim[channel]-rim[rim.length-4+channel])).toBeLessThan(3);
-  expect((await status()).edgeFogWidth).toBe(8);
   // The sky must respect the depth-written alpha aperture used by the real YouTube TV.
   await page.evaluate(()=>{const f=(window as any).fixture;f.view([7.3,2.33,-10.3],[7.3,2.33,-11.447]);f.scene.showTelevision('tv-hall',true);});
   const aperture:number[]=await page.evaluate(()=>(window as any).fixture.pixels());

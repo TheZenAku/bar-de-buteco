@@ -6,7 +6,7 @@ type KeyboardLock={keyboard?:{lock?(keys:string[]):Promise<void>}};
  * notice stays in it. The browser's (F11) shows the same, but a page can only see it, not leave it: the button says so.
  * In the page's, Esc keeps closing the game's windows where the browser lets it (Keyboard Lock): holding Esc leaves.
  */
-export function createFullscreen(button:HTMLButtonElement,notice:(text:string)=>void):void{
+export function createFullscreen(button:HTMLButtonElement,notice:(text:string)=>void,entered:()=>void):void{
   const browserFull=()=>!document.fullscreenElement&&(matchMedia('(display-mode: fullscreen)').matches||(innerWidth>=screen.width&&innerHeight>=screen.height));
   const render=()=>{
     const on=!!document.fullscreenElement||browserFull();
@@ -19,6 +19,7 @@ export function createFullscreen(button:HTMLButtonElement,notice:(text:string)=>
     if(browserFull()){notice('Esta é a tela cheia do navegador: aperte F11 para sair.');return;}
     try{await document.documentElement.requestFullscreen({navigationUI:'hide'});}
     catch{notice('O navegador não abriu a tela cheia daqui. Tente a tecla F11.');return;}
+    entered();
     try{await (navigator as Navigator&KeyboardLock).keyboard?.lock?.(['Escape']);}catch{/* Esc then leaves full screen at once. */}
   })());
   document.addEventListener('fullscreenchange',render);

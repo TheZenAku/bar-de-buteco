@@ -4,6 +4,7 @@ import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LA
 import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 import {FOOSBALL_TABLES} from './foosball.js';
+import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
 
 export const WALK_SPEED = 3.5;
 export const RUN_SPEED = 6;
@@ -32,7 +33,7 @@ export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
 });
 const BLACKJACK_COLLIDER:Collider={id:'blackjack',x:BLACKJACK_TABLE.x,z:BLACKJACK_TABLE.z,hx:.75,hz:.42,minY:BLACKJACK_TABLE.y,maxY:BLACKJACK_TABLE.y+.8};
 const JUKEBOX_COLLIDER:Collider=map.colliders.find(c=>c.id==='COL_Int_Jukebox')!;
-/** Static solids: walls, furniture (the jukebox among them), the game's props. Door leaves move; see solidColliders. */
+/** The bar's and the original neighbourhood's solids: walls, furniture (the jukebox among them), the game's props. Door leaves move; see solidColliders. */
 export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER];
 // Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
 // Doors start open, as authored in the map.
@@ -42,6 +43,8 @@ const COLLISION_CELL=8;
 const solidGrid=new Map<string,Collider[]>();
 type MapSurface=(typeof MAP_SURFACES)[number];
 const surfaceGrid=new Map<string,MapSurface[]>();
+/** Where the bike may ride: the streets and pavements of the original neighbourhood and of the city (import-city.mjs). */
+const roadSurfaces=new Set<MapSurface>(CITY_FLOORS.filter(floor=>floor.road));
 const cell=(value:number)=>Math.floor(value/COLLISION_CELL);
 const cellKey=(x:number,z:number)=>`${x}:${z}`;
 function indexArea<T>(grid:Map<string,T[]>,item:T,minX:number,maxX:number,minZ:number,maxZ:number):void {
@@ -50,17 +53,40 @@ function indexArea<T>(grid:Map<string,T[]>,item:T,minX:number,maxX:number,minZ:n
     if(items)items.push(item);else grid.set(key,[item]);
   }
 }
-for(const surface of MAP_SURFACES){
+for(const surface of MAP_SURFACES)if(surface.id.startsWith('COL_Rua'))roadSurfaces.add(surface);
+for(const surface of [...MAP_SURFACES,...CITY_FLOORS]){
   const xs=surface.points.map(point=>point[0]!),zs=surface.points.map(point=>point[2]!);
   indexArea(surfaceGrid,surface,Math.min(...xs),Math.max(...xs),Math.min(...zs),Math.max(...zs));
 }
+const indexSolid=(collider:Collider)=>indexArea(solidGrid,collider,collider.x-collider.hx-PLAYER_RADIUS,collider.x+collider.hx+PLAYER_RADIUS,
+  collider.z-collider.hz-PLAYER_RADIUS,collider.z+collider.hz+PLAYER_RADIUS);
+for(const collider of [...COLLIDERS,...CITY_SOLIDS])indexSolid(collider);
+let doorBoxes:Collider[]=[];
+/** Only the door leaves move: they leave the cells they were in and enter new ones, the thousands of static solids stay. */
 function rebuildSolids():void {
-  solids=[...COLLIDERS,...DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw))];
-  solidGrid.clear();
-  for(const collider of solids)indexArea(solidGrid,collider,collider.x-collider.hx-PLAYER_RADIUS,collider.x+collider.hx+PLAYER_RADIUS,
-    collider.z-collider.hz-PLAYER_RADIUS,collider.z+collider.hz+PLAYER_RADIUS);
+  for(const box of doorBoxes)for(let x=cell(box.x-box.hx-PLAYER_RADIUS);x<=cell(box.x+box.hx+PLAYER_RADIUS);x++)for(let z=cell(box.z-box.hz-PLAYER_RADIUS);z<=cell(box.z+box.hz+PLAYER_RADIUS);z++){
+    const items=solidGrid.get(cellKey(x,z));
+    if(items)solidGrid.set(cellKey(x,z),items.filter(item=>item!==box));
+  }
+  doorBoxes=DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw));
+  doorBoxes.forEach(indexSolid);
+  solids=[...COLLIDERS,...CITY_SOLIDS,...doorBoxes];
 }
 rebuildSolids();
+/** Whether a body of this radius reaches into the box. */
+export function boxContains(c:Collider,x:number,z:number,radius=0):boolean {
+  if(Math.abs(x-c.x)>=c.hx+radius-.00001||Math.abs(z-c.z)>=c.hz+radius-.00001)return false;
+  const turn=c.turn;
+  if(!turn)return true;
+  const dx=x-c.x,dz=z-c.z;
+  return Math.abs(dx*turn.ux+dz*turn.uz)<turn.lx+radius-.00001&&Math.abs(dz*turn.ux-dx*turn.uz)<turn.lz+radius-.00001;
+}
+/** A point in the turned box's own axes (x and z as they are for a square one). */
+const boxLocal=(c:Collider,x:number,z:number):[number,number]=>{
+  const dx=x-c.x,dz=z-c.z,turn=c.turn;
+  return turn?[dx*turn.ux+dz*turn.uz,dz*turn.ux-dx*turn.uz]:[dx,dz];
+};
+const boxHalf=(c:Collider):[number,number]=>c.turn?[c.turn.lx,c.turn.lz]:[c.hx,c.hz];
 const solidsAt=(x:number,z:number):readonly Collider[]=>solidGrid.get(cellKey(cell(x),cell(z)))??[];
 export function solidsBetween(ax:number,az:number,bx:number,bz:number):readonly Collider[] {
   const found=new Set<Collider>();
@@ -176,12 +202,22 @@ export function floorHeight(x:number,z:number,reference=.3):number|undefined {
   return highest;
 }
 
+/** The highest floor at or under a height, however far below (a step of `rise` still counts as under): what a falling body lands on. */
+export function groundBelow(x:number,z:number,y:number,rise=.2):number|undefined {
+  let highest:number|undefined;
+  for(const surface of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
+    const height=triangleHeight(surface.points,x,z);
+    if(height!==undefined&&height<=y+rise&&(highest===undefined||height>highest))highest=height;
+  }
+  return highest;
+}
+
 /** Like floorHeight, but only the streets and pavements: where a bar's or a yard's floor is the support, a vehicle may not go. */
 export function roadHeight(x:number,z:number,reference=0):number|undefined {
   let highest:number|undefined,road=false;
   for(const surface of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
     const y=triangleHeight(surface.points,x,z);
-    if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest)){highest=y;road=surface.id.startsWith('COL_Rua');}
+    if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest)){highest=y;road=roadSurfaces.has(surface);}
   }
   return road?highest:undefined;
 }
@@ -204,7 +240,7 @@ function obstructed(x:number,z:number,y:number,ignored?:Set<string>):boolean {
     if((c.maxY??Infinity)<=y+.26||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
     // Below knee height only the feet collide, so the body may lean over a step edge (the stage's 30 cm treads).
     const radius=(c.maxY??Infinity)<=y+.5?.15:body;
-    if(Math.abs(x-c.x)<c.hx+radius-.00001&&Math.abs(z-c.z)<c.hz+radius-.00001)return true;
+    if(boxContains(c,x,z,radius))return true;
   }
   // Sloped collision boxes are sampled on their real upper face, not their enclosing AABB.
   for(const s of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
@@ -283,7 +319,7 @@ export function interactionReach(object:Interactable,position:Position):{x:numbe
 
 function segmentCrossesBox(ax:number,az:number,bx:number,bz:number,c:Collider):boolean {
   // Slightly shrunk, so a wall that merely touches the object's edge does not count.
-  const from=[ax-c.x,az-c.z],delta=[bx-ax,bz-az],half=[c.hx-.02,c.hz-.02];
+  const from=boxLocal(c,ax,az),to=boxLocal(c,bx,bz),delta=[to[0]-from[0],to[1]-from[1]],size=boxHalf(c),half=[size[0]-.02,size[1]-.02];
   let enter=0,exit=1;
   for(let axis=0;axis<2;axis++){
     if(Math.abs(delta[axis]!)<1e-9){if(Math.abs(from[axis]!)>half[axis]!)return false;continue;}
@@ -301,7 +337,7 @@ export function canInteract(object:Interactable,position:Position,slack=0):boole
   const reach=interactionReach(object,position);
   if(reach.gap>TOUCH_GAP+slack+(object.type==='jukebox'?JUKEBOX_INTERACTION_SLACK:0))return false;
   const eye=y+1.3;
-  return !solids.some(c=>!c.ramp&&!object.footprint?.some(f=>f.id===c.id)&&(c.minY??-Infinity)<eye&&(c.maxY??Infinity)>eye
+  return !solidsBetween(position.x,position.z,reach.x,reach.z).some(c=>!c.ramp&&!object.footprint?.some(f=>f.id===c.id)&&(c.minY??-Infinity)<eye&&(c.maxY??Infinity)>eye
     &&segmentCrossesBox(position.x,position.z,reach.x,reach.z,c));
 }
 /** The first walkable point on the floor in front of a TV, searching a little to the sides. */
@@ -366,7 +402,7 @@ export function standingPosition(position:Position,rotation=0):Position {
 
 // What the camera sees through instead of pulling its boom in (the renderer's x-ray window, camera-xray.ts): furniture,
 // props, trees, cars and the stage's gear. Walls, floors, slabs, ceilings, roofs, doors and the stage's deck stop it.
-const SEE_THROUGH=/^(?:COL_(?:Mob|Ext|Int|Palco)_|COL_Predio_(?:Pergolado|Churrasqueira|GuardaCorpo)|blackjack$)/;
+const SEE_THROUGH=/^(?:COL_(?:Mob|Ext|Int|Palco)_|COL_Predio_(?:Pergolado|Churrasqueira|GuardaCorpo)|COL_Cid_(?:Arvore|Poste|Carro|Carreta|Banco|Orelhao|Mastro|Totem|Trave|Bomba|Brinquedo|Academia|Ponto_Onibus|Alambrado|Quiosque|Pilar|Trafo)|blackjack$)/;
 /** Where the segment first enters a solid (0-1 of the way; 1 when it does not), each box grown by `pad`. */
 function firstHit(start:Required<Position>,end:Required<Position>,pad:number,seeThrough:boolean):number {
   let first=1;
@@ -374,11 +410,14 @@ function firstHit(start:Required<Position>,end:Required<Position>,pad:number,see
   for(const c of candidates){
     // Posts, trunks and pillars are too thin to hide the player; letting the boom pass them avoids the
     // camera snapping onto the avatar (the spawn marker stands in front of a street lamp).
-    if(c.ramp||(c.hx<.2&&c.hz<.2)||(seeThrough&&SEE_THROUGH.test(c.id)))continue;
+    // The map's limits are invisible: nothing to hide behind or to see through.
+    if(c.ramp||(c.hx<.2&&c.hz<.2)||c.id.startsWith('COL_Cid_Limite')||(seeThrough&&SEE_THROUGH.test(c.id)))continue;
     let enter=0,exit=1;
-    const min=[c.x-c.hx-pad,(c.minY??0)-pad,c.z-c.hz-pad];
-    const max=[c.x+c.hx+pad,(c.maxY??3)+pad,c.z+c.hz+pad];
-    const from=[start.x,start.y,start.z],to=[end.x,end.y,end.z];
+    // In the box's own axes: a turned wall is met where it really is, not at the square around it.
+    const [ax,az]=boxLocal(c,start.x,start.z),[bx,bz]=boxLocal(c,end.x,end.z),[hx,hz]=boxHalf(c);
+    const min=[-hx-pad,(c.minY??0)-pad,-hz-pad];
+    const max=[hx+pad,(c.maxY??3)+pad,hz+pad];
+    const from=[ax,start.y,az],to=[bx,end.y,bz];
     // A seated avatar's target can start just inside a tabletop; ignore only that volume.
     if(from.every((v,i)=>v>=min[i]!&&v<=max[i]!))continue;
     for(let axis=0;axis<3;axis++){

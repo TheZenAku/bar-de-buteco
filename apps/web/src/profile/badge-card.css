@@ -1,0 +1,24 @@
+/* A badge blown up into a card (badge-card.ts). Over the game and the administration, on body like the tooltip; nothing here blurs what is behind, the game keeps drawing there. */
+.bc-backdrop{position:fixed;inset:0;z-index:420;display:grid;place-items:center;padding:16px;background:oklch(.06 .03 300 / 74%);overflow:hidden}
+.bc-scene{--card-width:min(calc(100vw - 32px),calc(min(100dvh - 48px,540px)*5/7));width:var(--card-width);aspect-ratio:5/7;perspective:820px;touch-action:none;cursor:grab}
+.bc-scene:active{cursor:grabbing}
+.bc-card{--rarity:var(--hl-gold);--frame:50%;--mx:0;--my:0;--px:50%;--py:50%;--hyp:0;position:relative;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;color:var(--foreground);border-radius:16px;background:radial-gradient(90% 56% at 50% 40%,color-mix(in oklch,var(--rarity) 30%,transparent),transparent 72%),linear-gradient(170deg,oklch(.24 .09 305),oklch(.12 .05 300));box-shadow:inset 0 0 0 12px color-mix(in oklch,var(--rarity) var(--frame),oklch(.14 .05 300)),inset 0 0 0 13px color-mix(in oklch,var(--rarity) 80%,white),inset 0 0 0 1.5px color-mix(in oklch,var(--rarity) 70%,white),0 22px 60px oklch(0 0 0 / 65%),0 0 46px color-mix(in oklch,var(--rarity) 34%,transparent);transform-origin:50% 50%;will-change:transform;user-select:none}
+.bc-card[data-rarity="legendary"]{--frame:72%}
+.bc-rarity{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:20px 22px 0;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:color-mix(in oklch,var(--rarity) 82%,white)}
+.bc-rarity i{display:flex;gap:4px;font-style:normal}
+.bc-rarity b{width:8px;height:8px;rotate:45deg;background:oklch(1 0 0 / 14%)}
+.bc-rarity b.on{background:var(--rarity);box-shadow:0 0 6px var(--rarity)}
+.bc-art{flex:1;min-height:0;display:grid;place-items:center;padding:6px 40px;translate:calc(var(--mx)*-7px) calc(var(--my)*-7px)}
+.bc-art .pf-medal{width:min(100%,64%)}
+.bc-art .pf-art{width:100%;height:100%;aspect-ratio:auto;min-height:0}
+.bc-art .pf-art img{filter:drop-shadow(0 6px 14px oklch(0 0 0 / 50%))}
+.bc-text{position:relative;z-index:3;margin:0 22px 22px;padding:10px 12px 11px;background:oklch(.1 .04 300 / 84%);border-top:1px solid color-mix(in oklch,var(--rarity) 60%,transparent);translate:calc(var(--mx)*3px) calc(var(--my)*3px)}
+.bc-text h2{margin:0 0 3px;font:700 20px/1.15 var(--font-display);overflow-wrap:anywhere}
+.bc-text p{margin:0;font-size:13.5px;line-height:1.35;color:var(--soft);overflow-wrap:anywhere}
+.bc-glare,.bc-holo,.bc-studs{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:inherit}
+.bc-glare{z-index:2;background:radial-gradient(circle at var(--px) var(--py),oklch(1 0 0 / 46%),oklch(1 0 0 / 13%) 26%,transparent 60%);mix-blend-mode:soft-light;opacity:calc(.55 + var(--hyp)*.45)}
+.bc-holo{z-index:1;background:repeating-linear-gradient(118deg,#ff4d8d 0,#ffd84d 7%,#4dffa6 14%,#4dd5ff 21%,#a65dff 28%,#ff4d8d 35%);background-size:240% 240%;background-position:var(--px) var(--py);-webkit-mask-image:radial-gradient(circle at var(--px) var(--py),#000 0,oklch(0 0 0 / 35%) 38%,transparent 78%);mask-image:radial-gradient(circle at var(--px) var(--py),#000 0,oklch(0 0 0 / 35%) 38%,transparent 78%);mix-blend-mode:color-dodge;opacity:calc(.3 + var(--hyp)*.32)}
+.bc-studs{z-index:2}
+.bc-close{position:absolute;top:12px;right:12px;display:grid;place-items:center;width:40px;height:40px;padding:0;color:var(--foreground);background:oklch(1 0 0 / 8%);border:0;cursor:pointer}
+.bc-close:hover,.bc-close:focus-visible{color:#fff;background:var(--active);outline:0}
+.bc-close .ui-icon{width:20px;height:20px}

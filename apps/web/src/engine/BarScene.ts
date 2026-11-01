@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {SHOP_SPOT, BLACKJACK_SEATS, BLACKJACK_TABLE, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
+import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, BLACKJACK_SEATS, BLACKJACK_TABLE, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
 import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
@@ -7,6 +7,7 @@ import type { MapView, SceneActor, SceneCallbacks, SceneInput, SceneLabel, Scene
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
+import {CityStreaming} from './city-streaming';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
 import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
 import {StageLights,type StageLightsStatus} from './stage-lights';
@@ -21,9 +22,13 @@ import {BarAnimations,barEndOffset,barState} from './bar-animations';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 import {CameraRig,type CameraMode} from './camera-rig';
 import {Motos,seatRider,type Bike} from './moto-delivery';
-import {NO_MOTO_INTENT,type MotoBody,type MotoIntent} from '@bar/shared';
+import {SpeedBlur} from './speed-blur';
+import {lifterPose,RagdollPuppet,type RagdollRig} from './moto-ragdoll';
+import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
 import {completeBasePose} from './animation-tracks';
+import {shootPortrait} from './skin-portrait';
+import {skillById} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -39,6 +44,8 @@ const HAND_LAYER = 'Hand';
 const HAND_FREE_CLIPS = new Set(['Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Use', 'Wait', 'OldCaneWalk', 'OldCaneHold']);
 // Looping clips that sit the hips on a chair (anchored to the 0.56 m seat height).
 const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
+/** How far the bike must have turned (radians) with a blinker on, for it to go off as the bars straighten. */
+const SIGNAL_CANCEL_TURN = .7;
 // Degrees by drunk stage (0-4): body sway of every avatar and camera roll of the local player.
 const DRUNK_BODY_SWAY = [0, 0, 3, 6, 6];
 const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
@@ -99,6 +106,8 @@ interface Avatar {
   glideNext?: number;
   /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
   riding?: boolean;
+  /** Thrown from a bike (moto-ragdoll.ts): the body as it flies and lies, until the getting-up clip has taken over. */
+  ragdoll?: RagdollPuppet;
   /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
   contact: pc.Entity;
   covered?: { x: number; z: number; value: boolean };
@@ -113,10 +122,17 @@ interface Avatar {
   lastDrawn?: pc.Vec3;
 }
 /** A bar animation the debug panel plays on an avatar without the room (development only). */
+/** The bike reaches behind the body, and a lamp post crossing the view at speed is not worth opening a window. */
+const MOTO_XRAY = { clearance: MOTO.HALF_LENGTH, xrayAfter: .25 };
 interface BarOverride { animation: string; startedAt: number; interactionState?: string; x?: number; y?: number; z?: number; meal?: Meal }
 /** What an avatar does in the bar animations this frame (barAction). */
 interface BarAction { step: BarStep; body?: string; frame?: BarFrame; seat?: string; servedFood: boolean }
 // The snacks a seated customer eats with the bar animations' fork (comer).
+/**
+ * The feeling of speed, riding: from this share of top speed on, up to full at the other, the view pulls back and widens by this many degrees
+ * and the edges of the screen blur (speed-blur.ts). How fast it comes in and goes away, per second: a crash should not leave it hanging.
+ */
+const RUSH_FROM = .5, RUSH_FULL = .95, RUSH_FOV = 4, RUSH_IN = 1.8, RUSH_OUT = 3.5;
 const FOODS = new Set<string>(ITEM_CATALOG.filter(item => item.category === 'comida').map(item => item.id));
 // Bar clips that end an action: a debug run of one is over once it has played.
 const FINAL_CLIPS = new Set<BarClip>(['levantar', 'urinar', 'vomitar', 'fumar_apagar', 'fumar_mixamo', 'levantar_chao', 'limpar_mesa', 'magrao_chopp', 'magrao_chopp_escuro', 'magrao_longneck']);
@@ -139,9 +155,9 @@ interface Pose {
  */
 const DEFAULT_MODEL='nathan';
 // Models and canes follow their rig version; regenerated animation banks have a separate cache version.
-const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'mixamo-20261027', rafael: 'mixamo-20261027b', read: 'mixamo-20261027', magrao: 'mixamo-20261027' };
+const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'mixamo-20261027', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'mixamo-actions-20261029b' : SKIN_VERSIONS[id];
+  const version = folder === 'animations' ? 'mixamo-actions-20261031' : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -225,6 +241,17 @@ export class BarScene {
   private readonly foosballBalls:FoosballBalls;
   /** The delivery bikes (moto-delivery.ts), and whether the camera is following the local player on one. */
   private readonly motos:Motos;
+  private readonly speedBlur:SpeedBlur;
+  private readonly tempUp = new pc.Vec3();
+  /** How much of the feeling of speed applies now, 0 to 1, and the lens it adds to (the phone's zoom sets that). */
+  private rush = 0;
+  private lensFov = 57;
+  /** The thrown bodies the room is running. */
+  private ragdollStarts:Record<string,RagdollStart&{startedAt:number}>={};
+  /** The rider's switches (Z, X, C, H), and how far the bike has turned with the blinker on. */
+  private motoSwitches=0;
+  private signalYaw?:number;
+  private lastFrameAt=performance.now();
   private chasing=false;
   private stageSpots:MusicianState[]=[];
   /** The light desk's settings for the show (BarState.stageShow), and whether its panel has the camera on the stage. */
@@ -265,6 +292,9 @@ export class BarScene {
   private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
   private mapEntity?: pc.Entity;
+  private city?: CityStreaming;
+  /** Tests and fixtures: stream around this point instead of the player or the camera. */
+  cityFocus?: {x:number;z:number};
   private contactMaterial?: pc.ShaderMaterial;
   /** What the bar serves, by item (tools/assets/import-drinks.mjs): held while drinking, carried on the tray, left on tables. */
   private readonly propModels=new Map<string,pc.ContainerResource>();
@@ -287,8 +317,8 @@ export class BarScene {
   private hiddenHead?: pc.Entity;
   private readonly headScale = new pc.Vec3(1, 1, 1);
   private dragging = false;
-  /** Where a left press began: released close by and quickly, it is a click on whoever is under it (onPlayerClick). */
-  private press?: { x: number; y: number; at: number };
+  /** Where a press began: the right button released close by and quickly is a click on whoever is under it (onWorldMenu). */
+  private press?: { x: number; y: number; at: number; button: number };
   private lastRotation = Math.PI;
   private eventType = '';
   private frameSeconds = 0;
@@ -319,9 +349,9 @@ export class BarScene {
 
     this.camera = new pc.Entity('Third-person camera');
     this.camera.addComponent('camera', {
-      // BarBoteco's expanded neighbourhood includes distant buildings, hills and a panorama. The Blender
-      // source declares camera_far_minimo_m=1100; the previous 150 m plane clipped most of that scenery.
-      clearColor: color('#9dafbd'), fov: 57, nearClip: 0.08, farClip: 1100,
+      // The city's far hills and panorama, as its scene's camera_far_minimo_m asks. What is detailed does not depend on this
+      // distance: that is the sectors' streaming (city-streaming.ts), and the fog hides everything well before it.
+      clearColor: color('#9dafbd'), fov: 57, nearClip: 0.08, farClip: CITY_FAR_CLIP,
     });
     this.app.root.addChild(this.camera);
     this.camera.setPosition(18, 9, 16);
@@ -338,7 +368,8 @@ export class BarScene {
     this.environment.addPartyShadows(this.partyLights);
     this.stageShow=new StageShow(this.app);
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
-    this.motos=new Motos(this.app,root=>this.contactShadow(root));
+    this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
+    this.speedBlur=new SpeedBlur(this.app);
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
     for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.screens.includes(tv.id))))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
@@ -421,6 +452,8 @@ export class BarScene {
         const resource = asset.resource as pc.ContainerResource;
         const map = resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
         map.name = 'BarBoteco imported map';
+        // Older exports still carry the backdrop from before the city: its buildings and hills would stand inside it.
+        (map.findByName('Fundo_Distante') as pc.Entity | null)?.destroy();
         this.app.root.addChild(map); this.mapEntity = map;
         for(const door of this.doorLeaves){
           door.entity=(map.findByName(door.leaf.id) as pc.Entity|null)??undefined;
@@ -429,6 +462,9 @@ export class BarScene {
         const lights = map.findComponents('light') as pc.LightComponent[];
         this.warmLights.push(...lights.map(light=>light.entity));
         this.environment.configureMap(map);
+        // The city streams around the bar on its own time, and never holds the game back (city-streaming.ts).
+        this.city=new CityStreaming(this.app,this.environment);
+        this.applyCityQuality();
         this.mapEffects=new MapEffects(this.app,map);
         this.jukeboxLights=new JukeboxLights(map);
         this.stageLights=new StageLights(map,this.partyLights.filter(light=>light.name==='Stage party wash').map(light=>light.light!));
@@ -458,9 +494,9 @@ export class BarScene {
     }
   }
 
-  getMapStatus(): {loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;stage?:StageLightsStatus;show:StageShowStatus;musicians?:ReturnType<StageMusicians['telemetry']>;barAnimations?:ReturnType<BarAnimations['telemetry']>;objective?:{x:number;y:number;z:number;visible:boolean};stageBlips:Partial<Record<StageBlip,{x:number;y:number;z:number;visible:boolean}>>} {
+  getMapStatus(): {city?:ReturnType<CityStreaming['telemetry']>;loaded:boolean;colliders:number;surfaces:number;doors:number;doorOpenness:Record<string,number>;renders:number;cartRenders:number;lights:number;effects?:MapEffectsStatus;jukebox?:JukeboxLightsStatus;stage?:StageLightsStatus;show:StageShowStatus;musicians?:ReturnType<StageMusicians['telemetry']>;barAnimations?:ReturnType<BarAnimations['telemetry']>;objective?:{x:number;y:number;z:number;visible:boolean};stageBlips:Partial<Record<StageBlip,{x:number;y:number;z:number;visible:boolean}>>} {
     const cart=this.mapEntity?.findByName('Carrinho_Espeto') as pc.Entity|undefined;
-    return {loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
+    return {city:this.city?.telemetry(),loaded:!!this.mapEntity,colliders:MAP_COLLIDERS.length,surfaces:MAP_SURFACES.length,doors:this.doorLeaves.filter(d=>d.entity).length,doorOpenness:Object.fromEntries(this.doorLeaves.map(d=>[d.leaf.id,+d.openness.toFixed(3)])),
       renders:this.mapEntity?.findComponents('render').length??0,cartRenders:cart?.findComponents('render').length??0,lights:this.warmLights.length,effects:this.mapEffects?.telemetry(),
       jukebox:this.jukeboxLights?.telemetry(),stage:this.stageLights?.telemetry(),show:this.stageShow.telemetry(),musicians:this.musicians?.telemetry(),barAnimations:this.barAnimations?.telemetry(),objective:this.objective?{...this.objective.target,visible:this.objective.marker.enabled}:undefined,
       stageBlips:Object.fromEntries([...this.stageBlips].map(([id,blip])=>[id,{...blip.target,visible:blip.marker.enabled}]))};
@@ -604,7 +640,7 @@ export class BarScene {
   setCameraDistance(distance: number): void { this.rig.setDistance(distance); }
   /** Restore both preferences together, retaining the third-person zoom while in first person. */
   setCamera(mode: CameraMode, distance: number): void { this.rig.setDistance(distance); this.rig.setMode(mode); }
-  getCamera() { return this.rig.telemetry(); }
+  getCamera() { return { ...this.rig.telemetry(), fov: +(this.camera.camera?.fov ?? 0).toFixed(2), rush: +this.rush.toFixed(3), blur: this.speedBlur.drawn }; }
 
   /**
    * First person shrinks the local avatar's head joint each frame (after the clips posed it), so the face and hair do not
@@ -626,16 +662,37 @@ export class BarScene {
   /** The phone camera's zoom: the lens narrows (1× is the game's own 57° view). */
   setZoom(factor: number): void {
     const zoom = Math.max(1, Math.min(8, factor || 1));
-    if (this.camera.camera) this.camera.camera.fov = zoom === 1 ? 57 : 2 * Math.atan(Math.tan(57 / 2 / RAD_TO_DEG) / zoom) * RAD_TO_DEG;
+    this.lensFov = zoom === 1 ? 57 : 2 * Math.atan(Math.tan(57 / 2 / RAD_TO_DEG) / zoom) * RAD_TO_DEG;
+    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV;
   }
-  /** The other player drawn under a point of the view (CSS pixels of the canvas), the nearest one first. */
-  pickPlayer(x: number, y: number): string | undefined {
+  /** Going fast on the local rider's own bike: the view and the edges of the screen, eased on the frames' time. */
+  private feelSpeed(bike: Bike | undefined, dt: number): void {
+    const share = bike?.predicted ? Math.abs(bike.predicted.speed) / MOTO.TOP_SPEED : 0;
+    const wanted = clamp((share - RUSH_FROM) / (RUSH_FULL - RUSH_FROM), 0, 1), goal = wanted * wanted * (3 - 2 * wanted);
+    this.rush += (goal - this.rush) * (1 - Math.exp(-(goal > this.rush ? RUSH_IN : RUSH_OUT) * dt));
+    if (this.rush < .002) this.rush = goal ? this.rush : 0;
+    this.rig.rush(this.rush);
+    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV;
+    this.speedBlur.set(this.rush);
+  }
+  /** A skin standing still, as an image (the profile window); undefined when it could not be drawn. */
+  async portrait(skin: string): Promise<string | undefined> {
+    const id = SKIN_IDS.has(skin) ? skin : DEFAULT_SKIN;
+    if (!this.skinModels.has(id)) this.loadSkin(id);
+    for (let waited = 0; !this.skinModels.has(id) && waited < 20000; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
+    const model = this.skinModels.get(id);
+    return model && !this.destroyed && this.camera.camera ? shootPortrait(this.app, model, this.camera.camera) : undefined;
+  }
+  /** The bike under a point of the view (CSS pixels of the canvas). */
+  pickMoto(x: number, y: number): string | undefined { return this.camera.camera ? this.motos.pick(this.camera.camera, x, y) : undefined; }
+  /** The player drawn under a point of the view (CSS pixels of the canvas), the nearest one first; the local one too with `self`, unless in first person. */
+  pickPlayer(x: number, y: number, self = false): string | undefined {
     const camera = this.camera.camera;
     if (!camera) return undefined;
     const eye = this.camera.getPosition(), forward = this.camera.forward;
     let best: { id: string; distance: number } | undefined;
     for (const [id, avatar] of this.actors) {
-      if (id === this.localId || avatar.npc) continue;
+      if (avatar.npc || (id === this.localId && (!self || this.rig.firstPerson))) continue;
       const feet = avatar.root.getPosition();
       this.tempPosition.set(feet.x - eye.x, feet.y + 1 - eye.y, feet.z - eye.z);
       const distance = this.tempPosition.length();
@@ -706,14 +763,52 @@ export class BarScene {
   predictMoto(id: string, body: MotoBody | undefined): void { this.motos.predict(id, body); }
   /** W/S: throttle, brake and reverse; A/D: +1 is right; Space: the handbrake. */
   getMotoInput(): MotoIntent {
-    if (!this.enabled || this.inputHasFocus() || document.hidden) return NO_MOTO_INTENT;
+    // The switches stay as they are while the chat is open or the tab hidden.
+    if (!this.enabled || this.inputHasFocus() || document.hidden) {
+      const riding = this.motos.ridden(this.localId);
+      if (riding) this.motos.gas(riding.state.id, false);
+      return { ...NO_MOTO_INTENT, lights: this.motoSwitches };
+    }
     const held = (...codes: string[]) => Number(codes.some(code => this.keys.has(code)));
-    return { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space') };
+    const input = { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space'), lights: this.motoSwitches };
+    const bike = this.motos.ridden(this.localId), speed = bike?.predicted?.speed ?? 0;
+    const braking = input.brake || (input.throttle < 0 && speed > .1) || (input.throttle > 0 && speed < -.1);
+    if (bike) { this.motos.lamps(bike.state.id, this.motoSwitches | (braking ? MOTO_LIGHT.BRAKE : 0)); this.motos.gas(bike.state.id, input.throttle > 0 && bike.state.engine === MOTO_ENGINE.ON); }
+    return input;
+  }
+  /** Z and C: the blinkers, X: both (hazard), H: the high beam. A blinker cancels itself once the turn is over, as on a real bike. */
+  private motoSwitch(code: string): void {
+    const { LEFT, RIGHT, HIGH } = MOTO_LIGHT, signals = LEFT | RIGHT, now = this.motoSwitches & signals;
+    if (code === 'KeyH') { this.motoSwitches ^= HIGH; return; }
+    const wanted = code === 'KeyZ' ? LEFT : code === 'KeyC' ? RIGHT : signals;
+    this.motoSwitches = (this.motoSwitches & ~signals) | (now === wanted ? 0 : wanted);
+    this.signalYaw = undefined;
+  }
+  private cancelSignal(bike: Bike): void {
+    const { LEFT, RIGHT } = MOTO_LIGHT, signal = this.motoSwitches & (LEFT | RIGHT);
+    if (!signal || signal === (LEFT | RIGHT)) { this.signalYaw = undefined; return; }
+    this.signalYaw ??= bike.drawn.yaw;
+    const turned = Math.abs(Math.atan2(Math.sin(bike.drawn.yaw - this.signalYaw), Math.cos(bike.drawn.yaw - this.signalYaw)));
+    if (turned > SIGNAL_CANCEL_TURN && Math.abs(bike.predicted?.steer ?? 0) < .1) { this.motoSwitches &= ~(LEFT | RIGHT); this.signalYaw = undefined; }
   }
   getMotos() {
-    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted }) => ({ id: state.id, riderId: state.riderId, speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
+    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
       position: [entity.getPosition().x, entity.getPosition().y, entity.getPosition().z], yaw: drawn.yaw, front: [-entity.forward.x, -entity.forward.y, -entity.forward.z], rig: rig.telemetry(),
       points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna'].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
+  }
+
+  /** Where a bike's middle is on the view, in CSS pixels (tests and telemetry). */
+  private bikeOnScreen(entity: pc.Entity): [number, number] {
+    this.tempPosition.copy(entity.getPosition()).add(this.tempUp.copy(entity.up).mulScalar(.6));
+    this.camera.camera?.worldToScreen(this.tempPosition, this.tempScreen);
+    return [this.tempScreen.x, this.tempScreen.y];
+  }
+  /** The thrown bodies as drawn (tests and telemetry). */
+  getRagdolls() {
+    return [...this.actors].filter(([, avatar]) => avatar.ragdoll).map(([id, avatar]) => {
+      const [x, y, z] = avatar.ragdoll!.pelvis(), head = avatar.skin?.bones.head.getPosition(), foot = avatar.skin?.bones.foot_l.getPosition(), hip = avatar.skin?.hip?.getPosition();
+      return { id, pelvis: [x, y, z], time: avatar.ragdoll!.time, asleep: avatar.ragdoll!.asleep, rotation: avatar.actor.rotation, hip: hip && [hip.x, hip.y, hip.z], head: head && [head.x, head.y, head.z], foot: foot && [foot.x, foot.y, foot.z] };
+    });
   }
 
   getInput(): SceneInput {
@@ -742,6 +837,7 @@ export class BarScene {
     this.stageState=world.televisions?.telao;
     this.stageSpots=Object.values(world.musicians??{});
     this.motos.sync(world.motos);
+    this.ragdollStarts=world.ragdolls??{};
     this.showDesk=world.stageShow;
     for(const door of this.doorLeaves){
       const state=world.doors?.[door.leaf.group];if(!state)continue;
@@ -953,12 +1049,14 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
+    this.motos.destroy();this.speedBlur.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
     this.musicians?.destroy();this.musicians=undefined;
     this.barAnimations?.destroy();this.barAnimations=undefined;
     this.foosballBalls.destroy();
+    this.city?.destroy();
     this.environment.destroy();
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
@@ -1598,7 +1696,7 @@ export class BarScene {
     }
     if (pose.waving) rightArm.setLocalEulerAngles(0, Math.sin(t * 12) * 20, 155);
     // Box avatars have no Fallen clip: lie down.
-    if (actor.animation === 'fallen') { body.setLocalPosition(0, 0.22, 0); body.setLocalEulerAngles(-88, 0, 0); }
+    if (actor.animation === 'fallen' || actor.animation === 'ragdoll') { body.setLocalPosition(0, 0.22, 0); body.setLocalEulerAngles(-88, 0, 0); }
   }
 
   /** The dance clip for a dance number (the room's draw, or an NPC's phase); '' until a dance bank has arrived. */
@@ -1622,8 +1720,8 @@ export class BarScene {
     // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
-    const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
-      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'ride' ? 'Sit'
+    const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
@@ -1678,7 +1776,7 @@ export class BarScene {
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
       // (On a bike seatRider puts the hips on its seat, wherever it is.)
-      if (SEATED_CLIPS.includes(clip) && action !== 'ride') {
+      if (SEATED_CLIPS.includes(clip) && action !== 'ride' && action !== 'ragdoll') {
         // The skins have different pelvis-to-thigh offsets; anchor the actual hip joints to the chair.
         const hipY = (bones.upperleg_l.getPosition().y + bones.upperleg_r.getPosition().y) / 2;
         body.setLocalPosition(0,(actor.y??0)+0.56-hipY,0);
@@ -1780,8 +1878,13 @@ export class BarScene {
     this.graphics = graphics; this.scale = graphics.renderScale; this.goodSeconds = 0;
     this.applyResolution();
     this.environment.setQuality(graphics.shadows, FOG_SCALE[graphics.fog]);
+    this.applyCityQuality();
     this.app.autoRender = this.enabled && !graphics.fpsCap;
     this.app.renderNextFrame = true;
+  }
+  private applyCityQuality(): void {
+    const graphics = this.graphics;
+    if (graphics) this.city?.setQuality(graphics.city, CITY_FOG.end * FOG_SCALE[graphics.fog], graphics.shadows !== 'off');
   }
   getGraphics() { return { ...this.graphics, currentScale: this.scale, fps: this.fps, pixelRatio: this.app.graphicsDevice.maxPixelRatio }; }
   private applyResolution(): void {
@@ -1809,6 +1912,9 @@ export class BarScene {
 
   private update(dt: number): void {
     this.frameSeconds += dt;
+    // The engine stops counting at a tenth of a second: below 10 FPS the bike must still ride in real time.
+    const wall = performance.now(), realDt = dt < .1 ? dt : Math.min((wall - this.lastFrameAt) / 1000, .5);
+    this.lastFrameAt = wall;
     this.swingDoors();
     if (this.shouldDraw(dt)) this.frames++;
     dt = Math.min(dt, 0.1);
@@ -1822,8 +1928,10 @@ export class BarScene {
     this.frameId++;
     this.barPlayed.clear();
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
-    this.motos.update(dt);
+    this.callbacks.onFrame?.(realDt);
+    this.motos.update(dt, this.camera, this.app.scene.exposure);
     this.placeRiders();
+    this.placeThrown(dt);
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
     // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
@@ -1833,6 +1941,7 @@ export class BarScene {
     // The tap runs while the chopp pours (Prop_Jato in Magrão's clip).
     this.mapEffects?.update(this.elapsed,!!this.barAnimations?.pouring()||bartender?.skin?.clip==='Bartend');
     const player = this.actors.get(this.localId);
+    this.feelSpeed(this.enabled ? this.motos.ridden(this.localId) : undefined, dt);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
     if(television){
       // Far enough back for the screen to fill the view: 1.15 m from a TV, about 6 m from the stage screen.
@@ -1860,11 +1969,13 @@ export class BarScene {
       this.rig.idle();
     } else if (player && this.enabled) {
       const bike = this.motos.ridden(this.localId);
-      if (!!bike !== this.chasing) { this.chasing = !!bike; this.rig.ride(this.chasing); }
-      if (bike) this.rig.chase(bike.drawn.yaw, dt);
+      // Thrown off, the view stays behind the body until it is up: never inside it.
+      const riding = !!bike || player.actor.interactionState === 'thrown';
+      if (riding !== this.chasing) { this.chasing = riding; this.rig.ride(this.chasing); this.motoSwitches = 0; }
+      if (bike) { this.rig.chase(bike.drawn.yaw, dt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
       this.rig.follow(dt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
-        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed });
+        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? MOTO_XRAY : {}) });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
       this.camera.setPosition(18+Math.sin(this.elapsed*.035)*2,9,16);
@@ -1872,6 +1983,8 @@ export class BarScene {
       this.rig.idle();
     }
     this.showOwnHead(player);
+    const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();
+    this.city?.update(dt, focus.x, focus.z);
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
     this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
@@ -1902,6 +2015,37 @@ export class BarScene {
       if (id === this.localId) this.lastRotation = bike.drawn.yaw;
     }
   }
+  /**
+   * The bodies a crash threw, on top of the clip (Sit: only what the ragdoll does not move shows), and the way back into getting up; and
+   * someone lifting a fallen bike. After motos.update, since the bike's grips are where the hands go.
+   */
+  private placeThrown(dt: number): void {
+    const now = Date.now() + this.serverClockOffset;
+    for (const [id, avatar] of this.actors) {
+      const { skin, actor } = avatar;
+      if (!skin) continue;
+      if (actor.animation === 'moto-lift') {
+        const bike = this.motos.lifted(id);
+        if (bike) lifterPose(this.bodyRig(avatar, skin), { left: bike.rig.ponto('ponto_mao_E').getPosition(), right: bike.rig.ponto('ponto_mao_D').getPosition(), seat: bike.rig.ponto('ponto_piloto').getPosition() }, (now - (actor.animationStartedAt ?? now)) / MOTO.LIFT_MS, reach);
+        continue;
+      }
+      const start = this.ragdollStarts[id];
+      if (start && actor.animation === 'ragdoll') {
+        if (avatar.ragdoll?.startedAt !== start.startedAt) avatar.ragdoll = new RagdollPuppet(start, start.startedAt, now - start.startedAt, start.seated ? this.motos.nearest(start)?.drawn : undefined);
+        const rig = this.bodyRig(avatar, skin);
+        avatar.ragdoll.pose(dt, rig);
+        const [x, , z] = avatar.ragdoll.pelvis();
+        avatar.contact.setPosition(x, avatar.ragdoll.ground() + .012, z);
+        continue;
+      }
+      if (avatar.ragdoll && !avatar.ragdoll.fade(dt, this.bodyRig(avatar, skin))) avatar.ragdoll = undefined;
+    }
+  }
+  private bodyRig(avatar: Avatar, skin: SkinnedRig): RagdollRig {
+    const hip = skin.hip ??= (skin.model.findByName('hip') as pc.Entity | null) ?? undefined;
+    avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
+    return { root: avatar.root, hip: hip!, spine: avatar.spine, neck: skin.model.findByName('neck') as pc.Entity | null, ...skin.bones };
+  }
   private seat(avatar: Avatar, skin: SkinnedRig, bike: Bike): void {
     const hip = skin.hip ??= (skin.model.findByName('hip') as pc.Entity | null) ?? undefined;
     if (!hip) return;
@@ -1914,6 +2058,8 @@ export class BarScene {
     return this.stageState?.status==='playing'||this.stageSpots.some(spot=>!!spot.playerId&&LIVE_PHASES.has(musicianPhase(spot,now)?.phase??'fim'));
   }
 
+  /** Full screen holds the mouse on the canvas (mouse-capture.ts): there is no cursor, and no button needed to look around. */
+  private get mouseCaptured(): boolean { return document.pointerLockElement === this.canvas; }
   private inputHasFocus(): boolean {
     const active = document.activeElement;
     return active instanceof HTMLElement &&
@@ -1928,43 +2074,53 @@ export class BarScene {
     };
     listen(window, 'keydown', event => {
       if (!this.enabled || this.inputHasFocus()) return;
+      // On a bike Space is the brake, even with the toolbar button last clicked still focused.
+      if (event.code === 'Space' && this.chasing && document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
       // Let a focused interface button receive its native keyboard activation.
       if ((event.code === 'Enter' || event.code === 'Space') && document.activeElement?.tagName === 'BUTTON') return;
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code) || (event.code === 'Space' && this.chasing)) {
         event.preventDefault(); this.keys.add(event.code);
       }
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
+      // On a bike, the switches on the bars take these keys over.
+      if (this.chasing && this.motos.ridden(this.localId) && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
       // F lights one and keeps smoking until F again; Shift+F smokes a whole cigarette and steps on the butt.
       if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.(event.shiftKey ? 'cigarette' : 'smoke'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
-      if (!event.repeat && event.code === 'KeyX') { event.preventDefault(); this.callbacks.onKick?.(); }
       if (!event.repeat && event.code === 'KeyQ') { event.preventDefault(); this.callbacks.onCameraChange?.(this.rig.cycle(),this.rig.reach); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }
+      if (!event.repeat && this.callbacks.onSkillKey?.(event.code)) event.preventDefault();
     });
     listen(window, 'keyup', event => this.keys.delete(event.code));
     listen(window, 'blur', () => { this.keys.clear(); this.dragging = false; });
     listen(this.canvas, 'pointerdown', event => {
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (event.button !== 0 && event.button !== 2)) return;
+      this.press = { x: event.clientX, y: event.clientY, at: performance.now(), button: event.button };
+      // A locked pointer cannot be captured, and it looks around anyway.
+      if (this.mouseCaptured) return;
       this.dragging = true;
-      this.press = event.button === 0 ? { x: event.clientX, y: event.clientY, at: performance.now() } : undefined;
       this.canvas.setPointerCapture(event.pointerId);
     });
     listen(this.canvas, 'pointermove', event => {
-      if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || !this.dragging) return;
+      if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (!this.dragging&&!this.mouseCaptured)) return;
       if(this.watchingTv||this.watchingStage){this.tvYaw-=event.movementX*.006;this.tvPitch+=event.movementY*.004;return;}
       this.rig.drag(event.movementX, event.movementY);
     });
     listen(window, 'pointerup', event => {
       this.dragging = false;
       const press = this.press; this.press = undefined;
-      if (!press || !this.enabled || this.watchingTv || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6 || performance.now() - press.at > 450) return;
-      const rect = this.canvas.getBoundingClientRect(), id = this.pickPlayer(event.clientX - rect.left, event.clientY - rect.top);
-      if (id) this.callbacks.onPlayerClick?.(id);
+      if (!press || press.button !== 2 || !this.enabled || this.watchingTv || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6 || performance.now() - press.at > 450) return;
+      const rect = this.canvas.getBoundingClientRect();
+      // With no cursor on the screen, a click is at the middle of the view.
+      const x = this.mouseCaptured ? rect.width / 2 : event.clientX - rect.left, y = this.mouseCaptured ? rect.height / 2 : event.clientY - rect.top;
+      const player = this.pickPlayer(x, y, true), moto = this.pickMoto(x, y);
+      if (player || moto) this.callbacks.onWorldMenu?.(rect.left + x, rect.top + y, { ...(player ? { player } : {}), ...(moto ? { moto } : {}) });
     });
     listen(this.canvas, 'pointercancel', () => { this.dragging = false; });
-    listen(this.canvas, 'contextmenu', event => event.preventDefault());
+    // The right button is the game's, over the view and over the HUD; a released drag can land on either. Text boxes keep paste and copy.
+    listen(window, 'contextmenu', event => { if (!(event.target instanceof Element && event.target.closest('input,textarea,[contenteditable="true"]'))) event.preventDefault(); });
     listen(this.canvas, 'wheel', event => {
       if (!this.enabled) return;
       event.preventDefault();

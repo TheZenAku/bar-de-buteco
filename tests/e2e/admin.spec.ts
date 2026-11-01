@@ -53,7 +53,7 @@ test('administração ingame: moedas, loja sincronizada, delegação, expulsão 
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.setViewportSize({width:960,height:640});
     await other.getByRole('button',{name:'Confirmar compra'}).click();await rafael.click();
-    await expect(other.locator('#kick-button')).toBeVisible();await other.keyboard.press('c');
+    await expect(other.locator('#skill-button')).toBeVisible();await other.keyboard.press('c');
     await expect(other.locator('#wallet-balance')).toHaveText('500 moedas');
     await page.getByRole('button',{name:'Atualizar painel'}).click();await expect(page.locator('.admin-current-balance b')).toHaveText('500 moedas');
     await adjust('remove',200);await expect(other.locator('#wallet-balance')).toHaveText('300 moedas',{timeout:20000});

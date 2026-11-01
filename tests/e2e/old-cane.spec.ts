@@ -17,7 +17,7 @@ test('chat toggles only the cane and gait, replicates to other players and works
   const id=await account(page,'bengala');
   const animation=(p:Page)=>p.evaluate(id=>(window as any).barDebug.animations().find((a:any)=>a.id===id),id);
   const appearance=(p:Page)=>p.evaluate(id=>{const p=(window as any).barDebug.snapshot().world.players[id];return {skin:p.skin,oldWalk:p.oldWalk};},id);
-  const command=async()=>{await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form').getByRole('button').click();};
+  const command=async()=>{await page.keyboard.press('t');await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form').getByRole('button').click();};
   await expect.poll(async()=>(await animation(page))?.cane?.enabled).toBe(false);
   const original=await appearance(page);
   const context=await browser.newContext({viewport:{width:640,height:480}}),other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));
@@ -36,11 +36,11 @@ test('chat toggles only the cane and gait, replicates to other players and works
       await page.screenshot({path:previewPath('old-cane.png')});
     }finally{await page.keyboard.up('d');await page.keyboard.up('Shift');}
     await expect.poll(async()=>(await animation(page))?.clip).toBe('OldCaneHold');
-    for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Read']){
+    for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Gabriel','Flavio Hipotético','Read']){
       await page.keyboard.press('c');const card=page.locator('.skin-card').filter({has:page.locator('b',{hasText:skin})});await card.click();
       // Nathan is free and already worn; the others are bought first.
       if(skin!=='Nathan'){await page.getByRole('button',{name:'Confirmar compra'}).click();await card.click();}
-      await expect.poll(async()=>(await animation(other))?.skin).toBe(skin==='Gilmar'?'gilmar-gordo':skin.toLowerCase());
+      await expect.poll(async()=>(await animation(other))?.skin).toBe(({Gilmar:'gilmar-gordo','Flavio Hipotético':'flavio-hipotetico'} as Record<string,string>)[skin]??skin.toLowerCase());
       await expect.poll(async()=>(await animation(other))?.cane?.enabled).toBe(true);
       await expect.poll(async()=>(await animation(other))?.clip).toBe('OldCaneHold');
     }

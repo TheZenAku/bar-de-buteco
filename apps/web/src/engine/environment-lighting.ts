@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
-import {WORLD} from '@bar/shared';
-import {daylightAt,EDGE_FOG_WIDTH,type Rgb} from './day-night';
+import {CITY_FAR_CLIP,cityFog} from '@bar/shared';
+import {daylightAt,type Rgb} from './day-night';
 
 interface Lamp {entity:pc.Entity;base:number;outside:boolean;street:boolean;enabled:boolean;}
 interface Glow {material:pc.StandardMaterial;base:number;outside:boolean;}
@@ -10,13 +10,12 @@ const SIGN_MATERIALS=new Set(['Letreiro_Highland','Placa_Highland','Neon_Magenta
 // The magenta halo behind the corner sign, on the bricks.
 const SIGN_LIGHT='Luz_Letreiro',SIGN_LIGHT_INTENSITY=2.2,SIGN_LIGHT_RANGE=5;
 /**
- * What never casts a shadow: the far backdrop (Fundo_Distante: a sky panorama dome some 1.5 km across, distant buildings,
- * hills and ground), which otherwise covers the whole map in the sun's shadow map and leaves everything outdoors in shade;
- * the painted contact shadows under the furniture (Sombra_Contato); the bulbs and glowing signs the lamps shine from; and
- * see-through materials (glass), which let the light through.
+ * What never casts a shadow: the painted contact shadows under the furniture (Sombra_Contato); the bulbs and glowing signs
+ * the lamps shine from; and see-through materials (glass), which let the light through.
  */
-const NO_SHADOW_NODES=new Set(['Fundo_Distante']);
-const NO_SHADOW_MATERIALS=new Set(['Sombra_Contato','Lampada','Ceu_Panorama',...SIGN_MATERIALS]);
+const NO_SHADOW_MATERIALS=new Set(['Sombra_Contato','Lampada',...SIGN_MATERIALS]);
+/** The city's lamps (Luz_* with luz_noturna, cidade_setores): how bright at night, and how far (their export says 30 m at most). */
+const CITY_LIGHT_INTENSITY=2.4,CITY_LIGHT_RANGE=30;
 /** Map lights driven by their own prop: the jukebox and the stage colour their lights (jukebox-lights.ts, stage-lights.ts). */
 const PROP_LIGHT=/^(Jukebox_FX_|Luz_Palco_Cor$)/;
 const streetFixtures=[
@@ -66,6 +65,12 @@ export class EnvironmentLighting {
   private hiddenCasters:pc.MeshInstance[]=[];
   private heldLights:pc.LightComponent[]=[];
   private refreshAll=false;
+  private cityLights=new Set<pc.LightComponent>();
+  private cityLightsOn=true;
+  /** One copy of the city's glowing lamp material, shared by every sector: sectors come and go, the glow stays in step. */
+  private cityLampMaterial?:pc.StandardMaterial;
+  private panorama?:pc.StandardMaterial;
+  private panoramaTint='';
   constructor(private app:pc.Application,private camera:pc.Entity){
     app.scene.fog.type=pc.FOG_LINEAR;
     this.moon=new pc.Entity('Moonlight');
@@ -77,12 +82,13 @@ export class EnvironmentLighting {
     this.skyMaterial.cull=pc.CULLFACE_FRONT;this.skyMaterial.depthWrite=false;
     this.sky=new pc.Entity('Day-night sky');
     this.sky.addComponent('render',{type:'sphere',material:this.skyMaterial,castShadows:false,receiveShadows:false,layers:[pc.LAYERID_SKYBOX]});
-    this.sky.setLocalScale(180,180,180);app.root.addChild(this.sky);
-    // Visual continuation below the original street; no colliders or walkable surfaces added.
+    // Behind everything, just inside the far plane: it is drawn after the opaque world, over whatever lies beyond it.
+    this.sky.setLocalScale(CITY_FAR_CLIP*1.9,CITY_FAR_CLIP*1.9,CITY_FAR_CLIP*1.9);app.root.addChild(this.sky);
+    // Under the city and its far ground (y -0.06), for the moments before they load. No colliders or walkable surfaces.
     this.skirtMaterial=new pc.StandardMaterial();this.skirtMaterial.useLighting=false;this.skirtMaterial.diffuse.set(0,0,0);this.skirtMaterial.useFog=false;
     this.skirt=new pc.Entity('Fog horizon ground');
     this.skirt.addComponent('render',{type:'plane',material:this.skirtMaterial,castShadows:false,receiveShadows:false});
-    this.skirt.setPosition(16,-.06,-13);this.skirt.setLocalScale(800,1,800);app.root.addChild(this.skirt);
+    this.skirt.setPosition(0,-.12,0);this.skirt.setLocalScale(3400,1,3400);app.root.addChild(this.skirt);
   }
   configureMap(map:pc.Entity):void {
     const lights=(map.findComponents('light') as pc.LightComponent[]).filter(light=>!PROP_LIGHT.test(light.entity.name));
@@ -120,20 +126,7 @@ export class EnvironmentLighting {
       this.shadowLights.push(entity.light!);
       this.app.root.addChild(entity);this.lamps.push({entity,base:3.1,outside:true,street:true,enabled:false});
     }
-    const nativeFog=pc.ShaderChunks.get(this.app.graphicsDevice,pc.SHADERLANGUAGE_GLSL).get('fogPS') as string;
-    const edgeFog=`
-float botecoEdgeVisibility(){
- #ifdef VERTEXSHADER
- return 1.0;
- #else
- vec2 edge=min(vPositionW.xz-vec2(${WORLD.minX.toFixed(2)},${WORLD.minZ.toFixed(2)}),vec2(${WORLD.maxX.toFixed(2)},${WORLD.maxZ.toFixed(2)})-vPositionW.xz);
- return smoothstep(0.0,${EDGE_FOG_WIDTH.toFixed(1)},min(edge.x,edge.y));
- #endif
-}
-`+nativeFog.replace('return clamp(fogFactor, 0.0, 1.0);','return clamp(fogFactor, 0.0, 1.0) * botecoEdgeVisibility();');
-    const patched=new Set<pc.Material>();
     for(const render of map.findComponents('render') as pc.RenderComponent[]){
-      if(NO_SHADOW_NODES.has(render.entity.name)){render.castShadows=false;render.receiveShadows=false;}
       for(const instance of render.meshInstances){
         const shading=instance.material;
         if(shading&&(NO_SHADOW_MATERIALS.has(shading.name)||(shading instanceof pc.StandardMaterial&&shading.blendType!==pc.BLEND_NONE)))instance.castShadow=false;
@@ -149,9 +142,6 @@ float botecoEdgeVisibility(){
       if(material.name==='Lampada'){
         const clone=material.clone();this.clones.push(clone);instance.material=material=clone;
         this.glows.push({material:clone,base:clone.emissiveIntensity,outside:/Exterior/.test(render.entity.name)});
-      }
-      if(!patched.has(material)){
-        patched.add(material);material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('fogPS',edgeFog);material.shaderChunksVersion='2.23';material.update();
       }
     }
     // The map's lamps exist only now: the chosen shadow quality applies to them too.
@@ -174,7 +164,8 @@ float botecoEdgeVisibility(){
     const ambient=this.app.scene.ambientLight;
     ambient.set(state.ambient[0]*(1-this.party*.08),state.ambient[1]*(1-this.party*.16),state.ambient[2]);
     this.app.scene.exposure=state.exposure;
-    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=state.fogStart*this.fogScale;this.app.scene.fog.end=state.fogEnd*this.fogScale;
+    const fog=cityFog(state.night);
+    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=fog.start*this.fogScale;this.app.scene.fog.end=fog.end*this.fogScale;
     this.camera.camera!.clearColor.set(...state.horizon,1);
     this.skirtMaterial.emissive.set(...state.horizon);this.skirtMaterial.update();
     this.sky.setPosition(this.camera.getPosition());
@@ -198,6 +189,13 @@ float botecoEdgeVisibility(){
     for(const sign of this.signs){
       sign.material.emissiveIntensity=Math.min(sign.strength,1/sign.peak)*this.electrical/state.exposure;
       sign.material.update();
+    }
+    const cityLight=CITY_LIGHT_INTENSITY*nowNight*this.electrical;
+    for(const light of this.cityLights){light.intensity=cityLight;light.enabled=this.cityLightsOn&&cityLight>.015;}
+    // The panorama is painted in daylight and draws over the sky near the horizon: it takes the colour of the hour.
+    if(this.panorama){
+      const day=1-nowNight,tint=state.horizon.map(channel=>Math.min(1,channel*1.15)*nowNight+day) as Rgb,key=tint.map(channel=>channel.toFixed(2)).join();
+      if(key!==this.panoramaTint){this.panoramaTint=key;this.panorama.emissive.set(...tint);this.panorama.update();}
     }
     if(this.signLight){
       this.signLight.intensity=SIGN_LIGHT_INTENSITY*nowNight*this.electrical;this.signLight.enabled=this.signLight.intensity>.015;
@@ -236,6 +234,24 @@ float botecoEdgeVisibility(){
       if(light?.enabled&&light.castShadows&&light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME){light.shadowUpdateMode=pc.SHADOWUPDATE_NONE;this.heldLights.push(light);}
     }
   }
+  /** A lamp of a city sector that just loaded: no shadows, on at night, as long as its sector stays. */
+  addCityLight(light:pc.LightComponent):void {
+    light.type='omni';light.castShadows=false;light.falloffMode=pc.LIGHTFALLOFF_LINEAR;light.range=Math.min(CITY_LIGHT_RANGE,light.range);
+    light.intensity=0;light.enabled=false;this.cityLights.add(light);
+  }
+  removeCityLight(light:pc.LightComponent):void {this.cityLights.delete(light);}
+  setCityLights(on:boolean):void {this.cityLightsOn=on;}
+  /** The material for a sector's glowing lamps (`Lampada`): they follow the night like the rest of the street's. */
+  cityLamp(source:pc.StandardMaterial):pc.StandardMaterial {
+    if(!this.cityLampMaterial){
+      const clone=this.cityLampMaterial=source.clone();this.clones.push(clone);
+      this.glows.push({material:clone,base:clone.emissiveIntensity,outside:true});
+    }
+    return this.cityLampMaterial;
+  }
+  /** The city's far ground has arrived: nothing is left for the fallback plane to cover. */
+  hideGroundFallback():void {this.skirt.enabled=false;}
+  setPanorama(material:pc.StandardMaterial):void {this.panorama=material;this.panoramaTint='';}
   /** What moves in the scene (see redrawLampShadows). */
   setDynamicCasters(casters:()=>Iterable<pc.MeshInstance>):void {this.dynamicCasters=casters;}
   /** Static things were added or removed (the props dressing the bar): every lamp redraws its shadows once. */
@@ -263,7 +279,8 @@ float botecoEdgeVisibility(){
   telemetry(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;
     return {...this.sampled,electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
-      lamps:this.lamps.map(lamp=>({name:lamp.entity.name,position:lamp.entity.getPosition().toArray(),outside:lamp.outside,street:lamp.street,enabled:lamp.entity.light!.enabled,intensity:lamp.entity.light!.intensity,shadows:lamp.entity.light!.castShadows,direction:lamp.entity.up.clone().mulScalar(-1).toArray()})),edgeFogWidth:EDGE_FOG_WIDTH,
+      lamps:this.lamps.map(lamp=>({name:lamp.entity.name,position:lamp.entity.getPosition().toArray(),outside:lamp.outside,street:lamp.street,enabled:lamp.entity.light!.enabled,intensity:lamp.entity.light!.intensity,shadows:lamp.entity.light!.castShadows,direction:lamp.entity.up.clone().mulScalar(-1).toArray()})),
+      cityLights:[...this.cityLights].map(light=>({name:light.entity.parent?.name??'',enabled:light.enabled,intensity:+light.intensity.toFixed(3),shadows:light.castShadows})),
       facade:{materials:this.signs.map(sign=>({name:sign.material.name,emissive:sign.material.emissive.toString(false),intensity:+sign.material.emissiveIntensity.toFixed(3)})),
         light:this.signLight?{enabled:this.signLight.enabled,intensity:+this.signLight.intensity.toFixed(3),type:this.signLight.type,color:this.signLight.color.toString(false)}:undefined},
       realtimeLocalShadows:this.shadowLights.filter(light=>light.enabled&&light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME).length};
@@ -271,6 +288,6 @@ float botecoEdgeVisibility(){
   destroy():void {
     for(const lamp of this.lamps)if(lamp.street)lamp.entity.destroy();
     this.moon.destroy();this.sky.destroy();this.skirt.destroy();this.skyMaterial.destroy();this.skirtMaterial.destroy();
-    this.clones.forEach(material=>material.destroy());this.lamps=[];this.glows=[];this.signs=[];this.signLight=undefined;
+    this.clones.forEach(material=>material.destroy());this.lamps=[];this.glows=[];this.signs=[];this.signLight=undefined;this.cityLights.clear();
   }
 }

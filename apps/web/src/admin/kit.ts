@@ -10,7 +10,7 @@ export interface AdminContext {
   /** The world's last admin.world snapshot (null until it arrives), and how to ask for a new one. */
   world:()=>WorldSnapshot|null;
   requestWorld:()=>void;
-  /** A command to the world (admin.job, admin.table, admin.media, admin.bots). */
+  /** A command to the world (admin.job, admin.table, admin.media, admin.bots, admin.moto.spawn, admin.moto.despawn). */
   send:(type:string,payload?:unknown)=>void;
   /** Opens another section, e.g. a player's file from the log. */
   go:(section:SectionId,params?:Record<string,string>)=>void;
@@ -21,7 +21,7 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'server';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'badges'|'server';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 
@@ -34,6 +34,7 @@ export interface WorldSnapshot {
   waiter:{phase:string;current?:WorldOrder;queue:WorldOrder[]};counterQueue:string[];
   jobs:Array<{id:string;name:string;slots:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number;orders?:Array<{customer:string;table:number;picked:boolean}>}>;pay:number;enabled:boolean;tasks?:number;paid?:number}>;
   dirtyTables?:number[];
+  motos?:Array<{id:string;x:number;y:number;z:number;speed:number;phase?:string;riderId:string;rider:string}>;
   media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number;title:string;by:string;live:boolean;queue:Array<{key:string;videoId:string;title:string;byName:string}>}>;
   bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
     status?:{walking:number;doing:Array<[string,number]>;rttP95?:number;loopP95?:number;inputs?:number;refusals?:Array<[string,number]>}};

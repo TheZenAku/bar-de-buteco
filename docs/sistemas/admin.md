@@ -19,6 +19,8 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 | Preços | Todos os preços e pagamentos do jogo numa tabela editável |
 | Logs | Uma linha do tempo de tudo o que ficou registrado, com filtros |
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
+| Veículos | As motos de entrega do mapa: spawnar perto de você e despawnar ([moto.md](moto.md#spawnar-e-despawnar)) |
+| Emblemas | O catálogo de emblemas: criar, editar, apagar, conceder e retirar, com raridade, ícone da lista ou PNG enviado ([perfil.md](perfil.md#emblemas)). Os 104 emblemas ganhos jogando aparecem aqui com a quantidade que os dá ([conquistas.md](conquistas.md#na-administração)) |
 | Servidor | Processos da API e do mundo, memória e disco da máquina, banco de dados e filas |
 
 O menu mostra quantas denúncias estão abertas. Nomes de jogadores em qualquer categoria (logs, denúncias, ranking, mundo) abrem a ficha do jogador.
@@ -122,6 +124,10 @@ Filtre por **texto** (nome, usuário, e-mail ou o texto do registro), **período
 
 O mundo guarda os eventos em uma fila e envia em lotes a cada rodada de manutenção (`POST /api/internal/logs`, segredo interno); se a API não responder, tenta de novo na próxima. Bots de teste e eventos ruidosos (portas, novas tentativas) ficam fora. O log guarda os ids reais para mostrar nomes (a saída de texto do mundo continua com pseudônimos). Linhas com mais de 90 dias são apagadas aos poucos.
 
+## Veículos
+
+A coluna Situação mostra quem pilota cada moto e se ela está estacionada, desgovernada, caída ou sendo levantada ([batidas](moto.md#batidas)). O mapa não tem moto até alguém criar uma aqui. **Spawnar moto** (`admin.moto.spawn`) põe uma na rua livre mais perto de você; **Despawnar** e **Despawnar todas** (`admin.moto.despawn`) tiram do mapa, e quem estiver pilotando desce na hora. A sala confere o papel `admin` em cada comando e registra `admin_moto_spawn` e `admin_moto_despawn` no log. Detalhes em [moto.md](moto.md#spawnar-e-despawnar).
+
 ## Servidor
 
 Atualiza a cada 15 s: tempo no ar, requisições, erros 5xx e tempo de resposta p95 da API; memória e disco da máquina (com barras que ficam amarelas acima de 75% e vermelhas acima de 90%), processadores e carga; o processo do mundo (memória, tick p95, última conversa com a API, fila de resultados gravável, preços sincronizados, eventos aguardando o log); o banco de dados (motor, versão, tamanho, conexões no PostgreSQL e cada tabela com registros e tamanho); comandos para o mundo pendentes e com falha e o tamanho do log.
@@ -140,6 +146,7 @@ Rotas administrativas (sessão autenticada, e-mail confirmado e papel `admin`; a
 | `GET /api/admin/logs` | Log (`categories`, `player`, `q`, `since`, `before`, `limit`) |
 | `GET /api/admin/economy?days=7\|30\|90` | Economia |
 | `GET` e `POST /api/admin/prices` | Preços e histórico de mudanças |
+| `GET /api/admin/badges` e demais rotas de emblemas | Emblemas ([perfil.md](perfil.md#api)) |
 | `GET /api/admin/server` | Servidor |
 
 Públicas e internas: `GET /api/prices` (tabela efetiva, sem login), `GET /api/internal/prices` e `POST /api/internal/logs` (segredo interno). A migração `008_admin_console.sql` cria `economy_prices` e `game_logs`, acrescenta a resolução às denúncias e índices por data; no desenvolvimento, `npm run dev` aplica (ou `npm run migrate -w @bar/api`).

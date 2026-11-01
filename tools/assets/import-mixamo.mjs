@@ -2,7 +2,8 @@
 // becomes apps/web/public/models/<id>.glb with canonical joint names, the mesh simplified to the game budget (texture
 // seams kept) and the textures embedded; then the Idle/Walk/Pose base clips are added from Nathan.
 // The mesh and its weights come from, in this order:
-//  - the download itself, when it is "FBX Binary, With Skin" (Rafael);
+//  - the download itself, when it is "FBX Binary, With Skin" (Rafael, Gabriel);
+//  - glb: a GLB already rigged with Mixamo names, with its own weights, normals and texture (Flavio Hipotético);
 //  - rig: the character's previous AccuRig GLB, posed into the Mixamo T-pose; its weights move to the matching bones;
 //  - mesh: the unrigged source, with automatic weights (lib/auto-weights.mjs).
 // usage: node tools/assets/import-mixamo.mjs [skin...]  (default: every skin)
@@ -10,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {Box3,BufferAttribute,BufferGeometry,Group,Matrix4,MeshStandardMaterial,Quaternion,Skeleton,SkinnedMesh,Texture,TextureLoader,Vector3} from 'three';
+import {Bone,Box3,BufferAttribute,BufferGeometry,Group,Matrix4,MeshStandardMaterial,Quaternion,Skeleton,SkinnedMesh,Texture,TextureLoader,Vector3} from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
@@ -24,10 +25,13 @@ import {mixamoBoneName} from './lib/mixamo-names.mjs';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const mixamo=path.join(root,'assets-bar/mixamo'),download=path.join(mixamo,'download'),models=path.join(root,'apps/web/public/models');
 // textures: Meshy PNGs (<prefix>.png, _normal, _roughness, _metallic); a rig brings its own embedded images.
-// normals: the unrigged source with the same vertices; Mixamo drops normals from its download.
+// texture: one colour image, embedded as it came (Tripo delivers no other maps).
+// normals: the unrigged source with the same vertices, when Mixamo dropped the normals from its download.
 const skins={
-  rafael:{name:'Rafael',fbx:'rafael/rafael-mixamo.fbx',normals:'rafael/rafael.fbx',textures:'rafael/rafael_texture',height:1.75},
+  rafael:{name:'Rafael',fbx:'../../skins/Rafael/rafael-rigged-corrigido.fbx',texture:'../../skins/Rafael/rafael-rigged-corrigido.fbm/tripo_rgb_8daec337-10ef-4108-a10a-28d56e876aac.png',height:1.75},
   'gilmar-gordo':{name:'Gilmar',fbx:'gilmar-gordo/gilmar-gordo-mixamo.fbx',mesh:'gilmar-gordo/gilmar-gordo.fbx',textures:'gilmar-gordo/gilmar-gordo_texture',height:1.8},
+  gabriel:{name:'Gabriel',fbx:'../../skins/Gabriel/Double Dagger Stab.fbx',texture:'../../skins/Gabriel/tripo_convert_7f75c99f-503e-496d-8047-73c07d69ad29.fbm/tripo_image_7f75c99f-503e-496d-8047-73c07d69ad29_0_0.jpg',height:1.8},
+  'flavio-hipotetico':{name:'Flavio Hipotético',glb:'../../skins/Flavio Hipotético/Flavio Hipotetico.glb',height:1.8},
   leandro:{name:'Leandro',fbx:'outros/leandro-mixamo.fbx',rig:'accurig/leandro.glb',height:1.86},
   read:{name:'Read',fbx:'outros/read-mixamo.fbx',rig:'accurig/read.glb',height:1.86},
   magrao:{name:'Magrao',fbx:'outros/magrao-mixamo.fbx',rig:'accurig/magrao.glb',height:1.86},
@@ -48,9 +52,9 @@ try{
   const page=await browser.newPage();
   for(const [id,skin] of Object.entries(skins)){
     if(wanted.length&&!wanted.includes(id))continue;
-    const file=path.join(download,skin.fbx);
-    if(!fs.existsSync(file))throw new Error(`${id}: assets-bar/mixamo/download/${skin.fbx} not found`);
-    const fbx=load(file),skinned=[];
+    const source=skin.glb??skin.fbx,file=path.join(download,source);
+    if(!fs.existsSync(file))throw new Error(`${id}: assets-bar/mixamo/download/${source} not found`);
+    const fbx=skin.glb?loadGlb(file):load(file),skinned=[];
     let bones=0;
     fbx.traverse(node=>{
       if(node.isSkinnedMesh)skinned.push(node);
@@ -60,26 +64,60 @@ try{
     if(missing.length)throw new Error(`${id}: Mixamo skeleton without ${missing.join(', ')}`);
     fbx.updateMatrixWorld(true);
     let meshes,textures,weights;
-    if(skinned.length){meshes=fromDownload(id,skin,skinned);weights='mixamo';}
+    if(skin.glb){meshes=skinned;weights='mixamo';textures=embeddedImages(file);}
+    else if(skinned.length){meshes=fromDownload(id,skin,skinned);weights='mixamo';}
     else if(skin.rig){meshes=fromRig(skin,fbx);weights='accurig';textures=embeddedTextures(path.join(mixamo,skin.rig));}
     else if(skin.mesh){meshes=fromMesh(skin,fbx);weights='automatic';}
     else throw new Error(`${id}: ${skin.fbx} has only the skeleton and no mesh source is configured`);
+    if(skin.texture)textures={color:{bytes:fs.readFileSync(path.join(download,skin.texture)),mime:/\.png$/i.test(skin.texture)?'image/png':'image/jpeg'}};
     textures??=await bakeTextures(page,path.join(download,skin.textures));
-    await importSkin(id,skin,fbx,meshes,textures,{bones,weights});
+    await importSkin(id,skin,fbx,meshes,textures,{bones,weights,source});
   }
 }finally{await browser.close();}
 
 function load(file){const bytes=fs.readFileSync(file);return new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length),'');}
+
+/** A rigged GLB in the shape the FBX loader gives: bones and skinned meshes under one root, the colon out of the bone names. */
+function loadGlb(file){
+  const glb=readGlb(file),{json}=glb,definition=json.skins[0],root=new Group();
+  const nodes=json.nodes.map((n,i)=>{
+    const node=definition.joints.includes(i)?new Bone():new Group();node.name=(n.name??'').replace(':','');
+    node.position.fromArray(n.translation??[0,0,0]);node.quaternion.fromArray(n.rotation??[0,0,0,1]);node.scale.fromArray(n.scale??[1,1,1]);
+    return node;
+  });
+  json.nodes.forEach((n,i)=>n.children?.forEach(c=>{if(json.nodes[c].mesh===undefined)nodes[i].add(nodes[c]);}));
+  for(const i of json.scenes[json.scene??0].nodes)root.add(nodes[i]);
+  root.updateMatrixWorld(true);
+  const inverse=read(glb,definition.inverseBindMatrices);
+  const skeleton=new Skeleton(definition.joints.map(i=>nodes[i]),definition.joints.map((_,k)=>new Matrix4().fromArray(inverse,k*16)));
+  // Skinning ignores the mesh's own node, so the bind pose is all that places the vertices.
+  for(const n of json.nodes){
+    if(n.mesh===undefined)continue;
+    for(const primitive of json.meshes[n.mesh].primitives){
+      const {POSITION,NORMAL,TEXCOORD_0,JOINTS_0,WEIGHTS_0}=primitive.attributes,geometry=new BufferGeometry();
+      geometry.setAttribute('position',new BufferAttribute(Float32Array.from(read(glb,POSITION)),3));geometry.setAttribute('normal',new BufferAttribute(Float32Array.from(read(glb,NORMAL)),3));
+      geometry.setAttribute('uv',new BufferAttribute(Float32Array.from(read(glb,TEXCOORD_0)),2));
+      geometry.setAttribute('skinIndex',new BufferAttribute(Uint16Array.from(read(glb,JOINTS_0)),4));geometry.setAttribute('skinWeight',new BufferAttribute(Float32Array.from(read(glb,WEIGHTS_0)),4));
+      geometry.setIndex(new BufferAttribute(Uint32Array.from(read(glb,primitive.indices)),1));
+      const mesh=new SkinnedMesh(geometry,new MeshStandardMaterial());root.add(mesh);mesh.updateMatrixWorld(true);mesh.bind(skeleton,mesh.matrixWorld);
+    }
+  }
+  return root;
+}
 
 /** The download's own skinned meshes: restore normals and convert the UVs. */
 function fromDownload(id,skin,meshes){
   const normals=skin.normals&&fs.existsSync(path.join(download,skin.normals))?load(path.join(download,skin.normals)):undefined;
   for(const mesh of meshes){
     const geometry=mesh.geometry;
-    for(const name of Object.keys(geometry.attributes))if(!['position','uv','skinIndex','skinWeight'].includes(name))geometry.deleteAttribute(name);
+    for(const name of Object.keys(geometry.attributes))if(!['position','uv','skinIndex','skinWeight',...(skin.normals?[]:['normal'])].includes(name))geometry.deleteAttribute(name);
     copyNormals(id,geometry,normals);
     // FBX textures use bottom-left UVs; glTF images use top-left UVs.
     const uv=geometry.attributes.uv;for(let i=0;i<uv.count;i++)uv.setY(i,1-uv.getY(i));
+    // Tripo stores its mesh Z-up under a rotated node: upright in the file too and with no transform of its own, like every other
+    // skin. Skinning ignores that node, but the game reads the body's height and the bones' bind pose through it (mixamo-retarget.ts).
+    geometry.applyMatrix4(mesh.bindMatrix);mesh.bindMatrix.identity();
+    mesh.position.set(0,0,0);mesh.quaternion.identity();mesh.scale.set(1,1,1);
   }
   return meshes;
 }
@@ -206,7 +244,7 @@ function read({json,bin},index){
   return out;
 }
 
-async function importSkin(id,skin,fbx,meshes,textures,{bones,weights}){
+async function importSkin(id,skin,fbx,meshes,textures,{bones,weights,source}){
   const total=meshes.reduce((sum,mesh)=>sum+triangles(mesh.geometry),0);
   let before=0,after=0,worst=0;
   for(const mesh of meshes){
@@ -233,14 +271,15 @@ async function importSkin(id,skin,fbx,meshes,textures,{bones,weights}){
     const view=gltf.bufferViews.push({buffer:0,byteOffset:offset,byteLength:bytes.length})-1;chunks.push(bytes);offset+=bytes.length;
     return gltf.textures.push({source:gltf.images.push({bufferView:view,mimeType:mime,name:`${id}-${name}`})-1,sampler:0})-1;
   };
-  const color=embed('color',textures.color),normal=embed('normal',textures.normal);
+  const color=embed('color',textures.color),normal=textures.normal&&embed('normal',textures.normal);
   const metallicRoughness=textures.metallicRoughness&&embed('metallicRoughness',textures.metallicRoughness);
   for(const material of gltf.materials){
-    material.pbrMetallicRoughness.baseColorTexture={index:color};material.normalTexture={index:normal};
+    material.pbrMetallicRoughness.baseColorTexture={index:color};
+    if(normal!==undefined)material.normalTexture={index:normal};
     if(metallicRoughness!==undefined)material.pbrMetallicRoughness.metallicRoughnessTexture={index:metallicRoughness};
   }
   gltf.asset.generator='B.A.R. Mixamo skin importer';
-  gltf.asset.extras={source:`assets-bar/mixamo/download/${skin.fbx}`,height:skin.height,rig:'Mixamo',weights,boneNames:'canonical aliases; sourceBone stored on joints'};
+  gltf.asset.extras={source:`assets-bar/mixamo/download/${source}`,height:skin.height,rig:'Mixamo',weights,boneNames:'canonical aliases; sourceBone stored on joints'};
   const output=path.join(models,`${id}.glb`);
   writeGlb(output,gltf,Buffer.concat(chunks));
   const adapted=retargetBase(readGlb(output),reference);
@@ -305,14 +344,18 @@ function smoothNormals(geometry){
   geometry.setAttribute('normal',new BufferAttribute(normals,3));
 }
 
-/** The images embedded in a previous skin. */
-function embeddedTextures(file){
+/** The images embedded in a GLB. */
+function embeddedImages(file){
   const {json,bin}=readGlb(file),material=json.materials[0];
   const image=texture=>{if(!texture)return;const source=json.images[json.textures[texture.index].source],view=json.bufferViews[source.bufferView];
     return {bytes:Buffer.from(bin.subarray(view.byteOffset??0,(view.byteOffset??0)+view.byteLength)),mime:source.mimeType};};
-  const color=image(material.pbrMetallicRoughness?.baseColorTexture),normal=image(material.normalTexture);
-  if(!color||!normal)throw new Error(`${file} has no base colour and normal textures to keep`);
-  return {color,normal,metallicRoughness:image(material.pbrMetallicRoughness?.metallicRoughnessTexture)};
+  return {color:image(material.pbrMetallicRoughness?.baseColorTexture),normal:image(material.normalTexture),metallicRoughness:image(material.pbrMetallicRoughness?.metallicRoughnessTexture)};
+}
+/** The images of a previous skin, which must keep both colour and normal. */
+function embeddedTextures(file){
+  const images=embeddedImages(file);
+  if(!images.color||!images.normal)throw new Error(`${file} has no base colour and normal textures to keep`);
+  return images;
 }
 
 /** Meshy PNGs: base colour and normal as 2048 JPEG; glTF metallic-roughness (G roughness, B metallic) as 512 PNG. */

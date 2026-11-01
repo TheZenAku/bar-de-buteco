@@ -401,6 +401,9 @@ button.inventory-slot:hover{background:var(--secondary)}
 .comanda__eyebrow{font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--comanda)}
 .comanda__title{margin-top:2px;font-size:15px;font-weight:600;line-height:1.25;text-transform:uppercase;letter-spacing:.05em}
 .comanda__text{margin-top:3px;font-size:13px;color:var(--muted-foreground)}
+.comanda__art{width:36px;height:40px;margin-top:0}
+.comanda__action{margin-top:6px;padding:3px 9px;font:600 11px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--comanda);background:none;border:1px solid var(--comanda);cursor:pointer}
+.comanda__action:hover,.comanda__action:focus-visible{color:#fff;background:oklch(1 0 0 / 10%);outline:0}
 .comanda__close{flex:none;display:grid;place-items:center;width:24px;height:24px;color:var(--muted-foreground);transition:background-color .15s,color .15s}
 .comanda__close:hover{background:var(--secondary);color:var(--foreground)}
 .comanda__close .ui-icon{width:14px;height:14px}
@@ -487,14 +490,5 @@ button.inventory-slot:hover{background:var(--secondary)}
   .prompts{bottom:230px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-/* The player card (apps/web/src/player-card.ts): the number to save and the Highgram. */
-.player-card .profile-initial{background:var(--avatar,var(--secondary))}
 .profile-initial.has-photo{overflow:hidden;padding:0}
 .profile-initial.has-photo img{width:100%;height:100%;object-fit:cover}
-.player-card .card-bio{margin-top:8px;font-size:13px;color:var(--soft)}
-.card-stats{grid-template-columns:repeat(3,1fr);margin:18px 0}
-.card-line{padding:12px 14px;background:oklch(1 0 0 / 3%);margin-bottom:14px}
-.card-line>span{display:flex;align-items:center;gap:8px}.card-line .ui-icon{width:14px;height:14px;color:var(--vw-pink)}
-.card-line .card-number{font:500 20px var(--font-mono);color:var(--money,var(--vw-cyan));letter-spacing:.06em}
-.card-actions{display:grid;grid-template-columns:1fr 1fr;gap:1px}
-.card-actions .button .ui-icon{width:14px;height:14px}

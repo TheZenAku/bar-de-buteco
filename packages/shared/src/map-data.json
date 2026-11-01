@@ -1,11 +1,12 @@
 {
-  "visualHash": "e89063fe9978312575223bba03214151e1c56f08f99ca7a6d929dd6c7660cdb2",
+  "visualHash": "741c9608ae194dac719fd11fa5a568acefc34450fa11872233a115cdad301476",
+  "visualSourceHash": "e89063fe9978312575223bba03214151e1c56f08f99ca7a6d929dd6c7660cdb2",
   "collisionHash": "ebe5b74590ca76c3b27288c67f13e1bb1de88c8a7e5cbce162ef94fe638c252e",
   "bounds": {
-    "minX": -103,
-    "maxX": 135,
-    "minZ": -117,
-    "maxZ": 91
+    "minX": -400,
+    "maxX": 400,
+    "minZ": -400,
+    "maxZ": 400
   },
   "markers": {
     "Spawn_Jogador": {
@@ -648,46 +649,6 @@
       "hz": 136,
       "minY": -0.5,
       "maxY": 0,
-      "ramp": false
-    },
-    {
-      "id": "COL_Rua_Limite",
-      "x": -103.25,
-      "z": -13,
-      "hx": 0.25,
-      "hz": 104,
-      "minY": 0,
-      "maxY": 8,
-      "ramp": false
-    },
-    {
-      "id": "COL_Rua_Limite.001",
-      "x": 135.25,
-      "z": -13,
-      "hx": 0.25,
-      "hz": 104,
-      "minY": 0,
-      "maxY": 8,
-      "ramp": false
-    },
-    {
-      "id": "COL_Rua_Limite.002",
-      "x": 16,
-      "z": 91.25,
-      "hx": 119,
-      "hz": 0.25,
-      "minY": 0,
-      "maxY": 8,
-      "ramp": false
-    },
-    {
-      "id": "COL_Rua_Limite.003",
-      "x": 16,
-      "z": -117.25,
-      "hx": 119,
-      "hz": 0.25,
-      "minY": 0,
-      "maxY": 8,
       "ramp": false
     },
     {

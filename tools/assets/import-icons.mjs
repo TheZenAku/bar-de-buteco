@@ -9,7 +9,7 @@ const source=path.join(root,'assets-bar/icons'),output=path.join(root,'apps/web/
 const ICONS={
   'items/agua.png':'agua-icone.png','items/refrigerante.png':'highcola-icone.png','items/cafe.png':'cafe-icone.png',
   'items/garrafa.png':'Highbeerlong-icone.png','items/copo.png':'copoamericano-icone.png','items/coxinha.png':'coxinha-icone.png',
-  'items/pastel.png':'pastel-icone.png','items/torresmo.png':'torresmo-icone.png','items/curativo.png':'curativo-icone.png',
+  'items/pastel.png':'pastel-icone.png','items/torresmo.png':'torresmo-icone.png','items/curativo.png':'curativo-icone.png','items/peca_moto.png':'peca-moto-icone.png',
   'moeda.png':'moeda-icone.png',
 };
 

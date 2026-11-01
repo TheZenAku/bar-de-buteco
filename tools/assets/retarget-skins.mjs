@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readGlb,retargetBase,writeGlb} from './lib/character-gltf.mjs';
 const root=fileURLToPath(new URL('../../',import.meta.url));
-const ids=['leandro','rafael','read','magrao','gilmar-gordo'];
+const ids=['leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico'];
 const wanted=process.argv.slice(2);
 for(const id of wanted)if(!ids.includes(id))throw new Error(`Unknown native rig: ${id}`);
 const reference=readGlb(path.join(root,'apps/web/public/models/nathan.glb'));

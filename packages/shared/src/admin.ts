@@ -139,6 +139,7 @@ const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão de
   'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados',
   'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas',
   'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada',
+  'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
   'report-resolve':'Denúncia resolvida','report-reopen':'Denúncia reaberta'};
 /** The name of an administrative action (moderation_actions.action); `undo-*` reads "Reversão: …". */
 export const adminActionLabel=(action:string):string=>action.startsWith('undo-')?`Reversão: ${ACTION_LABELS[action.slice(5)]??action.slice(5)}`:ACTION_LABELS[action]??action;
@@ -161,6 +162,7 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   expel:d=>({title:'Removido do bar',detail:text(d.reason)}),
   faint:d=>({title:'Desmaiou',detail:d.cause==='drunk'?'Bebeu demais.':d.cause?`Causa: ${text(d.cause)}`:''}),
   vomit:()=>({title:'Passou mal',detail:'Bebeu além da conta.'}),
+  achievement:d=>({title:'Ganhou um emblema',detail:text(d.badge)}),
   job_start:d=>({title:'Começou um turno',detail:`Emprego: ${text(d.jobId)}`}),
   job_end:d=>({title:'Terminou o turno',detail:`${text(d.tasks)||0} tarefa(s) · ${text(d.earned)||0} moedas`}),
   stage_pass:d=>({title:'Ingresso do palco',detail:'Comprou a entrada no palco.',amount:typeof d.price==='number'?-d.price:undefined}),
@@ -174,6 +176,8 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_media_off:d=>({title:'Administração: aparelho desligado',detail:text(d.id)}),
   media_refused:d=>({title:'Vídeo pulado: a plataforma não deixou tocar',detail:`${text(d.id)} · ${text(d.videoId)}${d.refunded?' · moedas devolvidas':''}`}),
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
+  admin_moto_spawn:d=>({title:'Administração: moto spawnada',detail:`${text(d.id)} em ${text(d.x)}, ${text(d.z)}`}),
+  admin_moto_despawn:d=>({title:'Administração: moto despawnada',detail:text(d.ids)}),
   blackjack_round:d=>({title:'Rodada de blackjack',detail:`Apostou ${text(d.staked)||0} · recebeu ${text(d.paid)||0}${d.outcomes?` · ${text(d.outcomes)}`:''}`,amount:typeof d.net==='number'?d.net:undefined}),
   blackjack_settle_refused:d=>({title:'Prêmio do blackjack recusado',detail:`Rodada ${text(d.roundId)}: ${text(d.reason)}`}),
   foosball_match:d=>({title:'Partida de pebolim',detail:`Mesa ${text(d.table)} · ${text(d.score)} · ${d.result==='win'?'venceu':d.result==='loss'?'perdeu':'sem resultado'}${d.forfeit?' (W.O.)':''}${d.stake?` · valendo ${text(d.stake)}`:''}`,amount:typeof d.net==='number'&&d.net?d.net:undefined}),

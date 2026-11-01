@@ -1,5 +1,6 @@
 import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
-import { DEFAULT_SHOW, DEFAULT_SKIN } from '@bar/shared';
+import type { MotoPhase } from '@bar/shared';
+import { DEFAULT_SHOW, DEFAULT_SKIN, NEW_MOTO_PARTS } from '@bar/shared';
 
 export class Player extends Schema {
   @type('string') id = '';
@@ -15,6 +16,8 @@ export class Player extends Schema {
   @type('number') animationStartedAt = 0;
   /** Drawn at random each time the player starts dancing; every client plays the same clip of its dance bank with it. */
   @type('uint16') dance = 0;
+  /** The skill being played while animationState is 'kick' (SKILLS in packages/shared). */
+  @type('string') skill = '';
   @type('string') interactionState = '';
   @type('string') currentTableId = '';
   @type('int32') lastProcessedInput = -1;
@@ -248,6 +251,39 @@ export class Moto extends Schema {
   @type('float32') steer = 0;
   /** '' while parked. */
   @type('string') riderId = '';
+  /** Its steps so far. */
+  @type('uint32') ticks = 0;
+  /** '' on its wheels and rideable; loose, tumble, down or lifting (moto-crash.ts). */
+  @type('string') phase: MotoPhase = '';
+  @type('string') lifterId = '';
+  /** MOTO_LIGHT's bits. */
+  @type('uint8') lights = 0;
+  /** How it lies, while `phase` is not empty. */
+  @type('float32') qx = 0;
+  @type('float32') qy = 0;
+  @type('float32') qz = 0;
+  @type('float32') qw = 1;
+  /** MOTO_ENGINE, and when that last changed (server ms): the browsers play the sounds from these. */
+  @type('uint8') engine = 0;
+  @type('number') engineAt = 0;
+  /** How the last try at starting ends: 0 catches, 1 to 4 which failure. */
+  @type('uint8') crank = 0;
+  @type('boolean') gas = false;
+  /** Each part's condition, whole percents in MOTO_PARTS's order. */
+  @type('string') parts = NEW_MOTO_PARTS;
+}
+/** A body thrown from a bike (RagdollStart in packages/shared/src/ragdoll.ts): the same steps run from here in the room and in each browser. */
+export class RagdollState extends Schema {
+  @type('float64') startedAt = 0;
+  @type('float64') x = 0;
+  @type('float64') y = 0;
+  @type('float64') z = 0;
+  @type('float64') yaw = 0;
+  @type('float64') vx = 0;
+  @type('float64') vz = 0;
+  @type('float64') closing = 0;
+  @type('boolean') seated = false;
+  @type('uint32') seed = 0;
 }
 /** The stage show's settings from the light desk (packages/shared/src/stage-show.ts, StageShowState). */
 export class StageShowState extends Schema {
@@ -295,6 +331,7 @@ export class BarState extends Schema {
   @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
   @type({ map: MusicianSpot }) musicians = new MapSchema<MusicianSpot>();
   @type({ map: Moto }) motos = new MapSchema<Moto>();
+  @type({ map: RagdollState }) ragdolls = new MapSchema<RagdollState>();
   @type(StageShowState) stageShow = new StageShowState();
   @type(EventState) event = new EventState();
   @type('uint16') occupancy = 0;

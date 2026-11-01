@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {test,expect,type Browser,type Page} from '@playwright/test';
+import {enterAsAdmin,inVehicles,orbit,selfOf as self,spawnBikeOnStreet,walkTo} from './moto-helpers';
 
 const SHOTS=process.env.MOTO_SHOTS||'test-results/moto';
 const PASSWORD=process.env.DEMO_PASSWORD||'ButecoDemo2026!';
@@ -18,53 +19,35 @@ async function enter(page:Page,email:string):Promise<void>{
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
   await expect.poll(()=>page.evaluate(()=>{const state=(window as any).barDebug.snapshot();return state.world?.players?.[state.localId]?.connected===true;}),{timeout:30000}).toBe(true);
-  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.motos()?.length??0),{timeout:30000}).toBeGreaterThan(0);
 }
 const moto=(page:Page)=>page.evaluate(()=>(window as any).barDebug.motos()[0]);
-const self=(page:Page)=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world.players[d.localId];});
 const roomMoto=(page:Page)=>page.evaluate(()=>Object.values((window as any).barDebug.snapshot().world.motos)[0] as any);
-/**
- * Short presses towards a point, keys relative to the camera, looking again after each: a slow page does not overshoot.
- * Stopped by something (a bin, a tree), a step to the side first.
- */
-async function walkTo(page:Page,x:number,z:number,tolerance=.25):Promise<void>{
-  const press=async(keys:string[],ms:number)=>{for(const key of keys)await page.keyboard.down(key);await page.waitForTimeout(ms);for(const key of keys)await page.keyboard.up(key);};
-  const deadline=Date.now()+45_000;
-  let last={x:Infinity,z:Infinity},side=1;
-  while(Date.now()<deadline){
-    const at=await self(page),yaw=await page.evaluate(()=>(window as any).barDebug.camera().yaw),dx=x-at.x,dz=z-at.z,length=Math.hypot(dx,dz);
-    if(length<=tolerance)break;
-    if(Math.hypot(at.x-last.x,at.z-last.z)<.02){await press([side>0?'w':'s',side>0?'a':'d'],300);side=-side;last={x:Infinity,z:Infinity};continue;}
-    last=at;
-    const across=(Math.cos(yaw)*dx-Math.sin(yaw)*dz)/length,ahead=(-Math.sin(yaw)*dx-Math.cos(yaw)*dz)/length,keys:string[]=[];
-    if(across>.38)keys.push('d');if(across<-.38)keys.push('a');if(ahead>.38)keys.push('w');if(ahead<-.38)keys.push('s');
-    await press(keys,Math.min(250,length/3.5*800));
-    await page.waitForTimeout(120);
-  }
-  await page.waitForTimeout(250);
-}
 const shot=async(page:Page,name:string)=>{fs.mkdirSync(SHOTS,{recursive:true});await page.screenshot({path:`${SHOTS}/${name}.png`});};
-/** Orbits the free camera by dragging over the canvas. */
-async function orbit(page:Page,dx:number,dy=0):Promise<void>{
-  const box=(await page.locator('canvas').first().boundingBox())!,x=box.x+box.width/2,y=box.y+box.height/3;
-  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();
-}
+/** Records the bike at every frame drawn until `stop` is called: how far it went for the time that passed. */
+const recordFrames=(page:Page)=>page.evaluate(()=>{const w=window as any;w.__frames=[];w.__recording=true;const tick=(t:number)=>{if(!w.__recording)return;const m=w.barDebug.motos()[0];if(m)w.__frames.push({t,p:m.position,speed:m.speed});requestAnimationFrame(tick);};requestAnimationFrame(tick);});
+const recordedSpeeds=(page:Page)=>page.evaluate(()=>{const w=window as any;w.__recording=false;const out:number[]=[];for(let i=1;i<w.__frames.length;i++){const a=w.__frames[i-1],b=w.__frames[i],dt=(b.t-a.t)/1000;if(dt>0&&dt<.2&&b.speed>4)out.push(Math.hypot(b.p[0]-a.p[0],b.p[2]-a.p[2])/dt/b.speed);}return out.sort((x,y)=>x-y);});
 const dot=(a:number[],b:number[])=>a[0]!*b[0]!+a[2]!*b[2]!;
 const minus=(a:number[],b:number[])=>[a[0]!-b[0]!,a[1]!-b[1]!,a[2]!-b[2]!];
 
-test('the delivery bike with real keys: E to get on, W rides where the headlight points, D turns right, walls stop it, the others see it, E to get off',async({browser}:{browser:Browser})=>{
+test('the delivery bike with real keys: the administration spawns it, E to get on, W rides where the headlight points, smoothly, D turns right, walls stop it, the others see it, E to get off, and it is despawned',async({browser}:{browser:Browser})=>{
   test.setTimeout(240_000);
   const context=await browser.newContext({viewport:{width:1280,height:720}}),page=await context.newPage(),errors=errorsOf(page);
   const watcher=await browser.newContext({viewport:{width:1280,height:720}}),other=await watcher.newPage(),otherErrors=errorsOf(other);
-  await enter(page,'jogador1@bar.local');
+  await enterAsAdmin(page);
   await enter(other,'jogador2@bar.local');
+  // The other player has no way of bringing a bike (and the room refuses them: apps/server/test/moto.integration.test.ts).
+  await expect(other.locator('#admin-button')).toBeHidden();
+  await spawnBikeOnStreet(page);
   const parked=await roomMoto(page);
+  expect(parked.x).toBeLessThan(15);
+  expect(Math.abs(parked.z-3.85)).toBeLessThan(.6);
+  expect(parked.yaw).toBeCloseTo(-Math.PI/2,1);
   expect(parked.riderId).toBe('');
   await walkTo(page,parked.x+.9,parked.z-2.85);
   await expect(page.locator('#context')).toBeHidden();
 
   // Walk up to it from the pavement: the prompt says "E para subir".
-  await walkTo(page,parked.x+.45,parked.z-1);
+  await walkTo(page,parked.x+.45,parked.z-.8);
   await expect(page.locator('#context')).toBeVisible();
   await expect(page.locator('#context')).toContainText('E');
   await expect(page.locator('#context-label')).toHaveText('para subir');
@@ -105,10 +88,24 @@ test('the delivery bike with real keys: E to get on, W rides where the headlight
   const headlightAhead=dot(minus(before.points.ponto_farol,before.position),before.front);
   expect(headlightAhead).toBeGreaterThan(.4);
   // Off the throttle for each screenshot: they take seconds here, and the street ends in a parked car 38 m ahead.
+  await recordFrames(page);await recordFrames(other);
   await page.keyboard.down('w');await page.waitForTimeout(1800);
+  // A starved page takes longer to get going.
+  await expect.poll(async()=>(await moto(page)).speed,{timeout:8000,intervals:[100]}).toBeGreaterThan(5);
   const riding=await moto(page);
   await page.keyboard.up('w');
   await shot(page,'5-andando');
+  // Frame by frame the bike is drawn at its real speed: no shake in the distance covered (it was 66–148% before moto-motion.ts).
+  const speeds=await recordedSpeeds(page);
+  expect(speeds.length).toBeGreaterThan(5);
+  expect(speeds[Math.floor(speeds.length*.05)]).toBeGreaterThan(.8);
+  expect(speeds[Math.floor(speeds.length*.95)]).toBeLessThan(1.2);
+  // The other player sees the same evenness, from the patches (10 a second) played back a little late.
+  await page.waitForTimeout(500);
+  const seen=await recordedSpeeds(other);
+  expect(seen.length).toBeGreaterThan(5);
+  expect(seen[Math.floor(seen.length*.05)]).toBeGreaterThan(.6);
+  expect(seen[Math.floor(seen.length*.95)]).toBeLessThan(1.4);
   const moved=minus(riding.position,before.position);
   expect(Math.hypot(moved[0]!,moved[2]!)).toBeGreaterThan(4);
   expect(dot(moved,before.front)/Math.hypot(moved[0]!,moved[2]!)).toBeGreaterThan(.99);
@@ -146,13 +143,27 @@ test('the delivery bike with real keys: E to get on, W rides where the headlight
   await page.keyboard.down('s');await page.waitForTimeout(1200);await page.keyboard.up('s');
   expect(Math.abs((await moto(page)).speed)).toBeLessThan(4);
 
-  // Against a wall: it never crosses it and it stays upright (the room's own bike, whatever the camera shows).
-  await page.keyboard.down('w');
-  const hits:number[]=[];let last=await roomMoto(page);
+  // Against a wall, slowly (faster it throws the rider off: moto-crash.spec.ts): it never crosses it and it stays upright (the room's
+  // own bike, whatever the camera shows). The street goes on for hundreds of metres, so it turns to the buildings on the bar's side (−Z)
+  // and rides, in short presses, until they stop it.
+  const hits:number[]=[];let held='';
+  const steer=async(key:string)=>{if(held===key)return;if(held)await page.keyboard.up(held);if(key)await page.keyboard.down(key);held=key;};
   const started=Date.now();
-  while(Date.now()-started<9000){last=await roomMoto(page);hits.push(Math.abs(last.speed));await page.waitForTimeout(100);}
+  let pressed=0;
+  while(Date.now()-started<45_000){
+    const last=await roomMoto(page),off=Math.atan2(Math.sin(Math.PI-last.yaw),Math.cos(Math.PI-last.yaw));
+    await steer(off>.08?'a':off<-.08?'d':'');
+    const speed=Math.abs(last.speed);
+    if(speed>2.4){await page.keyboard.up('w');await page.keyboard.down('s');await page.waitForTimeout(60);await page.keyboard.up('s');}
+    else{await page.keyboard.down('w');await page.waitForTimeout(90);await page.keyboard.up('w');pressed++;}
+    hits.push(speed);
+    if(pressed>25&&Math.abs(off)<.2&&Math.max(...hits.slice(-10))<1.2)break;
+    await page.waitForTimeout(60);
+  }
+  await steer('');
   await page.keyboard.up('w');
   await shot(page,'8-contra-a-parede');
+  expect((await self(page)).animationState,'Slowly into a wall the rider stays on').toBe('ride');
   expect(Math.min(...hits.slice(-10))).toBeLessThan(2);
   const stopped=await moto(page);
   expect(stopped.position[1]).toBeGreaterThanOrEqual(-.01);
@@ -169,6 +180,16 @@ test('the delivery bike with real keys: E to get on, W rides where the headlight
   expect((off.x-left.x)*left_x+(off.z-left.z)*left_z).toBeGreaterThan(.5);
   await page.waitForTimeout(600);
   await shot(page,'9-desceu');
+  // Despawned from the administration: gone for everyone.
+  await inVehicles(page,async()=>{
+    await expect(page.locator('[data-vehicle="despawn"]')).toHaveCount(1);
+    await shot(page,'10-veiculos');
+    await page.locator('[data-vehicle="despawn"]').click();
+    await expect(page.locator('.admin-empty')).toHaveText('Nenhuma moto no mapa.');
+  });
+  await expect.poll(()=>other.evaluate(()=>(window as any).barDebug.motos().length)).toBe(0);
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.motos().length)).toBe(0);
+  await page.request.post('/api/auth/logout').catch(()=>undefined);
   expect(errors).toEqual([]);
   expect(otherErrors).toEqual([]);
   await context.close();await watcher.close();

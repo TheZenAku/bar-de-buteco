@@ -87,9 +87,10 @@ const limbs={upperarm:'lowerarm',lowerarm:'hand',upperleg:'lowerleg',lowerleg:'f
 const position=(model:ReturnType<typeof asset>,name:string)=>model.byName.get(name)!.getPosition();
 const direction=(model:ReturnType<typeof asset>,from:string,to:string)=>new pc.Vec3().sub2(position(model,to),position(model,from)).normalize();
 
-for(const id of ['nathan','rafael','leandro','read','magrao','gilmar-gordo']) {
+for(const id of ['nathan','rafael','leandro','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico']) {
   test(`${id}: runtime bar and stage clips align actual limbs without stretching the native skeleton`,()=>{
     const model=asset(`models/${id}.glb`),target=readTarget(model.root,model.tracks);
+    assert.ok(target.height>1.6&&target.height<2,`${id}: the game reads a body of ${target.height} m`);
     const lengths=new Map<string,number>();
     for(const [start,end] of Object.entries(limbs))for(const side of ['l','r']){
       const a=`${start}_${side}`,b=`${end}_${side}`;lengths.set(a,position(model,a).distance(position(model,b)));

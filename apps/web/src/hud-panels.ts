@@ -108,7 +108,7 @@ export function createHudPanels(root:HTMLElement){
   window.addEventListener('resize',()=>{const next=mode();if(next!==screenMode){save();screenMode=next;load();}apply();});
   load();apply();
   void document.fonts.ready.then(apply);
-  return {forUser(id:string){owner=id;load();apply();},open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},isHidden(id:PanelId){return layout[id].hidden;},
+  return {closeMenu(){menu(false);},forUser(id:string){owner=id;load();apply();},open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},isHidden(id:PanelId){return layout[id].hidden;},
     // Appearing, the panel is measured at its natural height (not the one it was squeezed to while hidden) and lifted to fit.
     setAvailable(id:PanelId,on:boolean){if(available.has(id)===on)return;if(on){available.add(id);elements[id].style.maxHeight='';}else available.delete(id);apply();}};
 }

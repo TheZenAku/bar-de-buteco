@@ -18,14 +18,17 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Mesa de luz do palco | **Pronto (novo, 30/10)** | Blip violeta em cima do palco, ao lado da mesa de som: painel com cenas prontas e salvas, rodízio ou programa fixo, paletas, tap tempo, níveis, texto do letreiro e efeitos (flash, blackout, drop, letreiro), valendo para todo mundo; câmera de plateia enquanto o painel está aberto ([mesa de luz](../sistemas/palco.md#mesa-de-luz)) |
 | Tela de entrada com a logo animada | **Pronto (novo, 30/10)** | Letreiro de neon vivo ao lado do menu, com brinde no clique e bolhas de cerveja ([interface](../sistemas/interface.md#a-logo-na-entrada)) |
 | Músicos no palco | **Pronto (novo, 28/10)** | Violão, cavaquinho, bateria e vocal: um jogador por lugar, E para tocar e para parar, instrumento na mão, servidor dono das fases, quem chega no meio vê o show ([músicos do palco](../sistemas/palco.md)) |
-| Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno, karatê. Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
+| Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno e as skills de cada skin (Rafael: karatê e chute voador). Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
 | Fumar, beber e comer com props | **Pronto (28/10, noite)** | Beber com o objeto real na mão ([bebidas e comidas em 3D](../sistemas/drinks.md)). [Animações do bar](../sistemas/animacoes-bar.md): fumar (F, cigarro, brasa e fumaça), fumar um cigarro inteiro (Shift+F, do maço à bituca pisada, 29/10), comer com garfo o que foi servido na mesa, sentar puxando a cadeira do mapa, levantar, urinar no mictório, vomitar ao beber demais, cair e levantar do chão, limpar a mesa pela quina. Falta o cigarro como item da mochila |
 | Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
 | Câmera em primeira e terceira pessoa | **Pronto (atualizado, 29/10)** | Rodinha com zoom contínuo fino e distância exata nas configurações; Q alterna primeira/terceira pessoa preservando o zoom, sem toast. Giro horizontal e vertical livre; a câmera atravessa os colisores sem encurtar a distância, com raio-X em volta do personagem. Preferências salvas no navegador ([câmera](../sistemas/camera.md)) |
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
-| Moto de entrega pilotável | **Pronto (novo, 30/10)** | [Moto de entrega](../sistemas/moto.md): estacionada em frente ao bar, E para subir e descer, física arcade no servidor com predição, colisão com o mapa, vista por todos |
+| Cidade de 800 × 800 m em volta do bar | **Pronto (novo, 31/10)** | [Cidade](../sistemas/cidade.md): quatro bairros carregados por setores, com LOD, colisão no servidor, moto nas ruas, noite e névoa |
+| Moto de entrega pilotável | **Pronto (atualizado, 31/10)** | [Moto de entrega](../sistemas/moto.md): criada pela administração em Veículos, E para subir e descer, física arcade no servidor com predição, colisão com o mapa, vista por todos, com todas as luzes, queda em ragdoll nas batidas, moto que tomba e é levantada à mão, som de motor, estado de cada parte com falhas e conserto com peças (botão direito, Informações do veículo), atropelamento que tira vida, zoom e borrão em velocidade |
 | Minigame de entrega (pedidos, mapa procedural) | Falta | Plano abaixo |
+| Perfil do jogador | **Pronto (novo, 31/10)** | [Perfil](../sistemas/perfil.md): botão direito no jogador ou em si mesmo, janela arrastável com modelo parado, seis emblemas com descrição, mensagem de status e link do Highgram; skills por skin com tecla própria; emblemas gerenciados na administração |
+| Conquistas | **Pronto (novo, 31/10)** | [Conquistas](../sistemas/conquistas.md): 26 séries de quatro níveis (Bebum, Motoboy, Rei do 21, Fofoqueiro e outras), 104 emblemas ganhos jogando, com aviso, aba de progresso no perfil e a carta cravejada no nível IV |
 | Celular com apps paródia | **Pronto (29/10, ampliado 30/10)** | [Celular](../sistemas/celular.md) estilo iPhone 18 Pro na tecla K: ligações e chamadas de vídeo, Highzap com fotos, áudios e vídeos, Highgram com perfis, filtros, seguir e sugestões, HighBank com Pix, câmera com zoom, selfie e vídeo, mapa do bairro e os apps de sempre. Os números vêm da ficha do jogador (clique na pessoa no bar) |
 | Blackjack com apostas | **Pronto (novo, 30/10)** | [Blackjack](../sistemas/blackjack.md): regras de cassino (6 baralhos, S17, 3:2, seguro, dobrar, dividir, desistir), apostas em moedas do jogo com diário em disco e acerto conferido pela API, painel novo com cartas animadas, fichas e teclas 1–5, no PC e no celular |
 | Pebolim | **Pronto (novo, 30/10)** | [Pebolim](../sistemas/pebolim.md): as duas mesas do salão de jogos, 1 × 1 ou 2 × 2, regras da ITSF (saída do meio, tempo de posse de 10 s e 15 s, gol que entra e sai vale), física no servidor a 60 Hz com chute carregado, recuo e levantar, Zé do Totó em três níveis, partidas valendo moedas pelo mesmo diário do blackjack, painel em canvas que gira no celular, bola na mesa 3D |
@@ -67,7 +70,7 @@ Entregue como um aparelho no estilo do iPhone 18 Pro, aberto com **K** (a tecla 
 
 | App | Paródia de | Situação |
 | --- | --- | --- |
-| Telefone | — | Ligações e chamadas de vídeo entre jogadores, voz a qualquer distância entre quem atendeu, recentes, agenda e teclado com números de 9 dígitos. A agenda só tem quem você salvou pela ficha do jogador ou pelo número |
+| Telefone | — | Ligações e chamadas de vídeo entre jogadores, voz a qualquer distância entre quem atendeu, recentes, agenda e teclado com números de 9 dígitos. A agenda só tem quem você salvou pelo perfil do jogador ou pelo número |
 | Highzap | WhatsApp | Conversas de um para um com os contatos salvos, fotos, mensagens de voz, vídeos, tiques de enviada e lida, chamada de vídeo, avisos em tempo real pela sala |
 | Highgram | Instagram | Perfil com nome, @, bio e foto; seguir, buscar e sugestões; Início com quem você segue e Explorar; fotos da câmera do jogo com 12 filtros, curtidas, comentários, apagar e denunciar |
 | HighBank | Nubank | Saldo e extrato reais e Pix para um contato salvo ou um número digitado (operação `transfer` na API, com limites por Pix e por dia) |
@@ -77,12 +80,12 @@ Falta, do plano original: Crush (Tinder), conversas em grupo e o personagem segu
 
 ### 5. Entregas de moto (minigame)
 
-A moto já existe e anda pelo bairro do bar, na própria sala ([moto de entrega](../sistemas/moto.md)). Falta o minigame:
+A moto já existe e anda pela cidade, na própria sala ([moto de entrega](../sistemas/moto.md)). Falta o minigame:
 
 - **Sala separada:** `DeliveryRoom` no Colyseus, uma instância por jogador ou por grupo. O bar continua leve, e o minigame pode ter física própria.
 - **Mapa procedural:** uma seed por sessão gera uma grade de quarteirões (ruas, calçadas, casas) a partir de peças modulares de cidade low-poly CC0 ([assets](assets-recomendados.md)). A mesma seed gera colisores no servidor e malhas no cliente, então só a seed trafega.
 - **Loop:** pegar o pedido no restaurante, entregar no endereço sorteado dentro de um tempo, receber moedas pelo framework de empregos (`job:delivery:...`) com teto diário. Quantas entregas quiser, sem dinheiro real.
-- **Entrada e saída:** a moto estacionada na rua do bar é um interactable que transfere a pessoa de sala com um ticket novo. Sair do minigame devolve a pessoa ao ponto da moto.
+- **Entrada e saída:** uma moto estacionada na rua do bar (hoje só a administração cria motos) é um interactable que transfere a pessoa de sala com um ticket novo. Sair do minigame devolve a pessoa ao ponto da moto.
 
 ### 6. Animações, fumar e comer
 

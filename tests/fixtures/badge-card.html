@@ -1,0 +1,17 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;min-height:100vh;background:#1a0b33}#from{position:fixed;left:40px;top:40px;width:62px;height:62px}</style></head><body><button id="from">Emblema</button><script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import {openBadgeCard} from '../../apps/web/src/profile/badge-card.ts';
+const from=document.querySelector('#from');
+window.fixture={
+  open:(rarity,extra={})=>openBadgeCard({name:'Rei do Pebolim',description:'Ganhou dez partidas seguidas no salão de jogos, sem levar um gol sequer.',icon:'trophy',color:'#fac416',image:null,rarity,...extra},from),
+  /** The card's studs, drawn into numbers: how many pixels shine, and a fingerprint of which. */
+  studs(){
+    const canvas=document.querySelector('.bc-studs');if(!canvas)return null;
+    const {data}=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+    let lit=0,bright=0,print=0;
+    for(let i=0;i<data.length;i+=4){if(data[i+3]>0)lit++;if(data[i+3]>200){bright++;print=(print*31+i)>>>0;}}
+    return {lit,bright,print,size:[canvas.width,canvas.height]};
+  },
+};
+</script></body></html>

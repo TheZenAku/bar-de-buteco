@@ -39,7 +39,7 @@ const bars=(page:Page)=>page.evaluate(()=>Object.fromEntries((window as any).fix
 test('Mixamo locomotion and seated idle remain active on every skin after the authored bar banks load',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo'];
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico'];
   const actorId=(skin:string)=>skin==='magrao'?'bartender':`mixamo-${skin}`;
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
   const animations=()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations().map((actor:any)=>({
@@ -194,7 +194,7 @@ test('a whole cigarette (fumar_mixamo) on every skin: pack and lighter in hand, 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(['error','warning'].includes(message.type()))errors.push(message.text());});
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
   await page.evaluate(()=>(window as any).fixture.hour(14));
-  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo'],ids=skins.map(skin=>skin==='magrao'?'bartender':`cig-${skin}`);
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico'],ids=skins.map(skin=>skin==='magrao'?'bartender':`cig-${skin}`);
   const smokers=(state:string,ago:number):Actor[]=>skins.map((skin,index)=>[ids[index]!,skin,9+index,.15,1.6,0,state,ago]);
   // Lighting up (Roteiro: the flame from about 6.1 s to 7.3 s).
   await sync(page,smokers('cigarette',6600));
@@ -212,13 +212,13 @@ test('a whole cigarette (fumar_mixamo) on every skin: pack and lighter in hand, 
   await expect.poll(async()=>(await status(page)).particles).toBeGreaterThan(0);
   // Past the end: the butt stays on the floor, stepped on, one per smoker.
   await advance(page,9000);
-  await expect.poll(async()=>(await status(page)).leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro').length).toBe(6);
+  await expect.poll(async()=>(await status(page)).leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro').length).toBe(skins.length);
   const butts=await page.evaluate(()=>(window as any).fixture.scene.barAnimations.leftovers.map((left:any)=>left.entity.getPosition().y));
   for(const y of butts)expect(y).toBeCloseTo(.15,1);
   // Free again (the room's idle once the clip is over): the butts are still there.
   await sync(page,smokers('idle',0));
   await expect.poll(()=>bars(page)).toEqual(Object.fromEntries(ids.map(id=>[id,'Idle'])));
-  expect((await status(page)).leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro')).toHaveLength(6);
+  expect((await status(page)).leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro')).toHaveLength(skins.length);
   expect(errors).toEqual([]);
   await page.evaluate(()=>(window as any).fixture.scene.destroy());
 });

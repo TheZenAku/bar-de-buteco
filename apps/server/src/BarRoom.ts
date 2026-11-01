@@ -2,11 +2,12 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, KICK_DURATION_MS, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
-import { Access, internal, validateAccess, type Control } from './internal.js';
-import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Player, SeatState, TableState } from './state.js';
-import { MOTO, MOTOS, NO_MOTO_INTENT, canMountMoto, isRidingMoto, motoDismountSpot, motoInputSchema, motoInteraction, motoMountSchema, parkedMoto, stepMoto, type MotoInput } from '@bar/shared';
+import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
+import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Player, RagdollState, SeatState, TableState } from './state.js';
+import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
+import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
 import { BlackjackBank, GameBank, type BankEntry } from './minigames/blackjack-bank.js';
 import { FoosballTable, type FoosballSummary } from './minigames/foosball.js';
@@ -38,6 +39,8 @@ import { CLEANABLE_TABLES, barClipMs, cornerSpot, onBench, standUpSpot, tableCor
 import { Musicians, type MusicianEnd } from './world/musicians.js';
 import { BotRunner } from './world/bots.js';
 import { PhoneCalls, type PhoneCall } from './world/phone-calls.js';
+import { AchievementTracker } from './world/achievements.js';
+import { ACHIEVEMENT_BLADDER_MIN, ACHIEVEMENT_CALL_MS, seriesOfItem, type Badge } from '@bar/shared';
 import { PHONE, isJpeg, phoneCallIdSchema, phoneCallSchema, phonePingSchema, type PhoneCallEnd, type PhoneCallView, type PhonePing } from '@bar/shared';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
@@ -45,6 +48,15 @@ const INTERACTION_SLACK = 0.3;
 /** A video its platform refuses within its first seconds never really played: its coins go back. */
 const MEDIA_REFUND_WITHIN_S = 30;
 
+/** Bike inputs kept waiting, and the most that time saved up by a gap may run at once (half a second). */
+const MOTO_QUEUE = 12, MOTO_BURST = 10;
+/** How often what counts by its duration is read (countTime). */
+const ACHIEVEMENT_SAMPLE_MS = 5000;
+/** A knock that only stops the bike wears it once in this time; a fall counts as this share of the speed it had. */
+const MOTO_KNOCK_GAP_MS = 500, MOTO_FALL_FORCE = .4;
+/** The Player.interactionState of a body thrown by a crash, until it has got up; and of someone lifting a fallen bike. */
+const THROWN = 'thrown', LIFTING = 'moto-lift:';
+const RECOVER_HIPS_BEHIND = .42;
 interface Presence {
   joinedAt:number;
   ticket: GameTicket;
@@ -54,6 +66,9 @@ interface Presence {
   /** On a delivery bike, its inputs instead (simulated like walking: at most one a tick); when the last one came. */
   motoQueue: MotoInput[];
   motoInputAt: number;
+  /** How many bike inputs real time allows right now, and when that was counted (stepMotos). */
+  motoBudget: number;
+  motoBudgetAt: number;
   lastReceived: number;
   lastInputAt: number;
   seen: Set<Schema>;
@@ -91,7 +106,7 @@ interface Presence {
 /** What is in hand is had 5% at a time, like what is served at a table (served.ts). */
 const HOLDING_SIP = .05;
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
-const NEEDS_CONSCIOUS = new Set(['table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
+const NEEDS_CONSCIOUS = new Set(['moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
@@ -146,11 +161,21 @@ export class BarRoom extends Room<{ state: BarState }> {
   private logQueue: Array<{ event: string; userId?: string; details: Record<string, unknown>; at: number }> = [];
   /** Development bots stay out of the administration's log. */
   private botIds = new Set<string>();
+  /** What players did since the last report to the API: goals in it give badges (docs/sistemas/conquistas.md). */
+  private achievements = new AchievementTracker();
+  private achievementsAt = Date.now();
   private maintenanceBusy = false;
   private lastTableJson = '';
   private tickCount = 0;
-  /** When each bike was left parked: left alone long enough, it goes back to its spot (MOTOS). */
-  private readonly motoLeftAt = new Map<string, number>();
+  /** Numbers the bikes the administration spawns. */
+  private motoSerial = 0;
+  /** What a bike with nobody on it is doing (moto-crash.ts); the room's state only has how it looks. */
+  private readonly fallenMotos = new Map<string, { loose?: LooseBike; wreck?: MotoWreck; lift?: { from: [number, number, number, number]; to: [number, number, number, number]; fromAt: { x: number; y: number; z: number }; at: { x: number; y: number; z: number; yaw: number; pitch: number }; startedAt: number } }>();
+  /** Bodies thrown by a crash, by player: the same steps the browsers run (ragdoll.ts), and when getting up ends. */
+  /** `hurt`: the life a blow still has to take when the body comes to rest (it never knocks anyone out in the air). */
+  private readonly thrown = new Map<string, { sim: Ragdoll; upAt?: number; hurt: number }>();
+  /** Each bike's engine: when the try at starting ends, when W may try again, when it last took a light knock. */
+  private readonly motoEngines = new Map<string, { crankEnds: number; retryAt: number; knockedAt: number }>();
   /**
    * The blackjack table's coins (minigames/blackjack-bank.ts): every bet and every payment is on disk before the API is
    * asked, so a crash or an outage delays them and never loses them. Declared after the log queue it writes to.
@@ -202,7 +227,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     // Doors start open, as authored in the map; the shared physics mirrors this room's door states.
     setDoorStates(DOORS.map(door => [door.id, true] as const));
     for (const door of DOORS) this.state.doors.set(door.id, new DoorState().assign({ id: door.id, open: true }));
-    for (const spot of MOTOS) this.state.motos.set(spot.id, new Moto().assign(parkedMoto(spot)));
     for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
@@ -224,6 +248,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     worldMetrics.gauge('bar_world_job_workers', 'Players working a job shift', () => JOBS.reduce((sum, job) => sum + this.jobs.workers(job.id).length, 0));
     worldMetrics.gauge('bar_world_api_last_ok_seconds', 'Seconds since the API last answered the maintenance round trip', () => health.apiOkAt ? (Date.now() - health.apiOkAt) / 1000 : undefined);
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
+    this.clock.setInterval(() => this.countTime(Date.now()), ACHIEVEMENT_SAMPLE_MS);
     this.registerMessages();
   }
 
@@ -257,7 +282,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
+    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -409,12 +434,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('moto.input', motoInputSchema, 55, (client, input) => {
       const p = this.forClient(client)!;
       if (input.seq <= p.lastReceived) return;
-      if (p.motoQueue.length >= 6) p.motoQueue.shift();
+      if (p.motoQueue.length >= MOTO_QUEUE) p.motoQueue.shift();
       p.lastReceived = input.seq;
       p.lastInputAt = Date.now();
       p.motoQueue.push(input);
     });
     this.handle('moto.mount', motoMountSchema, 4, (client, { motoId }) => this.mountMoto(client, motoId));
+    this.handle('moto.repair', motoRepairSchema, 3, (client, { motoId, part }) => this.repairMoto(client, motoId, part));
     this.handle('player.interact', z.object({ objectId: z.string().max(64), item: z.enum(DRINK_ITEMS).optional() }).strict(), 5, (client, command) => this.interact(client, command.objectId, command.item));
     this.handle('inventory.sync',z.object({}).strict(),2,async client=>{await this.syncPresence(this.forClient(client)!);});
     this.handle('inventory.use',z.object({itemId:z.enum(ITEM_IDS)}).strict(),3,(client,{itemId})=>this.useInventory(client,itemId));
@@ -525,6 +551,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('show.cue',showCueSchema,3,(client,{cue})=>{
       const player=this.requireLightDesk(client);
       this.state.stageShow.assign(fireShowCue(this.state.stageShow.toJSON() as StageShowState,cue,Date.now(),player.displayName));
+      this.achieved(player.id,'mesa-de-luz');
     });
     // Only while the order is still at the counter: once on its way, it is coming to the table.
     this.handle('table.cancel',z.object({}).strict(),2,client=>{
@@ -583,6 +610,23 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.assignMedia(state,clearMedia(this.media(state),Date.now(),admin));
       this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
     });
+    // The delivery bikes exist only while the administration keeps them on the map.
+    this.handle('admin.moto.spawn',motoSpawnSchema,5,client=>{
+      const admin=this.requireAdmin(client),player=this.player(client);
+      if(this.state.motos.size>=MOTO.LIMIT)throw new Error(`O mapa já tem ${MOTO.LIMIT} motos. Despawne alguma antes.`);
+      const spot=motoSpawnSpot(player,player.rotation,[...this.state.motos.values()]);
+      if(!spot)throw new Error('Não há rua livre perto de você. Vá para a rua e tente de novo.');
+      const id=`moto-${++this.motoSerial}`;
+      this.state.motos.set(id,new Moto().assign(parkedMoto({id,...spot})));
+      this.log('admin_moto_spawn',{playerId:admin,id,x:+spot.x.toFixed(1),z:+spot.z.toFixed(1)});client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.moto.despawn',motoDespawnSchema,5,(client,{id})=>{
+      const admin=this.requireAdmin(client);
+      if(id&&!this.state.motos.has(id))throw new Error('Essa moto já saiu do mapa.');
+      const ids=id?[id]:[...this.state.motos.keys()];
+      for(const each of ids)this.despawnMoto(each);
+      this.log('admin_moto_despawn',{playerId:admin,ids:ids.join(', ')});client.send('admin.world',this.adminSnapshot());
+    });
     // Development bots for performance tests: how many the bar should have (0 takes them out), never more than fit in it.
     this.handle('admin.bots',z.object({count:z.number().int().min(0).max(128)}).strict(),3,(client,{count})=>{
       const admin=this.requireAdmin(client),room=this.botRoom();
@@ -590,7 +634,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.bots.set(count);this.botsAdmin=client;
       this.log('admin_bots',{playerId:admin,count});client.send('admin.world',this.adminSnapshot());
     });
-    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'kick', 'smoke', 'cigarette']) }).strict(), 4, (client, { emote }) => {
+    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'smoke', 'cigarette']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
       // A cigarette: lit and smoked where the player stands (movement held), put out and stepped on when asked again.
       if (emote === 'smoke' && p.interactionState === 'smoke') { this.stopSmoking(p, this.forClient(client)!, Date.now()); return; }
@@ -611,23 +655,26 @@ export class BarRoom extends Room<{ state: BarState }> {
         presence.gestureEndsAt = undefined; presence.queue.length = 0; p.lastProcessedInput = presence.lastReceived;
         return;
       }
-      if (emote === 'kick') {
-        if (p.skin !== 'rafael') throw new Error('O golpe de karatê é exclusivo do Rafael.');
-        const presence = this.forClient(client)!;
-        p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
-        presence.interactionEndsAt = p.animationStartedAt + KICK_DURATION_MS;
-        presence.queue.length = 0;
-        p.lastProcessedInput = presence.lastReceived;
-        return;
-      }
       if(emote==='wave'){
         this.playTemporary(p,this.forClient(client)!,'wave',WAVE_DURATION_MS);
         this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
+        this.achieved(p.id,'gente-boa');
       }else{
         // Each dance is drawn anew; the clients map the number onto their dance clips (apps/web/public/animations/<skin>-dances.glb).
         if(emote==='dance')p.dance=randomInt(65536);
         p.animationState=emote==='dance'?'dance':'idle';p.animationStartedAt=Date.now();
       }
+    });
+    // A skill of the skin being worn (SKILLS): which one is active and on which key is the player's choice, kept by the API.
+    this.handle('player.skill', z.object({ skill: z.string().max(32) }).strict(), 4, (client, { skill }) => {
+      const p = this.player(client), chosen = skillById(skill);
+      if (!chosen || chosen.skin !== p.skin) throw new Error('Esta skin não tem essa skill.');
+      if (p.interactionState) throw new Error('Levante-se primeiro.');
+      const presence = this.forClient(client)!;
+      p.skill = chosen.id; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
+      presence.interactionEndsAt = p.animationStartedAt + chosen.durationMs;
+      presence.queue.length = 0;
+      p.lastProcessedInput = presence.lastReceived;
     });
     this.handle('player.skin', skinMessageSchema, 2, async (client, { skin }) => {
       const player = this.player(client);
@@ -653,11 +700,13 @@ export class BarRoom extends Room<{ state: BarState }> {
         return;
       }
       const message: ChatMessage = { id: randomUUID(), playerId: player.id, displayName: player.displayName, text: text.replace(/[\u0000-\u001f\u007f]/g, ' '), sentAt: Date.now() };
+      let heard = false;
       for (const [id, target] of this.sessions) {
         if (target.revoked || target.blocked.has(player.id) || sender.blocked.has(id)) continue;
         const recipient = this.state.players.get(id)!;
-        if (recipient.connected && distance(player, recipient) <= CHAT_RADIUS) target.client.send('chat.message', message);
+        if (recipient.connected && distance(player, recipient) <= CHAT_RADIUS) { target.client.send('chat.message', message); heard ||= id !== player.id; }
       }
+      if (heard) this.achieved(player.id, 'resenha');
     });
     this.handle('blackjack.join', z.object({ tableId: z.literal('blackjack-1') }).strict(), 3, (client) => this.joinTable(client));
     this.handle('blackjack.leave', z.object({}).strict(), 3, (client) => this.leaveTable(client));
@@ -728,7 +777,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (presence.interactionEndsAt && now >= presence.interactionEndsAt) this.finishInteraction(player, presence, now);
       if (player.holding) this.updateHolding(player, presence, now);
       // A job task keeps the hands busy for its whole duration (the use clip is shorter, so it restarts).
-      if (player.interactionState === 'job' && player.animationState === 'use' && now - player.animationStartedAt >= TASK_GESTURE_MS) player.animationStartedAt = now;
+      if ((player.interactionState === 'job' || isRepairingMoto(player.interactionState)) && player.animationState === 'use' && now - player.animationStartedAt >= TASK_GESTURE_MS) player.animationStartedAt = now;
       const input = presence.queue.shift();
       let moving = false, running = false;
       if (input) {
@@ -738,6 +787,7 @@ export class BarRoom extends Room<{ state: BarState }> {
           const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player));
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
+          if (moving) this.achieved(id, 'andarilho', Math.hypot(position.x - player.x, position.z - player.z));
           player.x = position.x; player.y = position.y!; player.z = position.z; player.rotation = input.rotation;
           if (input.dx || input.dz) player.animationState = running ? 'run' : 'walk';
           else if (player.animationState === 'walk' || player.animationState === 'run') player.animationState = 'idle';
@@ -749,6 +799,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
     }
     this.stepMotos(now);
+    this.stepThrown(now);
     for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
     this.syncTable();
@@ -763,30 +814,268 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   /**
-   * The delivery bikes. Like walking, the rider's bike moves one input a tick, so it is the same step the browser predicted;
-   * a short gap waits for the next input, a longer one (a frozen tab, a lost connection) lets go of the controls. Anything
-   * that takes the rider off (fainting, leaving, a kick) lets the bike go here, and it stops by itself.
+   * The delivery bikes. Each input is one step, the same one the browser predicted. Real time decides how many may run: this
+   * timer and the browser's frames do not keep the same beat, and a late input is not lost nor a queue kept growing, while
+   * nobody gets further than the clock allows. A short gap waits for the next input, a longer one (a frozen tab, a lost
+   * connection) lets go of the controls. Anything that takes the rider off (fainting, leaving, a kick) lets the bike go here,
+   * and it stops by itself.
    */
   private stepMotos(now: number): void {
     for (const moto of this.state.motos.values()) {
+      this.stepEngine(moto, now);
+      if (moto.phase) { this.stepFallenMoto(moto, now); continue; }
       const rider = moto.riderId ? this.state.players.get(moto.riderId) : undefined;
       const presence = rider ? this.sessions.getByUser(rider.id) : undefined;
       const riding = !!rider?.connected && !!presence && !presence.revoked && rider.interactionState === motoInteraction(moto.id);
-      if (moto.riderId && !riding) this.freeMoto(moto, rider);
+      if (moto.riderId && !riding) {
+        this.freeMoto(moto, rider);
+        // Still fast with nobody on it: it goes on by itself, and falls when it stops holding itself up.
+        if (Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) { this.letLoose(moto, (Math.random() - .5) * 1.2); continue; }
+      }
+      const obstacles = this.motoObstacles(moto);
       let intent = moto.riderId ? NO_MOTO_INTENT : { ...NO_MOTO_INTENT, brake: true };
       if (riding) {
-        const input = presence.motoQueue.shift();
-        if (input) { intent = input; rider.lastProcessedInput = input.seq; presence.motoInputAt = now; }
-        else if (now - presence.motoInputAt < 250) continue;
+        presence.motoBudget = Math.min(MOTO_BURST, presence.motoBudget + (now - presence.motoBudgetAt) / TICK_MS); presence.motoBudgetAt = now;
+        let input: MotoInput | undefined, stepped = false;
+        while (presence.motoBudget >= 1 && (input = presence.motoQueue.shift())) {
+          presence.motoBudget--;
+          moto.lights = this.motoLights(moto, input);
+          // W with the engine off tries the starter; the throttle does nothing until it catches.
+          if (moto.engine === MOTO_ENGINE.OFF && input.throttle > 0 && now >= this.engineOf(moto).retryAt) this.crankEngine(moto, now);
+          moto.gas = moto.engine === MOTO_ENGINE.ON && input.throttle > 0;
+          const crashed = this.stepRidden(moto, input, obstacles, rider);
+          rider.lastProcessedInput = input.seq; presence.motoInputAt = now; stepped = true;
+          if (crashed) break;
+        }
+        if (moto.phase) continue;
+        if (stepped) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; this.strikeWalkers(moto, rider); continue; }
+        if (now - presence.motoInputAt < 250) continue;
+        moto.gas = false;
       }
-      if (!moto.speed && !moto.steer && !intent.throttle && !intent.steer) {
-        const spot = MOTOS.find(m => m.id === moto.id), left = this.motoLeftAt.get(moto.id);
-        if (spot && !moto.riderId && left && now - left >= MOTO.RETURN_MS) { moto.assign(parkedMoto(spot)); this.motoLeftAt.delete(moto.id); }
+      if (!moto.speed && !moto.steer && !intent.throttle && !intent.steer) continue;
+      if (this.stepRidden(moto, intent, obstacles, riding ? rider : undefined)) continue;
+      if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; this.strikeWalkers(moto, rider); }
+    }
+  }
+
+  /** The brake light is the room's (it knows the speed), the rest are the rider's switches. */
+  private motoLights(moto: Moto, input: MotoIntent): number {
+    const braking = input.brake || (input.throttle < 0 && moto.speed > .1) || (input.throttle > 0 && moto.speed < -.1);
+    return ((input.lights ?? 0) & ~MOTO_LIGHT.BRAKE) | (braking ? MOTO_LIGHT.BRAKE : 0);
+  }
+
+  /** One step on its wheels. True when it ended in a crash that threw the rider off. */
+  private stepRidden(moto: Moto, input: MotoIntent, obstacles: ReturnType<BarRoom['motoObstacles']>, rider?: Player): boolean {
+    const { body, hit } = advanceMoto(moto, input, TICK_MS / 1000, obstacles, motoHandling(moto));
+    if (rider) this.achieved(rider.id, 'motoboy', Math.hypot(body.x - moto.x, body.z - moto.z));
+    moto.assign(body); moto.ticks++;
+    if (!hit) return false;
+    if (hit.closing >= MOTO.CRASH_SPEED) { this.crashMoto(moto, hit, rider); return true; }
+    // A knock that only stops it still marks it, once (rubbing along a wall reports one every step).
+    const engine = this.engineOf(moto), now = Date.now();
+    if (hit.closing >= MOTO_WEAR_FROM && now - engine.knockedAt > MOTO_KNOCK_GAP_MS) { engine.knockedAt = now; this.wearMoto(moto, hit.closing, motoHitArea(moto.yaw, hit.nx, hit.nz)); }
+    return false;
+  }
+
+  private engineOf(moto: Moto) {
+    let engine = this.motoEngines.get(moto.id);
+    if (!engine) { engine = { crankEnds: 0, retryAt: 0, knockedAt: 0 }; this.motoEngines.set(moto.id, engine); }
+    return engine;
+  }
+  private setEngine(moto: Moto, engine: number, now: number): void {
+    if (moto.engine === engine) return;
+    moto.engine = engine; moto.engineAt = now;
+    if (engine !== MOTO_ENGINE.ON) moto.gas = false;
+  }
+  /** One try at starting: its outcome is decided here and every browser plays that clip. */
+  private crankEngine(moto: Moto, now: number): void {
+    moto.crank = motoCrank(readMotoParts(moto.parts));
+    this.engineOf(moto).crankEnds = now + MOTO_CRANK_MS[moto.crank]!;
+    this.setEngine(moto, MOTO_ENGINE.CRANKING, now);
+  }
+  /** A try at starting coming to its end, and a tired engine dying by itself. */
+  private stepEngine(moto: Moto, now: number): void {
+    const engine = this.engineOf(moto);
+    if (moto.engine === MOTO_ENGINE.CRANKING) {
+      if (now < engine.crankEnds) return;
+      if (moto.crank === 0) this.setEngine(moto, MOTO_ENGINE.ON, now);
+      else { engine.retryAt = now + MOTO_RETRY_MS; this.setEngine(moto, MOTO_ENGINE.OFF, now); }
+    } else if (moto.engine === MOTO_ENGINE.ON && moto.riderId && Math.random() < motoStallChance(readMotoParts(moto.parts)) * TICK_MS / 1000) {
+      engine.retryAt = now + MOTO_RETRY_MS;
+      this.setEngine(moto, MOTO_ENGINE.OFF, now);
+    }
+  }
+  /** A blow to the bike: its parts lose condition by how hard it was and where (moto-parts.ts). */
+  private wearMoto(moto: Moto, closing: number, area: MotoHitArea): void {
+    moto.parts = writeMotoParts(wearMotoParts(readMotoParts(moto.parts), closing, area));
+  }
+
+  private motoObstacles(moto: Moto) {
+    return [...this.state.motos.values()].filter(other => other !== moto).map(other => motoObstacle(other));
+  }
+
+  /**
+   * A crash. The rider keeps going as the bike was going, with what it had hit (ragdoll.ts); the bike takes the blow: a square hit knocks it
+   * over, a glancing one leaves it rolling by itself until it falls (moto-crash.ts). A bike it ran into gets its share of the blow too.
+   */
+  private crashMoto(moto: Moto, hit: MotoHit, rider?: Player): void {
+    const vx = Math.sin(moto.yaw) * hit.speed, vz = Math.cos(moto.yaw) * hit.speed;
+    this.wearMoto(moto, hit.closing, motoHitArea(moto.yaw, hit.nx, hit.nz));
+    if (rider) this.throwRider(moto, rider, vx, vz, hit.closing);
+    const other = hit.solid?.startsWith('moto:') ? this.state.motos.get(hit.solid.slice('moto:'.length)) : undefined;
+    if (other && !other.phase) { this.wearMoto(other, hit.closing * .55, 'side'); this.knockMoto(other, vx * .55, vz * .55); }
+    if (hit.closing < Math.abs(hit.speed) * MOTO.GLANCING) {
+      moto.speed = hit.speed - hit.speed * Math.min(1, hit.closing / Math.abs(hit.speed)) * .4;
+      this.letLoose(moto, (Math.random() < .5 ? -1 : 1) * (.3 + hit.closing * .12));
+    } else this.knockMoto(moto, 0, 0, hit.speed);
+  }
+
+  /** Off the bike and flying, from the seat, with the speed it had. */
+  private throwRider(moto: Moto, rider: Player, vx: number, vz: number, closing: number): void {
+    moto.riderId = ''; moto.lights &= ~MOTO_LIGHT.BRAKE;
+    this.startThrown(rider, { x: moto.x, y: moto.y, z: moto.z, yaw: moto.yaw, vx, vz, closing, seated: true, seed: Math.floor(Math.random() * 0xffffffff) });
+    this.achieved(rider.id, 'barbeiro');
+    this.log('moto_crash', { playerId: rider.id, moto: moto.id, speed: +Math.hypot(vx, vz).toFixed(1), closing: +closing.toFixed(1) });
+  }
+
+  /** `hurt`: the life this blow takes. All but the last point go at once; that one waits for the body to land, so nobody faints in the air. */
+  private startThrown(player: Player, start: RagdollStart, hurt = 0): void {
+    const presence = this.sessions.getByUser(player.id), now = Date.now(), atOnce = Math.min(hurt, Math.max(0, player.hp - 1));
+    this.dropHolding(player);
+    if (atOnce > 0) this.needs.damage(player, atOnce, now);
+    player.interactionState = THROWN; player.animationState = 'ragdoll'; player.animationStartedAt = now; player.drinkItem = '';
+    this.thrown.set(player.id, { sim: new Ragdoll(start), hurt: hurt - atOnce });
+    this.state.ragdolls.set(player.id, new RagdollState().assign({ ...start, startedAt: now }));
+    if (presence) { presence.queue.length = 0; presence.motoQueue.length = 0; presence.interactionEndsAt = undefined; presence.gestureEndsAt = undefined; player.lastProcessedInput = presence.lastReceived; }
+  }
+
+  /** The bodies go on until they stop; then getting up, from where they lie, whichever way they lie. */
+  private stepThrown(now: number): void {
+    for (const [id, body] of this.thrown) {
+      const player = this.state.players.get(id);
+      // Anything else that takes the player (falling unconscious, leaving): the body is no longer the crash's.
+      if (!player || player.interactionState !== THROWN) { this.thrown.delete(id); this.state.ragdolls.delete(id); continue; }
+      if (body.upAt) {
+        if (now < body.upAt) continue;
+        player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = now;
+        this.thrown.delete(id); this.state.ragdolls.delete(id);
         continue;
       }
-      moto.assign(stepMoto(moto, intent, TICK_MS / 1000));
-      if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; }
+      body.sim.advance(TICK_MS / 1000);
+      const rest = body.sim.rest();
+      player.x = rest.x; player.y = rest.y; player.z = rest.z;
+      if (!body.sim.asleep) continue;
+      if (body.hurt > 0) {
+        this.needs.damage(player, body.hurt, now); body.hurt = 0;
+        // No life left: the next tick's needs make this a faint, right where the body lies.
+        if (player.hp <= 0) continue;
+      }
+      // `levantar_chao` starts lying with the feet the way it faces and the hips behind its origin: turned and placed so it starts as the body lies.
+      const x = rest.x - Math.sin(rest.heading) * RECOVER_HIPS_BEHIND, z = rest.z - Math.cos(rest.heading) * RECOVER_HIPS_BEHIND;
+      // It may lie where nobody can stand (on a car, against a wall): the nearest place on foot.
+      const spot = isWalkable(x, z, rest.y) ? { x, y: rest.y, z } : standingPosition({ x, y: rest.y, z }, rest.heading);
+      player.x = spot.x; player.y = spot.y ?? rest.y; player.z = spot.z; player.rotation = rest.heading + Math.PI;
+      player.animationState = 'recover'; player.animationStartedAt = now; body.upAt = now + barClipMs('levantar_chao');
     }
+  }
+
+  /** On foot in the way of a bike going fast enough to crash: both go down. */
+  private strikeWalkers(moto: Moto, rider?: Player): void {
+    const speed = Math.abs(moto.speed);
+    if (speed < MOTO.CRASH_SPEED) return;
+    for (const player of this.state.players.values()) {
+      if (player === rider || !player.connected || player.interactionState || player.currentTableId || !motoStrikes(moto, player)) continue;
+      const way = Math.sign(moto.speed), vx = Math.sin(moto.yaw) * speed * way, vz = Math.cos(moto.yaw) * speed * way;
+      const hurt = motoStrikeHp(speed);
+      this.startThrown(player, { x: player.x, y: player.y ?? moto.y, z: player.z, yaw: player.rotation, vx: vx * .95, vz: vz * .95, closing: speed * .6, seated: false, seed: Math.floor(Math.random() * 0xffffffff) }, hurt);
+      this.log('moto_strike', { playerId: player.id, moto: moto.id, speed: +speed.toFixed(1), hp: hurt });
+      this.sessions.getByUser(player.id)?.client.send('moto.struck', { hp: hurt, by: rider?.displayName ?? '' });
+      this.crashMoto(moto, { speed: moto.speed, closing: speed * .45, nx: -Math.sin(moto.yaw) * way, nz: -Math.cos(moto.yaw) * way }, rider);
+      return;
+    }
+  }
+
+  private letLoose(moto: Moto, rollRate: number): void {
+    const loose = { roll: Math.sign(rollRate) * .02, rollRate };
+    this.fallenMotos.set(moto.id, { loose });
+    moto.phase = 'loose'; moto.riderId = '';
+    this.showMoto(moto, loosePose(moto, loose));
+  }
+  /** Knocked over: a rider on it comes off, and it goes down with the blow it took. */
+  private knockMoto(moto: Moto, vx: number, vz: number, speed = moto.speed): void {
+    if (moto.riderId) { const rider = this.state.players.get(moto.riderId); if (rider) this.throwRider(moto, rider, Math.sin(moto.yaw) * moto.speed + vx, Math.cos(moto.yaw) * moto.speed + vz, Math.hypot(vx, vz)); }
+    moto.riderId = '';
+    this.setEngine(moto, MOTO_ENGINE.OFF, Date.now());
+    this.wearMoto(moto, Math.max(MOTO_WEAR_FROM, Math.abs(speed) * MOTO_FALL_FORCE), 'fall');
+    const wreck = startWreck(moto, 0, (Math.random() < .5 ? -1 : 1) * (.35 + Math.random() * .5), speed, { vx, vz });
+    this.fallenMotos.set(moto.id, { wreck });
+    moto.phase = 'tumble';
+    this.showMoto(moto, wreckPose(wreck));
+  }
+  private showMoto(moto: Moto, pose: MotoPose): void { moto.assign(pose); moto.ticks++; }
+
+  /** A bike nobody holds: on its wheels, down, or being lifted. */
+  private stepFallenMoto(moto: Moto, now: number): void {
+    const sim = this.fallenMotos.get(moto.id);
+    if (moto.phase === 'down') return;
+    if (!sim) { moto.phase = ''; return; }
+    if (sim.lift) { this.stepLift(moto, sim.lift, now); return; }
+    if (sim.loose) {
+      const { body, hit, fell } = stepLoose(moto, sim.loose, TICK_MS / 1000, this.motoObstacles(moto));
+      moto.assign(body);
+      this.strikeWalkers(moto);
+      if (!this.fallenMotos.get(moto.id)?.loose) return;
+      if (hit && hit.closing >= MOTO.CRASH_SPEED) {
+        this.wearMoto(moto, hit.closing, motoHitArea(moto.yaw, hit.nx, hit.nz));
+        const other = hit.solid?.startsWith('moto:') ? this.state.motos.get(hit.solid.slice('moto:'.length)) : undefined;
+        if (other && !other.phase) { this.wearMoto(other, hit.closing * .55, 'side'); this.knockMoto(other, Math.sin(moto.yaw) * hit.speed * .55, Math.cos(moto.yaw) * hit.speed * .55); }
+        sim.wreck = startWreck(moto, sim.loose.roll, sim.loose.rollRate, hit.speed);
+      } else if (fell || !moto.speed) sim.wreck = startWreck(moto, sim.loose.roll, sim.loose.rollRate || (Math.random() < .5 ? -.4 : .4), moto.speed);
+      if (sim.wreck) {
+        sim.loose = undefined; moto.phase = 'tumble';
+        this.setEngine(moto, MOTO_ENGINE.OFF, now);
+        this.wearMoto(moto, Math.max(MOTO_WEAR_FROM, Math.abs(moto.speed) * MOTO_FALL_FORCE), 'fall');
+        this.showMoto(moto, wreckPose(sim.wreck));
+      }
+      else this.showMoto(moto, loosePose(moto, sim.loose));
+      return;
+    }
+    if (!sim.wreck) return;
+    const lies = stepWreck(sim.wreck, TICK_MS / 1000);
+    this.showMoto(moto, wreckPose(sim.wreck));
+    // Its bars flop towards the side it lies on.
+    moto.steer += (motoLeanSide(moto) < 0 ? 1 : -1) * .1; moto.steer = Math.max(-1, Math.min(1, moto.steer));
+    if (!lies) return;
+    moto.speed = 0; moto.phase = 'down'; moto.lights = 0; this.fallenMotos.delete(moto.id);
+  }
+
+  /** Near a fallen bike, E lifts it: the body beside it, by the seat, and in a moment it is on its wheels. */
+  private startLift(moto: Moto, player: Player, presence: Presence): void {
+    const upright = motoUprightSpot(moto), side = motoLeanSide(moto), spot = motoLiftSpot(upright, side), now = Date.now();
+    player.x = spot.x; player.y = spot.y; player.z = spot.z; player.rotation = Math.atan2(upright.x - spot.x, upright.z - spot.z);
+    player.interactionState = `${LIFTING}${moto.id}`; player.animationState = 'moto-lift'; player.animationStartedAt = now; player.drinkItem = '';
+    presence.queue.length = 0; presence.motoQueue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    moto.phase = 'lifting'; moto.lifterId = player.id; moto.ticks++;
+    this.fallenMotos.set(moto.id, { lift: { from: [moto.qx, moto.qy, moto.qz, moto.qw], to: uprightQuat(upright.yaw, upright.pitch), fromAt: { x: moto.x, y: moto.y, z: moto.z }, at: upright, startedAt: now } });
+  }
+  private stepLift(moto: Moto, lift: NonNullable<ReturnType<BarRoom['fallenMotos']['get']>>['lift'] & {}, now: number): void {
+    const lifter = this.state.players.get(moto.lifterId), done = (now - lift.startedAt) / MOTO.LIFT_MS;
+    // Whoever was lifting it let go (left, fell unconscious): it falls back where it was.
+    if (!lifter?.connected || lifter.interactionState !== `${LIFTING}${moto.id}`) {
+      moto.assign({ ...lift.fromAt, qx: lift.from[0], qy: lift.from[1], qz: lift.from[2], qw: lift.from[3] });
+      moto.phase = 'down'; moto.lifterId = ''; moto.ticks++; this.fallenMotos.delete(moto.id);
+      return;
+    }
+    if (done < 1) {
+      // Slowly off the ground, then the weight comes over the wheels and it rises quicker.
+      const eased = done * done * (3 - 2 * done), [qx, qy, qz, qw] = blendQuat(lift.from, lift.to, eased);
+      moto.assign({ x: lift.fromAt.x + (lift.at.x - lift.fromAt.x) * eased, y: lift.fromAt.y + (lift.at.y - lift.fromAt.y) * eased, z: lift.fromAt.z + (lift.at.z - lift.fromAt.z) * eased, qx, qy, qz, qw });
+      moto.ticks++;
+      return;
+    }
+    moto.assign({ ...lift.at, speed: 0, steer: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
+    moto.phase = ''; moto.lifterId = ''; moto.ticks++; this.fallenMotos.delete(moto.id);
+    lifter.interactionState = ''; lifter.animationState = 'idle'; lifter.animationStartedAt = now;
   }
 
   private mountMoto(client: Client, motoId: string): void {
@@ -794,12 +1083,48 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!moto) throw new Error('Essa moto não está aqui.');
     if (player.interactionState || player.currentTableId || player.animationState === 'kick' || !isConscious(player)) throw new Error('Encerre a ação atual antes de subir na moto.');
     if (moto.riderId) throw new Error('Alguém já está nessa moto.');
+    if (this.beingRepaired(moto.id)) throw new Error('Alguém está consertando essa moto.');
+    if (moto.phase === 'lifting') throw new Error('Alguém já está levantando essa moto.');
+    if (moto.phase === 'loose' || moto.phase === 'tumble') throw new Error('Espere a moto parar.');
+    if (moto.phase === 'down') {
+      if (!canLiftMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
+      this.startLift(moto, player, presence);
+      return;
+    }
     if (!canMountMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
-    moto.riderId = player.id;
+    moto.riderId = player.id; moto.lights = 0;
     player.x = moto.x; player.y = moto.y; player.z = moto.z; player.rotation = moto.yaw;
     player.interactionState = motoInteraction(moto.id); player.animationState = 'ride'; player.animationStartedAt = Date.now(); player.drinkItem = '';
-    presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoInputAt = 0; player.lastProcessedInput = presence.lastReceived;
-    this.motoLeftAt.delete(moto.id);
+    presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoInputAt = 0; presence.motoBudget = 1; presence.motoBudgetAt = Date.now(); player.lastProcessedInput = presence.lastReceived;
+    this.crankEngine(moto, Date.now());
+  }
+
+  private beingRepaired(motoId: string): boolean {
+    // Someone who left mid-repair does not hold the bike: their avatar stays for a while, working on nothing.
+    for (const player of this.state.players.values()) if (player.connected && repairOf(player.interactionState)?.motoId === motoId) return true;
+    return false;
+  }
+  /** Anyone beside a bike that is not moving: one piece from the backpack, a few seconds of work, and that part is better (moto-parts.ts). */
+  private async repairMoto(client: Client, motoId: string, part: MotoPartId): Promise<void> {
+    const player = this.player(client), presence = this.forClient(client)!, moto = this.state.motos.get(motoId);
+    if (!moto) throw new Error('Essa moto não está aqui.');
+    if (player.interactionState || player.currentTableId || player.animationState === 'kick') throw new Error('Encerre a ação atual antes de consertar a moto.');
+    if (moto.riderId) throw new Error('Alguém está pilotando essa moto.');
+    if (!canRepairMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto, com ela parada.');
+    if (readMotoParts(moto.parts)[part] >= 100) throw new Error('Essa parte está perfeita.');
+    if (this.beingRepaired(motoId)) throw new Error('Alguém já está consertando essa moto.');
+    if ((presence.inventory.get(MOTO_REPAIR.item) ?? 0) < MOTO_REPAIR.pieces) throw new Error('Você precisa de uma peça de moto. A loja da casa vende.');
+    // Taken before the piece is, so nobody gets on the bike while the backpack answers.
+    const working = motoRepairInteraction(motoId, part);
+    player.interactionState = working; player.animationState = 'use'; player.animationStartedAt = Date.now(); player.drinkItem = '';
+    player.rotation = Math.atan2(moto.x - player.x, moto.z - player.z);
+    presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    let view: InventoryView;
+    try { view = await this.removeInventory(presence, MOTO_REPAIR.item, MOTO_REPAIR.pieces, 'use'); }
+    catch (error) { if (player.interactionState === working) { player.interactionState = ''; player.animationState = 'idle'; } throw error; }
+    if (this.forClient(client) !== presence) return;
+    if (player.interactionState === working) presence.interactionEndsAt = Date.now() + MOTO_REPAIR.ms;
+    this.sendInventory(presence, view);
   }
 
   /** The rider gets off on the left and the bike stays there, unless it is still going too fast. */
@@ -807,12 +1132,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     const moto = this.state.motos.get(player.interactionState.slice('moto:'.length));
     if (!moto) { player.interactionState = ''; player.animationState = 'idle'; return; }
     if (Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) throw new Error('Diminua a velocidade para descer da moto.');
-    moto.speed = 0; moto.steer = 0;
+    moto.speed = 0; moto.steer = 0; moto.lights = 0;
     this.freeMoto(moto, player);
   }
 
   private freeMoto(moto: Moto, rider?: Player): void {
-    moto.riderId = ''; this.motoLeftAt.set(moto.id, Date.now());
+    moto.riderId = '';
+    this.setEngine(moto, MOTO_ENGINE.OFF, Date.now());
     if (!rider) return;
     if (rider.interactionState === motoInteraction(moto.id)) {
       Object.assign(rider, motoDismountSpot(moto));
@@ -820,6 +1146,22 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     const presence = this.sessions.getByUser(rider.id);
     if (presence) { presence.queue.length = 0; presence.motoQueue.length = 0; rider.lastProcessedInput = presence.lastReceived; }
+  }
+
+  /** Takes a bike off the map; whoever rides it stands beside where it was. */
+  private despawnMoto(id: string): void {
+    const moto = this.state.motos.get(id);
+    if (!moto) return;
+    const rider = moto.riderId ? this.state.players.get(moto.riderId) : undefined;
+    if (rider) {
+      this.freeMoto(moto, rider);
+      this.sessions.getByUser(rider.id)?.client.send('error', { message: 'Um administrador recolheu a moto.' });
+    }
+    const lifter = moto.lifterId ? this.state.players.get(moto.lifterId) : undefined;
+    if (lifter?.interactionState === `${LIFTING}${id}`) { lifter.interactionState = ''; lifter.animationState = 'idle'; lifter.animationStartedAt = Date.now(); }
+    this.fallenMotos.delete(id);
+    this.motoEngines.delete(id);
+    this.state.motos.delete(id);
   }
 
   private serveDrinks(now: number): void {
@@ -842,6 +1184,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (objectId === 'stand') {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
       if (isRidingMoto(player.interactionState)) { this.dismountMoto(player); return; }
+      // On the ground after a crash, or lifting a bike: it ends by itself.
+      if (player.interactionState === THROWN || player.interactionState.startsWith(LIFTING) || isRepairingMoto(player.interactionState)) return;
       // On the stage, standing up is putting the instrument back: the stop clip plays first.
       if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
       if (player.interactionState.startsWith('foosball:')) { this.leaveFoosball(player); return; }
@@ -989,7 +1333,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if(events.picked)this.sessions.getByUser(events.picked.playerId)?.client.send('table.state',{status:'ordered',order:{...publicOrder(events.picked),waiter:'Tonico',stage:'carrying'}});
     if(events.placing)this.served.place(events.placing.order,events.placing.plan,now);
     // Seated customers have what is in front of them, a little at a time.
-    this.served.update(now,this.seated,(playerId,item,portion)=>{const player=this.state.players.get(playerId);if(player)this.needs.consume(player,item,now,portion);});
+    this.served.update(now,this.seated,(playerId,item,portion)=>{const player=this.state.players.get(playerId);if(player)this.consume(player,item,now,portion);});
     if(events.delivered)this.tableDelivered(events.delivered,'O Tonico',now);
     if(events.dropped){
       const {order,reason}=events.dropped,presence=this.sessions.getByUser(order.playerId);
@@ -1000,6 +1344,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** An order reached its table (its items are there): the customer is told, and starts on it. */
   private tableDelivered(order:TableOrder,by:string,now:number,workerId?:string):void {
     const player=this.state.players.get(order.playerId);
+    this.achieved(order.playerId,'fregues');
     this.sessions.getByUser(order.playerId)?.client.send('table.state',{status:'delivered',order:publicOrder(order),message:`${by} deixou tudo na mesa. Bom apetite!`});
     if(player)this.systemMessage(`${by} entregou o pedido de ${player.displayName}. Bom apetite!`,player);
     this.log('table_delivered',{playerId:order.playerId,orderId:order.id,total:order.total,waitMs:now-order.placedAt,...workerId?{workerId}:{}});
@@ -1021,6 +1366,7 @@ export class BarRoom extends Room<{ state: BarState }> {
           if(player){player.carrying='';player.carryingOrder='';}
           this.tableDelivered(order,player?.displayName??'O ajudante',now,event.playerId);
         }
+        this.achieved(event.playerId,'ajudante');
         this.payJob(event.payment);
         if(presence)this.sendJob(presence);
       }else if(event.type==='changed'){if(presence)this.sendJob(presence);}
@@ -1069,6 +1415,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000),
         orders:s.orders.map(o=>({...publicOrder(o.order),customer:o.customer,table:o.table,picked:o.picked}))}))})),
       dirtyTables:this.served.dirtyTables(),
+      motos:[...this.state.motos.values()].map(m=>({id:m.id,x:+m.x.toFixed(1),y:+m.y.toFixed(1),z:+m.z.toFixed(1),speed:+m.speed.toFixed(1),phase:m.phase,riderId:m.riderId,rider:m.riderId?this.state.players.get(m.riderId)?.displayName??'':''})),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
       musicians:this.musicians.snapshot(),prices:this.prices,pricesLoaded:this.pricesLoaded,logQueue:this.logQueue.length,walletRetries:this.walletRetries.size,
       process:{uptimeS:Math.round(process.uptime()),node:process.version,pid:process.pid,rss:process.memoryUsage().rss,heapUsed:process.memoryUsage().heapUsed,
@@ -1099,6 +1446,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const item=itemById(itemId);if(!item)throw new Error('Item inválido.');
     const player=this.player(client),presence=this.forClient(client)!;
     if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a ação atual antes de usar um item.');
+    if(item.category==='peca')throw new Error('Essa peça se usa na moto: botão direito nela, Informações do veículo.');
     const inHand=consumedOverTime(itemId);
     if(inHand&&player.holding)throw new Error(`Ainda na mão: ${holdingName(player.holding)}. Termine antes de pegar outro item.`);
     const view=await this.removeInventory(presence,itemId,1,'use');
@@ -1117,8 +1465,20 @@ export class BarRoom extends Room<{ state: BarState }> {
   private finishInteraction(player: Player, presence: Presence, now: number): void {
     presence.interactionEndsAt = undefined;
     if (player.animationState === 'stand-up') { this.finishStandUp(player); return; }
-    if(presence.inventoryItem){const used=presence.inventoryItem;this.needs.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;}
-    if (player.interactionState.startsWith('toilet-') || player.interactionState.startsWith('mictorio-')) this.needs.relieve(player, now);
+    if (player.animationState === 'cigarette' || player.animationState === 'smoke-stop') this.achieved(player.id, 'fumante');
+    const repair = repairOf(player.interactionState), repaired = repair && this.state.motos.get(repair.motoId);
+    if (repair && repaired) {
+      const parts = readMotoParts(repaired.parts);
+      parts[repair.part] = Math.min(100, parts[repair.part] + MOTO_REPAIR.amount);
+      repaired.parts = writeMotoParts(parts);
+      this.achieved(player.id, 'mecanico');
+      this.log('moto_repair', { playerId: player.id, moto: repaired.id, part: repair.part, condition: Math.round(parts[repair.part]) });
+    }
+    if(presence.inventoryItem){const used=presence.inventoryItem;this.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;}
+    if (player.interactionState.startsWith('toilet-') || player.interactionState.startsWith('mictorio-')) {
+      if (player.bladder >= ACHIEVEMENT_BLADDER_MIN) this.achieved(player.id, 'bexiga-solta');
+      this.needs.relieve(player, now);
+    }
     player.interactionState = ''; player.animationState = 'idle'; player.drinkItem = '';
   }
   /**
@@ -1141,14 +1501,14 @@ export class BarRoom extends Room<{ state: BarState }> {
   private updateHolding(player: Player, presence: Presence, now: number): void {
     const item = player.holding, progress = Math.min(1, (now - player.holdingSince) / Math.max(1, player.holdingUntil - player.holdingSince));
     const portion = progress - (this.holdingConsumed.get(player.id) ?? 0);
-    if (portion >= HOLDING_SIP || (progress >= 1 && portion > 0)) { this.holdingConsumed.set(player.id, progress); this.needs.consume(player, item, now, portion); }
+    if (portion >= HOLDING_SIP || (progress >= 1 && portion > 0)) { this.holdingConsumed.set(player.id, progress); this.consume(player, item, now, portion); }
     if (progress < 1) return;
     this.dropHolding(player);
     if (!player.interactionState && !player.currentTableId && isConscious(player) && this.needs.sick(player, item, now)) this.startVomiting(player, presence, now);
   }
   /** Ending a toilet visit, or a backpack item used at once, early counts the part already done. */
   private consumePart(player: Player, presence: Presence, now: number): void {
-    if(presence.inventoryItem){this.needs.consume(player,presence.inventoryItem,now,(now-player.animationStartedAt)/Math.max(1,(presence.interactionEndsAt??now)-player.animationStartedAt));presence.inventoryItem=undefined;}
+    if(presence.inventoryItem){this.consume(player,presence.inventoryItem,now,(now-player.animationStartedAt)/Math.max(1,(presence.interactionEndsAt??now)-player.animationStartedAt));presence.inventoryItem=undefined;}
     if (player.interactionState.startsWith('toilet-') && presence.interactionEndsAt)
       this.needs.relieve(player, now, 1 - (presence.interactionEndsAt - now) / (NEEDS.bladder.toiletSeconds * 1000));
     if (player.interactionState.startsWith('mictorio-') && presence.interactionEndsAt)
@@ -1173,6 +1533,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     presence.interactionEndsAt = now + barClipMs('vomitar'); presence.gestureEndsAt = undefined;
     presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
     this.systemMessage(`${player.displayName} bebeu além da conta e passou mal.`, player);
+    this.achieved(player.id, 'passou-mal');
     this.log('vomit', { playerId: player.id, drunk: player.drunk });
   }
   /** The free corner of a table nearest to the worker, where `limpar_mesa` stands the body; none for other tables. */
@@ -1206,7 +1567,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     if (event.type === 'faint') {
       this.log('faint', { playerId: player.id, cause: event.cause });
-      if (event.cause === 'alcohol') { presence.recoveryMoveAt = now + NEEDS.faint.moveAfterSeconds * 1000; this.systemMessage(`${player.displayName} bebeu demais e apagou.`, player); }
+      if (event.cause === 'alcohol') { this.achieved(player.id, 'apagou'); presence.recoveryMoveAt = now + NEEDS.faint.moveAfterSeconds * 1000; this.systemMessage(`${player.displayName} bebeu demais e apagou.`, player); }
       else {
         this.systemMessage(`${player.displayName} desmaiou.`, player);
         // Keep the injectable inventory port useful for isolated modes/tests; the normal room uses the
@@ -1275,6 +1636,8 @@ export class BarRoom extends Room<{ state: BarState }> {
    */
   private assignMedia(schema:Jukebox,next:JukeboxState):void {
     const before=[schema.key,...schema.queue.map(entry=>entry.key)],{queue,...playback}=next;
+    // Counted as it starts: a video taken out of the queue gets its coins back and never counted.
+    if(next.key&&next.key!==schema.key&&next.by)this.achieved(next.by,'dj-de-boteco');
     if(playback.by&&!this.state.players.get(playback.by)?.connected)Object.assign(playback,{by:'',byName:''});
     schema.assign(playback);
     if(queue.map(entry=>entry.key).join()!==schema.queue.map(entry=>entry.key).join())schema.queue=new ArraySchema(...queue.map(entry=>new MediaEntry().assign(entry)));
@@ -1529,6 +1892,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const place = FOOSBALL_TABLES.find(t => t.id === summary.tableId)!, table = this.foosball.get(summary.tableId)!;
     for (const p of summary.players) this.log('foosball_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, team: p.team, result: p.result,
       score: summary.score, forfeit: summary.forfeit, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
+    if (!summary.forfeit) for (const p of summary.players) if (p.result === 'win') this.achieved(p.playerId, 'craque-do-pebolim');
     const origin = this.state.players.get(summary.players[0]?.playerId ?? ''), winner = table.winner;
     if (!origin || !winner) return;
     const names = table.slots.filter(s => s.team === winner && (s.playerId || s.cpu)).map(s => s.displayName);
@@ -1551,7 +1915,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (!self || !presence.client.view) continue;
       const visible = new Set<Schema>();
       // A rider is seen as far as the bike is (the bikes have no area of interest), not a bike riding itself.
-      for (const player of this.state.players.values()) if (player.id === id || isRidingMoto(player.interactionState) || distance(self, player) <= AOI_RADIUS) visible.add(player);
+      for (const player of this.state.players.values()) if (player.id === id || isRidingMoto(player.interactionState) || player.interactionState === THROWN || distance(self, player) <= AOI_RADIUS) visible.add(player);
       for (const npc of this.state.npcs.values()) if (distance(self, npc) <= AOI_RADIUS) visible.add(npc);
       for (const old of presence.seen) if (!visible.has(old)) presence.client.view.remove(old);
       for (const item of visible) if (!presence.seen.has(item)) presence.client.view.add(item);
@@ -1585,11 +1949,55 @@ export class BarRoom extends Room<{ state: BarState }> {
       // Prices and the log never hold up payments and results: they try again next round.
       if (!this.pricesLoaded) await this.reloadPrices().catch((error: unknown) => this.log('prices_unavailable', { message: error instanceof Error ? error.message : String(error) }));
       await this.flushLogs().catch(() => {});
+      await this.flushAchievements().catch((error: unknown) => this.log('achievements_unavailable', { message: error instanceof Error ? error.message : String(error) }));
     } catch (e) {
       worldMetrics.inc('bar_world_maintenance_failures_total', 'Maintenance rounds that failed (API unreachable or refused)');
       this.log('maintenance_retry', { message: e instanceof Error ? e.message : 'error', requestId: (e as { requestId?: string }).requestId });
     }
     finally { this.maintenanceBusy = false; }
+  }
+
+  /** Development bots earn nothing. */
+  private achieved(userId: string, series: string, amount = 1): void { if (!this.botIds.has(userId)) this.achievements.add(userId, series, amount); }
+  /** Having something: its effects, and its part towards the badges of what is being had. */
+  private consume(player: Player, item: string, now: number, portion = 1): void {
+    this.needs.consume(player, item, now, portion);
+    const series = seriesOfItem(item);
+    if (series) this.achieved(player.id, series, portion);
+  }
+  /** What counts by how long it lasts is read every few seconds: being in the city, dancing, playing on the stage. */
+  private countTime(now: number): void {
+    const seconds = Math.min(ACHIEVEMENT_SAMPLE_MS * 2, now - this.achievementsAt) / 1000;
+    this.achievementsAt = now;
+    for (const [id, presence] of this.sessions) {
+      const player = this.state.players.get(id);
+      if (!player?.connected || presence.revoked) continue;
+      this.achieved(id, 'frequentador', seconds);
+      if (player.animationState === 'dance') this.achieved(id, 'pe-de-valsa', seconds);
+      if (player.animationState === 'stage') this.achieved(id, 'estrela-do-palco', seconds);
+    }
+  }
+  /** Reports what was done, and tells whoever is here about the badges they got (from any source, the phone and the administration included). */
+  private async flushAchievements(): Promise<void> {
+    const events = this.achievements.take(), online = [...this.sessions].filter(([, presence]) => !presence.revoked && !presence.ticket.bot).map(([id]) => id);
+    if (!events.length && !online.length) return;
+    let answer: { unlocked?: Array<{ userId: string; badge: Badge }> };
+    try { answer = await internal('achievements', { events, online }); }
+    catch (error) {
+      // A refusal would be the same next time; anything else waits for the next round.
+      if (!(error instanceof InternalApiError && error.status < 500)) this.achievements.giveBack(events);
+      throw error;
+    }
+    for (const { userId, badge } of answer.unlocked ?? []) this.celebrate(userId, badge);
+  }
+  /** The player hears it with the card a click away; the bar hears about the rarer ones, and all of it about the rarest. */
+  private celebrate(userId: string, badge: Badge): void {
+    const presence = this.sessions.getByUser(userId), player = this.state.players.get(userId);
+    if (!presence || !player) return;
+    presence.client.send('achievement.unlocked', { badge });
+    this.log('achievement', { playerId: userId, badge: badge.name });
+    if (badge.rarity === 'legendary') this.systemMessage(`${player.displayName} conquistou o emblema lendário ${badge.name}!`);
+    else if (badge.rarity === 'rare' || badge.rarity === 'epic') this.systemMessage(`${player.displayName} conquistou o emblema ${badge.name}.`, player);
   }
 
   /** Reads the price table again and tells everyone in the bar; job pay follows its `job:<id>` price. */
@@ -1648,6 +2056,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   private recordResult(roundId: string, userId: string, result: Result): void {
     const outcome: MatchResult = result === 'push' ? 'draw' : result;
+    if (result === 'win') this.achieved(userId, 'rei-do-21');
     try { this.results.record(roundId, userId, outcome); health.outboxWritable = true; }
     catch (error) {
       health.outboxWritable = false; this.log('result_outbox_unavailable', { roundId, playerId: userId, error: error instanceof Error ? error.message : String(error) }); }
@@ -1728,7 +2137,11 @@ export class BarRoom extends Room<{ state: BarState }> {
         ...(call.answeredAt ? { answeredAt: call.answeredAt } : {}), ...(reason ? { reason } : {}), ...(call.video ? { video: true } : {}) } satisfies PhoneCallView);
     }
   }
-  private endCall(call: PhoneCall, reason: PhoneCallEnd, by?: string): void { if (this.phoneCalls.end(call.id)) this.sendCall(call, reason, by); }
+  private endCall(call: PhoneCall, reason: PhoneCallEnd, by?: string): void {
+    if (!this.phoneCalls.end(call.id)) return;
+    if (call.answeredAt && Date.now() - call.answeredAt >= ACHIEVEMENT_CALL_MS) { this.achieved(call.from, 'telefonista'); this.achieved(call.to, 'telefonista'); }
+    this.sendCall(call, reason, by);
+  }
   /** A player who drops or leaves ends their call: the other side hears it fall. */
   private dropCall(userId: string): void { const call = this.phoneCalls.of(userId); if (call) this.endCall(call, 'dropped', userId); }
 

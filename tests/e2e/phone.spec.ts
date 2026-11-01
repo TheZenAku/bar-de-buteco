@@ -21,20 +21,18 @@ async function openApp(page:Page,app:string):Promise<void>{
   await page.locator(`#phone .ph-home .ph-icon[data-app="${app}"]`).click();
   await expect(page.locator(`#phone .ph-app-${app}`)).toBeVisible();
 }
-/** Pessoas no bar → Ficha: the other player's number, saved to the agenda. */
+/** Pessoas no bar → Perfil: the other player's contact, saved to the agenda. */
 async function saveFromCard(page:Page,id:string):Promise<string>{
   if(await page.locator('#phone.open').count())await page.keyboard.press('Escape');
   await page.locator('[data-action="people"]').first().click();
-  await page.locator(`[data-action="player-card"][data-id="${id}"]`).click();
-  await expect(page.locator('.player-card')).toBeVisible({timeout:20000});
-  const number=(await page.locator('.card-number').textContent())!.replace(/\D/g,'');
-  await page.locator('[data-action="card-save"]').click();
-  await expect(page.locator('.card-actions')).toContainText('Na sua agenda',{timeout:20000});
-  await page.locator('[data-action="close-modal"]').first().click();
-  return number;
+  await page.locator(`[data-action="profile"][data-id="${id}"]`).click();
+  await page.locator('.pf-profile [data-pf="save"]').click({timeout:20000});
+  await expect(page.locator('.pf-profile [data-pf="message"]')).toBeVisible({timeout:20000});
+  await page.locator('.pf-profile .fw-close').click();
+  return (await (await page.request.get(`/api/profile/${id}`)).json()).number;
 }
 
-test('the phone: numbers from the player card, Highzap with photos, voice notes and videos, a video call and Pix',async({browser})=>{
+test('the phone: numbers from the player\'s profile, Highzap with photos, voice notes and videos, a video call and Pix',async({browser})=>{
   test.setTimeout(420000);
   const a=await enter(browser,'Ligadora'),b=await enter(browser,'Atendente');
 
@@ -42,16 +40,16 @@ test('the phone: numbers from the player card, Highzap with photos, voice notes 
   await openApp(a.page,'highzap');
   await a.page.locator('#phone [data-zap="new"]').click();
   await expect(a.page.locator(`#phone [data-zap="open"][data-id="${b.id}"]`)).toHaveCount(0);
-  await expect(a.page.locator('#phone .ph-app-highzap .ph-empty')).toContainText('ficha');
-  // Your own card shows your number; the other player's card saves theirs.
+  await expect(a.page.locator('#phone .ph-app-highzap .ph-empty')).toContainText('Perfil');
+  // Your own profile shows your number; the other player's saves theirs.
   await a.page.keyboard.press('Escape');
   await a.page.locator('[data-action="people"]').first().click();
   await a.page.locator('[data-action="people-tab"][data-tab="account"]').click();
-  await a.page.locator(`[data-action="player-card"][data-id="${a.id}"]`).click();
-  await expect(a.page.locator('.player-card h3')).toHaveText('Ligadora',{timeout:20000});
-  const aNumber=(await a.page.locator('.card-number').textContent())!.replace(/\D/g,'');
+  await a.page.locator(`[data-action="profile"][data-id="${a.id}"]`).click();
+  await expect(a.page.locator('.pf-profile h2')).toHaveText('Ligadora',{timeout:20000});
+  const aNumber=(await a.page.locator('.pf-line b').textContent())!.replace(/\D/g,'');
   expect(aNumber).toMatch(/^9\d{8}$/);
-  await a.page.locator('[data-action="close-modal"]').first().click();
+  await a.page.locator('.pf-profile .fw-close').click();
   await saveFromCard(a.page,b.id);
 
   // Highzap: a text, then the stranger's side shows the number and can answer without saving it.

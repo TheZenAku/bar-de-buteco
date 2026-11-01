@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Matrix4, Quaternion, Vector3, Box3 } from 'three';
+import { prepareCity, publishedBaseMap, writeIfChanged } from './import-city.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const source = path.join(root, 'assets-bar/map/BarBoteco/export');
@@ -16,6 +17,8 @@ function read(name) {
   return { bytes, json, bin: bytes.subarray(28 + size), hash: createHash('sha256').update(bytes).digest('hex') };
 }
 const visual = read('bar_boteco.glb'), collision = read('bar_boteco_colisao.glb');
+// The whole city is checked before anything is written: an export with a missing file publishes nothing.
+const city = prepareCity({ root, exportDir: source });
 const round = n => Math.round(n * 1e6) / 1e6;
 function matrices(json) {
   const parents = new Map(), cache = new Map();
@@ -45,6 +48,8 @@ for (let i = 0; i < collision.json.nodes.length; i++) {
   // Blender exports each movable door collider below an empty COLPORTA_* pivot. Door collision is
   // reconstructed from the visual door leaf at runtime; the empty is hierarchy, not a solid volume.
   if (node.name?.startsWith('COLPORTA_') && node.mesh === undefined) continue;
+  // The old neighbourhood's boundary walls would close the streets into the city (22_cidade_base.py makes them obsolete).
+  if (node.name?.startsWith('COL_Rua_Limite')) continue;
   if (!node.name?.startsWith('COL_') || node.mesh === undefined) throw new Error('Unexpected collision node');
   const box = new Box3(), isRamp = node.name.includes('Escada_Rampa');
   // Volumes people stand on: streets, floors and slabs, stairs, balconies, and the stage (15_palco.py) with its steps.
@@ -249,15 +254,8 @@ for (let i = 0; i < visual.json.nodes.length; i++) {
   doors.push({id:node.name, group:node.name.replace(/_[ED]$/, ''), x:round(hinge.x), y:round(hinge.y), z:round(hinge.z),
     closedYaw:round(closedYaw), openYaw:round(openYaw), min:local.min.toArray().map(round), max:local.max.toArray().map(round)});
 }
-// Playable bounds: the inner faces of the four street boundary walls.
-const limits = colliders.filter(c => c.id.startsWith('COL_Rua_Limite'));
-if (limits.length !== 4) throw new Error('Expected four COL_Rua_Limite walls');
-const bounds = {
-  minX: Math.max(...limits.filter(c => c.hz > c.hx && c.x < 0).map(c => c.x + c.hx)),
-  maxX: Math.min(...limits.filter(c => c.hz > c.hx && c.x > 0).map(c => c.x - c.hx)),
-  minZ: Math.max(...limits.filter(c => c.hx > c.hz && c.z < 0).map(c => c.z + c.hz)),
-  maxZ: Math.min(...limits.filter(c => c.hx > c.hz && c.z > 0).map(c => c.z - c.hz)),
-};
+// Playable bounds: the city's grid (cidade_setores.json); prepareCity checks that COL_Cid_Limite_* closes all four sides.
+const bounds = city.bounds;
 // The veranda's wooden ceiling (04_predio.py: polygon to VX = 23.8 and y = 15 at FORRO = 2.75) has no
 // collision volume, yet it must stop the camera boom. Glued to the facade at x/z = -0.57.
 const cameraCeilings = [
@@ -323,10 +321,14 @@ function readBarAnimations(){
   const topo=JSON.parse(read(path.join('animacoes','bar_mesa.glb')).json.scenes[0].extras.bar_animacoes).clipes.limpar_mesa.topo;
   return {groups,clips,tableTop:topo,counter:{magrao:place('Balcao_Lugar_Magrao'),delivery:place('Balcao_Entrega')},urinals};
 }
-const data = { visualHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
+const base = publishedBaseMap({json:visual.json,bytes:visual.bytes,binStart:28+visual.bytes.readUInt32LE(12)},city.sceneExtras);
+const data = { visualHash:createHash('sha256').update(base.bytes).digest('hex'), visualSourceHash:visual.hash, collisionHash:collision.hash, bounds, markers, effects, colliders, surfaces, cameraCeilings, doors, seats,
   tables:numberedTables, jukebox, stage, barAnimations };
 fs.mkdirSync(destination,{recursive:true});
-fs.copyFileSync(path.join(source,'bar_boteco.glb'),path.join(destination,'bar_boteco.glb'));
-fs.copyFileSync(path.join(source,'bar_boteco_colisao.glb'),path.join(destination,'bar_boteco_colisao.glb'));
-fs.writeFileSync(path.join(root,'packages/shared/src/map-data.json'),`${JSON.stringify(data,null,2)}\n`);
+const cityFiles = city.publish({publishDir:path.join(destination,'cidade'),sharedDir:path.join(root,'packages/shared/src')});
+writeIfChanged(path.join(destination,'bar_boteco.glb'),base.bytes);
+writeIfChanged(path.join(destination,'bar_boteco_colisao.glb'),collision.bytes);
+writeIfChanged(path.join(root,'packages/shared/src/map-data.json'),Buffer.from(`${JSON.stringify(data,null,2)}\n`));
 console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${effects.length} FX anchors, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats, ${numberedTables.length} numbered tables; all textures embedded.`);
+const {counts} = city, barriers = Object.values(base.counts).reduce((a,b)=>a+b,0);
+console.log(`City imported: ${counts.sectors} sectors, ${counts.solids} collision boxes, ${counts.markers} markers, ${counts.lights} lights, ${cityFiles} files published (${counts.gltfs} glTF, ${counts.textures} textures). Left out of the published copies: ${counts.silhouettes} silhouette triangles, ${counts.originalLods} LOD triangles over the original neighbourhood, ${barriers} triangles of the old sawhorses and cones.`);

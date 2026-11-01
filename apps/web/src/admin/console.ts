@@ -8,6 +8,8 @@ import {economySection} from './economy';
 import {pricesSection} from './prices';
 import {logsSection} from './logs';
 import {worldSection} from './world';
+import {vehiclesSection} from './vehicles';
+import {badgesSection} from './badges';
 import {serverSection} from './server';
 
 /** The administration's categories, in the menu's order. */
@@ -19,6 +21,8 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'prices',label:'Preços',icon:'tag',description:'Quanto custa cada coisa e quanto o bar paga. As mudanças valem para todos em poucos segundos.',factory:pricesSection},
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
+  {id:'vehicles',label:'Veículos',icon:'bike',description:'As motos de entrega do mapa: spawne uma perto de você ou tire do mapa as que não quer mais.',factory:vehiclesSection},
+  {id:'badges',label:'Emblemas',icon:'trophy',description:'Os emblemas da cidade: crie, edite, conceda e retire. Cada jogador escolhe até seis para mostrar no perfil.',factory:badgesSection},
   {id:'server',label:'Servidor',icon:'server',description:'Processos, memória, disco, banco de dados e filas entre a API e o mundo.',factory:serverSection},
 ];
 // The section the administration was on: reopening the window goes back to it.

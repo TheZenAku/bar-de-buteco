@@ -1,3 +1,5 @@
+import type {CityDetail} from './engine/city-plan';
+
 /** Graphics options of this browser (Configurações → Gráficos), applied by BarScene.setGraphics. */
 export type ShadowQuality='off'|'low'|'medium'|'high'|'ultra';
 export type FogDensity='light'|'normal'|'dense';
@@ -14,13 +16,15 @@ export interface GraphicsSettings {
   fpsCap:0|30|60|120;
   /** Sharper image on high-density screens (above 1.5× costs a lot on phones). */
   pixelRatioCap:1|1.5|2;
+  /** How much of the city around the player is drawn in full detail (city-plan.ts). */
+  city:CityDetail;
 }
 export const GRAPHICS_PRESETS:Record<Exclude<GraphicsPreset,'custom'>,Omit<GraphicsSettings,'preset'>>={
-  low:{renderScale:.6,dynamicResolution:true,shadows:'off',fog:'dense',fpsCap:30,pixelRatioCap:1},
-  medium:{renderScale:.8,dynamicResolution:true,shadows:'low',fog:'normal',fpsCap:60,pixelRatioCap:1},
+  low:{renderScale:.6,dynamicResolution:true,shadows:'off',fog:'dense',fpsCap:30,pixelRatioCap:1,city:'low'},
+  medium:{renderScale:.8,dynamicResolution:true,shadows:'low',fog:'normal',fpsCap:60,pixelRatioCap:1,city:'medium'},
   // Alto is exactly the previous fixed quality: nothing adapts unless the player turns it on.
-  high:{renderScale:1,dynamicResolution:false,shadows:'high',fog:'normal',fpsCap:0,pixelRatioCap:1.5},
-  ultra:{renderScale:1,dynamicResolution:false,shadows:'ultra',fog:'light',fpsCap:0,pixelRatioCap:2},
+  high:{renderScale:1,dynamicResolution:false,shadows:'high',fog:'normal',fpsCap:0,pixelRatioCap:1.5,city:'high'},
+  ultra:{renderScale:1,dynamicResolution:false,shadows:'ultra',fog:'light',fpsCap:0,pixelRatioCap:2,city:'ultra'},
 };
 export const PRESET_LABELS:Record<GraphicsPreset,string>={low:'Baixo',medium:'Médio',high:'Alto',ultra:'Ultra',custom:'Personalizado'};
 /** Phones and tablets start on Médio; computers on Alto. */
@@ -33,15 +37,17 @@ const pick=<T,>(value:unknown,options:readonly T[],fallback:T):T=>options.includ
 export function readGraphics(saved:unknown):GraphicsSettings {
   const fallback=defaultGraphics();
   if(!saved||typeof saved!=='object')return fallback;
-  const g=saved as Record<string,unknown>;
+  const g=saved as Record<string,unknown>,preset=pick(g.preset,['low','medium','high','ultra','custom'] as const,fallback.preset);
   return {
-    preset:pick(g.preset,['low','medium','high','ultra','custom'] as const,fallback.preset),
+    preset,
     renderScale:typeof g.renderScale==='number'&&Number.isFinite(g.renderScale)?Math.max(.5,Math.min(1,g.renderScale)):fallback.renderScale,
     dynamicResolution:typeof g.dynamicResolution==='boolean'?g.dynamicResolution:fallback.dynamicResolution,
     shadows:pick(g.shadows,['off','low','medium','high','ultra'] as const,fallback.shadows),
     fog:pick(g.fog,['light','normal','dense'] as const,fallback.fog),
     fpsCap:pick(g.fpsCap,[0,30,60,120] as const,fallback.fpsCap),
     pixelRatioCap:pick(g.pixelRatioCap,[1,1.5,2] as const,fallback.pixelRatioCap),
+    // Saved before the city existed: what its preset would choose.
+    city:pick(g.city,['low','medium','high','ultra'] as const,preset==='custom'?fallback.city:GRAPHICS_PRESETS[preset].city),
   };
 }
 /** Fog start/end multiplier: denser fog also hides more of the distant city, which is cheaper to draw. */

@@ -13,7 +13,7 @@ test('Nathan is free for new accounts; purchases persist and duplicate/racing re
   assert.equal(register.json().user.equippedSkin,'nathan');assert.equal('character' in register.json().user,false);
   assert.equal((await post('/api/game-ticket',{})).statusCode,200,'A new account enters the bar without any appearance step');
   let view=(await get('/api/wardrobe')).json();assert.equal(view.balance,0);
-  assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['read',false,850],['gilmar-gordo',false,900]]);
+  assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['read',false,850],['gilmar-gordo',false,900],['gabriel',false,900],['flavio-hipotetico',false,900]]);
   assert.equal((await post('/api/wardrobe/daily',{})).statusCode,409,'No income is enabled by default');
   assert.equal((await post('/api/wardrobe/buy',{skin:'nathan'})).statusCode,200,'Buying the free skin is a no-op');
   assert.equal((await post('/api/wardrobe/equip',{skin:'rafael'})).statusCode,403);

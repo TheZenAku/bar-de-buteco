@@ -4,7 +4,7 @@ type ColumnSpec=readonly [type:string,nullable?:boolean,defaultFragment?:string]
 const columns:Record<string,Record<string,ColumnSpec>>={
   bar_schema_migrations:{name:['text'],checksum:['text'],applied_at:['timestamp with time zone',false,'now()']},
   users:{id:['text'],username:['text'],email:['text'],password_hash:['text'],role:['text',false,"'player'::text"],verified:['boolean',false,'false'],created_at:['timestamp with time zone',false,'now()']},
-  user_profiles:{user_id:['text'],display_name:['text'],avatar_config:['jsonb',false,'#cf7549'],equipped_skin:['text',false,"'nathan'::text"]},
+  user_profiles:{user_id:['text'],display_name:['text'],avatar_config:['jsonb',false,'#cf7549'],equipped_skin:['text',false,"'nathan'::text"],status_message:['text',false,"''::text"],skill_loadouts:['jsonb',false,"'{}'::jsonb"]},
   sessions:{id:['text'],user_id:['text'],token_hash:['text'],expires_at:['timestamp with time zone'],created_at:['timestamp with time zone',false,'now()']},
   email_verifications:{token_hash:['text'],user_id:['text'],expires_at:['timestamp with time zone']},
   password_resets:{token_hash:['text'],user_id:['text'],expires_at:['timestamp with time zone']},
@@ -26,6 +26,10 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   gram_likes:{post_id:['text'],user_id:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_comments:{id:['text'],post_id:['text'],author_id:['text'],body:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_profiles:{user_id:['text'],handle:['text'],name:['text'],bio:['text',false,"''::text"],photo:['text',true],photo_at:['timestamp with time zone',true],updated_at:['timestamp with time zone',false,'now()']},
+  badges:{id:['text'],name:['text'],description:['text'],icon:['text'],color:['text'],rarity:['text',false,"'common'::text"],image_id:['text',true],created_at:['timestamp with time zone',false,'now()']},
+  badge_images:{id:['text'],bytes:['bytea'],size:['integer'],created_at:['timestamp with time zone',false,'now()']},
+  user_badges:{user_id:['text'],badge_id:['text'],shown_at:['smallint',true],granted_at:['timestamp with time zone',false,'now()'],notified_at:['timestamp with time zone',true]},
+  user_achievements:{user_id:['text'],series:['text'],value:['integer',false,'0'],updated_at:['timestamp with time zone',false,'now()']},
   gram_follows:{follower_id:['text'],followed_id:['text'],created_at:['timestamp with time zone',false,'now()']},
   phone_media:{id:['text'],owner_id:['text'],kind:['text'],mime:['text'],bytes:['bytea'],size:['integer'],duration_ms:['integer',true],created_at:['timestamp with time zone',false,'now()']},
   economy_prices:{key:['text'],value:['integer'],updated_by:['text',true],updated_at:['timestamp with time zone',false,'now()']},
@@ -38,7 +42,7 @@ const primaryKeys:Record<string,string>={
   blocks:'user_id,blocked_id',reports:'id',moderation_actions:'id',game_statistics:'user_id',game_results:'id',
   game_controls:'id',wallets:'user_id',skin_inventory:'user_id,skin_id',currency_ledger:'id',item_inventory:'user_id,item_id',inventory_ledger:'id',
   phone_lines:'user_id',phone_contacts:'owner_id,contact_id',phone_messages:'id',gram_posts:'id',gram_likes:'post_id,user_id',gram_comments:'id',
-  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',
+  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',badges:'id',user_badges:'user_id,badge_id',badge_images:'id',user_achievements:'user_id,series',
 };
 
 const foreignKeys:Array<readonly [table:string,column:string,cascade:boolean]>=[
@@ -49,19 +53,19 @@ const foreignKeys:Array<readonly [table:string,column:string,cascade:boolean]>=[
   ['phone_lines','user_id',true],['phone_contacts','owner_id',true],['phone_contacts','contact_id',true],['phone_messages','sender_id',true],['phone_messages','recipient_id',true],
   ['gram_posts','author_id',true],['gram_likes','user_id',true],['gram_comments','author_id',true],
   ['gram_profiles','user_id',true],['gram_follows','follower_id',true],['gram_follows','followed_id',true],['phone_media','owner_id',true],
-  ['reports','resolved_by',false],['economy_prices','updated_by',false],
+  ['reports','resolved_by',false],['economy_prices','updated_by',false],['user_badges','user_id',true],['user_achievements','user_id',true],
 ];
 
 const uniqueConstraints:Array<readonly [table:string,column:string]>=[['users','username'],['users','email'],['sessions','token_hash'],['phone_lines','number'],['gram_profiles','handle']];
 const checkConstraints:Array<readonly [table:string,fragments:string[]]>=[
-  ['bar_schema_migrations',['length(checksum)=64']],
+  ['bar_schema_migrations',['length(checksum)=64']],['user_achievements',['value>=0']],
   ['users',['role','player','admin']],['blocks',['user_id<>blocked_id']],['wallets',['balance>=0']],
   ['item_inventory',['quantity>0']],['inventory_ledger',['quantity<>0']],
   ['phone_contacts',['owner_id<>contact_id']],['phone_messages',['sender_id<>recipient_id']],['phone_lines',['number']],
-  ['gram_follows',['follower_id<>followed_id']],['gram_profiles',['handle']],['economy_prices',['value>=0']],['game_logs',['source','api','world']],['phone_media',['kind','photo','audio','video']],['phone_messages',['media_kind','length(body)']],
+  ['gram_follows',['follower_id<>followed_id']],['gram_profiles',['handle']],['economy_prices',['value>=0']],['game_logs',['source','api','world']],['phone_media',['kind','photo','audio','video']],['phone_messages',['media_kind','length(body)']],['badge_images',['length(id)=64']],['badges',['rarity','common','legendary']],
 ];
 const indexes:Record<string,string[]>={
-  sessions_user_idx:['sessions','user_id'],moderation_user_idx:['moderation_actions','user_id,action'],
+  sessions_user_idx:['sessions','user_id'],user_badges_unnotified_idx:['user_badges','user_id','notified_atisnull'],moderation_user_idx:['moderation_actions','user_id,action'],
   currency_ledger_user_idx:['currency_ledger','user_id,created_at'],inventory_ledger_user_idx:['inventory_ledger','user_id,created_atdesc'],
   game_controls_status_created_idx:['game_controls','status,created_at'],
   phone_messages_pair_idx:['phone_messages','sender_id,recipient_id,created_atdesc'],phone_messages_unread_idx:['phone_messages','recipient_id,read_at'],

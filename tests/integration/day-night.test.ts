@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {DAY_NIGHT,daylightAt,gameHour,edgeVisibility} from '../../apps/web/src/engine/day-night';
-import {WORLD} from '../../packages/shared/src/world';
+import {DAY_NIGHT,daylightAt,gameHour} from '../../apps/web/src/engine/day-night';
+import {CITY_FOG,cityFog} from '@bar/shared';
 const at=(hour:number)=>DAY_NIGHT.epochMs+(hour-DAY_NIGHT.offsetHours)/24*DAY_NIGHT.durationMs;
 test('day-night clock is periodic, deterministic and handles negative times',()=>{
   for(const hour of [0,5.5,6,12,17.5,18,23.99]){
@@ -22,15 +22,15 @@ test('lighting, sky and fog change continuously including the midnight seam',()=
     const a=daylightAt(at(hour)),b=daylightAt(at(hour+.001));
     for(const key of ['sunIntensity','moonIntensity','night','exposure'] as const)assert.ok(Math.abs(a[key]-b[key])<.02);
     // Distances are hundreds of metres on the expanded map; continuity is measured at that scale.
-    for(const key of ['fogStart','fogEnd'] as const)assert.ok(Math.abs(a[key]-b[key])<.25);
+    const fogA=cityFog(a.night),fogB=cityFog(b.night);
+    for(const key of ['start','end'] as const)assert.ok(Math.abs(fogA[key]-fogB[key])<.25);
     for(const key of ['top','horizon','ambient','sunColor'] as const)for(let i=0;i<3;i++)assert.ok(Math.abs(a[key][i]-b[key][i])<.01);
-    assert.ok(a.fogEnd>a.fogStart&&a.fogStart>=60&&a.fogEnd>=430&&a.fogEnd<=520);
+    assert.ok(fogA.end>fogA.start&&fogA.start>=80&&fogA.start<=CITY_FOG.start&&fogA.end>=540&&fogA.end<=CITY_FOG.end);
   }
   assert.deepEqual(daylightAt(at(0)),daylightAt(at(24)));
 });
-test('rim fog fully masks all four boundaries and preserves the central bar',()=>{
-  const {minX,maxX,minZ,maxZ}=WORLD,cx=(minX+maxX)/2,cz=(minZ+maxZ)/2;
-  for(const [x,z] of [[minX,cz],[maxX,cz],[cx,minZ],[cx,maxZ],[minX-2,cz]])assert.equal(edgeVisibility(x,z,WORLD),0);
-  assert.equal(edgeVisibility(16,-13,WORLD),1);
-  assert.equal(edgeVisibility(minX+4,cz,WORLD),.5);
+test('the day takes the fog the city was authored with, and the night closes it in a little',()=>{
+  const noon=cityFog(daylightAt(at(12)).night),midnight=cityFog(daylightAt(at(0)).night);
+  assert.deepEqual(noon,CITY_FOG);
+  assert.ok(midnight.end<noon.end&&midnight.start<noon.start);
 });

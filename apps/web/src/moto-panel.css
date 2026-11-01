@@ -1,0 +1,48 @@
+/* The vehicle's panel (moto-panel.ts): parts on the left, the bike from above and the chosen part on the right; the small right-click menu. */
+.modal.moto-modal{width:820px}
+.moto-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-bottom:12px;background:var(--border)}
+.moto-summary>div{padding:6px 14px;background:oklch(.12 .045 300)}
+.moto-summary small{display:block;font:400 10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground)}
+.moto-summary b{display:block;margin-top:3px;font:500 16px var(--font-mono);color:var(--foreground)}
+.moto-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.moto-group{display:grid;gap:2px;margin-bottom:8px}
+.moto-group h4{margin:0 0 3px;font:400 10px var(--font-mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted-foreground)}
+.moto-part{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;width:100%;padding:5px 10px 7px;text-align:left;font-size:13px;color:var(--foreground);background:oklch(1 0 0 / 3%);border:0;cursor:pointer}
+.moto-part:hover{background:var(--secondary)}
+.moto-part[aria-pressed=true],.moto-part[aria-pressed=true]:hover{background:var(--active);color:var(--active-foreground)}
+.moto-part b{font:500 13px var(--font-mono);color:hsl(var(--hue) 85% 62%)}
+.moto-part[aria-pressed=true] b{color:inherit}
+.moto-part i{position:absolute;left:0;right:0;bottom:0;height:3px;background:oklch(1 0 0 / 8%)}
+.moto-part i::after{content:'';display:block;width:var(--condition);height:100%;background:hsl(var(--hue) 85% 52%)}
+.moto-side{display:grid;gap:12px}
+.moto-drawing{display:flex;justify-content:center;padding:6px;background:oklch(1 0 0 / 3%)}
+.moto-plan{width:auto;height:180px}
+.moto-plan [data-part]{stroke:oklch(.1 .03 300);stroke-width:2.5}
+.moto-plan [data-part=bau]{fill:hsl(var(--bau) 70% 45%)}
+.moto-plan [data-part=lanterna]{fill:hsl(var(--lanterna) 70% 45%)}
+.moto-plan [data-part=pneu_traseiro]{fill:hsl(var(--pneu_traseiro) 70% 45%)}
+.moto-plan [data-part=pneu_dianteiro]{fill:hsl(var(--pneu_dianteiro) 70% 45%)}
+.moto-plan [data-part=carenagem]{fill:hsl(var(--carenagem) 70% 45%)}
+.moto-plan [data-part=motor]{fill:hsl(var(--motor) 70% 38%)}
+.moto-plan [data-part=bateria]{fill:hsl(var(--bateria) 70% 38%)}
+.moto-plan [data-part=escapamento]{fill:hsl(var(--escapamento) 70% 45%)}
+.moto-plan [data-part=suspensao]{fill:hsl(var(--suspensao) 70% 38%)}
+.moto-plan [data-part=freios]{fill:hsl(var(--freios) 70% 38%)}
+.moto-plan [data-part=direcao]{fill:hsl(var(--direcao) 70% 45%)}
+.moto-plan [data-part=farol]{fill:hsl(var(--farol) 70% 55%)}
+.moto-drawing[data-selected=bau] [data-part=bau],.moto-drawing[data-selected=lanterna] [data-part=lanterna],.moto-drawing[data-selected=pneu_traseiro] [data-part=pneu_traseiro],.moto-drawing[data-selected=pneu_dianteiro] [data-part=pneu_dianteiro],.moto-drawing[data-selected=carenagem] [data-part=carenagem],.moto-drawing[data-selected=motor] [data-part=motor],.moto-drawing[data-selected=bateria] [data-part=bateria],.moto-drawing[data-selected=escapamento] [data-part=escapamento],.moto-drawing[data-selected=suspensao] [data-part=suspensao],.moto-drawing[data-selected=freios] [data-part=freios],.moto-drawing[data-selected=direcao] [data-part=direcao],.moto-drawing[data-selected=farol] [data-part=farol]{stroke:#fff;stroke-width:4}
+.moto-detail header.moto-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.moto-detail header.moto-detail-head strong{font:500 22px var(--font-mono);color:hsl(var(--hue) 85% 62%)}
+.moto-status{color:hsl(var(--hue) 85% 62%)}
+.moto-detail .button{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.moto-detail .fine-print{margin:0;font-size:11px}
+.moto-work{display:grid;gap:6px;font-size:13px;color:var(--foreground)}
+.moto-work span{display:flex;align-items:center;gap:8px}
+.moto-work .ui-icon{width:14px;height:14px}
+.moto-work-bar{display:block;height:100%;width:0;background:var(--active);animation:moto-work linear forwards}
+@keyframes moto-work{to{width:100%}}
+.world-menu{position:fixed;z-index:390;min-width:210px;background:oklch(.12 .045 300 / 96%);box-shadow:0 8px 28px oklch(0 0 0 / 55%);border-top:2px solid transparent;border-image:var(--gradient-line) 1}
+.world-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;text-align:left;font-size:13px;color:var(--foreground);background:none;border:0;cursor:pointer}
+.world-menu button:hover,.world-menu button:focus-visible{background:var(--active);color:var(--active-foreground);outline:0}
+.world-menu .ui-icon{width:15px;height:15px}
+@media (max-width:760px){.moto-layout{grid-template-columns:minmax(0,1fr)}.moto-side{order:-1}}

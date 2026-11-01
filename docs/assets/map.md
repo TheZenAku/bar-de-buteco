@@ -1,24 +1,24 @@
 # Mapa BarBoteco
 
-O cenário ativo é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois arquivos são publicados integralmente em `apps/web/public/maps`.
+O cenário do bar e do bairro original é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois são publicados em `apps/web/public/maps`; a colisão como está, e o visual sem os cavaletes do limite antigo. Em volta dele fica a [cidade](../sistemas/cidade.md), de `export/cidade`, carregada por setores.
 
-Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json`. Esse arquivo alimenta a movimentação autoritativa, a previsão do cliente, as consultas de visibilidade da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
+Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json` e, para a cidade, `city-data.json` e `city-roads.json`. Esses arquivos alimentam a movimentação autoritativa, a previsão do cliente, as consultas de visibilidade da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
 
 ## Layout
 
-O bar continua no quarteirão central, agora cercado por um bairro de 5 × 5 quadras jogáveis e um anel externo de cenário em LOD. Os limites autoritativos vão de x −103 a 135 e de z −117 a 91 (o z do jogo é o y do Blender com sinal trocado).
+O bar continua no quarteirão central, cercado pelo bairro de 5 × 5 quadras e pelas casas do antigo anel, que agora fazem parte do Centro da cidade. Os limites autoritativos vêm da grade da cidade: x e z de −400 a +400 (o z do jogo é o y do Blender com sinal trocado).
 
 - **Bar térreo (0,30 m):** varandas, salão, balcão em L, cozinha, câmara fria, depósitos e banheiros.
 - **Piso superior (3,45 m):** salão de jogos, lounge, escritório, depósito e sacadas. A escada fica em x 13,25–16,45 e z −11,65 a −14,8, com patamar a 1,88 m.
 - **Terraço (3,45 m):** área sobre o anexo com mesas.
 - **Quintal (0,30 m):** pergolado, churrasqueira e palco a 0,90 m (`15_palco.py`), com degraus de 0,50 e 0,70 m no lado oeste.
-- **Bairro:** ruas, calçadas, casas, lojas, praça com coreto, igreja, escola, campinho, ponto de ônibus, carros, postes, árvores, fiação, prédios distantes, morros e panorama.
+- **Bairro:** ruas, calçadas, casas, lojas, praça com coreto, igreja, escola, campinho, ponto de ônibus, carros, postes, árvores e fiação. Morros e panorama vêm de `cidade_distante`.
 
 Os novos marcadores `Ponto_Praca`, `Ponto_Igreja`, `Ponto_Campinho`, `Ponto_Escola` e `Ponto_Onibus` também são importados e ficam disponíveis para futuras rotas e atividades.
 
 ## Colisões e interações
 
-O export fornece 1.557 volumes sólidos (o da jukebox, `COL_Int_Jukebox`, entre eles) e 134 triângulos de apoio. Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos, ruas, rampas, palco e escadas preservam as posições e dimensões exportadas.
+O export fornece 1.553 volumes sólidos (o da jukebox, `COL_Int_Jukebox`, entre eles; os quatro `COL_Rua_Limite` antigos ficam de fora) e 134 triângulos de apoio. A cidade acrescenta os seus ([colisão](../sistemas/cidade.md#colisão)). Paredes, móveis, casas, carros, postes, árvores, guarda-corpos, pisos, ruas, rampas, palco e escadas preservam as posições e dimensões exportadas.
 
 As 16 folhas de porta são dinâmicas. O importador ignora apenas seus pivôs vazios `COLPORTA_*`, lê a geometria real de cada folha e exporta dobradiça, largura e ângulos. A colisão acompanha individualmente o estado aberto ou fechado; veja [portas](../sistemas/doors.md).
 
@@ -64,12 +64,12 @@ O nascimento parte de `Spawn_Jogador`, na calçada, e procura o ponto livre mais
 
 ## Câmera e iluminação
 
-A câmera acompanha a altura do jogador com zoom contínuo e giro livre em qualquer ângulo. Paredes, lajes, portas e os demais colisores não encurtam a distância escolhida; obstáculos entre a câmera e o personagem abrem uma janela de raio-X em volta dele ([câmera](../sistemas/camera.md)). As colisões do jogador permanecem ativas. O plano distante foi ampliado para 1.100 m, conforme o valor autorado no mapa, para exibir o bairro, os prédios, os morros e o panorama. A névoa dinâmica começa entre 62–70 m e termina entre 430–520 m; uma máscara adicional nas bordas oculta o fim da área jogável.
+A câmera acompanha a altura do jogador com zoom contínuo e giro livre em qualquer ângulo. Paredes, lajes, portas e os demais colisores não encurtam a distância escolhida; obstáculos entre a câmera e o personagem abrem uma janela de raio-X em volta dele ([câmera](../sistemas/camera.md)). As colisões do jogador permanecem ativas. O plano distante é de 1.700 m (`camera_far_minimo_m` da cidade), para os morros e o panorama; o que tem detalhe não depende dele, e sim do streaming. A névoa vem dos extras da cena da cidade: de 90 a 650 m de dia e de 80 a 540 m à noite, multiplicada pela opção de névoa. O fim da área jogável é coberto pelo anel e pelo fundo distante.
 
 O importador glTF separa o sol das 13 luminárias do bar, preservando posições, cores e potências relativas. O ciclo completo de dia e noite dura 40 minutos; céu, lua, ambiente, névoa, luzes externas, festa e apagão permanecem integrados. Para limitar custo de GPU, doze focos externos com sombras atendem o entorno imediato do bar, enquanto o restante do bairro usa materiais emissivos, luz ambiente, lua e névoa.
 
 ## Testes
 
-`tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, a numeração 1–39 das mesas e a mesa de cada assento, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e consultas de visibilidade. `tests/integration/camera.test.ts` verifica o zoom e o giro livres da câmera, inclusive através das paredes. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
+`tests/integration/city.test.ts` verifica a publicação, a colisão e os limites da cidade. `tests/integration/map.test.ts` verifica hashes e publicação dos GLBs, as contagens, a numeração 1–39 das mesas e a mesa de cada assento, 128 posições de nascimento, escadas, rotas do navegador, balcão, assentos, jukebox, palco, barreiras e consultas de visibilidade. `tests/integration/camera.test.ts` verifica o zoom e o giro livres da câmera, inclusive através das paredes. `tests/integration/doors.test.ts` valida dimensões e giro das 16 folhas. Todos os 124 assentos precisam ter uma saída livre. `apps/server/test/npcs.test.ts` simula as rotas dos NPCs no mobiliário importado.
 
 Veja os [resultados da validação do mapa](../validacao/validation-map.md).

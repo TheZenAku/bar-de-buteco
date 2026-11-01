@@ -1,13 +1,13 @@
 import {test,expect} from '@playwright/test';
 
-test('all six rendered rigs return to the same pose after actions without resetting their skeletons',async({page})=>{
+test('all rendered rigs return to the same pose after actions without resetting their skeletons',async({page})=>{
   test.setTimeout(120000);
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.goto('/rigs.html');
   await page.evaluate(()=>(window as any).rigFixture.ready);
-  await expect(page.locator('#skin option')).toHaveCount(7);
+  await expect(page.locator('#skin option')).toHaveCount(9);
 
   // Use the actual loaded render entities and AnimComponent. The inspector normally resets
   // between selections for visual comparison; these transitions deliberately keep the graph.
@@ -51,7 +51,7 @@ test('all six rendered rigs return to the same pose after actions without resett
     }
     return results;
   });
-  expect(comparisons).toHaveLength(30);
+  expect(comparisons).toHaveLength(40);
   for(const {from,to,skin,maxError,bone} of comparisons)
     expect(maxError,`${skin}: ${bone} retained a pose from ${from} when entering ${to}`).toBeLessThan(.0001);
   expect(errors).toEqual([]);

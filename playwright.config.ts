@@ -9,7 +9,7 @@ export default defineConfig({
   projects:[
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
-    {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
+    {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts','**/mouse-capture.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
     {name:'camera',testMatch:'**/camera.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.4'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'media',testMatch:['**/jukebox.spec.ts','**/media-platforms.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'media-firefox',testMatch:'**/media-firefox.spec.ts',use:{browserName:'firefox',channel:'',launchOptions:{args:[]}}},
@@ -23,10 +23,13 @@ export default defineConfig({
     // Pebolim: the panel's canvas and the 3D ball at once, drawn on the GPU like the stage.
     {name:'foosball',testMatch:'**/foosball.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.6'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // The delivery bike: real keys over a real room, two players' worlds, drawn on the GPU like the stage.
-    {name:'moto',testMatch:'**/moto.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
+    {name:'moto',testMatch:['**/moto.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
+    // The city: streamed sectors, the real game on the bike; drawn on the GPU like the stage.
+    {name:'city',testMatch:'**/city.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.8'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'stage',testMatch:'**/stage.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.
     {name:'voice',testMatch:'**/voice.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.2'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
+    {name:'profile',testMatch:['**/profile.spec.ts','**/achievements.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.9'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'phone',testMatch:'**/phone.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.5'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
   ],
   webServer:{command:'node tests/e2e/server.mjs',url:'http://localhost:5273',reuseExistingServer:false,timeout:120000},

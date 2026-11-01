@@ -28,14 +28,14 @@ export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:
 ];
 
 /** Skins other than the free default (DEFAULT_SKIN). Names repeat SKINS (index.ts) to avoid an import cycle. */
-const SKIN_PRICES:ReadonlyArray<readonly [id:string,name:string,price:number]>=[['leandro','Leandro',750],['rafael','Rafael',1000],['read','Read',850],['gilmar-gordo','Gilmar',900]];
+const SKIN_PRICES:ReadonlyArray<readonly [id:string,name:string,price:number]>=[['leandro','Leandro',750],['rafael','Rafael',1000],['read','Read',850],['gilmar-gordo','Gilmar',900],['gabriel','Gabriel',900],['flavio-hipotetico','Flavio Hipotético',900]];
 const MEDIA_LABELS:Record<MediaPriceKind,string>={jukebox:'Jukebox',tv:'TV do salão',telao:'Telão do palco'};
 const envKey=(id:string)=>id.toUpperCase().replace(/-/g,'_');
 
 let entries:PriceEntry[]|undefined;
 export function priceEntries():readonly PriceEntry[]{
   return entries??=[
-    ...ITEM_CATALOG.map(item=>({key:`item:${item.id}`,group:'itens' as const,label:item.name,hint:item.id==='garrafa'||item.id==='copo'?'Balcão, mesa e mochila':item.category==='saude'?'Mochila':'Mesa e mochila',defaultValue:item.price,min:0,max:10_000})),
+    ...ITEM_CATALOG.map(item=>({key:`item:${item.id}`,group:'itens' as const,label:item.name,hint:item.id==='garrafa'||item.id==='copo'?'Balcão, mesa e mochila':item.category==='saude'?'Mochila':item.category==='peca'?'Loja da casa':'Mesa e mochila',defaultValue:item.price,min:0,max:10_000})),
     ...SKIN_PRICES.map(([id,name,price])=>({key:`skin:${id}`,group:'skins' as const,label:name,hint:'Coleção (C)',defaultValue:price,min:0,max:1_000_000})),
     ...(Object.keys(MEDIA_PRICES) as MediaPriceKind[]).map(kind=>({key:`media:${kind}`,group:'midia' as const,label:MEDIA_LABELS[kind],hint:'Por vídeo novo',defaultValue:MEDIA_PRICES[kind],min:0,max:10_000})),
     {key:'stage:pass',group:'palco',label:'Ingresso do palco',hint:`Vale ${STAGE_PASS.durationMs/60_000} minutos`,defaultValue:STAGE_PASS.price,min:0,max:10_000},

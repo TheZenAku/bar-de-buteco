@@ -7,7 +7,7 @@ O palco do quintal tem quatro lugares de músico: **violão**, **cavaquinho**, *
 1. Suba no palco com o ingresso (veja [economia](economia.md#palco)).
 2. Chegue a até 1,5 m de um lugar livre. O botão **E** mostra *Tocar violão*, *Tocar cavaquinho*, *Tocar bateria* ou *Cantar no microfone*. Um lugar em uso não é oferecido.
 3. Com **E**, o avatar desliza até o lugar em 0,35 s e toca quatro fases: pega o instrumento (`entrando`), começa (`comecando`), toca em loop (`loop`) e, quando pedido, guarda o instrumento e sai (`saindo`). Depois disso (`fim`), o lugar fica livre.
-4. Durante o show, o movimento, os emotes e o karatê ficam travados. **E** de novo (*Parar de tocar* ou *Parar de cantar*) guarda o instrumento. Pedido antes do loop, o fim começa assim que o começo acaba.
+4. Durante o show, o movimento, os emotes e as skills ficam travados. **E** de novo (*Parar de tocar* ou *Parar de cantar*) guarda o instrumento. Pedido antes do loop, o fim começa assim que o começo acaba.
 
 O instrumento do mapa (`Palco_Violao`, `Palco_Cavaquinho`, `Palco_Baquetas`) some enquanto alguém toca, e a cópia que vem no GLB da animação vai para as mãos. No primeiro quadro de pegar e no último de guardar, a cópia coincide com o instrumento do mapa, com até 3 mm de diferença, então a troca não aparece. O microfone do vocal fica no pedestal.
 

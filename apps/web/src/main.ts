@@ -6,10 +6,11 @@ import {gameUi} from './game-ui';
 import {CONTROLS,createLobbyMenu,detailCard,keyGrid} from './lobby-menu';
 import {createLobbyHero} from './lobby-hero';
 import {createFullscreen} from './fullscreen';
+import {createMouseCapture} from './mouse-capture';
 import './lobby-hero.css';
 import {createHudPanels} from './hud-panels';
 import {createNotifications} from './notifications';
-import {nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type PlayerCard,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
+import {keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene,BLIP_RADIUS} from './engine/BarScene';
 import {CAMERA_LABELS,CAMERA_MODES,isCameraMode} from './engine/camera-rig';
@@ -32,7 +33,10 @@ import {createNeedsHud} from './needs-hud';
 import './minimap.css';
 import {createMinimap} from './minimap';
 import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
-import {NO_MOTO_INTENT,isRidingMoto,nearestFreeMoto} from '@bar/shared';
+import {MOTO_ENGINE,MOTO_PARTS,MOTO_REPAIR,NO_MOTO_INTENT,canRepairMoto,isRepairingMoto,isRidingMoto,nearestFallenMoto,nearestFreeMoto,readMotoParts,repairOf,type MotoPartId} from '@bar/shared';
+import {motoPanelHtml} from './moto-panel';
+import {worldMenu,worldMenuOpen} from './world-menu';
+import './moto-panel.css';
 import {JOBS,canInteract as touching,stationInteractable,consumedOverTime,consumeMs,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
 import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal} from './economy-ui';
@@ -43,7 +47,9 @@ import {createBlackjackTable} from './blackjack/table';
 import {createFoosballPanel} from './foosball/panel';
 import {consumptions} from './consumption';
 import {createPhone} from './phone/phone';
-import {playerCardHtml} from './player-card';
+import {createProfileWindow} from './profile/profile-window';
+import {badgeMedal,openBadgeCard} from './profile/badge-card';
+import {BADGE_RARITY_INFO} from '@bar/shared';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
@@ -53,7 +59,10 @@ createLobbyHero(document.querySelector<HTMLElement>('#lobby')!);
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
 const hud=createHudPanels($('#game'));
 const notices=createNotifications($('#toasts'));
-createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
+// The menu closes on the way in: the mouse is about to be captured, and its row out would be out of reach.
+createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>hud.closeMenu());
+// What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the Painéis menu. The chat is typed.
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),()=>!sceneActive()||watchingTv||phone.isOpen||profile.isOpen||worldMenuOpen()||!$('#panel-menu').classList.contains('hidden'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 const minimap=createMinimap($('#game'));
 const consumingHud=createConsumingHud($('#consuming'));
@@ -159,7 +168,7 @@ function focusChat():void {
   panel.classList.add('chat-open');input.focus();
   if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
 }
-function showModal(title:string,content:string,type:string):void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function showModal(title:string,content:string,type:string):void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
 const measureDesk=()=>{const left=$('.modal').getBoundingClientRect().left;deskCover=innerWidth>760?Math.max(0,1-left/innerWidth):0;};
@@ -178,6 +187,15 @@ function openLightDesk():void {
 }
 function closeModal():void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
+const profile=createProfileWindow({
+  portrait:skin=>scene?.portrait(skin)??Promise.resolve(undefined),
+  highgram:id=>phone.open('highgram',{profile:id}),
+  contactSaved:()=>phone.refresh(),
+  message:person=>phone.open('highzap',person),
+  call:person=>phone.dial(person),
+  loadouts:next=>{skillLoadouts=next;renderSkillButton();},
+  toast,
+});
 const network=new BarNetwork({
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
   motoInput:()=>scene?.getMotoInput()??NO_MOTO_INTENT,
@@ -195,8 +213,13 @@ const network=new BarNetwork({
     else if(update.message)notices.show({variant:'aviso',title:'Palco',text:update.message});
   },
   voice:frame=>voice.receive(frame),
+  achievement:badge=>{
+    notices.show({variant:'conquista',id:`badge-${badge.id}`,title:badge.name,text:badge.description,tone:BADGE_RARITY_INFO[badge.rarity].color,art:badgeMedal(badge),duration:9000,action:{label:'Ver a carta',run:()=>openBadgeCard(badge)}});
+    if(profile.ownId)void profile.open(profile.ownId);
+  },
   itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
-  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[]};if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();},
+  motoStruck:({hp,by})=>notices.show({variant:'aviso',title:'Atropelado',text:`${by||'Uma moto desgovernada'} passou por cima de você: -${hp} de vida.`}),
+  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[]};if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();},
   inventoryResult:()=>{},
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
@@ -278,9 +301,9 @@ async function enterBar():Promise<void> {
   try{
     $('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;
     if(!admission.isCurrentEntry(attempt))return;
-    const [result,collection,items]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);
+    const [result,collection,items,own]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory'),api<ProfileView>(`/profile/${encodeURIComponent(user.id)}`).catch(()=>undefined)]);
     if(!admission.isCurrentEntry(attempt))return;
-    blocked=new Set(result.blocked);wardrobe=collection;inventory=items;await network.connect();
+    blocked=new Set(result.blocked);wardrobe=collection;inventory=items;skillLoadouts=own?.loadouts??{};await network.connect();
     if(!admission.isCurrentEntry(attempt))return;
     await voice.enter();phone.enter();
     if(!admission.completeEntry(attempt)&&(admission.phase==='leaving'||admission.phase==='outside'))voice.leave();
@@ -294,6 +317,7 @@ function leaveBar():Promise<void> {
 }
 function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   if(leavingPromise)return leavingPromise;
+  profile.close();
   const task=(async()=>{
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
@@ -328,17 +352,18 @@ function renderWorld():void {
   $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
   $('#smoke-button').setAttribute('aria-pressed',String(self?.interactionState==='smoke'));
   $('#cigarette-button').setAttribute('aria-pressed',String(self?.interactionState==='cigarette'));
-  $('#kick-button').classList.toggle('hidden',self?.skin!=='rafael');
+  renderSkillButton();
   const station=jobStation(),atStation=!!station&&!!self&&!self.interactionState&&!self.currentTableId&&touching(stationInteractable(station),self);
   const interaction=self?nearestObject(self):undefined;
   const moto=self&&!interaction&&!atStation?freeMotoNear(self):undefined;
+  const fallenMoto=self&&!interaction&&!atStation&&!moto?fallenMotoNear(self):undefined;
   // Near a free spot on the stage: its clips download now, so taking it starts without a wait.
   if(interaction?.type==='musician')scene?.preloadMusician(interaction.spot!);
   const context=$('#context');
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
   $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
-  context.classList.toggle('hidden',!self||self.animationState==='kick'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto));
-  $('#context-label').textContent=isRidingMoto(self?.interactionState)?'para descer':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':'');
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto));
+  $('#context-label').textContent=isRidingMoto(self?.interactionState)?'para descer':self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':'');
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   $('#event-banner').classList.toggle('hidden',!event?.type);
@@ -355,6 +380,8 @@ function renderWorld():void {
   if(foosball)foosballUi.update(foosball,user!.id,!seatedAt);else if(wasOpen)foosballUi.reset();
   if(wasOpen!==!!foosball)scene?.setEnabled(sceneActive());
   if(activeModal==='people')renderPeopleContent();
+  if(activeModal==='moto')renderMotoPanel();
+  watchOwnEngine(self);
   const hand=inHand()??'';if(hand!==handShown){handShown=hand;renderInventory();}
   if(activeModal==='admin')renderAdminPosition();
   renderJobCard();
@@ -397,6 +424,10 @@ const telaoLabel=()=>world?.televisions?.telao?.status==='playing'?`Telão · p�
 function freeMotoNear(self:PlayerState){
   return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}));
 }
+/** A bike on the ground within reach: E lifts it. */
+function fallenMotoNear(self:PlayerState){
+  return self.interactionState||self.currentTableId?undefined:nearestFallenMoto(self,Object.values(world?.motos??{}));
+}
 /** What E uses: a stage musician's spot only from up on the stage, and only while nobody plays there; the light desk from up there. */
 function nearestObject(self:PlayerState):Interactable|undefined {
   return nearestInteraction(self,object=>object.type==='lights'?onStage(self):object.type!=='musician'||(onStage(self)&&!world?.musicians?.[object.spot!]?.playerId));
@@ -416,6 +447,42 @@ function openTableMenu():void {
 }
 function renderTableMenu():void {$('#modal-content').innerHTML=tableMenuHtml(inventory?.balance??0,tableOrder,workersOnShift());}
 function openJobs():void {showModal('Trabalhar no bar',jobsHtml(world,jobTask),'jobs');}
+// The vehicle's panel: which bike and part it shows, and what it last drew (the room's patches come ten times a second).
+let panelMoto='',panelPart:MotoPartId=MOTO_PARTS[0].id,panelDrawn='',repairSeen='',repairStart=0;
+async function openMotoPanel(id:string):Promise<void>{
+  if(!inGame||!connected||!world?.motos?.[id])return;
+  panelMoto=id;panelPart=MOTO_PARTS[0].id;panelDrawn='';
+  showModal('Informações do veículo','<p>Olhando a moto…</p>','moto');
+  renderMotoPanel();
+  const generation=modalGeneration;
+  // The backpack may not have been opened yet: the pieces are counted from it.
+  if(!inventory){const result=await api<InventoryView>('/inventory');if(activeModal==='moto'&&generation===modalGeneration){inventory=result;renderMotoPanel();}}
+}
+function renderMotoPanel():void {
+  if(activeModal!=='moto')return;
+  const moto=world?.motos?.[panelMoto],self=world?.players[user?.id??''];
+  if(!moto||!self){$('#modal-content').innerHTML='<p class="modal-description">Essa moto não está mais no mapa.</p>';panelDrawn='';return;}
+  const parts=readMotoParts(moto.parts),pieces=inventory?.stacks.find(stack=>stack.itemId===MOTO_REPAIR.item)?.quantity??0;
+  const repair=repairOf(self.interactionState);
+  if(self.interactionState!==repairSeen){repairSeen=self.interactionState??'';repairStart=performance.now();}
+  // The same cases the room refuses, said before trying.
+  const blocked=parts[panelPart]>=100?'Esta parte está perfeita.':moto.riderId?'Alguém está pilotando esta moto.':moto.phase&&moto.phase!=='down'?'Espere a moto parar.':Math.abs(moto.speed)>0?'Espere a moto parar.'
+    :!canRepairMoto(moto,self,0)?'Chegue mais perto da moto para consertar.':self.interactionState||self.currentTableId?'Encerre o que está fazendo primeiro.':pieces<MOTO_REPAIR.pieces?'Você precisa de uma peça de moto. A loja da casa vende.':'';
+  const key=[moto.parts,moto.engine,pieces,blocked,panelPart,repairSeen].join('|');
+  if(key===panelDrawn)return;
+  panelDrawn=key;
+  $('#modal-content').innerHTML=motoPanelHtml({moto,selected:panelPart,pieces,blocked,working:repair?{...repair,elapsed:performance.now()-repairStart}:undefined});
+}
+// What the rider's own engine just did: the sound says it, and this says what to do about it.
+let ownEngine:{id:string;engine:number}|undefined;
+function watchOwnEngine(self:PlayerState|undefined):void {
+  const moto=self&&isRidingMoto(self.interactionState)?Object.values(world?.motos??{}).find(each=>each.riderId===self.id):undefined;
+  if(!moto){ownEngine=undefined;return;}
+  const before=ownEngine?.id===moto.id?ownEngine.engine:undefined;
+  ownEngine={id:moto.id,engine:moto.engine};
+  if(moto.engine!==MOTO_ENGINE.OFF||before===undefined||before===MOTO_ENGINE.OFF)return;
+  notices.show({variant:'aviso',title:before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:'Aperte W para tentar de novo. O estado da moto está nas informações do veículo.'});
+}
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
@@ -425,7 +492,7 @@ function interact():void {
   const station=jobStation();
   if(station&&touching(stationInteractable(station),self)){network.send('job.work');return;}
   const object=nearestObject(self);
-  if(!object){const moto=freeMotoNear(self);if(moto)network.send('moto.mount',{motoId:moto.id});return;}
+  if(!object){const moto=freeMotoNear(self)??fallenMotoNear(self);if(moto)network.send('moto.mount',{motoId:moto.id});return;}
   if(object.type==='counter'){orderDrink();return;}
   if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});
   else if(object.type==='foosball')network.send('foosball.join',{tableId:object.id});
@@ -453,23 +520,24 @@ function cigarette():void {
   if(self?.interactionState){toast(self.interactionState==='cigarette'?'Você já está fumando um cigarro.':'Encerre a ação atual antes de acender um cigarro.');return;}
   network.send('player.emote',{emote:'cigarette'});
 }
-function kick():void {
-  if(!connected||activeModal||!world||!user||performing())return;
-  const self=world.players[user.id];
-  if(self?.skin!=='rafael')return;
-  network.send('player.emote',{emote:'kick'});
+/** The active skill of the skin being worn and its key (chosen in the profile window, tab Skill). */
+let skillLoadouts:SkillLoadouts={};
+function activeSkill(){
+  const loadout=loadoutOf(skillLoadouts,world?.players[user?.id??'']?.skin),skill=skillById(loadout?.skill);
+  return loadout&&skill?{skill,key:loadout.key}:undefined;
 }
-let shownCard:PlayerCard|undefined;
-/** A player's card (click them in the bar): the number to save and their Highgram (apps/web/src/player-card.ts). */
-async function playerCard(id:string):Promise<void> {
-  // A card already open (after saving or following) is refreshed in place.
-  if(activeModal!=='player-card'||shownCard?.id!==id){shownCard=undefined;showModal(id===user?.id?'Sua ficha':'Ficha do jogador','<p class="modal-description">Carregando a ficha…</p>','player-card');}
-  const opened=modalGeneration;
-  try{
-    const card=await api<PlayerCard>(`/phone/card/${encodeURIComponent(id)}`);
-    if(activeModal!=='player-card'||modalGeneration!==opened)return;
-    shownCard=card;$('#modal-content').innerHTML=playerCardHtml(card);
-  }catch(error){if(activeModal==='player-card'&&modalGeneration===opened)$('#modal-content').innerHTML=`<p class="modal-description">${e(errorMessage(error))}</p>`;}
+function useSkill():void {
+  const active=activeSkill();
+  if(!active||!connected||activeModal||performing())return;
+  network.send('player.skill',{skill:active.skill.id});
+}
+let shownSkill:string|undefined;
+/** The hotbar's button for the active skill; written only when it changes, since the room's patches call this ten times a second. */
+function renderSkillButton():void {
+  const active=activeSkill(),key=active?`${active.skill.id}:${active.key}`:'';
+  if(key===shownSkill)return;shownSkill=key;
+  const button=$('#skill-button');button.classList.toggle('hidden',!active);
+  button.innerHTML=active?`${uiIcon(active.skill.icon)}<span class="tip">${e(active.skill.name)}</span><kbd>${e(keyLabel(active.key))}</kbd>`:'';
 }
 /** Pessoas no bar: who is around, with the occupancy and the connection, and the player's own place (Seu lugar no bar). */
 function people(tab:'people'|'account'='people'):void {
@@ -501,14 +569,14 @@ function renderPeopleContent():void {
     const key=JSON.stringify(['account',user?.displayName,user?.email,user?.color,skin,accountStats]);
     if(key===peopleKey)return;peopleKey=key;
     const stats=accountStats?`<div><b>${accountStats.gamesPlayed}</b><span>rodadas</span></div><div><b>${accountStats.wins}</b><span>vitórias</span></div><div><b>${accountStats.draws}</b><span>empates</span></div><div><b>${accountStats.losses}</b><span>derrotas</span></div>`:'Carregando suas rodadas…';
-    panel.innerHTML=`<div class="account-card"><span class="profile-initial" id="avatar" style="--avatar:${e(user?.color)}">${e(user?.displayName.slice(0,1).toUpperCase())}</span><h3 id="hud-name">${e(user?.displayName)}</h3><p id="hud-skin">${e(skin)} · B.A.R.</p><p>${e(user?.email)}</p></div><div id="statistics" class="statistics">${stats}</div><button class="button primary full" data-action="player-card" data-id="${e(user?.id)}">${uiIcon('idCard')} Sua ficha e seu número</button><button class="button secondary full" data-action="leave">Voltar à entrada</button><button class="text-button full" data-action="logout">Sair da conta</button>`;
+    panel.innerHTML=`<div class="account-card"><span class="profile-initial" id="avatar" style="--avatar:${e(user?.color)}">${e(user?.displayName.slice(0,1).toUpperCase())}</span><h3 id="hud-name">${e(user?.displayName)}</h3><p id="hud-skin">${e(skin)} · B.A.R.</p><p>${e(user?.email)}</p></div><div id="statistics" class="statistics">${stats}</div><button class="button primary full" data-action="profile" data-id="${e(user?.id)}">${uiIcon('idCard')} Seu perfil</button><button class="button secondary full" data-action="leave">Voltar à entrada</button><button class="text-button full" data-action="logout">Sair da conta</button>`;
     return;
   }
   const players=Object.values(world?.players||{}).filter(player=>player.id!==user?.id);
   const key=JSON.stringify(['people',world?.occupancy,world?.capacity,...players.map(p=>[p.id,p.displayName,p.connected,p.voice,blocked.has(p.id),voice.isMuted(p.id)])]);
   if(key===peopleKey)return;peopleKey=key;
   const occupancy=world?.occupancy??0,capacity=world?.capacity??0;
-  panel.innerHTML=`<div class="occupancy"><div class="status-row"><span>${uiIcon('users')} No bar agora</span><b id="occupancy">${occupancy} / ${capacity}</b></div><div class="hud-track"><i id="occupancy-fill" style="width:${capacity?Math.min(100,occupancy/capacity*100):0}%"></i></div><div class="status-row net-row"><span>${uiIcon('signal')} Sua conexão</span><b><span id="hud-status">${e(netStatus)}</span> · <span id="ping">${e(netPing)}</span></b></div></div><p class="modal-description">Você vê as pessoas próximas a você.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?(player.voice?'No bar · microfone ligado':'No bar'):'Ausente'}</small></div><button class="mini-button" data-action="player-card" data-id="${e(player.id)}">Ficha</button><button class="mini-button" data-action="voice-mute" data-id="${e(player.id)}" aria-pressed="${voice.isMuted(player.id)}">${voice.isMuted(player.id)?'Ouvir voz':'Silenciar voz'}</button><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Silenciar voz vale só para você. Bloquear oculta mensagens de chat e corta a voz nos dois sentidos. Denúncias são encaminhadas à administração.</p>`;
+  panel.innerHTML=`<div class="occupancy"><div class="status-row"><span>${uiIcon('users')} No bar agora</span><b id="occupancy">${occupancy} / ${capacity}</b></div><div class="hud-track"><i id="occupancy-fill" style="width:${capacity?Math.min(100,occupancy/capacity*100):0}%"></i></div><div class="status-row net-row"><span>${uiIcon('signal')} Sua conexão</span><b><span id="hud-status">${e(netStatus)}</span> · <span id="ping">${e(netPing)}</span></b></div></div><p class="modal-description">Você vê as pessoas próximas a você.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?(player.voice?'No bar · microfone ligado':'No bar'):'Ausente'}</small></div><button class="mini-button" data-action="profile" data-id="${e(player.id)}">Perfil</button><button class="mini-button" data-action="voice-mute" data-id="${e(player.id)}" aria-pressed="${voice.isMuted(player.id)}">${voice.isMuted(player.id)?'Ouvir voz':'Silenciar voz'}</button><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Silenciar voz vale só para você. Bloquear oculta mensagens de chat e corta a voz nos dois sentidos. Denúncias são encaminhadas à administração.</p>`;
 }
 async function mailbox():Promise<void> {
   if(!import.meta.env.DEV)return;
@@ -561,7 +629,7 @@ setInterval(()=>{void refreshAdministration();},5000);
 /** An item's effects on the needs, as "fome +35" (CONSUMABLES come from the same catalogue). */
 const effectList=(item:{effects:object})=>Object.entries(item.effects).filter(([key,value])=>key!=='name'&&typeof value==='number'&&Number(value)!==0)
   .map(([key,value])=>`${({hunger:'fome',thirst:'sede',hp:'vida',drunk:'álcool',bladder:'bexiga'} as Record<string,string>)[key]??key} ${Number(value)>0?'+':''}${value}`);
-const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde'};
+const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde',peca:'Peça'};
 /** "1:30" for a duration in milliseconds. */
 const clockText=(ms:number)=>`${Math.floor(ms/60_000)}:${String(Math.round(ms%60_000/1000)).padStart(2,'0')}`;
 // The backpack's chosen slot (its card shows beside the slots).
@@ -585,10 +653,10 @@ function renderInventory():void {
     const blocked=self?.condition==='fainted'||self?.condition==='stumbling'?'Espere recuperar o equilíbrio.'
       :self?.interactionState||self?.currentTableId?'Levante-se ou termine o que está fazendo para usar itens.'
       :held&&consumedOverTime(item.id)?`Ainda na mão: ${itemById(held)?.name??held}. Termine antes de pegar outro.`:'';
-    const lasts=consumedOverTime(item.id)?`dura ${clockText(consumeMs(item.id))}`:'na hora';
+    const lasts=consumedOverTime(item.id)?`dura ${clockText(consumeMs(item.id))}`:'na hora',forBike=item.category==='peca';
     detail=`<section class="item-detail" aria-label="${e(item.name)}"><header><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><div><small>${e(CATEGORY_NAMES[item.category]??item.category)}</small><h3>${e(item.name)}</h3></div><strong>×${stack.quantity}</strong></header>
-      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}<span class="item-time">${uiIcon('clock')}${lasts}</span></div>
-      ${blocked?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions"><button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>Usar</button><button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
+      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${forBike?'':`<span class="item-time">${uiIcon('clock')}${lasts}</span>`}</div>
+      ${blocked&&!forBike?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${forBike?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>Usar</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
   }
   const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar'};
   const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
@@ -646,6 +714,7 @@ async function wearSkin(id:string):Promise<void> {
   const owner=user?.id,generation=modalGeneration;
   const result=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin:id});if(user?.id!==owner)return;user=result.user;wardrobe=result;
   network.send('player.appearance');if(modalGeneration===generation)closeModal();
+  if(profile.ownId)void profile.open(profile.ownId);
 }
 function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Suba ao salão de jogos, chegue perto da mesa e aperte E. Monte a aposta com as fichas e confirme em Apostar: a primeira aposta abre a rodada para a mesa toda. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Na sua vez: Pedir (1), Parar (2), Dobrar (3), Dividir (4) ou Desistir (5). Blackjack paga 3 para 2; com um ás do dealer à mostra, dá para fazer seguro. O dealer para em 17. As apostas são em moedas da carteira, de ${livePrice('blackjack:min-bet')} a ${livePrice('blackjack:max-bet')} por mão; sair no meio da rodada para as suas mãos onde estão. O ícone de ajuda da mesa mostra todas as regras.</p><h3>Pebolim</h3><p>As duas mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa cheia ou com partida rolando, você assiste. Quem abre a mesa escolhe 1 × 1 ou 2 × 2, quantos gols, um set ou melhor de 3, e pode chamar o Zé do Totó para as vagas (três níveis: tomou todas, na média ou sóbrio) ou marcar a partida valendo moedas (${livePrice('foosball:min-bet')} a ${livePrice('foosball:max-bet')} por jogador; quem vence leva o dobro). Quando todo mundo marca Pronto, a bola rola. Mexa o mouse (ou o dedo) e os bonecos seguem o ponteiro; clique ou Espaço chuta, segurar carrega a bomba; botão direito ou Shift levanta os bonecos para a bola passar. Vale o tempo de posse oficial: 10 s no meio e 15 s nas outras linhas. Sair no meio de uma partida valendo é W.O.; no amistoso, o Zé assume o lugar.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez na mão; na mesa, o pedido inteiro ao mesmo tempo. Cada coisa vira um ícone acima dos avisos, com um anel que esvazia e o tempo que falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
@@ -660,23 +729,7 @@ app.addEventListener('click',event=>{
       case 'leave':await leaveBar();break;
       case 'logout':await leaveBar();await api('/auth/logout',{});user=undefined;renderAuth();break;
       case 'people':people();break;
-      case 'player-card':await playerCard(button.dataset.id!);break;
-      case 'card-save':{const id=button.dataset.id!;button.setAttribute('disabled','');await api('/phone/contacts',{userId:id});phone.refresh();toast('Contato salvo na agenda do celular.');await playerCard(id);break;}
-      case 'card-follow':{
-        const id=button.dataset.id!;button.setAttribute('disabled','');
-        const result=await api<{followed:boolean;notify?:string}>(`/phone/gram/users/${encodeURIComponent(id)}/follow`,{followed:button.dataset.on==='true'});
-        if(result.notify)network.send('phone.ping',{to:result.notify,kind:'gram-follow'});
-        await playerCard(id);break;
-      }
-      case 'card-gram':closeModal();phone.open('highgram',{profile:button.dataset.id});break;
-      case 'card-zap':case 'card-call':{
-        const card=shownCard;if(!card)break;closeModal();
-        const person={id:card.id,name:card.name,color:card.color,number:card.number,...(card.gram.author.photo?{photo:card.gram.author.photo}:{})};
-        if(action==='card-zap')phone.open('highzap',person);else phone.dial(person);
-        break;
-      }
-      case 'card-copy':{const number=button.dataset.number!;try{await navigator.clipboard.writeText(number);toast('Número copiado.');}catch{toast(`Seu número: ${number}`);}break;}
-      case 'card-edit':closeModal();phone.open('highgram',{resume:'edit'});break;
+      case 'profile':closeModal();await profile.open(button.dataset.id!);break;
       case 'people-tab':selectPeopleTab(button.dataset.tab==='account'?'account':'people');break;
       case 'account':people('account');break;
       case 'help':help();break;
@@ -703,13 +756,15 @@ app.addEventListener('click',event=>{
       case 'skins':await skins();break;
       case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
       case 'daily':{const owner=user?.id,generation=modalGeneration;const result=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();break;}
-      case 'kick':kick();break;
+      case 'skill':useSkill();break;
       case 'skin':await wearSkin(button.dataset.skin!);break;
       case 'audio':{const on=!(audio.enabled||media.some(m=>m.soundEnabled));if(audio.enabled!==on)audio.toggle();media.forEach(m=>m.setMuted(!on));break;}
       case 'stage-buy':network.send('stage.buy');break;
       case 'order':{const self=world?.players[user?.id??''],counter=INTERACTABLES.find(i=>i.type==='counter');closeModal();if(!connected||!self||!counter)break;if(!canInteract(counter,self)){toast('Chegue ao balcão para pedir.');break;}network.send('player.interact',{objectId:counter.id,item:button.dataset.item==='copo'?'copo':'garrafa'});break;}
       case 'table-menu':openTableMenu();break;
       case 'table-cancel':network.send('table.cancel');closeModal();break;
+      case 'moto-part':panelPart=button.dataset.part as MotoPartId;renderMotoPanel();break;
+      case 'moto-repair':network.send('moto.repair',{motoId:panelMoto,part:button.dataset.part});break;
       case 'jobs':openJobs();break;
       case 'job-start':network.send('job.start',{jobId:button.dataset.job});closeModal();break;
       case 'job-stop':network.send('job.stop');closeModal();break;
@@ -760,7 +815,7 @@ app.addEventListener('submit',event=>{
   })();
 });
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'){if(watchingTv)stopWatchingTv();else if(phone.isOpen&&!activeModal)phone.close();else closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
+  if(event.key==='Escape'){if(watchingTv)stopWatchingTv();else if(!activeModal&&profile.closeTop()){}else if(phone.isOpen&&!activeModal)phone.close();else closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
   // Closing must not reach the scene's own C handler on window, which would reopen the selector.
   if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
@@ -890,13 +945,21 @@ async function start():Promise<void>{
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
   try{scene=new BarScene($<HTMLCanvasElement>('#world'),{
     onInteract:interact,
+    onFrame:dt=>network.rideFrame(dt),
     onEmote:emote=>performing()?undefined:emote==='smoke'?smoke():emote==='cigarette'?cigarette():network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins().catch(error=>toast(errorMessage(error),true));},
-    onKick:kick,
-    onPlayerClick:id=>{if(inGame&&!activeModal)void playerCard(id);},
+    onSkillKey:code=>{const active=activeSkill();if(active?.key!==code)return false;useSkill();return true;},
+    onWorldMenu:(x,y,{player,moto})=>{
+      if(!inGame||activeModal)return;
+      worldMenu({x,y},[
+        ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
+        ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
+      ]);
+    },
+    motoVolume:()=>settings.get().master,
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
-    onMediaFrame:()=>{media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+    onMediaFrame:()=>{mouseCapture.sync();media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
   });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
@@ -909,7 +972,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),motos:()=>scene?.getMotos(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),motos:()=>scene?.getMotos(),ragdolls:()=>scene?.getRagdolls(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

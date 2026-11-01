@@ -21,7 +21,8 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Desmaiar / recuperar | `cair` / `levantar_chao` do export do bar | Mantém o par sincronizado, incluindo a pose no chão e o deslocamento da raiz. `Fallen` (`bebado-caido.fbx`) e `Recover` (`misc/Standing Up.fbx`, primeiros 5 s) permanecem no banco como alternativas de carregamento. |
 | Dealer | `carta-distribui.fbx` / `carta-recomeco.fbx` | Distribui e recolhe/prepara as cartas. |
 | Seu Zé | `Bartending.fbx` | Atendimento atrás do balcão, exclusivo da skin Magrão. |
-| Karatê | `karate-kick.fbx` | Golpe de 2 s da skin Rafael, sem dano ou deslocamento. |
+| Karatê | `karate-kick.fbx` | Skill de 2 s da skin Rafael, sem dano ou deslocamento. |
+| Chute voador | `misc/Drop Kick.fbx` | Skill de 2,9 s da skin Rafael. Salta e cai de costas; `inPlace` traz o quadril de volta, e o avatar fica parado para o servidor. |
 | Bengala | `A_Male_Walk_OldCane*.fbx` | Caminhada e repouso do comando `/velho`, com a bengala presa à mão direita. |
 
 O runtime dá preferência aos clipes Mixamo do banco para repouso, caminhada, corrida, caminhada e repouso de bêbado, dança, aceno, uso de objetos, espera e permanência sentado. Os clipes `parado_loop`, `andar_loop` e `andar_bebado_loop` do export do mapa não substituem essa locomoção.
