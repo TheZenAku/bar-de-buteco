@@ -321,6 +321,16 @@
 .admin-badge-icons .ui-icon{width:16px;height:16px}
 .admin-badge-icons img{width:24px;height:24px;object-fit:contain}
 .admin-badge-upload{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
+.admin-food-form{display:grid;gap:10px}
+.admin-food-preview{display:flex;align-items:center;gap:10px}
+.admin-food-face{width:88px;height:88px;border:1px solid var(--border)}
+.admin-food-thumb{width:42px;height:42px;border:1px solid var(--border)}
+.admin-food-table td{vertical-align:middle}
+.admin-food-table .mini-button{white-space:nowrap}
+.admin-food-look{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.admin-food-look span{display:flex;align-items:center;gap:6px;margin-top:2px}
+.admin-food-look b{min-width:18px;text-align:center;font-variant-numeric:tabular-nums}
+.admin-check{display:flex;align-items:center;gap:8px}
 .admin-badge-upload small{flex-basis:100%;color:var(--muted-foreground)}
 .admin-badge-colors{display:flex;flex-wrap:wrap;gap:6px}
 .admin-badge-colors button{width:26px;height:26px;padding:0;background:var(--swatch);border:2px solid transparent;cursor:pointer}

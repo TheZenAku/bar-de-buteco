@@ -14,6 +14,8 @@ const GRAVITY=9.81,ITERATIONS=8,DAMPING=.9995;
 const FRICTION=.75,WALL_FRICTION=.35;
 /** How much of a hit comes back (a body does not stick to what it hits), and how hard it must be (metres per step). */
 const BOUNCE=.14,WALL_BOUNCE=.32,BOUNCE_FROM=1.5*RAGDOLL_STEP;
+/** How far above the lowest it has been the body's energy may drift (as metres of height for all of it): rounding, not a gain. */
+const ENERGY_DRIFT=.02;
 /** Below this speed (m/s), for this long, it has stopped. */
 const CALM_SPEED=.45,CALM_SECONDS=.5;
 const SOLIDS_EVERY=4,SOLIDS_MARGIN=1.1;
@@ -73,6 +75,8 @@ export interface RagdollStart {
   /** On a bike's seat, or on foot hit by one. */
   seated:boolean;
   seed:number;
+  /** Kicked (kick.ts): how fast it goes up (m/s), and who did it. */
+  lift?:number;by?:string;
 }
 /** What happens next, the same on every machine. */
 const random=(seed:number)=>()=>{
@@ -81,6 +85,11 @@ const random=(seed:number)=>()=>{
   t=(t+Math.imul(t^(t>>>7),61|t))^t;
   return ((t^(t>>>14))>>>0)/4294967296;
 };
+
+/** A kick lands on the chest: the trunk leaves first, and this share of its speed is what the head and the feet lack, so the body folds around the blow. */
+const KICK_FOLD=.4,KICK_LANDS=.25,KICK_FOLD_REACH=.6;
+/** The points whose landing is heard: what carries the weight, and the head. */
+const HEARD=new Set<number>([J.pelvis,J.chest,J.head,J.shoulderL,J.shoulderR,J.hipL,J.hipR]);
 
 /** The sim itself: `points` holds x, y, z of each JOINT. */
 export class Ragdoll {
@@ -94,6 +103,9 @@ export class Ragdoll {
   private solids:readonly Collider[]=[];
   private stepsDone=0;
   private calm=0;
+  private loudest=0;
+  private lowestEnergy=Infinity;
+  private loudestAt=0;
   /** Seconds simulated. */
   time=0;
   asleep=false;
@@ -102,18 +114,19 @@ export class Ragdoll {
     const s=Math.sin(start.yaw),c=Math.cos(start.yaw),pose=start.seated?SEATED:STANDING,rand=random(start.seed);
     const pelvis=pose[J.pelvis]!,speed=Math.hypot(start.vx,start.vz),headOn=Math.min(1,start.closing/15);
     // Forward as it travels, and its side: the body turns over the side axis, feet held back and head going on.
-    const fx=speed>.01?start.vx/speed:s,fz=speed>.01?start.vz/speed:c,tumble=(start.seated?5.5:3.5)*(.25+headOn),lift=start.seated?1.1+.26*start.closing:1.2+.1*speed;
+    const fx=speed>.01?start.vx/speed:s,fz=speed>.01?start.vz/speed:c,tumble=(start.seated?5.5:3.5)*(.25+headOn),lift=start.lift||(start.seated?1.1+.26*start.closing:1.2+.1*speed);
     const sideways=(rand()-.5)*1.3+(start.seated?0:(rand()-.5)*.8),roll=(rand()-.5)*2.4,turn=(rand()-.5)*1.6;
     for(let i=0;i<COUNT;i++){
       const [lx,ly,lz]=pose[i]!,x=start.x+c*lx+s*lz,y=start.y+ly,z=start.z-s*lx+c*lz;
       const rx=c*(lx-pelvis[0])+s*(lz-pelvis[2]),ry=ly-pelvis[1],rz=-s*(lx-pelvis[0])+c*(lz-pelvis[2]);
       const along=rx*fx+rz*fz;
+      const carried=start.lift?1-KICK_FOLD*Math.min(1,Math.abs(ry-KICK_LANDS)/KICK_FOLD_REACH):1;
       // Spinning over the side axis: higher goes further forward, further ahead goes down.
       const forward=ry*tumble,up=-along*tumble;
       const sx=-fz,sz=fx,across=rx*sx+rz*sz;
-      const vx=start.vx+fx*forward+sx*(sideways+ry*roll)+sx*along*turn;
-      const vz=start.vz+fz*forward+sz*(sideways+ry*roll)+sz*along*turn;
-      const vy=lift+up-across*roll;
+      const vx=start.vx*carried+fx*forward+sx*(sideways+ry*roll)+sx*along*turn;
+      const vz=start.vz*carried+fz*forward+sz*(sideways+ry*roll)+sz*along*turn;
+      const vy=lift*carried+up-across*roll;
       this.points.set([x,y,z],i*3);
       this.before.set([x-vx*RAGDOLL_STEP,y-vy*RAGDOLL_STEP,z-vz*RAGDOLL_STEP],i*3);
     }
@@ -125,6 +138,12 @@ export class Ragdoll {
   }
   /** One point. */
   joint(index:number):[number,number,number] {const p=this.points;return [p[index*3]!,p[index*3+1]!,p[index*3+2]!];}
+  /** The hardest a heavy part hit something since the last time this was asked: how fast it was going (m/s) and which JOINT. It changes nothing in the sim. */
+  takeBlow():{speed:number;joint:number}|undefined {
+    const speed=this.loudest;
+    this.loudest=0;
+    return speed>0?{speed,joint:this.loudestAt}:undefined;
+  }
   /** Where it lies: on the ground under the pelvis, with the way from the feet to the head along the ground (radians, 0 is +Z). */
   rest():{x:number;y:number;z:number;heading:number;faceUp:boolean} {
     const [x,y,z]=this.joint(J.pelvis),[hx,,hz]=this.joint(J.head),[lx,,lz]=this.joint(J.footL),[rx,,rz]=this.joint(J.footR);
@@ -169,17 +188,38 @@ export class Ragdoll {
     for(let i=0;i<COUNT;i++){
       if(!pushed[i])continue;
       const at=i*3,nx=normal[at]!,ny=normal[at+1]!,nz=normal[at+2]!;
+      const blow=Math.max(0,-((free[at]!-b[at]!)*nx+(free[at+1]!-b[at+1]!)*ny+(free[at+2]!-b[at+2]!)*nz));
+      if(HEARD.has(i)&&blow/RAGDOLL_STEP>this.loudest){this.loudest=blow/RAGDOLL_STEP;this.loudestAt=i;}
       const dx=p[at]!-b[at]!,dy=p[at+1]!-b[at+1]!,dz=p[at+2]!-b[at+2]!,dn=dx*nx+dy*ny+dz*nz;
       const tx=dx-dn*nx,ty=dy-dn*ny,tz=dz-dn*nz,slide=Math.hypot(tx,ty,tz);
       if(slide<1e-9)continue;
-      const blow=Math.max(0,-((free[at]!-b[at]!)*nx+(free[at+1]!-b[at+1]!)*ny+(free[at+2]!-b[at+2]!)*nz));
       if(blow>BOUNCE_FROM){const back=blow*(ny>.5?BOUNCE:WALL_BOUNCE);b[at]=b[at]!-nx*back;b[at+1]=b[at+1]!-ny*back;b[at+2]=b[at+2]!-nz*back;}
       const stop=Math.min(1,ny>.5?FRICTION*(blow+GRAVITY*RAGDOLL_STEP*RAGDOLL_STEP)/slide:WALL_FRICTION*blow/slide);
       p[at]=p[at]!-tx*stop;p[at+1]=p[at+1]!-ty*stop;p[at+2]=p[at+2]!-tz*stop;
     }
+    this.spendEnergy();
     this.time+=RAGDOLL_STEP;
     this.calm=fastest/RAGDOLL_STEP<CALM_SPEED?this.calm+RAGDOLL_STEP:0;
     if(this.calm>=CALM_SECONDS||this.time>=RAGDOLL_MAX_SECONDS)this.asleep=true;
+  }
+  /**
+   * A body thrown only ever loses energy. This kind of sim takes every correction for speed, so a part pushed out of a solid would shoot the body up, and a foot
+   * caught on the far side of a thin wall, pulled by the rods and pushed back by the wall, would run it along the wall faster and faster. What it gained goes.
+   */
+  private spendEnergy():void {
+    const {points:p,before:b}=this;
+    let moving=0,height=0,mass=0;
+    for(let i=0;i<COUNT;i++){
+      const at=i*3,weight=1/WEIGHT[i]!,dx=p[at]!-b[at]!,dy=p[at+1]!-b[at+1]!,dz=p[at+2]!-b[at+2]!;
+      moving+=weight*(dx*dx+dy*dy+dz*dz)/2;height+=weight*p[at+1]!;mass+=weight;
+    }
+    // In metres and steps: gravity per step squared turns height into the same units as speed per step, squared.
+    const gravity=GRAVITY*RAGDOLL_STEP*RAGDOLL_STEP,energy=moving+height*gravity,allowed=this.lowestEnergy+mass*gravity*ENERGY_DRIFT;
+    if(energy>allowed){
+      const scale=Math.sqrt(Math.max(0,moving-(energy-allowed))/(moving||1));
+      for(let at=0;at<COUNT*3;at++)b[at]=p[at]!-(p[at]!-b[at]!)*scale;
+    }
+    if(energy<this.lowestEnergy)this.lowestEnergy=energy;
   }
   private rod(a:number,c:number,shortest:number,longest:number,firm:number):void {
     const p=this.points,ia=a*3,ic=c*3,dx=p[ic]!-p[ia]!,dy=p[ic+1]!-p[ia+1]!,dz=p[ic+2]!-p[ia+2]!,length=Math.hypot(dx,dy,dz);

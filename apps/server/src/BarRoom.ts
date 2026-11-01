@@ -5,7 +5,13 @@ import { z } from 'zod';
 import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
-import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Player, RagdollState, SeatState, TableState } from './state.js';
+import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
+import { HighfoodDesk, customerLine, type FoodOrder } from './world/highfood.js';
+import { TradeDesk, type Trade } from './world/trades.js';
+import { GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
+import { WALK_SPEED, type Position } from '@bar/shared';
+import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt } from '@bar/shared';
+import { KICK, KICKS, kickAim, kickClear, kickLaunch, kickTouches, kickWindow } from '@bar/shared';
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
@@ -56,6 +62,12 @@ const ACHIEVEMENT_SAMPLE_MS = 5000;
 const MOTO_KNOCK_GAP_MS = 500, MOTO_FALL_FORCE = .4;
 /** The Player.interactionState of a body thrown by a crash, until it has got up; and of someone lifting a fallen bike. */
 const THROWN = 'thrown', LIFTING = 'moto-lift:';
+/** What a kick can interrupt: being free, and what ends with nothing left hanging (another kick, a cigarette). */
+const KICKABLE = new Set(['', 'kick', 'smoke', 'cigarette']);
+/** Taking the bag out of the box, and the customer's dialog. */
+const FOOD_UNLOAD = 'food-unload', FOOD_TALK = 'food-talk';
+/** How often the customers' profiles are read again from the API. */
+const CUSTOMERS_EVERY_MS = 60_000;
 const RECOVER_HIPS_BEHIND = .42;
 interface Presence {
   joinedAt:number;
@@ -75,6 +87,8 @@ interface Presence {
   revoked: boolean;
   rejectReconnect?: () => void;
   interactionEndsAt?: number;
+  /** Just got up: nobody can kick this player again until then. */
+  kickSafeUntil?: number;
   /** A short non-blocking gesture (wave/use/recovery) and the state it may safely restore. */
   gestureEndsAt?:number;
   gestureState?:AnimationState;
@@ -101,12 +115,16 @@ interface Presence {
   stageBusy?:boolean;
   /** The pebolim table this player watches from beside it (its frames come to them), '' or undefined otherwise. */
   watching?:string;
+  /** The vehicles whose key this player holds (the API keeps them); what they were last seen with. */
+  vehicles:OwnedVehicle[];
+  /** The customer's dialog is open, and it closes by itself at this time. */
+  dialogUntil?:number;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
 /** What is in hand is had 5% at a time, like what is served at a table (served.ts). */
 const HOLDING_SIP = .05;
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
-const NEEDS_CONSCIOUS = new Set(['moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
+const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
@@ -169,11 +187,25 @@ export class BarRoom extends Room<{ state: BarState }> {
   private tickCount = 0;
   /** Numbers the bikes the administration spawns. */
   private motoSerial = 0;
+  /** Highfood (docs/sistemas/highfood.md): the shifts, the customers' profiles, and what is owed to the API. */
+  private customers: readonly CustomerProfile[] = HIGHFOOD_CUSTOMERS.map(person => ({ ...person, image: null, active: true }));
+  private customersAt = 0;
+  private readonly highfood = new HighfoodDesk(() => this.customers, () => this.prices);
+  private readonly leavingCustomers = new Map<string, { at: number; walkFrom: number; yaw: number }>();
+  private readonly waved = new Set<string>();
+  private readonly unpaid: Array<{ body: Record<string, unknown>; attempts: number }> = [];
+  /** Bought bikes on the map: the owner's bike, its metres, and when the owner left. */
+  private readonly ownedMotos = new Map<string, { vehicleId: string; motoId: string; mileage: number; wearLeft: number; goneAt?: number; dirty: boolean; broken: boolean }>();
+  /** Trades between players (docs/sistemas/troca.md): the conversation, and those confirmed and waiting for the API. */
+  private readonly trades = new TradeDesk();
+  private readonly tradeCommits = new Map<string, { trade: Trade; body: unknown; attempts: number; nextAt: number; sending: boolean }>();
   /** What a bike with nobody on it is doing (moto-crash.ts); the room's state only has how it looks. */
   private readonly fallenMotos = new Map<string, { loose?: LooseBike; wreck?: MotoWreck; lift?: { from: [number, number, number, number]; to: [number, number, number, number]; fromAt: { x: number; y: number; z: number }; at: { x: number; y: number; z: number; yaw: number; pitch: number }; startedAt: number } }>();
   /** Bodies thrown by a crash, by player: the same steps the browsers run (ragdoll.ts), and when getting up ends. */
   /** `hurt`: the life a blow still has to take when the body comes to rest (it never knocks anyone out in the air). */
   private readonly thrown = new Map<string, { sim: Ragdoll; upAt?: number; hurt: number }>();
+  /** Kicks on their way, by player: when each began, how far into the clip the foot has been checked, and who it already hit. */
+  private readonly kicks = new Map<string, { startedAt: number; checkedMs: number; hit: Set<string> }>();
   /** Each bike's engine: when the try at starting ends, when W may try again, when it last took a light knock. */
   private readonly motoEngines = new Map<string, { crankEnds: number; retryAt: number; knockedAt: number }>();
   /**
@@ -282,13 +314,14 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
+    const presence:Presence={vehicles:auth.vehicles??[],joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
     this.syncTable();
     client.send('wallet.state',{balance:presence.balance});
     client.send('prices',{prices:this.prices});
+    client.send('food.state',this.highfood.stateOf(auth.userId));
     this.sendJob(presence);
     if (auth.bot) this.botIds.add(auth.userId);
     this.log(previous ? 'takeover' : 'join', { playerId: auth.userId });
@@ -309,6 +342,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelTable(presence.ticket.userId);
     this.dropCall(presence.ticket.userId);
     if (player) this.endShift(player, 'Você caiu da conexão e o turno foi encerrado.');
+    if (player) this.stopHighfood(player, '');
+    this.leaveTrades(presence.ticket.userId, `${player?.displayName ?? 'A outra pessoa'} caiu da conexão.`);
     if (player?.interactionState === 'counter' && player.animationState !== 'drink') player.interactionState = '';
     const reservation = this.allowReconnection(client, 30);
     presence.rejectReconnect = () => reservation.reject();
@@ -327,7 +362,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (presence.revoked || !this.sessions.isCurrent(presence.ticket.userId, presence)) { client.leave(4000); return; }
     if (access && !access.valid) { if(access.banned)this.removeByAdmin(presence.ticket.userId,'ban','Sua conta está banida do bar.');else this.expel(presence.ticket.userId, 'Sua sessão terminou. Entre novamente.'); return; }
     if (!access) this.log('auth_refresh_unavailable', { playerId: presence.ticket.userId });
-    if (access) {presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);if(access.balance!==undefined)presence.balance=access.balance;client.send('wallet.state',{balance:presence.balance});}
+    if (access) {this.setVehicles(presence,access.vehicles??[]);presence.blocked = new Set(access.blocked);this.setInventory(presence,access.inventory??[]);this.sendInventory(presence);if(access.balance!==undefined)presence.balance=access.balance;client.send('wallet.state',{balance:presence.balance});}
     presence.rejectReconnect = undefined;
     presence.queue.length = 0; presence.motoQueue.length = 0;
     const player = this.state.players.get(presence.ticket.userId)!;
@@ -336,6 +371,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.syncFoosball();
     // Without an answer, the appearance already in the room stays as it is.
     if (access) this.applyAppearance(player,access);
+    client.send('food.state',this.highfood.stateOf(player.id));
     // Queued movement before a transport interruption must never replay afterward.
     player.lastProcessedInput = presence.lastReceived;
     this.refreshViews();
@@ -348,6 +384,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
     // Pending orders are refunded while the session is still registered (refunds go to its wallet owner).
     this.cancelCounter(userId); this.cancelTable(userId); this.dropCall(userId); this.releaseMedia(userId);
+    this.leaveTrades(userId, `${this.state.players.get(userId)?.displayName ?? 'A outra pessoa'} saiu do bar.`);
     this.sessions.remove(userId, presence);
     const player = this.state.players.get(userId);
     // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
@@ -369,6 +406,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelCounter(player.id);
     this.cancelTable(player.id);
     this.endShift(player, 'Turno encerrado.');
+    this.stopHighfood(player, '');
     if (player.currentTableId) Object.assign(player, standingPosition(player, player.rotation));
     player.currentTableId = '';
     // The microphone belongs to a session; a new one switches it on again itself.
@@ -379,10 +417,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     // A musician puts the instrument back (the stop clip plays) and the spot frees itself when it ends.
     if (player.interactionState.startsWith('stage-')) this.musicians.stop(player.id, Date.now());
     else if (player.animationState !== 'sit' && player.condition !== 'fainted') { player.interactionState = ''; player.animationState = 'idle'; }
+    player.looking = false;
   }
 
   /** Closes an older session of the same account without touching its avatar, which the new one takes. */
   private replaceSession(previous: Presence): void {
+    this.leaveTrades(previous.ticket.userId, 'A conta da outra pessoa entrou de outra janela.');
     this.cancelCounter(previous.ticket.userId); this.cancelTable(previous.ticket.userId); this.dropCall(previous.ticket.userId);
     this.sessions.remove(previous.ticket.userId, previous);
     previous.rejectReconnect?.();
@@ -393,7 +433,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -440,6 +480,43 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.motoQueue.push(input);
     });
     this.handle('moto.mount', motoMountSchema, 4, (client, { motoId }) => this.mountMoto(client, motoId));
+    this.handle('moto.tow', z.object({ vehicleId: z.string().uuid().optional() }).strict(), 2, (client, { vehicleId }) => this.towOwnMoto(client, vehicleId));
+    this.handle('moto.lock', z.object({ locked: z.boolean() }).strict(), 4, (client, { locked }) => this.lockMoto(client, locked));
+    this.handle('garage.take', z.object({ garageId: z.string().max(32), vehicleId: z.string().uuid() }).strict(), 3, (client, { garageId, vehicleId }) => this.takeFromGarage(client, garageId, vehicleId));
+    this.handle('garage.store', z.object({ garageId: z.string().max(32), recall: z.boolean() }).strict(), 3, (client, { garageId, recall }) => this.storeInGarage(client, garageId, recall));
+    this.handle('trade.request', tradeRequestSchema, 3, (client, { playerId }) => this.requestTrade(client, playerId));
+    this.handle('trade.respond', tradeRespondSchema, 5, (client, { inviteId, accept }) => this.respondTrade(client, inviteId, accept));
+    this.handle('trade.offer', tradeOfferMessageSchema, 12, (client, { tradeId, offer }) => this.offerTrade(client, tradeId, offer));
+    this.handle('trade.ready', tradeReadySchema, 6, (client, { tradeId, version, ready }) => this.readyTrade(client, tradeId, version, ready));
+    this.handle('trade.confirm', tradeConfirmSchema, 6, (client, { tradeId, version }) => this.confirmTrade(client, tradeId, version));
+    this.handle('trade.cancel', tradeCancelSchema, 6, (client, { tradeId }) => this.cancelTrade(client, tradeId));
+    // Browser tests only (tests/e2e/server.mjs runs the world with NODE_ENV=test): a ride across the city is covered once, not at every step of a test.
+    if (process.env.NODE_ENV === 'test') this.handle('test.player.place', z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }).strict(), 5, (client, at) => {
+      const player = this.player(client), presence = this.forClient(client)!;
+      Object.assign(player, at); presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    });
+    if (process.env.NODE_ENV === 'test') this.handle('test.moto.parts', z.object({ parts: z.string().max(80) }).strict(), 5, (client, { parts }) => {
+      const player = this.player(client), moto = this.ownMoto(player.id);
+      if (!moto) throw new Error('Sem moto.');
+      moto.parts = parts; this.markOwned(player.id, true);
+    });
+    if (process.env.NODE_ENV === 'test') this.handle('test.moto.place', z.object({ x: z.number().finite(), z: z.number().finite() }).strict(), 5, (client, { x, z: at }) => {
+      const player = this.player(client), moto = this.ownMoto(player.id);
+      if (!moto) throw new Error('Sem moto.');
+      moto.assign({ x, z: at, speed: 0, steer: 0 }); moto.ticks++;
+      if (moto.riderId === player.id) { player.x = x; player.z = at; }
+    });
+    this.handle('phone.look', z.object({ on: z.boolean() }).strict(), 6, (client, { on }) => { this.player(client).looking = on; });
+    this.handle('food.start', foodEmptySchema, 3, client => this.startHighfood(client));
+    this.handle('food.stop', foodEmptySchema, 3, client => this.stopHighfood(this.player(client), ''));
+    this.handle('food.state', foodEmptySchema, 10, client => { client.send('food.state', this.highfood.stateOf(this.player(client).id)); });
+    this.handle('food.accept', foodOrderSchema, 5, (client, { orderId }) => this.acceptOrder(client, orderId));
+    this.handle('food.decline', foodOrderSchema, 5, (client, { orderId }) => { const player = this.player(client); this.highfood.decline(player.id, orderId, Date.now()); this.sendFood(player.id); });
+    this.handle('food.cancel', foodEmptySchema, 3, client => this.cancelFoodOrder(client));
+    this.handle('food.unload', foodEmptySchema, 4, client => this.unloadOrder(client));
+    this.handle('food.talk', foodEmptySchema, 4, client => this.talkToCustomer(client));
+    this.handle('food.leave', foodEmptySchema, 4, client => this.closeDialog(this.player(client), this.forClient(client)!));
+    this.handle('food.deliver', foodOrderSchema, 4, (client, { orderId }) => this.handOverFood(client, orderId));
     this.handle('moto.repair', motoRepairSchema, 3, (client, { motoId, part }) => this.repairMoto(client, motoId, part));
     this.handle('player.interact', z.object({ objectId: z.string().max(64), item: z.enum(DRINK_ITEMS).optional() }).strict(), 5, (client, command) => this.interact(client, command.objectId, command.item));
     this.handle('inventory.sync',z.object({}).strict(),2,async client=>{await this.syncPresence(this.forClient(client)!);});
@@ -563,6 +640,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('job.start',z.object({jobId:z.string().max(32)}).strict(),2,(client,{jobId})=>{
       const player=this.player(client),presence=this.forClient(client)!;
       if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual antes de começar a trabalhar.');
+      if(player.courier)throw new Error('Saia do Highfood antes de trabalhar no bar.');
       const shift=this.jobs.start(player.id,jobId,player,Date.now());
       player.job=jobId;this.syncJobs();this.sendJob(presence);
       this.log('job_start',{playerId:player.id,jobId,shiftId:shift.shiftId});
@@ -613,11 +691,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     // The delivery bikes exist only while the administration keeps them on the map.
     this.handle('admin.moto.spawn',motoSpawnSchema,5,client=>{
       const admin=this.requireAdmin(client),player=this.player(client);
-      if(this.state.motos.size>=MOTO.LIMIT)throw new Error(`O mapa já tem ${MOTO.LIMIT} motos. Despawne alguma antes.`);
+      if([...this.state.motos.values()].filter(moto=>!moto.ownerId).length>=MOTO.LIMIT)throw new Error(`O mapa já tem ${MOTO.LIMIT} motos. Despawne alguma antes.`);
       const spot=motoSpawnSpot(player,player.rotation,[...this.state.motos.values()]);
       if(!spot)throw new Error('Não há rua livre perto de você. Vá para a rua e tente de novo.');
       const id=`moto-${++this.motoSerial}`;
-      this.state.motos.set(id,new Moto().assign(parkedMoto({id,...spot})));
+      // Anyone's to ride, and plated like every other vehicle; the plate lasts as long as the bike does.
+      this.state.motos.set(id,new Moto().assign({...parkedMoto({id,...spot}),plate:makePlate()}));
       this.log('admin_moto_spawn',{playerId:admin,id,x:+spot.x.toFixed(1),z:+spot.z.toFixed(1)});client.send('admin.world',this.adminSnapshot());
     });
     this.handle('admin.moto.despawn',motoDespawnSchema,5,(client,{id})=>{
@@ -671,8 +750,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (!chosen || chosen.skin !== p.skin) throw new Error('Esta skin não tem essa skill.');
       if (p.interactionState) throw new Error('Levante-se primeiro.');
       const presence = this.forClient(client)!;
+      const aim = kickAim(p, [...this.state.players.values()].filter(target => this.kickable(p, target, Date.now())));
+      if (aim !== undefined) p.rotation = aim;
       p.skill = chosen.id; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
       presence.interactionEndsAt = p.animationStartedAt + chosen.durationMs;
+      if (kickWindow(chosen.id)) this.kicks.set(p.id, { startedAt: p.animationStartedAt, checkedMs: 0, hit: new Set() });
       presence.queue.length = 0;
       p.lastProcessedInput = presence.lastReceived;
     });
@@ -799,7 +881,10 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
     }
     this.stepMotos(now);
+    this.stepKicks(now);
     this.stepThrown(now);
+    this.stepHighfood(now);
+    this.stepTrades(now);
     for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
     this.syncTable();
@@ -809,7 +894,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.serveDrinks(now);
     this.serveTables(now);
     this.runJobs(now);
-    this.npcs.update(this.state.npcs.values(), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
+    this.npcs.update([...this.state.npcs.values()].filter(npc => !isCustomerNpc(npc.id)), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
     if (++this.tickCount % 2 === 0) this.refreshViews();
   }
 
@@ -868,6 +953,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private stepRidden(moto: Moto, input: MotoIntent, obstacles: ReturnType<BarRoom['motoObstacles']>, rider?: Player): boolean {
     const { body, hit } = advanceMoto(moto, input, TICK_MS / 1000, obstacles, motoHandling(moto));
     if (rider) this.achieved(rider.id, 'motoboy', Math.hypot(body.x - moto.x, body.z - moto.z));
+    if (moto.ownerId) this.rodeOwned(moto, Math.hypot(body.x - moto.x, body.z - moto.z));
     moto.assign(body); moto.ticks++;
     if (!hit) return false;
     if (hit.closing >= MOTO.CRASH_SPEED) { this.crashMoto(moto, hit, rider); return true; }
@@ -908,6 +994,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** A blow to the bike: its parts lose condition by how hard it was and where (moto-parts.ts). */
   private wearMoto(moto: Moto, closing: number, area: MotoHitArea): void {
     moto.parts = writeMotoParts(wearMotoParts(readMotoParts(moto.parts), closing, area));
+    if (moto.ownerId) this.markOwned(moto.ownerId, true);
   }
 
   private motoObstacles(moto: Moto) {
@@ -935,13 +1022,47 @@ export class BarRoom extends Room<{ state: BarState }> {
     moto.riderId = ''; moto.lights &= ~MOTO_LIGHT.BRAKE;
     this.startThrown(rider, { x: moto.x, y: moto.y, z: moto.z, yaw: moto.yaw, vx, vz, closing, seated: true, seed: Math.floor(Math.random() * 0xffffffff) });
     this.achieved(rider.id, 'barbeiro');
+    if (this.highfood.crashed(rider.id)) this.sendFood(rider.id);
     this.log('moto_crash', { playerId: rider.id, moto: moto.id, speed: +Math.hypot(vx, vz).toFixed(1), closing: +closing.toFixed(1) });
+  }
+
+  /** Who a kick can throw: someone up and free, or busy with something a blow can cut short. Sitting, working, playing or riding, it passes them by. */
+  private kickable(kicker: Player, target: Player, now: number): boolean {
+    if (target === kicker || !target.connected || target.currentTableId || !isConscious(target)) return false;
+    if (!KICKABLE.has(target.interactionState)) return false;
+    return now >= (this.sessions.getByUser(target.id)?.kickSafeUntil ?? 0) && kickClear(kicker, target);
+  }
+
+  /** Each kick on its way: all the way the foot went since the last tick, against everyone it could touch. It can hit more than one. */
+  private stepKicks(now: number): void {
+    for (const [id, kick] of this.kicks) {
+      const kicker = this.state.players.get(id);
+      if (!kicker || kicker.animationState !== 'kick' || kicker.animationStartedAt !== kick.startedAt) { this.kicks.delete(id); continue; }
+      const span = kickWindow(kicker.skill), ms = now - kick.startedAt;
+      if (!span) { this.kicks.delete(id); continue; }
+      for (const target of this.state.players.values()) {
+        if (kick.hit.has(target.id) || !this.kickable(kicker, target, now) || !kickTouches(kicker.skill, kick.checkedMs, ms, kicker, target)) continue;
+        kick.hit.add(target.id);
+        this.landKick(kicker, target);
+      }
+      kick.checkedMs = ms;
+      if (ms > span.to) this.kicks.delete(id);
+    }
+  }
+
+  private landKick(kicker: Player, target: Player): void {
+    const hurt = Math.min(KICKS[kicker.skill]!.hp, Math.max(0, target.hp - 1));
+    this.startThrown(target, kickLaunch(kicker.skill, kicker.id, kicker, target, Math.floor(Math.random() * 0xffffffff)), hurt);
+    this.log('kick_hit', { playerId: target.id, by: kicker.id, skill: kicker.skill, hp: hurt });
+    this.sessions.getByUser(target.id)?.client.send('player.kicked', { hp: hurt, by: kicker.displayName });
   }
 
   /** `hurt`: the life this blow takes. All but the last point go at once; that one waits for the body to land, so nobody faints in the air. */
   private startThrown(player: Player, start: RagdollStart, hurt = 0): void {
     const presence = this.sessions.getByUser(player.id), now = Date.now(), atOnce = Math.min(hurt, Math.max(0, player.hp - 1));
     this.dropHolding(player);
+    this.closeDialog(player, presence);
+    this.dropParcel(player);
     if (atOnce > 0) this.needs.damage(player, atOnce, now);
     player.interactionState = THROWN; player.animationState = 'ragdoll'; player.animationStartedAt = now; player.drinkItem = '';
     this.thrown.set(player.id, { sim: new Ragdoll(start), hurt: hurt - atOnce });
@@ -959,6 +1080,8 @@ export class BarRoom extends Room<{ state: BarState }> {
         if (now < body.upAt) continue;
         player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = now;
         this.thrown.delete(id); this.state.ragdolls.delete(id);
+        const presence = this.sessions.getByUser(id);
+        if (presence) presence.kickSafeUntil = now + KICK.graceMs;
         continue;
       }
       body.sim.advance(TICK_MS / 1000);
@@ -1082,6 +1205,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.player(client), presence = this.forClient(client)!, moto = this.state.motos.get(motoId);
     if (!moto) throw new Error('Essa moto não está aqui.');
     if (player.interactionState || player.currentTableId || player.animationState === 'kick' || !isConscious(player)) throw new Error('Encerre a ação atual antes de subir na moto.');
+    if (moto.locked && moto.ownerId !== player.id && !moto.phase) throw new Error(`Essa moto está trancada. Placa ${moto.plate}, de ${moto.ownerName || 'outra pessoa'}.`);
     if (moto.riderId) throw new Error('Alguém já está nessa moto.');
     if (this.beingRepaired(moto.id)) throw new Error('Alguém está consertando essa moto.');
     if (moto.phase === 'lifting') throw new Error('Alguém já está levantando essa moto.');
@@ -1093,10 +1217,523 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     if (!canMountMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
     moto.riderId = player.id; moto.lights = 0;
+    this.dropParcel(player);
     player.x = moto.x; player.y = moto.y; player.z = moto.z; player.rotation = moto.yaw;
     player.interactionState = motoInteraction(moto.id); player.animationState = 'ride'; player.animationStartedAt = Date.now(); player.drinkItem = '';
     presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoInputAt = 0; presence.motoBudget = 1; presence.motoBudgetAt = Date.now(); player.lastProcessedInput = presence.lastReceived;
     this.crankEngine(moto, Date.now());
+  }
+
+  // ---- Bikes people own (HighMotors) ----
+  /** `broken`: what can be seen on the bike changed, and it goes to the API right away; the odometer can wait for the next round. */
+  private markOwned(userId: string, broken = false): void { const owned = this.ownedMotos.get(userId); if (owned) { owned.dirty = true; owned.broken ||= broken; } }
+  /** Metres on the clock, and every so often a point of wear (moto-parts.ts). */
+  private rodeOwned(moto: Moto, metres: number): void {
+    const owned = this.ownedMotos.get(moto.ownerId);
+    if (!owned) return;
+    owned.mileage += metres; owned.wearLeft -= metres; owned.dirty = true;
+    if (owned.wearLeft <= 0) { owned.wearLeft += HIGHFOOD.WEAR_EVERY_M; moto.parts = writeMotoParts(mileageWear(readMotoParts(moto.parts))); owned.broken = true; }
+  }
+  /** Keeps what happened to it and forgets it is on the map. */
+  private releaseOwned(userId: string): void {
+    const owned = this.ownedMotos.get(userId);
+    if (!owned) return;
+    const moto = this.state.motos.get(owned.motoId);
+    if (moto) { this.keepVehicle(userId, owned, moto); void this.saveVehicles().catch(() => {}); }
+    this.ownedMotos.delete(userId);
+  }
+  /** What is on its way to the API, by vehicle: only the latest of each matters. */
+  private vehicleUpdates = new Map<string, { vehicleId: string; parts: string; mileage: number }>();
+  private savingVehicles?: Promise<void>;
+  private vehiclesKeptAt = 0;
+  private keepVehicle(userId: string, owned: { vehicleId: string; mileage: number; dirty: boolean; broken: boolean }, moto: Moto): void {
+    owned.dirty = false; owned.broken = false;
+    const update = { vehicleId: owned.vehicleId, parts: moto.parts, mileage: Math.round(owned.mileage) };
+    this.vehicleUpdates.set(owned.vehicleId, update);
+    const held = this.sessions.getByUser(userId)?.vehicles.find(vehicle => vehicle.id === owned.vehicleId);
+    if (held) { held.parts = update.parts; held.mileage = update.mileage; }
+  }
+  /** `all`: the odometers too (each maintenance round), otherwise only what changed on the bike itself. */
+  private keepVehicles(all: boolean): void {
+    for (const [userId, owned] of this.ownedMotos) {
+      const moto = this.state.motos.get(owned.motoId);
+      if (moto && (owned.broken || (all && owned.dirty))) this.keepVehicle(userId, owned, moto);
+    }
+  }
+  /** One batch at a time. A batch that fails stays queued for the next try, and what changes meanwhile goes in the next one. */
+  private saveVehicles(): Promise<void> {
+    if (this.savingVehicles) return this.savingVehicles;
+    if (!this.vehicleUpdates.size) return Promise.resolve();
+    const saving = (async () => {
+      while (this.vehicleUpdates.size) {
+        const batch = [...this.vehicleUpdates.values()].slice(0, 256);
+        await internal('vehicles', { updates: batch });
+        for (const sent of batch) if (this.vehicleUpdates.get(sent.vehicleId) === sent) this.vehicleUpdates.delete(sent.vehicleId);
+      }
+    })().finally(() => { this.savingVehicles = undefined; });
+    this.savingVehicles = saving;
+    return saving;
+  }
+  /** The API's list, with what the room knows that the API has not heard yet. */
+  private setVehicles(presence: Presence, list: readonly OwnedVehicle[]): void {
+    presence.vehicles = list.map(vehicle => {
+      const pending = this.vehicleUpdates.get(vehicle.id);
+      return pending ? { ...vehicle, parts: pending.parts, mileage: pending.mileage } : { ...vehicle };
+    });
+  }
+  /** Puts a vehicle on the street nearest a point, as it was, locked. */
+  private placeOwned(userId: string, vehicle: OwnedVehicle, near: Position, yaw: number): Moto {
+    // Clear of the garages' rings: E beside a bike standing on a ring would open the garage instead of getting on.
+    const spot = motoSpawnSpot(near, yaw, [...this.state.motos.values()], GARAGES.map(garage => ({ x: garage.x, z: garage.z, radius: GARAGE.REACH + MOTO.HALF_LENGTH + MOTO.REACH + .2 })));
+    if (!spot) throw new Error('Não há rua livre por perto para a moto.');
+    const id = `moto-${++this.motoSerial}`;
+    const moto = new Moto().assign({ ...parkedMoto({ id, ...spot }), ownerId: userId, ownerName: this.state.players.get(userId)?.displayName ?? '', plate: vehicle.plate, vehicleId: vehicle.id, locked: true, parts: vehicle.parts });
+    this.state.motos.set(id, moto);
+    this.ownedMotos.set(userId, { vehicleId: vehicle.id, motoId: id, mileage: vehicle.mileage, wearLeft: HIGHFOOD.WEAR_EVERY_M, dirty: false, broken: false });
+    return moto;
+  }
+  private ownMoto(userId: string): Moto | undefined { const owned = this.ownedMotos.get(userId); return owned ? this.state.motos.get(owned.motoId) : undefined; }
+  /** The phone's Guincho: for a price, the owner's bike comes to the street nearest them, wherever it was and however it was. */
+  private async towOwnMoto(client: Client, vehicleId?: string): Promise<void> {
+    const player = this.player(client), presence = this.forClient(client)!;
+    if (!presence.vehicles.length) throw new Error('Você ainda não tem moto. Compre uma no HighMotors.');
+    if (isRidingMoto(player.interactionState)) throw new Error('Você já está na moto.');
+    if (player.interactionState === THROWN) throw new Error('Espere levantar.');
+    if (this.trades.committing(player.id)) throw new Error('Espere a negociação terminar.');
+    const current = this.ownMoto(player.id), chosen = vehicleId ?? current?.vehicleId ?? presence.vehicles[0]!.id;
+    if (!presence.vehicles.some(vehicle => vehicle.id === chosen)) throw new Error('Você não tem a chave desse veículo.');
+    if (current && current.vehicleId !== chosen) throw new Error(`A moto ${current.plate} já está na rua. Guarde ela na garagem antes.`);
+    if (current && motoDistance(current, player) < 25 && !current.phase) throw new Error('Sua moto já está aqui perto.');
+    const spot = motoSpawnSpot(player, player.rotation, [...this.state.motos.values()]);
+    if (!spot) throw new Error('Não há rua livre por perto. Vá até uma rua e chame de novo.');
+    const price = priceOf(this.prices, 'vehicle:tow'), charge = randomUUID();
+    if (price > 0) {
+      const change = await changeWallet({ sessionId: presence.ticket.sessionId, userId: player.id }, -price, 'vehicle:tow', charge);
+      presence.balance = change.balance; client.send('wallet.state', { balance: change.balance, delta: change.applied, reason: 'vehicle' });
+    }
+    const now = this.ownMoto(player.id);
+    if (now) { const rider = now.riderId ? this.state.players.get(now.riderId) : undefined; if (rider) this.freeMoto(now, rider); this.despawnMoto(now.id, ''); }
+    const vehicle = presence.vehicles.find(each => each.id === chosen);
+    // Traded away or taken back while the money was on its way: the coins come back with the error.
+    if (!vehicle) { if (price > 0) this.refund(presence, charge, price); throw new Error('Você não tem mais a chave desse veículo.'); }
+    const moto = this.placeOwned(player.id, vehicle, player, player.rotation);
+    this.log('moto_tow', { playerId: player.id, price, moto: moto.id, plate: moto.plate });
+    client.send('moto.towed', { x: moto.x, z: moto.z });
+  }
+  /** The key's button: only the key holder, from a little way off. */
+  private lockMoto(client: Client, locked: boolean): void {
+    const player = this.player(client), moto = this.ownMoto(player.id);
+    if (!moto) throw new Error('Sua moto não está na rua.');
+    if (Math.hypot(moto.x - player.x, moto.z - player.z) > GARAGE.LOCK_REACH) throw new Error('Chegue mais perto da moto.');
+    moto.locked = locked;
+    this.log('moto_lock', { playerId: player.id, plate: moto.plate, locked });
+    client.send('moto.locked', { plate: moto.plate, locked });
+  }
+
+  // ---- Garages (docs/sistemas/garagem.md) ----
+  private atGarage(player: Player, garageId: string) {
+    const garage = garageById(garageId), object = garage && INTERACTABLES.find(each => each.id === garage.id);
+    if (!garage || !object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Vá até a garagem para isso.');
+    return garage;
+  }
+  private garageView(presence: Presence, garageId: GarageView['garageId']): GarageView {
+    const garage = garageById(garageId)!, owned = this.ownedMotos.get(presence.ticket.userId), out = owned && this.state.motos.get(owned.motoId);
+    return {
+      garageId, towPrice: priceOf(this.prices, 'vehicle:tow'),
+      vehicles: presence.vehicles.map(vehicle => out?.vehicleId === vehicle.id
+        ? { ...vehicle, parts: out.parts, mileage: Math.round(owned!.mileage), out: true, far: Math.hypot(out.x - garage.x, out.z - garage.z) > GARAGE.STORE_REACH }
+        : { ...vehicle, out: false }),
+    };
+  }
+  private takeFromGarage(client: Client, garageId: string, vehicleId: string): void {
+    const player = this.player(client), presence = this.forClient(client)!, garage = this.atGarage(player, garageId);
+    if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes de tirar um veículo.');
+    if (this.trades.committing(player.id)) throw new Error('Espere a negociação terminar.');
+    const vehicle = presence.vehicles.find(each => each.id === vehicleId);
+    if (!vehicle) throw new Error('Você não tem a chave desse veículo.');
+    const out = this.ownMoto(player.id);
+    if (out) throw new Error(`A moto ${out.plate} já está na rua. Guarde ela antes de tirar outra.`);
+    // The rings face the wall behind them: the bike comes out the other way, on the road, pointing away from it.
+    const moto = this.placeOwned(player.id, vehicle, garage, garage.rotation + Math.PI);
+    this.log('garage_take', { playerId: player.id, plate: moto.plate });
+    client.send('garage.taken', { plate: moto.plate, x: moto.x, z: moto.z });
+  }
+  /** Near the garage it just goes in; from afar the tow truck brings it, at the tow's price, and only if the player said yes to that. */
+  private async storeInGarage(client: Client, garageId: string, recall: boolean): Promise<void> {
+    const player = this.player(client), presence = this.forClient(client)!, garage = this.atGarage(player, garageId), moto = this.ownMoto(player.id);
+    if (this.trades.committing(player.id)) throw new Error('Espere a negociação terminar.');
+    if (!moto) throw new Error('Você não tem veículo na rua.');
+    if (moto.riderId === player.id && Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) throw new Error('Pare a moto para guardar.');
+    const far = Math.hypot(moto.x - garage.x, moto.z - garage.z) > GARAGE.STORE_REACH, price = far ? priceOf(this.prices, 'vehicle:tow') : 0;
+    if (far && !recall) throw new Error('A moto está longe: só o guincho traz.');
+    const charge = randomUUID();
+    if (price > 0) {
+      const change = await changeWallet({ sessionId: presence.ticket.sessionId, userId: player.id }, -price, 'vehicle:tow', charge);
+      presence.balance = change.balance; client.send('wallet.state', { balance: change.balance, delta: change.applied, reason: 'vehicle' });
+    }
+    const now = this.ownMoto(player.id);
+    if (now?.vehicleId === moto.vehicleId) {
+      const plate = now.plate;
+      this.despawnMoto(now.id, now.riderId && now.riderId !== player.id ? `O dono guardou a moto ${plate} na garagem.` : '');
+      this.log('garage_store', { playerId: player.id, plate, recalled: far, price });
+    } else if (price > 0) this.refund(presence, charge, price);
+    client.send('garage.state', this.garageView(presence, garage.id));
+  }
+
+  // ---- Trades between players (docs/sistemas/troca.md) ----
+  /** Why these two cannot be trading right now, if so. */
+  private tradeProblem(player: Player | undefined, other: Player | undefined, reach: number): string | undefined {
+    if (!player?.connected || !other?.connected) return 'A outra pessoa saiu.';
+    if (!isConscious(player) || !isConscious(other)) return 'Alguém perdeu os sentidos.';
+    if (player.interactionState === THROWN || other.interactionState === THROWN) return 'Alguém caiu no chão.';
+    if (isRidingMoto(player.interactionState) || isRidingMoto(other.interactionState)) return 'Alguém subiu numa moto.';
+    if (Math.hypot(player.x - other.x, player.z - other.z) > reach || Math.abs(player.y - other.y) > 1.5) return 'Vocês se afastaram demais.';
+  }
+  private requestTrade(client: Client, targetId: string): void {
+    const player = this.player(client), presence = this.forClient(client)!, other = this.state.players.get(targetId), theirs = this.sessions.getByUser(targetId);
+    if (!other?.connected || !theirs || theirs.ticket.bot) throw new Error('Essa pessoa não pode negociar agora.');
+    if (presence.blocked.has(targetId) || theirs.blocked.has(player.id)) throw new Error('Essa pessoa não pode negociar com você.');
+    const problem = this.tradeProblem(player, other, TRADE.REACH);
+    if (problem) throw new Error(problem === 'Vocês se afastaram demais.' ? `Chegue mais perto de ${other.displayName} para negociar.` : problem);
+    const invite = this.trades.invite(player.id, player.displayName, targetId, other.displayName, Date.now());
+    theirs.client.send('trade.invite', invite);
+    client.send('trade.sent', { name: other.displayName, expiresAt: invite.expiresAt });
+  }
+  private respondTrade(client: Client, inviteId: string, accept: boolean): void {
+    const player = this.player(client), { invite, trade } = this.trades.respond(player.id, inviteId, accept, Date.now());
+    const asker = this.sessions.getByUser(invite.from);
+    if (!trade) { asker?.client.send('trade.notice', { text: `${player.displayName} recusou a negociação.` }); return; }
+    const problem = this.tradeProblem(player, this.state.players.get(invite.from), TRADE.LEAVE_REACH);
+    if (problem) { this.endTrade(trade, problem); throw new Error(problem); }
+    this.sendTrade(trade);
+  }
+  private sendTrade(trade: Trade): void {
+    for (const side of [trade.a, trade.b]) this.sessions.getByUser(side.userId)?.client.send('trade.state', this.trades.viewFor(trade, side.userId));
+  }
+  /** Ends it with nothing moved, and says why. */
+  private endTrade(trade: Trade, message: string): void {
+    this.trades.close(trade);
+    for (const side of [trade.a, trade.b]) this.sessions.getByUser(side.userId)?.client.send('trade.closed', { id: trade.id, status: 'cancelled', message });
+  }
+  private leaveTrades(userId: string, why: string): void {
+    for (const invite of this.trades.dropInvites(userId)) {
+      const other = invite.from === userId ? invite.to : invite.from;
+      this.sessions.getByUser(other)?.client.send(invite.from === userId ? 'trade.uninvite' : 'trade.notice', invite.from === userId ? { id: invite.id } : { text: why });
+    }
+    const trade = this.trades.of(userId);
+    // Confirmed already: it is at the API and ends there, whoever is around to hear about it.
+    if (trade && trade.stage !== 'committing') this.endTrade(trade, why);
+  }
+  /** What this offer asks for against what the room knows the player has. The API has the last word, under locks. */
+  private checkOffer(presence: Presence, offer: TradeOffer): void {
+    if (offer.coins > presence.balance) throw new Error('Você não tem essas moedas.');
+    for (const { itemId, quantity } of offer.items) if ((presence.inventory.get(itemId) ?? 0) < quantity) throw new Error(`Você não tem ${quantity} de ${itemById(itemId)?.name ?? itemId}.`);
+    for (const id of offer.vehicles) if (!presence.vehicles.some(vehicle => vehicle.id === id)) throw new Error('Você não tem essa chave.');
+  }
+  private offerTrade(client: Client, tradeId: string, offer: TradeOffer): void {
+    const player = this.player(client), presence = this.forClient(client)!;
+    this.checkOffer(presence, offer);
+    const lines = offer.vehicles.map(id => { const vehicle = presence.vehicles.find(each => each.id === id)!; return { id, plate: vehicle.plate, name: vehicle.name }; });
+    this.sendTrade(this.trades.setOffer(player.id, tradeId, offer, lines, Date.now()));
+  }
+  private readyTrade(client: Client, tradeId: string, version: number, ready: boolean): void {
+    const player = this.player(client), presence = this.forClient(client)!, now = Date.now();
+    if (ready) { const current = this.trades.of(player.id); if (current?.id === tradeId) this.checkOffer(presence, (current.a.userId === player.id ? current.a : current.b).offer); }
+    this.sendTrade(this.trades.setReady(player.id, tradeId, version, ready, now));
+  }
+  private confirmTrade(client: Client, tradeId: string, version: number): void {
+    const player = this.player(client), { trade, go } = this.trades.confirm(player.id, tradeId, version, Date.now());
+    this.sendTrade(trade);
+    if (!go) return;
+    const first = this.sessions.getByUser(trade.a.userId), second = this.sessions.getByUser(trade.b.userId);
+    if (!first || !second) { this.endTrade(trade, 'A outra pessoa saiu.'); return; }
+    this.tradeCommits.set(trade.id, { trade, attempts: 0, nextAt: 0, sending: false, body: {
+      id: trade.id,
+      a: { userId: trade.a.userId, sessionId: first.ticket.sessionId, offer: trade.a.offer },
+      b: { userId: trade.b.userId, sessionId: second.ticket.sessionId, offer: trade.b.offer },
+    } });
+  }
+  private cancelTrade(client: Client, tradeId: string): void {
+    const player = this.player(client), trade = this.trades.cancel(player.id, tradeId);
+    for (const side of [trade.a, trade.b]) this.sessions.getByUser(side.userId)?.client.send('trade.closed', { id: trade.id, status: 'cancelled', message: `${player.displayName} cancelou a negociação.` });
+  }
+  /** The clock of the trades: invitations and tables left alone, people who walked away, and what the API has not answered yet. */
+  private stepTrades(now: number): void {
+    for (const event of this.trades.update(now)) {
+      if (event.kind === 'idle') for (const side of [event.trade.a, event.trade.b]) this.sessions.getByUser(side.userId)?.client.send('trade.closed', { id: event.trade.id, status: 'cancelled', message: 'A negociação ficou parada e foi encerrada.' });
+      else {
+        this.sessions.getByUser(event.invite.to)?.client.send('trade.uninvite', { id: event.invite.id });
+        this.sessions.getByUser(event.invite.from)?.client.send('trade.notice', { text: `${event.invite.toName} não respondeu.` });
+      }
+    }
+    for (const trade of [...this.trades.active()]) {
+      if (trade.stage === 'committing') continue;
+      const problem = this.tradeProblem(this.state.players.get(trade.a.userId), this.state.players.get(trade.b.userId), TRADE.LEAVE_REACH);
+      if (problem) this.endTrade(trade, problem);
+    }
+    for (const commit of this.tradeCommits.values()) if (!commit.sending && now >= commit.nextAt) void this.sendCommit(commit);
+  }
+  /** The one call that moves things. The same id any number of times: the API does it once and always answers how it ended. */
+  private async sendCommit(commit: { trade: Trade; body: unknown; attempts: number; nextAt: number; sending: boolean }): Promise<void> {
+    commit.sending = true; commit.attempts++;
+    // What each vehicle looks like goes first, so the new owner never gets an old picture of it.
+    await this.saveVehicles().catch(() => {});
+    try {
+      const result = await internal<TradeResult>('trades/commit', commit.body);
+      this.tradeCommits.delete(commit.trade.id);
+      this.finishTrade(commit.trade, result);
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status < 500) { this.tradeCommits.delete(commit.trade.id); this.failTrade(commit.trade, error.message); return; }
+      commit.sending = false; commit.nextAt = Date.now() + TRADE.RETRY_MS;
+      if (commit.attempts >= TRADE.RETRIES) { this.tradeCommits.delete(commit.trade.id); this.failTrade(commit.trade, 'O servidor não confirmou a troca. Confira sua mochila.'); }
+    }
+  }
+  private failTrade(trade: Trade, message: string): void {
+    this.trades.close(trade);
+    for (const [side, other] of [[trade.a, trade.b], [trade.b, trade.a]] as const) {
+      this.log('trade_failed', { playerId: side.userId, with: other.name, reason: message });
+      const presence = this.sessions.getByUser(side.userId);
+      presence?.client.send('trade.closed', { id: trade.id, status: 'failed', message: `A troca não aconteceu e nada mudou de mãos. ${message}` });
+      if (presence) void this.syncPresence(presence).catch(() => {});
+    }
+  }
+  private finishTrade(trade: Trade, result: TradeResult): void {
+    this.trades.close(trade);
+    // A vehicle out on the street goes to the garage, for its new owner to take from there: its last state goes with it.
+    for (const id of [...trade.a.offer.vehicles, ...trade.b.offer.vehicles]) {
+      const moto = [...this.state.motos.values()].find(each => each.vehicleId === id);
+      if (moto) this.despawnMoto(moto.id, `A moto ${moto.plate} mudou de dono e foi para a garagem.`);
+    }
+    for (const [side, other] of [[trade.a, trade.b], [trade.b, trade.a]] as const) {
+      const now = result.sides[side.userId], presence = this.sessions.getByUser(side.userId), player = this.state.players.get(side.userId);
+      this.log('trade_done', { playerId: side.userId, with: other.name, gave: this.offerText(side), got: this.offerText(other) });
+      if (!now || !presence) continue;
+      this.setInventory(presence, now.stacks); this.setVehicles(presence, now.vehicles);
+      const delta = now.balance - presence.balance;
+      presence.balance = now.balance;
+      this.sendInventory(presence, { balance: now.balance, keys: now.keys });
+      presence.client.send('wallet.state', { balance: now.balance, delta, reason: 'trade' });
+      presence.client.send('trade.closed', { id: trade.id, status: 'done', message: 'Troca feita.', gave: this.trades.viewFor(trade, side.userId).me, got: this.trades.viewFor(trade, side.userId).them });
+      if (player && !now.vehicles.length) this.stopHighfood(player, 'Você negociou sua última moto.');
+      // Anything that crossed this answer on the way in (a drink, say) is read again from the API.
+      void this.syncPresence(presence).catch(() => {});
+    }
+  }
+  private offerText(side: Trade['a']): string {
+    if (offerIsEmpty(side.offer)) return 'nada';
+    return [side.offer.coins ? `${side.offer.coins} moedas` : '', ...side.offer.items.map(({ itemId, quantity }) => `${quantity}× ${itemById(itemId)?.name ?? itemId}`), ...side.vehicles.map(line => `chave ${line.plate}`)].filter(Boolean).join(', ');
+  }
+
+  // ---- Highfood ----
+  private sendFood(userId: string): void { this.sessions.getByUser(userId)?.client.send('food.state', this.highfood.stateOf(userId)); }
+  private startHighfood(client: Client): void {
+    const player = this.player(client), presence = this.forClient(client)!;
+    if (player.courier) throw new Error('Você já está no Highfood.');
+    if (!presence.vehicles.length) throw new Error('Você precisa de uma moto. Compre no app HighMotors do celular.');
+    if (player.job) throw new Error('Encerre o turno no bar antes de entrar no Highfood.');
+    // From anywhere, the app or the base. Without the bike out, no order comes up until it is (stepHighfood).
+    const now = Date.now();
+    this.highfood.start(player.id, null, now);
+    player.courier = true;
+    this.sendFood(player.id);
+    if (!this.ownMoto(player.id)) client.send('food.notice', { title: 'Highfood', text: 'Você está online, mas sua moto está na garagem. Tire ela de lá para os pedidos começarem a chegar.' });
+    this.log('highfood_online', { playerId: player.id });
+    void internal<{ rating: number | null }>('highfood/rating', { userId: player.id }).then(({ rating }) => { const shift = this.highfood.of(player.id); if (shift) shift.rating = rating; }).catch(() => {});
+  }
+  /** Off the shift (`why` tells the player; '' when they are gone anyway). What was under way is lost. */
+  private stopHighfood(player: Player, why: string): void {
+    if (!player.courier) return;
+    const shift = this.highfood.of(player.id), done = shift?.done ?? 0, earned = shift?.earned ?? 0, order = this.highfood.stop(player.id), presence = this.sessions.getByUser(player.id);
+    player.courier = false;
+    if (presence) this.closeDialog(player, presence);
+    this.dropParcel(player);
+    if (player.interactionState === FOOD_UNLOAD) { player.interactionState = ''; player.animationState = 'idle'; }
+    if (order) this.loseOrder(player.id, order, 'left');
+    this.sendFood(player.id);
+    this.log('highfood_offline', { playerId: player.id, done, earned });
+    if (why) presence?.client.send('food.notice', { title: 'Highfood', text: why });
+  }
+  private acceptOrder(client: Client, orderId: string): void {
+    const player = this.player(client), now = Date.now();
+    if (!this.ownMoto(player.id)) throw new Error('Sua moto está na garagem. Tire ela de lá antes de aceitar.');
+    const order = this.highfood.accept(player.id, orderId, now), body = order.profile.skin;
+    const npc = new Npc().assign({ id: HIGHFOOD_NPC_PREFIX + order.id, displayName: order.customer.name, color: '#fac416', x: order.x, y: order.y, z: order.z, rotation: order.spot.yaw, behavior: 'customer', animationState: 'text', animationStartedAt: now, skin: body });
+    this.state.npcs.set(npc.id, npc);
+    this.refreshViews();
+    this.sendFood(player.id);
+    this.log('highfood_accept', { playerId: player.id, customer: order.customer.name, address: order.address, length: order.length });
+  }
+  /** The customer stops waiting: they turn and go. */
+  private releaseCustomer(order: FoodOrder, now: number): void { this.leavingCustomers.set(HIGHFOOD_NPC_PREFIX + order.id, { at: now + 3000, walkFrom: now, yaw: order.spot.yaw + Math.PI }); }
+  private loseOrder(userId: string, order: FoodOrder, reason: 'cancelled' | 'gave-up' | 'left'): void {
+    this.releaseCustomer(order, Date.now());
+    this.log('highfood_lost', { playerId: userId, customer: order.customer.name, reason: reason === 'left' ? 'Saiu do Highfood com o pedido' : reason === 'gave-up' ? 'O cliente desistiu de esperar' : 'Cancelou o pedido' });
+    this.unpaid.push({ body: { path: 'highfood/lost', userId, orderId: order.id, customerId: order.customer.id, customer: order.customer.name, restaurant: order.restaurant, items: order.items, address: order.address, length: order.length, reason }, attempts: 0 });
+  }
+  private cancelFoodOrder(client: Client): void {
+    const player = this.player(client), presence = this.forClient(client)!;
+    this.closeDialog(player, presence);
+    this.dropParcel(player);
+    const order = this.highfood.cancel(player.id, Date.now());
+    this.loseOrder(player.id, order, 'cancelled');
+    this.sendFood(player.id);
+  }
+  /** The bag goes back to the box: thrown off the bike, back on it, off the shift. */
+  private dropParcel(player: Player): void {
+    const order = this.highfood.orderOf(player.id);
+    if (player.parcel) player.parcel = '';
+    if (order && order.stage !== 'going') { order.stage = 'going'; order.unloadEndsAt = undefined; this.sendFood(player.id); }
+  }
+  private startUnload(player: Player, moto: Moto, order: FoodOrder): void {
+    const now = Date.now(), presence = this.sessions.getByUser(player.id);
+    player.interactionState = FOOD_UNLOAD; player.animationState = 'pick'; player.animationStartedAt = now; player.drinkItem = '';
+    // Facing the box, behind the seat.
+    player.rotation = Math.atan2(moto.x - Math.sin(moto.yaw) * .7 - player.x, moto.z - Math.cos(moto.yaw) * .7 - player.z);
+    if (presence) { presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+    order.stage = 'unload'; order.unloadEndsAt = now + HIGHFOOD.UNLOAD_MS;
+    this.sendFood(player.id);
+  }
+  /** E beside the bike, near the customer: the bag out of the box (the bike may have been left there some other way than getting off it). */
+  private unloadOrder(client: Client): void {
+    const player = this.player(client), order = this.highfood.orderOf(player.id), moto = this.ownMoto(player.id);
+    if (!order || order.stage !== 'going') throw new Error('Você não tem pedido para pegar no baú.');
+    if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes.');
+    if (!moto || moto.phase || motoDistance(moto, player) > MOTO.REACH + 1.2) throw new Error('Chegue perto do baú da sua moto.');
+    if (Math.hypot(order.x - player.x, order.z - player.z) > HIGHFOOD.UNLOAD_REACH) throw new Error('Leve a moto até o endereço da entrega.');
+    this.startUnload(player, moto, order);
+  }
+  private talkToCustomer(client: Client): void {
+    const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id);
+    if (!order) throw new Error('Você não tem entrega em andamento.');
+    if (order.stage !== 'carrying') throw new Error('Pegue o pedido no baú da moto primeiro.');
+    if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes.');
+    if (Math.hypot(order.x - player.x, order.z - player.z) > HIGHFOOD.HAND_REACH + INTERACTION_SLACK) throw new Error(`Chegue mais perto de ${order.customer.name}.`);
+    player.interactionState = FOOD_TALK; player.animationState = 'idle'; player.rotation = Math.atan2(order.x - player.x, order.z - player.z);
+    presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; presence.dialogUntil = Date.now() + HIGHFOOD.DIALOG_MS;
+    const npc = this.state.npcs.get(HIGHFOOD_NPC_PREFIX + order.id);
+    if (npc) npc.rotation = Math.atan2(player.x - npc.x, player.z - npc.z);
+    client.send('food.dialog', { orderId: order.id, customer: order.customer, line: customerLine(order, player.displayName), items: order.items, restaurant: order.restaurant });
+  }
+  private closeDialog(player: Player, presence: Presence | undefined): void {
+    if (presence) presence.dialogUntil = undefined;
+    if (player.interactionState === FOOD_TALK) { player.interactionState = ''; player.animationState = 'idle'; presence?.client.send('food.dialog', null); }
+  }
+  private async handOverFood(client: Client, orderId: string): Promise<void> {
+    const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id), now = Date.now();
+    if (!order || order.id !== orderId || player.interactionState !== FOOD_TALK) throw new Error('Essa entrega não está mais em andamento.');
+    const moto = this.ownMoto(player.id), wornBox = !!moto && readMotoParts(moto.parts).bau < HIGHFOOD.BOX_WORN, onTime = now <= order.promiseAt, crashes = order.crashes;
+    // The bag changes hands at once; the money follows.
+    presence.dialogUntil = undefined;
+    player.parcel = ''; player.animationState = 'use'; player.animationStartedAt = now; presence.gestureEndsAt = now + HIGHFOOD.HANDOVER_MS; presence.gestureState = 'use'; player.interactionState = '';
+    const npc = this.state.npcs.get(HIGHFOOD_NPC_PREFIX + order.id);
+    if (npc) { npc.parcel = 'bag'; npc.animationState = 'thank'; npc.animationStartedAt = now; this.leavingCustomers.set(npc.id, { at: now + HIGHFOOD.LEAVE_MS, walkFrom: now + HIGHFOOD.LEAVE_MS - 3500, yaw: order.spot.yaw + Math.PI }); }
+    const stars = deliveryStars({ length: order.length, onTime, crashes, wornBox });
+    this.highfood.delivered(player.id, 0, stars, now);
+    this.sendFood(player.id);
+    this.achieved(player.id, 'entregador');
+    const body = { userId: player.id, orderId: order.id, customerId: order.customer.id, customer: order.customer.name, restaurant: order.restaurant, items: order.items, address: order.address, length: order.length, durationMs: Math.max(0, now - order.acceptedAt), onTime, crashes, wornBox };
+    client.send('food.delivered', { customer: order.customer.name, onTime, crashes, wornBox, stars });
+    try { this.applyReceipt(await internal<HighfoodReceipt>('highfood/complete', body), player.id, order); }
+    catch (error) {
+      // The API is away: the same order is paid when it comes back.
+      if (error instanceof InternalApiError && error.status < 500) { this.log('highfood_refused', { playerId: player.id, status: error.status }); return; }
+      this.unpaid.push({ body: { path: 'highfood/complete', ...body }, attempts: 0 });
+    }
+  }
+  private applyReceipt(receipt: HighfoodReceipt, userId: string, order?: { customer: { name: string }; address: string }): void {
+    const presence = this.sessions.getByUser(userId), shift = this.highfood.of(userId);
+    if (shift) shift.earned += receipt.paid;
+    if (presence && receipt.balance !== undefined) { presence.balance = receipt.balance; presence.client.send('wallet.state', { balance: receipt.balance }); }
+    presence?.client.send('food.receipt', receipt);
+    this.sendFood(userId);
+    this.log('highfood_delivered', { playerId: userId, customer: order?.customer.name ?? receipt.customer, address: order?.address ?? '', stars: receipt.stars, paid: receipt.paid });
+  }
+  /** The clock of the shifts and of the customers on the pavements. */
+  private stepHighfood(now: number): void {
+    // Orders come only to whoever has their bike out: the courier may be online from a chair in the bar.
+    for (const event of this.highfood.update(now, id => this.ownMoto(id) ? this.state.players.get(id) : undefined)) {
+      if (event.kind === 'changed') this.sendFood(event.userId);
+      else if (event.kind === 'missed') {
+        const player = this.state.players.get(event.userId);
+        if (event.offline && player) { player.courier = false; this.log('highfood_offline', { playerId: player.id, done: 0, earned: 0 }); }
+        this.sendFood(event.userId);
+        if (event.offline) this.sessions.getByUser(event.userId)?.client.send('food.notice', { title: 'Highfood', text: 'Você ficou offline porque os pedidos ficaram sem resposta. Fique online de novo pelo app.' });
+      } else {
+        const player = this.state.players.get(event.userId), presence = this.sessions.getByUser(event.userId);
+        if (player) { this.closeDialog(player, presence); this.dropParcel(player); }
+        this.loseOrder(event.userId, event.order, 'gave-up');
+        this.sendFood(event.userId);
+        presence?.client.send('food.notice', { title: 'Pedido perdido', text: `${event.order.customer.name} cansou de esperar e cancelou o pedido.` });
+      }
+    }
+    for (const [id, presence] of this.sessions) {
+      const player = this.state.players.get(id), order = this.highfood.orderOf(id);
+      if (presence.dialogUntil && now >= presence.dialogUntil && player) this.closeDialog(player, presence);
+      if (player && order?.stage === 'unload' && order.unloadEndsAt && now >= order.unloadEndsAt && player.interactionState === FOOD_UNLOAD) {
+        order.stage = 'carrying'; order.unloadEndsAt = undefined; player.interactionState = ''; player.animationState = 'idle'; player.parcel = 'bag';
+        this.sendFood(id);
+      }
+    }
+    for (const npc of this.state.npcs.values()) if (isCustomerNpc(npc.id)) this.stepCustomer(npc, now);
+    // A broken lamp is written down within a second, so a world that dies takes nothing with it but the last moment.
+    if (now - this.vehiclesKeptAt >= 1000) {
+      this.vehiclesKeptAt = now;
+      this.keepVehicles(false);
+      if (this.vehicleUpdates.size && !this.savingVehicles) void this.saveVehicles().catch(() => {});
+    }
+    // A bike whose owner has gone for good goes home.
+    for (const [userId, owned] of this.ownedMotos) {
+      const player = this.state.players.get(userId);
+      if (player?.connected) { owned.goneAt = undefined; continue; }
+      owned.goneAt ??= now;
+      const moto = this.state.motos.get(owned.motoId);
+      if (!moto) { this.ownedMotos.delete(userId); continue; }
+      if (now - owned.goneAt >= HIGHFOOD.ABSENT_OWNER_MS && !moto.riderId && !moto.speed) this.despawnMoto(moto.id, '');
+    }
+  }
+  /** Waiting for the bike, they look up at whoever is coming and wave once; handed over, they wave, turn and go. */
+  private stepCustomer(npc: Npc, now: number): void {
+    const leaving = this.leavingCustomers.get(npc.id);
+    if (leaving && now >= leaving.at) { this.leavingCustomers.delete(npc.id); this.waved.delete(npc.id); this.state.npcs.delete(npc.id); return; }
+    if (leaving && now >= leaving.walkFrom) {
+      const pace = WALK_SPEED * .7 * TICK_MS / 1000, x = npc.x + Math.sin(leaving.yaw) * pace, z = npc.z + Math.cos(leaving.yaw) * pace;
+      npc.rotation = leaving.yaw;
+      if (isWalkable(x, z, npc.y)) { npc.x = x; npc.z = z; npc.animationState = 'walk'; } else npc.animationState = 'idle';
+      return;
+    }
+    if (npc.animationState === 'wave' && now - npc.animationStartedAt > WAVE_DURATION_MS) npc.animationState = 'idle';
+    if (npc.animationState === 'thank' && now - npc.animationStartedAt > HIGHFOOD.THANK_MS) npc.animationState = 'idle';
+    if (leaving) return;
+    const order = [...this.highfood.shifts.values()].find(shift => shift.order && HIGHFOOD_NPC_PREFIX + shift.order.id === npc.id), courier = order && this.state.players.get(order.userId);
+    if (!courier) return;
+    const gap = Math.hypot(courier.x - npc.x, courier.z - npc.z);
+    if (gap < 16) {
+      const want = Math.atan2(courier.x - npc.x, courier.z - npc.z), turn = Math.atan2(Math.sin(want - npc.rotation), Math.cos(want - npc.rotation));
+      npc.rotation += turn * Math.min(1, TICK_MS / 300);
+    }
+    if (gap < 14 && !this.waved.has(npc.id)) { this.waved.add(npc.id); npc.animationState = 'wave'; npc.animationStartedAt = now; }
+  }
+  /** Each maintenance round: profiles once a minute, what the API still owes or has yet to hear about the bikes. */
+  private async flushHighfood(now: number): Promise<void> {
+    if (now - this.customersAt >= CUSTOMERS_EVERY_MS) {
+      const { customers } = await internal<{ customers: unknown }>('highfood/customers');
+      this.customersAt = now;
+      const known = sanitizeCustomers(customers);
+      if (known.length) this.customers = known;
+    }
+    this.keepVehicles(true);
+    await this.saveVehicles();
+    for (const entry of this.unpaid.splice(0)) {
+      const { path, ...body } = entry.body as { path: string } & Record<string, unknown>;
+      try {
+        const answer = await internal<HighfoodReceipt>(path, body);
+        if (path === 'highfood/complete') this.applyReceipt(answer, body.userId as string);
+      } catch (error) {
+        if (error instanceof InternalApiError && error.status < 500) { this.log('highfood_refused', { playerId: body.userId, status: error.status }); continue; }
+        if (++entry.attempts < 200) this.unpaid.push(entry);
+        else this.log('highfood_abandoned', { playerId: body.userId, path });
+      }
+    }
   }
 
   private beingRepaired(motoId: string): boolean {
@@ -1134,6 +1771,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) throw new Error('Diminua a velocidade para descer da moto.');
     moto.speed = 0; moto.steer = 0; moto.lights = 0;
     this.freeMoto(moto, player);
+    const order = this.highfood.orderOf(player.id);
+    if (order?.stage === 'going' && moto.ownerId === player.id && Math.hypot(order.x - player.x, order.z - player.z) <= HIGHFOOD.UNLOAD_REACH) this.startUnload(player, moto, order);
   }
 
   private freeMoto(moto: Moto, rider?: Player): void {
@@ -1149,13 +1788,14 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   /** Takes a bike off the map; whoever rides it stands beside where it was. */
-  private despawnMoto(id: string): void {
+  private despawnMoto(id: string, why = 'Um administrador recolheu a moto.'): void {
     const moto = this.state.motos.get(id);
     if (!moto) return;
+    if (moto.ownerId) this.releaseOwned(moto.ownerId);
     const rider = moto.riderId ? this.state.players.get(moto.riderId) : undefined;
     if (rider) {
       this.freeMoto(moto, rider);
-      this.sessions.getByUser(rider.id)?.client.send('error', { message: 'Um administrador recolheu a moto.' });
+      if (why) this.sessions.getByUser(rider.id)?.client.send('error', { message: why });
     }
     const lifter = moto.lifterId ? this.state.players.get(moto.lifterId) : undefined;
     if (lifter?.interactionState === `${LIFTING}${id}`) { lifter.interactionState = ''; lifter.animationState = 'idle'; lifter.animationStartedAt = Date.now(); }
@@ -1185,7 +1825,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
       if (isRidingMoto(player.interactionState)) { this.dismountMoto(player); return; }
       // On the ground after a crash, or lifting a bike: it ends by itself.
-      if (player.interactionState === THROWN || player.interactionState.startsWith(LIFTING) || isRepairingMoto(player.interactionState)) return;
+      if (player.interactionState === THROWN || player.interactionState.startsWith(LIFTING) || isRepairingMoto(player.interactionState) || player.interactionState === FOOD_UNLOAD) return;
+      if (player.interactionState === FOOD_TALK) { this.closeDialog(player, presence); return; }
       // On the stage, standing up is putting the instrument back: the stop clip plays first.
       if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
       if (player.interactionState.startsWith('foosball:')) { this.leaveFoosball(player); return; }
@@ -1212,6 +1853,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     const object = INTERACTABLES.find(i => i.id === objectId);
     if (!object || !canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto para interagir.');
+    // The garage is the one place that also opens from on top of a bike.
+    if (object.type === 'garage' && (!player.interactionState || isRidingMoto(player.interactionState))) { client.send('garage.state', this.garageView(presence, object.id as GarageView['garageId'])); return; }
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
     if (object.type === 'foosball') { this.joinFoosball(client, object.id); return; }
@@ -1251,6 +1894,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     else if (object.type === 'stage') client.send('stage.open', { until: player.stageUntil, price: priceOf(this.prices, 'stage:pass') });
     // The house's shop: buying goes through the API (POST /api/inventory/buy), as from any shop window.
     else if (object.type === 'shop') client.send('shop.open', {});
+    else if (object.type === 'highfood') client.send('food.base', { owned: presence.vehicles.length > 0, out: !!this.ownMoto(player.id), state: this.highfood.stateOf(player.id) });
     // The light desk: up on the deck, facing the sound desk; the panel sends show.set and show.cue from then on.
     else if (object.type === 'lights') {
       if (!onStage(player)) throw new Error('A mesa de luz fica em cima do palco.');
@@ -1415,7 +2059,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       jobs:this.jobs.slots().map(slot=>({...slot,...this.jobs.totals.get(slot.id),workers:this.jobs.workers(slot.id).map(s=>({playerId:s.playerId,tasks:s.tasks,earned:s.earned,station:s.task.station.label,endsInS:Math.round((s.endsAt-now)/1000),
         orders:s.orders.map(o=>({...publicOrder(o.order),customer:o.customer,table:o.table,picked:o.picked}))}))})),
       dirtyTables:this.served.dirtyTables(),
-      motos:[...this.state.motos.values()].map(m=>({id:m.id,x:+m.x.toFixed(1),y:+m.y.toFixed(1),z:+m.z.toFixed(1),speed:+m.speed.toFixed(1),phase:m.phase,riderId:m.riderId,rider:m.riderId?this.state.players.get(m.riderId)?.displayName??'':''})),
+      highfood:[...this.highfood.shifts.values()].map(s=>({playerId:s.userId,name:this.state.players.get(s.userId)?.displayName??s.userId.slice(0,8),status:s.status,done:s.done,earned:s.earned,order:s.order?.customer.name??'',address:s.order?.address??''})),
+      motos:[...this.state.motos.values()].map(m=>({owner:m.ownerId?m.ownerName||m.ownerId.slice(0,8):'',plate:m.plate,locked:m.locked,id:m.id,x:+m.x.toFixed(1),y:+m.y.toFixed(1),z:+m.z.toFixed(1),speed:+m.speed.toFixed(1),phase:m.phase,riderId:m.riderId,rider:m.riderId?this.state.players.get(m.riderId)?.displayName??'':''})),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
       musicians:this.musicians.snapshot(),prices:this.prices,pricesLoaded:this.pricesLoaded,logQueue:this.logQueue.length,walletRetries:this.walletRetries.size,
       process:{uptimeS:Math.round(process.uptime()),node:process.version,pid:process.pid,rss:process.memoryUsage().rss,heapUsed:process.memoryUsage().heapUsed,
@@ -1431,7 +2076,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   private sendInventory(presence:Presence,view?:Partial<InventoryView>):void {
     const stacks=[...presence.inventory].map(([itemId,quantity])=>({itemId,quantity}));
-    presence.client.send('inventory.state',{capacity:INVENTORY_CAPACITY,usedSlots:stacks.length,...view,stacks});
+    presence.client.send('inventory.state',{capacity:INVENTORY_CAPACITY,usedSlots:stacks.length,keys:presence.vehicles.map(vehicle=>({vehicleId:vehicle.id,plate:vehicle.plate,name:vehicle.name})),...view,stacks});
   }
   private async removeInventory(presence:Presence,itemId:ItemId,quantity:number,reason:'use'|'discard'|'faint'):Promise<InventoryView>{
     if(presence.inventoryBusy)throw new Error('Aguarde a operação anterior da mochila.');
@@ -1471,6 +2116,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       const parts = readMotoParts(repaired.parts);
       parts[repair.part] = Math.min(100, parts[repair.part] + MOTO_REPAIR.amount);
       repaired.parts = writeMotoParts(parts);
+      if (repaired.ownerId) this.markOwned(repaired.ownerId, true);
       this.achieved(player.id, 'mecanico');
       this.log('moto_repair', { playerId: player.id, moto: repaired.id, part: repair.part, condition: Math.round(parts[repair.part]) });
     }
@@ -1916,7 +2562,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       const visible = new Set<Schema>();
       // A rider is seen as far as the bike is (the bikes have no area of interest), not a bike riding itself.
       for (const player of this.state.players.values()) if (player.id === id || isRidingMoto(player.interactionState) || player.interactionState === THROWN || distance(self, player) <= AOI_RADIUS) visible.add(player);
-      for (const npc of this.state.npcs.values()) if (distance(self, npc) <= AOI_RADIUS) visible.add(npc);
+      const customer = this.highfood.orderOf(id)?.id;
+      for (const npc of this.state.npcs.values()) if (distance(self, npc) <= AOI_RADIUS || (customer && npc.id === HIGHFOOD_NPC_PREFIX + customer)) visible.add(npc);
       for (const old of presence.seen) if (!visible.has(old)) presence.client.view.remove(old);
       for (const item of visible) if (!presence.seen.has(item)) presence.client.view.add(item);
       presence.seen = visible;
@@ -1948,6 +2595,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       await this.walletRetries.flush();
       // Prices and the log never hold up payments and results: they try again next round.
       if (!this.pricesLoaded) await this.reloadPrices().catch((error: unknown) => this.log('prices_unavailable', { message: error instanceof Error ? error.message : String(error) }));
+      await this.flushHighfood(Date.now()).catch((error: unknown) => this.log('highfood_unavailable', { message: error instanceof Error ? error.message : String(error) }));
       await this.flushLogs().catch(() => {});
       await this.flushAchievements().catch((error: unknown) => this.log('achievements_unavailable', { message: error instanceof Error ? error.message : String(error) }));
     } catch (e) {
@@ -2025,6 +2673,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     // Coins can change outside the room too (a Pix on the phone, the administration).
     if (access.balance !== undefined && access.balance !== presence.balance) { presence.balance = access.balance; presence.client.send('wallet.state', { balance: presence.balance }); }
     const player = this.state.players.get(presence.ticket.userId); if (player) this.applyAppearance(player, access);
+    // A vehicle bought on the phone is in the garage already; one that is no longer theirs (the administration took it back) leaves the map.
+    const id = presence.ticket.userId, list = access.vehicles ?? [], out = this.ownMoto(id);
+    if (out && !list.some(vehicle => vehicle.id === out.vehicleId)) this.despawnMoto(out.id, '');
+    this.setVehicles(presence, list);
+    const owned = this.ownedMotos.get(id), moto = owned && this.state.motos.get(owned.motoId), held = owned && presence.vehicles.find(vehicle => vehicle.id === owned.vehicleId);
+    if (moto && held) { held.parts = moto.parts; held.mileage = Math.round(owned!.mileage); }
+    if (player && !list.length) this.stopHighfood(player, 'Você não tem mais moto.');
+    this.sendInventory(presence);
+    presence.client.send('food.owned', { owned: list.length > 0 });
   }
 
   /** One administrative control. Throws to reject it for good (the API records it as failed). */

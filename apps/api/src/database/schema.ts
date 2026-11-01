@@ -1,4 +1,4 @@
-import { boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
+import {index, boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
 import type { BadgeRarity } from '@bar/shared';
 
 const date = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -143,6 +143,26 @@ export const userAchievements=pgTable('user_achievements',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),series:text('series').notNull(),
   value:integer('value').notNull().default(0),updatedAt:date('updated_at').notNull().defaultNow(),
 },t=>[primaryKey({columns:[t.userId,t.series]})]);
+/** Every vehicle players bought (HighMotors), with the state the room keeps it in. `userId` is who holds its key: one column, so there is only one key. */
+export const playerVehicles=pgTable('player_vehicles',{
+  id:text('id').primaryKey(),plate:text('plate').notNull().unique(),
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),model:text('model').notNull(),parts:text('parts').notNull(),mileage:integer('mileage').notNull().default(0),
+  boughtAt:date('bought_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[index('player_vehicles_owner_idx').on(t.userId,t.boughtAt)]);
+/** Every trade that happened (trade-service.ts), written with what it moved: a retry finds it and changes nothing. */
+export const trades=pgTable('trades',{
+  id:text('id').primaryKey(),userA:text('user_a').notNull(),userB:text('user_b').notNull(),offerA:jsonb('offer_a').notNull(),offerB:jsonb('offer_b').notNull(),fingerprint:text('fingerprint').notNull(),createdAt:date('created_at').notNull().defaultNow(),
+},t=>[index('trades_user_a_idx').on(t.userA,t.createdAt.desc()),index('trades_user_b_idx').on(t.userB,t.createdAt.desc())]);
+/** Who the deliveries go to; the administration edits them. `image`: a picture from the badges' store, else the avatar drawn from `look`. */
+export const highfoodCustomers=pgTable('highfood_customers',{
+  id:text('id').primaryKey(),name:text('name').notNull(),skin:text('skin').notNull(),look:jsonb('look').notNull(),image:text('image_id').references(()=>badgeImages.id,{onDelete:'set null'}),
+  lines:jsonb('lines').notNull(),active:boolean('active').notNull().default(true),updatedAt:date('updated_at').notNull().defaultNow(),
+});
+export const highfoodDeliveries=pgTable('highfood_deliveries',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),customerId:text('customer_id').notNull(),customer:text('customer').notNull(),restaurant:text('restaurant').notNull(),
+  items:jsonb('items').notNull(),address:text('address').notNull(),length:integer('length_m').notNull(),durationMs:integer('duration_ms').notNull(),paid:integer('paid').notNull().default(0),stars:smallint('stars'),
+  onTime:boolean('on_time').notNull().default(false),crashes:smallint('crashes').notNull().default(0),status:text('status').notNull(),createdAt:date('created_at').notNull().defaultNow(),
+});
 /** The event log: logins from the API, entries, shifts and faints from the world (apps/api/src/admin-console.ts). */
 export const gameLogs=pgTable('game_logs',{
   id:text('id').primaryKey(),source:text('source').notNull(),event:text('event').notNull(),userId:text('user_id'),

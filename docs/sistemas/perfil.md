@@ -37,9 +37,46 @@ Algumas skins têm habilidades próprias, listadas em `SKILLS` (`packages/shared
 
 Para criar uma skill: ponha o clipe no banco da skin (`clips` e `exclusive` em `tools/assets/convert-animations.mjs`) e acrescente a entrada em `SKILLS`, com a duração do clipe.
 
+### O chute que acerta
+
+Os dois chutes do Rafael derrubam quem o pé tocar: o corpo voa em ragdoll, cai, rola e a pessoa se levanta sozinha. Quem leva o chute vê o aviso **Chutado**, com a vida perdida.
+
+| Skill | Vida | Lançamento | Distância típica |
+| --- | ---: | --- | --- |
+| Golpe de karatê | 6 | 9 m/s, subindo a 3,8 m/s | 8 a 9 m |
+| Chute voador | 10 | 12 m/s, subindo a 4,8 m/s | 11 a 13 m |
+
+As distâncias são em rua aberta. Dentro do bar, a parede para o corpo antes, e ele bate e volta.
+
+**O que conta como acertar.** A sala não tem esqueleto, então decide por uma tabela com o caminho do quadril e dos pés durante o clipe (`packages/shared/src/kick-paths.ts`, gerada do próprio `rafael.glb`). A cada passo do servidor, ela confere todo o trajeto da perna desde o passo anterior contra o corpo da outra pessoa, tratado como uma cápsula em pé. Assim, o que a perna toca no desenho é o que apanha, e o karatê, que vem girando pela direita, pega quem está à direita, mas não quem está à esquerda.
+
+- A perna só conta enquanto está no ar: de 0,4 a 0,85 s no karatê e de 0,9 a 1,45 s no chute voador. O clipe segue o relógio da sala, para o pé estar onde a sala acha que está.
+- Um chute pode pegar várias pessoas, cada uma uma vez.
+- **Mira:** ao apertar a tecla, o Rafael gira até quem estiver a até 2 m e a até 60° da frente dele. Quem está atrás não é mirado.
+- Parede segura o chute e a mira. Poste, árvore e móvel baixo, não.
+
+**Quem pode ser atingido.** Só quem está a pé e livre, fumando ou no meio de outro chute. Quem está sentado, trabalhando, jogando, no banheiro, no palco, na moto, desmaiado, já caído ou ausente não é atingido.
+
+**Para não virar perseguição:**
+
+- Um chute nunca tira o último ponto de vida, então sozinho ele não desmaia ninguém nem faz perder item.
+- Depois de se levantar, a pessoa fica 2,5 s sem poder ser chutada de novo (`KICK.graceMs`).
+
+Como em todo ragdoll, cair derruba a bebida da mão e a encomenda do Highfood.
+
+**O que se vê e se ouve no golpe** (só no navegador, sem passar pela sala):
+
+- A [perna cortando o ar](../assets/sons-golpes.md), mesmo que erre, e o som do pé ao acertar.
+- Uma estrela de luz onde o pé encosta (`engine/blow-fx.ts`).
+- A câmera treme para quem chutou e, mais forte, para quem levou. Com "reduzir movimento" no sistema, não treme.
+- O clipe de quem chutou segura 70 ms ao acertar, para o golpe ter peso.
+- Cada batida forte do corpo faz barulho, e no chão levanta poeira. Isso vale também para quem cai da moto.
+
+Os números ficam em `KICKS` e `KICK` (`packages/shared/src/kick.ts`). Para outra skill que acerte: ponha o clipe em `KICKS` de `tools/assets/measure-kicks.mjs`, rode `npm run assets:kicks` e acrescente a entrada em `KICKS`.
+
 ### Animação do chute voador
 
-O FBX `assets-bar/skins/Rafael/rafael-rigged-corrigido.fbx` tem malha, esqueleto e textura, mas **nenhuma curva de animação**. Por isso, o `AirKick` usa `assets-bar/anim/misc/Drop Kick.fbx`, o chute no ar do acervo. Quando chegar o arquivo definitivo, basta trocar o `filename` de `AirKick` em `convert-animations.mjs` e a duração em `AIR_KICK_DURATION_MS`, e rodar `node tools/assets/convert-animations.mjs rafael`.
+O FBX `assets-bar/skins/Rafael/rafael-rigged-corrigido.fbx` tem malha, esqueleto e textura, mas **nenhuma curva de animação**. Por isso, o `AirKick` usa `assets-bar/anim/misc/Drop Kick.fbx`, o chute no ar do acervo. Quando chegar o arquivo definitivo, basta trocar o `filename` de `AirKick` em `convert-animations.mjs` e a duração em `AIR_KICK_DURATION_MS`, rodar `node tools/assets/convert-animations.mjs rafael` e depois `npm run assets:kicks`, senão o chute acerta pelo caminho do clipe antigo (um teste avisa).
 
 ## Emblemas
 
@@ -95,4 +132,5 @@ No administrador, **Ver a carta** (abaixo da prévia do formulário) mostra como
 
 - Cliente: `apps/web/src/profile/profile-window.ts` (a janela), `badge-card.ts` e `badge-card.css` (medalha e carta), `floating-window.ts` (arrastar, manter na tela, ordem), `profile.css`, `apps/web/src/world-menu.ts` (menu do botão direito, que a moto também usa), `apps/web/src/admin/badges.ts`.
 - API: `apps/api/src/profile-service.ts`.
-- Testes: `apps/api/test/profile.test.ts`, `tests/e2e/profile.spec.ts` e `tests/e2e/badge-card.spec.ts` (com `tests/fixtures/badge-card.html`).
+- Chutes: `packages/shared/src/kick.ts` e `kick-paths.ts`, `BarRoom.stepKicks`, `apps/web/src/engine/blow-sound.ts` e `blow-fx.ts`.
+- Testes: `apps/api/test/profile.test.ts`, `tests/e2e/profile.spec.ts` e `tests/e2e/badge-card.spec.ts` (com `tests/fixtures/badge-card.html`). Chutes: `tests/integration/kick.test.ts`, `apps/server/test/kick.integration.test.ts` e `tests/e2e/kick.spec.ts`.

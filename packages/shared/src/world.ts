@@ -5,6 +5,7 @@ import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 import {FOOSBALL_TABLES} from './foosball.js';
 import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
+import {GARAGE,GARAGES} from './garage.js';
 
 export const WALK_SPEED = 3.5;
 export const RUN_SPEED = 6;
@@ -156,6 +157,8 @@ export const COUNTER_FOOTPRINT:readonly Footprint[]=map.colliders
  * its blip, a gold ring like the others: within SHOP_REACH metres of its centre.
  */
 export const SHOP_SPOT:Required<Position>={x:18.79,y:.3,z:-15.45};
+/** The same spot as HIGHFOOD.BASE (highfood.ts, which needs prices.ts and so comes after this file). */
+const HIGHFOOD_BASE={x:-3.8,y:0,z:-15.5,rotation:-1.538,reach:1.6} as const;
 export const SHOP_REACH=.7;
 export const INTERACTABLES: readonly Interactable[] = [
   {id:'blackjack-1',type:'blackjack',label:'Jogar blackjack',...BLACKJACK_TABLE,footprint:[footprint(BLACKJACK_COLLIDER)]},
@@ -174,6 +177,10 @@ export const INTERACTABLES: readonly Interactable[] = [
   // The stage's steps: touching them, from below or from the deck, opens the pass (the room charges it).
   {id:'stage',type:'stage',label:'Subir no palco',...STAGE_ENTRY,footprint:STAGE.steps.map(footprint)},
   {id:'shop',type:'shop',label:'Comprar na loja da casa',...SHOP_SPOT,reach:SHOP_REACH},
+  // Where a Highfood shift starts: the ring on the street beside the bar (docs/sistemas/highfood.md).
+  {id:'highfood-base',type:'highfood',label:'Highfood',x:HIGHFOOD_BASE.x,y:HIGHFOOD_BASE.y,z:HIGHFOOD_BASE.z,rotation:HIGHFOOD_BASE.rotation,reach:HIGHFOOD_BASE.reach},
+  // Where bought vehicles are kept (docs/sistemas/garagem.md); usable on foot or riding.
+  ...GARAGES.map(garage=>({id:garage.id,type:'garage' as const,label:`${garage.name}: seus veículos`,x:garage.x,y:garage.y,z:garage.z,rotation:garage.rotation,reach:GARAGE.REACH})),
   // The light desk, up on the deck by the sound desk: standing on its blip opens the stage show's controls.
   {id:'light-desk',type:'lights',label:'Mexer na mesa de luz',x:LIGHT_DESK.x,y:LIGHT_DESK.y,z:LIGHT_DESK.z,rotation:LIGHT_DESK.rotation,reach:LIGHT_DESK_REACH},
   ...STAGE.places.map(place=>({id:`palco-${place.id}`,type:'musician' as const,label:musicianRole(place.id).label,spot:place.id,

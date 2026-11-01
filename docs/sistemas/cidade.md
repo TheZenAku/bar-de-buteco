@@ -118,6 +118,18 @@ As caixas giradas guardam a forma real em `turn`, e `hx`/`hz` continuam sendo a 
 
 `@bar/shared/city-roads` traz o grafo de `cidade_vias.json` nos eixos do jogo, com `nearestRoadNode` e `roadRoute`. Hoje só os testes o usam. Fica fora do índice do pacote para não pesar no navegador.
 
+## Nomes das ruas
+
+As ruas têm nomes reais de Santa Bárbara d'Oeste, lidos das plantas da prefeitura: [Centro](https://ws.santabarbara.sp.gov.br/instar/mapas/loteamentos/centro.pdf), [Parque Olaria](https://ws.santabarbara.sp.gov.br/instar/mapas/loteamentos/olaria.pdf), [Jardim Conceição](https://ws.santabarbara.sp.gov.br/instar/mapas/loteamentos/conceicao.pdf) e [Distrito Industrial](https://ws.santabarbara.sp.gov.br/instar/mapas/loteamentos/distrito-industrial-i.pdf). As plantas são desenhos de CAD, sem texto, então a grafia foi lida a olho, com zoom. Os jogadores veem esses nomes no endereço dos pedidos do Highfood e no app Mapas.
+
+A tabela fica em `tools/assets/street-names.ts`. Para mudar um nome, edite a tabela e rode `npm run assets:gps`. O `cidade_vias.json` continua com os nomes originais do export, que só servem de chave na tabela.
+
+- **O traçado não é o real.** O mapa do jogo não segue a cidade: cada trecho de rua recebe um nome da planta do bairro onde está. Só no Centro as ruas paralelas mantêm a ordem real, de oeste para leste e de norte para sul.
+- **Uma rua muda de nome ao cruzar um bairro.** Por isso a mesma rua do jogo pode ter um nome em cada lado da divisa. Perto da divisa, cerca de 4% dos endereços mostram o nome de uma rua do bairro vizinho.
+- **Trechos curtos herdam um nome.** As plantas do Conceição e do Olaria têm menos ruas que o jogo, então trechos sem nome próprio usam o da rua nomeada mais próxima.
+
+As placas 3D das esquinas (`P_Placa_Rua_A` e `_B`) não acompanham a rua onde estão. Os dois modelos se repetem pela cidade, com quatro nomes pintados em `atlas_bairro.jpg`: Rua Dona Margarida, Rua XV de Novembro, Rua João Lino e Rua 13 de Maio, que são as ruas em volta do bar. Em outras esquinas, a placa não bate com o endereço. Se a textura mudar, troque todas as cópias: `texturas/`, `export/cidade/texturas/`, a publicada (com o hash em `cidade_publicacao.json`) e a imagem embutida em `bar_boteco.glb`, ou gere o export de novo pelo Blender.
+
 ## Testes
 
 - `tests/integration/city.test.ts`: manifesto, URIs, publicação, duplicidade, colisores, pisos, ruas, moto, setores nas bordas, marcadores, alcance a pé, limites.

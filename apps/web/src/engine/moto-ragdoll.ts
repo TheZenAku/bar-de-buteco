@@ -11,9 +11,11 @@ export interface RagdollRig {
 /** How long the body takes to go from lying as it fell to the first frame of getting up. */
 const RELEASE_SECONDS=.5;
 /** The room's start older than this was seen late (out of view, or a late arrival): the body catches up at once. */
-const LATE_MS=500;
+export const LATE_MS=500;
 /** Between where it was drawn on the bike and where the room threw it from (the bike is drawn a little behind the room): gone in this long. */
 const OFFSET_FADE=9;
+/** Heard and seen, a body landing: from this hard (m/s), and not more often than this (s) however many parts hit at once. */
+const LANDS_FROM=1.2,LANDS_EVERY=.11;
 
 const tempA=new pc.Vec3(),tempB=new pc.Vec3(),tempC=new pc.Vec3(),matrix=new pc.Mat4();
 /** The rotation whose X, Y and Z are these (`left`, then `up` made square with it, and their cross). */
@@ -40,11 +42,12 @@ export class RagdollPuppet {
   /** How the body lay on the last frame the sim drew it: the fade into the next clip starts from there. */
   private kept?:{hip:pc.Vec3;turns:Array<[pc.Entity,pc.Quat]>};
   private readonly drawnOffset=new pc.Vec3();
+  private landedAt=-1;
 
-  /** `from`: where this body's seat was drawn when it came off, if it was seen on a bike. */
+  /** `from`: where this body was drawn when it was hit, or its seat if it was seen on a bike. */
   constructor(start:RagdollStart,readonly startedAt:number,age:number,from?:{x:number;y:number;z:number}) {
     this.sim=new Ragdoll(start);
-    if(age>LATE_MS)this.sim.advance(age/1000);
+    if(age>LATE_MS){this.sim.advance(age/1000);this.sim.takeBlow();}
     else if(from)this.drawnOffset.set(from.x-start.x,from.y-start.y,from.z-start.z);
   }
   /** Where the pelvis is right now. */
@@ -55,6 +58,14 @@ export class RagdollPuppet {
   get asleep():boolean {return this.sim.asleep;}
   private at(joint:number,out:pc.Vec3):pc.Vec3 {const [x,y,z]=this.sim.joint(joint);return out.set(x,y,z);}
   private between(from:number,to:number,out:pc.Vec3):pc.Vec3 {const [ax,ay,az]=this.sim.joint(from),[bx,by,bz]=this.sim.joint(to);return out.set(bx-ax,by-ay,bz-az);}
+  /** The body has just hit something hard enough to notice: where, how hard, and whether it was the floor. */
+  takeLanding():{x:number;y:number;z:number;speed:number;floor:boolean}|undefined {
+    const blow=this.sim.takeBlow();
+    if(!blow||blow.speed<LANDS_FROM||this.sim.time-this.landedAt<LANDS_EVERY)return;
+    this.landedAt=this.sim.time;
+    const [x,y,z]=this.sim.joint(blow.joint),ground=this.sim.rest().y;
+    return {x,y,z,speed:blow.speed,floor:y-ground<.35};
+  }
   /** Time passes and the body takes the sim's pose. Run after the clip (and after the root has been placed) this frame. */
   pose(dt:number,rig:RagdollRig):void {
     this.sim.advance(dt);

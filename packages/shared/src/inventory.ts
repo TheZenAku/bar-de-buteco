@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import type {VehicleKey} from './garage.js';
 import type {ConsumableEffects} from './needs.js';
 
 export const INVENTORY_CAPACITY=12;
@@ -37,4 +38,6 @@ export interface InventoryEntry extends InventoryStack {item:ItemDefinition}
 export interface InventoryHistoryEntry {id:string;itemId:ItemId;quantity:number;reason:string;createdAt:string}
 export interface InventoryView {
   stacks:InventoryStack[];capacity:number;usedSlots:number;balance:number;history:InventoryHistoryEntry[];
+  /** Vehicle keys: on top of the slots, because a full backpack must not stop anyone from owning a vehicle. */
+  keys?:VehicleKey[];
 }

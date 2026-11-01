@@ -14,6 +14,9 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Dançar | Todos os FBXs de `dance/` | Cada **G** toca uma dança sorteada (veja abaixo). Os NPCs na festa escolhem uma pelo próprio id. |
 | Acenar | `misc/Waving Gesture.fbx` | Gesto único sincronizado pela tecla V; antes o servidor o convertia imediatamente em `idle`. |
 | Usar objeto | `misc/Button Pushing.fbx` (trecho de 2 s) | Mão estendida ao abrir porta, jukebox ou TV; o personagem vira para o ponto tocado. |
+| Olhar o celular | `misc/Texting While Standing.fbx` (primeiros 6 s, em loop) | `Text`: o cliente do [Highfood](../sistemas/highfood.md) esperando e quem está parado com o celular aberto. O aparelho é desenhado à parte. |
+| Agradecer | `misc/Thankful.fbx` | `Thank`: o cliente ao receber o pedido, com o saco na mão. |
+| Pegar | `misc/Picking Up Object.fbx` | `Pick`: o entregador tirando o pedido do baú. |
 | Esperar / vaso sanitário | `misc/Standing Idle 03.fbx` | Repouso enquanto aguarda Seu Zé ou usa o vaso sanitário. O mictório mantém a ação específica `urinar`. |
 | Permanecer sentado | `Sitting.fbx` | Loop de 1,17 s no esqueleto nativo do Nathan, adaptado a cada skin como as demais ações nativas. `Sit` substitui o corpo de `sentado_loop` nas mesas e nos bancos. Entra com mistura de 0,3 s e continua no tempo decorrido desde o início desse trecho da linha do tempo. A cadeira e os demais objetos mantêm a animação original. |
 | Blackjack | `carta-sentado.fbx` / `misc/Sitting Angry.fbx` | Pose normal específica das cartas ou reação Mixamo à derrota. As cartas públicas da mão aparecem como geometria real entre as duas mãos (até cinco no leque). |
@@ -21,8 +24,8 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Desmaiar / recuperar | `cair` / `levantar_chao` do export do bar | Mantém o par sincronizado, incluindo a pose no chão e o deslocamento da raiz. `Fallen` (`bebado-caido.fbx`) e `Recover` (`misc/Standing Up.fbx`, primeiros 5 s) permanecem no banco como alternativas de carregamento. |
 | Dealer | `carta-distribui.fbx` / `carta-recomeco.fbx` | Distribui e recolhe/prepara as cartas. |
 | Seu Zé | `Bartending.fbx` | Atendimento atrás do balcão, exclusivo da skin Magrão. |
-| Karatê | `karate-kick.fbx` | Skill de 2 s da skin Rafael, sem dano ou deslocamento. |
-| Chute voador | `misc/Drop Kick.fbx` | Skill de 2,9 s da skin Rafael. Salta e cai de costas; `inPlace` traz o quadril de volta, e o avatar fica parado para o servidor. |
+| Karatê | `karate-kick.fbx` | Skill de 2 s da skin Rafael, sem deslocamento. [Acerta quem o pé tocar](../sistemas/perfil.md#o-chute-que-acerta), pelo caminho do pé medido do clipe (`npm run assets:kicks`). |
+| Chute voador | `misc/Drop Kick.fbx` | Skill de 2,9 s da skin Rafael. Salta e cai de costas; `inPlace` traz o quadril de volta, e o avatar fica parado para o servidor. Acerta como o karatê. |
 | Bengala | `A_Male_Walk_OldCane*.fbx` | Caminhada e repouso do comando `/velho`, com a bengala presa à mão direita. |
 
 O runtime dá preferência aos clipes Mixamo do banco para repouso, caminhada, corrida, caminhada e repouso de bêbado, dança, aceno, uso de objetos, espera e permanência sentado. Os clipes `parado_loop`, `andar_loop` e `andar_bebado_loop` do export do mapa não substituem essa locomoção.

@@ -13,6 +13,10 @@ As moedas são da conta e ficam na API. O mundo só **pede** mudanças. Cada ped
 | Telão do palco | 50 por vídeo novo | ao tocar um link | idem |
 | Ingresso do palco | 200, vale 30 min | ao comprar na escada do palco | se a pessoa sair de perto da escada (ou mudar de sessão) antes de receber o ingresso |
 | Ajudante do Magrão (emprego) | 6 por tarefa concluída (pegar um pedido no balcão e entregá-lo contam como duas) | ao terminar a tarefa | — |
+| Entregas do [Highfood](highfood.md) | de 16 a 40 por entrega, até 700 por dia | ao entregar na mão do cliente | — |
+| Moto de entrega | 10.000, até 10 no nome de cada um | ao comprar no HighMotors | — |
+| Guincho da moto | 30 | ao chamar no HighMotors, ou para levar a moto à [garagem](garagem.md) de longe | — |
+| [Troca entre jogadores](troca.md) | sem limite de valor; não cria nem destrói moedas | ao confirmarem os dois | — |
 
 Pausar, continuar, avançar, voltar e pular a mídia são de graça; tirar o próprio vídeo da fila devolve as moedas, e um vídeo que a plataforma recusa nos primeiros 30 s também. Os valores padrão estão em `MEDIA_PRICES`, `STAGE_PASS`, `ITEM_CATALOG` e `JOBS` (`packages/shared`), e as variáveis `PRICE_JUKEBOX`, `PRICE_TV`, `PRICE_TELAO`, `PRICE_STAGE`, `SKIN_PRICE_*`, `WALLET_INITIAL_COINS` e `WALLET_DAILY_COINS` continuam mudando o padrão. Por cima deles, a administração muda qualquer preço ou pagamento em **Administração → Preços** (ver [admin.md](admin.md#preços)): a tabela efetiva (`packages/shared/src/prices.ts`) vem da API, o mundo cobra e paga com ela e os navegadores mostram os valores novos em poucos segundos (`0` torna gratuito). O motivo no extrato do ingresso é `stage:pass`.
 
@@ -34,7 +38,7 @@ Os dois blips do palco (escada e telão) só aparecem para quem está no quintal
 
 - registra a linha do livro-caixa `world:<requestId>` antes de mexer no saldo; uma repetição devolve o resultado já aplicado;
 - o saldo nunca fica negativo nem passa de `MAX_COIN_BALANCE`;
-- o mundo só pode **creditar** por trabalho (`job:`) ou estorno (`refund:<id da cobrança>`). Um estorno devolve no máximo o valor cobrado, uma única vez, e só da mesma conta;
+- o mundo só pode **creditar** por trabalho (`job:`) ou estorno (`refund:<id da cobrança>`). Um estorno devolve no máximo o valor cobrado, uma única vez, e só da mesma conta. As entregas têm rota própria, em que a API calcula o valor ([Highfood](highfood.md#dinheiro-como-está-balanceado));
 - o trabalho paga até `JOB_DAILY_CAP` (400) moedas por pessoa e por dia. Uma tarefa acima do limite fica registrada com valor 0, para nunca ser paga depois;
 - só a sessão viva do jogador é aceita, com o segredo interno.
 

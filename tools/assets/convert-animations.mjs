@@ -27,6 +27,8 @@ const clips = {
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
   Wait: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
+  // Highfood: looking at the phone (the customer waiting, anyone with the phone open), thanking for the delivery, the bag coming out of the box.
+  Text: misc('Texting While Standing.fbx'), Thank: misc('Thankful.fbx'), Pick: misc('Picking Up Object.fbx'),
 };
 // Clips that only one skin uses: Rafael's skills (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
 const exclusive = { Kick: 'rafael', AirKick: 'rafael', Bartend: 'magrao' };
@@ -39,6 +41,7 @@ const trims = {
   // Four seconds preserve the relaxed weight shifts while avoiding an 11.4 s idle in every skin bank.
   // Blend the tail into the opening pose so the shorter loop remains visually seamless.
   Wait: {from:0,to:4,blend:.5},
+  Text: {from:0,to:6,blend:.5},
 };
 
 const canonicalSourceName = name => {

@@ -678,7 +678,7 @@ def tex_atlas_bairro():
     A[640:648, :] = (1, 1, 1); A[760:768, :] = (1, 1, 1)
     W_.append(("ESCOLA ESTADUAL PROF. ANTÔNIO CARLOS", 512, 704, 58, True, 'C', 980))
     # placas de rua 256x64
-    for (x0, y0), nm in (((512, 768), "R. DAS FLORES"), ((768, 768), "R. SÃO JOSÉ"), ((512, 832), "AV. BRASIL"), ((768, 832), "R. DA PAZ")):
+    for (x0, y0), nm in (((512, 768), "R. DONA MARGARIDA"), ((768, 768), "R. XV DE NOVEMBRO"), ((512, 832), "R. JOÃO LINO"), ((768, 832), "R. 13 DE MAIO")):
         A[y0:y0 + 64, x0:x0 + 256] = (0.08, 0.22, 0.55)
         A[y0 + 4:y0 + 6, x0 + 4:x0 + 252] = (1, 1, 1); A[y0 + 58:y0 + 60, x0 + 4:x0 + 252] = (1, 1, 1)
         W_.append((nm, x0 + 128, y0 + 32, 28, True, 'C', 236))

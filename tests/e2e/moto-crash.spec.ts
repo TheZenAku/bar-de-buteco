@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import {test,expect,type Browser,type Page} from '@playwright/test';
-import {enterAsAdmin,inVehicles,selfOf as self,spawnBikeOnStreet,walkTo} from './moto-helpers';
+import {enterAsAdmin,inVehicles,lastOfBody,selfOf as self,spawnBikeOnStreet,walkTo} from './moto-helpers';
 
 const SHOTS=process.env.MOTO_SHOTS||'test-results/moto-crash';
 const errorsOf=(page:Page)=>{
@@ -71,18 +71,19 @@ test('all the lamps, then a crash with real keys: thrown off with the bike\'s sp
   // Flat out along the street until the parked car ahead: nothing but W.
   const local=(await self(page)).id as string;
   await page.evaluate(()=>{const w=window as any;w.__crash=[];const tick=()=>{const d=w.barDebug,s=d.snapshot(),m=d.motos()[0],me=s.world.players[s.localId],r=d.ragdolls()[0];w.__crash.push({t:performance.now(),anim:me.animationState,interaction:me.interactionState,x:me.x,z:me.z,speed:m?.speed,phase:m?.phase,up:m?.up,bike:m?.position,pelvis:r?.pelvis,head:r?.head,foot:r?.foot});if(w.__crash.length<6000)w.__crashTimer=requestAnimationFrame(tick);};w.__crashTimer=requestAnimationFrame(tick);});
+  const bodies=[lastOfBody(page,local),lastOfBody(other,local)];
   await page.keyboard.down('w');
   let top=0;
   await expect.poll(async()=>{const state=await self(page),now=await moto(page);top=Math.max(top,Math.abs(now.speed));return state.animationState;},{timeout:40_000,intervals:[60]}).toBe('ragdoll');
   await page.keyboard.up('w');
-  await shot(page,'2-voando');
+  // Before the screenshot, which takes seconds here: by its end the body may already be up.
   const thrown=await ragdolls(page);
   expect(thrown.map((r:any)=>r.id)).toContain(local);
+  await shot(page,'2-voando');
   // Far away, the other player is shown the same body: the same steps from the same start give the same place on the ground.
-  await expect.poll(async()=>(await ragdolls(other)).some((r:any)=>r.id===local&&r.asleep),{timeout:15_000,intervals:[60]}).toBe(true);
-  await expect.poll(async()=>(await ragdolls(page)).some((r:any)=>r.id===local&&r.asleep),{timeout:15_000,intervals:[60]}).toBe(true);
-  const mine=(await ragdolls(page)).find((r:any)=>r.id===local),theirs=(await ragdolls(other)).find((r:any)=>r.id===local);
-  expect(Math.hypot(mine.pelvis[0]-theirs.pelvis[0],mine.pelvis[2]-theirs.pelvis[2]),`${mine.pelvis} and ${theirs.pelvis}`).toBeLessThan(.02);
+  const [mine,theirs]=await Promise.all(bodies);
+  expect(mine&&theirs,'Both drew the body').toBeTruthy();
+  expect(Math.hypot(mine![0]!-theirs![0]!,mine![2]!-theirs![2]!),`${mine} and ${theirs}`).toBeLessThan(.02);
   expect(top,'Going fast enough to be thrown').toBeGreaterThan(5);
   expect((await roomMoto(page)).riderId,'Nobody on the bike any more').toBe('');
   await expect(page.locator('#context')).toBeHidden();

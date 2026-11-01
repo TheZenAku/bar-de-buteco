@@ -8,7 +8,7 @@ import {assertLocalMigrationHelperAllowed,connectDatabase,defaultMigrationFolder
 import {loadMigrations,MIGRATION_TABLE} from '../src/database/migrations.js';
 import {readMigrationConfig} from '../src/config.js';
 
-const migrationNames=['001_initial.sql','002_characters.sql','003_inventory.sql','004_control_outbox.sql','005_retire_character_creator.sql','006_phone.sql','007_phone_social.sql','008_admin_console.sql','009_profile.sql','010_badge_images.sql','011_badge_rarity.sql','012_achievements.sql'];
+const migrationNames=['001_initial.sql','002_characters.sql','003_inventory.sql','004_control_outbox.sql','005_retire_character_creator.sql','006_phone.sql','007_phone_social.sql','008_admin_console.sql','009_profile.sql','010_badge_images.sql','011_badge_rarity.sql','012_achievements.sql','013_highfood.sql','014_garage_trade.sql'];
 
 async function fixture(t:TestContext){
   const root=await mkdtemp(join(tmpdir(),'bar-migrations-')),folder=join(root,'migrations'),path=join(root,'database');

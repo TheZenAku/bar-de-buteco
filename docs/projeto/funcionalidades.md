@@ -18,7 +18,7 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Mesa de luz do palco | **Pronto (novo, 30/10)** | Blip violeta em cima do palco, ao lado da mesa de som: painel com cenas prontas e salvas, rodízio ou programa fixo, paletas, tap tempo, níveis, texto do letreiro e efeitos (flash, blackout, drop, letreiro), valendo para todo mundo; câmera de plateia enquanto o painel está aberto ([mesa de luz](../sistemas/palco.md#mesa-de-luz)) |
 | Tela de entrada com a logo animada | **Pronto (novo, 30/10)** | Letreiro de neon vivo ao lado do menu, com brinde no clique e bolhas de cerveja ([interface](../sistemas/interface.md#a-logo-na-entrada)) |
 | Músicos no palco | **Pronto (novo, 28/10)** | Violão, cavaquinho, bateria e vocal: um jogador por lugar, E para tocar e para parar, instrumento na mão, servidor dono das fases, quem chega no meio vê o show ([músicos do palco](../sistemas/palco.md)) |
-| Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno e as skills de cada skin (Rafael: karatê e chute voador). Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
+| Animações e estilos de andar por jogador | Parcial | Andar normal, correr, bêbado, bengala (`/velho`), dança, aceno e as skills de cada skin (Rafael: karatê e chute voador, que [jogam longe quem o pé tocar](../sistemas/perfil.md#o-chute-que-acerta)). Faltam estilos escolhíveis (gingado, feminino etc.); veja "Animações" |
 | Fumar, beber e comer com props | **Pronto (28/10, noite)** | Beber com o objeto real na mão ([bebidas e comidas em 3D](../sistemas/drinks.md)). [Animações do bar](../sistemas/animacoes-bar.md): fumar (F, cigarro, brasa e fumaça), fumar um cigarro inteiro (Shift+F, do maço à bituca pisada, 29/10), comer com garfo o que foi servido na mesa, sentar puxando a cadeira do mapa, levantar, urinar no mictório, vomitar ao beber demais, cair e levantar do chão, limpar a mesa pela quina. Falta o cigarro como item da mochila |
 | Skins com encaixe fácil de ossos | Pronto | Esqueleto nativo por skin, calibração e retarget automáticos (`npm run assets:retarget`, [esqueletos nativos](../assets/native-rigs.md)) |
 | Interface limpa para PC e celular | Parcial | Painéis móveis, layout de celular. Falta **controle por toque** (joystick virtual e botões de ação) |
@@ -26,7 +26,10 @@ Comparação da lista de funcionalidades desejadas com o código em 27/10/2026. 
 | Fluido e fácil de navegar | Parcial | Predição a 20 Hz. Faltam o touch e as metas de FPS medidas em hardware de referência |
 | Cidade de 800 × 800 m em volta do bar | **Pronto (novo, 31/10)** | [Cidade](../sistemas/cidade.md): quatro bairros carregados por setores, com LOD, colisão no servidor, moto nas ruas, noite e névoa |
 | Moto de entrega pilotável | **Pronto (atualizado, 31/10)** | [Moto de entrega](../sistemas/moto.md): criada pela administração em Veículos, E para subir e descer, física arcade no servidor com predição, colisão com o mapa, vista por todos, com todas as luzes, queda em ragdoll nas batidas, moto que tomba e é levantada à mão, som de motor, estado de cada parte com falhas e conserto com peças (botão direito, Informações do veículo), atropelamento que tira vida, zoom e borrão em velocidade |
-| Minigame de entrega (pedidos, mapa procedural) | Falta | Plano abaixo |
+| Entregas (Highfood) | **Pronto (novo, 01/11)** | [Highfood](../sistemas/highfood.md): moto comprada no app HighMotors, base na rua ao lado do bar, pedidos só no app, com vibração, GPS pelas ruas no minimapa e no Mapas, cliente na calçada, diálogo, pagamento com teto diário, histórico, ganhos e perfil, clientes editáveis na administração |
+| Garagem, placa, chave e tranca | **Pronto (novo, 01/11)** | [Garagem](../sistemas/garagem.md): dois anéis na rua ao lado do bar, lista de veículos, estado salvo no banco, placa em todos os veículos, chave que nunca cai e tranca |
+| Troca entre jogadores | **Pronto (novo, 01/11)** | [Troca](../sistemas/troca.md): botão direito → Negociar; moedas, itens e chaves numa só transação, confirmada pelos dois, sem duplicar |
+| GPS e destino no mapa | **Pronto (novo, 01/11)** | [GPS](../sistemas/highfood.md#gps-e-mapas): tocar no Mapas do celular marca um destino; a rota aparece no celular e no minimapa, pela cidade inteira |
 | Perfil do jogador | **Pronto (novo, 31/10)** | [Perfil](../sistemas/perfil.md): botão direito no jogador ou em si mesmo, janela arrastável com modelo parado, seis emblemas com descrição, mensagem de status e link do Highgram; skills por skin com tecla própria; emblemas gerenciados na administração |
 | Conquistas | **Pronto (novo, 31/10)** | [Conquistas](../sistemas/conquistas.md): 26 séries de quatro níveis (Bebum, Motoboy, Rei do 21, Fofoqueiro e outras), 104 emblemas ganhos jogando, com aviso, aba de progresso no perfil e a carta cravejada no nível IV |
 | Celular com apps paródia | **Pronto (29/10, ampliado 30/10)** | [Celular](../sistemas/celular.md) estilo iPhone 18 Pro na tecla K: ligações e chamadas de vídeo, Highzap com fotos, áudios e vídeos, Highgram com perfis, filtros, seguir e sugestões, HighBank com Pix, câmera com zoom, selfie e vídeo, mapa do bairro e os apps de sempre. Os números vêm da ficha do jogador (clique na pessoa no bar) |
@@ -78,14 +81,9 @@ Entregue como um aparelho no estilo do iPhone 18 Pro, aberto com **K** (a tecla 
 
 Falta, do plano original: Crush (Tinder), conversas em grupo e o personagem segurando o celular (precisa do clipe e do modelo do aparelho). As fotos, áudios e vídeos ficam no Postgres (60 publicações e 150 MB de mídia do Highzap por conta); com muitos jogadores, o próximo passo é um armazenamento S3 compatível, e para muitas chamadas de vídeo, WebRTC.
 
-### 5. Entregas de moto (minigame)
+### 5. Entregas de moto
 
-A moto já existe e anda pela cidade, na própria sala ([moto de entrega](../sistemas/moto.md)). Falta o minigame:
-
-- **Sala separada:** `DeliveryRoom` no Colyseus, uma instância por jogador ou por grupo. O bar continua leve, e o minigame pode ter física própria.
-- **Mapa procedural:** uma seed por sessão gera uma grade de quarteirões (ruas, calçadas, casas) a partir de peças modulares de cidade low-poly CC0 ([assets](assets-recomendados.md)). A mesma seed gera colisores no servidor e malhas no cliente, então só a seed trafega.
-- **Loop:** pegar o pedido no restaurante, entregar no endereço sorteado dentro de um tempo, receber moedas pelo framework de empregos (`job:delivery:...`) com teto diário. Quantas entregas quiser, sem dinheiro real.
-- **Entrada e saída:** uma moto estacionada na rua do bar (hoje só a administração cria motos) é um interactable que transfere a pessoa de sala com um ticket novo. Sair do minigame devolve a pessoa ao ponto da moto.
+Feito em 01/11 como [Highfood](../sistemas/highfood.md), na própria sala e na cidade real, em vez de uma sala separada com mapa procedural.
 
 ### 6. Animações, fumar e comer
 

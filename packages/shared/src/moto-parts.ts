@@ -130,6 +130,17 @@ export function motoStrikeHp(speed:number):number {
 }
 
 /** Fixing a part: one piece from the backpack (placeholder for now: a single generic piece), this long, and this much back. */
+/** Riding wears an owned bike a little, one point at a time, most of it where the road touches it. */
+const MILEAGE_WEAR:ReadonlyArray<readonly [MotoPartId,number]>=[['pneu_traseiro',5],['pneu_dianteiro',4],['freios',4],['motor',2],['suspensao',2],['escapamento',1],['bateria',1],['direcao',1]];
+export function mileageWear(parts:MotoParts,random:()=>number=Math.random):MotoParts {
+  const total=MILEAGE_WEAR.reduce((sum,[,weight])=>sum+weight,0);
+  let pick=random()*total;
+  for(const [id,weight] of MILEAGE_WEAR){
+    pick-=weight;
+    if(pick<0)return {...parts,[id]:Math.max(0,parts[id]-1)};
+  }
+  return parts;
+}
 export const MOTO_REPAIR={item:'peca_moto' as ItemId,pieces:1,amount:40,ms:3500} as const;
 export const motoRepairSchema=z.object({motoId:z.string().max(32),part:z.enum(MOTO_PART_IDS)}).strict();
 /** The state of someone working on a bike, in Player.interactionState. */

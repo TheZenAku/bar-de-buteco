@@ -1,4 +1,4 @@
-import {CALL_END_TEXT,PHONE,type PhoneCallView,type PhonePing,type PhoneProfile} from '@bar/shared';
+import {CALL_END_TEXT,HIGHFOOD,PHONE,type HighfoodState,type PhoneCallView,type PhonePing,type PhoneProfile} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {gameHour} from '../engine/day-night';
 import {uiIcon} from '../ui-icons';
@@ -9,12 +9,14 @@ import {highgram} from './apps/gram';
 import {camera,fotos} from './apps/camera';
 import {mapas} from './apps/maps';
 import {highbank} from './apps/bank';
+import {highfood} from './apps/highfood';
+import {highmotors} from './apps/motors';
 import {notas,calendario,relogio,calculadora,ajustes} from './apps/tools';
 import {WALLPAPERS} from './wallpapers';
 import './phone.css';
 
 /** Dock first (Telefone, Highzap, Highgram, Câmera), then the home screen's grid. */
-const APPS:PhoneApp[]=[telefone,highzap,highgram,camera,fotos,mapas,highbank,contatos,notas,calendario,relogio,calculadora,ajustes];
+const APPS:PhoneApp[]=[telefone,highzap,highgram,camera,fotos,mapas,highfood,highmotors,highbank,contatos,notas,calendario,relogio,calculadora,ajustes];
 const SCALE={s:.6,m:.74,l:.9} as const;
 const GAME_PHASES:Array<[number,string]>=[[5,'Madrugada'],[7,'Amanhecer'],[12,'Manhã'],[17.5,'Tarde'],[19,'Entardecer'],[24,'Noite']];
 const statusIcons=`<span class="ph-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span><small>5G</small><svg class="ph-wifi" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 4a10 10 0 0 1 14 0M3.5 6.8a6.5 6.5 0 0 1 9 0M6 9.5a3 3 0 0 1 4 0" stroke="currentColor" fill="none" stroke-width="1.7" stroke-linecap="round"/></svg><span class="ph-battery" aria-hidden="true"><b></b></span>`;
@@ -83,7 +85,30 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     banner:(app,title,text,initials)=>banner(app,title,text,initials),
     onPing(listener){listeners.add(listener);return ()=>listeners.delete(listener);},
     setBadge:(app,count)=>setBadge(app,count),
+    foodSeen:()=>foodSeen(),
   };
+  // A new order: it shows only in the app, and until someone looks there, the pocket vibrates.
+  let buzzing:ReturnType<typeof setInterval>|undefined,offerShown='';
+  function buzz():void {
+    if(settings.dnd)return;
+    sounds.vibrate();
+    const button=root.querySelector('[data-action="phone"]');
+    button?.classList.remove('phone-buzz');void (button as HTMLElement|null)?.offsetWidth;button?.classList.add('phone-buzz');
+  }
+  function stopBuzz():void {clearInterval(buzzing);buzzing=undefined;}
+  function foodSeen():void {stopBuzz();setBadge('highfood',0);const offer=host.food.state().offer;if(offer)offerShown=offer.id;}
+  function onFood(state:HighfoodState):void {
+    const offer=state.status==='offer'?state.offer:undefined;
+    if(!offer){stopBuzz();setBadge('highfood',0);return;}
+    if(offer.id===offerShown)return;
+    if(open&&current?.app.id==='highfood'){offerShown=offer.id;stopBuzz();if(!settings.dnd)sounds.ding();return;}
+    if(buzzing)return;
+    setBadge('highfood',1);
+    buzz();buzzing=setInterval(buzz,HIGHFOOD.BUZZ_EVERY_MS);
+    if(open)quietBanner('highfood','Highfood','Chegou um pedido novo.');
+  }
+  host.food.listen(onFood);
+  host.food.receipts(receipt=>{if(!settings.dnd&&receipt.paid>0)sounds.cash();});
 
   function applySettings():void {
     const wall=WALLPAPERS[settings.wallpaper];
@@ -109,7 +134,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     const time=gameClock().text,node=$('.ph-time');if(node.textContent!==time)node.textContent=time;
     const clock=home.querySelector('[data-widget="clock"] b');if(clock&&clock.textContent!==time)clock.textContent=time;
   }
-  const icon=(app:PhoneApp,label=true)=>`<button class="ph-icon" type="button" data-app="${app.id}" aria-label="${e(app.name)}${badges.get(app.id)?` · ${badges.get(app.id)} novidades`:''}"><span class="ph-glyph" style="--tint:${app.tint}">${uiIcon(app.icon)}${badges.get(app.id)?`<i class="ph-badge">${Math.min(99,badges.get(app.id)!)}</i>`:''}</span>${label?`<span class="ph-label">${e(app.name)}</span>`:''}</button>`;
+  const icon=(app:PhoneApp,label=true)=>`<button class="ph-icon" type="button" data-app="${app.id}" aria-label="${e(app.name)}${badges.get(app.id)?` · ${badges.get(app.id)} novidades`:''}"><span class="ph-glyph ${app.image?'has-image':''}" style="--tint:${app.tint}">${app.image?`<img src="${import.meta.env.BASE_URL}${app.image}" alt="" draggable="false">`:uiIcon(app.icon)}${badges.get(app.id)?`<i class="ph-badge">${Math.min(99,badges.get(app.id)!)}</i>`:''}</span>${label?`<span class="ph-label">${e(app.name)}</span>`:''}</button>`;
   function renderHome():void {
     const clock=gameClock(),balance=host.wallet(),unread=profile?.unread??0,today=new Date();
     home.innerHTML=`<div class="ph-widgets">
@@ -148,9 +173,12 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
   function banner(app:string,title:string,text:string,initials?:string):void {
     if(!settings.dnd)sounds.ding();
     if(!open){host.notice(title,text,initials);return;}
+    quietBanner(app,title,text);
+  }
+  function quietBanner(app:string,title:string,text:string):void {
     const target=APPS.find(candidate=>candidate.id===app);
     const node=document.createElement('button');node.type='button';node.className='ph-banner';node.dataset.app=app;
-    node.innerHTML=`<span class="ph-glyph" style="--tint:${target?.tint??'#555'}">${uiIcon(target?.icon??'bell')}</span><span><small>${e(target?.name??'')}</small><b>${e(title)}</b><span>${e(text)}</span></span>`;
+    node.innerHTML=`<span class="ph-glyph ${target?.image?'has-image':''}" style="--tint:${target?.tint??'#555'}">${target?.image?`<img src="${import.meta.env.BASE_URL}${target.image}" alt="" draggable="false">`:uiIcon(target?.icon??'bell')}</span><span><small>${e(target?.name??'')}</small><b>${e(title)}</b><span>${e(text)}</span></span>`;
     banners.replaceChildren(node);setTimeout(()=>node.remove(),4500);
   }
 
@@ -376,13 +404,13 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     disconnected(){if(call&&call.state!=='ended')onCall({...call,state:'ended',reason:'dropped'});},
     enter(){
       settings=store.get('settings',{...DEFAULT_SETTINGS});applySettings();
-      badges.clear();setBadge('telefone',store.get<number>('missed',0));
+      badges.clear();setBadge('telefone',store.get<number>('missed',0));offerShown='';stopBuzz();
       void ctx.refreshProfile();renderHome();renderStatus();
     },
     leave(){
       if(call&&call.state!=='ended')hangup();
       sounds.stop();host.setCallPeer(undefined);stopVideo();call=undefined;callShown=false;micForCall=false;
-      hide();profile=undefined;profileAt=0;renderCall();
+      hide();profile=undefined;profileAt=0;renderCall();stopBuzz();
     },
   };
 }

@@ -23,7 +23,7 @@ test('generated animations bind to existing skins and contain valid skeletal rot
     assert.equal(json.meshes, undefined, 'Animation banks must not duplicate character geometry');
     const names = json.animations.map((animation: any) => animation.name);
     if (file === skin) {
-      for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Sit', 'Wave', 'Use', 'Wait', 'Recover']) assert.ok(names.includes(clip));
+      for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Sit', 'Wave', 'Use', 'Wait', 'Text', 'Thank', 'Pick', 'Recover']) assert.ok(names.includes(clip));
       assert.ok(!names.some((name: string) => name.startsWith('Dance')), 'The dances have a bank of their own');
     } else assert.deepEqual(names, DANCES, 'Every distinct dance of assets-bar/anim/dance, in file order');
     assert.equal(names.includes('Kick'), skin === 'rafael' && file === skin);
@@ -46,7 +46,7 @@ test('generated animations bind to existing skins and contain valid skeletal rot
         if (animation.name === 'Recover') assert.equal(Math.round(input.max[0] * 1000), RECOVER_DURATION_MS);
         const accessor = json.accessors[sampler.output], view = json.bufferViews[accessor.bufferView];
         assert.equal(accessor.count, input.count);
-        const looped = ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Sit','Wait'].includes(animation.name) || animation.name.startsWith('Dance ');
+        const looped = ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Sit','Wait','Text'].includes(animation.name) || animation.name.startsWith('Dance ');
         if (looped && channel.target.path === 'translation') {
           // Standard Run travels forward in its file (root motion): the loop must come back to where it started.
           const at = (frame: number) => Array.from({ length: 3 }, (_, c) => bin.readFloatLE((view.byteOffset ?? 0) + (accessor.byteOffset ?? 0) + frame * 12 + c * 4));

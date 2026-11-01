@@ -22,13 +22,17 @@ import {BarAnimations,barEndOffset,barState} from './bar-animations';
 import {FOG_SCALE,type GraphicsSettings} from '../graphics';
 import {CameraRig,type CameraMode} from './camera-rig';
 import {Motos,seatRider,type Bike} from './moto-delivery';
+import {HighfoodProps} from './highfood-props';
+import {GARAGES,HIGHFOOD} from '@bar/shared';
 import {SpeedBlur} from './speed-blur';
-import {lifterPose,RagdollPuppet,type RagdollRig} from './moto-ragdoll';
+import {LATE_MS,lifterPose,RagdollPuppet,type RagdollRig} from './moto-ragdoll';
+import {BlowSounds} from './blow-sound';
+import {BlowEffects} from './blow-fx';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
 import {completeBasePose} from './animation-tracks';
 import {shootPortrait} from './skin-portrait';
-import {skillById} from '@bar/shared';
+import {KICKS,skillById} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -85,6 +89,10 @@ interface Avatar {
   drinks?: Partial<Record<HeldDrink, pc.Entity>>;
   /** Tonico's tray and the order on it (`key`: the items it was built for). */
   tray?: { entity: pc.Entity; key: string; items: pc.Entity[] };
+  /** The Highfood bag in hand and backpack, while someone has them (dressCourier). They live in the scene, not under the body. */
+  parcelProp?: pc.Entity;
+  packProp?: pc.Entity;
+  phoneProp?: pc.Entity;
   /** The bone that bows the upper body (Tonico putting an order down); null when the rig has none. */
   spine?: pc.Entity | null;
   /** A small fan of real geometry shown between both hands at the blackjack table. */
@@ -106,8 +114,12 @@ interface Avatar {
   glideNext?: number;
   /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
   riding?: boolean;
-  /** Thrown from a bike (moto-ragdoll.ts): the body as it flies and lies, until the getting-up clip has taken over. */
+  /** Thrown from a bike or by a kick (moto-ragdoll.ts): the body as it flies and lies, until the getting-up clip has taken over. */
   ragdoll?: RagdollPuppet;
+  /** The kick whose leg was last heard cutting the air (its animationStartedAt). */
+  swungAt?: number;
+  /** A kick has just landed: the clip holds until then (performance.now), so it has weight. */
+  hitStopUntil?: number;
   /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
   contact: pc.Entity;
   covered?: { x: number; z: number; value: boolean };
@@ -186,6 +198,10 @@ const OBJECTIVE_COLOR = '#5fd86c';
 // read the same colours (--blip-stage, --blip-telao, --blip-shop and --blip-desk in neon-ui.css).
 // A musician plays (and the stage show runs) from the start of the playing, through the loop, until putting it away.
 const LIVE_PHASES = new Set<StagePhase>(['comecando','loop']);
+/** Highfood's base: the ring's colour, how far it shows from, and where its sign stands. */
+const FOOD_COLOR='#ff3d5a',FOOD_BASE_RANGE=70,FOOD_STAND={x:-1.15,y:.15,z:-15.5};
+/** The garages' rings, in the colour of everything about vehicles. */
+const GARAGE_COLOR='#17d4f4';
 const STAGE_BLIPS = {entry:{at:STAGE_ENTRY,color:'#ff47c2'},telao:{at:TV_SPOTS.telao!,color:'#3adfd7'},shop:{at:SHOP_SPOT,color:'#fac416'},desk:{at:LIGHT_DESK,color:'#a77bff'}} as const;
 export type StageBlip = keyof typeof STAGE_BLIPS;
 /** The radius of a blip's floor ring, in metres: standing within it is standing on the blip. */
@@ -204,6 +220,12 @@ const color = (hex: string): pc.Color => new pc.Color().fromString(hex);
 const lerp = (a: number, b: number, amount: number): number => a + (b - a) * amount;
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
+/** A kick: how late the leg may still be heard (ms), how far from the body a foot can be and still mark the blow (m), how long the clip holds when it lands (ms). */
+const SWING_LATE_MS = 700, KICK_STAR_NEAR = 1.1, HIT_STOP_MS = 70;
+/** How far a kick's clip may stray from the room's clock (s) before it is put back. */
+const KICK_DRIFT = .1;
+/** A body raises dust from the floor from this hard (m/s). */
+const DUST_FROM = 2.5;
 /**
  * BarBoteco supplies the full environment; shared exported volumes control movement and the camera.
  * The app supplies authoritative snapshots and predicted local positions. This
@@ -248,6 +270,8 @@ export class BarScene {
   private lensFov = 57;
   /** The thrown bodies the room is running. */
   private ragdollStarts:Record<string,RagdollStart&{startedAt:number}>={};
+  private readonly blowSounds:BlowSounds;
+  private readonly blowEffects:BlowEffects;
   /** The rider's switches (Z, X, C, H), and how far the bike has turned with the blinker on. */
   private motoSwitches=0;
   private signalYaw?:number;
@@ -269,6 +293,11 @@ export class BarScene {
   private objective?:Marker;
   /** The stage's blips (STAGE_BLIPS), shown while the player is in the stage's area (below the deck, but the light desk's also on it). */
   private readonly stageBlips = new Map<StageBlip, Marker>();
+  /** Highfood's base: its ring and its sign, near the bar. */
+  private foodBase?: Marker;
+  private foodStand?: pc.Entity;
+  private garageRings?: Marker[];
+  private highfoodProps?: HighfoodProps;
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
   private readonly resizeObserver: ResizeObserver;
@@ -369,6 +398,11 @@ export class BarScene {
     this.stageShow=new StageShow(this.app);
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
+    this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
+      const ear=this.camera.getPosition();
+      return {x:ear.x,y:ear.y,z:ear.z,forward:this.camera.forward,up:this.camera.up};
+    });
+    this.blowEffects=new BlowEffects(this.app);
     this.speedBlur=new SpeedBlur(this.app);
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
@@ -564,6 +598,43 @@ export class BarScene {
     }
   }
 
+  /** Where the nearest garage is on screen, while its ring shows. */
+  projectGarage():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
+    const p=this.actors.get(this.localId)?.root.getPosition();
+    if(!p||!this.garageRings)return null;
+    const near=[...this.garageRings].sort((a,b)=>Math.hypot(a.target.x-p.x,a.target.z-p.z)-Math.hypot(b.target.x-p.x,b.target.z-p.z))[0];
+    return near?.marker.enabled?this.projectMarker(near):null;
+  }
+  private updateGarages():void {
+    const p=this.actors.get(this.localId)?.root.getPosition();
+    this.garageRings??=GARAGES.map(garage=>{
+      const ring=this.buildMarker(`Garagem ${garage.id}`,GARAGE_COLOR);
+      ring.target={x:garage.x,y:garage.y,z:garage.z};ring.marker.setPosition(garage.x,garage.y,garage.z);ring.marker.enabled=false;
+      return ring;
+    });
+    for(const ring of this.garageRings){
+      const shown=!!p&&this.enabled&&!this.watchingTv&&Math.hypot(p.x-ring.target.x,p.z-ring.target.z)<FOOD_BASE_RANGE&&Math.abs(p.y-ring.target.y)<2.5;
+      ring.marker.enabled=shown;
+      if(shown)this.animateMarker(ring);
+    }
+  }
+  /** Where the Highfood base is on screen, while its ring shows. */
+  projectFoodBase():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.foodBase);}
+  /** The ring shows up to a street or two away, in the base's colour, for anyone (the base is where the job starts). */
+  private updateFoodBase():void {
+    const player=this.actors.get(this.localId),p=player?.root.getPosition(),{x,y,z,rotation}=HIGHFOOD.BASE;
+    const near=!!p&&this.enabled&&!this.watchingTv&&Math.hypot(p.x-x,p.z-z)<FOOD_BASE_RANGE&&Math.abs(p.y-y)<2.5;
+    if(!near){if(this.foodBase)this.foodBase.marker.enabled=false;if(this.foodStand)this.foodStand.enabled=false;return;}
+    if(!this.foodBase){
+      this.foodBase=this.buildMarker('Highfood base',FOOD_COLOR);this.foodBase.target={x,y,z};this.foodBase.marker.setPosition(x,y,z);
+      this.highfoodProps??=new HighfoodProps(this.app,this.materials);
+      // Back against the bar's wall, on the side of the ring, facing the street.
+      this.foodStand=this.highfoodProps.stand();this.app.root.addChild(this.foodStand);
+      this.foodStand.setPosition(FOOD_STAND.x,FOOD_STAND.y,FOOD_STAND.z);this.foodStand.setEulerAngles(0,rotation*RAD_TO_DEG,0);
+    }
+    this.foodBase.marker.enabled=true;if(this.foodStand)this.foodStand.enabled=true;this.animateMarker(this.foodBase);
+  }
+
   private projectMarker(blip:Marker|undefined):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
     const player=this.actors.get(this.localId);
     if(!blip?.marker.enabled||!this.camera.camera||!player)return null;
@@ -756,7 +827,7 @@ export class BarScene {
       const q = avatar.root.getPosition();
       others.push({ id, x: q.x, y: q.y, z: q.z, npc: avatar.npc });
     }
-    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others };
+    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others, riding: !!self.actor.interactionState?.startsWith('moto:') };
   }
 
   /** The bike the local player rides, as predicted (networking.ts). */
@@ -804,6 +875,8 @@ export class BarScene {
     return [this.tempScreen.x, this.tempScreen.y];
   }
   /** The thrown bodies as drawn (tests and telemetry). */
+  /** Kicks and falls: what was heard and what is showing (tests). */
+  getBlows() { return { ...this.blowSounds.telemetry(), effects: this.blowEffects.showing }; }
   getRagdolls() {
     return [...this.actors].filter(([, avatar]) => avatar.ragdoll).map(([id, avatar]) => {
       const [x, y, z] = avatar.ragdoll!.pelvis(), head = avatar.skin?.bones.head.getPosition(), foot = avatar.skin?.bones.foot_l.getPosition(), hip = avatar.skin?.hip?.getPosition();
@@ -1049,10 +1122,12 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
-    this.motos.destroy();this.speedBlur.destroy();
+    this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
+    this.foodBase?.marker.destroy();this.foodBase=undefined;this.foodStand?.destroy();this.foodStand=undefined;
+    for(const ring of this.garageRings??[])ring.marker.destroy();this.garageRings=undefined;
     this.musicians?.destroy();this.musicians=undefined;
     this.barAnimations?.destroy();this.barAnimations=undefined;
     this.foosballBalls.destroy();
@@ -1214,7 +1289,7 @@ export class BarScene {
   }
 
   private usesSkin(actor: SceneActor, npc: boolean): boolean {
-    return !npc || actor.id === 'tonico' || actor.id === 'dealer' || !!NPC_SKINS[actor.id];
+    return !npc || actor.id === 'tonico' || actor.id === 'dealer' || !!NPC_SKINS[actor.id] || !!actor.skin;
   }
 
   private loadAnimations(id: string): void {
@@ -1242,7 +1317,7 @@ export class BarScene {
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
     for (const asset of bank.animations) {
       const track = asset.resource as pc.AnimTrack;
-      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover'].includes(track.name);
+      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick'].includes(track.name);
       skin.model.anim!.assignAnimation(track.name, track, undefined, 1, loop);
       skin.tracks.add(track.name);
       if (track.name === 'Drink') this.addHandLayer(skin, track);
@@ -1288,7 +1363,7 @@ export class BarScene {
    * Asks for missing skins.
    */
   private skinFor(actor: SceneActor, npc: boolean): string | undefined {
-    const wanted=npc ? NPC_SKINS[actor.id]??DEFAULT_MODEL : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
+    const wanted=npc ? NPC_SKINS[actor.id]??(actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_MODEL) : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
     if (!this.skinModels.has(wanted)) this.loadSkin(wanted);
     return this.skinModels.has(wanted)?wanted:undefined;
   }
@@ -1418,7 +1493,7 @@ export class BarScene {
     const seated = animation.includes('sit') || animation.includes('seat') || animation.includes('blackjack');
     // The local player faces the predicted travel direction; the server's lags behind it.
     // Seats, stage spots and the bar animations set the facing on the server, so the player keeps that one meanwhile.
-    if (local && (seated || actor.musician || (bar && actor.interactionState))) this.lastRotation = actor.rotation ?? this.lastRotation;
+    if (local && (seated || actor.musician || animation === 'kick' || (bar && actor.interactionState))) this.lastRotation = actor.rotation ?? this.lastRotation;
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
     avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
@@ -1452,6 +1527,39 @@ export class BarScene {
     // Tonico serving or clearing, and a player working the bar with an order on the tray (Magrão's hands are in his clips).
     if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
     else if (avatar.tray) avatar.tray.entity.enabled = false;
+    if (avatar.skin) this.dressCourier(avatar, avatar.skin, !!bar); else if (avatar.parcelProp || avatar.packProp) this.dressCourier(avatar, undefined, true);
+  }
+
+  /** The bag in hand (a courier's on the way to the door, a customer's once it is theirs) and the backpack on a courier on foot. */
+  private dressCourier(avatar: Avatar, skin: SkinnedRig | undefined, busy: boolean): void {
+    const { actor, body } = avatar, moving = actor.animation === 'ragdoll' || actor.animation === 'ride' || actor.animation === 'sit';
+    const holding = !!skin && !busy && !moving && actor.parcel === 'bag', wearing = !!skin && !busy && !moving && !!actor.courier;
+    const texting = !!skin && !busy && (actor.animation === 'text' || (actor.animation === 'idle' && !!actor.looking));
+    if (avatar.phoneProp) avatar.phoneProp.enabled = texting;
+    if (!holding && !wearing && !texting) { if (avatar.parcelProp) avatar.parcelProp.enabled = false; if (avatar.packProp) avatar.packProp.enabled = false; return; }
+    this.highfoodProps ??= new HighfoodProps(this.app, this.materials);
+    const front = body.forward.clone().mulScalar(-1), side = body.right.clone(), up = pc.Vec3.UP; front.y = 0; front.normalize(); side.y = 0; side.normalize();
+    if (texting) {
+      const hand = skin!.bones.hand_r, phone = avatar.phoneProp ??= (() => { const made = this.highfoodProps!.phone(); this.app.root.addChild(made); return made; })();
+      // Flat in the palm, its screen up towards the face (the skins' hand bones do not share axes, so it follows the body).
+      phone.setPosition(hand.getPosition().clone().add(front.clone().mulScalar(.03)).add(up.clone().mulScalar(.02))); phone.setEulerAngles(-52, avatar.yaw, 0); phone.enabled = true;
+    }
+    if (avatar.parcelProp) avatar.parcelProp.enabled = holding;
+    if (holding) {
+      const bones = skin!.bones, bag = avatar.parcelProp ??= (() => { const made = this.highfoodProps!.bag(); this.app.root.addChild(made); return made; })();
+      // A customer waves with the other hand; the arm hangs a little forward, away from the leg.
+      const right = !avatar.npc, upper = right ? bones.upperarm_r : bones.upperarm_l, lower = right ? bones.lowerarm_r : bones.lowerarm_l, hand = right ? bones.hand_r : bones.hand_l, out = right ? 1 : -1;
+      const wrist = upper.getPosition().clone().add(front.clone().mulScalar(.2)).sub(up.clone().mulScalar(.5)).add(side.clone().mulScalar(out * .06));
+      reach(upper, lower, hand, wrist, new pc.Vec3().sub(front).add(side.clone().mulScalar(out * .5)));
+      bag.setPosition(hand.getPosition().clone().sub(up.clone().mulScalar(.06))); bag.setEulerAngles(0, avatar.yaw, 0); bag.enabled = true;
+    }
+    if (avatar.packProp) avatar.packProp.enabled = wearing;
+    if (wearing) {
+      const pack = avatar.packProp ??= (() => { const made = this.highfoodProps!.backpack(); this.app.root.addChild(made); return made; })();
+      avatar.spine ??= (skin!.model.findByName('spine_02') as pc.Entity | null) ?? null;
+      const at = (avatar.spine ?? skin!.bones.upperarm_r).getPosition().clone().sub(front.clone().mulScalar(.12)).add(up.clone().mulScalar(.08));
+      pack.setPosition(at); pack.setEulerAngles(0, avatar.yaw, 0); pack.enabled = true;
+    }
   }
 
   /**
@@ -1721,7 +1829,7 @@ export class BarScene {
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
-      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'ride' || action === 'ragdoll' ? 'Sit'
+      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
@@ -1748,11 +1856,11 @@ export class BarScene {
       else if (actionImported && !locomotion && actor.animationStartedAt && anim.baseLayer) {
         const age = Math.max(0, (Date.now() + this.serverClockOffset - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
-        anim.baseLayer.activeStateCurrentTime = ['Deal', 'Wait', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) || clip.startsWith('Dance ') ? age % duration : Math.min(age, duration);
+        anim.baseLayer.activeStateCurrentTime = ['Deal', 'Wait', 'Text', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) || clip.startsWith('Dance ') ? age % duration : Math.min(age, duration);
       }
     }
     const pace = MIXAMO_PACE[clip];
-    anim.speed = pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):1;
+    anim.speed = pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
     // A drink in hand: the hand layer fades in over a free body and keeps to the room's clock (sips line up for everyone,
     // whatever pace the walk sets for the clips).
     const now = Date.now() + this.serverClockOffset;
@@ -1772,6 +1880,11 @@ export class BarScene {
       // PlayCanvas accumulates loop time across laps. Compare phases so an old/suspended tab can still catch up.
       const drift = Math.abs((looping ? (current % duration + duration) % duration : current) - time);
       if ((looping ? Math.min(drift, duration - drift) : drift) > .2) anim.baseLayer.activeStateCurrentTime = time;
+    }
+    // A kick too: the room decides what it hits from this very moment of the clip, so the foot must be where the room says it is.
+    else if (action === 'kick' && actionImported && anim.baseLayer?.activeState === clip && actor.animationStartedAt && (avatar.hitStopUntil ?? 0) <= performance.now()) {
+      const time = Math.min(Math.max(0, (now - actor.animationStartedAt) / 1000), anim.baseLayer.activeStateDuration);
+      if (Math.abs(anim.baseLayer.activeStateCurrentTime - time) > KICK_DRIFT) anim.baseLayer.activeStateCurrentTime = time;
     }
     if (imported) {
       body.setLocalPosition(0, 0, 0); body.setLocalEulerAngles(0, 0, 0);
@@ -1932,6 +2045,7 @@ export class BarScene {
     this.motos.update(dt, this.camera, this.app.scene.exposure);
     this.placeRiders();
     this.placeThrown(dt);
+    this.blowEffects.update(dt, this.camera);
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
     // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
@@ -1995,6 +2109,8 @@ export class BarScene {
     this.televisions.get('telao')?.setDim(this.stageShow.screenDim);
     this.animateMarker(this.objective);
     this.updateStageBlips();
+    this.updateFoodBase();
+    this.updateGarages();
     const party = this.environment.partyStrength;
     for (let i = 0; i < this.partyLights.length; i++) {
       const light = this.partyLights[i]!.light;
@@ -2016,7 +2132,7 @@ export class BarScene {
     }
   }
   /**
-   * The bodies a crash threw, on top of the clip (Sit: only what the ragdoll does not move shows), and the way back into getting up; and
+   * The bodies a crash or a kick threw, on top of the clip (Sit: only what the ragdoll does not move shows), and the way back into getting up; and
    * someone lifting a fallen bike. After motos.update, since the bike's grips are where the hands go.
    */
   private placeThrown(dt: number): void {
@@ -2024,6 +2140,7 @@ export class BarScene {
     for (const [id, avatar] of this.actors) {
       const { skin, actor } = avatar;
       if (!skin) continue;
+      if (actor.animation === 'kick') this.swingKick(avatar, now);
       if (actor.animation === 'moto-lift') {
         const bike = this.motos.lifted(id);
         if (bike) lifterPose(this.bodyRig(avatar, skin), { left: bike.rig.ponto('ponto_mao_E').getPosition(), right: bike.rig.ponto('ponto_mao_D').getPosition(), seat: bike.rig.ponto('ponto_piloto').getPosition() }, (now - (actor.animationStartedAt ?? now)) / MOTO.LIFT_MS, reach);
@@ -2031,15 +2148,47 @@ export class BarScene {
       }
       const start = this.ragdollStarts[id];
       if (start && actor.animation === 'ragdoll') {
-        if (avatar.ragdoll?.startedAt !== start.startedAt) avatar.ragdoll = new RagdollPuppet(start, start.startedAt, now - start.startedAt, start.seated ? this.motos.nearest(start)?.drawn : undefined);
+        if (avatar.ragdoll?.startedAt !== start.startedAt) {
+          avatar.ragdoll = new RagdollPuppet(start, start.startedAt, now - start.startedAt, start.seated ? this.motos.nearest(start)?.drawn : avatar.root.getPosition());
+          if (start.by && now - start.startedAt <= LATE_MS) this.kickLanded(id, avatar, skin, start.by);
+        }
         const rig = this.bodyRig(avatar, skin);
         avatar.ragdoll.pose(dt, rig);
+        const landing = avatar.ragdoll.takeLanding();
+        if (landing) {
+          this.blowSounds.fall(landing.speed, landing);
+          if (landing.floor && landing.speed > DUST_FROM) this.blowEffects.puff(landing.x, avatar.ragdoll.ground(), landing.z, Math.min(1, landing.speed / 7));
+        }
         const [x, , z] = avatar.ragdoll.pelvis();
         avatar.contact.setPosition(x, avatar.ragdoll.ground() + .012, z);
         continue;
       }
       if (avatar.ragdoll && !avatar.ragdoll.fade(dt, this.bodyRig(avatar, skin))) avatar.ragdoll = undefined;
     }
+  }
+  /** The kicking leg cuts the air at the same moment of the clip for everyone (clips run on the room's clock). A late arrival hears nothing. */
+  private swingKick(avatar: Avatar, now: number): void {
+    const { actor } = avatar, blow = KICKS[actor.skill ?? ''], age = now - (actor.animationStartedAt ?? now);
+    if (!blow || avatar.swungAt === actor.animationStartedAt || age < blow.swingMs) return;
+    avatar.swungAt = actor.animationStartedAt;
+    if (age > blow.swingMs + SWING_LATE_MS) return;
+    const at = avatar.root.getPosition();
+    this.blowSounds.swing(blow.heavy, { x: at.x, y: at.y + 1, z: at.z });
+  }
+  /** The moment a kick lands, for whoever is looking: a star where the foot is drawn, the sound, and the blow felt by the two involved. */
+  private kickLanded(id: string, avatar: Avatar, skin: SkinnedRig, by: string): void {
+    const kicker = this.actors.get(by), heavy = !!KICKS[kicker?.actor.skill ?? '']?.heavy;
+    const head = skin.bones.head.getPosition(), feet = avatar.root.getPosition();
+    const chest = this.tempPosition.set(feet.x, (feet.y + head.y) / 2 + .25, feet.z);
+    const left = kicker?.skin?.bones.foot_l.getPosition(), right = kicker?.skin?.bones.foot_r.getPosition();
+    const foot = left && right ? (left.distance(chest) < right.distance(chest) ? left : right) : undefined;
+    // The room saw the foot a little earlier than this frame draws it: far from the body, the body is where it hurts.
+    const at = foot && foot.distance(chest) < KICK_STAR_NEAR ? foot : chest;
+    this.blowSounds.hit(heavy, at);
+    this.blowEffects.star(at, heavy ? .85 : .6);
+    if (kicker) kicker.hitStopUntil = performance.now() + HIT_STOP_MS;
+    const felt = id === this.localId ? (heavy ? .085 : .06) : by === this.localId ? (heavy ? .04 : .026) : 0;
+    if (felt && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.rig.shake(felt);
   }
   private bodyRig(avatar: Avatar, skin: SkinnedRig): RagdollRig {
     const hip = skin.hip ??= (skin.model.findByName('hip') as pc.Entity | null) ?? undefined;

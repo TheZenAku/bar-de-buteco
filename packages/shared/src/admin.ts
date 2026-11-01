@@ -31,6 +31,8 @@ export interface AdminPlayerDetail {
   account:AdminAccount&{createdAt:string;equippedSkin:string;phone:string|null};
   wallet:{balance:number;earned30d:number;spent30d:number;ledger:AdminLedgerEntry[]};
   inventory:Array<{itemId:string;quantity:number}>;
+  /** The vehicles whose key this player holds. */
+  vehicles:Array<{id:string;plate:string;name:string;parts:string;mileage:number}>;
   skins:Array<{id:string;name:string;owned:boolean;acquiredAt:string|null}>;
   sessions:{active:number;lastLoginAt:string|null};
   stats:{gamesPlayed:number;wins:number;losses:number;draws:number};
@@ -100,11 +102,11 @@ export interface AdminServerInfo {
  * coins between players and never changes the total.
  */
 export const LEDGER_SOURCES={
-  'boas-vindas':'Boas-vindas',bonus:'Bônus diário',trabalho:'Trabalho',estorno:'Estornos',admin:'Administração',pix:'Pix entre jogadores',
-  skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',blackjack:'Blackjack',pebolim:'Pebolim',testes:'Bots de teste',outros:'Outros',
+  'boas-vindas':'Boas-vindas',bonus:'Bônus diário',trabalho:'Trabalho',estorno:'Estornos',admin:'Administração',pix:'Pix entre jogadores',trade:'Trocas entre jogadores',
+  highfood:'Entregas Highfood',veiculos:'Veículos',skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',blackjack:'Blackjack',pebolim:'Pebolim',testes:'Bots de teste',outros:'Outros',
 } as const;
 export type LedgerSource=keyof typeof LEDGER_SOURCES;
-const PREFIX_SOURCE:Record<string,LedgerSource>={welcome:'boas-vindas',daily:'bonus',job:'trabalho',refund:'estorno',pix:'pix',skin:'skins',item:'mochila',
+const PREFIX_SOURCE:Record<string,LedgerSource>={highfood:'highfood',vehicle:'veiculos',welcome:'boas-vindas',daily:'bonus',job:'trabalho',refund:'estorno',pix:'pix',trade:'trade',skin:'skins',item:'mochila',
   media:'midia',counter:'balcao',table:'mesa',stage:'palco',blackjack:'blackjack',foosball:'pebolim','dev-bots':'testes'};
 export const ledgerSource=(reason:string):LedgerSource=>reason.startsWith('{')?'admin':PREFIX_SOURCE[reason.split(':')[0]!]??'outros';
 const itemName=(id:string|undefined)=>itemById(id??'')?.name??id??'item';
@@ -119,8 +121,11 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
     case 'welcome':return 'Moedas de boas-vindas';
     case 'daily':return 'Bônus diário';
     case 'job':return 'Pagamento por tarefa';
+    case 'highfood':return 'Entrega pelo Highfood';
+    case 'vehicle':return a==='tow'?'Guincho da moto':'Comprou a moto de entrega';
     case 'refund':return 'Estorno de cobrança';
     case 'pix':return a==='out'?`Pix enviado para ${names[b??'']??'outro jogador'}`:`Pix recebido de ${names[b??'']??'outro jogador'}`;
+    case 'trade':return a==='out'?`Moedas dadas numa troca com ${names[b??'']??'outro jogador'}`:`Moedas recebidas numa troca com ${names[b??'']??'outro jogador'}`;
     case 'skin':return `Comprou a skin ${a}`;
     case 'item':return `Comprou ${b??1}× ${itemName(a)} na mochila`;
     case 'media':return a==='telao'?'Vídeo no telão':a?.startsWith('jukebox')?'Música na jukebox':'Vídeo na TV';
@@ -140,12 +145,13 @@ const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão de
   'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas',
   'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
+  'vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
   'report-resolve':'Denúncia resolvida','report-reopen':'Denúncia reaberta'};
 /** The name of an administrative action (moderation_actions.action); `undo-*` reads "Reversão: …". */
 export const adminActionLabel=(action:string):string=>action.startsWith('undo-')?`Reversão: ${ACTION_LABELS[action.slice(5)]??action.slice(5)}`:ACTION_LABELS[action]??action;
 
 /** inventory_ledger.reason in the panel's words. */
-export const ITEM_LOG_REASONS:Readonly<Record<string,string>>={starter:'Itens iniciais',purchase:'Comprado na mochila',use:'Usado',discard:'Descartado',faint:'Perdido no desmaio',admin:'Ajuste da administração'};
+export const ITEM_LOG_REASONS:Readonly<Record<string,string>>={starter:'Itens iniciais',purchase:'Comprado na mochila',use:'Usado',discard:'Descartado',faint:'Perdido no desmaio',admin:'Ajuste da administração',trade:'Negociação com outro jogador'};
 /** game_logs written by the API (logins); registrations come from the accounts themselves. */
 export const ACCESS_LOG_EVENTS:Readonly<Record<string,string>>={register:'Criou a conta',login:'Entrou na conta',login_failed:'Errou a senha',logout:'Saiu da conta',password_reset:'Trocou a senha'};
 
@@ -178,6 +184,16 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
   admin_moto_spawn:d=>({title:'Administração: moto spawnada',detail:`${text(d.id)} em ${text(d.x)}, ${text(d.z)}`}),
   admin_moto_despawn:d=>({title:'Administração: moto despawnada',detail:text(d.ids)}),
+  highfood_online:()=>({title:'Ficou online no Highfood',detail:''}),
+  highfood_offline:d=>({title:'Saiu do Highfood',detail:`${text(d.done)||0} entrega(s) · ${text(d.earned)||0} moedas`}),
+  highfood_delivered:d=>({title:'Entrega feita',detail:`${text(d.customer)} · ${text(d.address)} · ${text(d.stars)} estrelas`,amount:typeof d.paid==='number'?d.paid:undefined}),
+  highfood_lost:d=>({title:'Entrega perdida',detail:`${text(d.customer)} · ${text(d.reason)}`}),
+  moto_tow:d=>({title:'Guinchou a própria moto',detail:text(d.plate),amount:typeof d.price==='number'?-d.price:undefined}),
+  garage_take:d=>({title:'Tirou um veículo da garagem',detail:`Placa ${text(d.plate)}`}),
+  garage_store:d=>({title:d.recalled?'Mandou o guincho levar um veículo à garagem':'Guardou um veículo na garagem',detail:`Placa ${text(d.plate)}`,amount:typeof d.price==='number'&&d.price?-d.price:undefined}),
+  moto_lock:d=>({title:d.locked?'Trancou a moto':'Destrancou a moto',detail:`Placa ${text(d.plate)}`}),
+  trade_done:d=>({title:'Negociou com outro jogador',detail:`Com ${text(d.with)} · deu ${text(d.gave)} · recebeu ${text(d.got)}`}),
+  trade_failed:d=>({title:'Negociação recusada',detail:`Com ${text(d.with)} · ${text(d.reason)}`}),
   blackjack_round:d=>({title:'Rodada de blackjack',detail:`Apostou ${text(d.staked)||0} · recebeu ${text(d.paid)||0}${d.outcomes?` · ${text(d.outcomes)}`:''}`,amount:typeof d.net==='number'?d.net:undefined}),
   blackjack_settle_refused:d=>({title:'Prêmio do blackjack recusado',detail:`Rodada ${text(d.roundId)}: ${text(d.reason)}`}),
   foosball_match:d=>({title:'Partida de pebolim',detail:`Mesa ${text(d.table)} · ${text(d.score)} · ${d.result==='win'?'venceu':d.result==='loss'?'perdeu':'sem resultado'}${d.forfeit?' (W.O.)':''}${d.stake?` · valendo ${text(d.stake)}`:''}`,amount:typeof d.net==='number'&&d.net?d.net:undefined}),

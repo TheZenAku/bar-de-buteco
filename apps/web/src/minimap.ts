@@ -1,11 +1,11 @@
-import {BLACKJACK_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
+import {BLACKJACK_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,GARAGES,HIGHFOOD,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
 import type {MapView} from './engine/scene-types';
 import {uiIconSource} from './ui-icons';
 
 /** Above this height the player is on the bar's upper floor (its slabs are at 3.2–3.45 m). */
 const UPPER=2;
 /** Metres from the player to the rim: closer in and around the bar (up to NEAR metres from its lot), wider out in the street. */
-const RANGE={inside:15,outside:28},NEAR=8;
+const RANGE={inside:15,outside:28,riding:62},NEAR=8;
 /** Redrawn at most this often (ms), and only when something on it moved. */
 const FRAME_MS=33;
 const TAU=Math.PI*2;
@@ -36,6 +36,10 @@ function layerOf(id:string):Layer|undefined {
   if(/^COL_(Mob|Int|Palco)_/.test(name))return 'furniture';
 }
 const LAYERS=new Map<Layer,Box[]>();
+export type MapLayerName=Layer;
+export type MapLayerBox=Box;
+/** The same boxes for the phone's map. */
+export const MAP_LAYERS:ReadonlyMap<Layer,readonly Box[]>=LAYERS;
 for(const c of MAP_COLLIDERS){
   const layer=layerOf(c.id);if(!layer)continue;
   const list=LAYERS.get(layer)??[];list.push({x:c.x,z:c.z,hx:c.hx,hz:c.hz,upper:(c.minY??0)>=3.1});LAYERS.set(layer,list);
@@ -65,6 +69,8 @@ const TERRACE_X=Math.min(...MAP_COLLIDERS.filter(c=>/^COL_Predio_Terraco/.test(c
 const inLot=(x:number,z:number,margin=0)=>Math.abs(x-LOT.x)<=LOT.hx+margin&&Math.abs(z-LOT.z)<=LOT.hz+margin;
 const CITY_PLACES:Record<string,string>={Ponto_Prefeitura:'Prefeitura',Ponto_Terminal:'Terminal Central',Ponto_Escola_Conceicao:'EMEF Conceição',Ponto_UBS:'UBS',Ponto_Praca_Conceicao:'Praça do Jardim',Ponto_Bosque_Conceicao:'Bosque',
   Ponto_Lazer_Olaria:'Área de lazer',Ponto_Campo_Olaria:'Campo do Olaria',Ponto_Supermercado:'Supermercado',Ponto_Posto:'Posto',Ponto_Subestacao:'Subestação',Ponto_Transportes:'Transportadora',Ponto_Metalurgica:'Metalúrgica'};
+/** The city's named places, for the phone's map. */
+export const cityPlaces=()=>Object.entries(CITY_PLACES).map(([id,name])=>({name,x:CITY_MARKERS[id]!.x,z:CITY_MARKERS[id]!.z}));
 const PLACES:ReadonlyArray<readonly [{x:number;z:number},string]>=[[MAP_MARKERS.Ponto_Praca,'Praça'],[MAP_MARKERS.Ponto_Igreja,'Igreja'],[MAP_MARKERS.Ponto_Campinho,'Campinho'],[MAP_MARKERS.Ponto_Escola,'Escola'],[MAP_MARKERS.Ponto_Onibus,'Ponto de ônibus'],
   ...Object.entries(CITY_PLACES).map(([id,place])=>[CITY_MARKERS[id]!,place] as const)];
 /** The name under the map: the part of the bar the player is in, or the nearest landmark outside it. */
@@ -87,6 +93,8 @@ const POIS:readonly Poi[]=[
   poi('micVocal','#ff47c2',{x:STAGE.deck.x,y:STAGE.deck.maxY,z:STAGE.deck.z}),
   poi('music','#17d4f4',JUKEBOX),
   poi('store','#fac416',SHOP_SPOT),
+  poi('food','#ff3d5a',HIGHFOOD.BASE),
+  ...GARAGES.map(garage=>poi('warehouse','#17d4f4',garage)),
   poi('cards','#a77bff',BLACKJACK_TABLE),
   poi('ball','#0386f0',centre(FOOSBALL_TABLES)),
   poi('toilet','#c9bff0',restroom(false)),
@@ -103,6 +111,9 @@ export function createMinimap(root:HTMLElement){
   const canvas=root.querySelector<HTMLCanvasElement>('#minimap')!,label=root.querySelector<HTMLElement>('#minimap-zone')!;
   const context=canvas.getContext('2d');
   let size=0,signature='',checked=0,range:number=RANGE.inside,objective:Position|null=null,zone='',font='';
+  /** The GPS's line and what it is for; other things to keep in sight, on the rim when out of range. */
+  let route:ReadonlyArray<readonly [number,number]>=[],routeColour='',routeKey=0;
+  let marks:ReadonlyArray<{x:number;z:number;colour:string;icon:string}>=[],marksKey='';
   const icons=new Map<string,HTMLImageElement>();
   const icon=(name:string)=>{
     let image=icons.get(name);
@@ -147,6 +158,13 @@ export function createMinimap(root:HTMLElement){
     if(up){fill('furniture',C.furnitureFar,{floor:false});fill('wall',C.wallFar,{floor:false,thin:.6*px});fill('slab',C.slab);}
     fill('stairs',C.stairs);fill('furniture',C.furniture,{floor:up});
     fill('wall',C.wallGlow,{floor:up,thin:.75*px,grow:1.6*px});fill('wall',C.wall,{floor:up,thin:.75*px});
+    // The GPS's line, from the avatar as drawn.
+    if(route.length>1){
+      ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(v.x,v.z);
+      for(let i=1;i<route.length;i++)ctx.lineTo(route[i]![0],route[i]![1]);
+      ctx.lineWidth=7*px;ctx.strokeStyle=C.edge;ctx.stroke();
+      ctx.lineWidth=4*px;ctx.strokeStyle=routeColour;ctx.stroke();
+    }
     // Blips and people upright, in screen pixels. Those on the other floor fade.
     ctx.setTransform(ratio,0,0,ratio,0,0);
     const at=(x:number,z:number)=>{const dx=x-v.x,dz=z-v.z;return {x:c+(dx*cos-dz*sin)*scale,y:c+(dx*sin+dz*cos)*scale};};
@@ -167,6 +185,12 @@ export function createMinimap(root:HTMLElement){
         ctx.closePath();ctx.fillStyle=C.job;ctx.fill();
       }
       badge(ctx,p.x,p.y,C.job,'briefcase',8.5);
+    }
+    // Where the GPS goes and the bike left behind, on the rim when out of range.
+    for(const mark of marks){
+      let p=at(mark.x,mark.z);const dx=p.x-c,dy=p.y-c,d=Math.hypot(dx,dy),max=R-13;
+      if(d>max)p={x:c+dx/d*max,y:c+dy/d*max};
+      badge(ctx,p.x,p.y,mark.colour,mark.icon,8);
     }
     // The camera's view, a soft wedge up from the player, and the player: an arrow where the avatar faces.
     const cone=ctx.createRadialGradient(c,c,0,c,c,R*.85);cone.addColorStop(0,'rgba(255,255,255,.22)');cone.addColorStop(1,'rgba(255,255,255,0)');
@@ -198,11 +222,11 @@ export function createMinimap(root:HTMLElement){
       const elapsed=now-checked;checked=now;
       const v=view();if(!v||!size)return;
       // Eases between the ranges walking up to the bar or away from it, then settles (and stops redrawing).
-      const want=inLot(v.x,v.z,NEAR)?RANGE.inside:RANGE.outside;
+      const want=v.riding?RANGE.riding:inLot(v.x,v.z,NEAR)?RANGE.inside:RANGE.outside;
       range+=(want-range)*Math.min(1,elapsed/350);if(Math.abs(want-range)<.05)range=want;
       let crowd=0;for(const o of v.others)crowd+=Math.round(o.x*20)*3+Math.round(o.z*20)*7+Math.round(o.y);
       const ratio=Math.min(devicePixelRatio||1,2),backing=Math.round(size*ratio);
-      const key=`${Math.round(v.x*40)}:${Math.round(v.z*40)}:${v.y>UPPER}:${Math.round(v.yaw*400)}:${Math.round(v.facing*60)}:${range.toFixed(2)}:${v.others.length}:${crowd}:${objective?`${objective.x}:${objective.z}`:''}:${backing}`;
+      const key=`${Math.round(v.x*40)}:${Math.round(v.z*40)}:${v.y>UPPER}:${Math.round(v.yaw*400)}:${Math.round(v.facing*60)}:${range.toFixed(2)}:${v.others.length}:${crowd}:${objective?`${objective.x}:${objective.z}`:''}:${backing}:${routeKey}:${marksKey}`;
       const name=zoneName(v.x,v.y,v.z);if(name!==zone){zone=name;label.textContent=name;}
       if(key===signature)return;
       signature=key;
@@ -214,6 +238,12 @@ export function createMinimap(root:HTMLElement){
       if(target?.x===objective?.x&&target?.z===objective?.z)return;
       objective=target;signature='';
     },
-    reset():void {objective=null;signature='';zone='';label.textContent='';context?.clearRect(0,0,canvas.width,canvas.height);},
+    /** The GPS's line (the first point is the avatar's, drawn from where it is on this frame). */
+    setRoute(points:ReadonlyArray<readonly [number,number]>,colour:string,version:number):void {route=points;routeColour=colour;routeKey=version;},
+    setMarks(next:ReadonlyArray<{x:number;z:number;colour:string;icon:string}>):void {
+      const key=next.map(mark=>`${Math.round(mark.x*4)}:${Math.round(mark.z*4)}:${mark.icon}`).join();
+      marks=next;if(key!==marksKey){marksKey=key;signature='';}
+    },
+    reset():void {route=[];marks=[];objective=null;signature='';zone='';label.textContent='';context?.clearRect(0,0,canvas.width,canvas.height);},
   };
 }

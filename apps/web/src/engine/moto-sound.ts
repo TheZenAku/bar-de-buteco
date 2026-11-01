@@ -45,6 +45,13 @@ export function roughness(motor:number,time:number):number {
   return dip>.35?1-(1-motor/50)*.6:1;
 }
 
+/** The ear is the camera: `forward` and `up` as it looks. */
+export function placeListener(context:AudioContext,x:number,y:number,z:number,forward:{x:number;y:number;z:number},up:{x:number;y:number;z:number}):void {
+  const l=context.listener;
+  if(l.positionX){l.positionX.value=x;l.positionY.value=y;l.positionZ.value=z;l.forwardX.value=forward.x;l.forwardY.value=forward.y;l.forwardZ.value=forward.z;l.upX.value=up.x;l.upY.value=up.y;l.upZ.value=up.z;}
+  else{l.setPosition(x,y,z);l.setOrientation(forward.x,forward.y,forward.z,up.x,up.y,up.z);}
+}
+
 interface Loop {source:AudioBufferSourceNode;gain:GainNode}
 interface Shot {source:AudioBufferSourceNode;gain:GainNode;clip:MotoClip;endsAt:number}
 
@@ -187,19 +194,13 @@ export class MotoSounds {
       return context;
     }catch{return;}
   }
-  /** The ear is the camera: `forward` and `up` as it looks. */
-  listen(context:AudioContext,x:number,y:number,z:number,forward:{x:number;y:number;z:number},up:{x:number;y:number;z:number}):void {
-    const l=context.listener;
-    if(l.positionX){l.positionX.value=x;l.positionY.value=y;l.positionZ.value=z;l.forwardX.value=forward.x;l.forwardY.value=forward.y;l.forwardZ.value=forward.z;l.upX.value=up.x;l.upY.value=up.y;l.upZ.value=up.z;}
-    else{l.setPosition(x,y,z);l.setOrientation(forward.x,forward.y,forward.z,up.x,up.y,up.z);}
-  }
   update(dt:number,bikes:readonly {id:string;view:EngineView;x:number;y:number;z:number;gasNow?:boolean}[],ear:{x:number;y:number;z:number},forward:{x:number;y:number;z:number},up:{x:number;y:number;z:number}):void {
     this.time+=dt;
     if(!bikes.length&&!this.voices.size)return;
     const context=this.graph();
     if(!context||!this.bus)return;
     this.bus.gain.setTargetAtTime(document.hidden?0:this.level(),context.currentTime,.1);
-    this.listen(context,ear.x,ear.y,ear.z,forward,up);
+    placeListener(context,ear.x,ear.y,ear.z,forward,up);
     const away=(bike:{x:number;y:number;z:number})=>Math.hypot(bike.x-ear.x,bike.y-ear.y,bike.z-ear.z);
     const near=bikes.filter(bike=>bike.view.engine===MOTO_ENGINE.ON&&away(bike)<AUDIBLE).sort((a,b)=>away(a)-away(b)).slice(0,VOICES);
     for(const bike of bikes){

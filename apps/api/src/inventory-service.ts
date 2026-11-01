@@ -1,7 +1,7 @@
 import {and,desc,eq,sql} from 'drizzle-orm';
-import {INVENTORY_CAPACITY,ITEM_IDS,STARTER_ITEMS,itemById,type InventoryView,type ItemId,type PublicUser} from '@bar/shared';
+import {INVENTORY_CAPACITY,ITEM_IDS,MOTO_NAME,STARTER_ITEMS,itemById,type InventoryView,type ItemId,type PublicUser} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {currencyLedger,inventoryLedger,itemInventory,wallets} from './database/schema.js';
+import {currencyLedger,inventoryLedger,itemInventory,playerVehicles,wallets} from './database/schema.js';
 import type {WardrobeService} from './wardrobe.js';
 
 export class InventoryError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
@@ -25,14 +25,15 @@ export class InventoryService {
 
   async view(userId:string):Promise<InventoryView>{
     await this.initialize(userId);
-    const [stacks,[wallet],history]=await Promise.all([
+    const [stacks,[wallet],history,vehicles]=await Promise.all([
       this.db.select().from(itemInventory).where(eq(itemInventory.userId,userId)),
       this.db.select().from(wallets).where(eq(wallets.userId,userId)),
       this.db.select().from(inventoryLedger).where(eq(inventoryLedger.userId,userId)).orderBy(desc(inventoryLedger.createdAt)).limit(20),
+      this.db.select({vehicleId:playerVehicles.id,plate:playerVehicles.plate}).from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(playerVehicles.boughtAt),
     ]);
     const valid=stacks.filter(row=>!!itemById(row.itemId)&&row.quantity>0).map(row=>({itemId:row.itemId as ItemId,quantity:row.quantity}))
       .sort((a,b)=>ITEM_IDS.indexOf(a.itemId)-ITEM_IDS.indexOf(b.itemId));
-    return {stacks:valid,capacity:INVENTORY_CAPACITY,usedSlots:valid.length,balance:wallet?.balance??0,
+    return {stacks:valid,capacity:INVENTORY_CAPACITY,usedSlots:valid.length,balance:wallet?.balance??0,keys:vehicles.map(vehicle=>({...vehicle,name:MOTO_NAME})),
       history:history.filter(row=>!!itemById(row.itemId)).map(row=>({id:row.id,itemId:row.itemId as ItemId,quantity:row.quantity,reason:row.reason,createdAt:row.createdAt.toISOString()}))};
   }
 

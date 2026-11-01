@@ -7,7 +7,7 @@ const COLORS=['#fac416','#f59847','#ea2fdc','#a77bff','#17d4f4','#0386f0','#5fd8
 const BLANK={name:'',description:'',icon:'trophy',color:COLORS[0]!,rarity:'common' as BadgeRarity,image:null as string|null};
 
 /** The file as the server keeps it: a PNG of at most PROFILE.badgeImageSide on its longest side, transparency intact. */
-async function badgePng(file:File):Promise<Blob> {
+export async function badgePng(file:File):Promise<Blob> {
   if(file.type!=='image/png')throw new Error('Envie um arquivo PNG.');
   const bitmap=await createImageBitmap(file).catch(()=>{throw new Error('Não foi possível abrir este PNG.');});
   const scale=Math.min(1,PROFILE.badgeImageSide/Math.max(bitmap.width,bitmap.height));
@@ -18,7 +18,7 @@ async function badgePng(file:File):Promise<Blob> {
   return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Não foi possível preparar a imagem.')),'image/png'));
 }
 /** Sends the bytes, not JSON (as phone/media.ts); answers the image's id. */
-async function sendBadgeImage(blob:Blob):Promise<string> {
+export async function sendBadgeImage(blob:Blob):Promise<string> {
   const response=await fetch('/api/admin/badges/images',{method:'POST',credentials:'include',headers:{'Content-Type':'image/png'},body:blob});
   const data=await response.json().catch(()=>({error:'O servidor não respondeu como esperado.'}));
   if(!response.ok)throw new ApiError(data.error||'Não foi possível enviar a imagem.',response.status);

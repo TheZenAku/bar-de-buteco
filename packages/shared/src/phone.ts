@@ -83,10 +83,13 @@ export function ledgerLabel(entry:Pick<BankEntry,'reason'|'amount'|'peer'>):stri
   if(entry.reason.startsWith('{'))return 'Ajuste da administração';
   switch(kind){
     case 'pix':return entry.amount<0?`Pix para ${entry.peer??'outro jogador'}`:`Pix de ${entry.peer??'outro jogador'}`;
+    case 'trade':return entry.amount<0?`Troca com ${entry.peer??'outro jogador'}`:`Troca com ${entry.peer??'outro jogador'}`;
     case 'media':return detail==='telao'?'Vídeo no telão':detail.startsWith('tv')?'Vídeo na TV':'Música na jukebox';
     case 'counter':return 'Balcão do Magrão';
     case 'table':return 'Pedido na mesa';
     case 'job':return 'Trabalho no bar';
+    case 'highfood':return 'Entrega Highfood';
+    case 'vehicle':return detail==='tow'?'Guincho da moto':'Compra da moto';
     case 'stage':return 'Ingresso do palco';
     case 'refund':return 'Estorno';
     case 'blackjack':return detail==='bet'?'Aposta no blackjack':'Blackjack';

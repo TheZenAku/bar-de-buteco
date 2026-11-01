@@ -33,6 +33,11 @@ export interface SceneActor {
   /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
   carrying?: string;
   carryingOrder?: string;
+  /** A Highfood shift: the backpack, and the bag in hand. */
+  courier?: boolean;
+  parcel?: string;
+  /** With the phone in front of them: standing still they look at it (the Text clip, with a phone in hand). */
+  looking?: boolean;
   /** False for an avatar left in the bar by a player who logged out. */
   connected?: boolean;
   /** Drunkenness 0-100 (packages/shared/src/needs.ts): the body sways by stage. */
@@ -67,6 +72,8 @@ export interface MapView {
   /** Where the avatar faces: atan2(dx, dz), as PlayerState.rotation. */
   facing: number;
   others: Array<{ id: string; x: number; y: number; z: number; npc: boolean }>;
+  /** On a bike: the map shows further. */
+  riding?: boolean;
 }
 
 export interface SceneLabel {

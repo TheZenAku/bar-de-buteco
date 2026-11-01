@@ -45,7 +45,7 @@ export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
  * is MOTO_ENGINE, `engineAt` when that last changed (server ms, what tells the browsers to play a sound), `crank` the outcome of the last try at
  * starting, `gas` whether the throttle is open, and `parts` the condition of each part in MOTO_PARTS's order.
  */
-export interface MotoState extends MotoBody {id:string;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
+export interface MotoState extends MotoBody {id:string;/** Who holds its key (docs/sistemas/garagem.md). '' for the administration's, which anyone may ride. */ownerId?:string;/** The key holder's name, the plate on its back, and the row it is in the API. */ownerName?:string;plate?:string;vehicleId?:string;/** Only the key holder gets on it. */locked?:boolean;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
 export interface MotoIntent {throttle:number;steer:number;brake:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
 /** W/S (forward, brake and reverse), A/D (+1 is right), the handbrake and the switches. */
 export interface MotoInput extends MotoIntent {seq:number}
@@ -56,8 +56,10 @@ export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 /** The rider's Player.interactionState. */
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
 export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:');
-export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,speed:0,steer:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
+export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
 export const motoSpawnSchema=z.object({}).strict();
+/** How far a body is from the hull, seen from above. */
+export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'>,position:Position)=>hullGap(moto,position);
 /** One bike, or every bike when there is no id. */
 export const motoDespawnSchema=z.object({id:z.string().max(32).optional()}).strict();
 
@@ -205,13 +207,13 @@ const SPAWN_FIRST_RING=MOTO.HALF_LENGTH+.8,SPAWN_RING_STEP=1,SPAWN_LAST_RING=30,
  * The free stretch of street nearest to a point, starting straight ahead of `yaw` and pointing that way if it fits. From inside the
  * bar or the terrace this is the street outside. Undefined when no street is near.
  */
-export function motoSpawnSpot(near:Position,yaw:number,others:readonly Pick<MotoBody,'x'|'z'>[]):{x:number;y:number;z:number;yaw:number;pitch:number}|undefined {
+export function motoSpawnSpot(near:Position,yaw:number,others:readonly Pick<MotoBody,'x'|'z'>[],avoid:ReadonlyArray<{x:number;z:number;radius:number}>=[]):{x:number;y:number;z:number;yaw:number;pitch:number}|undefined {
   const reach=MOTO.HALF_LENGTH+Math.abs(MOTO.CENTRE_Z)+.1;
   for(let ring=SPAWN_FIRST_RING;ring<=SPAWN_LAST_RING;ring+=SPAWN_RING_STEP){
     for(let i=0;i<SPAWN_ANGLES;i++){
       // 0, +1, −1, +2, −2…: the nearest to straight ahead first.
       const angle=yaw+Math.ceil(i/2)*(i%2?1:-1)*Math.PI*2/SPAWN_ANGLES,x=near.x+Math.sin(angle)*ring,z=near.z+Math.cos(angle)*ring;
-      if(others.some(other=>Math.hypot(other.x-x,other.z-z)<SPAWN_GAP))continue;
+      if(others.some(other=>Math.hypot(other.x-x,other.z-z)<SPAWN_GAP)||avoid.some(zone=>Math.hypot(zone.x-x,zone.z-z)<zone.radius))continue;
       const solids=solidsBetween(x-reach,z-reach,x+reach,z+reach);
       for(const heading of [yaw,yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI])for(const reference of [near.y??0,0]){
         const floor=ground(x,z,heading,reference);
@@ -228,8 +230,8 @@ function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'>,position:Position):number {
   return Math.hypot(Math.max(0,side),Math.max(0,along));
 }
 /** Close enough to get on (the server allows `slack` more for latency), on its floor, on its wheels, nobody riding it. */
-export function canMountMoto(moto:MotoState,position:Position,slack=0):boolean {
-  return !moto.riderId&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=MOTO.REACH+slack;
+export function canMountMoto(moto:MotoState,position:Position,slack=0,who?:string):boolean {
+  return !moto.riderId&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=MOTO.REACH+slack;
 }
 /** Close enough to work on it, standing or lying, and nobody on it, nobody lifting it, and it is not moving. */
 export function canRepairMoto(moto:MotoState,position:Position,slack=0):boolean {
@@ -246,8 +248,8 @@ export function nearestFallenMoto(position:Position,motos:readonly MotoState[]):
 export function motoStrikes(moto:Pick<MotoBody,'x'|'y'|'z'|'yaw'>,position:Position):boolean {
   return Math.abs((position.y??moto.y)-moto.y)<.6&&hullGap(moto,position)<=.22;
 }
-export function nearestFreeMoto(position:Position,motos:readonly MotoState[]):MotoState|undefined {
-  return motos.filter(moto=>canMountMoto(moto,position)).sort((a,b)=>hullGap(a,position)-hullGap(b,position))[0];
+export function nearestFreeMoto(position:Position,motos:readonly MotoState[],who?:string):MotoState|undefined {
+  return motos.filter(moto=>canMountMoto(moto,position,0,who)).sort((a,b)=>hullGap(a,position)-hullGap(b,position))[0];
 }
 /** Where the rider stands getting off: on the left (+X of the bike), or else whichever side has room. */
 export function motoDismountSpot(moto:MotoBody):Required<Position> {

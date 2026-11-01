@@ -9,7 +9,7 @@ import {FOOSBALL} from './foosball.js';
  * in the panel's Preços (apps/api/src/pricing-service.ts keeps the overrides). The API answers the effective table to
  * the browser (GET /api/prices) and to the world, which charges and pays with it and tells the players when it changes.
  */
-export type PriceGroup='itens'|'skins'|'midia'|'palco'|'jogos'|'trabalho'|'recompensas';
+export type PriceGroup='itens'|'skins'|'midia'|'palco'|'jogos'|'trabalho'|'highfood'|'recompensas';
 export interface PriceEntry {
   key:string;group:PriceGroup;label:string;
   /** Where the value is used, in the panel's words. */
@@ -24,6 +24,7 @@ export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:
   {id:'palco',label:'Palco',description:'Ingresso para subir no palco do quintal.'},
   {id:'jogos',label:'Jogos',description:'Limites de aposta: no blackjack, por mão (dobrar e dividir repetem a aposta); no pebolim, o que cada jogador põe numa partida valendo moedas.'},
   {id:'trabalho',label:'Trabalho',description:'O que o bar paga por tarefa concluída e o teto diário por jogador.'},
+  {id:'highfood',label:'Highfood e veículos',description:'A moto, o guincho e o que cada entrega paga. Veja o cálculo em docs/sistemas/highfood.md antes de mexer: é a maior torneira de moedas do jogo.'},
   {id:'recompensas',label:'Recompensas',description:'Moedas que entram na economia sem compra: boas-vindas e bônus diário.'},
 ];
 
@@ -45,6 +46,14 @@ export function priceEntries():readonly PriceEntry[]{
     {key:'foosball:max-bet',group:'jogos',label:'Aposta máxima do pebolim',hint:'Maior valor por jogador (nunca abaixo da mínima)',defaultValue:FOOSBALL.maxBet,min:1,max:100_000},
     ...JOBS.map(job=>({key:`job:${job.id}`,group:'trabalho' as const,label:job.name,hint:'Pagamento por tarefa',defaultValue:job.pay,min:0,max:1000})),
     {key:'cap:job-daily',group:'trabalho',label:'Teto diário do trabalho',hint:'Máximo que um jogador ganha trabalhando por dia',defaultValue:JOB_DAILY_CAP,min:0,max:1_000_000},
+    {key:'vehicle:moto',group:'highfood',label:'Moto de entrega',hint:'Venda no app HighMotors do celular',defaultValue:10_000,min:0,max:1_000_000},
+    {key:'vehicle:tow',group:'highfood',label:'Guincho',hint:'Trazer a própria moto até a rua mais perto, pelo celular',defaultValue:30,min:0,max:10_000},
+    {key:'highfood:base',group:'highfood',label:'Entrega: valor fixo',hint:'Por entrega, qualquer distância',defaultValue:8,min:0,max:1000},
+    {key:'highfood:per-100m',group:'highfood',label:'Entrega: por 100 m de rota',hint:'Medido pelas ruas, de onde o pedido apareceu até o cliente',defaultValue:4,min:0,max:1000},
+    {key:'highfood:on-time-pct',group:'highfood',label:'Entrega: bônus no prazo (%)',hint:'Sobre o valor da entrega, chegando dentro do prometido',defaultValue:20,min:0,max:100},
+    {key:'highfood:full-per-day',group:'highfood',label:'Entregas por dia a preço cheio',hint:'Depois disso, cada entrega paga a porcentagem abaixo',defaultValue:20,min:0,max:1000},
+    {key:'highfood:late-pct',group:'highfood',label:'Pagamento depois disso (%)',hint:'Porcentagem do valor normal',defaultValue:50,min:0,max:100},
+    {key:'cap:highfood-daily',group:'highfood',label:'Teto diário do Highfood',hint:'Máximo que um jogador ganha entregando por dia',defaultValue:700,min:0,max:1_000_000},
     {key:'reward:initial',group:'recompensas',label:'Moedas de boas-vindas',hint:'Na primeira vez que a conta abre a carteira',defaultValue:0,min:0,max:1_000_000},
     {key:'reward:daily',group:'recompensas',label:'Bônus diário',hint:'Resgatado uma vez por dia na coleção (0 desativa)',defaultValue:0,min:0,max:1_000_000},
   ];

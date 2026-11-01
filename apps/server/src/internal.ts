@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { internalSecret } from '@bar/shared/tickets';
-import type {InventoryStack} from '@bar/shared';
+import type {InventoryStack,OwnedVehicle} from '@bar/shared';
 import { readWorldConfig } from './config.js';
 
-export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[];balance?:number }
+export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';equippedSkin?:string;ownedSkins?:string[];inventory?:InventoryStack[];balance?:number;vehicles?:OwnedVehicle[] }
 /** `prices`: read the price table again; `sync`: read a player's items, coins and skins again (the administration changed them). */
 export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event' | 'prices' | 'sync'; playerId?: string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string }
 

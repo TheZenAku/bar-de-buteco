@@ -1,6 +1,6 @@
 # Moto de entrega
 
-O mapa começa sem nenhuma moto Highland Bar Delivery. Só a administração cria uma, em **Veículos**. Depois disso, qualquer jogador perto dela sobe, pilota pelas ruas e calçadas da [cidade](cidade.md) e desce onde quiser. Todos veem a moto de qualquer ponto do mapa, com o piloto em cima.
+O mapa começa sem nenhuma moto Highland Bar Delivery de uso comum. A administração cria essas em **Veículos**, e qualquer jogador perto delas sobe, pilota pelas ruas e calçadas da [cidade](cidade.md) e desce onde quiser. Os jogadores também podem [comprar a própria moto](highfood.md#app-highmotors) no celular: ela fica na [garagem](garagem.md), com placa, chave e tranca. Todos veem as motos de qualquer ponto do mapa, com o piloto em cima.
 
 ## Spawnar e despawnar
 
@@ -107,7 +107,7 @@ Com o botão direito na moto, **Informações do veículo** abre o painel: as 12
 
 - Abaixo de 1,5 m/s contra o obstáculo, a batida não marca a moto. A pior batida (a toda, de frente) tira de 11% a 18% do motor e de 41% a 69% do farol.
 - A carenagem protege motor, bateria, freios e suspensão. Inteira, eles sofrem 65% do golpe; sem ela, 135%.
-- Moto nova vem com tudo a 100%. Como as motos só existem na sala, a condição se perde quando o mundo reinicia.
+- Moto nova vem com tudo a 100%. A condição das motos compradas fica salva no banco e sobrevive a um reinício do mundo. A das motos spawnadas se perde, porque elas só existem na sala.
 
 | Parte | A partir de | O que acontece |
 | --- | --- | --- |
@@ -122,7 +122,7 @@ Com o botão direito na moto, **Informações do veículo** abre o painel: as 12
 | Suspensão | 35% | A moto vira menos |
 | Direção | 35% | Puxa para um lado, sempre o mesmo em cada moto, mesmo com o guidão reto |
 | Pneus | 25% | Mais resistência: em 0% não passa de meia velocidade. O dianteiro vira menos, o traseiro tira força |
-| Baú | | Sem efeito por enquanto; fica para as entregas |
+| Baú | 35% | Nas entregas do [Highfood](highfood.md), o pedido chega amassado: vale 15% menos e 1 estrela a menos |
 
 **Consertar.** Perto da moto (até cerca de 1,5 m), com ela parada e sem ninguém nela, de pé ou caída: escolha a parte e clique em **Consertar**. Isso usa 1 peça da mochila, leva 3,5 s e devolve 40%. Enquanto isso, a pessoa não anda e ninguém sobe na moto. Quem cair ou sair no meio perde a peça.
 
@@ -187,6 +187,8 @@ O jogo não tem motor de física, então `packages/shared/src/ragdoll.ts` é um 
 
 A câmera continua em terceira pessoa até o corpo ficar de pé, mesmo para quem estava em primeira pessoa.
 
+**Um corpo lançado só perde energia** (`spendEnergy`). Nesse tipo de simulação, toda correção de posição vira velocidade: uma parte empurrada para fora de um sólido dispararia o corpo para cima, e um pé preso do outro lado de um muro fino faria o corpo correr ao longo do muro cada vez mais rápido. Por isso, a cada passo, o que o corpo ganhou de energia é tirado. A [queda do corpo tem som e poeira](../assets/sons-golpes.md), e os [chutes do Rafael](perfil.md#o-chute-que-acerta) lançam este mesmo corpo.
+
 ### Rede
 
 `BarState.motos` traz posição, direção, inclinação, velocidade, guidão, quem pilota, o motor e a condição das partes (`parts`, um texto curto na ordem de `MOTO_PARTS`), para todos os jogadores. A moto não usa a área de interesse de 18 m, e quem pilota também passa a ser visto de qualquer distância, para ninguém ver uma moto andando sozinha.
@@ -245,8 +247,8 @@ O modelo é desenhado a 80% do tamanho do arquivo, sem mudar o `.glb`: `MotoRig`
 - Os NPCs não são obstáculo: a moto passa por eles.
 - O corpo lançado não colide com a moto nem com outros jogadores, e uma moto tombando ou deslizando atravessa os outros (só a moto `loose` atropela).
 - Quem pilota não perde vida nem itens ao bater: só cai e levanta. Só quem é atropelado perde vida.
-- A moto caída ou deslizando não desgasta mais depois da queda, e nada desgasta só de andar: só batidas.
-- A condição das peças se perde quando o mundo reinicia, como as próprias motos.
+- A moto caída ou deslizando não desgasta mais depois da queda. Só a moto comprada desgasta ao andar: 1 ponto a cada 300 m, em geral nos pneus e nos freios.
+- A condição das peças das motos spawnadas se perde quando o mundo reinicia, como as próprias motos. A da moto comprada fica salva no banco ([garagem](garagem.md#o-que-fica-salvo)).
 - O painel não anda com a pessoa: é preciso fechá-lo para chegar perto da moto.
 - Sem animação própria de pilotar nem de levantar a moto (os dois são poses por IK).
 - Não há som de batida nem de queda (não vieram na pasta). O som sai do centro da moto; `ponto_escapamento` está disponível no rig.

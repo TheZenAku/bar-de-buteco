@@ -1,6 +1,6 @@
 import {Client,type Room} from '@colyseus/sdk';
 import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type FoosballFrame,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
-import type {Badge} from '@bar/shared';
+import type {Badge,GarageView,HighfoodDialog,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
 import {PredictedRide} from './engine/moto-motion';
 
@@ -21,6 +21,25 @@ export interface NetworkHooks {
   television?:(id:string)=>void;
   /** The stage's steps were touched (`open`: show the pass panel), or the pass changed: bought, or ran out (`message`). */
   stage?:(update:{open?:boolean;until:number;price?:number;message?:string})=>void;
+  /** Highfood: the shift changed, E at the base, a customer's dialog (null closes it), the bag handed over and its pay, something to tell the courier. */
+  food?:(state:HighfoodState)=>void;
+  foodBase?:(message:{owned:boolean;out:boolean;state:HighfoodState})=>void;
+  foodOwned?:(owned:boolean)=>void;
+  garage?:(view:GarageView)=>void;
+  garageTaken?:(taken:{plate:string;x:number;z:number})=>void;
+  motoLocked?:(lock:{plate:string;locked:boolean})=>void;
+  tradeInvite?:(invite:TradeInvite)=>void;
+  tradeUninvite?:(id:string)=>void;
+  tradeSent?:(name:string)=>void;
+  tradeNotice?:(text:string)=>void;
+  tradeState?:(view:TradeView)=>void;
+  tradeClosed?:(closed:TradeClosed)=>void;
+  foodDialog?:(dialog:HighfoodDialog|null)=>void;
+  foodDelivered?:(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>void;
+  foodReceipt?:(receipt:HighfoodReceipt)=>void;
+  foodNotice?:(notice:{title:string;text:string})=>void;
+  /** The bike bought on the phone reached the base, or the tow truck brought it. */
+  motoReady?:(at:{x:number;z:number},towed:boolean)=>void;
   /** Standing on the shop's blip, E: the room let this browser open the house's shop. */
   shop?:()=>void;
   /** At the light desk, E: the room let this browser open the stage show's panel. */
@@ -32,6 +51,8 @@ export interface NetworkHooks {
   itemLost?:(item:string)=>void;
   /** A bike ran this player over: the life it took, and who was riding ('' with nobody on it). */
   motoStruck?:(hit:{hp:number;by:string})=>void;
+  /** Rafael's kick landed on this player: the life it took, and who it was. */
+  kicked?:(hit:{hp:number;by:string})=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
   inventoryResult?:(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>void;
   /** Coins after a change made in the room (media, counter, table, job, refund). */
@@ -122,10 +143,28 @@ export class BarNetwork {
     room.onMessage('tv.result',()=>{});
     room.onMessage('stage.open',(message:{until:number;price:number})=>this.hooks.stage?.({...message,open:true}));
     room.onMessage('shop.open',()=>this.hooks.shop?.());
+    room.onMessage('food.state',(state:HighfoodState)=>this.hooks.food?.(state));
+    room.onMessage('food.base',(message:{owned:boolean;out:boolean;state:HighfoodState})=>this.hooks.foodBase?.(message));
+    room.onMessage('food.owned',(message:{owned:boolean})=>this.hooks.foodOwned?.(message.owned));
+    room.onMessage('garage.state',(view:GarageView)=>this.hooks.garage?.(view));
+    room.onMessage('garage.taken',(taken:{plate:string;x:number;z:number})=>this.hooks.garageTaken?.(taken));
+    room.onMessage('moto.locked',(lock:{plate:string;locked:boolean})=>this.hooks.motoLocked?.(lock));
+    room.onMessage('trade.invite',(invite:TradeInvite)=>this.hooks.tradeInvite?.(invite));
+    room.onMessage('trade.uninvite',(message:{id:string})=>this.hooks.tradeUninvite?.(message.id));
+    room.onMessage('trade.sent',(message:{name:string})=>this.hooks.tradeSent?.(message.name));
+    room.onMessage('trade.notice',(message:{text:string})=>this.hooks.tradeNotice?.(message.text));
+    room.onMessage('trade.state',(view:TradeView)=>this.hooks.tradeState?.(view));
+    room.onMessage('trade.closed',(closed:TradeClosed)=>this.hooks.tradeClosed?.(closed));
+    room.onMessage('food.dialog',(dialog:HighfoodDialog|null)=>this.hooks.foodDialog?.(dialog));
+    room.onMessage('food.delivered',(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>this.hooks.foodDelivered?.(facts));
+    room.onMessage('food.receipt',(receipt:HighfoodReceipt)=>this.hooks.foodReceipt?.(receipt));
+    room.onMessage('food.notice',(notice:{title:string;text:string})=>this.hooks.foodNotice?.(notice));
+    room.onMessage('moto.towed',(at:{x:number;z:number})=>this.hooks.motoReady?.(at,true));
     room.onMessage('lights.open',()=>this.hooks.lights?.());
     room.onMessage('stage.state',(message:{until:number;price?:number;message?:string})=>this.hooks.stage?.(message));
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
     room.onMessage('moto.struck',(hit:{hp:number;by:string})=>this.hooks.motoStruck?.(hit));
+    room.onMessage('player.kicked',(hit:{hp:number;by:string})=>this.hooks.kicked?.(hit));
     room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
     room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));

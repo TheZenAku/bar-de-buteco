@@ -10,7 +10,7 @@ import {createMouseCapture} from './mouse-capture';
 import './lobby-hero.css';
 import {createHudPanels} from './hud-panels';
 import {createNotifications} from './notifications';
-import {keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
+import {GARAGE,VEHICLE_KEY,keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene,BLIP_RADIUS} from './engine/BarScene';
 import {CAMERA_LABELS,CAMERA_MODES,isCameraMode} from './engine/camera-rig';
@@ -36,7 +36,14 @@ import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle'
 import {MOTO_ENGINE,MOTO_PARTS,MOTO_REPAIR,NO_MOTO_INTENT,canRepairMoto,isRepairingMoto,isRidingMoto,nearestFallenMoto,nearestFreeMoto,readMotoParts,repairOf,type MotoPartId} from '@bar/shared';
 import {motoPanelHtml} from './moto-panel';
 import {worldMenu,worldMenuOpen} from './world-menu';
+import {garagePanelHtml,keyChirp,plateHtml} from './garage-panel';
+import {createTrade} from './trade/trade';
+import './trade/trade.css';
 import './moto-panel.css';
+import './highfood/highfood.css';
+import {basePanelHtml,createCourier,createFoodDialog} from './highfood/courier';
+import {createGps,type GpsTarget} from './gps';
+import {HIGHFOOD,floorHeight,motoDistance,type HighfoodState} from '@bar/shared';
 import {JOBS,canInteract as touching,stationInteractable,consumedOverTime,consumeMs,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
 import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal} from './economy-ui';
@@ -59,10 +66,24 @@ createLobbyHero(document.querySelector<HTMLElement>('#lobby')!);
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
 const hud=createHudPanels($('#game'));
 const notices=createNotifications($('#toasts'));
+// Highfood (docs/sistemas/highfood.md): the shift as the room tells it, the GPS's line and the customer's dialog.
+const courier=createCourier();
+const ROUTE_COLOURS={delivery:'#ff3d5a',waypoint:'#17d4f4',bike:'#ff9f0a'} as const;
+const gps=createGps({
+  changed:()=>{const target=gps?.target;minimap.setRoute(gps?.route??[],target?ROUTE_COLOURS[target.source]:'',gps?.version??0);},
+  arrived:target=>notices.show({variant:'acao',title:'Você chegou',text:target.label||'Este é o destino que você marcou.'}),
+});
+// Trading between players (docs/sistemas/troca.md): the window is the game's modal; what is on the table is always what the room last said.
+const trade=createTrade({
+  root:$('#game'),send:(type,payload)=>network.send(type,payload),inventory:()=>inventory,balance:()=>inventory?.balance??wardrobe?.balance??0,now:()=>serverNow(),
+  notify:(title,text,warning)=>notices.show({variant:warning?'aviso':'acao',title,text}),
+  open:()=>showModal('NEGOCIAR','','trade'),close:()=>closeModal(),isOpen:()=>activeModal==='trade',content:()=>$('#modal-content'),
+});
+const foodDialog=createFoodDialog($('#game'),{confirm:orderId=>network.send('food.deliver',{orderId}),leave:()=>network.send('food.leave',{})});
 // The menu closes on the way in: the mouse is about to be captured, and its row out would be out of reach.
 createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>hud.closeMenu());
 // What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the Painéis menu. The chat is typed.
-const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),()=>!sceneActive()||watchingTv||phone.isOpen||profile.isOpen||worldMenuOpen()||!$('#panel-menu').classList.contains('hidden'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 const minimap=createMinimap($('#game'));
 const consumingHud=createConsumingHud($('#consuming'));
@@ -168,7 +189,7 @@ function focusChat():void {
   panel.classList.add('chat-open');input.focus();
   if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
 }
-function showModal(title:string,content:string,type:string):void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function showModal(title:string,content:string,type:string):void {if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
 const measureDesk=()=>{const left=$('.modal').getBoundingClientRect().left;deskCover=innerWidth>760?Math.max(0,1-left/innerWidth):0;};
@@ -185,7 +206,7 @@ function openLightDesk():void {
   document.body.classList.add('at-light-desk');
   measureDesk();addEventListener('resize',measureDesk);scene?.watchStage(()=>deskCover);
 }
-function closeModal():void {closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function closeModal():void {if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
 const profile=createProfileWindow({
   portrait:skin=>scene?.portrait(skin)??Promise.resolve(undefined),
@@ -206,6 +227,31 @@ const network=new BarNetwork({
   jukebox:openJukebox,
   television:openTelevision,
   shop:()=>{void openShop().catch(error=>toast(errorMessage(error),true));},
+  food:onFoodState,
+  foodBase:({owned,out,state})=>{courier.setOwned(owned);showModal('HIGHFOOD',basePanelHtml(owned,out,state,livePrice('vehicle:moto'),livePrice('cap:highfood-daily')),'highfood');},
+  foodOwned:owned=>courier.setOwned(owned),
+  garage:view=>{if(activeModal==='garage')$('#modal-content').innerHTML=garagePanelHtml(view);else showModal('GARAGEM',garagePanelHtml(view),'garage');garageShown=view.garageId;},
+  garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();notices.show({variant:'acao',title:'Moto na rua',text:`A moto ${plate} está esperando, trancada. Só quem tem a chave sobe nela.`});gps.setWaypoint({x,y:0,z,source:'bike',label:`Moto ${plate}`});},
+  motoLocked:({plate,locked})=>{keyChirp(settings.get().master,locked);notices.show({variant:'acao',title:locked?'Trancada':'Destrancada',text:locked?`Só você sobe na moto ${plate}.`:`Qualquer um pode subir na moto ${plate} agora. Ela continua sendo sua.`});if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
+  tradeInvite:invite=>trade.invited(invite),
+  tradeUninvite:id=>trade.uninvited(id),
+  tradeSent:name=>notices.show({variant:'acao',title:'Negociação',text:`Esperando ${name} responder.`}),
+  tradeNotice:text=>notices.show({variant:'aviso',title:'Negociação',text}),
+  tradeState:view=>trade.state(view),
+  tradeClosed:closed=>trade.closed(closed),
+  foodDialog:dialog=>foodDialog.show(dialog),
+  foodDelivered:()=>foodDialog.show(null),
+  foodReceipt:receipt=>{
+    courier.receipt(receipt);
+    if(receipt.balance!==undefined){if(inventory)inventory={...inventory,balance:receipt.balance};if(wardrobe)wardrobe={...wardrobe,balance:receipt.balance};renderBalance();}
+    notices.show({variant:'acao',title:`Entrega feita: ${receipt.customer}`,text:receipt.paid>0?`+${receipt.paid.toLocaleString('pt-BR')} moedas · ${'★'.repeat(receipt.stars)}${receipt.capped?' · você chegou ao teto de hoje':''}`:`Você já chegou ao teto de hoje: esta não pagou. ${'★'.repeat(receipt.stars)}`});
+  },
+  foodNotice:notice=>notices.show({variant:'aviso',...notice}),
+  motoReady:(at,towed)=>{
+    courier.setOwned(true);
+    notices.show({variant:'acao',title:'A moto chegou',text:towed?'O guincho deixou a moto na rua mais perto.':'Siga o GPS até ela.'});
+    gps.setWaypoint({x:at.x,y:0,z:at.z,source:'bike',label:'Sua moto'});
+  },
   lights:openLightDesk,
   stage:update=>{
     if(update.open){openStage(update.price??livePrice('stage:pass'));return;}
@@ -219,11 +265,12 @@ const network=new BarNetwork({
   },
   itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
   motoStruck:({hp,by})=>notices.show({variant:'aviso',title:'Atropelado',text:`${by||'Uma moto desgovernada'} passou por cima de você: -${hp} de vida.`}),
-  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[]};if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();},
+  kicked:({hp,by})=>notices.show({variant:'aviso',title:'Chutado',text:hp?`${by} acertou um chute em você: -${hp} de vida.`:`${by} acertou um chute em você.`}),
+  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();},
   inventoryResult:()=>{},
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
-    renderBalance();blackjackUi.refresh();foosballUi.refresh();
+    renderBalance();blackjackUi.refresh();foosballUi.refresh();trade.refresh();
     if(change.reason==='job'&&change.delta)notices.show({variant:'acao',title:'Trabalho feito',text:`+${change.delta} moedas na carteira.`});
     if(change.reason==='refund'&&change.delta)notices.show({variant:'acao',title:'Estorno',text:`${change.delta} moedas voltaram para a carteira.`});
   },
@@ -289,6 +336,8 @@ const phone=createPhone($('#game'),{
   microphone:{active:()=>voice.micActive,set:on=>voice.setMicrophone(on),unavailable:()=>voice.unavailableReason},
   setCallPeer:id=>voice.setCallPeer(id),
   volume:()=>settings.get().master,
+  gps,
+  food:courier,
 });
 async function enterBar():Promise<void> {
   if(inGame)return;
@@ -320,7 +369,8 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   profile.close();
   const task=(async()=>{
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
-  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  gps.reset();foodDialog.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
+  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
@@ -354,6 +404,11 @@ function renderWorld():void {
   $('#cigarette-button').setAttribute('aria-pressed',String(self?.interactionState==='cigarette'));
   renderSkillButton();
   const station=jobStation(),atStation=!!station&&!!self&&!self.interactionState&&!self.currentTableId&&touching(stationInteractable(station),self);
+  if(self)gps.update(self.x,self.z);
+  // Standing with the phone out, the character looks at it, for everyone.
+  if(connected&&!!self?.looking!==phone.isOpen&&lookingSent!==phone.isOpen){lookingSent=phone.isOpen;network.send('phone.look',{on:phone.isOpen});}
+  renderMapMarks(self);
+  const food=foodPrompt(self);
   const interaction=self?nearestObject(self):undefined;
   const moto=self&&!interaction&&!atStation?freeMotoNear(self):undefined;
   const fallenMoto=self&&!interaction&&!atStation&&!moto?fallenMotoNear(self):undefined;
@@ -362,8 +417,8 @@ function renderWorld():void {
   const context=$('#context');
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
   $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
-  context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto));
-  $('#context-label').textContent=isRidingMoto(self?.interactionState)?'para descer':self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':'');
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!food&&!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto));
+  $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?'Tirando o pedido do baú…':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':'');
   const event=world.event;
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   $('#event-banner').classList.toggle('hidden',!event?.type);
@@ -388,6 +443,14 @@ function renderWorld():void {
   // Also on every patch, not only on the 100 ms tick: a quick use lasts two seconds.
   consumingHud.render(consumptions(world,self,usedItem,serverNow()),serverNow());
 }
+let marksDrawn='',lookingSent:boolean|undefined;
+/** The minimap's marks: where the GPS goes, and your bike when you are off it. */
+function renderMapMarks(self:PlayerState|undefined):void {
+  const target=gps.target,bike=self?Object.values(world?.motos??{}).find(moto=>moto.ownerId===self.id&&moto.riderId!==self.id):undefined;
+  const marks=[...(target&&target.source!=='bike'?[{x:target.x,z:target.z,colour:ROUTE_COLOURS[target.source],icon:target.source==='delivery'?'bag':'mapPin'}]:[]),...(bike?[{x:bike.x,z:bike.z,colour:ROUTE_COLOURS.bike,icon:'bike'}]:[])];
+  const key=marks.map(mark=>`${mark.x.toFixed(1)}:${mark.z.toFixed(1)}`).join();
+  if(key!==marksDrawn){marksDrawn=key;minimap.setMarks(marks);}
+}
 function jobStation(){return jobTask?.station;}
 /** Players working the bar right now, who take table orders like Tonico (never the local player). */
 function workersOnShift():Array<{id:string;name:string}> {
@@ -398,7 +461,7 @@ let jobPanelKey='';
 function renderJobCard():void {
   const task=inGame?jobTask:null,self=world?.players[user?.id??''],station=jobStation();
   // The objective marker exists only here: the room sends the task to its worker alone, so nobody else can draw it.
-  const objective=task&&station&&!task.startedAt?{x:station.x,y:station.y,z:station.z}:null;
+  const objective=task?(station&&!task.startedAt?{x:station.x,y:station.y,z:station.z}:null):objectiveNow();
   scene?.setObjective(objective);minimap.setObjective(objective);
   if(!task){jobPanelKey='';hud.setAvailable('job',false);return;}
   // Rebuilt only when the task changes; rewriting it ten times a second made its buttons miss clicks.
@@ -409,6 +472,17 @@ function renderJobCard():void {
   hud.setAvailable('job',true);
 }
 const objectiveBlip=createObjectiveBlip($<HTMLCanvasElement>('#job-blip'));
+// Highfood's base, in the brand's colour: its ring near the bar, named to the player standing on it.
+const foodBlip=createObjectiveBlip($<HTMLCanvasElement>('#food-blip'),{accent:['--blip-food','#ff3d5a'],edge:false,within:HIGHFOOD.BASE_REACH});
+// The garages, in the cyan of everything about vehicles: the nearest one is named to the player standing on its ring.
+const garageBlip=createObjectiveBlip($<HTMLCanvasElement>('#garage-blip'),{accent:['--blip-garage','#17d4f4'],edge:false,within:GARAGE.REACH});
+/** The garage under whoever is riding slowly enough to stop: E opens it instead of getting off. */
+function garageUnder(self:PlayerState){
+  const moto=Object.values(world?.motos??{}).find(each=>each.riderId===self.id);
+  if(moto&&Math.abs(moto.speed)>1)return undefined;
+  return INTERACTABLES.find(object=>object.type==='garage'&&canInteract(object,self));
+}
+let garageShown:string='';
 // Where the stage is entered and its pass bought: the foot of its steps, in the stage's magenta (--blip-stage). Its
 // badge names it only to the player standing on its ring; the ring alone marks it from afar.
 const stageBlip=createObjectiveBlip($<HTMLCanvasElement>('#stage-blip'),{accent:['--blip-stage','#ff47c2'],edge:false,within:BLIP_RADIUS});
@@ -420,10 +494,36 @@ const shopBlip=createObjectiveBlip($<HTMLCanvasElement>('#shop-blip'),{accent:['
 // The light desk up on the stage, in the logo's violet (--blip-desk): its ring shows in the backyard, on the deck too.
 const deskBlip=createObjectiveBlip($<HTMLCanvasElement>('#desk-blip'),{accent:['--blip-desk','#a77bff'],edge:false,within:BLIP_RADIUS});
 const telaoLabel=()=>world?.televisions?.telao?.status==='playing'?`Telão · pôr vídeo na fila · ${livePrice('media:telao')} moedas`:`Vídeo no telão · ${livePrice('media:telao')} moedas`;
-/** The parked delivery bike within reach, on foot and free: E gets on it. Anything else within reach comes first. */
+/** The parked delivery bike within reach, on foot and free (a bought one only for its owner): E gets on it. Anything else within reach comes first. */
 function freeMotoNear(self:PlayerState){
-  return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}));
+  return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}),self.id);
 }
+/** The shift's news: the GPS follows the order. */
+function onFoodState(state:HighfoodState):void {
+  courier.update(state);
+  const order=state.order;
+  // To the kerb in front of them while riding; on foot, to the customer.
+  gps.setDelivery(order?{x:order.stage==='going'?order.parkX:order.x,y:order.y,z:order.stage==='going'?order.parkZ:order.z,source:'delivery',label:`${order.customer.name} · ${order.address}`}:null);
+  if(world)renderWorld();
+}
+/** What E does for the courier here, if anything; beats everything else in reach. */
+function foodPrompt(self:PlayerState|undefined):{label:string;send:string}|undefined {
+  const order=courier.state().order;
+  if(!self||!order||self.currentTableId)return;
+  if(order.stage==='carrying'&&!self.interactionState&&Math.hypot(order.x-self.x,order.z-self.z)<=HIGHFOOD.HAND_REACH)return {label:`Entregar o pedido a ${order.customer.name}`,send:'food.talk'};
+  if(order.stage==='going'&&!self.interactionState&&Math.hypot(order.x-self.x,order.z-self.z)<=HIGHFOOD.UNLOAD_REACH){
+    const bike=Object.values(world?.motos??{}).find(moto=>moto.ownerId===self.id);
+    if(bike&&!bike.phase&&!bike.riderId&&motoDistance(bike,self)<=2)return {label:'Pegar o pedido no baú',send:'food.unload'};
+  }
+}
+/** Where the ring in the scene goes: the worker's station first (renderJobCard), then the customer, then what the player marked. */
+function objectiveNow():Required<Position>|null {
+  const order=courier.state().order;
+  if(order)return order.stage==='going'?{x:order.parkX,y:0,z:order.parkZ}:{x:order.x,y:order.y,z:order.z};
+  const mark:GpsTarget|undefined=gps.waypoint;
+  return mark?{x:mark.x,y:floorHeight(mark.x,mark.z,.15)??mark.y??0,z:mark.z}:null;
+}
+const objectiveTitle=()=>{const order=courier.state().order;return !jobTask&&order?(order.stage==='going'?'Entrega':order.customer.name):!jobTask&&gps.waypoint?gps.waypoint.label:'';};
 /** A bike on the ground within reach: E lifts it. */
 function fallenMotoNear(self:PlayerState){
   return self.interactionState||self.currentTableId?undefined:nearestFallenMoto(self,Object.values(world?.motos??{}));
@@ -468,10 +568,10 @@ function renderMotoPanel():void {
   // The same cases the room refuses, said before trying.
   const blocked=parts[panelPart]>=100?'Esta parte está perfeita.':moto.riderId?'Alguém está pilotando esta moto.':moto.phase&&moto.phase!=='down'?'Espere a moto parar.':Math.abs(moto.speed)>0?'Espere a moto parar.'
     :!canRepairMoto(moto,self,0)?'Chegue mais perto da moto para consertar.':self.interactionState||self.currentTableId?'Encerre o que está fazendo primeiro.':pieces<MOTO_REPAIR.pieces?'Você precisa de uma peça de moto. A loja da casa vende.':'';
-  const key=[moto.parts,moto.engine,pieces,blocked,panelPart,repairSeen].join('|');
+  const key=[moto.parts,moto.engine,moto.locked,pieces,blocked,panelPart,repairSeen].join('|');
   if(key===panelDrawn)return;
   panelDrawn=key;
-  $('#modal-content').innerHTML=motoPanelHtml({moto,selected:panelPart,pieces,blocked,working:repair?{...repair,elapsed:performance.now()-repairStart}:undefined});
+  $('#modal-content').innerHTML=motoPanelHtml({moto,selected:panelPart,pieces,blocked,keyHolder:!!moto.ownerId&&moto.ownerId===self.id,working:repair?{...repair,elapsed:performance.now()-repairStart}:undefined});
 }
 // What the rider's own engine just did: the sound says it, and this says what to do about it.
 let ownEngine:{id:string;engine:number}|undefined;
@@ -483,11 +583,20 @@ function watchOwnEngine(self:PlayerState|undefined):void {
   if(moto.engine!==MOTO_ENGINE.OFF||before===undefined||before===MOTO_ENGINE.OFF)return;
   notices.show({variant:'aviso',title:before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:'Aperte W para tentar de novo. O estado da moto está nas informações do veículo.'});
 }
+/** The key's button (L, the bike's menu or its panel). */
+function lockOwnBike():void {
+  const bike=Object.values(world?.motos??{}).find(moto=>moto.ownerId===user?.id);
+  if(!bike){toast('Sua moto não está na rua.',true);return;}
+  network.send('moto.lock',{locked:!bike.locked});
+}
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
+  const food=foodPrompt(self);
+  if(food){network.send(food.send,{});return;}
   if(self.currentTableId){blackjackUi.requestLeave();return;}
   if(self.interactionState.startsWith('foosball:')||foosballWatching){foosballUi.requestLeave();return;}
+  if(isRidingMoto(self.interactionState)){const garage=garageUnder(self);if(garage){network.send('player.interact',{objectId:garage.id});return;}}
   if(self.interactionState){network.send('player.interact',{objectId:'stand'});return;}
   const station=jobStation();
   if(station&&touching(stationInteractable(station),self)){network.send('job.work');return;}
@@ -641,13 +750,17 @@ let selectedItem='';
 function renderInventory():void {
   if(activeModal!=='inventory'||!inventory)return;
   const self=world?.players[user?.id??''],held=inHand();
-  const stacks=inventory.stacks.filter(stack=>itemById(stack.itemId));
-  if(!stacks.some(stack=>stack.itemId===selectedItem))selectedItem=stacks[0]?.itemId??'';
-  const slots=Array.from({length:inventory.capacity},(_,index)=>{const stack=stacks[index],item=stack&&itemById(stack.itemId);
+  const stacks=inventory.stacks.filter(stack=>itemById(stack.itemId)),keys=inventory.keys??[];
+  const chosenKey=keys.find(key=>`key:${key.vehicleId}`===selectedItem);
+  if(!chosenKey&&!stacks.some(stack=>stack.itemId===selectedItem))selectedItem=stacks[0]?.itemId??(keys[0]?`key:${keys[0].vehicleId}`:'');
+  const keySlots=keys.map(key=>`<button type="button" class="inventory-slot vehicle-key" data-action="inventory-select" data-item="key:${e(key.vehicleId)}" aria-pressed="${selectedItem===`key:${key.vehicleId}`}" aria-label="${e(VEHICLE_KEY.name)}, placa ${e(key.plate)}" title="${e(VEHICLE_KEY.name)} · placa ${e(key.plate)}\n${e(VEHICLE_KEY.description)}"><img class="item-img" src="${import.meta.env.BASE_URL}${VEHICLE_KEY.icon}" alt="" draggable="false"><small>${e(key.plate)}</small></button>`).join('');
+  const slots=keySlots+Array.from({length:inventory.capacity},(_,index)=>{const stack=stacks[index],item=stack&&itemById(stack.itemId);
     return item?`<button type="button" class="inventory-slot" data-action="inventory-select" data-item="${e(item.id)}" aria-pressed="${item.id===selectedItem}" aria-label="${e(item.name)}, ${stack!.quantity}" title="${e(item.name)}">${itemImage(item)}<b>${stack!.quantity}</b></button>`
       :'<span class="inventory-slot empty" aria-hidden="true"></span>';}).join('');
   const stack=stacks.find(entry=>entry.itemId===selectedItem),item=stack&&itemById(stack.itemId);
   let detail='<div class="item-detail empty"><p class="empty-state">Sua mochila está vazia.</p></div>';
+  const shownKey=keys.find(key=>`key:${key.vehicleId}`===selectedItem);
+  if(shownKey)detail=`<section class="item-detail key-detail" aria-label="${e(VEHICLE_KEY.name)}"><header><span class="item-icon" aria-hidden="true"><img class="item-img" src="${import.meta.env.BASE_URL}${VEHICLE_KEY.icon}" alt="" draggable="false"></span><div><small>Veículo</small><h3>${e(VEHICLE_KEY.name)}</h3></div>${plateHtml(shownKey.plate)}</header><p>${e(shownKey.name)}.</p><p class="key-never">${uiIcon('lock')}<span>${e(VEHICLE_KEY.description)}</span></p></section>`;
   if(item&&stack){
     // Why Usar waits, when it does (the room refuses the same cases).
     const blocked=self?.condition==='fainted'||self?.condition==='stumbling'?'Espere recuperar o equilíbrio.'
@@ -658,7 +771,7 @@ function renderInventory():void {
       <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${forBike?'':`<span class="item-time">${uiIcon('clock')}${lasts}</span>`}</div>
       ${blocked&&!forBike?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${forBike?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>Usar</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
   }
-  const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar'};
+  const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar',trade:'Negociação'};
   const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
   $('#modal-content').innerHTML=`<div class="inventory-summary"><div class="status-row"><span>${uiIcon('bag')} Espaço</span><b>${inventory.usedSlots} / ${inventory.capacity} pilhas</b></div><div class="hud-track"><i style="width:${Math.min(100,inventory.usedSlots/Math.max(1,inventory.capacity)*100)}%"></i></div></div>
     <div class="inventory-layout"><div class="inventory-slots" role="group" aria-label="Itens na mochila">${slots}</div>${detail}</div>
@@ -750,8 +863,15 @@ app.addEventListener('click',event=>{
       case 'inventory':await openInventory();break;
       case 'inventory-use':useInventoryItem(button.dataset.item!);break;
       case 'inventory-select':selectedItem=button.dataset.item??'';renderInventory();document.querySelector<HTMLElement>(`.inventory-slot[data-item="${CSS.escape(selectedItem)}"]`)?.focus();break;
+      case 'garage-take':network.send('garage.take',{garageId:garageShown,vehicleId:button.dataset.vehicle});break;
+      case 'garage-store':network.send('garage.store',{garageId:garageShown,recall:button.dataset.recall==='true'});break;
+      case 'moto-lock':lockOwnBike();break;
       case 'inventory-discard':confirmDiscard(button.dataset.item!);break;
       case 'inventory-discard-confirm':{const itemId=button.dataset.item as ItemId;closeModal();network.send('inventory.discard',{itemId,quantity:1});break;}
+      case 'food-start':network.send('food.start',{});closeModal();phone.open('highfood');break;
+      case 'food-stop':network.send('food.stop',{});closeModal();break;
+      case 'food-app':closeModal();phone.open('highfood');break;
+      case 'food-motors':closeModal();phone.open('highmotors');break;
       case 'inventory-buy':{const itemId=button.dataset.item as ItemId;button.setAttribute('disabled','');try{const result=await api<InventoryView>('/inventory/buy',{itemId,quantity:1,requestId:crypto.randomUUID()});inventory=result;if(wardrobe)wardrobe={...wardrobe,balance:result.balance};network.send('inventory.sync');renderInventory();renderShop();renderBalance();}finally{button.removeAttribute('disabled');}break;}
       case 'skins':await skins();break;
       case 'buy-skin':{const owner=user?.id,generation=modalGeneration;button.setAttribute('disabled','');try{const result=await api<Wardrobe>('/wardrobe/buy',{skin:button.dataset.skin});if(user?.id!==owner)break;wardrobe=result;if(modalGeneration===generation)await skins();}finally{button.removeAttribute('disabled');}break;}
@@ -827,12 +947,18 @@ document.addEventListener('keydown',event=>{
     if(event.code==='KeyP'&&!activeModal){event.preventDefault();openTableMenu();}
     else if(event.code==='KeyP'&&activeModal==='table')closeModal();
     if(event.code==='KeyK'&&!activeModal){event.preventDefault();phone.toggle();}
+    if(event.code==='KeyL'&&!activeModal&&!event.repeat){event.preventDefault();lockOwnBike();}
     if(event.code==='KeyJ'&&!activeModal){event.preventDefault();openJobs();}
     else if(event.code==='KeyJ'&&activeModal==='jobs')closeModal();
   }
   if(event.key==='Enter'&&inGame&&!activeModal&&!['INPUT','TEXTAREA','BUTTON'].includes((document.activeElement as HTMLElement)?.tagName)){event.preventDefault();focusChat();}
 });
 document.addEventListener('keyup',event=>{if(event.code==='KeyB')voice.setPushToTalk(false);});
+// Passing the mouse over a key says what it says on a click: that it is never lost.
+document.addEventListener('pointerover',event=>{
+  const slot=(event.target as Element).closest?.<HTMLElement>('.inventory-slot.vehicle-key[data-action="inventory-select"]');
+  if(slot&&activeModal==='inventory'&&selectedItem!==slot.dataset.item){selectedItem=slot.dataset.item??'';renderInventory();}
+});
 window.addEventListener('blur',()=>voice.setPushToTalk(false));
 $('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
 $('#modal').addEventListener('input',event=>{
@@ -952,14 +1078,17 @@ async function start():Promise<void>{
     onSkillKey:code=>{const active=activeSkill();if(active?.key!==code)return false;useSkill();return true;},
     onWorldMenu:(x,y,{player,moto})=>{
       if(!inGame||activeModal)return;
+      const bike=moto?world?.motos?.[moto]:undefined,other=player&&player!==user?.id&&world?.players[player]?.connected!==false;
       worldMenu({x,y},[
         ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
+        ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
-      ]);
+        ...(bike?.ownerId&&bike.ownerId===user?.id?[{id:'lock',icon:bike.locked?'unlock':'lock',label:bike.locked?'Destrancar':'Trancar',choose:()=>lockOwnBike()}]:[]),
+      ],bike?.plate?`${plateHtml(bike.plate)}<span>${bike.ownerId?`de ${e(bike.ownerName||'outro jogador')}${bike.locked?' · trancada':''}`:'Moto do bar'}</span>`:'');
     },
     motoVolume:()=>settings.get().master,
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
-    onMediaFrame:()=>{mouseCapture.sync();media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null);const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+    onMediaFrame:()=>{mouseCapture.sync();media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
   });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
@@ -972,7 +1101,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),motos:()=>scene?.getMotos(),ragdolls:()=>scene?.getRagdolls(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),motos:()=>scene?.getMotos(),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 setInterval(()=>{
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[];

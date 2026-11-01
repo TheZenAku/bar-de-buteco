@@ -35,6 +35,21 @@ export async function walkTo(page:Page,x:number,z:number,tolerance=.25):Promise<
   }
   await page.waitForTimeout(250);
 }
+/**
+ * Where this page last drew a body before it got up. Watched frame by frame: a body at rest starts getting up on the room's very next tick, too short a moment
+ * for anything polling from outside.
+ */
+export const lastOfBody=(page:Page,id:string)=>page.evaluate(id=>new Promise<number[]|undefined>(done=>{
+  const deadline=performance.now()+25_000;
+  let last:number[]|undefined;
+  const look=()=>{
+    const body=(window as any).barDebug.ragdolls().find((each:any)=>each.id===id);
+    if(body)last=body.pelvis;
+    if((last&&!body)||performance.now()>deadline){done(last);return;}
+    requestAnimationFrame(look);
+  };
+  look();
+}),id);
 /** Orbits the free camera by dragging over the canvas. */
 export async function orbit(page:Page,dx:number,dy=0):Promise<void>{
   const box=(await page.locator('canvas').first().boundingBox())!,x=box.x+box.width/2,y=box.y+box.height/3;

@@ -3,7 +3,7 @@ import {statfs} from 'node:fs/promises';
 import os from 'node:os';
 import {and,desc,eq,gte,ilike,inArray,isNotNull,isNull,lt,or,sql,type Column,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {ACCESS_LOG_EVENTS,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,SKINS,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
+import {ACCESS_LOG_EVENTS,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKINS,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
   type AdminEconomy,type AdminLedgerEntry,type AdminLogCategory,type AdminLogEntry,type AdminLogPage,type AdminPlayerDetail,type AdminPlayerOperation,type AdminReport,
   type AdminServerInfo,type AdminSummary,type LedgerSource,type PublicUser} from '@bar/shared';
 import type {MetricsRegistry} from '@bar/shared/metrics';
@@ -20,7 +20,7 @@ const dayKey=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).pad
 const startOfDay=(date:Date)=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
 const likeTerm=(term:string)=>`%${term.replace(/[\\%_]/g,'\\$&')}%`;
 /** Coin movements that create or destroy coins (a Pix only moves them between wallets). */
-const notTransfer=sql`${t.currencyLedger.reason} not like 'pix:%'`;
+const notTransfer=sql`${t.currencyLedger.reason} not like 'pix:%' and ${t.currencyLedger.reason} not like 'trade:%'`;
 const sourceSql=sql<string>`case when ${t.currencyLedger.reason} like '{%' then 'admin' else split_part(${t.currencyLedger.reason},':',1) end`;
 const DISPLAY_NAME=/^[^\u0000-\u001f\u007f<>]{2,32}$/u;
 /** World and API events kept in the log; older lines are removed now and then. */
@@ -89,7 +89,7 @@ export class AdminConsole {
         .from(t.reports).leftJoin(reporter,eq(t.reports.reporterId,reporter.userId)).leftJoin(resolver,eq(t.reports.resolvedBy,resolver.userId)).where(eq(t.reports.userId,id)).orderBy(desc(t.reports.createdAt)).limit(30),
       this.db.select({n:sql<number>`count(*)`.mapWith(Number)}).from(t.reports).where(eq(t.reports.reporterId,id)),
     ]);
-    const names=await this.names(ledger.flatMap(entry=>entry.reason.startsWith('pix:')?[entry.reason.split(':')[2]!]:[]));
+    const names=await this.names(ledger.flatMap(entry=>entry.reason.startsWith('pix:')||entry.reason.startsWith('trade:')?[entry.reason.split(':')[2]!]:[]));
     const state=states.get(id)!;
     // The last login: an active session, or the log when every session ended.
     const [lastLog]=await this.db.select({at:t.gameLogs.createdAt}).from(t.gameLogs).where(and(eq(t.gameLogs.userId,id),eq(t.gameLogs.event,'login'))).orderBy(desc(t.gameLogs.createdAt)).limit(1);
@@ -98,6 +98,7 @@ export class AdminConsole {
       account:{id:row.id,username:row.username,email:row.email,displayName:row.displayName,verified:row.verified,balance:row.balance,...state,createdAt:row.createdAt.toISOString(),equippedSkin:row.equippedSkin,phone:row.phone??null},
       wallet:{balance:row.balance,earned30d:flows?.earned??0,spent30d:flows?.spent??0,ledger:ledger.map(entry=>this.ledgerEntry(entry,names))},
       inventory:items.filter(item=>item.quantity>0).map(item=>({itemId:item.itemId,quantity:item.quantity})),
+      vehicles:(await this.db.select({id:t.playerVehicles.id,plate:t.playerVehicles.plate,parts:t.playerVehicles.parts,mileage:t.playerVehicles.mileage}).from(t.playerVehicles).where(eq(t.playerVehicles.userId,id))).map(vehicle=>({...vehicle,name:MOTO_NAME})),
       skins:SKINS.map(skin=>{const owned=skins.find(s=>s.skinId===skin.id);return {id:skin.id,name:skin.name,owned:skin.id===DEFAULT_SKIN||!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
       sessions:{active:sessions?.active??0,lastLoginAt:iso(lastLogin)},
       stats:{gamesPlayed:stats?.gamesPlayed??0,wins:stats?.blackjackWins??0,losses:stats?.blackjackLosses??0,draws:stats?.blackjackDraws??0},
@@ -232,7 +233,7 @@ export class AdminConsole {
     if(want.has('moedas'))jobs.push(this.db.select({id:t.currencyLedger.id,at:t.currencyLedger.createdAt,amount:t.currencyLedger.amount,reason:t.currencyLedger.reason,playerId:t.currencyLedger.userId,playerName:name.displayName})
       .from(t.currencyLedger).leftJoin(name,eq(t.currencyLedger.userId,name.userId))
       .where(and(window(t.currencyLedger.createdAt),person(t.currencyLedger.userId,t.currencyLedger.reason),sql`${t.currencyLedger.amount}<>0`)).orderBy(desc(t.currencyLedger.createdAt)).limit(take)
-      .then(async rows=>{const names=await this.names(rows.flatMap(r=>r.reason.startsWith('pix:')?[r.reason.split(':')[2]!]:[]));
+      .then(async rows=>{const names=await this.names(rows.flatMap(r=>r.reason.startsWith('pix:')||r.reason.startsWith('trade:')?[r.reason.split(':')[2]!]:[]));
         return rows.map(r=>{const source=ledgerSource(r.reason);return {id:`moedas:${r.id}`,at:r.at.toISOString(),category:'moedas' as const,kind:source,title:LEDGER_SOURCES[source],detail:ledgerText(r.reason,names),amount:r.amount,playerId:r.playerId,playerName:r.playerName,actorName:null};});}));
     if(want.has('itens'))jobs.push(this.db.select({id:t.inventoryLedger.id,at:t.inventoryLedger.createdAt,itemId:t.inventoryLedger.itemId,quantity:t.inventoryLedger.quantity,reason:t.inventoryLedger.reason,playerId:t.inventoryLedger.userId,playerName:name.displayName})
       .from(t.inventoryLedger).leftJoin(name,eq(t.inventoryLedger.userId,name.userId))
@@ -294,7 +295,7 @@ export class AdminConsole {
       const bucket=perDay.get(dayKey(new Date(row.hour)));if(!bucket)continue;
       const source=row.source==='admin'?'admin':ledgerSource(`${row.source}:`);
       bucket.net+=row.net;
-      if(source!=='pix'){bucket.created+=row.created;bucket.destroyed+=row.destroyed;}
+      if(source!=='pix'&&source!=='trade'){bucket.created+=row.created;bucket.destroyed+=row.destroyed;}
       const s=perSource.get(source)??{created:0,destroyed:0,count:0};s.created+=row.created;s.destroyed+=row.destroyed;s.count+=row.count;perSource.set(source,s);
     }
     let closing=total;const series:AdminEconomy['series']=[];

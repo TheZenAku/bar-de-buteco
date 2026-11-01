@@ -57,6 +57,8 @@ function trail(value:number,goal:number,before:number,rate:number,dt:number):num
   return goal-steady-(before-value-steady)*Math.exp(-rate*dt);
 }
 
+/** How fast a knock to the camera dies away (per second). */
+const SHAKE_FADE=13;
 /**
  * The camera of the local player. Zoom and unrestricted rotation follow the hand smoothly. Geometry never changes
  * the chosen distance or angle; whatever hides the player is cut away by the visual x-ray (camera-xray.ts).
@@ -90,6 +92,9 @@ export class CameraRig {
   private sinceDrag=0;
   /** How much of the fall back at speed applies (rush). */
   private rushing=0;
+  /** A blow felt through the camera: how far it shakes right now (metres). */
+  private shaking=0;
+  private shakeTime=0;
   private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),up:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3()};
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
@@ -146,6 +151,9 @@ export class CameraRig {
   /** The view pulling back at speed, 0 to 1 (BarScene eases it): added to the chosen distance, never changing it. */
   rush(amount:number):void {this.rushing=amount;}
 
+  /** A knock: the view shakes this far (metres) for a moment. Harder ones win over what is left of the last. */
+  shake(metres:number):void {this.shaking=Math.max(this.shaking,metres);}
+
   /** Places the camera behind or in the eyes of `subject`, and sets the x-ray window for this frame. */
   follow(dt:number,subject:CameraSubject):void {
     const {a,b,c,up,goal,centre}=this.temp,{feet}=subject;
@@ -173,6 +181,10 @@ export class CameraRig {
     a.mulScalar(-1);
     up.set(-Math.sin(this.yaw)*Math.sin(this.pitch),Math.cos(this.pitch),-Math.cos(this.yaw)*Math.sin(this.pitch));
     const position=b.lerp(behind,this.eye,w);
+    if(this.shaking>.0005){
+      this.shakeTime+=dt;this.shaking*=Math.exp(-SHAKE_FADE*dt);
+      position.x+=Math.sin(this.shakeTime*67)*this.shaking;position.y+=Math.sin(this.shakeTime*83+1)*this.shaking;position.z+=Math.sin(this.shakeTime*59+2)*this.shaking;
+    }
     this.camera.setPosition(position);
     this.camera.lookAt(c.copy(position).add(a),up);
     if(subject.roll)this.camera.rotateLocal(Math.sin(subject.elapsed*.7)*subject.roll*.3,0,Math.sin(subject.elapsed*.45)*subject.roll);

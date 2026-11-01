@@ -429,10 +429,10 @@ export class PhoneService {
     await this.wardrobe.initialize(userId);
     const [[wallet],rows,sentToday]=await Promise.all([this.db.select().from(wallets).where(eq(wallets.userId,userId)),
       this.db.select().from(currencyLedger).where(eq(currencyLedger.userId,userId)).orderBy(desc(currencyLedger.createdAt)).limit(PHONE.bankPage),this.sentToday(userId)]);
-    const peers=await this.people(rows.filter(row=>row.reason.startsWith('pix:')).map(row=>row.reason.split(':')[2]!).filter(Boolean));
+    const peers=await this.people(rows.filter(row=>row.reason.startsWith('pix:')||row.reason.startsWith('trade:')).map(row=>row.reason.split(':')[2]!).filter(Boolean));
     // Administrative adjustments keep their JSON detail to themselves: the statement shows only the kind.
     return {balance:wallet?.balance??0,sentToday,entries:rows.filter(row=>row.amount!==0).map(row=>({id:row.id,amount:row.amount,reason:row.reason.startsWith('{')?'admin':row.reason,at:row.createdAt.getTime(),
-      ...(row.reason.startsWith('pix:')?{peer:peers.get(row.reason.split(':')[2]!)?.name}:{})}))};
+      ...(row.reason.startsWith('pix:')||row.reason.startsWith('trade:')?{peer:peers.get(row.reason.split(':')[2]!)?.name}:{})}))};
   }
   /** Moves coins between two players in one transaction, once per requestId, within PHONE.pixMax and PHONE.pixDailyMax. */
   async pix(userId:string,target:{userId?:string;number?:string},amount:number,requestId:string):Promise<{balance:number;amount:number;to:PhoneContact}>{

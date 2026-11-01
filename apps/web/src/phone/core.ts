@@ -1,4 +1,5 @@
-import type {PhoneContact,PhonePing,PhoneProfile,PublicUser,WorldState} from '@bar/shared';
+import type {HighfoodReceipt,HighfoodState,PhoneContact,PhonePing,PhoneProfile,PublicUser,WorldState} from '@bar/shared';
+import type {Gps} from '../gps';
 import {escape as e} from '../api';
 
 /** What the phone needs from the game (main.ts). */
@@ -27,6 +28,10 @@ export interface PhoneHost {
   setCallPeer(id?:string):void;
   /** The game's general volume, 0–1. */
   volume():number;
+  /** Where the player wants to go (the map's waypoint, the order under way). */
+  gps:Gps;
+  /** The Highfood shift as the room tells it. */
+  food:{state():HighfoodState;owned():boolean;setOwned(value:boolean):void;listen(listener:(state:HighfoodState)=>void):()=>void;receipts(listener:(receipt:HighfoodReceipt)=>void):()=>void};
 }
 
 export interface PhoneSettings {wallpaper:string;dark:boolean;dnd:boolean;ringtone:number;ringVolume:number;keyClicks:boolean;size:'s'|'m'|'l'}
@@ -54,9 +59,13 @@ export interface PhoneContext {
   gallery:Gallery;
   sounds:PhoneSounds;
   setBadge(app:string,count:number):void;
+  /** The courier is looking at the Highfood app: the pocket stops vibrating. */
+  foodSeen():void;
 }
 export interface PhoneApp {
   id:string;name:string;icon:string;
+  /** A picture for the icon, under apps/web/public, instead of the glyph on its tint. */
+  image?:string;
   /** The icon's background (CSS). */
   tint:string;
   dock?:boolean;
@@ -183,6 +192,19 @@ export class PhoneSounds {
   busy():void {this.stop();for(let i=0;i<3;i++)this.note(425,i*.5,.25,.08);}
   ding():void {this.note(1175,0,.35,.14);this.note(1568,.12,.5,.12);}
   click():void {this.note(1800,0,.03,.05,'triangle');}
+  private vibration?:Promise<AudioBuffer|undefined>;
+  /** The phone buzzing in the pocket: a recording (public/phone/vibrate.wav, CC0, see docs/sistemas/highfood.md), which no volume setting of the phone silences, as in real life, only the game's. */
+  vibrate():void {
+    const context=this.audio();if(!context||this.volume()<=0)return;
+    this.vibration??=fetch('/phone/vibrate.wav').then(response=>response.arrayBuffer()).then(data=>context.decodeAudioData(data)).catch(()=>undefined);
+    void this.vibration.then(buffer=>{
+      if(!buffer)return;
+      const source=context.createBufferSource(),gain=context.createGain();gain.gain.value=.85*this.volume();
+      source.buffer=buffer;source.connect(gain).connect(context.destination);source.start();
+    });
+  }
+  /** Coins coming in: two bright notes. */
+  cash():void {this.note(1568,0,.18,.16,'triangle');this.note(2093,.1,.4,.16,'triangle');}
   shutter():void {
     const context=this.audio();if(!context||this.volume()<=0)return;
     const length=Math.floor(context.sampleRate*.09),buffer=context.createBuffer(1,length,context.sampleRate),data=buffer.getChannelData(0);

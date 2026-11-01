@@ -79,11 +79,14 @@ const PICK_REACH=40,PICK_MARGIN=.12;
 export interface Bike {
   entity:pc.Entity;rig:MotoRig;state:MotoState;lights:MotoLights;
   /** The local rider's own bike as it should be drawn this frame (moto-motion.ts); everybody else's follows `track`. */
+  plate?:{material:pc.StandardMaterial;texture:pc.Texture}|undefined;
   predicted?:MotoBody;track:RoomTrack;riddenHere:boolean;gap:{x:number;z:number;yaw:number};
   drawn:{x:number;y:number;z:number;yaw:number;pitch:number};
 }
 
 /** The delivery bikes the room syncs, drawn between its patches (and the rider's prediction, for the local one). */
+/** Under the plate lamp (moto-lights.ts), in the tail node's space. */
+const PLATE_AT=[.016,-.295,.03] as const,PLATE_SIZE=[.21,.08,.006] as const;
 export class Motos {
   private model?:pc.ContainerResource;
   private states:readonly MotoState[]=[];
@@ -115,6 +118,27 @@ export class Motos {
       this.model=asset.resource as pc.ContainerResource;this.place();
     });
   }
+  /** The plate on the bike's back, under the lamp that lights it: Mercosul colours, on a thin box on the tail's node. */
+  private plate(rig:MotoRig,text:string):{material:pc.StandardMaterial;texture:pc.Texture} {
+    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=96;
+    const g=canvas.getContext('2d')!;
+    g.fillStyle='#f4f4f0';g.fillRect(0,0,256,96);
+    g.fillStyle='#123c9c';g.fillRect(0,0,256,22);
+    g.fillStyle='#fff';g.font='700 15px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('BRASIL',128,12);
+    g.fillStyle='#111';g.font='700 60px "Courier New",monospace';g.fillText(text,128,60,244);
+    g.strokeStyle='#111';g.lineWidth=5;g.strokeRect(2,2,252,92);
+    const texture=new pc.Texture(this.app.graphicsDevice,{width:256,height:96,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,minFilter:pc.FILTER_LINEAR_MIPMAP_LINEAR,magFilter:pc.FILTER_LINEAR,anisotropy:4});
+    texture.setSource(canvas);
+    const material=new pc.StandardMaterial();
+    material.diffuseMap=texture;material.emissiveMap=texture;material.emissive=new pc.Color(.35,.35,.35);material.useMetalness=false;material.update();
+    const entity=new pc.Entity('Placa');
+    entity.addComponent('render',{type:'box',castShadows:false,receiveShadows:false});
+    entity.render!.meshInstances[0]!.material=material;
+    const [x,y,z]=PLATE_AT;
+    entity.setLocalPosition(x,y,z);entity.setLocalScale(PLATE_SIZE[0],PLATE_SIZE[1],PLATE_SIZE[2]);
+    rig.ponto('ponto_lanterna').addChild(entity);
+    return {material,texture};
+  }
   sync(states:Record<string,MotoState>|undefined):void {
     this.states=Object.values(states??{});this.place();
     const now=performance.now();
@@ -130,9 +154,10 @@ export class Motos {
       entity.addChild(body);this.app.root.addChild(entity);
       const contact=this.shadow(entity);contact.setLocalScale(1.1*MOTO.SCALE,1,2.3*MOTO.SCALE);
       const rig=new MotoRig(body);
-      this.bikes.set(state.id,{entity,rig,lights:new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
+      const plate=state.plate?this.plate(rig,state.plate):undefined;
+      this.bikes.set(state.id,{entity,rig,plate,lights:new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
-    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.entity.destroy();this.bikes.delete(id);}
+    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
   }
   /** The local rider's own bike as it should be drawn this frame (undefined off the bike). */
   predict(id:string,body:MotoBody|undefined):void {const bike=this.bikes.get(id);if(bike)bike.predicted=body;}

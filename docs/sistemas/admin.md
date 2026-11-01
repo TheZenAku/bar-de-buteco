@@ -92,6 +92,10 @@ Períodos de **7**, **30** e **90 dias**. Os números vêm do livro de moedas (`
 - Um parágrafo com o diagnóstico em palavras (crescendo, encolhendo ou estável, e o que costuma ajudar).
 - Gráficos de moedas em circulação por dia e de criadas × retiradas por dia (passe o mouse ou o foco para ver os valores), a tabela de origens e destinos, a distribuição (mediana, média, parcela dos 10% mais ricos, Gini e quantos copos de chopp a carteira mediana paga), os maiores saldos e os números de cada dia numa tabela.
 
+## Highfood
+
+Quanto as entregas pagaram, quem está online, os perfis dos clientes (nome, corpo, falas e foto enviada) e dar ou tirar a moto de alguém (de quem tem mais de uma, informando a [placa](garagem.md#administração)). Detalhes em [Highfood](highfood.md#administração).
+
 ## Preços
 
 Uma tabela por grupo (**Bar e mochila**, **Skins**, **Jukebox, TVs e telão**, **Palco**, **Trabalho**, **Recompensas**) com o valor padrão, o atual e o campo **Novo valor**, a variação em relação ao padrão e **Padrão** para voltar. As linhas alteradas ficam destacadas e nada muda no jogo até **Salvar preços**, que pede o motivo e grava todas juntas. **Reajuste** aplica uma porcentagem ao grupo filtrado (ou a todos) para revisar antes de salvar.

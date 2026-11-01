@@ -56,6 +56,11 @@ export class Player extends Schema {
   @type('string') carryingOrder = '';
   /** 'call' while on an answered phone call ('' otherwise), so everyone sees who is on the line. */
   @type('string') phone = '';
+  /** On a Highfood shift, and the bag in hand ('' or 'bag'): both are drawn for everyone. */
+  @type('boolean') courier = false;
+  @type('string') parcel = '';
+  /** Has the phone out, so everyone sees them look at it while standing. */
+  @type('boolean') looking = false;
 }
 export class Npc extends Schema {
   @type('string') id = '';
@@ -71,6 +76,9 @@ export class Npc extends Schema {
   /** Tonico's tray: the items of the order he carries, comma-separated ('' when empty), and its id. */
   @type('string') carrying = '';
   @type('string') carryingOrder = '';
+  /** A Highfood customer's body and what they have in hand. */
+  @type('string') skin = '';
+  @type('string') parcel = '';
 }
 /** Something served on a table top (apps/server/src/world/served.ts). */
 export class ServedItem extends Schema {
@@ -242,6 +250,13 @@ export class MusicianSpot extends Schema {
 /** A delivery bike (MotoState in packages/shared/src/moto.ts). */
 export class Moto extends Schema {
   @type('string') id = '';
+  /** Whoever holds its key ('' for the administration's), their name, the plate on its back and its row in the API. */
+  @type('string') ownerId = '';
+  @type('string') ownerName = '';
+  @type('string') plate = '';
+  @type('string') vehicleId = '';
+  /** Only the key holder gets on it. */
+  @type('boolean') locked = false;
   @type('float32') x = 0;
   @type('float32') y = 0;
   @type('float32') z = 0;
@@ -272,7 +287,7 @@ export class Moto extends Schema {
   /** Each part's condition, whole percents in MOTO_PARTS's order. */
   @type('string') parts = NEW_MOTO_PARTS;
 }
-/** A body thrown from a bike (RagdollStart in packages/shared/src/ragdoll.ts): the same steps run from here in the room and in each browser. */
+/** A body thrown from a bike or by a kick (RagdollStart in packages/shared/src/ragdoll.ts): the same steps run from here in the room and in each browser. */
 export class RagdollState extends Schema {
   @type('float64') startedAt = 0;
   @type('float64') x = 0;
@@ -284,6 +299,9 @@ export class RagdollState extends Schema {
   @type('float64') closing = 0;
   @type('boolean') seated = false;
   @type('uint32') seed = 0;
+  /** Kicked: how fast it went up, and who did it. */
+  @type('float64') lift = 0;
+  @type('string') by = '';
 }
 /** The stage show's settings from the light desk (packages/shared/src/stage-show.ts, StageShowState). */
 export class StageShowState extends Schema {

@@ -7,7 +7,7 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
+import {PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
@@ -17,6 +17,8 @@ import {AchievementService} from './achievement-service.js';
 import {AdminService} from './admin-service.js';
 import {AdminConsole} from './admin-console.js';
 import {PricingService} from './pricing-service.js';
+import {HighfoodService} from './highfood-service.js';
+import {TradeService} from './trade-service.js';
 import {DevBots} from './dev-bots.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
 import {acknowledgeControls,claimControlsOnce,leaseControls} from './control-outbox.js';
@@ -54,6 +56,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const wardrobe=new WardrobeService(db,pricing);
   const inventory=new InventoryService(db,wardrobe);
   const wallet=new WalletService(db,wardrobe);
+  const highfood=new HighfoodService(db,pricing);
+  const trade=new TradeService(db,highfood);
   const achievements=new AchievementService(db);
   // A counter that fails must not take the message or the Pix down with it.
   const phone=new PhoneService(db,wardrobe,(userId,series)=>achievements.add([{userId,series,amount:1}]).catch((error:unknown)=>{app.log.error({err:error,series},'Falha ao contar conquista');}));
@@ -296,6 +300,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/profile/status', { preHandler: phoneUser }, request => profile.setStatus(me(request), profileStatusSchema.parse(request.body).status));
   app.post('/api/profile/badges', { preHandler: phoneUser }, request => profile.showBadges(me(request), profileBadgesSchema.parse(request.body).badges));
   app.post('/api/profile/skill', { preHandler: phoneUser }, request => profile.setLoadout(me(request), profileSkillSchema.parse(request.body)));
+  // Highfood and HighMotors (docs/sistemas/highfood.md): what the phone's apps show; the shift itself is the room's.
+  app.get('/api/highfood', { preHandler: phoneUser }, request => highfood.view(me(request)));
+  app.get('/api/vehicles', { preHandler: phoneUser }, request => highfood.vehicle(me(request)));
+  app.post('/api/vehicles/buy', { preHandler: phoneUser, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, request => highfood.buy(request.auth!.user, z.object({ requestId: uuidSchema.toLowerCase() }).strict().parse(request.body).requestId));
   const badgeImageId = z.object({ id: z.string().regex(BADGE_IMAGE_ID, 'Imagem inválida.') }).strict();
   // Named by its contents, so the browser keeps it.
   app.get('/api/badges/images/:id', { preHandler: authenticated, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -438,6 +446,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   app.post('/api/admin/badges/images/delete',{preHandler:administrator},async request=>{
     const body=badgeImageId.extend({reason:reasonSchema}).strict().parse(request.body);
+    const customer=await highfood.usesImage(body.id);
+    if(customer)throw new HttpError(409,`O cliente ${customer} usa esta imagem.`);
     return {images:await profile.deleteImage(request.auth!.user.id,body.id,body.reason)};
   });
   app.get('/api/admin/badges/:id/holders',{preHandler:administrator},async request=>({holders:await profile.holders(z.object({id:badgeIdSchema}).parse(request.params).id)}));
@@ -453,6 +463,16 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const body=z.object({badgeId:badgeIdSchema,playerId:uuidSchema,grant:z.boolean(),reason:reasonSchema}).strict().parse(request.body);
     return profile.grant(request.auth!.user.id,body.playerId,body.badgeId,body.grant,body.reason);
   });
+  app.get('/api/admin/highfood',{preHandler:administrator},async()=>({customers:await highfood.customers(false),images:await profile.images(),stats:await highfood.stats()}));
+  app.post('/api/admin/highfood/customers',{preHandler:administrator},async request=>{
+    const {reason,...customer}=customerSaveSchema.parse(request.body);
+    return {customers:await highfood.saveCustomer(request.auth!.user.id,customer,reason)};
+  });
+  app.post('/api/admin/highfood/vehicle',{preHandler:administrator},async request=>{
+    const body=z.object({playerId:uuidSchema,owned:z.boolean(),reason:reasonSchema,plate:z.string().trim().toUpperCase().regex(PLATE,'Placa inválida.').optional()}).strict().parse(request.body);
+    await highfood.setVehicle(request.auth!.user.id,body.playerId,body.owned,body.reason,body.plate);
+    return {ok:true};
+  });
   app.post('/api/admin/revert',{preHandler:administrator},request=>{
     const body=z.object({actionId:z.string().min(1).max(128),reason:reasonSchema}).strict().parse(request.body);
     return administration.revert(request.auth!.user.id,body);
@@ -462,7 +482,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session] = await db.select().from(tables.sessions).where(and(eq(tables.sessions.id, sessionId), eq(tables.sessions.userId, userId), gt(tables.sessions.expiresAt, new Date())));
     const user = session ? await getUser(db, userId) : null;
     const banned=await isBanned(db,userId),valid = !!user?.verified && !banned;
-    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?{...await wardrobe.access(user),...await inventory.access(user.id)}:{}) };
+    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?{...await wardrobe.access(user),...await inventory.access(user.id),...await highfood.access(user.id)}:{}) };
   });
   app.post('/api/internal/inventory',internalOptions,async request=>{
     const body=z.object({sessionId:uuidSchema,userId:uuidSchema,itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),
@@ -500,6 +520,17 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await wardrobe.equip(user,skin);
     return {valid:true,role:user.role,blocked:await blockedIds(db,userId),...await wardrobe.access({...user,equippedSkin:skin})};
   });
+  app.post('/api/internal/highfood/rating',internalOptions,async request=>({rating:await highfood.rating(z.object({userId:uuidSchema}).strict().parse(request.body).userId)}));
+  app.get('/api/internal/highfood/customers',internalOptions,async()=>({customers:await highfood.customers()}));
+  app.post('/api/internal/highfood/complete',internalOptions,async request=>highfood.complete(highfoodCompleteSchema.parse(request.body)));
+  app.post('/api/internal/highfood/lost',internalOptions,async request=>{await highfood.lost(highfoodCancelSchema.parse(request.body));return {ok:true};});
+  app.post('/api/internal/vehicles',internalOptions,async request=>{
+    const {updates}=z.object({updates:z.array(z.object({vehicleId:uuidSchema,parts:z.string().max(80).regex(/^[\d,]+$/),mileage:z.number().int().min(0).max(2_000_000_000)}).strict()).max(512)}).strict().parse(request.body);
+    await highfood.saveVehicles(updates);
+    return {ok:true};
+  });
+  // Trades between players (docs/sistemas/troca.md): everything moves here, once per id; the world only says what was agreed.
+  app.post('/api/internal/trades/commit',internalOptions,request=>trade.commit(tradeCommitSchema.parse(request.body)));
   app.get('/api/internal/prices', internalOptions, async () => ({ prices: await pricing.table() }));
   // The world's events for the administration's log (WORLD_LOG_EVENTS), in batches.
   app.post('/api/internal/logs', { ...internalOptions, bodyLimit: 262_144 }, async (request) => {

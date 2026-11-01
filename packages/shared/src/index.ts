@@ -20,7 +20,12 @@ export * from './moto.js';
 export * from './moto-parts.js';
 export * from './moto-crash.js';
 export * from './ragdoll.js';
+export * from './kick.js';
 export * from './city.js';
+export * from './gps.js';
+export * from './highfood.js';
+export * from './garage.js';
+export * from './trade.js';
 import type {JukeboxState} from './jukebox.js';
 import type {JobSlotsView,ServedItemState} from './economy.js';
 import type {MusicianState} from './musicians.js';
@@ -36,6 +41,8 @@ export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
 export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,isWalkable,movePlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
+  /** Highfood: a customer waiting with the phone, thanking for the delivery, and the courier taking the bag from the box. */
+  | 'text' | 'thank' | 'pick'
   | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend'
   /** Playing at one of the stage's musicians' spots (BarState.musicians says which, and the phase). */
   | 'stage'
@@ -87,10 +94,16 @@ export interface PlayerState extends Position { id: string; displayName: string;
   /** 'call' while on a phone call (phone.ts), so the others see who is on the line. */ phone?: string;
   /** Until when (server clock, ms) the stage pass lasts; 0 without one (STAGE_PASS in economy.ts). */ stageUntil?: number;
   /** A worker's tray (a table order taken for a customer), like Tonico's: comma-separated items and the order's id. */
-  carrying?: string; carryingOrder?: string }
+  carrying?: string; carryingOrder?: string;
+  /** On a Highfood shift, and the delivery in hand. */
+  courier?: boolean; parcel?: string;
+  /** Has the phone in front of them: standing still, they look at it. */
+  looking?: boolean }
 export interface NpcState extends Position { id: string; displayName: string; color: string; rotation: number; animationState: AnimationState; animationStartedAt: number; behavior: string;
   /** Tonico's tray: the order's items, comma-separated ('' when empty), and that order's id. */
-  carrying?: string; carryingOrder?: string }
+  carrying?: string; carryingOrder?: string;
+  /** A Highfood customer: which body, and the delivery once it is in their hands. */
+  skin?: string; parcel?: string }
 export interface Card { rank: string; suit: string }
 /** A card on the blackjack table; seq is its place in the round's deal (the browsers key and animate cards by it). The
  *  dealer's hole card reads rank '?' until it is turned. */
@@ -113,14 +126,14 @@ export interface WorldState { players: Record<string,PlayerState>; npcs: Record<
   stageShow?:StageShowState;
   /** The pebolim tables, by id (foosball.ts): lobby, score and phase; the ball and the rods come as frames (foosball.frame). */
   foosball?:Record<string,FoosballTableView>;
-  /** The delivery bikes, by id (moto.ts): seen from anywhere on the map. */
+  /** The delivery bikes, by id (moto.ts): seen from anywhere on the map. Bought ones have their ownerId. */
   motos?:Record<string,MotoState>;
   /** The bodies flying or lying after a crash, by player (ragdoll.ts): each browser runs the same steps from here. */
   ragdolls?:Record<string,RagdollStart&{startedAt:number}>; event: ActiveEvent; occupancy: number; capacity: number; serverTime: number }
 export interface ChatMessage { id:string; playerId:string; displayName:string; text:string; sentAt:number; system?:boolean }
 /** Collision boxes the player touches to use an object; chairs have none and are reached at their seat point. */
 export type Footprint = Pick<Collider,'id'|'x'|'z'|'hx'|'hz'>;
-export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'foosball'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'; label:string; rotation?:number; footprint?:Footprint[];
+export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'foosball'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'|'highfood'|'garage'; label:string; rotation?:number; footprint?:Footprint[];
   /** Without a footprint: how far from the point (metres) the player's centre may be; a chair's seat point by default. */
   reach?:number;
   /** A musician's spot on the stage (STAGE_SPOTS id). */

@@ -25,8 +25,8 @@ export const AIR_KICK_DURATION_MS = 2900;
 /** What a skin can do besides what every skin does. `clip` is in that skin's animation bank only. */
 export interface Skill {id:string;skin:string;name:string;description:string;clip:string;durationMs:number;icon:string}
 export const SKILLS:readonly Skill[]=[
-  {id:'karate',skin:'rafael',name:'Golpe de karatê',description:'Um golpe rápido, com os pés no chão.',clip:'Kick',durationMs:KICK_DURATION_MS,icon:'kick'},
-  {id:'air-kick',skin:'rafael',name:'Chute voador',description:'Salta, acerta o ar com os dois pés e cai de costas no chão.',clip:'AirKick',durationMs:AIR_KICK_DURATION_MS,icon:'bolt'},
+  {id:'karate',skin:'rafael',name:'Golpe de karatê',description:'Um golpe rápido, com os pés no chão. Quem leva voa longe e perde 6 de vida.',clip:'Kick',durationMs:KICK_DURATION_MS,icon:'kick'},
+  {id:'air-kick',skin:'rafael',name:'Chute voador',description:'Salta, acerta com os dois pés e cai de costas no chão. Quem leva voa mais longe ainda e perde 10 de vida.',clip:'AirKick',durationMs:AIR_KICK_DURATION_MS,icon:'bolt'},
 ];
 export const skillById=(id:string|undefined):Skill|undefined=>SKILLS.find(skill=>skill.id===id);
 export const skillsOf=(skin:string|undefined):readonly Skill[]=>SKILLS.filter(skill=>skill.skin===skin);

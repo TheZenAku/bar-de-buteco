@@ -11,7 +11,9 @@ Cada jogador tem um celular no bolso, no estilo de um iPhone 18 Pro: moldura de 
 | **Highgram** | Perfil com nome, @usuário, bio e foto; seguir, buscar e sugestões de quem seguir; feed de quem você segue e Explorar com o bar inteiro; fotos com filtros, curtir (também com dois toques), comentar, apagar e denunciar | API (`gram_profiles`, `gram_follows`, `gram_posts`, `gram_likes`, `gram_comments`) |
 | **Câmera** | Visor ao vivo do jogo, foto, vídeo (até 30 s, com o microfone), selfie e zoom de 1× a 8× | A foto e o vídeo vão para a galeria deste navegador |
 | **Fotos** | Galeria de fotos e vídeos: postar no Highgram, mandar no Highzap, usar como fundo de tela, apagar | Este navegador (IndexedDB), até 60 itens por conta |
-| **Mapas** | O bairro desenhado a partir dos colisores do mapa, você como seta, as pessoas que a sala mostra, lugares e mesas pesquisáveis | `@bar/shared` (sem rede) |
+| **Mapas** | A cidade inteira, com ruas e bairros nomeados, você como seta, as pessoas que a sala mostra, sua moto, lugares e mesas pesquisáveis. Tocar no mapa marca um destino, e o GPS mostra o caminho aqui e no minimapa ([GPS](highfood.md#gps-e-mapas)) | `@bar/shared` (sem rede) |
+| **Highfood** | O emprego de entregador: pedidos, entrega em andamento, histórico, ganhos e perfil ([Highfood](highfood.md)) | Sala (turno) e API (`highfood_deliveries`) |
+| **HighMotors** | A venda da moto de entrega e os veículos do jogador: placa, estado, quilometragem, onde está e guincho ([garagem](garagem.md)) | API (`player_vehicles`) |
 | **HighBank** | Saldo real, extrato do livro-caixa e Pix para um contato salvo ou para um número digitado | API (`wallets`, `currency_ledger`) |
 | **Contatos** | A agenda (o mesmo conteúdo da aba Contatos do Telefone) | API (`phone_contacts`) |
 | **Notas**, **Calendário** | Notas e eventos | Este navegador |
@@ -81,7 +83,7 @@ O visor é o próprio canvas do jogo, transmitido por `captureStream`. A foto é
 
 ## Mapas
 
-O mapa redesenha a cada quadro da tela enquanto está aberto (`requestAnimationFrame`), e não mais quatro vezes por segundo. As 1.557 caixas dos colisores viram um caminho (`Path2D`) por camada uma vez só, e cada quadro pinta oito caminhos com uma transformação. As posições que a sala manda (dez por segundo) são suavizadas no desenho, então a sua seta e os pontos das pessoas deslizam em vez de pular; um salto de mais de 6 m (um teletransporte) aparece direto.
+O mapa redesenha a cada quadro da tela enquanto está aberto (`requestAnimationFrame`), e não mais quatro vezes por segundo. As caixas da cidade viram um caminho (`Path2D`) por camada uma vez só, e cada quadro pinta esses caminhos com uma transformação. Com o mapa afastado, ele usa uma imagem da cidade inteira, feita uma vez, em vez de redesenhar milhares de caixas. Tocar no mapa marca um destino para o [GPS](highfood.md#gps-e-mapas). As posições que a sala manda (dez por segundo) são suavizadas no desenho, então a sua seta e os pontos das pessoas deslizam em vez de pular; um salto de mais de 6 m (um teletransporte) aparece direto.
 
 ## Mensagens, curtidas, seguidores e Pix em tempo real
 
@@ -127,7 +129,7 @@ As tabelas vêm das migrações `infra/migrations/006_phone.sql` e `007_phone_so
 
 ## Ainda não tem
 
-- Animação do personagem segurando o celular (falta o clipe e o modelo do aparelho).
+- Animação de segurar o celular andando. Parado, o personagem já olha para o celular com ele na mão (clipe `Text`).
 - Conversas em grupo no Highzap, vídeos no Highgram e o app de encontros do plano original.
 - O vídeo das chamadas passa pela sala do jogo, quadro a quadro. Para muitas chamadas de vídeo ao mesmo tempo, o próximo passo é WebRTC (com um servidor TURN), que tira esse tráfego do servidor.
 - As fotos, áudios e vídeos ficam no Postgres. Com muitos jogadores, o próximo passo é um armazenamento compatível com S3.
