@@ -40,6 +40,8 @@ export interface WorldConfig {
   blackjackJournalPath: string;
   /** The pebolim tables' journal of stakes and payments (a GameBank, like blackjack's), beside the outbox. */
   foosballJournalPath: string;
+  trucoJournalPath: string;
+  poolJournalPath: string;
   /** Owner name of this process's leases on the API's control outbox. */
   instanceId: string;
   /** Coins per new video on the jukebox, a TV and the stage screen, and for a stage pass (packages/shared/src/economy.ts). */
@@ -72,7 +74,7 @@ export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConf
     capacity: Math.max(2, Math.min(128, e.ROOM_CAPACITY || e.BAR_CAPACITY || 32)),
     blackjackTurnMs: Math.max(5000, e.BLACKJACK_TURN_MS || BLACKJACK.turnMs),
     eventMinMs, eventMaxMs: Math.max(eventMinMs, e.EVENT_MAX_MS || 600_000),
-    outboxPath, blackjackJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.blackjack.jsonl'), foosballJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.foosball.jsonl'),
+    outboxPath, blackjackJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.blackjack.jsonl'), foosballJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.foosball.jsonl'), trucoJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.truco.jsonl'), poolJournalPath: outboxPath.replace(/(\.jsonl)?$/, '.pool.jsonl'),
     prices: { jukebox: e.PRICE_JUKEBOX ?? MEDIA_PRICES.jukebox, tv: e.PRICE_TV ?? MEDIA_PRICES.tv, telao: e.PRICE_TELAO ?? MEDIA_PRICES.telao, stage: e.PRICE_STAGE ?? STAGE_PASS.price },
     musicianDropMs: e.MUSICIAN_DROP_MS ?? MUSICIANS.dropMs,
     // Under `node --test` the world never calls YouTube unless a test points it somewhere.

@@ -9,7 +9,7 @@ import {priceOf} from './prices.js';
  */
 export const HIGHFOOD={
   /** Where a shift starts: the spot the administration chose standing there (2026-11-01). */
-  BASE:{x:-3.8,y:0,z:-15.5,rotation:-1.538},
+  BASE:{x:-3.99,y:0,z:-13.97,rotation:1.594},
   /** How far from the base's centre the ring can be used. */
   BASE_REACH:1.6,
   /** How long a new order takes to come up after the last one ended (a good rating shortens it, a bad one stretches it). */
@@ -24,11 +24,15 @@ export const HIGHFOOD={
   PROMISE_START_MS:30_000,PROMISE_SPEED:7.5,
   /** Past this many times the promise, the customer gives up and the order is lost. */
   GIVE_UP_FACTOR:3,
+  /** How close to a pickup point's middle (metres, on the side its screen faces) the code can be typed. */
+  PICKUP_REACH:2.2,
+  /** What the promise allows at the pickup point: getting off, walking up, finding the code in the app, typing it. */
+  PICKUP_MS:20_000,
   /** From this close to the customer (metres) the bag can come out of the box. */
   UNLOAD_REACH:35,
   /** How close to the customer the player hands it over (metres). */
   HAND_REACH:1.9,
-  /** How long the bag takes to come out of the box, and the customer stays after getting it (ms). */
+  /** How long the bag takes to come out of the box or the locker, and the customer stays after getting it (ms). */
   UNLOAD_MS:2000,HANDOVER_MS:1200,THANK_MS:3000,LEAVE_MS:9000,
   /** The customer's patience at the dialog before it closes by itself. */
   DIALOG_MS:60_000,
@@ -43,12 +47,17 @@ export const HIGHFOOD={
 export const HIGHFOOD_NPC_PREFIX='cliente-';
 export const isCustomerNpc=(id:string)=>id.startsWith(HIGHFOOD_NPC_PREFIX);
 export const inHighfoodBase=(position:{x:number;z:number;y?:number},slack=0)=>Math.abs((position.y??0)-HIGHFOOD.BASE.y)<.6&&Math.hypot(position.x-HIGHFOOD.BASE.x,position.z-HIGHFOOD.BASE.z)<=HIGHFOOD.BASE_REACH+slack;
+/** Standing at a pickup point's screen: near it and on the side it faces, not behind the locker. */
+export const atPickup=(point:{x:number;z:number;frontX:number;frontZ:number},position:{x:number;z:number},slack=0)=>{
+  const dx=position.x-point.x,dz=position.z-point.z;
+  return Math.hypot(dx,dz)<=HIGHFOOD.PICKUP_REACH+slack&&dx*point.frontX+dz*point.frontZ>0;
+};
 export const MOTO_MODEL='moto-delivery';
 export const MOTO_NAME='Highland Bar Delivery';
 
 /** What a delivery's outcome depends on, measured by the room. */
 export interface DeliveryFacts {
-  /** Metres along the streets from where the order was taken. */
+  /** Metres along the streets from the pickup point the order was offered from. */
   length:number;
   /** Delivered within the promise. */
   onTime:boolean;
@@ -125,24 +134,31 @@ export const fillLine=(line:string,courier:string,item:string)=>line.replace(/\{
 /** Lines any customer may fall back on. */
 export const HIGHFOOD_LINES:readonly string[]=['Opa, até que enfim! A fome já estava apertando.','Valeu, {nome}! Cheguei a achar que tinha esquecido de mim.','Chegou quentinho? Tava doido por {item}.','Boa, {nome}. Vai com Deus e cuidado no trânsito.'];
 
+/** Where an order is collected: the locker, where to stand and where the bike stops; `length`: metres along the streets from the courier. */
+export interface HighfoodPickupView {x:number;y:number;z:number;frontX:number;frontZ:number;standX:number;standZ:number;parkX:number;parkZ:number;address:string;neighbourhood:string;length:number}
 /** The offer in the app and the order under way. */
 export interface HighfoodCustomerView {id:string;name:string;look:CustomerLook;image:string|null}
 export interface HighfoodOrderView {
   id:string;customer:HighfoodCustomerView;restaurant:string;kind:string;items:string[];
   address:string;neighbourhood:string;place:string;
   x:number;y:number;z:number;parkX:number;parkZ:number;
-  /** Metres along the streets when it came up, and what it should pay (before crashes and lateness). */
+  pickup:HighfoodPickupView;
+  /** The four digits typed at the pickup point. Empty until the order is accepted. */
+  code:string;
+  /** Metres along the streets from the pickup point when it came up, and what it should pay (before crashes and lateness). */
   length:number;pay:number;
   /** When the offer stops waiting (offers) and when the promise runs out (orders under way), server clock. */
   expiresAt:number;promiseAt:number;
   /** The rider crashed this many times carrying it. */
   crashes:number;
-  /** going: on the way; unload: the bag is coming out of the box; carrying: in hand. */
-  stage:'going'|'unload'|'carrying';
+  /** pickup: on the way to the locker; collect: the bag is coming out of it; going: on the way, the bag in the box; unload: it is coming out of the box; carrying: in hand. */
+  stage:'pickup'|'collect'|'going'|'unload'|'carrying';
 }
 export type HighfoodStatus='off'|'waiting'|'offer'|'order';
 /** What the room tells its courier, whenever it changes. */
 export interface HighfoodState {status:HighfoodStatus;since:number;offer?:HighfoodOrderView;order?:HighfoodOrderView;done:number;earned:number;nextAt?:number}
+/** The pickup point's screen is open for this order. */
+export interface HighfoodLockerView {orderId:string}
 /** The dialog when handing over. */
 export interface HighfoodDialog {orderId:string;customer:HighfoodCustomerView;line:string;items:string[];restaurant:string}
 /** The receipt after handing over. */
@@ -151,6 +167,7 @@ export interface HighfoodReceipt {orderId:string;pay:DeliveryPay;paid:number;sta
 /** Room messages. */
 export const foodOrderSchema=z.object({orderId:z.string().uuid()}).strict();
 export const foodEmptySchema=z.object({}).strict();
+export const foodCodeSchema=z.object({orderId:z.string().uuid(),code:z.string().regex(/^\d{4}$/)}).strict();
 /** What the world asks the API to record and pay. */
 export const highfoodCompleteSchema=z.object({
   userId:z.string().uuid(),orderId:z.string().uuid(),customerId:z.string().max(40),customer:z.string().max(40),restaurant:z.string().max(60),items:z.array(z.string().max(60)).max(4),address:z.string().max(90),

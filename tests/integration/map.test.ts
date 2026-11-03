@@ -30,11 +30,11 @@ test('published map and collision export match the supplied BarBoteco assets; th
   const collision=read('apps/web/public/maps','bar_boteco_colisao.glb');
   assert.equal(createHash('sha256').update(collision).digest('hex'),map.collisionHash);
   assert.ok(read('assets-bar/map/BarBoteco/export','bar_boteco_colisao.glb').equals(collision),'The collision export is served as it is');
-  // Only the old sawhorses and cones go from the visual one (city.test.ts holds them to that).
+  // The visual one gets what the export lacks (city.test.ts holds it to that).
   assert.equal(createHash('sha256').update(read('apps/web/public/maps','bar_boteco.glb')).digest('hex'),map.visualHash);
   assert.equal(createHash('sha256').update(read('assets-bar/map/BarBoteco/export','bar_boteco.glb')).digest('hex'),map.visualSourceHash);
-  // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts). The four old boundary walls are out.
-  assert.equal(map.colliders.length,1553);
+  // Empty COLPORTA pivots are hierarchy; the 16 actual door leaves remain dynamic (doors.test.ts). The four old boundary walls are out, and the iFood point is in.
+  assert.equal(map.colliders.length,1473);
   assert.equal(map.doors.length,16);
   // 124 chairs and the picnic tables' bench places (8 × 6).
   assert.equal(map.seats.length,172);

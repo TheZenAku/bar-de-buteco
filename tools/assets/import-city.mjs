@@ -171,7 +171,7 @@ export function prepareCity({root,exportDir}){
     const glb=readGlbFile(path.join(sectorsDir,sector.arquivos.colisao),source),world=worldMatrices(glb.json);
     if(glb.json.nodes.length!==sector.colisores)fail(`${name}: ${glb.json.nodes.length} colisores, o manifesto diz ${sector.colisores}`);
     glb.json.nodes.forEach((node,index)=>{
-      if(!node.name?.startsWith('COL_Cid_')||node.mesh===undefined)fail(`${name}: nó de colisão inesperado "${node.name}"`);
+      if(!/^COL_(Cid_|Ponto_iFood)/.test(node.name??'')||node.mesh===undefined)fail(`${name}: nó de colisão inesperado "${node.name}"`);
       if(seenIds.has(node.name))fail(`colisor ${node.name} repetido (${name})`);
       seenIds.add(node.name);
       boxes.push(squared(worldBox(glb.json,index,world)));
@@ -235,7 +235,7 @@ export function prepareCity({root,exportDir}){
       const previous=fs.existsSync(stampFile)?Object.keys(JSON.parse(fs.readFileSync(stampFile,'utf8')).arquivos):[];
       const files=new Map();
       const put=(file,bytes)=>files.set(path.relative(source,file).replaceAll('\\','/'),bytes);
-      for(const json of ['cidade_setores.json','cidade_vias.json','cidade_lotes.json','validacao.json'])put(path.join(source,json),fs.readFileSync(path.join(source,json)));
+      for(const json of ['cidade_setores.json','cidade_vias.json','cidade_lotes.json','pontos_ifood.json','validacao.json'])put(path.join(source,json),fs.readFileSync(path.join(source,json)));
       for(const entry of gltfs){put(entry.file,fs.readFileSync(entry.file));put(entry.binFile,entry.bin);}
       for(const texture of textures)put(texture,fs.readFileSync(texture));
       const hashes={};
@@ -327,5 +327,139 @@ export function publishedBaseMap(glb,extras){
       fail(`cavaletes antigos: esperados ${JSON.stringify(OLD_BARRIER_TRIANGLES)}, encontrados ${JSON.stringify(counts)}`);
   }
   return {bytes,counts};
+}
+/** What 17_lugares_animacao.py adds to the bar map, and the game counts on. */
+const BAR_PIECES=['Freezer_Bar_Tampa','Copo_Bandeja','Balcao_Lugar_Magrao','Balcao_Entrega','Mictorio_Lugar_1','Mictorio_Lugar_2','Mictorio_Lugar_3'];
+/** Where they stand inside Bar_Mobilia: [minX,maxX,minY,maxY,minZ,maxZ]. Only these materials there are the freezer's and the tray's, not the counter's. */
+const FREEZER_BOX=[19.5,20.9,.25,1.6,-5.95,-5.1],TRAY_BOX=[17.72,18.04,1.05,1.35,-8.88,-8.44];
+/** The bar freezer (06_interior.py at 20.2, 5.53, turned 180°): inside its walls, and under its lid (36_bar_polimento.py P_Freezer). */
+const FREEZER_INSIDE={minX:19.58,maxX:20.82,minZ:-5.83,maxZ:-5.23,x:20.2,z:-5.53},BODY_TOP=1.075,LID_Y=1.079;
+const inBox=([x,y,z],[x0,x1,y0,y1,z0,z1])=>x>x0&&x<x1&&y>y0&&y<y1&&z>z0&&z<z1;
+const normalOf=([a,b,c])=>new Vector3(...b).sub(new Vector3(...a)).cross(new Vector3(...c).sub(new Vector3(...a))).normalize();
+/** Of the exported freezer: its lid and handle, which become the Freezer_Bar_Tampa that opens. */
+const isLid=(material,points)=>{const c=centroid(points);return ['Plastico_Branco','Metal_Escuro'].includes(material)&&inBox(c,FREEZER_BOX)&&c[1]>LID_Y;};
+/** What the exported freezer loses: the lid, and the top of its solid body, so it opens onto the inside. */
+const isClosed=(material,points)=>isLid(material,points)||material==='Plastico_Branco'&&inBox(centroid(points),FREEZER_BOX)&&Math.abs(centroid(points)[1]-BODY_TOP)<.003&&normalOf(points).y>.9;
+/** What the donor gives: the tray, and the freezer's inside (ice, lining, the inner faces of its walls, the rubber rim). */
+const isInside=(material,points)=>{
+  const c=centroid(points);
+  if(['Copo_Vidro','Borracha_Preta'].includes(material)&&inBox(c,TRAY_BOX))return true;
+  if(!inBox(c,FREEZER_BOX))return false;
+  if(['Gelo_Freezer','Freezer_Interno'].includes(material))return true;
+  if(material==='Borracha_Preta')return c[1]>BODY_TOP-.005;
+  if(material!=='Plastico_Branco'||c[0]<FREEZER_INSIDE.minX||c[0]>FREEZER_INSIDE.maxX||c[2]<FREEZER_INSIDE.minZ||c[2]>FREEZER_INSIDE.maxZ)return false;
+  const n=normalOf(points);
+  return Math.abs(n.y)<.1&&n.x*(FREEZER_INSIDE.x-c[0])+n.z*(FREEZER_INSIDE.z-c[2])>0;
+};
+/**
+ * A bar map exported from a .blend where 17_lugares_animacao.py did not run (the exports of 2026-11-01 and 11-02) has a closed freezer, no
+ * tray of glasses and no places for Magrão and the urinals. The published copy opens the exported freezer (its lid becomes Freezer_Bar_Tampa)
+ * and takes the rest from the last export that has them (donor): the freezer's inside and the tray out of its Bar_Mobilia, the long necks in
+ * the freezer, and the other six nodes. The rest stays as exported; a map that has them goes through untouched.
+ */
+export function withBarPieces(glb,donor){
+  const missing=BAR_PIECES.filter(name=>!glb.json.nodes.some(node=>node.name===name));
+  if(!missing.length)return glb;
+  if(missing.length<BAR_PIECES.length)fail(`bar_boteco.glb tem só parte das peças do 17_lugares_animacao.py: faltam ${missing.join(', ')}`);
+  const from=donor(),json=structuredClone(glb.json),source=Buffer.from(glb.bin),chunks=[source],copied=new Map();
+  let end=source.length;
+  const append=(bytes,target)=>{
+    const padding=(4-end%4)%4;
+    chunks.push(Buffer.alloc(padding),bytes);
+    const bufferView=json.bufferViews.push({buffer:0,byteOffset:end+padding,byteLength:bytes.length,...(target?{target}:{})})-1;
+    end+=padding+bytes.length;
+    return bufferView;
+  };
+  const floats=(values,type)=>{
+    const bytes=Buffer.alloc(values.length*4);
+    values.forEach((value,i)=>bytes.writeFloatLE(value,i*4));
+    return json.accessors.push({bufferView:append(bytes),componentType:5126,count:values.length/ITEMS[type],type})-1;
+  };
+  const material=index=>{
+    const wanted=from.json.materials[index],found=json.materials.findIndex(entry=>entry.name===wanted.name);
+    if(found>=0)return found;
+    if(JSON.stringify(wanted).includes('"index"'))fail(`o material ${wanted.name} das peças do bar tem textura`);
+    return json.materials.push(wanted)-1;
+  };
+  const accessor=index=>{
+    if(copied.has(index))return copied.get(index);
+    const {byteOffset=0,...entry}=from.json.accessors[index],view=from.json.bufferViews[entry.bufferView],itemSize=COMPONENTS[entry.componentType][0]*ITEMS[entry.type],length=entry.count*itemSize;
+    if(view.byteStride&&view.byteStride!==itemSize)fail('peças do bar com vértices intercalados');
+    const start=(view.byteOffset??0)+byteOffset;
+    const copy=json.accessors.push({...entry,bufferView:append(from.bin.subarray(start,start+length),view.target)})-1;
+    copied.set(index,copy);
+    return copy;
+  };
+  const mesh=index=>({...from.json.meshes[index],primitives:from.json.meshes[index].primitives.map(primitive=>({...primitive,material:material(primitive.material),indices:accessor(primitive.indices),
+    attributes:Object.fromEntries(Object.entries(primitive.attributes).map(([name,value])=>[name,accessor(value)]))}))});
+  const named=(entry,name)=>entry.nodes.find(node=>node.name===name)??fail(`${name} não existe na fonte das peças do bar`);
+  /**
+   * The triangles of `primitive` that `keep` chooses, with the vertices they use, as a new primitive of the published copy. `place`
+   * moves positions and turns normals (into a node's own frame); `materialIndex` is the copy's material.
+   */
+  const subset=(entry,primitive,keep,materialIndex,place)=>{
+    const name=entry.json.materials[primitive.material].name;
+    const positions=accessorValues(entry.json,entry.bin,primitive.attributes.POSITION),indices=accessorValues(entry.json,entry.bin,primitive.indices),kept=new Map(),triangles=[];
+    for(let i=0;i<indices.length;i+=3){
+      const corners=indices.slice(i,i+3);
+      if(keep(name,corners.map(v=>positions.slice(v*3,v*3+3))))for(const v of corners){if(!kept.has(v))kept.set(v,kept.size);triangles.push(kept.get(v));}
+    }
+    if(!triangles.length)return null;
+    const attributes=Object.fromEntries(Object.entries(primitive.attributes).map(([attribute,index])=>{
+      const accessor=entry.json.accessors[index],items=ITEMS[accessor.type],values=accessorValues(entry.json,entry.bin,index);
+      if(accessor.componentType!==5126)fail(`atributo ${attribute} das peças do bar não é float`);
+      let picked=[...kept.keys()].flatMap(v=>values.slice(v*items,v*items+items));
+      if(place&&['POSITION','NORMAL'].includes(attribute))picked=Array.from({length:picked.length/3},(_,i)=>place[attribute](new Vector3(...picked.slice(i*3,i*3+3))).toArray()).flat();
+      const copy=floats(picked,accessor.type);
+      if(attribute==='POSITION'){
+        const axes=[0,1,2].map(axis=>picked.filter((_,i)=>i%3===axis));
+        Object.assign(json.accessors[copy],{min:axes.map(values=>Math.min(...values)),max:axes.map(values=>Math.max(...values))});
+      }
+      return [attribute,copy];
+    }));
+    const wide=kept.size>65535,bytes=Buffer.alloc(triangles.length*(wide?4:2));
+    triangles.forEach((v,i)=>wide?bytes.writeUInt32LE(v,i*4):bytes.writeUInt16LE(v,i*2));
+    const index=json.accessors.push({bufferView:append(bytes,34963),componentType:wide?5125:5123,count:triangles.length,type:'SCALAR'})-1;
+    return {attributes,indices:index,material:materialIndex};
+  };
+  const furniture=json.meshes[named(json,'Bar_Mobilia').mesh],exportedFurniture=furniture.primitives.slice();
+  // The exported lid, read before the furniture loses it, in the frame of the donor's Freezer_Bar_Tampa (its hinge, where it turns).
+  const hinge=named(from.json,'Freezer_Bar_Tampa'),turn=new Quaternion(...(hinge.rotation??[0,0,0,1])),back=turn.clone().invert(),at=new Vector3(...(hinge.translation??[0,0,0]));
+  if(hinge.scale||from.json.nodes.some(node=>node.children?.includes(from.json.nodes.indexOf(hinge))))fail('Freezer_Bar_Tampa da fonte não é um nó raiz sem escala');
+  const lid=exportedFurniture.map(primitive=>subset(glb,primitive,isLid,primitive.material,{POSITION:p=>p.sub(at).applyQuaternion(back),NORMAL:n=>n.applyQuaternion(back)})).filter(Boolean);
+  if(!lid.length)fail('o freezer do bar_boteco.glb não tem tampa acima do corpo');
+  for(const primitive of exportedFurniture)retireTriangles(json,source,primitive,points=>isClosed(json.materials[primitive.material].name,points));
+  for(const primitive of from.json.meshes[named(from.json,'Bar_Mobilia').mesh].primitives){
+    const inside=subset(from,primitive,isInside,undefined);
+    if(inside)furniture.primitives.push({...inside,material:material(primitive.material)});
+  }
+  // The long necks standing in the hollow freezer are instances: they join the map's.
+  const necks=named(json,'INST_A_long-neck'),neckDonor=named(from.json,'INST_A_long-neck');
+  if(necks.translation||neckDonor.translation)fail('INST_A_long-neck fora da origem');
+  const instancing=node=>node.extensions.EXT_mesh_gpu_instancing.attributes,own=instancing(necks),given=instancing(neckDonor);
+  const places=accessorValues(from.json,from.bin,given.TRANSLATION),inFreezer=[];
+  for(let i=0;i<places.length/3;i++)if(inBox(places.slice(i*3,i*3+3),FREEZER_BOX))inFreezer.push(i);
+  for(const [name,type] of [['TRANSLATION','VEC3'],['ROTATION','VEC4'],['SCALE','VEC3']]){
+    const items=ITEMS[type];
+    const values=given[name]===undefined?null:accessorValues(from.json,from.bin,given[name]),kept=own[name]===undefined?null:accessorValues(json,source,own[name]);
+    if(!values||!kept)fail(`INST_A_long-neck sem ${name}`);
+    own[name]=floats([...kept,...inFreezer.flatMap(i=>values.slice(i*items,i*items+items))],type);
+  }
+  for(const name of BAR_PIECES){
+    const node=structuredClone(named(from.json,name));
+    if(name==='Freezer_Bar_Tampa')node.mesh=json.meshes.push({name:'P_Freezer_Bar_Tampa',primitives:lid})-1;
+    else if(node.mesh!==undefined)node.mesh=json.meshes.push(mesh(node.mesh))-1;
+    json.scenes[json.scene??0].nodes.push(json.nodes.push(node)-1);
+  }
+  chunks.push(Buffer.alloc((4-end%4)%4));
+  const bin=Buffer.concat(chunks);
+  json.buffers[0].byteLength=bin.length;
+  let text=Buffer.from(JSON.stringify(json));
+  text=Buffer.concat([text,Buffer.alloc((4-text.length%4)%4,0x20)]);
+  const header=Buffer.alloc(20);
+  header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(28+text.length+bin.length,8);header.writeUInt32LE(text.length,12);header.writeUInt32LE(0x4e4f534a,16);
+  const binHeader=Buffer.alloc(8);
+  binHeader.writeUInt32LE(bin.length,0);binHeader.writeUInt32LE(0x004e4942,4);
+  return {...glb,json,bin,bytes:Buffer.concat([header,text,binHeader,bin]),restored:BAR_PIECES};
 }
 export {readGlbFile};

@@ -1,3 +1,4 @@
+import {buySkill,showCard,wearCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import map from '../../packages/shared/src/map-data.json' with {type:'json'};
 // Route validated by tests/integration/map.test.ts: pavement, veranda east opening, counter aisle, both stair flights.
@@ -31,10 +32,13 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   await page.keyboard.type('wasdx');
   await expect(page.locator('#chat-input')).toHaveValue('wasdx');
   await page.keyboard.press('Escape');
-  await page.getByRole('button',{name:/Meu visual/}).click();
-  await selectSkin(page,'Rafael');await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:/Coleção/}).click();
+  await wearCard(page,'rafael');
   await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.locator('#hud-skin')).toContainText('Rafael');await page.getByRole('button',{name:'Fechar janela'}).click();
+  // The card alone brings no skill: the button comes with the purchase.
+  await expect(page.locator('#skill-button')).toBeHidden();
+  await buySkill(page,'rafael','karate');
   await expect(page.locator('#skill-button')).toBeVisible();
   for(let visit=0;visit<2;visit++){
     await page.getByRole('button',{name:'Pessoas no bar'}).click();
@@ -108,6 +112,7 @@ test('BarBoteco map loads fully; keyboard enters the bar, climbs stairs, returns
   // Seu Zé wears Magrão (not offered in the selector) and works the counter.
   const bartender=()=>page.evaluate(()=>(window as any).barDebug.animations().find((a:any)=>a.id==='bartender'));
   await expect.poll(async()=>(await bartender())?.skin).toBe('magrao');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.animations().find((a:any)=>a.id==='tonico')?.skin)).toBe('tonico');
   await page.keyboard.press('e');
   // Bottle or glass: the choice travels with the order and shows in the hand.
   await expect(page.locator('#modal-title')).toHaveText('PEDIR AO MAGRÃO');
@@ -142,12 +147,12 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`anim_${Date.now().toString(36)}`);
   const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-  for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Gabriel','Flavio Hipotético','Read']){
-    await page.keyboard.press('c');
-    // Magrão is Seu Zé's; players choose among the others.
-    await expect(page.locator('.skin-card')).toHaveCount(7);
-    await selectSkin(page,skin);
-    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(({Gilmar:'gilmar-gordo','Flavio Hipotético':'flavio-hipotetico'} as Record<string,string>)[skin]??skin.toLowerCase());
+  for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','read']){
+    await showCard(page,skin);
+    // Magrão is Seu Zé's; players choose among the others, one card per character in the hand.
+    await expect(page.locator('.cl-hand-card')).toHaveCount(7);
+    await wearCard(page,skin);
+    await expect.poll(()=>page.evaluate((id)=>(window as any).barDebug.animations().find((a:any)=>a.id===id)?.skin,id),{timeout:60000}).toBe(skin);
     await expect.poll(()=>page.evaluate((id)=>{
       const tracks=(window as any).barDebug.animations().find((a:any)=>a.id===id)?.tracks??[];
       // The dances arrive in a second bank, after these.
@@ -178,7 +183,7 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
     // Respect the authoritative skin-change rate limit.
     await page.waitForTimeout(600);
   }
-  await page.keyboard.press('c');await selectSkin(page,'Rafael');
+  await wearCard(page,'rafael');await buySkill(page,'rafael','karate');
   await expect(page.locator('#skill-button')).toBeVisible();
   // The chat input stays hidden, and refuses focus, until T opens the box.
   await page.keyboard.press('t');await expect(page.getByLabel('Mensagem por proximidade')).toBeFocused();
@@ -241,14 +246,6 @@ test('leaving while admission data is loading cannot reconnect the player behind
   await expect(page.locator('#game')).toBeHidden();
 });
 
-async function selectSkin(page:Page,name:string):Promise<void>{
-  const card=page.locator('.skin-card').filter({has:page.locator('b',{hasText:name})});
-  await card.click();
-  if(await page.getByRole('heading',{name:`Comprar ${name}`,exact:true}).isVisible()){
-    await page.getByRole('button',{name:'Confirmar compra'}).click();
-    await card.click();
-  }
-}
 
 test('new accounts wear the free default skin; bought skins persist and other players see each change',async({browser,page})=>{
   // Two registrations, two map loads and three skin swaps on software WebGL.
@@ -264,16 +261,16 @@ test('new accounts wear the free default skin; bought skins persist and other pl
     await createAccount(other,`look_${Date.now().toString(36)}`);
     await expect.poll(()=>rendered(other),{timeout:60000}).toBe('nathan');
     await page.keyboard.press('c');
-    await expect(page.locator('.skin-card').filter({has:page.locator('b',{hasText:'Nathan'})})).toContainText('Em uso');
-    await selectSkin(page,'Rafael');
+    await expect(page.locator('.cl-hand-card[data-base="nathan"]')).toContainText('Vestindo');
+    await wearCard(page,'rafael');
     await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
     await expect.poll(()=>rendered(other),{timeout:60000}).toBe('rafael');
     // Respect the authoritative skin-change rate limit.
     await page.waitForTimeout(600);
-    await page.keyboard.press('c');await selectSkin(page,'Nathan');
+    await wearCard(page,'nathan');
     await expect.poll(()=>skin(other),{timeout:60000}).toBe('nathan');
     await page.waitForTimeout(600);
-    await page.keyboard.press('c');await selectSkin(page,'Rafael');
+    await wearCard(page,'rafael');
     await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
     await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
     await page.getByLabel('E-mail',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByRole('button',{name:'Entrar no bar'}).click();

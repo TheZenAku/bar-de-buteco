@@ -46,7 +46,7 @@ test('Rafael\'s kicks, with real keys: the one touched flies far with sound, sta
   const kickerContext=await browser.newContext({viewport:{width:1280,height:720}}),kicker=await kickerContext.newPage(),kickerErrors=errorsOf(kicker);
   const victimContext=await browser.newContext({viewport:{width:1280,height:720}}),victim=await victimContext.newPage(),victimErrors=errorsOf(victim);
   await enterAsAdmin(kicker);
-  for(const [url,data] of [['/api/wardrobe/buy',{skin:'rafael'}],['/api/wardrobe/equip',{skin:'rafael'}],['/api/profile/skill',{skill:'karate',key:'KeyX'}]] as const)await kicker.request.post(url,{data});
+  for(const [url,data] of [['/api/wardrobe/buy',{skin:'rafael'}],['/api/wardrobe/equip',{skin:'rafael'}],['/api/wardrobe/skill',{skill:'karate'}],['/api/profile/skill',{skill:'karate',key:'KeyX'}]] as const)await kicker.request.post(url,{data});
   await kicker.reload();
   await kicker.getByRole('button',{name:'Entrar no bar'}).click();
   await expect(kicker.locator('#waiting')).toBeHidden({timeout:60_000});
@@ -99,6 +99,7 @@ test('Rafael\'s kicks, with real keys: the one touched flies far with sound, sta
   await expect.poll(async()=>(await self(kicker)).animationState,{timeout:6000}).toBe('idle');
 
   // The flying kick, with both feet: more life, further, and with the weight in the sound.
+  await kicker.request.post('/api/wardrobe/skill',{data:{skill:'air-kick'}});
   await kicker.request.post('/api/profile/skill',{data:{skill:'air-kick',key:'KeyX'}});
   await kicker.reload();
   await kicker.getByRole('button',{name:'Entrar no bar'}).click();

@@ -16,7 +16,7 @@ const DANCES = ['Dancing', 'Dancing Twerk', 'Hip Hop Dancing', 'Hip Hop Dancing 
   'Hip Hop Dancing (8)', 'Salsa Dancing', 'Salsa Dancing (2)', 'Samba Dancing', 'Swing Dancing', 'Twist Dance', 'Wave Hip Hop Dance'].map(name => `Dance ${name}`);
 
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico']) for (const file of [skin, `${skin}-dances`]) {
+  for (const skin of ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico']) for (const file of [skin, `${skin}-dances`]) {
     const { json, bin } = glb(`animations/${file}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
@@ -26,8 +26,8 @@ test('generated animations bind to existing skins and contain valid skeletal rot
       for (const clip of ['Drink', 'Fallen', 'Deal', 'Shuffle', 'CardsSit', 'AngrySit', 'Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Sit', 'Wave', 'Use', 'Wait', 'Text', 'Thank', 'Pick', 'Recover']) assert.ok(names.includes(clip));
       assert.ok(!names.some((name: string) => name.startsWith('Dance')), 'The dances have a bank of their own');
     } else assert.deepEqual(names, DANCES, 'Every distinct dance of assets-bar/anim/dance, in file order');
-    assert.equal(names.includes('Kick'), skin === 'rafael' && file === skin);
-    assert.equal(names.includes('AirKick'), skin === 'rafael' && file === skin);
+    assert.equal(names.includes('Kick'), (skin === 'rafael' || skin === 'rafael-rose') && file === skin);
+    assert.equal(names.includes('AirKick'), (skin === 'rafael' || skin === 'rafael-rose') && file === skin);
     assert.equal(names.includes('Bartend'), skin === 'magrao' && file === skin, 'Bartending belongs to Seu Zé (Magrão)');
     for (const animation of json.animations) {
       for (const channel of animation.channels) {
@@ -73,9 +73,11 @@ test('generated animations bind to existing skins and contain valid skeletal rot
 // joints, whose Mixamo names stay recorded as sourceBone; `weights` says where the skin weights came from.
 const MIXAMO_SKINS = [
   {id:'rafael',name:'Rafael',joints:65,weights:'mixamo'},
-  {id:'leandro',name:'Leandro',joints:41,weights:'accurig'},
+  {id:'rafael-rose',name:'Rafael Rosé',joints:65,weights:'mixamo'},
+  {id:'leandro',name:'Leandro',joints:65,weights:'mixamo'},
   {id:'read',name:'Read',joints:41,weights:'accurig'},
   {id:'magrao',name:'Magrao',joints:41,weights:'accurig'},
+  {id:'tonico',name:'Tonico',joints:65,weights:'mixamo'},
   {id:'gilmar-gordo',name:'Gilmar',joints:41,weights:'automatic'},
   {id:'gabriel',name:'Gabriel',joints:34,weights:'mixamo'},
   {id:'flavio-hipotetico',name:'Flavio Hipotético',joints:65,weights:'mixamo'},
@@ -103,8 +105,8 @@ for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has it
     }
     const material=json.materials[primitive.material];
     assert.ok(material.pbrMetallicRoughness.baseColorTexture);
-    // Tripo delivered these three with a colour map only.
-    if(id!=='gabriel'&&id!=='rafael'&&id!=='flavio-hipotetico')assert.ok(material.normalTexture);
+    // Tripo delivered these with a colour map only.
+    if(!['gabriel','rafael','rafael-rose','leandro','tonico','flavio-hipotetico'].includes(id))assert.ok(material.normalTexture);
     // Mixamo downloads drop the normals; the importer restores them.
     assert.ok(primitive.attributes.NORMAL!==undefined);
     // Simplification must not bridge distant parts (e.g. a fingertip to the hip), which stretch in every pose.
@@ -116,7 +118,9 @@ for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has it
       const a=indices[f+k]!*3,b=indices[f+(k+1)%3]!*3;
       longest=Math.max(longest,Math.hypot(position[a]!-position[b]!,position[a+1]!-position[b+1]!,position[a+2]!-position[b+2]!));
     }
-    assert.ok(longest/height<.13,`${name}: a triangle edge of ${(longest/height*100).toFixed(0)}% of the body height`);
+    // Rafael Rosé's file closes the top of the trousers with a fan from the middle of the hip, hidden under the sash and not simplified.
+    // Tonico's apron goes round both legs, and its hem joins one thigh to the other in the file itself.
+    assert.ok(longest/height<(id==='tonico'?.18:id==='rafael-rose'?.15:.13),`${name}: a triangle edge of ${(longest/height*100).toFixed(0)}% of the body height`);
     triangles+=indices.length/3;
   }
   assert.ok(triangles<=100000,`${name}: ${triangles} triangles exceed the skin budget`);

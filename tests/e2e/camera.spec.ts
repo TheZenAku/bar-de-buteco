@@ -15,7 +15,7 @@ test.beforeEach(async({request})=>{
   await expect.poll(async()=>{try{return (await request.get('/api/health')).ok()&&(await request.get('http://localhost:2677/health')).ok();}catch{return false;}},{timeout:30000}).toBe(true);
 });
 
-test('camera keeps precise zoom, rotates freely, restores preferences and changes views silently',async({page})=>{
+test('camera steps between three zooms, rotates, restores preferences and changes views silently',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   const username=`camera_${Date.now().toString(36)}`;
@@ -32,27 +32,27 @@ test('camera keeps precise zoom, rotates freely, restores preferences and change
     await page.getByRole('button',{name:'Configurações',exact:true}).click();
     const distance=page.locator('[data-setting="cameraDistance"]'),mode=page.locator('[data-setting="camera"]');
     await expect(mode.locator('option')).toHaveCount(2);
-    expect(await distance.getAttribute('max')).toBeNull();
-    await distance.fill('7.1375');await distance.press('Tab');
-    await expect.poll(()=>camera(page)).toMatchObject({mode:'third',distance:7.1375,reach:7.1375});
-    await expect.poll(()=>saved(page)).toMatchObject({camera:'third',cameraDistance:7.1375});
+    await expect(distance.locator('option')).toHaveText(['Perto','Médio','Longe']);
+    await distance.selectOption('2.5');
+    await expect.poll(()=>camera(page)).toMatchObject({mode:'third',distance:2.5,reach:2.5});
+    await expect.poll(()=>saved(page)).toMatchObject({camera:'third',cameraDistance:2.5});
     await page.screenshot({path:previewPath('camera-settings.png')});
 
-    await distance.fill('0');await distance.press('Tab');
-    await expect(mode).toHaveValue('first');
-    await expect.poll(()=>camera(page)).toMatchObject({mode:'first',distance:0,reach:7.1375});
-    await expect.poll(()=>saved(page)).toMatchObject({camera:'first',cameraDistance:7.1375});
-    await mode.selectOption('third');await expect(distance).toHaveValue('7.1375');
+    await mode.selectOption('first');
+    await expect.poll(()=>camera(page)).toMatchObject({mode:'first',distance:0,reach:2.5});
+    await expect.poll(()=>saved(page)).toMatchObject({camera:'first',cameraDistance:2.5});
+    await mode.selectOption('third');await expect(distance).toHaveValue('2.5');
     await page.keyboard.press('Escape');
 
     const canvas=page.locator('#world');
-    await canvas.dispatchEvent('wheel',{deltaY:.125,deltaMode:0});
-    const fine=(await camera(page)).distance;
-    expect(fine).toBeGreaterThan(7.1375);expect(fine).toBeLessThan(7.1475);
-    await expect.poll(()=>saved(page)).toMatchObject({camera:'third',cameraDistance:fine});
-    await canvas.dispatchEvent('wheel',{deltaY:-.125,deltaMode:0});
-    const chosen=(await camera(page)).distance;
-    expect(chosen).toBeCloseTo(7.1375,10);
+    await canvas.dispatchEvent('wheel',{deltaY:100,deltaMode:0});
+    expect((await camera(page)).distance).toBe(4.2);
+    await canvas.dispatchEvent('wheel',{deltaY:100,deltaMode:0});
+    expect((await camera(page)).distance).toBe(6.5);
+    await canvas.dispatchEvent('wheel',{deltaY:100,deltaMode:0});
+    expect((await camera(page)).distance,'Longe is the limit').toBe(6.5);
+    await expect.poll(()=>saved(page)).toMatchObject({camera:'third',cameraDistance:6.5});
+    const chosen=6.5;
 
     await page.keyboard.press('q');
     await expect.poll(()=>camera(page)).toMatchObject({mode:'first',distance:0,reach:chosen});
@@ -67,7 +67,8 @@ test('camera keeps precise zoom, rotates freely, restores preferences and change
     await page.mouse.move(point.x,point.y);await page.mouse.down({button:'right'});
     await canvas.dispatchEvent('pointermove',{movementX:0,movementY:1500,buttons:2,pointerId:1,pointerType:'mouse'});
     await page.mouse.up({button:'right'});
-    await expect.poll(async()=>(await camera(page)).pitch).toBeGreaterThan(Math.PI*2);
+    // Third person stops short of the pole, however far the mouse goes.
+    await expect.poll(async()=>(await camera(page)).pitch).toBeCloseTo(1.35,1);
     expect((await camera(page)).position.every(Number.isFinite)).toBe(true);
 
     await expect(page.locator('.comanda').filter({hasText:'Câmera'})).toHaveCount(0);

@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
+import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
@@ -10,16 +10,20 @@ import { HighfoodDesk, customerLine, type FoodOrder } from './world/highfood.js'
 import { TradeDesk, type Trade } from './world/trades.js';
 import { GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
 import { WALK_SPEED, type Position } from '@bar/shared';
-import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt } from '@bar/shared';
+import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, atPickup, foodCodeSchema, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt } from '@bar/shared';
 import { KICK, KICKS, kickAim, kickClear, kickLaunch, kickTouches, kickWindow } from '@bar/shared';
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
+import { TrucoTable } from './minigames/truco.js';
 import { BlackjackBank, GameBank, type BankEntry } from './minigames/blackjack-bank.js';
 import { FoosballTable, type FoosballSummary } from './minigames/foosball.js';
-import { betLimits, blackjackActionSchema, blackjackBetSchema, blackjackInsuranceSchema } from '@bar/shared';
+import { PoolTable, type PoolSummary } from './minigames/pool.js';
+import { TRUCO_SEATS, betLimits, blackjackActionSchema, blackjackBetSchema, blackjackInsuranceSchema, trucoAnswerSchema, trucoConfigSchema, trucoElevenSchema, trucoJoinSchema, trucoPlaySchema, trucoReadySchema, trucoSeatSchema, trucoSignalSchema, trucoStakes } from '@bar/shared';
 import { FOOSBALL, FOOSBALL_TABLES, TEAM_NAMES, foosballBetLimits, foosballConfigSchema, foosballCpuSchema, foosballExit, foosballInputSchema, foosballJoinSchema, foosballKickSchema,
   foosballReadySchema, foosballSlotSchema, foosballSpot, foosballWatchSchema, type FoosballFrame } from '@bar/shared';
+import { POOL_TABLES, poolStakes, poolAimSchema, poolChoiceSchema, poolConfigSchema, poolCpuSchema, poolExit, poolJoinSchema, poolReadySchema, poolSeatSchema, poolShotSchema, poolSpot,
+  poolWatchSchema, type PoolShotView } from '@bar/shared';
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
 import { BarService } from './world/bartender.js';
@@ -65,11 +69,13 @@ const THROWN = 'thrown', LIFTING = 'moto-lift:';
 /** What a kick can interrupt: being free, and what ends with nothing left hanging (another kick, a cigarette). */
 const KICKABLE = new Set(['', 'kick', 'smoke', 'cigarette']);
 /** Taking the bag out of the box, and the customer's dialog. */
-const FOOD_UNLOAD = 'food-unload', FOOD_TALK = 'food-talk';
+const FOOD_UNLOAD = 'food-unload', FOOD_TALK = 'food-talk', FOOD_LOCKER = 'food-locker';
 /** How often the customers' profiles are read again from the API. */
 const CUSTOMERS_EVERY_MS = 60_000;
 const RECOVER_HIPS_BEHIND = .42;
 interface Presence {
+  /** The skills this player bought (SKILLS). */
+  skills:Set<string>;
   joinedAt:number;
   ticket: GameTicket;
   client: Client;
@@ -113,8 +119,10 @@ interface Presence {
   counterCharge?:{requestId:string;amount:number};
   /** A stage pass being charged: a second click meanwhile must not buy (and charge) another. */
   stageBusy?:boolean;
-  /** The pebolim table this player watches from beside it (its frames come to them), '' or undefined otherwise. */
+  /** The pebolim or pool table this player watches from beside it (its frames and views come to them), '' or undefined otherwise. */
   watching?:string;
+  /** Each pool table's view revision and stroke this player last got (pool.view, pool.shot). */
+  poolSeen?:Map<string,{revision:number;shot:number}>;
   /** The vehicles whose key this player holds (the API keeps them); what they were last seen with. */
   vehicles:OwnedVehicle[];
   /** The customer's dialog is open, and it closes by itself at this time. */
@@ -124,7 +132,7 @@ interface Presence {
 /** What is in hand is had 5% at a time, like what is served at a table (served.ts). */
 const HOLDING_SIP = .05;
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
-const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
+const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'truco.join', 'truco.seat', 'truco.config', 'truco.ready', 'truco.again', 'truco.play', 'truco.call', 'truco.answer', 'truco.eleven', 'truco.signal', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'pool.join', 'pool.seat', 'pool.config', 'pool.cpu', 'pool.ready', 'pool.shot', 'pool.choice', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
@@ -225,6 +233,20 @@ export class BarRoom extends Room<{ state: BarState }> {
     limits: () => betLimits(this.prices),
     timing: { turnMs: this.config.blackjackTurnMs },
   });
+  /** The truco table (minigames/truco.ts). Each person's view goes to them alone by message: their cards never enter the room's state. */
+  private trucoBank = new GameBank('truco', new FileOutbox<BankEntry>(this.config.trucoJournalPath, (event, details) => this.log(event, details)),
+    userId => this.sessions.getByUser(userId)?.ticket, changeWallet, internal, {
+      log: (event, details) => this.log(event, details),
+      wallet: (userId, change) => { const presence = this.sessions.getByUser(userId); if (presence) this.walletChanged(presence, change.balance, change.applied, 'truco'); },
+    });
+  private truco = new TrucoTable('truco-1', {
+    view: (playerId, view) => this.sessions.getByUser(playerId)?.client.send('truco.view', view),
+    notice: (playerId, message) => this.sessions.getByUser(playerId)?.client.send('error', { message }),
+    onMatch: summary => this.log('truco_match', { ...summary, score: summary.score.join(' x ') }),
+    bank: this.trucoBank,
+    stakes: () => trucoStakes(this.prices),
+    random: randomInt,
+  });
   /** The pebolim tables' coins: stakes and payments journaled like blackjack's (foosball:bet:<match>, /internal/foosball/settle). */
   private foosballBank = new GameBank('foosball', new FileOutbox<BankEntry>(this.config.foosballJournalPath, (event, details) => this.log(event, details)),
     userId => this.sessions.getByUser(userId)?.ticket, changeWallet, internal, {
@@ -239,6 +261,23 @@ export class BarRoom extends Room<{ state: BarState }> {
     onMatch: summary => this.foosballMatch(summary),
   })] as const));
   private foosballShown = new Map<string, string>();
+  /**
+   * The pool tables of the games hall (minigames/pool.ts), by id. Each one's view goes by message (pool.view) on every change,
+   * and each stroke's recorded paths (pool.shot), to its players, whoever watches it and everyone near it on its floor.
+   */
+  /** The pool tables' coins, journaled like the truco's (pool:bet:<match>, /internal/pool/settle). */
+  private poolBank = new GameBank('pool', new FileOutbox<BankEntry>(this.config.poolJournalPath, (event, details) => this.log(event, details)),
+    userId => this.sessions.getByUser(userId)?.ticket, changeWallet, internal, {
+      log: (event, details) => this.log(event, details),
+      wallet: (userId, change) => { const presence = this.sessions.getByUser(userId); if (presence) this.walletChanged(presence, change.balance, change.applied, 'pool'); },
+    });
+  private pool = new Map(POOL_TABLES.map(place => [place.id, new PoolTable(place.id, {
+    bank: this.poolBank,
+    stakes: () => poolStakes(this.prices),
+    onShot: shot => this.sendPoolShot(shot),
+    onNotice: (playerId, message) => this.sessions.getByUser(playerId)?.client.send('error', { message }),
+    onMatch: summary => this.poolMatch(summary),
+  })] as const));
   private foosballTimer?: ReturnType<typeof setInterval>;
   /** The tables' fixed steps catch up on the timer's real pace (Windows timers run late); frames go 30 times a second. */
   private foosballClock = { last: 0, owed: 0, frameAt: 0 };
@@ -271,7 +310,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     worldMetrics.gauge('bar_world_result_outbox_pending', 'Finished rounds waiting for the API', () => this.results.pending);
     worldMetrics.gauge('bar_world_wallet_credits_pending', 'Refunds and job pay waiting for the API', () => this.walletRetries.size);
     worldMetrics.gauge('bar_world_blackjack_settlements_pending', 'Blackjack payments waiting for the API', () => this.blackjackBank.pending);
+    worldMetrics.gauge('bar_world_truco_settlements_pending', 'Truco payments waiting for the API', () => this.trucoBank.pending);
     worldMetrics.gauge('bar_world_foosball_settlements_pending', 'Pebolim payments waiting for the API', () => this.foosballBank.pending);
+    worldMetrics.gauge('bar_world_pool_settlements_pending', 'Sinuca payments waiting for the API', () => this.poolBank.pending);
     worldMetrics.gauge('bar_world_foosball_matches', 'Pebolim matches being played', () => [...this.foosball.values()].filter(t => t.inMatch).length);
     // The pebolim tables' physics: 60 ticks a second, on a timer of their own (the room's clock ticks with its 20 Hz step).
     this.foosballTimer = setInterval(() => this.foosballTick(), 1000 / FOOSBALL.tickHz);
@@ -314,7 +355,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={vehicles:auth.vehicles??[],joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
+    const presence:Presence={skills:new Set(auth.ownedSkills),vehicles:auth.vehicles??[],joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -337,6 +378,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     // A pebolim match waits for its player (paused) until they are back or the wait runs out.
     for (const table of this.foosball.values()) table.connection(presence.ticket.userId, false);
     this.syncFoosball();
+    // A pool table waits for its shooter (paused) until they are back or the wait runs out.
+    for (const table of this.pool.values()) table.connection(presence.ticket.userId, false);
     // A pending order is dropped with the connection, which would otherwise leave the player waiting forever.
     this.cancelCounter(presence.ticket.userId);
     this.cancelTable(presence.ticket.userId);
@@ -368,6 +411,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.state.players.get(presence.ticket.userId)!;
     player.connected = true;
     for (const table of this.foosball.values()) table.connection(player.id, true);
+    for (const table of this.pool.values()) table.connection(player.id, true);
+    presence.poolSeen = undefined;
+    // Back on the socket: the panel gets the table as it is now.
+    if (player.interactionState.startsWith('truco:')) this.truco.refresh(player.id);
     this.syncFoosball();
     // Without an answer, the appearance already in the room stays as it is.
     if (access) this.applyAppearance(player,access);
@@ -403,6 +450,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.blackjack.leave(player.id);
     // Off the pebolim table (a match with coins on it is lost; a friendly goes on with Zé do Totó).
     this.leaveFoosball(player);
+    // Off the truco table: an NPC takes the seat.
+    this.leaveTruco(player);
+    // Off the pool table: leaving a match in play is giving it up.
+    this.leavePool(player);
     this.cancelCounter(player.id);
     this.cancelTable(player.id);
     this.endShift(player, 'Turno encerrado.');
@@ -513,6 +564,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('food.accept', foodOrderSchema, 5, (client, { orderId }) => this.acceptOrder(client, orderId));
     this.handle('food.decline', foodOrderSchema, 5, (client, { orderId }) => { const player = this.player(client); this.highfood.decline(player.id, orderId, Date.now()); this.sendFood(player.id); });
     this.handle('food.cancel', foodEmptySchema, 3, client => this.cancelFoodOrder(client));
+    this.handle('food.locker', foodEmptySchema, 4, client => this.openLocker(client));
+    this.handle('food.code', foodCodeSchema, 4, (client, payload) => this.typeLockerCode(client, payload.orderId, payload.code));
     this.handle('food.unload', foodEmptySchema, 4, client => this.unloadOrder(client));
     this.handle('food.talk', foodEmptySchema, 4, client => this.talkToCustomer(client));
     this.handle('food.leave', foodEmptySchema, 4, client => this.closeDialog(this.player(client), this.forClient(client)!));
@@ -746,10 +799,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     // A skill of the skin being worn (SKILLS): which one is active and on which key is the player's choice, kept by the API.
     this.handle('player.skill', z.object({ skill: z.string().max(32) }).strict(), 4, (client, { skill }) => {
-      const p = this.player(client), chosen = skillById(skill);
-      if (!chosen || chosen.skin !== p.skin) throw new Error('Esta skin não tem essa skill.');
+      const p = this.player(client), chosen = skillById(skill), presence = this.forClient(client)!;
+      if (!chosen || chosen.skin !== skinBase(p.skin)) throw new Error('Esta skin não tem essa skill.');
+      if (!presence.skills.has(chosen.id)) throw new Error('Compre esta habilidade na coleção (C).');
       if (p.interactionState) throw new Error('Levante-se primeiro.');
-      const presence = this.forClient(client)!;
       const aim = kickAim(p, [...this.state.players.values()].filter(target => this.kickable(p, target, Date.now())));
       if (aim !== undefined) p.rotation = aim;
       p.skill = chosen.id; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
@@ -805,6 +858,17 @@ export class BarRoom extends Room<{ state: BarState }> {
       try { await this.blackjack.insure(this.atTable(client).id, take); } finally { this.syncTable(); }
     });
     // Pebolim: E at a table takes a free place (or watches a full one); then the table's lobby, the pointer and the kicks.
+    this.handle('truco.join', trucoJoinSchema, 3, client => this.joinTruco(client));
+    this.handle('truco.leave', z.object({}).strict(), 3, client => this.leaveTruco(this.player(client)));
+    this.handle('truco.seat', trucoSeatSchema, 4, (client, { seat }) => { const player = this.atTruco(client); this.truco.move(player.id, seat); this.seatAtTruco(player); this.truco.tick(Date.now()); });
+    this.handle('truco.config', trucoConfigSchema, 8, (client, patch) => { this.truco.configure(this.atTruco(client).id, { ...(patch.level ? { level: patch.level } : {}), ...(patch.stake !== undefined ? { stake: patch.stake } : {}), ...(patch.dark !== undefined ? { dark: patch.dark } : {}) }); this.truco.tick(Date.now()); });
+    this.handle('truco.ready', trucoReadySchema, 3, (client, { ready }) => this.truco.ready(this.atTruco(client).id, ready, Date.now()));
+    this.handle('truco.again', z.object({}).strict(), 3, client => this.truco.again(this.atTruco(client).id));
+    this.handle('truco.play', trucoPlaySchema, 6, (client, { card, hidden }) => this.truco.play(this.atTruco(client).id, card, !!hidden, Date.now()));
+    this.handle('truco.call', z.object({}).strict(), 4, client => this.truco.call(this.atTruco(client).id, Date.now()));
+    this.handle('truco.answer', trucoAnswerSchema, 4, (client, { answer, to }) => this.truco.answer(this.atTruco(client).id, answer, to, Date.now()));
+    this.handle('truco.eleven', trucoElevenSchema, 4, (client, { answer }) => this.truco.eleven(this.atTruco(client).id, answer, Date.now()));
+    this.handle('truco.signal', trucoSignalSchema, 6, (client, { signal }) => this.truco.signal(this.atTruco(client).id, signal, Date.now()));
     this.handle('foosball.join', foosballJoinSchema, 3, (client, { tableId, slot }) => this.joinFoosball(client, tableId, slot));
     this.handle('foosball.watch', foosballWatchSchema, 3, (client, { tableId }) => {
       const presence = this.forClient(client)!;
@@ -823,6 +887,29 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     this.handle('foosball.input', foosballInputSchema, 45, (client, { y, lift }) => { const { player, table } = this.atFoosball(client); table.input(player.id, y, lift); });
     this.handle('foosball.kick', foosballKickSchema, 10, (client, { power }) => { const { player, table } = this.atFoosball(client); table.kick(player.id, power); });
+    this.handle('pool.join', poolJoinSchema, 3, (client, { tableId, seat }) => this.joinPool(client, tableId, seat));
+    this.handle('pool.watch', poolWatchSchema, 3, (client, { tableId }) => {
+      const presence = this.forClient(client)!;
+      if (tableId && !this.nearPool(this.player(client), tableId)) throw new Error('Chegue mais perto da mesa para assistir.');
+      presence.watching = tableId || undefined;
+    });
+    this.handle('pool.leave', z.object({}).strict(), 3, client => this.leavePool(this.player(client)));
+    this.handle('pool.seat', poolSeatSchema, 4, (client, { seat }) => { const { player, table } = this.atPool(client); table.move(player.id, seat); this.syncPool(); });
+    this.handle('pool.config', poolConfigSchema, 8, (client, patch) => { const { player, table } = this.atPool(client); table.configure(player.id, patch); this.syncPool(); });
+    this.handle('pool.cpu', poolCpuSchema, 4, (client, { on }) => { const { player, table } = this.atPool(client); table.cpu(player.id, on); this.syncPool(); });
+    this.handle('pool.ready', poolReadySchema, 4, async (client, { ready }) => {
+      const { player, table } = this.atPool(client), presence = this.forClient(client)!;
+      // Checked here too (the cached wallet), so nobody says yes to a stake they cannot pay; the API decides when it is taken.
+      if (ready && table.stake > presence.balance) throw new Error(`Esta partida vale ${table.stake} moedas e você tem ${presence.balance}.`);
+      try { await table.ready(player.id, ready); } finally { this.syncPool(); }
+    });
+    this.handle('pool.choice', poolChoiceSchema, 4, (client, { choice }) => { const { player, table } = this.atPool(client); table.choose(player.id, choice); this.syncPool(); });
+    this.handle('pool.shot', poolShotSchema, 4, (client, stroke) => { const { player, table } = this.atPool(client); table.shoot(player.id, stroke); this.syncPool(); });
+    // Where the shooter aims, to the others at the table (their cue moves on the felt as the shooter's does).
+    this.handle('pool.aim', poolAimSchema, 14, (client, aim) => {
+      const { player, table } = this.atPool(client), view = table.aim(player.id, aim);
+      if (view) for (const [id, presence] of this.sessions) if (id !== player.id && (presence.watching === table.id || table.seatOf(id))) presence.client.send('pool.aim', view);
+    });
     this.handle('ping', z.object({ at: z.number().finite() }).strict(), 3, (client, { at }) => client.send('pong', { at }));
   }
 
@@ -887,9 +974,14 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.stepTrades(now);
     for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
+    this.checkTruco();
+    this.truco.tick(now);
     this.syncTable();
     this.checkFoosball();
     this.syncFoosball();
+    this.checkPool();
+    for (const table of this.pool.values()) table.tick(now);
+    this.syncPool();
     if (this.events.update(now, this.state.occupancy)) this.syncEvent(now);
     this.serveDrinks(now);
     this.serveTables(now);
@@ -1547,7 +1639,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.courier = false;
     if (presence) this.closeDialog(player, presence);
     this.dropParcel(player);
-    if (player.interactionState === FOOD_UNLOAD) { player.interactionState = ''; player.animationState = 'idle'; }
     if (order) this.loseOrder(player.id, order, 'left');
     this.sendFood(player.id);
     this.log('highfood_offline', { playerId: player.id, done, earned });
@@ -1556,12 +1647,12 @@ export class BarRoom extends Room<{ state: BarState }> {
   private acceptOrder(client: Client, orderId: string): void {
     const player = this.player(client), now = Date.now();
     if (!this.ownMoto(player.id)) throw new Error('Sua moto está na garagem. Tire ela de lá antes de aceitar.');
-    const order = this.highfood.accept(player.id, orderId, now), body = order.profile.skin;
+    const order = this.highfood.accept(player.id, orderId, now, player), body = order.profile.skin;
     const npc = new Npc().assign({ id: HIGHFOOD_NPC_PREFIX + order.id, displayName: order.customer.name, color: '#fac416', x: order.x, y: order.y, z: order.z, rotation: order.spot.yaw, behavior: 'customer', animationState: 'text', animationStartedAt: now, skin: body });
     this.state.npcs.set(npc.id, npc);
     this.refreshViews();
     this.sendFood(player.id);
-    this.log('highfood_accept', { playerId: player.id, customer: order.customer.name, address: order.address, length: order.length });
+    this.log('highfood_accept', { playerId: player.id, customer: order.customer.name, address: order.address, pickup: order.pickup.address, length: order.length });
   }
   /** The customer stops waiting: they turn and go. */
   private releaseCustomer(order: FoodOrder, now: number): void { this.leavingCustomers.set(HIGHFOOD_NPC_PREFIX + order.id, { at: now + 3000, walkFrom: now, yaw: order.spot.yaw + Math.PI }); }
@@ -1578,11 +1669,34 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.loseOrder(player.id, order, 'cancelled');
     this.sendFood(player.id);
   }
-  /** The bag goes back to the box: thrown off the bike, back on it, off the shift. */
+  /** The bag goes back to the box: thrown off the bike, back on it, off the shift. An order still at the pickup point stays there; and whoever was taking a bag out stops. */
   private dropParcel(player: Player): void {
     const order = this.highfood.orderOf(player.id);
     if (player.parcel) player.parcel = '';
-    if (order && order.stage !== 'going') { order.stage = 'going'; order.unloadEndsAt = undefined; this.sendFood(player.id); }
+    if (player.interactionState === FOOD_UNLOAD) { player.interactionState = ''; player.animationState = 'idle'; }
+    if (order && order.stage !== 'going' && order.stage !== 'pickup') { order.stage = 'going'; order.unloadEndsAt = undefined; this.sendFood(player.id); }
+  }
+  /** E at the pickup point's screen, with the order still to be collected. */
+  private openLocker(client: Client): void {
+    const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id);
+    if (!order || order.stage !== 'pickup') throw new Error('Você não tem pedido para retirar.');
+    if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes.');
+    if (!atPickup(order.pickup, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da tela do ponto de retirada.');
+    player.interactionState = FOOD_LOCKER; player.animationState = 'idle'; player.rotation = Math.atan2(order.pickup.x - player.x, order.pickup.z - player.z);
+    presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; presence.dialogUntil = Date.now() + HIGHFOOD.DIALOG_MS;
+    client.send('food.locker', { orderId: order.id });
+  }
+  /** The code typed on the screen: right, the door opens and the bag comes out. A wrong one costs nothing but typing it again. */
+  private typeLockerCode(client: Client, orderId: string, code: string): void {
+    const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id), now = Date.now();
+    if (!order || order.id !== orderId || player.interactionState !== FOOD_LOCKER) throw new Error('Esse pedido não está mais em andamento.');
+    if (code !== order.code) { client.send('food.code', { ok: false }); return; }
+    presence.dialogUntil = undefined;
+    player.interactionState = FOOD_UNLOAD; player.animationState = 'pick'; player.animationStartedAt = now; player.drinkItem = '';
+    order.stage = 'collect'; order.unloadEndsAt = now + HIGHFOOD.UNLOAD_MS;
+    client.send('food.code', { ok: true });
+    this.sendFood(player.id);
+    this.log('highfood_pickup', { playerId: player.id, pickup: order.pickup.address });
   }
   private startUnload(player: Player, moto: Moto, order: FoodOrder): void {
     const now = Date.now(), presence = this.sessions.getByUser(player.id);
@@ -1605,6 +1719,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private talkToCustomer(client: Client): void {
     const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id);
     if (!order) throw new Error('Você não tem entrega em andamento.');
+    if (order.stage === 'pickup' || order.stage === 'collect') throw new Error('Retire o pedido no ponto de retirada primeiro.');
     if (order.stage !== 'carrying') throw new Error('Pegue o pedido no baú da moto primeiro.');
     if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes.');
     if (Math.hypot(order.x - player.x, order.z - player.z) > HIGHFOOD.HAND_REACH + INTERACTION_SLACK) throw new Error(`Chegue mais perto de ${order.customer.name}.`);
@@ -1617,6 +1732,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private closeDialog(player: Player, presence: Presence | undefined): void {
     if (presence) presence.dialogUntil = undefined;
     if (player.interactionState === FOOD_TALK) { player.interactionState = ''; player.animationState = 'idle'; presence?.client.send('food.dialog', null); }
+    if (player.interactionState === FOOD_LOCKER) { player.interactionState = ''; player.animationState = 'idle'; presence?.client.send('food.locker', null); }
   }
   private async handOverFood(client: Client, orderId: string): Promise<void> {
     const player = this.player(client), presence = this.forClient(client)!, order = this.highfood.orderOf(player.id), now = Date.now();
@@ -1669,9 +1785,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const [id, presence] of this.sessions) {
       const player = this.state.players.get(id), order = this.highfood.orderOf(id);
       if (presence.dialogUntil && now >= presence.dialogUntil && player) this.closeDialog(player, presence);
-      if (player && order?.stage === 'unload' && order.unloadEndsAt && now >= order.unloadEndsAt && player.interactionState === FOOD_UNLOAD) {
+      if (player && (order?.stage === 'unload' || order?.stage === 'collect') && order.unloadEndsAt && now >= order.unloadEndsAt && player.interactionState === FOOD_UNLOAD) {
+        const collected = order.stage === 'collect';
         order.stage = 'carrying'; order.unloadEndsAt = undefined; player.interactionState = ''; player.animationState = 'idle'; player.parcel = 'bag';
         this.sendFood(id);
+        if (collected) presence.client.send('food.notice', { title: 'Pedido retirado', text: `Leve até ${order.customer.name}. Subindo na moto, ele vai no baú.` });
       }
     }
     for (const npc of this.state.npcs.values()) if (isCustomerNpc(npc.id)) this.stepCustomer(npc, now);
@@ -1826,10 +1944,12 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (isRidingMoto(player.interactionState)) { this.dismountMoto(player); return; }
       // On the ground after a crash, or lifting a bike: it ends by itself.
       if (player.interactionState === THROWN || player.interactionState.startsWith(LIFTING) || isRepairingMoto(player.interactionState) || player.interactionState === FOOD_UNLOAD) return;
-      if (player.interactionState === FOOD_TALK) { this.closeDialog(player, presence); return; }
+      if (player.interactionState === FOOD_TALK || player.interactionState === FOOD_LOCKER) { this.closeDialog(player, presence); return; }
       // On the stage, standing up is putting the instrument back: the stop clip plays first.
       if (player.interactionState.startsWith('stage-')) { this.musicians.stop(player.id, now); return; }
       if (player.interactionState.startsWith('foosball:')) { this.leaveFoosball(player); return; }
+      if (player.interactionState.startsWith('pool:')) { this.leavePool(player); return; }
+      if (player.interactionState.startsWith('truco:')) { this.leaveTruco(player); return; }
       // Already getting up, putting the cigarette out, smoking a whole one or being sick: it ends by itself.
       if (['stand-up', 'smoke-stop', 'cigarette', 'vomit'].includes(player.animationState)) return;
       if (player.interactionState === 'smoke') { this.stopSmoking(player, presence, now); return; }
@@ -1857,7 +1977,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (object.type === 'garage' && (!player.interactionState || isRidingMoto(player.interactionState))) { client.send('garage.state', this.garageView(presence, object.id as GarageView['garageId'])); return; }
     if (player.interactionState) throw new Error('Levante-se antes de interagir.');
     if (object.type === 'blackjack') { this.joinTable(client); return; }
+    if (object.type === 'truco') { this.joinTruco(client); return; }
     if (object.type === 'foosball') { this.joinFoosball(client, object.id); return; }
+    if (object.type === 'pool') { this.joinPool(client, object.id); return; }
     if(object.type!=='seat'){
       const target=interactionReach(object,player);
       if(Math.hypot(target.x-player.x,target.z-player.z)>.01)player.rotation=Math.atan2(target.x-player.x,target.z-player.z);
@@ -2194,6 +2316,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.dropHolding(player);
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
     if (player.interactionState.startsWith('foosball:')) this.leaveFoosball(player);
+    if (player.interactionState.startsWith('truco:')) this.leaveTruco(player);
+    if (player.interactionState.startsWith('pool:')) this.leavePool(player);
     if (player.interactionState && player.interactionState !== 'fainted' && player.interactionState !== 'stumbling') Object.assign(player, standingPosition(player, player.rotation));
     // A musician who falls drops out at once: the spot is free and the instrument is back on its stand.
     this.musicians.release(player.id);
@@ -2419,6 +2543,51 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (dealer && dealer.animationState !== animation) { dealer.animationState = animation; dealer.animationStartedAt = Date.now(); }
   }
 
+  // ── Truco ────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  /** E at the truco table: a chair, and the panel opens. The table says where; a match in play has no chair to give. */
+  private joinTruco(client: Client): void {
+    const player = this.player(client), object = INTERACTABLES.find(i => i.id === 'truco-1')!;
+    if (this.truco.seatOf(player.id) >= 0) { this.truco.refresh(player.id); return; }
+    if (!canInteract(object, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da mesa de truco.');
+    if (player.interactionState || player.currentTableId) throw new Error('Encerre a ação atual antes de jogar.');
+    if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+    this.truco.join({ id: player.id, name: player.displayName, color: player.color });
+    this.seatAtTruco(player);
+    player.interactionState = 'truco:truco-1'; player.drinkItem = '';
+    const presence = this.forClient(client)!;
+    presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    this.truco.refresh(player.id);
+    this.systemMessage(`${player.displayName} sentou na mesa de truco.`, player);
+  }
+  private seatAtTruco(player: Player): void {
+    const seat = TRUCO_SEATS[this.truco.seatOf(player.id)]!;
+    player.x = seat.x; player.y = seat.y ?? player.y; player.z = seat.z; player.rotation = seat.rotation;
+    player.animationState = 'sit'; player.animationStartedAt = Date.now();
+  }
+  /** Up from the table; in a match, an NPC takes the seat and the stake stays behind. */
+  private leaveTruco(player: Player): void {
+    if (!player.interactionState.startsWith('truco:')) return;
+    this.truco.leave(player.id);
+    Object.assign(player, standingPosition(player, player.rotation));
+    player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();
+    const presence = this.sessions.getByUser(player.id);
+    if (presence) { presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+  }
+  /** Whoever is no longer sitting there gives the seat up, by whatever way they left it; the avatar of someone seatless stands. */
+  private checkTruco(): void {
+    for (const person of this.truco.people) {
+      if (this.state.players.get(person.id)?.interactionState !== 'truco:truco-1') this.truco.leave(person.id);
+    }
+    for (const player of this.state.players.values()) if (player.interactionState.startsWith('truco:') && this.truco.seatOf(player.id) < 0) this.leaveTruco(player);
+  }
+  /** The player at the truco table, or why they cannot play. */
+  private atTruco(client: Client): Player {
+    const player = this.player(client);
+    if (!player.interactionState.startsWith('truco:')) throw new Error('Sente-se à mesa de truco primeiro.');
+    return player;
+  }
+
   // ── Pebolim ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
   /**
@@ -2545,6 +2714,132 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.systemMessage(`Pebolim, mesa ${place.number}: ${names.join(' e ')} (${TEAM_NAMES[winner]}) venceu por ${summary.score}${summary.forfeit ? ', por W.O.' : ''}${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
   }
 
+  // ── Sinuca ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * E at a pool table: a free seat (the avatar goes to its side of the table), or the other seat before the match. A
+   * table in a match, or full, is watched from beside it instead (pool.open says which).
+   */
+  private joinPool(client: Client, tableId: string, seat?: number): void {
+    const player = this.player(client), presence = this.forClient(client)!, table = this.pool.get(tableId);
+    if (!table) throw new Error('Mesa de sinuca desconhecida.');
+    const here = table.seatOf(player.id);
+    if (!here) {
+      if (!this.nearPool(player, tableId)) throw new Error('Chegue mais perto da mesa de sinuca.');
+      if (player.interactionState || player.currentTableId) throw new Error(player.interactionState.startsWith('pool:') ? 'Você já está em outra mesa de sinuca.' : 'Encerre a ação atual antes de jogar.');
+      if (player.animationState === 'kick') throw new Error('Espere o golpe terminar.');
+    }
+    try {
+      if (here && seat !== undefined) table.move(player.id, seat);
+      else if (!here) table.join(player.id, player.displayName, seat);
+    } catch (error) {
+      if (here) throw error;
+      presence.watching = tableId;
+      client.send('pool.open', { tableId, watching: true, reason: error instanceof Error ? error.message : '' });
+      this.syncPool();
+      return;
+    }
+    presence.watching = undefined;
+    player.interactionState = `pool:${tableId}`; player.animationState = 'wait'; player.animationStartedAt = Date.now(); player.drinkItem = '';
+    presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+    client.send('pool.open', { tableId, watching: false });
+    this.syncPool();
+    if (!here) this.systemMessage(`${player.displayName} chegou na mesa ${POOL_TABLES.find(t => t.id === tableId)!.number} da sinuca.`, player);
+  }
+
+  /** Off the table (or stops watching): a step back from its side of the table. */
+  private leavePool(player: Player): void {
+    const presence = this.sessions.getByUser(player.id);
+    if (presence?.watching?.startsWith('sinuca-')) presence.watching = undefined;
+    if (!player.interactionState.startsWith('pool:')) return;
+    const id = player.interactionState.slice('pool:'.length), table = this.pool.get(id), place = POOL_TABLES.find(t => t.id === id);
+    const seat = table?.seatOf(player.id)?.seat ?? 0;
+    table?.leave(player.id);
+    if (place) { const exit = poolExit(place, seat); Object.assign(player, isWalkable(exit.x, exit.z, exit.y) ? exit : standingPosition(player, player.rotation)); }
+    player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();
+    if (presence) { presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+    this.syncPool();
+  }
+
+  /** Touching the table (to play), or close by on its floor (to watch). */
+  private nearPool(player: Player, tableId: string): boolean {
+    const object = INTERACTABLES.find(i => i.id === tableId), place = POOL_TABLES.find(t => t.id === tableId);
+    if (!object || !place) return false;
+    return canInteract(object, player, INTERACTION_SLACK) || (Math.abs(player.y - place.y) < 1 && Math.hypot(player.x - place.x, player.z - place.z) < 4);
+  }
+
+  /** The player at a pool table, and the table, or why they cannot play. */
+  private atPool(client: Client): { player: Player; table: PoolTable } {
+    const player = this.player(client), table = player.interactionState.startsWith('pool:') ? this.pool.get(player.interactionState.slice('pool:'.length)) : undefined;
+    if (!table?.seatOf(player.id)) throw new Error('Pegue um lugar numa mesa de sinuca primeiro.');
+    return { player, table };
+  }
+
+  /** Seats whose player is no longer at the table (moved, knocked down) are given up; avatars left without a seat get up. */
+  private checkPool(): void {
+    for (const [id, table] of this.pool) for (const seat of table.humans) {
+      const player = this.state.players.get(seat.playerId);
+      if (!player || player.interactionState !== `pool:${id}`) table.leave(seat.playerId);
+    }
+    for (const player of this.state.players.values())
+      if (player.interactionState.startsWith('pool:') && !this.pool.get(player.interactionState.slice('pool:'.length))?.seatOf(player.id)) this.leavePool(player);
+  }
+
+  /** Who gets a table's view and strokes: its players, whoever watches it, and everyone near it on its floor (the 3D balls). */
+  private poolAudience(tableId: string): Array<[string, Presence]> {
+    const place = POOL_TABLES.find(t => t.id === tableId)!, table = this.pool.get(tableId)!, out: Array<[string, Presence]> = [];
+    for (const [id, presence] of this.sessions) {
+      const player = this.state.players.get(id);
+      if (!player?.connected || presence.revoked) continue;
+      const distance = Math.hypot(player.x - place.x, player.z - place.z);
+      // Whoever walked away stops watching.
+      if (presence.watching === tableId && distance > 8) presence.watching = undefined;
+      if (table.seatOf(id) || presence.watching === tableId || (Math.abs(player.y - place.y) < 1.5 && distance < AOI_RADIUS)) out.push([id, presence]);
+    }
+    return out;
+  }
+
+  /** Each table's view to whoever has not seen its latest revision (and the stroke rolling, to whoever came midway); players at their places. */
+  private syncPool(): void {
+    for (const [id, table] of this.pool) {
+      const place = POOL_TABLES.find(t => t.id === id)!;
+      for (const seat of table.humans) {
+        const player = this.state.players.get(seat.playerId), spot = poolSpot(place, seat.seat);
+        if (player && Math.hypot(player.x - spot.x, player.z - spot.z) + Math.abs(player.rotation - spot.rotation) > .01) Object.assign(player, spot);
+      }
+      let view: ReturnType<PoolTable['snapshot']> | undefined;
+      for (const [, presence] of this.poolAudience(id)) {
+        presence.poolSeen ??= new Map();
+        const seen = presence.poolSeen.get(id) ?? { revision: -1, shot: -1 };
+        if (seen.revision === table.revision) continue;
+        view ??= table.snapshot();
+        presence.client.send('pool.view', view);
+        if (table.phase === 'rolling' && table.lastShot && seen.shot !== table.lastShot.shot) { presence.client.send('pool.shot', table.lastShot); seen.shot = table.lastShot.shot; }
+        seen.revision = table.revision; presence.poolSeen.set(id, seen);
+      }
+    }
+  }
+
+  /** A stroke struck: its view and its recorded paths, at once, to the table's audience. */
+  private sendPoolShot(shot: PoolShotView): void {
+    const table = this.pool.get(shot.tableId)!, view = table.snapshot();
+    for (const [, presence] of this.poolAudience(shot.tableId)) {
+      presence.poolSeen ??= new Map();
+      presence.client.send('pool.view', view);
+      presence.client.send('pool.shot', shot);
+      presence.poolSeen.set(shot.tableId, { revision: table.revision, shot: shot.shot });
+    }
+  }
+
+  /** A finished rack: in the log for each player, and told to the bar around the table. */
+  private poolMatch(summary: PoolSummary): void {
+    const place = POOL_TABLES.find(t => t.id === summary.tableId)!;
+    for (const p of summary.players) this.log('pool_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, seat: p.seat, result: p.result, rack: summary.rack,
+      reason: summary.reason, forfeit: summary.forfeit, cpu: summary.cpu, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
+    const origin = this.state.players.get(summary.players[0]?.playerId ?? '');
+    if (origin) this.systemMessage(`Sinuca, mesa ${place.number}: ${summary.winner} venceu ${summary.loser} (${summary.reason.charAt(0).toLowerCase()}${summary.reason.slice(1)})${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
+  }
+
   private syncEvent(now: number): void {
     const current = this.events.current;
     this.state.event.type = current.kind === 'none' ? '' : eventTypes[current.kind];
@@ -2592,6 +2887,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       await this.results.flush();
       await this.blackjackBank.flush();
       await this.foosballBank.flush();
+      await this.trucoBank.flush();
+      await this.poolBank.flush();
       await this.walletRetries.flush();
       // Prices and the log never hold up payments and results: they try again next round.
       if (!this.pricesLoaded) await this.reloadPrices().catch((error: unknown) => this.log('prices_unavailable', { message: error instanceof Error ? error.message : String(error) }));
@@ -2705,6 +3002,9 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private applyAppearance(player:Player,access:Access):void {
+    // What the skill handler checks. The API answers it with the collection, so it is always this fresh: bought in the collection, it works at once.
+    const presence=access.ownedSkills?this.sessions.getByUser(player.id):undefined;
+    if(presence)presence.skills=new Set(access.ownedSkills);
     // A response without the collection (invalid session) leaves the avatar as it is.
     if(player.animationState==='kick'||!access.ownedSkins)return;
     const requested=access.equippedSkin??DEFAULT_SKIN;

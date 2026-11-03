@@ -1,0 +1,10 @@
+Leandro (Tripo) - malha corrigida, rig ORIGINAL do Leandro.glb do Tripo
+
+Leandro.glb  -> para o jogo (three.js GLTFLoader). Esqueleto Mixamo 65 ossos (mixamorig:*),
+                juntas e inverseBindMatrices copiadas byte a byte do Leandro.glb original.
+                Sem animacao, repouso em pe (pose T do Tripo), Y para cima.
+Leandro.fbx  -> mesmo personagem em FBX (Mixamo/Unity/Blender), textura embutida, sem animacao.
+Leandro.fbm/ -> textura solta (como nos zips do Tripo).
+
+Altura: 1,00 m (escala original do Tripo). O animacoes_bar.js foi autorado para 1,903 m;
+o modulo faz o retarget sozinho, mas avisa no console se o personagem nao for escalado no jogo.

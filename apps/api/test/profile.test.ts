@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {deflateSync} from 'node:zlib';
-import {createApi} from '../src/app.js';import {readConfig} from '../src/config.js';import {OWNER_EMAIL} from '../src/admin-policy.js';import {profiles,skinInventory} from '../src/database/schema.js';
+import {createApi} from '../src/app.js';import {readConfig} from '../src/config.js';import {OWNER_EMAIL} from '../src/admin-policy.js';import {profiles,skillInventory,skinInventory} from '../src/database/schema.js';
 
 test('profile: status, badges on show, skills per skin and the administration of badges',async t=>{
   const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
@@ -74,6 +74,8 @@ test('profile: status, badges on show, skills per skin and the administration of
   assert.equal((await ana.post('/api/profile/skill',{skill:'karate',key:'KeyX'})).statusCode,400,'Nathan has no skills');
   await api.db.insert(skinInventory).values({userId:ana.id,skinId:'rafael'});
   await api.db.update(profiles).set({equippedSkin:'rafael'});
+  assert.equal((await ana.post('/api/profile/skill',{skill:'air-kick',key:'KeyR'})).statusCode,403,'Skills are bought first');
+  await api.db.insert(skillInventory).values({userId:ana.id,skillId:'air-kick'});
   assert.equal((await ana.post('/api/profile/skill',{skill:'air-kick',key:'KeyW'})).statusCode,400);
   assert.equal((await ana.post('/api/profile/skill',{skill:'air-kick',key:'Escape'})).statusCode,400);
   assert.equal((await ana.post('/api/profile/skill',{skill:'nada',key:'KeyR'})).statusCode,400);

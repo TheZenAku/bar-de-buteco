@@ -29,7 +29,7 @@ test('the export as it is passes, and says what the published copy leaves out',(
   const city=prepareCity({root,exportDir});
   assert.deepEqual(city.bounds,{minX:-400,maxX:400,minZ:-400,maxZ:400});
   assert.deepEqual(city.originalArea,{minX:-141,maxX:173,minZ:-149,maxZ:123});
-  assert.equal(city.counts.sectors,64);assert.equal(city.counts.gltfs,130);assert.equal(city.counts.textures,18);assert.equal(city.counts.solids,5725);
+  assert.equal(city.counts.sectors,64);assert.equal(city.counts.gltfs,130);assert.equal(city.counts.textures,40);assert.equal(city.counts.solids,5650);
   assert.equal(city.counts.silhouettes,2720);assert.equal(city.counts.lights,9);assert.equal(city.counts.markers,39);
 });
 
@@ -92,8 +92,8 @@ test('publishing replaces only what it published, and refuses a folder that is n
     assert.throws(()=>city.publish({publishDir,sharedDir}),/não foi publicado por este importador/);
     assert.ok(fs.existsSync(path.join(publishDir,'do-usuario.txt')));
     fs.rmSync(publishDir,{recursive:true});
-    assert.equal(city.publish({publishDir,sharedDir}),283);
-    for(const file of ['cidade_setores.json','cidade_anel.bin','setores/cidade_S04_04.gltf','setores/cidade_S04_04_lod.bin','texturas/panorama.jpg','cidade_publicacao.json'])assert.ok(fs.existsSync(path.join(publishDir,file)),file);
+    assert.equal(city.publish({publishDir,sharedDir}),306);
+    for(const file of ['cidade_setores.json','pontos_ifood.json','texturas/ponto_ifood_atlas.jpg','cidade_anel.bin','setores/cidade_S04_04.gltf','setores/cidade_S04_04_lod.bin','texturas/panorama.jpg','cidade_publicacao.json'])assert.ok(fs.existsSync(path.join(publishDir,file)),file);
     assert.ok(!fs.existsSync(path.join(publishDir,'capturas')));
     assert.ok(fs.existsSync(path.join(sharedDir,'city-data.json')));assert.ok(fs.existsSync(path.join(sharedDir,'city-roads.json')));
     // A file of the last publication that is gone from the export goes; one the importer never published stays.

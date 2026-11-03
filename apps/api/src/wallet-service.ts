@@ -1,5 +1,5 @@
 import {and,eq,gte,inArray,like,sql} from 'drizzle-orm';
-import {BLACKJACK_MAX_RETURN,FOOSBALL_MAX_RETURN,MAX_COIN_BALANCE,type WalletChange} from '@bar/shared';
+import {BLACKJACK_MAX_RETURN,FOOSBALL_MAX_RETURN,MAX_COIN_BALANCE,POOL_MAX_RETURN,TRUCO_MAX_RETURN,type WalletChange} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {currencyLedger,wallets} from './database/schema.js';
 import type {WardrobeService} from './wardrobe.js';
@@ -64,13 +64,20 @@ export class WalletService {
    * keeps two players' settlements from both reading the same total).
    */
   settleFoosball(settlement:GameSettlement):Promise<WalletChange>{return this.settleGame('foosball',settlement);}
+  /**
+   * The end of a truco match for one player: never above TRUCO_MAX_RETURN on their own stake on the ledger, once per match
+   * and player. There is no pot to check: the part of an NPC is the house's, so two people beating two NPCs are both paid.
+   */
+  settleTruco(settlement:GameSettlement):Promise<WalletChange>{return this.settleGame('truco',settlement);}
+  /** The end of a sinuca match for one player, the truco's way: twice their own stake at most, once; Juca's part is the house's. */
+  settlePool(settlement:GameSettlement):Promise<WalletChange>{return this.settleGame('pool',settlement);}
 
-  private async settleGame(game:'blackjack'|'foosball',{userId,roundId,payout,stakes,voids}:GameSettlement):Promise<WalletChange>{
+  private async settleGame(game:'blackjack'|'foosball'|'truco'|'pool',{userId,roundId,payout,stakes,voids}:GameSettlement):Promise<WalletChange>{
     const ids=[...stakes,...voids];
     if(new Set(ids).size!==ids.length)throw new WalletError(400,'Aposta repetida no acerto.');
     await this.wardrobe.initialize(userId);
     const id=`${game}:${roundId}:${userId}`,betReason=`${game}:bet:${roundId}`,payReason=`${game}:payout:${roundId}`;
-    const maxReturn=game==='blackjack'?BLACKJACK_MAX_RETURN:FOOSBALL_MAX_RETURN;
+    const maxReturn=game==='blackjack'?BLACKJACK_MAX_RETURN:game==='truco'?TRUCO_MAX_RETURN:game==='pool'?POOL_MAX_RETURN:FOOSBALL_MAX_RETURN;
     return this.db.transaction(async tx=>{
       if(game==='foosball')await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`bar-de-buteco:${game}:${roundId}`},0))`);
       const [wallet]=await tx.select().from(wallets).where(eq(wallets.userId,userId)).for('update');

@@ -192,6 +192,8 @@ export class PhoneSounds {
   busy():void {this.stop();for(let i=0;i<3;i++)this.note(425,i*.5,.25,.08);}
   ding():void {this.note(1175,0,.35,.14);this.note(1568,.12,.5,.12);}
   click():void {this.note(1800,0,.03,.05,'triangle');}
+  /** Two low notes: a code the screen refused. */
+  denied():void {this.note(330,0,.16,.1,'square');this.note(262,.18,.24,.1,'square');}
   private vibration?:Promise<AudioBuffer|undefined>;
   /** The phone buzzing in the pocket: a recording (public/phone/vibrate.wav, CC0, see docs/sistemas/highfood.md), which no volume setting of the phone silences, as in real life, only the game's. */
   vibrate():void {

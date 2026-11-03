@@ -19,7 +19,11 @@ EXTERIOR = ["Exterior_Rua", "Exterior_Vizinhanca", "Exterior_Mobiliario"]
 DISTANTE = ["Exterior_Distante"]
 LINKAR = ["Portas", "Iluminacao", "Marcadores", "Interativos", "Interativos_Bar", "Mesas"]   # nos separados (o jogo acha pelo nome)
 INST_MIN = 6                                   # malhas usadas >= 6 vezes viram instancias de GPU...
-INST_PREFIXOS = ("A_", "P_Arvore", "P_Canteiro")  # ...so as pesadas/numerosas; o resto vai pro lote estatico
+INST_PREFIXOS = ("A_", "P_Arvore", "P_Canteiro",  # ...so as pesadas/numerosas; o resto vai pro lote estatico
+                 # props do bar refeitos no 36_bar_polimento (mais detalhados: instanciar evita repetir a malha no GLB)
+                 "P_Garrafa", "P_Engradado", "P_Luminaria", "P_Lampada", "P_Caixa_Papelao", "P_Lixeira", "P_Barril",
+                 "P_Vaso", "P_Freezer", "P_Ventilador", "P_Mesa_Madeira", "P_Guarda_Sol", "P_Extintor", "P_Prateleira",
+                 "P_Pia_Banheiro", "P_Mictorio", "P_Geladeira", "P_Sinuca", "P_Fogao", "P_Coifa", "P_TV")
 CHUNKS = 1                                     # 1 = bairro num lote so (menos draw calls); 3 = pedacos 3x3 p/ frustum culling
 q = B.quadra
 X0, X1, Y0, Y1 = q(-3, 0)[0], q(3, 0)[1], q(0, -3)[2], q(0, 3)[3]
@@ -160,7 +164,7 @@ for cn in LINKAR:
         exp.objects.link(o)
 set_active(exp)
 vl.update()
-extras_addon = {k: scn[k] for k in list(scn.keys()) if k.startswith("blendermcp")}       # nao vazar props do addon no glTF
+extras_addon = {k: scn[k] for k in list(scn.keys()) if k.startswith(("blendermcp", "cid_vis_usuario"))}   # nao vazar props do addon/editor no glTF
 for k in extras_addon:
     del scn[k]
 out = os.path.join(B.EXPORT_DIR, "bar_boteco.glb")

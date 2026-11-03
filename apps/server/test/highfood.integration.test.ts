@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {DELIVERY_SPOTS,GARAGES,HIGHFOOD,HIGHFOOD_CUSTOMERS,HIGHFOOD_NPC_PREFIX,MOTO,MOTO_ENGINE,NEW_MOTO_PARTS,defaultPrices,type HighfoodState} from '@bar/shared';
+import {DELIVERY_SPOTS,GARAGES,HIGHFOOD,HIGHFOOD_CUSTOMERS,HIGHFOOD_NPC_PREFIX,MOTO,MOTO_ENGINE,NEW_MOTO_PARTS,PICKUP_POINTS,defaultPrices,gpsRoute,nearestPickup,type HighfoodState} from '@bar/shared';
 import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 import {HighfoodDesk,customerLine} from '../src/world/highfood.js';
@@ -25,6 +25,10 @@ test('the desk: orders come after a wait, wait for an answer, and three ignored 
   assert.equal(state.status,'offer');assert.ok(state.offer&&state.offer.length>=HIGHFOOD.ROUTE_MIN&&state.offer.length<=HIGHFOOD.ROUTE_MAX,`${state.offer?.length} m`);
   assert.equal(state.offer!.expiresAt,now+HIGHFOOD.OFFER_MS);
   assert.ok(state.offer!.pay>=12&&state.offer!.pay<=40);
+  // The way that pays is the one from the pickup point nearest the courier, and the code only comes with the order.
+  assert.equal(state.offer!.pickup.address,'Rua Dona Margarida, 24');assert.equal(state.offer!.stage,'pickup');assert.equal(state.offer!.code,'');
+  const kerb=gpsRoute({x:state.offer!.pickup.parkX,z:state.offer!.pickup.parkZ},{x:state.offer!.parkX,z:state.offer!.parkZ})!;
+  assert.equal(state.offer!.length,Math.round(kerb.length));
   // Nobody answers, three times.
   for(let i=0;i<HIGHFOOD.MAX_IGNORED;i++){
     now+=HIGHFOOD.OFFER_MS+1;
@@ -43,11 +47,20 @@ test('the desk: taking an order, the promise, and the customer who gets tired of
   desk.start('bia',4.8,now);
   now+=HIGHFOOD.WAIT_MAX_MS+1;desk.update(now,where);
   const offer=desk.stateOf('bia').offer!;
-  assert.throws(()=>desk.accept('bia',uuid(9),now),/não está mais/);
-  const order=desk.accept('bia',offer.id,now);
-  assert.equal(order.promiseAt,now+HIGHFOOD.PROMISE_START_MS+order.length/HIGHFOOD.PROMISE_SPEED*1000);
+  assert.throws(()=>desk.accept('bia',uuid(9),now,where()),/não está mais/);
+  // Gone somewhere else since the offer: the GPS takes them to the point nearest from there, and what was offered stands.
+  const moved=PICKUP_POINTS[7]!,from={x:moved.parkX+12,z:moved.parkZ},offered={length:offer.length,pay:offer.pay};
+  const order=desk.accept('bia',offer.id,now,from);
+  assert.equal(order.pickup.parkX,nearestPickup(from)!.point.parkX);assert.equal(order.pickup.parkZ,nearestPickup(from)!.point.parkZ);
+  assert.deepEqual({length:order.length,pay:order.pay},offered);
+  const way=gpsRoute({x:order.pickup.parkX,z:order.pickup.parkZ},{x:order.parkX,z:order.parkZ})!.length;
+  assert.equal(order.promiseAt,now+HIGHFOOD.PROMISE_START_MS+HIGHFOOD.PICKUP_MS+(order.pickup.length+way)/HIGHFOOD.PROMISE_SPEED*1000);
+  assert.match(order.code,/^\d{4}$/);assert.equal(desk.stateOf('bia').order!.code,order.code);assert.equal(order.stage,'pickup');
   assert.ok(order.parkX!==undefined&&DELIVERY_SPOTS.some(spot=>spot.x===order.x&&spot.z===order.z));
   assert.equal(desk.stateOf('bia').status,'order');
+  // Nothing on board yet, nothing to knock about.
+  assert.equal(desk.crashed('bia'),false);assert.equal(order.crashes,0);
+  order.stage='going';
   assert.equal(desk.crashed('bia'),true);assert.equal(desk.orderOf('bia')!.crashes,1);assert.equal(desk.crashed('ninguem'),false);
   const line=customerLine(order,'Bia Souza');assert.ok(line.length>3);assert.ok(!line.includes('{nome}'));assert.ok(!line.includes('{item}'));
   const giveUp=order.acceptedAt+(order.promiseAt-order.acceptedAt)*HIGHFOOD.GIVE_UP_FACTOR;
@@ -79,8 +92,8 @@ test('Highfood over real WebSockets: the bike and the base, an order from the ap
   const client=new Client(`http://127.0.0.1:${(http.address() as AddressInfo).port}`),rooms:Room[]=[];
   const join=async(id:string)=>{
     const joined=await client.joinOrCreate('bar',{ticket:signTicket({userId:id,sessionId:`00000000-0000-4000-8000-${id.slice(-12)}`,displayName:'Ana Lima',role:'user',color:'#aa8844'})});rooms.push(joined);
-    const errors:string[]=[],got={food:[] as HighfoodState[],dialogs:[] as unknown[],receipts:[] as Array<{paid:number}>,base:[] as unknown[],notices:[] as unknown[]};
-    joined.onMessage('error',m=>errors.push(m.message));joined.onMessage('food.state',m=>got.food.push(m));joined.onMessage('food.dialog',m=>got.dialogs.push(m));joined.onMessage('food.receipt',m=>got.receipts.push(m));joined.onMessage('food.base',m=>got.base.push(m));joined.onMessage('food.notice',m=>got.notices.push(m));
+    const errors:string[]=[],got={lockers:[] as unknown[],codes:[] as Array<{ok:boolean}>,food:[] as HighfoodState[],dialogs:[] as unknown[],receipts:[] as Array<{paid:number}>,base:[] as unknown[],notices:[] as unknown[]};
+    joined.onMessage('error',m=>errors.push(m.message));joined.onMessage('food.state',m=>got.food.push(m));joined.onMessage('food.dialog',m=>got.dialogs.push(m));joined.onMessage('food.locker',m=>got.lockers.push(m));joined.onMessage('food.code',m=>got.codes.push(m));joined.onMessage('food.receipt',m=>got.receipts.push(m));joined.onMessage('food.base',m=>got.base.push(m));joined.onMessage('food.notice',m=>got.notices.push(m));
     for(const type of ['chat.message','inventory.state','job.state','wallet.state','prices','food.delivered','moto.towed','food.owned','garage.state','garage.taken','achievement.unlocked'])joined.onMessage(type,()=>{});
     return {room:joined,errors,got,food:()=>got.food.at(-1)!,player:()=>room.state.players.get(id)!};
   };
@@ -124,12 +137,45 @@ test('Highfood over real WebSockets: the bike and the base, an order from the ap
     assert.ok(Math.abs(npc()!.x-offer.x)<.01&&Math.abs(npc()!.z-offer.z)<.01);
     // The others' customers do not get in the way of the bar's NPCs.
     await pause(200);assert.ok(room.state.npcs.get('tonico'));
-    // Not yet: no bag, no handing over; the customer is far.
-    ana.room.send('food.talk',{});await until(()=>ana.errors.some(e=>e.includes('baú')));
-    ana.room.send('food.unload',{});await until(()=>ana.errors.some(e=>e.includes('baú da sua moto')||e.includes('Leve a moto')));
+    // Not yet: the order is still at the pickup point, nothing to hand over or take out of the box.
+    const taken=ana.food().order!,pickup=taken.pickup,lockerStand={x:pickup.standX,y:pickup.y,z:pickup.standZ};
+    assert.match(taken.code,/^\d{4}$/);assert.equal(taken.stage,'pickup');assert.equal(offer.code,'');
+    assert.equal(bob.got.food.at(-1)?.order,undefined);
+    ana.room.send('food.talk',{});await until(()=>ana.errors.some(e=>e.includes('ponto de retirada')));
+    ana.room.send('food.unload',{});await until(()=>ana.errors.some(e=>e.includes('pegar no baú')));
+    // Far from the screen, or behind it, it does not open; in front of it, it does and holds the player there.
+    ana.errors.length=0;
+    ana.room.send('food.locker',{});await until(()=>ana.errors.some(e=>e.includes('tela do ponto')));
+    ana.errors.length=0;
+    ana.player().assign({x:pickup.x-pickup.frontX*1.2,y:pickup.y,z:pickup.z-pickup.frontZ*1.2});await pause(300);
+    ana.room.send('food.locker',{});await until(()=>ana.errors.some(e=>e.includes('tela do ponto')));
+    ana.player().assign(lockerStand);await pause(300);
+    ana.room.send('food.locker',{});await until(()=>ana.got.lockers.length===1);
+    assert.deepEqual(ana.got.lockers[0],{orderId:offer.id});assert.equal(ana.player().interactionState,'food-locker');
+    // A wrong code, or a malformed one, opens nothing and can be typed again; leaving closes the screen.
+    const wrong=taken.code==='0000'?'0001':'0000';
+    ana.room.send('food.code',{orderId:offer.id,code:wrong});await until(()=>ana.got.codes.length===1);
+    assert.equal(ana.got.codes[0]!.ok,false);assert.equal(ana.player().interactionState,'food-locker');assert.equal(ana.food().order!.stage,'pickup');
+    ana.errors.length=0;
+    ana.room.send('food.code',{orderId:offer.id,code:'12'});await until(()=>ana.errors.includes('Comando inválido.'));
+    ana.room.send('food.leave',{});await until(()=>ana.player().interactionState==='');
+    assert.equal(ana.got.lockers.at(-1),null);assert.equal(ana.food().order!.stage,'pickup');
+    // The code without the screen open does nothing.
+    ana.errors.length=0;
+    ana.room.send('food.code',{orderId:offer.id,code:taken.code});await until(()=>ana.errors.some(e=>e.includes('não está mais')));
+    assert.equal(ana.food().order!.stage,'pickup');
+    await pause(300);ana.room.send('food.locker',{});await until(()=>ana.player().interactionState==='food-locker');
+    ana.room.send('food.code',{orderId:offer.id,code:taken.code});await until(()=>ana.got.codes.at(-1)!.ok);
+    assert.equal(ana.player().interactionState,'food-unload');await until(()=>ana.food().order!.stage==='collect');
+    await until(()=>ana.player().parcel==='bag',HIGHFOOD.UNLOAD_MS+2500);
+    await until(()=>ana.food().order!.stage==='carrying');assert.equal(ana.player().interactionState,'');
+    await until(()=>ana.got.notices.length>1);
+    assert.ok(ana.got.notices.some(notice=>JSON.stringify(notice).includes('Pedido retirado')));
     // Ride there: the bike is put at the kerb, on it, and getting off takes the bag out.
     ana.player().assign({x:bike.x+Math.cos(bike.yaw)*.8,y:bike.y,z:bike.z-Math.sin(bike.yaw)*.8});await pause(350);ana.room.send('moto.mount',{motoId:bike.id});
     await until(()=>bike.riderId===id);
+    // Up on the bike, the bag goes in the box.
+    assert.equal(ana.player().parcel,'');await until(()=>ana.food().order!.stage==='going');
     await until(()=>bike.engine===MOTO_ENGINE.ON);
     const fits=offer.parkX,fitz=offer.parkZ;bike.assign({x:fits,z:fitz,speed:0});
     await pause(120);
@@ -170,6 +216,16 @@ test('Highfood over real WebSockets: the bike and the base, an order from the ap
     assert.equal(ana.food().status,'waiting');
     await until(()=>calls.some(call=>call.path==='highfood/lost'),6000);
     assert.equal(calls.find(call=>call.path==='highfood/lost')!.body.reason,'cancelled');
+    // Cancelling with the door already open: nobody stays stuck taking out a bag that no longer exists.
+    shift.nextAt=Date.now();await until(()=>ana.food()?.status==='offer');
+    const third=ana.food().offer!;ana.player().assign({x:base.x,y:base.y,z:base.z});await pause(300);
+    ana.room.send('food.accept',{orderId:third.id});await until(()=>ana.food()?.status==='order');
+    const thirdOrder=ana.food().order!;
+    ana.player().assign({x:thirdOrder.pickup.standX,y:thirdOrder.pickup.y,z:thirdOrder.pickup.standZ});await pause(300);
+    ana.room.send('food.locker',{});await until(()=>ana.player().interactionState==='food-locker');
+    ana.room.send('food.code',{orderId:third.id,code:thirdOrder.code});await until(()=>ana.player().interactionState==='food-unload');
+    ana.room.send('food.cancel',{});await until(()=>ana.food().status==='waiting');
+    assert.equal(ana.player().interactionState,'');assert.equal(ana.player().parcel,'');
     ana.player().assign({x:-60,y:0,z:-60});bike.assign({x:base.x-2,z:base.z});
     await pause(2200);
     ana.room.send('moto.tow',{});

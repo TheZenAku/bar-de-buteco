@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JOINT,MAP_COLLIDERS,MOTO,Ragdoll,advanceMoto,isWalkable,loosePose,motoFits,motoLeanSide,motoLiftSpot,motoObstacle,motoStrikes,motoUprightSpot,parkedMoto,startWreck,stepLoose,stepMoto,stepWreck,wreckPose,type MotoBody,type MotoWreck,type RagdollStart} from '@bar/shared';
 
-const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Carro_Prata')!;
+const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Arquibancada')!;
 const at=(x:number,z:number,yaw:number,speed=0):MotoBody=>({x,y:0,z,yaw,pitch:0,speed,steer:0});
 const THROTTLE={throttle:1,steer:0,brake:false};
 /** Open street, far from anything. */

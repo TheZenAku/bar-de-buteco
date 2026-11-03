@@ -1,0 +1,357 @@
+/* The truco table (truco/table.ts): the whole screen, in the blackjack's colours and vocabulary. A violet felt with a neon
+   oval; you below, your partner across, the opponents on the sides; the score and the log in the top corners; tricks, the
+   cards of the trick and the vira in the middle. Everything is sized in --u, one pixel of a 1366 x 720 design, so the table
+   keeps its proportions at any window: no card is cut and nothing overlaps. Cards size themselves from --card-w alone,
+   because a card leaving the table flies outside the container. */
+.game:has(#truco:not(.hidden)) :is([data-panel="actions"],.prompts,.minimap,.game-header){display:none}
+.game>.truco{inset:8px;z-index:110;max-height:none;padding:0;overflow:hidden;container-type:size;background:oklch(.11 .045 300 / 97%);border:1px solid var(--border)}
+.tc,.tc-ghost{--card-back:radial-gradient(circle at 50% 50%,oklch(.62 .27 330 / .55) 0 18%,transparent 19%),repeating-linear-gradient(45deg,oklch(.5 .24 330) 0 2px,oklch(.27 .13 305) 2px 6px),repeating-linear-gradient(-45deg,oklch(.5 .24 330 / .6) 0 2px,transparent 2px 6px)}
+.tc{--u:min(calc(100cqw/1366),calc(100cqh/720));--gold-line:oklch(.86 .14 85 / .38);--us:var(--hl-magenta);--them:var(--hl-cyan);
+  display:flex;flex-direction:column;width:100%;height:100%;min-height:0;font-size:max(11px,calc(var(--u)*13))}
+
+/* The top bar: the blackjack's. */
+.tc-head{display:flex;align-items:center;gap:calc(var(--u)*14);flex:none;min-height:calc(var(--u)*44);padding:0 calc(var(--u)*8) 0 calc(var(--u)*16);border-bottom:1px solid var(--border)}
+.tc-title{display:flex;align-items:center;gap:calc(var(--u)*9);font:500 max(12px,calc(var(--u)*16)) var(--font-display);letter-spacing:.34em;text-transform:uppercase;color:var(--hl-magenta);text-shadow:0 0 12px oklch(.62 .28 330 / .6)}
+.tc-title b{font-weight:700}
+.tc-title .ui-icon{width:calc(var(--u)*18);height:calc(var(--u)*18)}
+.tc-mode{font:400 max(10px,calc(var(--u)*11.5)) var(--font-mono);letter-spacing:.08em;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-tools{display:flex;gap:2px;margin-left:auto}
+.tc-tools button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:calc(var(--u)*36);height:calc(var(--u)*34);padding:0 calc(var(--u)*9);color:var(--muted-foreground);transition:background-color .12s,color .12s}
+.tc-tools button:hover,.tc-tools button[aria-expanded="true"]{background:var(--secondary);color:var(--foreground)}
+.tc-tools .ui-icon{width:calc(var(--u)*17);height:calc(var(--u)*17)}
+.tc-leave span{font:500 max(10px,calc(var(--u)*11.5)) var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+
+/* The felt holds everyone. Violet cloth lit from above, with the blackjack's gradient. */
+.tc-felt{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:calc(var(--u)*276) minmax(0,1fr) calc(var(--u)*276);grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"score top log" "left center right" "bottom bottom bottom";gap:calc(var(--u)*4) calc(var(--u)*8);padding:calc(var(--u)*10) calc(var(--u)*14) calc(var(--u)*8);
+  background:radial-gradient(120% 100% at 50% -10%,oklch(.34 .13 305) 0%,oklch(.22 .1 300) 40%,oklch(.13 .05 295) 100%);box-shadow:inset 0 14px 30px oklch(0 0 0 / .35)}
+.tc-oval{position:absolute;left:calc(var(--u)*150);right:calc(var(--u)*150);top:calc(var(--u)*92);bottom:calc(var(--u)*128);border-radius:50%;
+  background:radial-gradient(closest-side,oklch(.62 .28 330 / .1),transparent);border:1.5px solid var(--gold-line);box-shadow:0 0 0 calc(var(--u)*7) oklch(.62 .28 330 / .05),0 0 0 calc(var(--u)*8) oklch(.62 .28 330 / .28),0 0 calc(var(--u)*30) oklch(.62 .28 330 / .22),inset 0 0 calc(var(--u)*60) oklch(0 0 0 / .3);pointer-events:none}
+.tc-felt h4{margin:0 0 calc(var(--u)*5);font:500 max(9px,calc(var(--u)*10)) var(--font-mono);letter-spacing:.28em;color:var(--muted-foreground)}
+.tc-felt.hit{animation:tc-hit .42s cubic-bezier(.3,.7,.3,1)}
+@keyframes tc-hit{15%{transform:translate(calc(var(--u)*-6),calc(var(--u)*4))}35%{transform:translate(calc(var(--u)*5),calc(var(--u)*-3))}60%{transform:translate(calc(var(--u)*-3),calc(var(--u)*2))}}
+
+/* The score. */
+.tc-score{grid-area:score;z-index:2;align-self:start;display:grid;gap:calc(var(--u)*3);padding:calc(var(--u)*8) calc(var(--u)*12);background:oklch(.12 .05 300 / 82%);border:1px solid var(--border);box-shadow:0 0 calc(var(--u)*18) oklch(.62 .28 330 / .12)}
+.tc-row{display:grid;grid-template-columns:minmax(calc(var(--u)*38),max-content) max-content minmax(0,1fr);align-items:center;gap:calc(var(--u)*6)}
+.tc-row>span{font:600 max(10px,calc(var(--u)*12)) var(--font-display);letter-spacing:.12em;text-transform:uppercase}
+.tc-row>b{font:700 calc(var(--u)*30)/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.tc-row.us>span,.tc-row.us>b{color:var(--us);text-shadow:0 0 10px oklch(.62 .28 330 / .55)}
+.tc-row.them>span,.tc-row.them>b{color:var(--them);text-shadow:0 0 10px oklch(.78 .13 210 / .5)}
+.tc-row>b.bump{animation:tc-bump .7s cubic-bezier(.2,.8,.25,1)}
+@keyframes tc-bump{30%{transform:scale(1.5)}}
+.tc-tentos{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:calc(var(--u)*2)}
+.tc-tentos i{height:calc(var(--u)*12);background:oklch(1 0 0 / 8%)}
+.tc-tentos i:nth-child(11){box-shadow:0 0 0 1px oklch(.86 .14 85 / .4)}
+.tc-row.us .tc-tentos i.on{background:var(--us);box-shadow:0 0 6px oklch(.62 .28 330 / .7)}
+.tc-row.them .tc-tentos i.on{background:var(--them);box-shadow:0 0 6px oklch(.78 .13 210 / .6)}
+.tc-score footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:calc(var(--u)*3);padding-top:calc(var(--u)*5);border-top:1px solid oklch(1 0 0 / 7%);font:400 max(9px,calc(var(--u)*10.5)) var(--font-mono);color:var(--muted-foreground);white-space:nowrap}
+.tc-score footer b{font-weight:500;color:var(--soft)}
+.tc-value{display:flex;align-items:center;gap:6px}
+.tc-value em{padding:0 5px;background:var(--active);color:var(--active-foreground);font:600 max(9px,calc(var(--u)*9.5))/1.6 var(--font-mono);font-style:normal;letter-spacing:.1em;text-transform:uppercase}
+.tc-value b[data-tc="value"]{font:700 calc(var(--u)*17)/1 var(--font-mono);color:var(--hl-gold);text-shadow:0 0 8px oklch(.86 .14 85 / .45)}
+
+/* What happened: the last lines. */
+.tc-log{grid-area:log;z-index:2;align-self:start;min-width:0;padding:calc(var(--u)*8) calc(var(--u)*12);background:oklch(.12 .05 300 / 60%);border:1px solid oklch(1 0 0 / 5%)}
+.tc-log ol{display:grid;gap:calc(var(--u)*2);margin:0;padding:0;list-style:none;font:400 max(9px,calc(var(--u)*10.5))/1.4 var(--font-mono);color:var(--muted-foreground)}
+.tc-log li{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tc-log li:last-child{color:var(--soft)}
+
+/* The players. */
+.tc-seat{position:relative;z-index:3;min-width:0;--team:var(--us)}
+.tc-seat[data-team="them"]{--team:var(--them)}
+.tc-seat.top{grid-area:top;justify-self:center;display:flex;align-items:center;gap:calc(var(--u)*14)}
+.tc-seat.left{grid-area:left;justify-self:start;align-self:start;display:grid;justify-items:center;gap:calc(var(--u)*12);padding:calc(var(--u)*20) 0 0 calc(var(--u)*6)}
+.tc-seat.right{grid-area:right;justify-self:end;align-self:start;display:grid;justify-items:center;gap:calc(var(--u)*12);padding:calc(var(--u)*20) calc(var(--u)*6) 0 0}
+.tc-player{position:relative;display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:calc(var(--u)*7)}
+/* The face beside each player: neutral, and for a moment the sign someone chose. Everyone at the table sees it. */
+.tc-mood{display:grid;place-items:center;width:calc(var(--u)*32);height:calc(var(--u)*32);padding:0;font:400 calc(var(--u)*24)/1 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;text-transform:none;filter:saturate(.75)}
+.tc-mood.mine{background:oklch(1 0 0 / 6%);border:1px solid var(--border);transition:background-color .12s}
+.tc-mood.mine:hover,.tc-mood.mine[aria-expanded="true"]{background:var(--secondary)}
+.tc-mood.flash{filter:none;animation:tc-mood .22s cubic-bezier(.2,.9,.3,1.5)}
+@keyframes tc-mood{from{transform:scale(.5)}60%{transform:scale(1.35)}}
+.tc-avatar{position:relative;display:block;width:calc(var(--u)*60);height:calc(var(--u)*60);background:#241435;border:2px solid var(--team);box-shadow:0 0 calc(var(--u)*10) color-mix(in oklab,var(--team) 45%,transparent);animation:tc-breathe 4.2s ease-in-out infinite}
+.tc-seat.right .tc-avatar{animation-delay:-1.3s}.tc-seat.top .tc-avatar{animation-delay:-2.6s}
+@keyframes tc-breathe{50%{translate:0 calc(var(--u)*-2)}}
+.tc-avatar svg,.tc-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+.tc-initial{display:grid;place-items:center;width:100%;height:100%;background:var(--avatar);font:700 calc(var(--u)*26) var(--font-display);color:#fff}
+.tc-id{display:grid;gap:calc(var(--u)*1);min-width:0;max-width:calc(var(--u)*120);line-height:1.25}
+.tc-id b{overflow:hidden;font:600 max(11px,calc(var(--u)*13)) var(--font-display);letter-spacing:.05em;text-transform:uppercase;text-overflow:ellipsis;white-space:nowrap}
+.tc-team{width:max-content;padding:0 calc(var(--u)*5);background:color-mix(in oklab,var(--team) 18%,transparent);font:500 max(9px,calc(var(--u)*9.5))/1.6 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--team)}
+.tc-id small{overflow:hidden;font:400 max(9px,calc(var(--u)*9.5)) var(--font-mono);color:var(--muted-foreground);white-space:nowrap;text-overflow:ellipsis}
+.tc-id small:empty{display:none}
+.tc-turn{position:absolute;left:0;top:calc(100% + var(--u)*3);width:calc(var(--u)*60);height:calc(var(--u)*3);background:oklch(1 0 0 / 8%);opacity:0;transition:opacity .2s}
+.tc-turn i{display:block;height:100%;width:100%;transform:scaleX(var(--t,0));transform-origin:left;background:var(--gradient-line);transition:transform .25s linear}
+.tc-seat.turn .tc-turn{opacity:1}
+/* Whose turn: a pulse around the avatar (a layer that only fades, cheap under software compositing). */
+.tc-avatar::after{content:'';position:absolute;inset:calc(var(--u)*-6);border:2px solid var(--hl-magenta);box-shadow:0 0 calc(var(--u)*16) var(--hl-magenta);opacity:0;pointer-events:none}
+.tc-seat.turn .tc-avatar::after{animation:tc-pulse 1.3s ease-in-out infinite}
+.tc-seat.calling .tc-avatar::after{border-color:var(--hl-gold);box-shadow:0 0 calc(var(--u)*16) var(--hl-gold);animation:tc-pulse .6s ease-in-out infinite}
+@keyframes tc-pulse{50%{opacity:1}}
+.tc-seat.turn .tc-id b{color:var(--hl-magenta)}
+.tc-seat.thinking .tc-id small::after{content:'…';display:inline-block;margin-left:2px;animation:tc-pulse 1s infinite}
+.tc-dealer{position:absolute;z-index:2;top:calc(var(--u)*-5);left:calc(var(--u)*-6);padding:0 calc(var(--u)*5);background:var(--hl-gold);color:#1d1300;font:700 max(9px,calc(var(--u)*9))/1.6 var(--font-mono);letter-spacing:.06em;text-transform:uppercase}
+/* A line at the table. */
+.tc-say{position:absolute;z-index:8;max-width:calc(var(--u)*210);padding:calc(var(--u)*5) calc(var(--u)*10);background:oklch(.97 .01 300);color:#1d1626;font:600 max(10px,calc(var(--u)*12))/1.25 var(--font-display);box-shadow:0 4px 14px oklch(0 0 0 / .5);opacity:0;pointer-events:none}
+.tc-say.in{animation:tc-say 3.6s cubic-bezier(.2,.9,.3,1.2) forwards}
+.tc-say.taunt{background:var(--hl-magenta-deep);color:#fff}
+.tc-say.signal{background:var(--hl-gold);color:#1d1300}
+.tc-seat.top .tc-say{left:calc(100% + var(--u)*8);top:calc(var(--u)*8);width:max-content}
+.tc-seat.left .tc-say{left:calc(100% - var(--u)*40);top:calc(var(--u)*100);width:max-content}
+.tc-seat.right .tc-say{right:calc(100% - var(--u)*40);top:calc(var(--u)*100);width:max-content}
+.tc-seat.bottom .tc-say{left:calc(var(--u)*70);bottom:calc(100% + var(--u)*4);width:max-content}
+@keyframes tc-say{0%{opacity:0;transform:translateY(8px) scale(.85)}7%{opacity:1;transform:none}88%{opacity:1}100%{opacity:0}}
+
+/* Everyone else's hands: only backs. The sides hold theirs sideways. */
+.tc-backs{display:flex;justify-content:center;--card-w:calc(var(--u)*44);min-height:calc(var(--card-w)*1.4)}
+.tc-backs .tc-card+.tc-card{margin-left:calc(var(--card-w)*-.62)}
+.tc-backs .tc-card:nth-child(1){rotate:-7deg}.tc-backs .tc-card:nth-child(3){rotate:7deg}
+.tc-seat.left .tc-backs,.tc-seat.right .tc-backs{flex-direction:column;align-items:center;min-height:0;width:calc(var(--card-w)*1.4);height:calc(var(--card-w)*1.9)}
+.tc-seat.left .tc-card,.tc-seat.right .tc-card{margin:calc(var(--card-w)*-.2 - 2px) 0 calc(var(--card-w)*-.58)!important;rotate:90deg}
+.tc-seat.left .tc-card:nth-child(1),.tc-seat.right .tc-card:nth-child(3){rotate:83deg}
+.tc-seat.left .tc-card:nth-child(3),.tc-seat.right .tc-card:nth-child(1){rotate:97deg}
+
+/* The middle: status, tricks, the trick being played and the vira. */
+.tc-center{grid-area:center;z-index:2;display:grid;grid-template-columns:calc(var(--u)*128) auto calc(var(--u)*150);grid-template-rows:auto minmax(0,1fr);justify-content:center;align-items:center;gap:calc(var(--u)*4) calc(var(--u)*36);min-height:0}
+.tc-status{grid-column:1/-1;display:grid;grid-template-columns:auto auto;justify-content:center;justify-items:center;align-items:center;column-gap:calc(var(--u)*10);row-gap:calc(var(--u)*4);min-height:calc(var(--u)*26)}
+.tc-status b:only-of-type{grid-column:auto}
+.tc-status em[hidden]+b{grid-column:1/-1}
+.tc-iron{padding:0 calc(var(--u)*8);border:1px solid var(--hl-orange);color:var(--hl-orange);font:600 max(10px,calc(var(--u)*11.5))/1.8 var(--font-display);font-style:normal;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 0 12px oklch(.7 .17 55 / .4)}
+.tc-status[data-tone="us"] b{color:var(--us);text-shadow:0 0 14px oklch(.62 .28 330 / .7)}
+.tc-status[data-tone="them"] b{color:var(--them);text-shadow:0 0 14px oklch(.78 .13 210 / .6)}
+.tc-status[data-tone="tie"] b{color:var(--hl-violet)}
+.tc-status b{font:600 max(12px,calc(var(--u)*16))/1.25 var(--font-display);letter-spacing:.08em;text-transform:uppercase;text-shadow:0 0 12px oklch(.62 .28 330 / .45)}
+.tc-timer{grid-column:1/-1;width:calc(var(--u)*260);height:calc(var(--u)*3);background:oklch(1 0 0 / 10%)}
+.tc-timer i{display:block;width:100%;height:100%;transform:scaleX(var(--t,0));transform-origin:center;background:var(--gradient-line);transition:transform .25s linear}
+.tc-timer i.urgent{background:var(--hl-orange)}
+.tc-cross{position:relative;display:grid;grid-template-columns:repeat(3,var(--card-w));grid-template-rows:repeat(3,calc(var(--card-w)*1.4));grid-template-areas:". top ." "left mid right" ". bottom .";gap:calc(var(--u)*6) calc(var(--u)*18);--card-w:calc(var(--u)*66)}
+.tc-slot{position:relative;width:var(--card-w);height:calc(var(--card-w)*1.4);border:1px dashed oklch(.86 .14 85 / .18)}
+.tc-slot.top{grid-area:top}.tc-slot.left{grid-area:left}.tc-slot.right{grid-area:right}.tc-slot.bottom{grid-area:bottom}
+.tc-slot .tc-card{position:absolute;inset:0}
+/* The house's mark, printed on the cloth under the trick. */
+.tc-cross::before{content:'';position:absolute;left:50%;top:50%;width:calc(var(--u)*320);height:calc(var(--u)*220);translate:-50% -50%;background:url('/ui/logo-highland-hud.webp') center/contain no-repeat;opacity:.09;pointer-events:none}
+.tc-compass{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);translate:-50% -50%;rotate:calc(var(--pos,0)*-90deg);transition:rotate .35s cubic-bezier(.3,.7,.3,1.2)}
+.tc-compass i{position:absolute;left:50%;bottom:0;translate:-50% 0;width:0;height:0;border:calc(var(--u)*7) solid transparent;border-top:calc(var(--u)*11) solid var(--hl-magenta);border-bottom:0;filter:drop-shadow(0 0 5px var(--hl-magenta))}
+.tc-tricks{align-self:center;padding:calc(var(--u)*8) calc(var(--u)*10);background:oklch(.12 .05 300 / 62%);border:1px solid oklch(1 0 0 / 6%)}
+.tc-tricks ol{display:grid;gap:calc(var(--u)*4);margin:0;padding:0;list-style:none}
+.tc-tricks li{display:grid;grid-template-columns:calc(var(--u)*26) minmax(0,1fr);align-items:center;padding:calc(var(--u)*3) calc(var(--u)*6);border-left:calc(var(--u)*3) solid oklch(1 0 0 / 12%);background:oklch(1 0 0 / 3%);font:400 max(9px,calc(var(--u)*10.5)) var(--font-mono);color:var(--muted-foreground)}
+.tc-tricks li b{font:600 max(10px,calc(var(--u)*11.5)) var(--font-display);letter-spacing:.06em;text-transform:uppercase}
+.tc-tricks li.us{border-color:var(--us);background:oklch(.62 .28 330 / .14)}.tc-tricks li.us b{color:var(--us)}
+.tc-tricks li.them{border-color:var(--them);background:oklch(.78 .13 210 / .12)}.tc-tricks li.them b{color:var(--them)}
+.tc-tricks li.tie{border-color:var(--hl-violet)}.tc-tricks li.tie b{color:var(--hl-violet)}
+.tc-tricks li.live{border-color:var(--hl-gold)}.tc-tricks li.live b{color:var(--hl-gold)}
+.tc-vira{display:grid;justify-items:center;align-self:center;padding:calc(var(--u)*8) calc(var(--u)*10);background:oklch(.12 .05 300 / 62%);border:1px solid var(--gold-line);box-shadow:0 0 calc(var(--u)*18) oklch(.86 .14 85 / .14)}
+.tc-vira h4{color:var(--hl-gold);text-shadow:0 0 8px oklch(.86 .14 85 / .5)}
+.tc-stack{position:relative;--card-w:calc(var(--u)*66);width:calc(var(--card-w)*1.5);height:calc(var(--card-w)*1.4)}
+.tc-stack>i,.tc-stack::before,.tc-stack::after{content:'';position:absolute;right:0;top:0;width:var(--card-w);aspect-ratio:5/7;background:var(--card-back);border:calc(var(--card-w)*.05) solid #f3ecdf;border-radius:calc(var(--card-w)*.07);box-shadow:2px 2px 0 oklch(.24 .07 300),4px 4px 0 oklch(.18 .05 300),0 6px 12px oklch(0 0 0 / .5)}
+.tc-stack::before,.tc-stack::after{opacity:0}
+.tc-stack.shuffling::before{opacity:1;animation:tc-riffle .5s ease-in-out infinite}
+.tc-stack.shuffling::after{opacity:1;animation:tc-riffle .5s ease-in-out infinite reverse}
+@keyframes tc-riffle{50%{transform:translateX(calc(var(--card-w)*-.45)) rotate(-7deg)}}
+.tc-vira-card{position:absolute;left:0;top:0;z-index:2}
+.tc-vira-card .tc-card{rotate:-5deg}
+.tc-vira-card .tc-face{box-shadow:0 0 0 1px var(--hl-gold),0 0 calc(var(--card-w)*.2) oklch(.86 .14 85 / .55)}
+.tc-manilha-rank{margin:calc(var(--u)*6) 0 calc(var(--u)*4);font:400 max(9px,calc(var(--u)*10.5)) var(--font-mono);color:var(--muted-foreground)}
+.tc-manilha-rank b{font:700 max(11px,calc(var(--u)*13)) var(--font-display);color:var(--hl-gold);letter-spacing:.04em;text-transform:uppercase}
+.tc-legend{display:grid;gap:calc(var(--u)*1);margin:0;padding:0;list-style:none;font:400 max(9px,calc(var(--u)*10)) var(--font-mono);color:var(--soft)}
+.tc-legend li{display:grid;grid-template-columns:calc(var(--u)*14) auto;align-items:center;gap:calc(var(--u)*5)}
+.tc-legend .tc-suit{width:calc(var(--u)*12);height:calc(var(--u)*12);color:#efe8dc}
+.tc-legend li.red .tc-suit{color:#ff5470}
+
+/* Your side: who you are, your three cards, the moves of the moment. */
+.tc-bottom{grid-area:bottom;display:grid;grid-template-columns:calc(var(--u)*276) minmax(0,1fr) calc(var(--u)*276);align-items:end;gap:calc(var(--u)*8);min-height:calc(var(--u)*162);z-index:4}
+.tc-seat.bottom{display:grid;justify-items:start;gap:calc(var(--u)*10);align-self:end;padding-bottom:calc(var(--u)*8)}
+.tc-seat.empty{opacity:.45}
+.tc-seat.bottom .tc-backs{display:none}
+.tc-signals{position:absolute;left:0;bottom:calc(100% + var(--u)*6);z-index:9;width:calc(var(--u)*276);padding:calc(var(--u)*6);background:oklch(.12 .05 300 / 97%);border:1px solid var(--border);box-shadow:0 6px 20px oklch(0 0 0 / .55)}
+.tc-signal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:calc(var(--u)*4)}
+.tc-signal-grid button{display:grid;justify-items:center;gap:calc(var(--u)*2);padding:calc(var(--u)*6) calc(var(--u)*2);background:oklch(1 0 0 / 5%);transition:background-color .12s}
+.tc-signal-grid button:hover{background:var(--active);color:var(--active-foreground)}
+.tc-signal-grid i{font:400 calc(var(--u)*28)/1.1 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;font-style:normal}
+.tc-signal-grid b{font:500 max(9px,calc(var(--u)*9.5))/1.2 var(--font-mono);letter-spacing:.02em;white-space:nowrap}
+.tc-hand{display:flex;align-items:flex-end;justify-content:center;gap:calc(var(--u)*10);--card-w:calc(var(--u)*104);min-height:calc(var(--card-w)*1.4);padding-bottom:calc(var(--u)*6)}
+.tc-hand .tc-card{--fan:0;rotate:calc(var(--fan)*4deg);translate:0 calc(var(--fan)*var(--fan)*var(--u)*7);transition:translate .18s cubic-bezier(.2,.8,.25,1.1),rotate .18s,scale .18s}
+.tc-hand .tc-card.playable{cursor:pointer}
+.tc-hand .tc-card.playable:hover{translate:0 calc(var(--u)*-16);z-index:6}
+.tc-hand .tc-card:focus-visible{outline:2px solid var(--ring);outline-offset:3px}
+.tc-hand .tc-card.selected{translate:0 calc(var(--u)*-28);rotate:0deg;scale:1.05;z-index:7}
+.tc-hand .tc-card.selected .tc-face{box-shadow:0 0 0 2px var(--hl-magenta),0 0 calc(var(--u)*22) var(--hl-magenta),0 8px 18px oklch(0 0 0 / .6)}
+.tc-hand .tc-card.manilha.selected .tc-face{box-shadow:0 0 0 2px var(--hl-gold),0 0 calc(var(--u)*22) var(--hl-gold),0 8px 18px oklch(0 0 0 / .6)}
+.tc-actions{display:grid;gap:calc(var(--u)*6);justify-items:stretch;align-self:end;min-height:calc(var(--u)*56);padding:calc(var(--u)*8);background:oklch(.1 .04 300 / 72%);border:1px solid var(--border)}
+.tc-act{display:inline-flex;align-items:center;justify-content:center;gap:calc(var(--u)*8);min-height:calc(var(--u)*44);padding:0 calc(var(--u)*12);background:oklch(1 0 0 / 7%);border:1px solid var(--border);
+  font:600 max(11px,calc(var(--u)*13)) var(--font-display);letter-spacing:.07em;text-transform:uppercase;transition:background-color .12s,transform .12s,filter .12s,box-shadow .12s}
+.tc-act .ui-icon{width:calc(var(--u)*16);height:calc(var(--u)*16)}
+.tc-act kbd{margin-left:auto;padding:0 calc(var(--u)*5);border:1px solid var(--key);font:500 max(9px,calc(var(--u)*10))/1.6 var(--font-mono)}
+.tc-act small{font:500 max(9px,calc(var(--u)*10)) var(--font-mono);letter-spacing:0;text-transform:none;opacity:.75}
+.tc-act:hover:not(:disabled){background:var(--secondary)}
+.tc-act:active:not(:disabled){transform:translateY(1px)}
+.tc-act.primary{background:var(--active);border-color:transparent;box-shadow:var(--active-glow);color:var(--active-foreground)}
+.tc-act.primary:hover:not(:disabled){background:var(--active);filter:brightness(1.14);box-shadow:0 0 22px oklch(.62 .28 330 / .7)}
+.tc-act.call{background:linear-gradient(100deg,oklch(.5 .2 40),oklch(.5 .26 345));border-color:oklch(.86 .14 85 / .45);box-shadow:0 0 14px oklch(.65 .2 40 / .4)}
+.tc-act.call:hover:not(:disabled){background:linear-gradient(100deg,oklch(.5 .2 40),oklch(.5 .26 345));filter:brightness(1.18)}
+.tc-act.run:hover:not(:disabled){background:oklch(.5 .19 20);border-color:transparent}
+.tc-act.danger{background:oklch(.5 .19 20);border-color:transparent}
+.tc-act.quiet{background:oklch(1 0 0 / 5%)}
+.tc-act-row{display:grid;gap:calc(var(--u)*6)}
+.tc-act-row.two{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
+.tc-act-row.two .tc-act{padding:0 calc(var(--u)*8);gap:calc(var(--u)*6)}
+.tc-act.hide{background:oklch(.3 .1 305);border-color:var(--hl-violet)}
+.tc-act.hide:hover:not(:disabled){background:oklch(.38 .14 305);box-shadow:0 0 14px oklch(.7 .15 295 / .45)}
+.tc-actions:empty{visibility:hidden}
+.tc-note{display:flex;align-items:center;gap:calc(var(--u)*8);min-height:calc(var(--u)*38);margin:0;font-size:max(11px,calc(var(--u)*12.5));color:var(--soft)}
+.tc-note .ui-icon{flex:none;width:calc(var(--u)*15);height:calc(var(--u)*15);color:var(--hl-magenta)}
+.tc-note.warn .ui-icon{color:var(--hl-orange)}
+.tc-foot{display:flex;flex:none;gap:calc(var(--u)*18);min-height:calc(var(--u)*26);align-items:center;padding:0 calc(var(--u)*14);border-top:1px solid oklch(1 0 0 / 5%);font:400 max(10px,calc(var(--u)*11)) var(--font-mono);color:var(--muted-foreground)}
+.tc-foot b{font-weight:500;color:var(--hl-gold)}
+.tc-foot .ui-icon{width:calc(var(--u)*11);height:calc(var(--u)*11)}
+.tc-keys{margin-left:auto}
+
+/* Cards: real ones, printed on warm paper. Sized by --card-w and nothing else. */
+.tc-card{position:relative;flex:none;width:var(--card-w);aspect-ratio:5/7;perspective:700px}
+.tc-card-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.3,.7,.3,1)}
+.tc-card.down .tc-card-inner{transform:rotateY(180deg)}
+.tc-face,.tc-back{position:absolute;inset:0;border-radius:calc(var(--card-w)*.07);backface-visibility:hidden;box-shadow:0 1px 0 oklch(0 0 0 / .25),0 4px 10px oklch(0 0 0 / .45);transition:box-shadow .18s}
+.tc-face{overflow:hidden;background:linear-gradient(165deg,#fffdf8,#efe8dc);border:1px solid oklch(0 0 0 / .2);color:#1d1626}
+.tc-card.red .tc-face{color:#c41e3a}
+.tc-back{transform:rotateY(180deg);background:var(--card-back);border:calc(var(--card-w)*.05) solid #f3ecdf}
+.tc-back::after{content:'H';position:absolute;inset:0;display:grid;place-items:center;font:700 calc(var(--card-w)*.34) var(--font-display);color:oklch(.97 .02 300 / .9);text-shadow:0 0 6px var(--hl-magenta)}
+.tc-suit{display:block;width:100%;height:100%}
+.tc-corner{position:absolute;top:calc(var(--card-w)*.05);left:calc(var(--card-w)*.055);display:grid;justify-items:center;width:calc(var(--card-w)*.2);z-index:1}
+.tc-corner b{font:700 calc(var(--card-w)*.24)/.95 var(--font-display)}
+.tc-corner .tc-suit{width:calc(var(--card-w)*.16);height:calc(var(--card-w)*.16)}
+.tc-corner.end{top:auto;left:auto;right:calc(var(--card-w)*.055);bottom:calc(var(--card-w)*.05);rotate:180deg}
+.tc-pips{position:absolute;inset:0}
+.tc-pip{position:absolute;width:calc(var(--card-w)*.17);height:calc(var(--card-w)*.17);translate:-50% -50%}
+.tc-pip.flip{rotate:180deg}
+.tc-pips.ace .tc-pip{width:calc(var(--card-w)*.46);height:calc(var(--card-w)*.46)}
+.tc-pips.ace::after{content:'';position:absolute;left:50%;top:50%;width:calc(var(--card-w)*.66);aspect-ratio:1;translate:-50% -50%;border:1px solid currentColor;border-radius:50%;opacity:.3}
+.tc-court{position:absolute;inset:11% 17%;overflow:hidden;border:1px solid currentColor}
+.tc-court>svg{display:block;width:100%;height:100%}
+.tc-court-suit{position:absolute;top:2%;left:4%;width:calc(var(--card-w)*.14);height:calc(var(--card-w)*.14)}
+.tc-court-suit.end{top:auto;left:auto;right:4%;bottom:2%;rotate:180deg}
+/* The manilha: gold edge and its name. */
+.tc-card.manilha .tc-face{box-shadow:0 0 0 calc(var(--card-w)*.018) var(--hl-gold),0 0 calc(var(--card-w)*.16) oklch(.86 .14 85 / .65),0 4px 10px oklch(0 0 0 / .45)}
+.tc-manilha{position:absolute;left:50%;bottom:calc(var(--card-w)*.04);translate:-50% 0;z-index:2;padding:0 calc(var(--card-w)*.05);background:#1d1300;color:var(--hl-gold);font:700 calc(var(--card-w)*.105)/1.5 var(--font-mono);font-style:normal;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.tc-slot .tc-card.winner{z-index:3;animation:tc-won .75s cubic-bezier(.2,.8,.25,1.1) both}
+.tc-slot .tc-card.winner .tc-face{box-shadow:0 0 0 2px var(--hl-magenta),0 0 calc(var(--card-w)*.32) var(--hl-magenta)}
+@keyframes tc-won{40%{scale:1.2}100%{scale:1.1}}
+.tc-slot .tc-card.lost{opacity:.5;transition:opacity .3s}
+.tc-ghost{position:fixed;z-index:300;margin:0!important;pointer-events:none}
+
+/* What the table announces: a banner over the trick, and a call that slams in. */
+.tc-banner{position:absolute;left:50%;top:50%;z-index:12;translate:-50% -50%;display:flex;align-items:center;gap:calc(var(--u)*10);margin:0;padding:calc(var(--u)*6) calc(var(--u)*16);background:oklch(.12 .05 300 / 92%);border:1px solid var(--border);font:600 max(12px,calc(var(--u)*15)) var(--font-display);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;pointer-events:none;animation:tc-banner .3s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes tc-banner{from{opacity:0;transform:scale(.8)}}
+.tc-banner .ui-icon{width:calc(var(--u)*16);height:calc(var(--u)*16)}
+.tc-banner.us{border-color:var(--us);color:var(--us);box-shadow:0 0 18px oklch(.62 .28 330 / .4)}
+.tc-banner.them{border-color:var(--them);color:var(--them);box-shadow:0 0 18px oklch(.78 .13 210 / .35)}
+.tc-banner.tie{border-color:var(--hl-violet);color:var(--hl-violet)}
+.tc-banner.big{flex-direction:column;gap:calc(var(--u)*2);width:calc(var(--u)*280);padding:calc(var(--u)*12) calc(var(--u)*14);text-align:center}
+.tc-banner.big b{font:700 calc(var(--u)*46)/1 var(--font-mono);color:var(--hl-gold);text-shadow:0 0 14px oklch(.86 .14 85 / .5)}
+.tc-banner.big small{font:400 max(10px,calc(var(--u)*11))/1.3 var(--font-mono);letter-spacing:.04em;text-transform:none;white-space:normal;color:var(--soft)}
+.tc-call{position:absolute;left:50%;top:38%;z-index:30;translate:-50% -50%;font:700 calc(var(--u)*128)/1 var(--font-display);letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;color:#fff;text-shadow:0 0 calc(var(--u)*20) var(--hl-magenta),0 0 calc(var(--u)*50) var(--hl-magenta);pointer-events:none;opacity:0}
+.tc-call.in{animation:tc-call 1.05s cubic-bezier(.2,.9,.3,1) forwards}
+@keyframes tc-call{0%{opacity:0;transform:scale(2.6)}18%{opacity:1;transform:scale(1)}72%{opacity:1;transform:scale(1.03)}100%{opacity:0;transform:scale(1.25)}}
+
+/* Decisions: a panel in the corner of the moves, so the vira and the trick stay in sight while you decide. */
+.tc-dialog{position:absolute;right:calc(var(--u)*14);bottom:calc(var(--u)*8);z-index:20;display:grid;justify-items:center;gap:calc(var(--u)*6);width:calc(var(--u)*300);padding:calc(var(--u)*12) calc(var(--u)*14);background:oklch(.12 .06 300 / 97%);border:1px solid var(--hl-magenta);box-shadow:0 0 calc(var(--u)*34) oklch(.62 .28 330 / .45),0 14px 40px oklch(0 0 0 / .6);text-align:center;animation:tc-dialog .32s .1s cubic-bezier(.2,.9,.3,1.2) backwards}
+@keyframes tc-dialog{from{opacity:0;transform:scale(.88)}}
+.tc-dialog::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.tc-dialog>small{font:500 max(10px,calc(var(--u)*12)) var(--font-mono);letter-spacing:.24em;text-transform:uppercase;color:var(--muted-foreground)}
+.tc-dialog h2{margin:0;font:700 calc(var(--u)*44)/1 var(--font-display);letter-spacing:.03em;color:#fff;text-shadow:0 0 calc(var(--u)*16) var(--hl-magenta)}
+.tc-dialog.eleven h2{font-size:calc(var(--u)*22);text-shadow:0 0 calc(var(--u)*14) var(--hl-gold)}
+.tc-dialog.eleven{border-color:var(--hl-gold);box-shadow:0 0 calc(var(--u)*34) oklch(.86 .14 85 / .35),0 14px 40px oklch(0 0 0 / .6)}
+.tc-dialog p{margin:0;font-size:max(11px,calc(var(--u)*13.5));color:var(--soft)}
+.tc-dialog p b{font-family:var(--font-mono);font-weight:700}
+.tc-dialog .gold{color:var(--hl-gold)}
+.tc-ladder{display:flex;gap:calc(var(--u)*5);margin:calc(var(--u)*2) 0}
+.tc-ladder span{display:grid;place-items:center;min-width:calc(var(--u)*36);height:calc(var(--u)*24);background:oklch(1 0 0 / 5%);font:500 max(11px,calc(var(--u)*13)) var(--font-mono);color:var(--muted-foreground)}
+.tc-ladder .past{opacity:.35}
+.tc-ladder .from{box-shadow:inset 0 0 0 1px var(--soft);color:var(--foreground)}
+.tc-ladder .to{background:var(--hl-gold);color:#1d1300;font-weight:700;box-shadow:0 0 12px oklch(.86 .14 85 / .55)}
+.tc-dialog-acts{display:grid;gap:calc(var(--u)*5);width:100%;margin-top:calc(var(--u)*2)}
+.tc-dialog.eleven .tc-dialog-acts,.tc-end .tc-dialog-acts{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+.tc-dialog .tc-act{min-height:calc(var(--u)*40)}
+.tc-wait{display:flex;align-items:center;gap:calc(var(--u)*8)}
+.tc-wait .ui-icon{width:calc(var(--u)*15);height:calc(var(--u)*15);color:var(--hl-magenta)}
+.tc-partner-cards{display:flex;justify-content:center;gap:calc(var(--u)*6);--card-w:calc(var(--u)*62)}
+
+/* Before the match: the two teams and the start. */
+.tc[data-phase="lobby"] :is(.tc-center,.tc-hand,.tc-actions,.tc-score,.tc-log,.tc-mood){visibility:hidden}
+.tc-lobby{position:absolute;left:50%;top:50%;z-index:25;translate:-50% -50%;display:grid;justify-items:center;gap:calc(var(--u)*9);width:calc(var(--u)*620);padding:calc(var(--u)*20) calc(var(--u)*26);background:oklch(.12 .06 300 / 97%);border:1px solid var(--hl-magenta);box-shadow:0 0 calc(var(--u)*34) oklch(.62 .28 330 / .4),0 14px 40px oklch(0 0 0 / .6);text-align:center}
+.tc-lobby::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.tc-lobby>small{font:500 max(10px,calc(var(--u)*11)) var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--muted-foreground)}
+.tc-lobby h2{margin:0;font:700 calc(var(--u)*30)/1.1 var(--font-display);text-shadow:0 0 calc(var(--u)*14) var(--hl-magenta)}
+.tc-lobby>p{margin:0;font-size:max(11px,calc(var(--u)*13));color:var(--soft)}
+.tc-lobby-sum b{font-family:var(--font-mono);font-weight:700;color:var(--hl-gold)}
+.tc-levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:calc(var(--u)*6);width:100%}
+.tc-level{display:grid;gap:calc(var(--u)*1);padding:calc(var(--u)*7) calc(var(--u)*6);background:oklch(1 0 0 / 5%);border:1px solid var(--border);transition:background-color .12s,box-shadow .12s}
+.tc-level:hover{background:var(--secondary)}
+.tc-level[aria-pressed="true"]{background:var(--active);border-color:transparent;box-shadow:var(--active-glow);color:var(--active-foreground)}
+.tc-level b{font:600 max(11px,calc(var(--u)*13)) var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+.tc-level small{font:400 max(9px,calc(var(--u)*10)) var(--font-mono);opacity:.85}
+.tc-stake{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:calc(var(--u)*8);width:100%;padding:calc(var(--u)*5) calc(var(--u)*10);background:oklch(.86 .14 85 / .08);border:1px solid var(--gold-line);text-align:left}
+.tc-stake>span{display:grid;font:600 max(11px,calc(var(--u)*12.5)) var(--font-display);letter-spacing:.04em}
+.tc-stake>span small{font:400 max(9px,calc(var(--u)*10)) var(--font-mono);color:var(--muted-foreground)}
+.tc-stake>b{min-width:calc(var(--u)*70);font:700 calc(var(--u)*22) var(--font-mono);text-align:center;color:var(--hl-gold)}
+.tc-stake button{display:grid;place-items:center;width:calc(var(--u)*34);height:calc(var(--u)*34);background:oklch(1 0 0 / 7%);border:1px solid var(--border)}
+.tc-stake button:hover:not(:disabled){background:var(--secondary)}
+.tc-stake .ui-icon{width:calc(var(--u)*15);height:calc(var(--u)*15)}
+.tc-lobby-teams{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*10);width:100%}
+.tc-lobby-teams section{display:grid;gap:calc(var(--u)*5)}
+.tc-lobby-teams section:first-child h4{color:var(--us)}.tc-lobby-teams section:last-child h4{color:var(--them)}
+.tc-lobby-seat{display:grid;gap:calc(var(--u)*1);min-height:calc(var(--u)*52);padding:calc(var(--u)*6) calc(var(--u)*10);background:oklch(1 0 0 / 5%);border:1px dashed var(--border);text-align:left;transition:background-color .12s}
+.tc-lobby-seat:not(:disabled):hover{background:var(--secondary)}
+.tc-lobby-seat:disabled{opacity:1;cursor:default;border-style:solid}
+.tc-lobby-seat.self{border-color:var(--hl-magenta);box-shadow:inset 0 0 calc(var(--u)*12) oklch(.62 .28 330 / .25)}
+.tc-lobby-seat.ready small{color:var(--hl-gold)}
+.tc-lobby-seat b{font:600 max(11px,calc(var(--u)*13)) var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+.tc-lobby-seat small{font:400 max(9px,calc(var(--u)*10)) var(--font-mono);color:var(--muted-foreground)}
+.tc-lobby-option{display:flex;align-items:center;gap:calc(var(--u)*8);width:100%;padding:calc(var(--u)*6) calc(var(--u)*10);background:oklch(1 0 0 / 3%);text-align:left;cursor:pointer}
+.tc-lobby-option input{accent-color:var(--hl-magenta);width:calc(var(--u)*16);height:calc(var(--u)*16)}
+.tc-lobby-option span{display:grid}
+.tc-lobby-option b{font:600 max(11px,calc(var(--u)*12.5)) var(--font-display);letter-spacing:.04em}
+.tc-lobby-option small{font:400 max(9px,calc(var(--u)*10)) var(--font-mono);color:var(--muted-foreground)}
+.tc-lobby .tc-act{width:100%}
+
+/* The rules, and the end of the match. */
+.tc-rules{position:absolute;inset:0;z-index:40;overflow:auto;padding:calc(var(--u)*20) calc(var(--u)*32);background:oklch(.1 .04 300 / 98%)}
+.tc-rules h3{margin:0 0 calc(var(--u)*10)}
+.tc-rules dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:calc(var(--u)*7) calc(var(--u)*18);margin:0;font-size:max(12px,calc(var(--u)*13))}
+.tc-rules dt{font:600 max(11px,calc(var(--u)*13)) var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:var(--hl-magenta)}
+.tc-rules dd{margin:0;color:var(--soft)}
+.tc-end{position:absolute;inset:0;z-index:35;display:grid;align-content:center;justify-items:center;gap:calc(var(--u)*10);overflow:hidden;padding:calc(var(--u)*20);background:radial-gradient(closest-side,oklch(.2 .1 300 / .96),oklch(.08 .04 300 / .96));text-align:center;animation:tc-fade .4s}
+@keyframes tc-fade{from{opacity:0}}
+.tc-end>small{font:500 max(11px,calc(var(--u)*12)) var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--muted-foreground)}
+.tc-end h2{margin:0;font:700 calc(var(--u)*104)/1 var(--font-display);animation:tc-title .6s .1s cubic-bezier(.2,.9,.3,1.25) backwards}
+@keyframes tc-title{from{opacity:0;transform:scale(1.6)}}
+.tc-end.won h2{color:var(--hl-gold);text-shadow:0 0 calc(var(--u)*30) oklch(.86 .14 85 / .7)}
+.tc-end.lost h2{color:var(--foreground);text-shadow:0 0 calc(var(--u)*24) oklch(.66 .2 20 / .7)}
+.tc-end>p{margin:0;font-size:max(12px,calc(var(--u)*14));color:var(--soft)}
+.tc-end>p.tc-prize{font:700 calc(var(--u)*30)/1.1 var(--font-mono)}
+.tc-prize.won{color:var(--hl-gold)!important;text-shadow:0 0 calc(var(--u)*14) oklch(.86 .14 85 / .6)}
+.tc-prize.lost{color:var(--destructive)!important}
+.tc-final{display:flex;align-items:baseline;gap:calc(var(--u)*16);font:600 calc(var(--u)*20) var(--font-display);text-transform:uppercase;letter-spacing:.06em}
+.tc-final b{font:700 calc(var(--u)*50)/1 var(--font-mono)}
+.tc-final .us{color:var(--us)}.tc-final .them{color:var(--them)}.tc-final i{font-style:normal;color:var(--muted-foreground)}
+.tc-end .tc-dialog-acts{width:calc(var(--u)*440);z-index:1}
+.tc-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.tc-confetti i{position:absolute;left:var(--x);top:-5%;width:calc(var(--u)*9);height:calc(var(--u)*15);background:var(--hl-magenta);rotate:var(--r);animation:tc-fall 3.2s var(--d) linear infinite}
+.tc-confetti i:nth-child(3n){background:var(--hl-gold)}.tc-confetti i:nth-child(3n+1){background:var(--hl-cyan)}
+@keyframes tc-fall{to{transform:translateY(calc(var(--u)*760)) rotate(420deg);opacity:.4}}
+
+/* Phones and small windows: what is secondary steps aside so the cards stay readable. */
+@container (max-width:900px){
+  .tc-log,.tc-legend,.tc-keys,.tc-mode{display:none}
+  .tc-felt{grid-template-areas:"score top top" "left center right" "bottom bottom bottom"}
+}
+/* Four players around a table do not fit a standing phone: it asks to be turned. */
+@container (max-aspect-ratio:1/1){
+  .tc-felt,.tc-foot{visibility:hidden}
+  .tc{position:relative}
+  .tc::after{content:'Gire o aparelho: a mesa de truco joga na horizontal.';position:absolute;inset:44px 0 0;display:grid;place-items:center;padding:32px;font:600 16px/1.4 var(--font-display);letter-spacing:.04em;text-align:center;color:var(--soft)}
+}
+@media(prefers-reduced-motion:reduce){
+  .tc-card-inner,.tc-timer i,.tc-turn i,.tc-hand .tc-card,.tc-compass{transition:none}
+  .tc-avatar,.tc-seat.turn .tc-avatar::after,.tc-felt.hit,.tc-call.in,.tc-dialog,.tc-banner,.tc-end,.tc-end h2,.tc-confetti i,.tc-slot .tc-card.winner,.tc-stack.shuffling::before,.tc-stack.shuffling::after{animation:none}
+  .tc-avatar::after{opacity:0}.tc-seat.turn .tc-avatar::after{opacity:1}
+}

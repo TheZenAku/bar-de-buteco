@@ -1,8 +1,8 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {and,asc,desc,eq,inArray,isNotNull,sql} from 'drizzle-orm';
-import {isSkillKey,PROFILE,skillsOf,type AdminBadge,type AdminBadgeHolder,type Badge,type BadgeRarity,type ProfileView,type SkillLoadout,type SkillLoadouts} from '@bar/shared';
+import {isSkillKey,PROFILE,skillsOf,skinBase,type AdminBadge,type AdminBadgeHolder,type Badge,type BadgeRarity,type ProfileView,type SkillLoadout,type SkillLoadouts} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {badgeImages,badges,moderationActions,profiles,userBadges,users} from './database/schema.js';
+import {badgeImages,badges,moderationActions,profiles,skillInventory,userBadges,users} from './database/schema.js';
 import type {PhoneService} from './phone-service.js';
 
 export class ProfileError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
@@ -30,9 +30,10 @@ export class ProfileService {
 
   async view(viewer:string,userId:string):Promise<ProfileView>{
     const card=await this.phone.card(viewer,userId),mine=viewer===userId;
-    const [[profile],owned]=await Promise.all([
+    const [[profile],owned,skills]=await Promise.all([
       this.db.select({skin:profiles.equippedSkin,status:profiles.statusMessage,loadouts:profiles.skillLoadouts}).from(profiles).where(eq(profiles.userId,userId)),
       this.db.select({...badgeColumns,shownAt:userBadges.shownAt}).from(userBadges).innerJoin(badges,eq(userBadges.badgeId,badges.id)).where(eq(userBadges.userId,userId)).orderBy(desc(userBadges.grantedAt),asc(badges.name)),
+      mine?this.db.select({id:skillInventory.skillId}).from(skillInventory).where(eq(skillInventory.userId,userId)):Promise.resolve([]),
     ]);
     if(!profile)throw new ProfileError(404,'Jogador não encontrado.');
     const plain=({shownAt:_,...badge}:Badge&{shownAt:number|null}):Badge=>badge;
@@ -40,7 +41,7 @@ export class ProfileService {
       id:userId,name:card.name,color:card.color,skin:profile.skin,status:profile.status,mine,
       handle:card.gram.author.handle,...(card.gram.author.photo?{photo:card.gram.author.photo}:{}),number:card.number,saved:card.saved,
       badges:owned.filter(badge=>badge.shownAt!==null).sort((a,b)=>a.shownAt!-b.shownAt!).map(plain),
-      ...(mine?{owned:owned.map(plain),loadouts:profile.loadouts as SkillLoadouts}:{}),
+      ...(mine?{owned:owned.map(plain),loadouts:profile.loadouts as SkillLoadouts,ownedSkills:skills.map(skill=>skill.id)}:{}),
     };
   }
   async setStatus(userId:string,status:string):Promise<ProfileView>{
@@ -57,14 +58,15 @@ export class ProfileService {
     });
     return this.view(userId,userId);
   }
-  /** The active skill and its key for the skin the player is wearing. */
+  /** The active skill and its key for the character the player is wearing, whichever variant of it. */
   async setLoadout(userId:string,loadout:SkillLoadout):Promise<ProfileView>{
     await this.db.transaction(async tx=>{
       const [profile]=await tx.select({skin:profiles.equippedSkin,loadouts:profiles.skillLoadouts}).from(profiles).where(eq(profiles.userId,userId)).for('update');
       if(!profile)throw new ProfileError(404,'Jogador não encontrado.');
       if(!skillsOf(profile.skin).some(skill=>skill.id===loadout.skill))throw new ProfileError(400,'Esta skin não tem essa skill.');
+      if(!(await tx.select({id:skillInventory.skillId}).from(skillInventory).where(and(eq(skillInventory.userId,userId),eq(skillInventory.skillId,loadout.skill)))).length)throw new ProfileError(403,'Compre esta habilidade na coleção antes de usar.');
       if(!isSkillKey(loadout.key))throw new ProfileError(400,'Esta tecla já é usada pelo jogo.');
-      await tx.update(profiles).set({skillLoadouts:{...(profile.loadouts as SkillLoadouts),[profile.skin]:loadout}}).where(eq(profiles.userId,userId));
+      await tx.update(profiles).set({skillLoadouts:{...(profile.loadouts as SkillLoadouts),[skinBase(profile.skin)]:loadout}}).where(eq(profiles.userId,userId));
     });
     return this.view(userId,userId);
   }

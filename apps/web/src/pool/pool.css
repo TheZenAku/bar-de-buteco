@@ -1,0 +1,213 @@
+/* The pool panel (pool/panel.ts), in the blackjack table's clothes: the same header, the violet felt lit from above, the
+   magenta active state, gold for what counts and the cyan clock. On top, the two players with their group and the balls
+   they have left (the 8 lights up when it is theirs); in the middle, the table from above; below, the lobby or the cue's
+   controls (power, the tip on the cue ball, the cue's elevation, Tacar). Sized by its own box (container queries): on a
+   tall phone screen the table stands upright. While at a table, the hotbar, the prompts and the minimap step aside. */
+.game:has(#pool:not(.hidden)) :is([data-panel="actions"],.prompts,.minimap,.game-header){display:none}
+.game>.pool{inset:8px;z-index:110;max-height:none;padding:0;overflow:hidden;container-type:size;border:1px solid var(--border);
+  background:radial-gradient(130% 100% at 50% -20%,oklch(.34 .13 305) 0%,oklch(.22 .1 300) 42%,oklch(.13 .05 295) 100%)}
+.pl{--gold-line:oklch(.86 .14 85 / .38);display:flex;flex-direction:column;height:100%;min-height:0}
+
+.pl-head{display:flex;align-items:center;gap:12px;padding:7px 8px 7px 14px;border-bottom:1px solid var(--border);background:oklch(.1 .04 300 / 72%)}
+.pl-title{display:flex;align-items:center;gap:8px;min-width:0;font:400 11px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.pl-title b{font-weight:500}
+.pl-title small{overflow:hidden;font-size:10px;letter-spacing:.14em;color:var(--muted-foreground);text-overflow:ellipsis;white-space:nowrap}
+.pl-title .ui-icon{flex:none;width:15px;height:15px}
+.pl-head-tools{display:flex;gap:2px;margin-left:auto}
+.pl-valendo{margin-left:auto;padding:2px 10px;background:oklch(.86 .14 85 / .1);border:1px solid var(--gold-line);font:600 11px var(--font-mono);color:var(--hl-gold)}
+.pl-valendo+.pl-head-tools{margin-left:8px}
+.pl-valendo .ui-icon{width:12px;height:12px}
+.pl-head-tools button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:34px;height:32px;padding:0 8px;color:var(--muted-foreground)}
+.pl-head-tools button:hover,.pl-head-tools button[aria-expanded="true"]{background:var(--secondary);color:var(--foreground)}
+.pl-head-tools .ui-icon{width:16px;height:16px}
+.pl-leave span{font:500 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+
+/* The two players and, between them, whose turn it is and the clock. */
+.pl-board{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:14px;padding:8px 14px 6px}
+.pl-player{display:grid;gap:4px;min-width:0;padding:7px 12px;border:1px solid transparent;transition:border-color .2s,box-shadow .2s,background-color .2s}
+.pl-player[data-seat="1"]{justify-items:end;text-align:right}
+.pl-player.turn{border-color:var(--hl-magenta);box-shadow:var(--active-glow);background:linear-gradient(to top,oklch(.62 .28 330 / .13),transparent 80%)}
+.pl-player.empty{opacity:.45}
+.pl-who{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.pl-player[data-seat="1"] .pl-who{flex-direction:row-reverse}
+.pl-who b{overflow:hidden;font:600 13px var(--font-display);letter-spacing:.06em;text-transform:uppercase;text-overflow:ellipsis;white-space:nowrap}
+.pl-player.turn .pl-who b{color:var(--hl-magenta)}
+.pl-racks{display:inline-flex;align-items:center;gap:3px;font:600 12px var(--font-mono);color:var(--hl-gold)}
+.pl-racks .ui-icon{width:13px;height:13px}
+.pl-badge{padding:1px 7px;background:oklch(1 0 0 / 8%);font:600 9px/1.6 var(--font-mono);font-style:normal;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.pl-badge.cpu{background:oklch(.7 .15 295 / .2);color:var(--hl-violet)}
+.pl-badge.ready{background:oklch(.78 .13 210 / .2);color:var(--hl-cyan)}
+.pl-badge.away{background:oklch(.66 .2 20 / .18);color:var(--destructive)}
+.pl-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-height:22px}
+.pl-player[data-seat="1"] .pl-group{justify-content:flex-end}
+.pl-group>small{font:400 10px var(--font-mono);letter-spacing:.22em;text-transform:uppercase;color:var(--muted-foreground)}
+.pl-balls{display:flex;gap:3px}
+.pl-eight{display:inline-flex;align-items:center;gap:6px;padding:1px 8px 1px 2px;background:var(--hl-gold);color:#1d1300;font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;
+  animation:pl-eight 1.6s ease-in-out infinite}
+.pl-eight small{font:inherit}
+@keyframes pl-eight{50%{box-shadow:0 0 14px oklch(.86 .14 85 / .7)}}
+.pl-benefit{padding:1px 8px;background:oklch(.62 .28 330 / .2);font:600 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--hl-magenta)}
+/* A ball on the scoreboard: its colour (a band for the stripes), its number on a white disc; dim once it dropped. */
+.pl-ball{--c:#f2c21b;position:relative;display:inline-grid;place-items:center;flex:none;width:19px;height:19px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,oklch(1 0 0 / .55),transparent 38%),var(--c);box-shadow:inset 0 -2px 3px oklch(0 0 0 / .45),0 1px 2px oklch(0 0 0 / .5);transition:opacity .3s,filter .3s}
+.pl-ball.stripe{background:radial-gradient(circle at 34% 30%,oklch(1 0 0 / .55),transparent 38%),linear-gradient(#f4f1e8 0 24%,var(--c) 24% 76%,#f4f1e8 76%)}
+.pl-ball b{display:grid;place-items:center;width:11px;height:11px;border-radius:50%;background:#f6f3ec;font:700 7px/1 var(--font-mono);color:#16111c}
+.pl-ball.down{opacity:.22;filter:grayscale(.8)}
+.pl-mid{display:grid;justify-items:center;gap:3px;min-width:170px;text-align:center}
+.pl-mid b{font:600 14px/1.3 var(--font-display);letter-spacing:.06em;text-transform:uppercase}
+.pl-clock{min-height:15px;font:500 12px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--hl-cyan)}
+.pl-timer{width:150px;height:3px;background:oklch(1 0 0 / 10%)}
+.pl-timer i{display:block;width:0;height:100%;background:var(--gradient-line);transition:width .25s linear}
+.pl-timer i.urgent{background:var(--hl-orange)}
+
+/* The table, the feed of what happened, the dialogs and the rules over it. */
+.pl-stage{position:relative;flex:1;min-height:0}
+.pl-canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.pl[data-view="lobby"] .pl-canvas{cursor:default}
+.pl-blocked .pl-canvas{cursor:not-allowed}
+/* What happened, the last three, in a strip of its own between the scoreboard and the table (never over a pocket). */
+.pl-feed{display:grid;align-content:end;justify-items:center;gap:3px;flex:none;height:70px;margin:0 14px 2px;padding:0;overflow:hidden;list-style:none;pointer-events:none}
+.pl-feed li{display:flex;align-items:center;gap:7px;padding:2px 9px;line-height:17px;background:oklch(.1 .04 300 / 82%);border-left:2px solid var(--border);font-size:12px;color:var(--soft)}
+.pl-feed li.new{animation:pl-in .35s ease-out}
+.pl-feed li .ui-icon{flex:none;width:13px;height:13px}
+.pl-feed li.foul{border-color:var(--hl-orange);color:var(--foreground)}.pl-feed li.foul .ui-icon{color:var(--hl-orange)}
+.pl-feed li.pot{border-color:var(--hl-gold)}.pl-feed li.pot .ui-icon{color:var(--hl-gold)}
+.pl-feed li.win{border-color:var(--hl-gold);color:var(--hl-gold)}
+.pl-feed li.turn{border-color:var(--hl-magenta)}.pl-feed li.turn .ui-icon{color:var(--hl-magenta)}
+.pl-feed li:not(:last-child){opacity:.72}
+@keyframes pl-in{from{opacity:0;transform:translateX(-8px)}}
+.pl-overlay{position:absolute;inset:0;display:none;place-items:center;padding:16px;background:oklch(.08 .03 300 / .55);backdrop-filter:blur(2px)}
+.pl-overlay.on{display:grid}
+.pl-dialog,.pl-result{display:grid;justify-items:center;gap:8px;max-width:520px;padding:18px 26px;background:oklch(.1 .04 300 / 96%);border:1px solid var(--gold-line);text-align:center;
+  box-shadow:0 18px 50px oklch(0 0 0 / .6);animation:pl-pop .4s cubic-bezier(.2,.9,.3,1.2)}
+.pl-dialog small,.pl-result small{font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--muted-foreground)}
+.pl-dialog b,.pl-result b{font:700 22px/1.2 var(--font-display);letter-spacing:.04em;text-transform:uppercase}
+.pl-dialog p,.pl-result>span{margin:0;font-size:13px;color:var(--soft)}
+.pl-dialog-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:6px}
+.pl-result.win{border-color:var(--hl-gold);box-shadow:0 0 0 1px var(--hl-gold),0 0 40px oklch(.86 .14 85 / .35),0 18px 50px oklch(0 0 0 / .6)}
+.pl-result.win b{color:var(--hl-gold);text-shadow:0 0 18px oklch(.86 .14 85 / .55)}
+.pl-result.loss b{color:var(--soft)}
+.pl-result-ball .pl-ball{width:44px;height:44px;animation:pl-drop 1.1s cubic-bezier(.3,.7,.3,1)}
+.pl-result-ball .pl-ball b{width:22px;height:22px;font-size:13px}
+.pl-prize{font:700 20px var(--font-mono);font-style:normal}
+.pl-prize.win{color:var(--hl-gold);text-shadow:0 0 14px oklch(.86 .14 85 / .5)}
+.pl-prize.loss{color:var(--destructive)}
+.pl-score{margin:4px 0 0;font:500 13px var(--font-mono);color:var(--soft)}
+.pl-score b{font:700 18px var(--font-mono);color:var(--hl-gold)}
+.pl-score i{margin:0 8px;font-style:normal;color:var(--muted-foreground)}
+@keyframes pl-pop{from{opacity:0;transform:scale(.9) translateY(10px)}}
+@keyframes pl-drop{0%{transform:translateY(-30px) scale(.6);opacity:0}60%{transform:translateY(4px) scale(1.05);opacity:1}100%{transform:none}}
+.pl-rules{position:absolute;inset:8px;z-index:6;overflow:auto;padding:16px 20px;background:oklch(.1 .04 300 / 97%);border:1px solid var(--border)}
+.pl-rules h3{margin:0 0 8px}
+.pl-rules ul{margin:0 0 14px;padding-left:18px}
+.pl-rules li{margin:5px 0;font-size:13px;color:var(--soft)}
+.pl-rules dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0;font-size:13px}
+.pl-rules dt{font:500 12px var(--font-mono);color:var(--hl-cyan)}
+.pl-rules dd{margin:0;color:var(--soft)}
+.pl-source{margin:14px 0 0;font-size:11px;color:var(--muted-foreground)}
+
+/* The lobby, as at the truco table: a card over the cloth with the seats, Juca's level and its stake (or the stake between
+   two people), what the winner gets and the yes that takes the coins. */
+.pl[data-view="lobby"] .pl-canvas{filter:saturate(.8) brightness(.7)}
+.pl-lobby{position:absolute;left:50%;top:50%;z-index:25;translate:-50% -50%;display:grid;justify-items:center;gap:9px;width:min(620px,calc(100% - 24px));max-height:calc(100% - 16px);overflow:auto;padding:20px 26px;
+  background:oklch(.12 .06 300 / 97%);border:1px solid var(--hl-magenta);box-shadow:0 0 34px oklch(.62 .28 330 / .4),0 14px 40px oklch(0 0 0 / .6);text-align:center}
+.pl-lobby[hidden]{display:none}
+.pl-lobby::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.pl-lobby>small{font:500 11px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--muted-foreground)}
+.pl-lobby h2{margin:0;font:700 30px/1.1 var(--font-display);text-shadow:0 0 14px var(--hl-magenta)}
+.pl-lobby>p{margin:0;font-size:13px;color:var(--soft)}
+.pl-lobby-sum b{font-family:var(--font-mono);font-weight:700;color:var(--hl-gold)}
+.pl-lobby-host{font-size:12px!important;color:var(--muted-foreground)!important}
+.pl-lobby-seats{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;width:100%}
+.pl-lobby-vs{font:700 18px var(--font-display);font-style:normal;color:var(--muted-foreground)}
+.pl-lobby-seat{display:grid;gap:1px;min-height:52px;padding:6px 10px;background:oklch(1 0 0 / 5%);border:1px dashed var(--border);text-align:left;transition:background-color .12s}
+.pl-lobby-seat:not(:disabled):hover{background:var(--secondary)}
+.pl-lobby-seat:disabled{opacity:1;cursor:default;border-style:solid}
+.pl-lobby-seat.self{border-color:var(--hl-magenta);box-shadow:inset 0 0 12px oklch(.62 .28 330 / .25)}
+.pl-lobby-seat.ready small{color:var(--hl-gold)}
+.pl-lobby-seat b{font:600 13px var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+.pl-lobby-seat small{font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.pl-levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}
+.pl-level{display:grid;gap:1px;padding:7px 6px;background:oklch(1 0 0 / 5%);border:1px solid var(--border);transition:background-color .12s,box-shadow .12s}
+.pl-level:not([aria-pressed="true"]):hover:not(:disabled){background:var(--secondary)}
+.pl-level:disabled{opacity:.6}
+.pl-level[aria-pressed="true"]{background:var(--active);border-color:transparent;box-shadow:var(--active-glow);color:var(--active-foreground);opacity:1}
+.pl-level b{font:600 13px var(--font-display);letter-spacing:.05em;text-transform:uppercase}
+.pl-level small{font:400 10px var(--font-mono);opacity:.85}
+.pl-stake{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:8px;width:100%;padding:5px 10px;background:oklch(.86 .14 85 / .08);border:1px solid var(--gold-line);text-align:left}
+.pl-stake>span{display:grid;font:600 12.5px var(--font-display);letter-spacing:.04em}
+.pl-stake>span small{font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.pl-stake>b{min-width:70px;font:700 22px var(--font-mono);text-align:center;color:var(--hl-gold)}
+.pl-stake button{display:grid;place-items:center;width:34px;height:34px;background:oklch(1 0 0 / 7%);border:1px solid var(--border)}
+.pl-stake button:hover:not(:disabled){background:var(--secondary)}
+.pl-stake .ui-icon{width:15px;height:15px}
+.pl-lobby .pl-act{width:100%;justify-content:center}
+.pl-act.primary{background:var(--active);border-color:transparent;box-shadow:var(--active-glow);color:var(--active-foreground)}
+.pl-act.primary:hover:not(:disabled){filter:brightness(1.14);box-shadow:0 0 22px oklch(.62 .28 330 / .7)}
+.pl-act.quiet{background:oklch(1 0 0 / 5%)}
+.pl-act.quiet:hover{background:var(--secondary);color:var(--foreground)}
+.pl-act:disabled{opacity:.5}
+@container (max-width:560px){.pl-lobby{padding:14px 12px}.pl-lobby h2{font-size:22px}.pl-levels{grid-template-columns:1fr}.pl-lobby-seats{grid-template-columns:1fr}.pl-lobby-vs{display:none}}
+
+/* Lobby and the cue's controls. */
+.pl-controls{display:flex;flex:none;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 12px;min-height:108px;padding:10px 14px;border-top:1px solid var(--border);background:oklch(.1 .04 300 / 96%)}
+.pl-note{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:var(--soft)}
+.pl-note small{color:var(--muted-foreground)}
+.pl-note .ui-icon{flex:none;width:15px;height:15px;color:var(--hl-magenta)}
+.pl-note.warn .ui-icon{color:var(--hl-orange)}
+.pl-mini{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;background:oklch(1 0 0 / 6%);font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+.pl-mini:hover:not(:disabled){background:var(--secondary);color:var(--foreground)}
+.pl-mini.on{background:var(--active);color:var(--active-foreground)}
+.pl-mini .ui-icon{width:13px;height:13px}
+.pl-primary{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;background:var(--active);box-shadow:var(--active-glow);color:var(--active-foreground);
+  font:600 13px var(--font-display);letter-spacing:.08em;text-transform:uppercase}
+.pl-primary:hover:not(:disabled){filter:brightness(1.12)}
+.pl-primary:disabled{opacity:.45;box-shadow:none}
+.pl-primary .ui-icon{width:16px;height:16px}
+.pl-primary.done{background:oklch(.86 .14 85 / .12);border:1px solid var(--gold-line);box-shadow:none;color:var(--hl-gold)}
+.pl-primary.done small{margin-left:4px;font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.pl-primary.danger{background:oklch(.5 .19 20);box-shadow:none}
+.pl-primary kbd,.pl-act kbd{margin-left:6px;padding:0 6px;border:1px solid oklch(1 0 0 / 35%);font:500 10px/1.6 var(--font-mono)}
+.pl-act{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 14px;background:oklch(1 0 0 / 7%);border:1px solid var(--border);font:600 13px var(--font-display);letter-spacing:.06em;text-transform:uppercase}
+.pl-act:hover{background:var(--active);border-color:transparent;color:var(--active-foreground)}
+.pl-act .ui-icon{width:16px;height:16px}
+
+.pl-aim{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 18px;width:100%}
+.pl-power{--p:0;display:grid;grid-template-columns:auto minmax(160px,280px) 44px;align-items:center;gap:8px}
+/* Charging: the bar glows and its tip pulses while the left button is held. */
+.pl-charging .pl-power-bar{box-shadow:inset 0 0 0 1px var(--hl-magenta),0 0 14px oklch(.62 .28 330 / .55)}
+.pl-charging .pl-power-bar i::after{content:'';position:absolute;top:-3px;right:-2px;bottom:-3px;width:4px;background:#fff;box-shadow:0 0 10px #fff;animation:pl-tip .4s ease-in-out infinite alternate}
+.pl-charging .pl-power b{color:var(--hl-magenta)}
+.pl-charging .pl-canvas{cursor:grabbing}
+@keyframes pl-tip{to{opacity:.4}}
+.pl-power small,.pl-spin-box small,.pl-elev small{font:400 9px var(--font-mono);letter-spacing:.24em;text-transform:uppercase;color:var(--muted-foreground)}
+.pl-power-bar{position:relative;height:14px;background:oklch(1 0 0 / 8%);box-shadow:inset 0 0 0 1px var(--border)}
+.pl-power-bar i{position:absolute;inset:0 auto 0 0;width:calc(var(--p)*100%);background:linear-gradient(90deg,var(--hl-cyan),var(--hl-magenta) 60%,var(--hl-orange))}
+.pl-power b{font:600 13px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--hl-gold)}
+.pl-spin-box{display:grid;justify-items:center;gap:3px;min-width:92px}
+/* The cue ball's face: where the tip strikes it. */
+.pl-spin{--sx:0;--sy:0;position:relative;width:50px;height:50px;border-radius:50%;cursor:crosshair;touch-action:none;
+  background:radial-gradient(circle at 36% 30%,#fff,#ece7dc 45%,#b9b1a3 100%);box-shadow:inset 0 -3px 6px oklch(0 0 0 / .3),0 0 0 1px var(--gold-line)}
+.pl-spin::before{content:'';position:absolute;inset:25%;border:1px dashed oklch(0 0 0 / .18);border-radius:50%}
+.pl-spin-dot{position:absolute;top:calc(50% - var(--sy)*36% - 5px);left:calc(50% + var(--sx)*36% - 5px);width:10px;height:10px;border-radius:50%;background:#3b73c9;box-shadow:0 0 0 2px #fff,0 0 8px var(--hl-magenta)}
+.pl-elev{display:grid;grid-template-columns:auto 110px 34px;align-items:center;gap:8px}
+.pl-elev input{accent-color:var(--hl-magenta)}
+.pl-elev b{font:500 12px var(--font-mono);color:var(--soft)}
+.pl-aim-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pl-hint{flex-basis:100%;margin:0;font-size:12px;color:var(--muted-foreground);text-align:center}
+.pl-wait{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+.pl-foot b{font-weight:500;color:var(--hl-gold)}
+.pl-foot .ui-icon{width:11px;height:11px}
+.pl-foot{display:flex;gap:18px;padding:6px 14px;border-top:1px solid oklch(1 0 0 / 5%);background:oklch(.1 .04 300 / 96%);font:400 11px var(--font-mono);color:var(--muted-foreground)}
+.pl-keys{margin-left:auto}
+
+@container (max-width:760px){
+  .pl-board{grid-template-columns:1fr 1fr;gap:6px 10px;padding:6px 8px}
+  .pl-mid{grid-column:1/-1;grid-row:2;min-width:0}
+  .pl-ball{width:15px;height:15px}.pl-ball b{width:9px;height:9px;font-size:6px}
+  .pl-power{grid-template-columns:auto 1fr 40px;flex:1 1 100%}
+  .pl-keys,.pl-hint{display:none}
+}
+@container (max-height:620px){.pl-board{padding:4px 10px}.pl-controls{min-height:84px;padding:6px 10px}.pl-hint{display:none}.pl-feed{height:40px}.pl-feed li{font-size:11px}.pl-feed li:first-child:nth-last-child(3){display:none}}
+@media(max-width:760px){.game>.pool{inset:4px}}
+@media(prefers-reduced-motion:reduce){.pl-eight,.pl-dialog,.pl-result,.pl-result-ball .pl-ball,.pl-feed li{animation:none}.pl-timer i{transition:none}}

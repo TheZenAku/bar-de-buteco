@@ -30,8 +30,8 @@ const clips = {
   // Highfood: looking at the phone (the customer waiting, anyone with the phone open), thanking for the delivery, the bag coming out of the box.
   Text: misc('Texting While Standing.fbx'), Thank: misc('Thankful.fbx'), Pick: misc('Picking Up Object.fbx'),
 };
-// Clips that only one skin uses: Rafael's skills (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
-const exclusive = { Kick: 'rafael', AirKick: 'rafael', Bartend: 'magrao' };
+// Clips that only some skins use: Rafael's skills, in every variant of him (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
+const exclusive = { Kick: ['rafael', 'rafael-rose'], AirKick: ['rafael', 'rafael-rose'], Bartend: ['magrao'] };
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
 // Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,
 // matching the five-second gameplay recovery instead of freezing on the source's trailing frames.
@@ -108,7 +108,7 @@ const knownClips=new Set([...Object.keys(clips),...dances.map(dance=>dance.name)
 const manifest=Object.fromEntries(Object.entries(previousManifest).filter(([name])=>knownClips.has(name)));
 const requested=process.argv.slice(2);
 // Gilmar enters once his Mixamo skin has been imported (tools/assets/import-mixamo.mjs).
-const skins = ['nathan', 'leandro', 'rafael', 'read', 'magrao', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
+const skins = ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
 for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);
   const retargeted = id !== 'nathan';
@@ -241,7 +241,7 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   }
   const actions = bank(), dancing = bank();
   for (const [name, definition] of Object.entries(clips)) {
-    if (exclusive[name] && exclusive[name] !== id) continue;
+    if (exclusive[name] && !exclusive[name].includes(id)) continue;
     convert(actions, name, definition);
   }
   for (const { name, definition } of dances) convert(dancing, name, definition);

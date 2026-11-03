@@ -1,3 +1,4 @@
+import {wearCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import {previewPath} from './preview-path';
 
@@ -36,11 +37,10 @@ test('chat toggles only the cane and gait, replicates to other players and works
       await page.screenshot({path:previewPath('old-cane.png')});
     }finally{await page.keyboard.up('d');await page.keyboard.up('Shift');}
     await expect.poll(async()=>(await animation(page))?.clip).toBe('OldCaneHold');
-    for(const skin of ['Nathan','Leandro','Rafael','Gilmar','Gabriel','Flavio Hipotético','Read']){
-      await page.keyboard.press('c');const card=page.locator('.skin-card').filter({has:page.locator('b',{hasText:skin})});await card.click();
+    for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','read']){
       // Nathan is free and already worn; the others are bought first.
-      if(skin!=='Nathan'){await page.getByRole('button',{name:'Confirmar compra'}).click();await card.click();}
-      await expect.poll(async()=>(await animation(other))?.skin).toBe(({Gilmar:'gilmar-gordo','Flavio Hipotético':'flavio-hipotetico'} as Record<string,string>)[skin]??skin.toLowerCase());
+      await wearCard(page,skin);
+      await expect.poll(async()=>(await animation(other))?.skin).toBe(skin);
       await expect.poll(async()=>(await animation(other))?.cane?.enabled).toBe(true);
       await expect.poll(async()=>(await animation(other))?.clip).toBe('OldCaneHold');
     }

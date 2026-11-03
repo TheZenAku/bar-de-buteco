@@ -10,6 +10,7 @@ import {logsSection} from './logs';
 import {worldSection} from './world';
 import {vehiclesSection} from './vehicles';
 import {badgesSection} from './badges';
+import {collectionSection} from './collection';
 import {highfoodSection} from './highfood';
 import {serverSection} from './server';
 
@@ -25,6 +26,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'vehicles',label:'Veículos',icon:'bike',description:'As motos de entrega do mapa: spawne uma perto de você ou tire do mapa as que não quer mais.',factory:vehiclesSection},
   {id:'highfood',label:'Highfood',icon:'food',description:'As entregas de agora, o que elas pagam e os clientes: nome, corpo no jogo, falas e foto.',factory:highfoodSection},
   {id:'badges',label:'Emblemas',icon:'trophy',description:'Os emblemas da cidade: crie, edite, conceda e retire. Cada jogador escolhe até seis para mostrar no perfil.',factory:badgesSection},
+  {id:'collection',label:'Coleção',icon:'cards',description:'As cartas de personagem e as habilidades: raridade, preço, texto e se estão à venda. Veja também quem comprou e o que rendeu.',factory:collectionSection},
   {id:'server',label:'Servidor',icon:'server',description:'Processos, memória, disco, banco de dados e filas entre a API e o mundo.',factory:serverSection},
 ];
 // The section the administration was on: reopening the window goes back to it.

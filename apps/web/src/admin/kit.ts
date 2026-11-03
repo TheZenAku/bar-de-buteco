@@ -21,7 +21,7 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'highfood'|'badges'|'server';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'highfood'|'badges'|'collection'|'server';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 

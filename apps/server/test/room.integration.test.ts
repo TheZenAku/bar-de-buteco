@@ -21,7 +21,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
   const previousApi = process.env.API_INTERNAL_URL, previousCapacity = process.env.BAR_CAPACITY;
   process.env.BAR_CAPACITY = '2';
   const equipped:Record<string,string>={alice:'nathan',bob:'leandro'};
-  const access=(userId:string)=>({valid:true,blocked:[],role:'user',balance:1000,equippedSkin:equipped[userId]??'nathan',ownedSkins:userId==='bob'?['nathan','leandro']:SKINS.map(s=>s.id)});
+  const access=(userId:string)=>({valid:true,blocked:[],role:'user',balance:1000,equippedSkin:equipped[userId]??'nathan',ownedSkins:userId==='bob'?['nathan','leandro']:SKINS.map(s=>s.id),ownedSkills:userId==='bob'?[]:['karate','air-kick']});
   const bets:Array<{userId:string;amount:number;reason:string}>=[];
   const internal = createServer(async (req, res) => {
     let data = '';

@@ -3,7 +3,7 @@ import {statfs} from 'node:fs/promises';
 import os from 'node:os';
 import {and,desc,eq,gte,ilike,inArray,isNotNull,isNull,lt,or,sql,type Column,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {ACCESS_LOG_EVENTS,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKINS,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
+import {ACCESS_LOG_EVENTS,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
   type AdminEconomy,type AdminLedgerEntry,type AdminLogCategory,type AdminLogEntry,type AdminLogPage,type AdminPlayerDetail,type AdminPlayerOperation,type AdminReport,
   type AdminServerInfo,type AdminSummary,type LedgerSource,type PublicUser} from '@bar/shared';
 import type {MetricsRegistry} from '@bar/shared/metrics';
@@ -75,13 +75,14 @@ export class AdminConsole {
       .from(t.users).innerJoin(t.profiles,eq(t.users.id,t.profiles.userId)).leftJoin(t.wallets,eq(t.users.id,t.wallets.userId)).leftJoin(t.phoneLines,eq(t.users.id,t.phoneLines.userId)).where(eq(t.users.id,id));
     if(!row)throw new AdminError(404,'Jogador não encontrado.');
     const month=new Date(Date.now()-30*DAY),reporter=alias(t.profiles,'reporter'),resolver=alias(t.profiles,'resolver');
-    const [states,ledger,[flows],items,skins,[sessions],[stats],history,against,[made]]=await Promise.all([
+    const [states,ledger,[flows],items,skins,skills,[sessions],[stats],history,against,[made]]=await Promise.all([
       this.admin.accountStates(actor,[row]),
       this.db.select().from(t.currencyLedger).where(eq(t.currencyLedger.userId,id)).orderBy(desc(t.currencyLedger.createdAt),desc(t.currencyLedger.id)).limit(40),
       this.db.select({earned:sql<number>`coalesce(sum(greatest(${t.currencyLedger.amount},0)),0)`.mapWith(Number),spent:sql<number>`coalesce(sum(greatest(-${t.currencyLedger.amount},0)),0)`.mapWith(Number)})
         .from(t.currencyLedger).where(and(eq(t.currencyLedger.userId,id),gte(t.currencyLedger.createdAt,month))),
       this.db.select().from(t.itemInventory).where(eq(t.itemInventory.userId,id)),
       this.db.select().from(t.skinInventory).where(eq(t.skinInventory.userId,id)),
+      this.db.select().from(t.skillInventory).where(eq(t.skillInventory.userId,id)),
       this.db.select({active:sql<number>`count(*) filter (where ${t.sessions.expiresAt}>now())`.mapWith(Number),last:sql<Date|null>`max(${t.sessions.createdAt})`}).from(t.sessions).where(eq(t.sessions.userId,id)),
       this.db.select().from(t.statistics).where(eq(t.statistics.userId,id)),
       this.admin.audits(actor,eq(t.moderationActions.userId,id),50),
@@ -100,6 +101,7 @@ export class AdminConsole {
       inventory:items.filter(item=>item.quantity>0).map(item=>({itemId:item.itemId,quantity:item.quantity})),
       vehicles:(await this.db.select({id:t.playerVehicles.id,plate:t.playerVehicles.plate,parts:t.playerVehicles.parts,mileage:t.playerVehicles.mileage}).from(t.playerVehicles).where(eq(t.playerVehicles.userId,id))).map(vehicle=>({...vehicle,name:MOTO_NAME})),
       skins:SKINS.map(skin=>{const owned=skins.find(s=>s.skinId===skin.id);return {id:skin.id,name:skin.name,owned:skin.id===DEFAULT_SKIN||!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
+      skills:SKILLS.map(skill=>{const owned=skills.find(s=>s.skillId===skill.id);return {id:skill.id,name:skill.name,owned:!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
       sessions:{active:sessions?.active??0,lastLoginAt:iso(lastLogin)},
       stats:{gamesPlayed:stats?.gamesPlayed??0,wins:stats?.blackjackWins??0,losses:stats?.blackjackLosses??0,draws:stats?.blackjackDraws??0},
       history,
@@ -180,6 +182,21 @@ export class AdminConsole {
           }
           await sync();
           return {message:operation.grant?`Skin ${skin.name} adicionada à coleção.`:`Skin ${skin.name} retirada da coleção.`};
+        }
+        case 'skill':{
+          requireWallet();
+          const skill=skillById(operation.skillId);if(!skill)throw new AdminError(400,'Habilidade inválida.');
+          if(operation.grant){
+            const inserted=await tx.insert(t.skillInventory).values({userId:target.id,skillId:skill.id}).onConflictDoNothing().returning();
+            if(!inserted.length)throw new AdminError(409,`O jogador já tem a habilidade ${skill.name}.`);
+            await record('skill-grant',skill.name);
+          }else{
+            const removed=await tx.delete(t.skillInventory).where(and(eq(t.skillInventory.userId,target.id),eq(t.skillInventory.skillId,skill.id))).returning();
+            if(!removed.length)throw new AdminError(409,`O jogador não tem a habilidade ${skill.name}.`);
+            await record('skill-revoke',skill.name);
+          }
+          await sync();
+          return {message:operation.grant?`Habilidade ${skill.name} adicionada.`:`Habilidade ${skill.name} retirada.`};
         }
       }
     });
@@ -308,9 +325,9 @@ export class AdminConsole {
       const [kind,a,b]=reason.split(':');
       const add=(key:string,q:number)=>{if(priceEntry(key))basket.set(key,(basket.get(key)??0)+q);};
       if(kind==='item')add(`item:${a}`,n*Number(b??1));else if(kind==='counter')add(`item:${a}`,n);else if(kind==='table')for(const id of (a??'').split('-'))add(`item:${id}`,n);
-      else if(kind==='skin')add(`skin:${a}`,n);else if(kind==='media')add(a==='telao'?'media:telao':a==='jukebox'?'media:jukebox':'media:tv',n);else if(kind==='stage')add('stage:pass',n);
+      else if(kind==='skin')add(`skin:${a}`,n);else if(kind==='skill')add(`skill:${a}`,n);else if(kind==='media')add(a==='telao'?'media:telao':a==='jukebox'?'media:jukebox':'media:tv',n);else if(kind==='stage')add('stage:pass',n);
     }
-    if(!basket.size)for(const key of Object.keys(prices))if(/^(item|media|stage|skin):/.test(key))basket.set(key,1);
+    if(!basket.size)for(const key of Object.keys(prices))if(/^(item|media|stage|skin|skill):/.test(key))basket.set(key,1);
     let atNow=0,atDefault=0;for(const [key,q] of basket){atNow+=q*(prices[key]??0);atDefault+=q*(this.pricing.defaults[key]??0);}
     const beer=prices['item:copo']??1;
     return {generatedAt:now.toISOString(),days,

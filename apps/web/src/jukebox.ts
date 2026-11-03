@@ -10,8 +10,14 @@ interface Playback {
   muted?:boolean;
   /** The screen's corners on the page in the last frame (null without a projection). */
   points?:Point[]|null;
-  /** Built with the platform's own controls: this browser controls the video (see MediaController.controls). */
+  /** Built with the platform's own controls (see MediaController.controls). */
   controls:boolean;
+  /** Until when the screen waits for YouTube to stop painting over the picture (see MediaController.veil). */
+  cleanAt:number;
+  /** On YouTube's cued card: the cover under a big play button. */
+  cued:boolean;
+  /** How far a live player sits behind the shared timeline, measured once it settled (see MediaController.keepInSync). */
+  liveGap?:number;
   /** Counts the players built on this screen, so a replaced player's late events are ignored. */
   generation:number;
   /** Just loaded or moved to the timeline: its first playing frames are checked against it at once. */
@@ -27,7 +33,7 @@ interface Playback {
  */
 interface Session {
   state:JukeboxState;system:MediaSystem;players:Playback[];audible:number;gain:number;audibleVolume:number;distant:boolean;silentSince?:number;
-  /** This browser controls the video: its screens carry the player's controls, and what is done on them goes to everyone. */
+  /** This browser controls the video in a window, whose player carries its controls: what is done on them goes to everyone. */
   control:boolean;
   /** What the players are built for (playerKey). */
   built:string;
@@ -39,12 +45,14 @@ interface Session {
   reported:Set<string>;
   /** The heard player's length a few seconds ago: a live broadcast's keeps growing with the clock. */
   growth?:{duration:number;at:number;live:boolean};
+  /** The furthest a live broadcast was played here, run on by the clock: its live edge as far as this browser can tell (liveEdge). */
+  edge?:{time:number;at:number};
 }
 interface Hooks {
   send:(type:string,payload:unknown)=>void;now:()=>number;
   /** The screen's corners on the page, or null when no projection exists (the back of the TV). */
   project:(screen:string)=>Point[]|null;
-  /** No wall between the camera and the screen, so the pointer may reach its player. */
+  /** No wall between the camera and the screen. */
   clear:(screen:string)=>boolean;
   screen:(screen:string,visible:boolean)=>void;ambient:(suppressed:boolean)=>void;
   /** Share of this source's sound the listener gets next to the other area's (areaMix); 1 when absent. */
@@ -70,8 +78,12 @@ const labels:Record<LocalStatus,string>={loading:'Carregando vídeo…',playing:
 const AUDIBLE_HYSTERESIS=1.5;
 /** Seconds a screen may drift from the shared timeline before it is corrected, and how often each one is checked. */
 const DRIFT_TOLERANCE=1.5,SYNC_MS=3000;
-/** A live broadcast's players differ by their own latency: only a bigger gap is corrected. */
-const LIVE_DRIFT_TOLERANCE=5;
+/** A live broadcast's players each sit at their own latency: only a change of this many seconds in that gap is corrected. */
+const LIVE_DRIFT_TOLERANCE=15;
+/** A live player's gap is measured this long after it was last moved (ms). */
+const LIVE_SETTLE_MS=1500;
+/** How long YouTube keeps its title, buttons, logo and a big pause mark over the picture once it starts or is moved, with its controls off and no pointer near (ms; measured: gone by 5 s). */
+const CHROME_MS=5000;
 /** How long a source must stay silent and out of sight here before its players pause (no flapping at the edge of its reach). */
 const DISTANT_AFTER_MS=3000;
 /** Seconds the controller's player must jump at once to count as a seek on YouTube's controls; and how long after this code moved it a jump is its own. */
@@ -126,13 +138,10 @@ export class MediaController {
   private container=playerContainer();
   private disposed=false;
   private onVisibility=()=>this.setWorld(this.world,this.localId,this.connected);
-  private pointer={x:-1,y:-1};
-  private onPointer=(event:PointerEvent)=>{if(event.buttons)return;this.pointer={x:event.clientX,y:event.clientY};};
   /** A browser that blocked autoplay accepts it after any click or key press in the game (click, so buttons still get theirs). */
   private onGesture=()=>{for(const session of this.sessions.values())for(const p of session.players)if(p.status==='blocked'){p.revision=-1;this.apply(session,p);}};
   constructor(private kind:MediaKind,private hooks:Hooks,private players:(provider:MediaProvider)=>Promise<PlayerFactory>=loadPlayers) {
     document.addEventListener('visibilitychange',this.onVisibility);
-    window.addEventListener('pointermove',this.onPointer);
     window.addEventListener('click',this.onGesture,true);window.addEventListener('keydown',this.onGesture,true);
     try{const stored=Number(localStorage.getItem(kind.volumeKey));if(localStorage.getItem(kind.volumeKey)!==null&&Number.isFinite(stored))this.volume=Math.max(0,Math.min(1,stored));}catch{}
   }
@@ -151,11 +160,10 @@ export class MediaController {
   }
   private system(id:string):MediaSystem|undefined {return this.kind.systems.find(s=>s.id===id);}
   /**
-   * The player's own controls show only on the screens of whoever controls the video, and only they can click them; for
-   * everyone else the picture is bare and the pointer goes past it. The stage screen fills the backyard's view and never
-   * takes the pointer, so its controller works it from the panel.
+   * A screen shows the picture and nothing else, to everyone, and the pointer goes past it: whoever controls the video
+   * works it from the panel. Only a platform in a window over the game (MediaPlatform.window) has its own controls, for its controller.
    */
-  private controls(state:JukeboxState):boolean {const system=this.system(state.id);return !!system?.screens.length&&system.area==='bar'&&!!state.by&&state.by===this.localId;}
+  private controls(state:JukeboxState):boolean {const system=this.system(state.id);return windowed(state)&&!!system?.screens.length&&system.area==='bar'&&!!state.by&&state.by===this.localId;}
   /** This browser tells the server what the players see (the end, a refusal, a live broadcast). */
   private reporter(session:Session):boolean {return mediaReporter(session.state,this.localId);}
   private async create(state:JukeboxState):Promise<void> {
@@ -165,7 +173,7 @@ export class MediaController {
     for(const screen of system.screens.length?system.screens:['']){
       const frame=document.createElement('div');frame.className=`media-player ${this.kind.prefix}-player${screen?'':' audio-only'}`;frame.dataset.media=state.id;if(screen)frame.dataset.screen=screen;
       frame.append(document.createElement('div'));this.container.append(frame);
-      session.players.push({screen,frame,ready:false,revision:-1,videoId:'',status:'loading',error:'',title:'',lastSync:0,lastVolume:0,onScreen:false,controls:false,generation:0,fresh:false,movedAt:0});
+      session.players.push({screen,frame,ready:false,revision:-1,videoId:'',status:'loading',error:'',title:'',lastSync:0,lastVolume:0,onScreen:false,controls:false,cleanAt:0,cued:false,generation:0,fresh:false,movedAt:0});
     }
     this.sessions.set(state.id,session);this.updateActive();
     await this.build(session);
@@ -179,7 +187,7 @@ export class MediaController {
     session.control=this.controls(state);session.built=playerKey(state);session.dismissed=false;session.distant=false;session.silentSince=undefined;
     for(const p of session.players){
       clearTimeout(p.timeout);p.player?.destroy();p.player=undefined;p.generation++;
-      Object.assign(p,{ready:false,revision:-1,videoId:'',status:'loading',error:'',sample:undefined,muted:undefined});
+      Object.assign(p,{ready:false,revision:-1,videoId:'',status:'loading',error:'',sample:undefined,muted:undefined,cleanAt:0,cued:false,liveGap:undefined});
       p.frame.replaceChildren(document.createElement('div'));this.dress(session,p,inWindow);
     }
     if(inWindow)session.audible=0;else this.chooseAudible(session,true);
@@ -194,6 +202,7 @@ export class MediaController {
   private dress(session:Session,p:Playback,inWindow:boolean):void {
     const first=p===session.players[0],frame=p.frame;
     frame.classList.toggle('media-window',inWindow&&first);frame.classList.toggle('audio-only',!inWindow&&!p.screen);
+    frame.classList.toggle('media-crop',!!p.screen&&providerOf(session.state)==='youtube');
     frame.style.display='';
     // A screen's player shows only once projected: at the page's corner it would show through another screen's aperture.
     frame.style.visibility=(inWindow?first:!p.screen||p.onScreen)?'':'hidden';
@@ -249,15 +258,21 @@ export class MediaController {
     const previous=p.status;
     p.status=({[-1]:'loading',0:'ended',1:'playing',2:'paused',3:'buffering',5:'paused'} as Record<number,LocalStatus>)[state]??'loading';
     if(state===1||state===2||state===0||state===5)clearTimeout(p.timeout);
-    if(state===1){p.error='';if(document.hidden||!this.connected){this.moved(p);p.player?.pauseVideo();}}
+    p.cued=state===5&&providerOf(session.state)==='youtube';
+    if(state===1){
+      p.error='';
+      // Started or moved by this code: its time over the picture runs from here. A hiccup of the connection is left alone.
+      if(previous==='loading'||p.fresh||performance.now()<p.cleanAt)this.veil(session,p);
+      if(document.hidden||!this.connected){this.moved(p);p.player?.pauseVideo();}
+    }
     // Pressed on the player's own controls by whoever controls the video: it goes to everyone.
     if(this.handled(session,p)){
       if(state===2&&previous!=='paused'&&session.state.status==='playing')this.command('pause',{},session.state.id);
       else if(state===1&&session.state.status==='paused')this.command('resume',{},session.state.id);
     }
     const duration=p.player?.getDuration()??0;
-    // One report per source: the player being heard speaks for the other screens.
-    if(state===0&&p===session.players[session.audible]&&session.state.status==='playing'&&this.reporter(session)&&Number.isFinite(duration)&&duration>0)this.report(session,'ended',{duration});
+    // One report per source: the player being heard speaks for the other screens. A live broadcast's length is not where it ended (watchLive), so its timeline answers for it.
+    if(state===0&&p===session.players[session.audible]&&session.state.status==='playing'&&this.reporter(session)&&Number.isFinite(duration)&&duration>0)this.report(session,'ended',{duration:session.state.live?Math.max(1,Math.min(duration,jukeboxTime(session.state,this.hooks.now()))):duration});
     this.renderPanel();
   }
   private report(session:Session,event:'ended'|'failed'|'live',payload:Record<string,number>):void {
@@ -265,6 +280,16 @@ export class MediaController {
     this.hooks.send(`${this.kind.prefix}.${event}`,{id:session.state.id,revision:session.state.revision,videoId:session.state.videoId,...payload});
   }
   private moved(p:Playback):void {p.movedAt=performance.now();p.sample=undefined;}
+  /**
+   * Each time YouTube's player starts or is moved, it paints its title, buttons, logo and a big pause mark over the
+   * picture for a few seconds, with its controls off and no pointer near. No option turns that off, so the screen shows
+   * its standby picture meanwhile (the sound goes on). .media-crop takes care of what stays longer, on its edges.
+   */
+  private veil(session:Session,p:Playback):void {if(providerOf(session.state)==='youtube')p.cleanAt=performance.now()+CHROME_MS;}
+  /** Nothing but the picture would reach the screen: not YouTube's end, error, loading or cued cards, nor its play button when autoplay is blocked. */
+  private bare(p:Playback,now:number):boolean {
+    return now>=p.cleanAt&&!p.cued&&(p.status==='buffering'?!p.fresh:p.status!=='ended'&&p.status!=='error'&&p.status!=='loading'&&p.status!=='blocked');
+  }
   /**
    * The controller is working this player's own controls: it has the keyboard focus (they clicked it), and this code
    * has not just moved it. Its pause, play and seeks become commands.
@@ -283,14 +308,17 @@ export class MediaController {
     p.revision=state.revision;p.lastSync=performance.now();p.error='';p.fresh=true;this.moved(p);
     const playing=state.status==='playing';
     if(p.videoId!==state.videoId){
-      p.videoId=state.videoId;p.title='';p.status='loading';session.growth=undefined;this.applyVolume(session,true);
+      p.videoId=state.videoId;p.title='';p.status='loading';session.growth=undefined;session.edge=undefined;this.applyVolume(session,true);this.veil(session,p);
       if(playing)p.player.loadVideoById({videoId:p.videoId,startSeconds:target});else p.player.cueVideoById({videoId:p.videoId,startSeconds:target});
     } else {
-      p.player.seekTo(target,true);
+      // Already there: a seek would only rebuffer it, and bring YouTube's title back over the picture.
+      const near=Math.abs(p.player.getCurrentTime()-target)<(state.live?LIVE_DRIFT_TOLERANCE:DRIFT_TOLERANCE),running=p.player.getPlayerState()===1;
+      if(!near){p.player.seekTo(target,true);this.veil(session,p);}
       if(playing){
+        if(!running)this.veil(session,p);
         p.status='loading';p.player.playVideo();
-        // Only YouTube's player answers a play while it plays already; for the others that is the answer.
-        if(providerOf(state)!=='youtube'&&p.player.getPlayerState()===1)p.status='playing';
+        // Only YouTube's player answers a play while it plays already, and only when it was moved; for the others that is the answer.
+        if((near||providerOf(state)!=='youtube')&&running)p.status='playing';
       }else{p.player.pauseVideo();p.status='paused';}
     }
     clearTimeout(p.timeout);
@@ -314,19 +342,16 @@ export class MediaController {
   frame():void {
     const now=performance.now(),dt=Math.min(.25,(now-this.lastTick)/1000||.05),periodic=now-this.lastTick>=100;
     if(periodic)this.lastTick=now;
-    let pointerOnTv=false;
     for(const session of this.sessions.values()) {
       for(const p of session.players){
         if(!p.screen||session.built&&windowed(session.state))continue;
         // The picture never leaves its screen: without a projection (seen from behind) it is simply not drawn. Nor is
-        // YouTube's end or error card: the screen shows its own standby picture instead.
-        const points=!document.hidden&&this.connected?this.hooks.project(p.screen):null,drawn=points&&p.status!=='ended'&&p.status!=='error'?points:null;
+        // anything but the picture (bare): the screen shows its own standby picture instead.
+        const points=!document.hidden&&this.connected?this.hooks.project(p.screen):null,drawn=points&&this.bare(p,now)?points:null;
         p.points=points;
         if(drawn){
           p.frame.style.transform=televisionTransform(drawn);
           if(!p.onScreen){p.onScreen=true;p.frame.style.visibility='';this.hooks.screen(p.screen,true);}
-          // Only the controller's screens take the pointer (the player's controls), and never the stage screen.
-          if(!pointerOnTv&&p.controls&&drawn.every((point,i)=>{const next=drawn[(i+1)%4]!;return (next.x-point.x)*(this.pointer.y-point.y)-(next.y-point.y)*(this.pointer.x-point.x)>=0;}))pointerOnTv=this.hooks.clear(p.screen);
         }else if(p.onScreen){p.onScreen=false;p.frame.style.visibility='hidden';this.hooks.screen(p.screen,false);}
       }
       if(periodic){
@@ -336,25 +361,34 @@ export class MediaController {
     }
     // A paused/failed selection must not unexpectedly restart the old procedural music.
     this.hooks.ambient(this.sessions.size>0);
-    if(this.kind.prefix==='tv'){const canvas=document.querySelector<HTMLCanvasElement>('#world');if(canvas)canvas.style.pointerEvents=pointerOnTv?'none':'';}
     if(periodic)this.renderPanel();
   }
   /**
    * Keeps every screen on the shared timeline, without continuously seeking during buffering, ads or errors: right after
    * it starts, then every SYNC_MS. The controller's player under their hands is the timeline's reference instead. A
    * stream with no timeline (length 0: a Twitch channel, a radio) is left where it is.
+   *
+   * A live broadcast cannot be held to the timeline second by second: each player stays at its own distance from the
+   * edge, and every seek costs a rebuffer. So each one's gap is measured once it settles, and it is moved only when that
+   * gap changes by more than LIVE_DRIFT_TOLERANCE (it stalled): once, and measured again from where it landed.
    */
   private keepInSync(session:Session,p:Playback,now:number):void {
     if(!p.ready||!p.player||p.status!=='playing'||session.state.status!=='playing'||document.hidden||!this.connected||this.handled(session,p))return;
     if(!p.fresh&&now-p.lastSync<=SYNC_MS)return;
+    const fresh=p.fresh,live=session.state.live;
+    if(live&&fresh&&now-p.movedAt<LIVE_SETTLE_MS)return;
     p.fresh=false;p.lastSync=now;
     // A live broadcast not reported as one yet keeps its place: the timeline still counts from 0 until liveMedia.
-    if(!session.state.live&&this.isLive(session,p))return;
-    const duration=p.player.getDuration(),live=session.state.live;
-    // Never past a video's end. A live broadcast's timeline runs at its edge: no further than this player's own edge,
-    // or a player a little behind the others would seek forever.
-    const target=live?Math.min(jukeboxTime(session.state,this.hooks.now()),duration):jukeboxTime(session.state,this.hooks.now());
-    if(duration>0&&(live||target<duration-2)&&Math.abs(p.player.getCurrentTime()-target)>(live?LIVE_DRIFT_TOLERANCE:DRIFT_TOLERANCE)){this.moved(p);p.player.seekTo(target,true);}
+    if(!live&&this.isLive(session,p))return;
+    const duration=p.player.getDuration(),target=jukeboxTime(session.state,this.hooks.now()),gap=target-p.player.getCurrentTime();
+    if(!(duration>0))return;
+    if(live){
+      if(fresh||p.liveGap===undefined){p.liveGap=gap;return;}
+      if(Math.abs(gap-p.liveGap)>LIVE_DRIFT_TOLERANCE){this.moved(p);this.veil(session,p);p.fresh=true;p.player.seekTo(target,true);}
+      return;
+    }
+    // Never past a video's end.
+    if(target<duration-2&&Math.abs(gap)>DRIFT_TOLERANCE){this.moved(p);this.veil(session,p);p.player.seekTo(target,true);}
   }
   /** A jump on the controller's player that this code did not make is a seek on the player's controls: everyone follows. */
   private watchControls(session:Session,p:Playback):void {
@@ -369,12 +403,16 @@ export class MediaController {
     return (p.ready&&p.player?.getVideoData?.()?.isLive===true)||!!session.growth?.live;
   }
   /**
-   * Tells the server the video is a live broadcast, with the live edge of this browser's player (its length: the time
-   * since the stream began). Everyone's timeline jumps there (liveMedia), instead of hours behind at the stream's start.
+   * Tells the server the video is a live broadcast, with where this browser's player is in it: it starts at the edge,
+   * and the time counts from when the stream began, the same for everyone. Everyone's timeline jumps there (liveMedia),
+   * instead of hours behind at the stream's start. A YouTube live's length is no edge: it stands still for minutes,
+   * about an hour ahead of what can be played, and a seek there comes back to the edge after a rebuffer.
    */
   private watchLive(session:Session,now:number):void {
     const p=session.players[session.audible];
-    if(!p?.ready||!p.player||p.status!=='playing'||session.state.live||p.revision!==session.state.revision)return;
+    if(!p?.ready||!p.player||p.status!=='playing'||p.revision!==session.state.revision)return;
+    const time=p.player.getCurrentTime();
+    if(session.state.live){const edge=session.edge;session.edge={time:Math.max(time,edge?edge.time+(now-edge.at)/1000:0),at:now};return;}
     const duration=p.player.getDuration();
     // No length at all: a stream with no timeline to jump to (a radio, a live playlist).
     if(!Number.isFinite(duration)||duration<=0){if(this.reporter(session)&&p.player.getVideoData?.()?.isLive===true)this.report(session,'live',{edge:0});return;}
@@ -384,7 +422,7 @@ export class MediaController {
       const elapsed=(now-growth.at)/1000,grew=duration-growth.duration;
       session.growth={duration,at:now,live:growth.live||(grew>elapsed*.5&&grew<elapsed*1.5)};
     }
-    if(this.reporter(session)&&this.isLive(session,p))this.report(session,'live',{edge:duration});
+    if(this.reporter(session)&&this.isLive(session,p))this.report(session,'live',{edge:time});
   }
   /** The sound of a TV group comes from the screen closest to the listener. */
   private chooseAudible(session:Session,immediate=false):void {
@@ -452,7 +490,7 @@ export class MediaController {
   setMaster(value:number):void {if(!Number.isFinite(value))return;this.master=Math.max(0,Math.min(1,value));for(const session of this.sessions.values())this.applyVolume(session,true);}
   setMuted(value:boolean):void {this.muted=value;for(const session of this.sessions.values())this.applyVolume(session,true);this.renderPanel();}
   get soundEnabled():boolean {return this.sessions.size>0&&!this.muted;}
-  /** Length in seconds of the video this source plays, from the player being heard (0 while unknown); a live broadcast's grows. */
+  /** Length in seconds of the video this source plays, from the player being heard (0 while unknown). */
   duration(id:string):number {
     const session=this.sessions.get(id),p=session?.players[session.audible],value=p?.ready?p.player?.getDuration()??0:0;
     return Number.isFinite(value)&&value>0?value:0;
@@ -511,8 +549,8 @@ export class MediaController {
     if('error' in link){hint.textContent=link.error;return;}
     const {label,note}=MEDIA_PLATFORMS[link.provider];hint.textContent=note?`${label}. ${note}`:label;
   }
-  /** The live edge of a broadcast in this browser: the heard player's length (the time since the stream began). */
-  private liveEdge(session:Session):number {return this.duration(session.state.id)||jukeboxTime(session.state,this.hooks.now());}
+  /** The live edge of a broadcast as far as this browser can tell: the furthest it was played here, run on by the clock. */
+  private liveEdge(session:Session):number {const edge=session.edge;return edge?edge.time+(performance.now()-edge.at)/1000:jukeboxTime(session.state,this.hooks.now());}
   /** The panel's step back or forward, within the video (or up to a broadcast's live edge). */
   private step(direction:number):void {
     const state=this.states()?.[this.selected],session=this.sessions.get(this.selected);if(!state||!Number.isFinite(direction))return;
@@ -603,7 +641,7 @@ export class MediaController {
     set('title',state?.title||p?.title||(state?.videoId?untitled(state.provider,state.videoId):this.kind.nothing));
     set('platform',playing?MEDIA_PLATFORMS[providerOf(state)].label:'');
     show(root.querySelector(this.id('live')),!!state?.live&&playing);
-    set('owner',!playing?'':controller?`Você está no controle: só você pausa, avança e pula este ${this.kind.prefix==='tv'?'vídeo':'som'}.${session?.control?' Na tela, os controles do player também valem.':''}`
+    set('owner',!playing?'':controller?`Você está no controle: só você pausa, avança e pula este ${this.kind.prefix==='tv'?'vídeo':'som'}.${session?.control?' Na janela, os controles do player também valem.':''}`
       :free?'Quem pôs este vídeo saiu do bar: quem estiver aqui pode assumir o controle.':`No controle: ${state.byName}. O seu vídeo entra na fila.`);
     const shared=state?.status==='playing'?'Bar: tocando':state?.status==='paused'?'Bar: pausado':this.kind.offState;
     set('state',this.checking?'Conferindo se este link toca aqui…':pending?'Enviando comando…':p?`${shared} · Neste navegador: ${session?.dismissed?'janela fechada':labels[p.status]}`:shared);
@@ -617,7 +655,7 @@ export class MediaController {
       if(position.max!==String(Math.floor(duration)))position.max=String(Math.floor(duration));
       if(!this.dragging)position.value=String(Math.min(Math.floor(duration),Math.floor(time)));
       set('time',`${clock(this.dragging?Number(position.value):time)} / ${clock(duration)}`);
-    } else if(live){const behind=(duration||time)-time;set('time',behind<LIVE_LAG?'No ao vivo':`${clock(behind)} atrás do ao vivo`);}
+    } else if(live){const behind=duration&&session?this.liveEdge(session)-time:0;set('time',behind<LIVE_LAG?'No ao vivo':`${clock(behind)} atrás do ao vivo`);}
     position.disabled=busy;
     root.querySelectorAll<HTMLButtonElement>('[data-media],[data-media-step],[data-media-live]').forEach(button=>{
       const action=button.dataset.media;
@@ -662,9 +700,9 @@ export class MediaController {
   }
   /** While a TV plays, the vignette must not darken its picture. */
   private updateActive():void {document.body.classList.toggle('media-active',!!this.container.querySelector('.tv-player'));}
-  reset():void {for(const id of [...this.sessions.keys()])this.remove(id);this.world=undefined;this.connected=false;this.clearPending();this.detachPanel();this.hooks.ambient(false);if(this.kind.prefix==='tv'){const canvas=document.querySelector<HTMLCanvasElement>('#world');if(canvas)canvas.style.pointerEvents='';}}
+  reset():void {for(const id of [...this.sessions.keys()])this.remove(id);this.world=undefined;this.connected=false;this.clearPending();this.detachPanel();this.hooks.ambient(false);}
   destroy():void {
-    this.disposed=true;this.reset();document.removeEventListener('visibilitychange',this.onVisibility);window.removeEventListener('pointermove',this.onPointer);
+    this.disposed=true;this.reset();document.removeEventListener('visibilitychange',this.onVisibility);
     window.removeEventListener('click',this.onGesture,true);window.removeEventListener('keydown',this.onGesture,true);
     if(!this.container.children.length)this.container.remove();
   }

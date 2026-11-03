@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DELIVERY_SPOTS, HIGHFOOD, HIGHFOOD_LINES, HIGHFOOD_RESTAURANTS, cityZone, deliveryPay, fillLine, gpsRoute, ratingWait, type CustomerProfile, type DeliverySpot, type HighfoodOrderView, type HighfoodState, type HighfoodStatus, type Position, type PriceTable } from '@bar/shared';
+import { DELIVERY_SPOTS, HIGHFOOD, HIGHFOOD_LINES, HIGHFOOD_RESTAURANTS, cityZone, deliveryPay, fillLine, gpsRoute, nearestPickup, ratingWait, type CustomerProfile, type DeliverySpot, type HighfoodOrderView, type HighfoodPickupView, type HighfoodState, type HighfoodStatus, type PickupPoint, type Position, type PriceTable } from '@bar/shared';
 
 /** An order as the room knows it: what the app sees and what it does not need to. */
 export interface FoodOrder extends HighfoodOrderView { profile: CustomerProfile; spot: DeliverySpot; acceptedAt: number; unloadEndsAt?: number }
@@ -10,6 +10,7 @@ export type DeskEvent =
   | { kind: 'missed'; userId: string; offline: boolean }
   | { kind: 'gave-up'; userId: string; order: FoodOrder };
 
+const pickupView = ({ street, number, ...point }: PickupPoint, length: number): HighfoodPickupView => ({ ...point, address: `${street}, ${number}`, neighbourhood: cityZone(point.x, point.z), length: Math.round(length) });
 const view = (order: FoodOrder): HighfoodOrderView => { const { profile: _profile, spot: _spot, acceptedAt: _at, unloadEndsAt: _ends, ...rest } = order; return rest; };
 
 /**
@@ -45,20 +46,22 @@ export class HighfoodDesk {
     return { status: shift.status, since: shift.since, done: shift.done, earned: shift.earned, ...(shift.nextAt ? { nextAt: shift.nextAt } : {}), ...(shift.offer ? { offer: view(shift.offer) } : {}), ...(shift.order ? { order: view(shift.order) } : {}) };
   }
 
-  /** A random place with a customer in reach from where the courier is now, and the way there. */
+  /** A random place with a customer in reach from the pickup point nearest the courier now, and the way there: the pay is measured from it. */
   private makeOffer(shift: Shift, from: Position, now: number): FoodOrder | undefined {
     const people = this.customers();
-    if (!people.length) return;
+    const nearest = nearestPickup(from);
+    if (!people.length || !nearest) return;
+    const origin = { x: nearest.point.parkX, z: nearest.point.parkZ };
     const busy = [...this.shifts.values()].flatMap(other => [other.order, other.offer].filter(Boolean) as FoodOrder[]);
     const free = people.filter(person => !busy.some(order => order.profile.id === person.id));
     const near = DELIVERY_SPOTS.filter(spot => {
-      const distance = Math.hypot(spot.x - from.x, spot.z - from.z);
+      const distance = Math.hypot(spot.x - origin.x, spot.z - origin.z);
       return distance >= HIGHFOOD.SPOT_MIN && distance <= HIGHFOOD.SPOT_MAX && !busy.some(order => Math.hypot(order.spot.x - spot.x, order.spot.z - spot.z) < 15);
     });
     if (!near.length) return;
     for (let attempt = 0; attempt < 8; attempt++) {
       const spot = near[Math.floor(this.random() * near.length)]!;
-      const route = gpsRoute(from, { x: spot.parkX, z: spot.parkZ });
+      const route = gpsRoute(origin, { x: spot.parkX, z: spot.parkZ });
       if (!route || route.length < HIGHFOOD.ROUTE_MIN || route.length > HIGHFOOD.ROUTE_MAX) continue;
       const pool = free.length ? free : people, profile = pool[Math.floor(this.random() * pool.length)]!;
       const restaurant = HIGHFOOD_RESTAURANTS[Math.floor(this.random() * HIGHFOOD_RESTAURANTS.length)]!;
@@ -67,7 +70,8 @@ export class HighfoodDesk {
       return {
         id: randomUUID(), customer: { id: profile.id, name: profile.name, look: profile.look, image: profile.image }, restaurant: restaurant.name, kind: restaurant.kind, items,
         address: `${spot.street}, ${spot.number}`, neighbourhood: cityZone(spot.x, spot.z), place: spot.place, x: spot.x, y: spot.y, z: spot.z, parkX: spot.parkX, parkZ: spot.parkZ,
-        length: Math.round(route.length), pay: estimate.total, expiresAt: now + HIGHFOOD.OFFER_MS, promiseAt: 0, crashes: 0, stage: 'going', profile, spot, acceptedAt: 0,
+        pickup: pickupView(nearest.point, nearest.length), code: '',
+        length: Math.round(route.length), pay: estimate.total, expiresAt: now + HIGHFOOD.OFFER_MS, promiseAt: 0, crashes: 0, stage: 'pickup', profile, spot, acceptedAt: 0,
       };
     }
   }
@@ -96,11 +100,16 @@ export class HighfoodDesk {
     return events;
   }
 
-  accept(userId: string, orderId: string, now: number): FoodOrder {
+  /** `from`: where the courier is now, who may have moved since the offer: the GPS takes them to the point nearest from here. What was offered stands: the pay, and so the length. */
+  accept(userId: string, orderId: string, now: number, from: Position): FoodOrder {
     const shift = this.shifts.get(userId);
     if (!shift || shift.status !== 'offer' || shift.offer?.id !== orderId) throw new Error('Esse pedido não está mais disponível.');
     const order = shift.offer;
-    order.acceptedAt = now; order.promiseAt = now + HIGHFOOD.PROMISE_START_MS + order.length / HIGHFOOD.PROMISE_SPEED * 1000;
+    const nearest = nearestPickup(from);
+    if (nearest) order.pickup = pickupView(nearest.point, nearest.length);
+    const way = gpsRoute({ x: order.pickup.parkX, z: order.pickup.parkZ }, { x: order.parkX, z: order.parkZ })?.length ?? order.length;
+    order.code = String(Math.floor(this.random() * 10_000)).padStart(4, '0');
+    order.acceptedAt = now; order.promiseAt = now + HIGHFOOD.PROMISE_START_MS + HIGHFOOD.PICKUP_MS + (order.pickup.length + way) / HIGHFOOD.PROMISE_SPEED * 1000;
     shift.offer = undefined; shift.order = order; shift.status = 'order'; shift.since = now; shift.ignored = 0;
     return order;
   }
@@ -128,7 +137,8 @@ export class HighfoodDesk {
   }
   crashed(userId: string): boolean {
     const order = this.orderOf(userId);
-    if (!order) return false;
+    // Before the pickup point there is nothing on board to knock about.
+    if (!order || order.stage === 'pickup') return false;
     order.crashes++;
     return true;
   }

@@ -54,7 +54,7 @@ test('badges earned by playing: the notice, the card, the progress tab and the c
   await page.locator('.pf-tabs [data-tab="achievements"]').click();
   const bebum=page.locator('.pf-ach[data-series="bebum"]');
   await expect(bebum.locator('small')).toHaveText('10 de 50 cervejas');
-  await expect(page.locator('.pf-panel .pf-lead')).toContainText('de 104 emblemas');
+  await expect(page.locator('.pf-panel .pf-lead')).toContainText('de 108 emblemas');
   await expect(page.locator('.pf-panel .pf-lead b')).toHaveText('1');
   await expect(bebum.locator('button.pf-ach-medal')).toHaveCount(1);await expect(bebum.locator('span.pf-ach-medal')).toHaveCount(3);
   // A started series comes before one nobody touched.

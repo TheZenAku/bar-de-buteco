@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import {sectorDistance,type SectorCell} from '@bar/shared';
 import {CityPlanner,CITY_TUNING,type CityBackend,type CityDetail,type LodMode,type SlotKind} from './city-plan';
 import type {EnvironmentLighting} from './environment-lighting';
+import {pointAtFirstTexture} from './gltf-textures';
 
 const CITY_URL=`${import.meta.env.BASE_URL}maps/cidade/`;
 /** Beyond this distance a sector's buildings and trees cast no sun shadow (the sun's cascades reach 55 m). */
@@ -25,7 +26,6 @@ interface LoadedFile {
   entities:number;
 }
 interface SectorEntry {arquivos:{visual:string;lod:string};kb:{visual:number;lod:number}}
-const textureInfos=(material:Record<string,any>)=>[material.pbrMetallicRoughness?.baseColorTexture,material.emissiveTexture,material.normalTexture,material.pbrMetallicRoughness?.metallicRoughnessTexture,material.occlusionTexture];
 /** The city's only textures that are data and not colour are its normal maps (telha_n, tijolo_n). */
 const holdsColour=(file:string)=>!/_n\.[a-z]+$/i.test(file);
 
@@ -263,15 +263,5 @@ export class CityStreaming implements CityBackend<LoadedFile> {
     file.casting=casting;
     for(const render of file.casters)render.castShadows=casting;
   }
-}
-/**
- * The parser makes a clone of a texture each time a glTF refers to its image again, and the exporter repeats one image in many
- * textures: 32 textures for 13 images in a sector, each drawn from its own copy on the GPU. Materials all point at the first of each
- * image (the parser runs this after making the textures, so their order must stay), and the clones, never bound, never reach the GPU.
- */
-function pointAtFirstTexture(gltf:Record<string,any>):void {
-  const first=new Map<number,number>();
-  (gltf.textures??[]).forEach((texture:{source:number},index:number)=>{if(!first.has(texture.source))first.set(texture.source,index);});
-  for(const material of gltf.materials??[])for(const info of textureInfos(material))if(info)info.index=first.get(gltf.textures[info.index].source);
 }
 const countEntities=(entity:pc.GraphNode):number=>entity.children.reduce((sum,child)=>sum+countEntities(child),1);

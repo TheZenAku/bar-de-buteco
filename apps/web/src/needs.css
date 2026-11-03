@@ -88,6 +88,8 @@ body.drunk-3 #world,body.drunk-4 #world{animation:drunk-sway 4.5s ease-in-out in
 body.drunk-2 .vignette,body.drunk-3 .vignette,body.drunk-4 .vignette{box-shadow:inset 0 0 200px oklch(.5 .14 330 / .5)}
 @keyframes drunk-sway{0%,100%{transform:scale(1.03) rotate(0)}30%{transform:scale(1.04) rotate(.7deg) translateX(.6%)}70%{transform:scale(1.035) rotate(-.6deg) translateX(-.5%)}}
 @media(prefers-reduced-motion:reduce){body[class*=drunk-] #world{animation:none}}
+/* A filter on the whole game canvas is one more full-screen pass every frame: phones keep the sway and the warm vignette. */
+@media(pointer:coarse){body.drunk-3 #world,body.drunk-4 #world{filter:none}}
 /* Phones: the cores follow the smaller map (minimap.css); thicker rings and less inset keep them readable. */
 @media(max-width:760px){
   .need-core{inset:3px}

@@ -50,5 +50,17 @@ export function readGraphics(saved:unknown):GraphicsSettings {
     city:pick(g.city,['low','medium','high','ultra'] as const,preset==='custom'?fallback.city:GRAPHICS_PRESETS[preset].city),
   };
 }
+/**
+ * The largest side, in pixels, a texture keeps on the GPU (larger ones are scaled down as they load: BarScene.limitTextures).
+ * Every 1024² texture costs about 5 MB of video memory, a 2048² one about 21 MB: phones run out long before computers.
+ * It applies to what loads after a change (the map loads once, at the start).
+ */
+export function textureLimit(graphics:Pick<GraphicsSettings,'preset'|'city'>,coarse=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches):number {
+  // A custom preset goes by the city detail chosen with it, the closest thing to a texture quality.
+  const level=graphics.preset==='custom'?graphics.city:graphics.preset;
+  if(level==='low')return 512;
+  if(level==='medium')return coarse?512:1024;
+  return level==='high'&&coarse?1024:Infinity;
+}
 /** Fog start/end multiplier: denser fog also hides more of the distant city, which is cheaper to draw. */
 export const FOG_SCALE:Record<FogDensity,number>={light:1.35,normal:1,dense:.7};

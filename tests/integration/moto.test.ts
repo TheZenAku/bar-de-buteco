@@ -91,9 +91,9 @@ test('steering right turns it right, tighter when slow, and the rear wheel follo
 });
 
 test('it stops at solids instead of crossing them, flat out and on every tick',()=>{
-  const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Carro_Prata')!;
-  // Head on along the street into the parked car, from far enough to be flat out.
-  const start=at(car.x-40,car.z,Math.PI/2);
+  const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Arquibancada')!;
+  // Head on into the grandstand, the only long solid with a clear run-up now the parked cars are gone.
+  const start=at(car.x-car.hx-10,car.z,Math.PI/2);
   let hit=false;
   const end=ride(start,{throttle:1},200,body=>{
     assert.equal(hullInSolid(body),undefined,`Inside a solid at ${body.x},${body.z}`);
@@ -134,7 +134,7 @@ test('the rider gets off on the bike\'s left when there is room, and always on a
   assert.ok(left>.9,`Left of the bike (+X local): ${left}`);
   assert.ok(isWalkable(off.x,off.z,off.y));
   // Against the silver car: the other side.
-  const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Carro_Prata')!;
+  const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Arquibancada')!;
   const beside=motoDismountSpot({...parked,x:car.x,z:car.z+car.hz+.5});
   assert.ok(isWalkable(beside.x,beside.z,beside.y));
 });

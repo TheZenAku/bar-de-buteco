@@ -144,7 +144,7 @@ test('the engine, the wear, being run over and fixing a part, over real WebSocke
     staff.room.send('admin.moto.despawn',{});await until(()=>room.state.motos.size===0);await pause(250);
     staff.room.send('admin.moto.spawn',{});await until(()=>room.state.motos.size===1);
     const third=[...room.state.motos.values()][0]!;
-    const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Carro_Prata')!,fromCar=car.x-car.hx-MOTO.HALF_LENGTH-3;
+    const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Arquibancada')!,fromCar=car.x-car.hx-MOTO.HALF_LENGTH-3;
     rider.player().assign({x:fromCar,y:0,z:car.z+1.2});third.assign({x:fromCar,y:0,z:car.z,yaw:Math.PI/2});await pause(100);
     rider.room.send('moto.mount',{motoId:third.id});await until(()=>third.riderId==='rider');await until(()=>third.engine===MOTO_ENGINE.ON,2000);
     third.assign({speed:14,x:fromCar,z:car.z,yaw:Math.PI/2});rider.player().assign({x:fromCar,y:0,z:car.z});

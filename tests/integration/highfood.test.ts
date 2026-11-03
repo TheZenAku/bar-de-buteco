@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {GARAGES,motoSpawnSpot,DELIVERY_SPOTS,GPS_CELL,HIGHFOOD,HIGHFOOD_CUSTOMERS,MOTO_PARTS,NEW_MOTO_PARTS,STREET_LABELS,customerLookSchema,defaultPrices,deliveryPay,deliveryStars,floorHeight,gpsClass,gpsRoute,isWalkable,mileageWear,motoFits,priceOf,ratingWait,readMotoParts,routeLength,routeProgress,roadHeight,SKINS,courierLevel,fillLine} from '@bar/shared';
+import {readFileSync} from 'node:fs';
+import {PICKUP_POINTS,atPickup,nearestPickup,GARAGES,motoSpawnSpot,DELIVERY_SPOTS,GPS_CELL,HIGHFOOD,HIGHFOOD_CUSTOMERS,MOTO_PARTS,NEW_MOTO_PARTS,STREET_LABELS,customerLookSchema,defaultPrices,deliveryPay,deliveryStars,floorHeight,gpsClass,gpsRoute,isWalkable,mileageWear,motoFits,priceOf,ratingWait,readMotoParts,routeLength,routeProgress,roadHeight,SKINS,courierLevel,fillLine} from '@bar/shared';
 
 const prices=defaultPrices({});
 const sample=<T>(list:readonly T[],count:number)=>Array.from({length:count},(_,i)=>list[Math.floor(i*list.length/count)]!);
@@ -74,6 +75,50 @@ test('every delivery spot: someone can stand there, it is on the pavement, and t
   // Spread around the map, not in one corner.
   const quadrants=new Set(DELIVERY_SPOTS.map(spot=>`${Math.sign(spot.x)}:${Math.sign(spot.z)}`));
   assert.equal(quadrants.size,4);
+});
+
+test('the pickup points: every one in the map, with its screen to the street, room to stand and the bike at the kerb',()=>{
+  const {pontos}=JSON.parse(readFileSync(new URL('../../apps/web/public/maps/cidade/pontos_ifood.json',import.meta.url),'utf8')) as {pontos:Array<{nome:string;pos_gltf:number[];frente_gltf:number[]}>};
+  assert.equal(PICKUP_POINTS.length,pontos.length,'Run npm run assets:gps');
+  pontos.forEach(({nome,pos_gltf:[x,,z],frente_gltf:[frontX,,frontZ]},i)=>{
+    const point=PICKUP_POINTS[i]!;
+    assert.ok(Math.abs(point.x-x!)<.01&&Math.abs(point.z-z!)<.01,`${nome}: run npm run assets:gps`);
+    assert.ok(Math.abs(point.frontX-frontX!)<.01&&Math.abs(point.frontZ-frontZ!)<.01,nome);
+    assert.ok(point.street.length>3&&point.number>0,nome);
+    // Someone can stand at the screen, and it counts as there; behind the locker it does not.
+    const y=floorHeight(point.standX,point.standZ,.15);
+    assert.ok(y!==undefined&&isWalkable(point.standX,point.standZ,y),`${nome}: nobody can stand at the screen`);
+    assert.ok(atPickup(point,{x:point.standX,z:point.standZ}),nome);
+    assert.ok(!atPickup(point,{x:point.x-point.frontX,z:point.z-point.frontZ}),nome);
+    assert.ok(!atPickup(point,{x:point.parkX+point.frontX*3,z:point.parkZ+point.frontZ*3}),nome);
+    // The bike stops in the street, just past the kerb, and from there it is a free walk to the screen.
+    const road=roadHeight(point.parkX,point.parkZ,0);
+    assert.ok(road!==undefined&&road<.08,`${nome}: the bike does not stop on the street`);
+    assert.ok(motoFits(point.parkX,point.parkZ,point.frontX?0:Math.PI/2,0),nome);
+    const gap=Math.hypot(point.parkX-point.standX,point.parkZ-point.standZ);
+    assert.ok(gap<4,`${nome}: the bike stays ${gap} m from the screen`);
+    for(let d=.9;d<gap;d+=.3){const wx=point.standX+point.frontX*d,wz=point.standZ+point.frontZ*d;assert.ok(isWalkable(wx,wz,floorHeight(wx,wz,.15)??0),`${nome}: the walk is blocked at ${wx},${wz}`);}
+    // Reached along the streets, from the bar's corner of the city.
+    assert.ok(gpsRoute(HIGHFOOD.BASE,{x:point.parkX,z:point.parkZ}),`${nome}: no way there`);
+  });
+});
+
+test('the GPS takes the courier to the pickup point nearest along the streets',()=>{
+  const places=sample(DELIVERY_SPOTS,120);
+  let same=0,worst=0;
+  const started=performance.now();
+  for(const spot of places)nearestPickup({x:spot.parkX,z:spot.parkZ});
+  const each=(performance.now()-started)/places.length;
+  assert.ok(each<60,`${each.toFixed(1)} ms per search`);
+  for(const spot of places){
+    const from={x:spot.parkX,z:spot.parkZ},found=nearestPickup(from)!;
+    const all=PICKUP_POINTS.map(point=>gpsRoute(from,{x:point.parkX,z:point.parkZ})?.length??Infinity),shortest=Math.min(...all);
+    if(found.length<=shortest+.01)same++;
+    worst=Math.max(worst,found.length-shortest);
+  }
+  assert.ok(same/places.length>=.95,`${same} of ${places.length} found the nearest of all`);
+  assert.ok(worst<60,`At worst ${worst.toFixed(0)} m further than the nearest`);
+  assert.equal(nearestPickup({x:HIGHFOOD.BASE.x,z:HIGHFOOD.BASE.z})!.point,PICKUP_POINTS[0],'Beside the bar, the bar\'s own');
 });
 
 test('what a delivery pays: base, distance, bonus for the promise, less for crashes, less for a ruined box',()=>{

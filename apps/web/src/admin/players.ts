@@ -98,7 +98,10 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
       ${card('Veículos',d.vehicles.length?`<ul class="admin-items skins">${d.vehicles.map(v=>`<li>${plateHtml(v.plate)}<b>${e(v.name)}</b><span>${n(Math.round(v.mileage/1000))} km</span></li>`).join('')}</ul><p class="fine-print">Quem tem a chave tem o veículo. As chaves não ocupam espaço na mochila e nunca caem.</p>`:empty('Nenhum veículo.'),{icon:'key'})}
       ${card('Skins',`<ul class="admin-items skins">${d.skins.map(s=>`<li class="${s.owned?'':'none'}"><b>${e(s.name)}</b><span>${s.id==='nathan'?'Gratuita':s.owned?`Desde ${e(when(s.acquiredAt))}`:'Não tem'}</span></li>`).join('')}</ul>
         ${p.canEditWallet&&paid.length?`<form data-admin-form="skin" class="admin-inline-form"><label>Skin<select name="skinId" aria-label="Skin">${paid.map(s=>`<option value="${s.id}">${e(s.name)}${s.owned?' (tem)':''}</option>`).join('')}</select></label>${reasonField('Motivo da mudança de skin')}
-        <div class="admin-confirm-buttons"><button class="button secondary" type="submit" value="grant">Dar skin</button><button class="mini-button" type="submit" value="revoke">Retirar skin</button></div></form>`:''}`,{icon:'shirt'})}</div>`;
+        <div class="admin-confirm-buttons"><button class="button secondary" type="submit" value="grant">Dar skin</button><button class="mini-button" type="submit" value="revoke">Retirar skin</button></div></form>`:''}`,{icon:'shirt'})}
+      ${card('Habilidades',`<ul class="admin-items skins">${d.skills.map(s=>`<li class="${s.owned?'':'none'}"><b>${e(s.name)}</b><span>${s.owned?`Desde ${e(when(s.acquiredAt))}`:'Não tem'}</span></li>`).join('')}</ul>
+        ${p.canEditWallet&&d.skills.length?`<form data-admin-form="skill" class="admin-inline-form"><label>Habilidade<select name="skillId" aria-label="Habilidade">${d.skills.map(s=>`<option value="${s.id}">${e(s.name)}${s.owned?' (tem)':''}</option>`).join('')}</select></label>${reasonField('Motivo da mudança de habilidade','Por que dar ou retirar')}
+        <div class="admin-confirm-buttons"><button class="button secondary" type="submit" value="grant">Dar habilidade</button><button class="mini-button" type="submit" value="revoke">Retirar habilidade</button></div></form>`:''}`,{icon:'bolt'})}</div>`;
   }
   function moderationTab(d:AdminPlayerDetail):string {
     const p=d.account,actions=`${p.canModerate?`<button class="mini-button" data-admin="kick">Expulsar</button>${p.kickId?'<button class="mini-button" data-admin="unkick">Desfazer expulsão</button>':''}<button class="mini-button" data-admin="${p.banned?'unban':'ban'}">${p.banned?'Desbanir':'Banir'}</button>`:''}
@@ -211,6 +214,7 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
     else if(kind==='logout')player({op:'logout'},'Sessões encerradas.');
     else if(kind==='item'){const quantity=Math.abs(Number(values.quantity));player({op:'item',itemId:String(values.itemId),quantity:submitter?.value==='remove'?-quantity:quantity},submitter?.value==='remove'?'Itens retirados da mochila.':`${itemById(String(values.itemId))?.name??'Item'} entregue na mochila.`);}
     else if(kind==='skin')player({op:'skin',skinId:String(values.skinId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Skin retirada da coleção.':'Skin adicionada à coleção.');
+    else if(kind==='skill')player({op:'skill',skillId:String(values.skillId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Habilidade retirada.':'Habilidade adicionada.');
     else if(kind==='role')void ctx.run(async()=>{await ctx.api('/admin/role',{playerId:p.id,role:p.role==='admin'?'user':'admin',reason});mode='';await reload();},'Permissão administrativa atualizada.');
     else void ctx.run(async()=>{await ctx.api('/admin/action',{playerId:p.id,action:kind,reason});mode='';await reload();},'Ação de moderação registrada.');
   };

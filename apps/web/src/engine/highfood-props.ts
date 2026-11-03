@@ -1,7 +1,7 @@
 import * as pc from 'playcanvas';
 
 const BRAND='#d9172f';
-/** The Highland Bar Delivery mark (public/highfood/logo.webp) on a square of the prop's colour, for the bag, the backpack and the stand. Plain colour until the picture arrives. */
+/** The Highland Bar Delivery mark (public/highfood/logo.webp) on a square of the prop's colour, for the bag and the backpack. Plain colour until the picture arrives. */
 function logoTexture(app:pc.Application,background:string):pc.Texture {
   const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
   const g=canvas.getContext('2d')!;
@@ -14,7 +14,7 @@ function logoTexture(app:pc.Application,background:string):pc.Texture {
   return texture;
 }
 
-/** What delivery work is drawn with and the game has no model of: the paper bag, the courier's backpack and the sign at the base. Plain boxes with the brand on them, sharing one mesh. */
+/** What delivery work is drawn with and the game has no model of: the paper bag and the courier's backpack. Plain boxes with the brand on them, sharing one mesh. */
 export class HighfoodProps {
   private readonly box:pc.Mesh;
   private readonly materials=new Map<string,pc.StandardMaterial>();
@@ -63,19 +63,6 @@ export class HighfoodProps {
     const root=new pc.Entity('Phone in hand'),body=this.material('phone-body','#16161a',undefined,.7),screen=this.material('phone-screen','#9fc4ff',undefined,.8);
     this.part(root,body,[0,0,0],[.07,.145,.009]);
     this.part(root,screen,[0,0,.0052],[.062,.133,.001]);
-    return root;
-  }
-  /** The sign at the base: a post with the mark on both faces and a shelf of bags waiting. Facing +Z. */
-  stand():pc.Entity {
-    const root=new pc.Entity('Highfood stand'),metal=this.material('stand-metal','#3b3f48',undefined,.55),face=this.material('stand-face',BRAND,'#14060a',.5),panel=this.material('stand-panel','#ffffff',undefined,.4),wood=this.material('stand-wood','#54463c');
-    this.part(root,metal,[0,.92,0],[.09,1.84,.09]);
-    this.part(root,panel,[0,2.25,0],[.9,.9,.07]);
-    this.part(root,face,[0,2.25,.037],[.84,.84,.002]);
-    this.part(root,face,[0,2.25,-.037],[.84,.84,.002]);
-    this.part(root,wood,[0,.42,.04],[.8,.05,.4]);
-    this.part(root,metal,[-.37,.2,.04],[.04,.4,.38]);
-    this.part(root,metal,[.37,.2,.04],[.04,.4,.38]);
-    for(const [x,z] of [[-.22,.08],[.04,-.03],[.26,.1]] as const){const bag=this.bag();bag.setLocalPosition(x,.76,.04+z);root.addChild(bag);}
     return root;
   }
 }

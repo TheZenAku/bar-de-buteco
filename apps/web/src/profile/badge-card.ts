@@ -27,7 +27,7 @@ function seeded(text:string):()=>number {
 }
 let glintSprites:HTMLCanvasElement[]|undefined;
 /** A four-pointed star in its halo, one per hue; drawing a picture is far cheaper than a path, for hundreds of stones a frame. */
-function glints():HTMLCanvasElement[] {
+export function glints():HTMLCanvasElement[] {
   return glintSprites??=GLINT_HUES.map(hue=>{
     const sprite=document.createElement('canvas');sprite.width=sprite.height=64;
     const g=sprite.getContext('2d')!,halo=g.createRadialGradient(32,32,0,32,32,22);
@@ -50,7 +50,7 @@ function frameStones(width:number,height:number):Array<[number,number]> {
 }
 interface Stone {x:number;y:number;size:number;faceX:number;faceY:number;sprite:HTMLCanvasElement;phase:number;speed:number}
 /** The rarest card's stones: set in the frame and scattered on the face, each flashing when the tilt turns it to the light, as glitter does. */
-function studs(canvas:HTMLCanvasElement,seed:string):(lightX:number,lightY:number,time:number)=>void {
+export function studs(canvas:HTMLCanvasElement,seed:string):(lightX:number,lightY:number,time:number)=>void {
   const width=canvas.offsetWidth,height=canvas.offsetHeight,scale=Math.min(devicePixelRatio||1,2),random=seeded(seed),sprites=glints();
   canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
   const context=canvas.getContext('2d')!;context.scale(scale,scale);

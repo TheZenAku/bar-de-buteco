@@ -1,4 +1,4 @@
-import {BLACKJACK_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,GARAGES,HIGHFOOD,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
+import {BLACKJACK_TABLE,TRUCO_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,POOL_TABLES,GARAGES,HIGHFOOD,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
 import type {MapView} from './engine/scene-types';
 import {uiIconSource} from './ui-icons';
 
@@ -27,7 +27,7 @@ function layerOf(id:string):Layer|undefined {
   if(/^COL_Viz_(Casa|Loja|Escola|Igreja)$/.test(name)||/^COL_Cid_(Casa|Loja|Sobrado|Galpao|Escritorio|Guarita|Obra|Viz_Antiga|Supermercado|Conveniencia|UBS|Escola|Prefeitura|Terminal|Vestiario|Quiosque|Casa_Comando)$/.test(name))return 'house';
   if(/^COL_Viz_(Muro|Muro_Escola|Portao|Adro)$/.test(name)||name==='COL_Ext_Alambrado'||/^COL_Cid_(Muro|Alambrado|Cerca_Ferrovia)$/.test(name))return 'fence';
   if(/^COL_Ext_(Carro|Sedan)_/.test(name)||/^COL_Cid_(Carro|Carreta)$/.test(name))return 'car';
-  if(/^COL_Ext_(Banca|Ponto_Onibus|Arquibancada|Coreto)$/.test(name)||/^COL_Cid_(Ponto_Onibus|Arquibancada|Doca|Academia|Brinquedo|Banco)$/.test(name))return 'prop';
+  if(/^COL_Ponto_iFood/.test(name)||/^COL_Ext_(Banca|Ponto_Onibus|Arquibancada|Coreto)$/.test(name)||/^COL_Cid_(Ponto_Onibus|Arquibancada|Doca|Academia|Brinquedo|Banco)$/.test(name))return 'prop';
   if(name==='COL_Predio_Piso')return 'lot';
   if(name==='COL_Predio_Laje')return 'slab';
   if(/^COL_Predio_Escada_(Base|Rampa|Patamar)$/.test(name))return 'stairs';
@@ -61,6 +61,29 @@ for(const c of CITY_SOLIDS){
     (layer==='block'?blocks:greens).push({x:(minX+maxX)/2,z:(minZ+maxZ)/2,hx:(maxX-minX)/2,hz:(maxZ-minZ)/2,upper:false,corners:[p[0]!,p[2]!,q[0]!,q[2]!,r[0]!,r[2]!,s[0]!,s[2]!]});
   }
   LAYERS.set('block',blocks);LAYERS.set('green',greens);
+}
+/**
+ * Each layer's boxes by square cells of the ground (a box goes in the cell of its centre): a redraw reads the cells around
+ * the player instead of all of the city's ~7000 boxes, 17 times. `reach`: the layer's largest half size, how far a box
+ * can stick out of its cell.
+ */
+const CELL=40;
+const GRID=new Map<Layer,{cells:Map<number,Box[]>;reach:number}>();
+const cellKey=(cx:number,cz:number)=>(cx+512)*1024+(cz+512);
+for(const [layer,boxes] of LAYERS){
+  const cells=new Map<number,Box[]>();let reach=0;
+  for(const b of boxes){
+    const key=cellKey(Math.floor(b.x/CELL),Math.floor(b.z/CELL));
+    const list=cells.get(key)??[];list.push(b);cells.set(key,list);
+    reach=Math.max(reach,b.hx,b.hz);
+  }
+  GRID.set(layer,{cells,reach});
+}
+/** The boxes of a layer that may reach within `range` of (x, z), in the layer's order within each cell. */
+function* boxesNear(layer:Layer,x:number,z:number,range:number):Generator<Box> {
+  const grid=GRID.get(layer);if(!grid)return;
+  const r=range+grid.reach,x0=Math.floor((x-r)/CELL),x1=Math.floor((x+r)/CELL),z0=Math.floor((z-r)/CELL),z1=Math.floor((z+r)/CELL);
+  for(let cx=x0;cx<=x1;cx++)for(let cz=z0;cz<=z1;cz++){const list=grid.cells.get(cellKey(cx,cz));if(list)yield* list;}
 }
 const LOT=MAP_COLLIDERS.find(c=>c.id==='COL_Predio_Piso')!;
 /** Behind the slabs' back edge is the backyard; past the terrace's wall, upstairs, the terrace. */
@@ -96,7 +119,9 @@ const POIS:readonly Poi[]=[
   poi('food','#ff3d5a',HIGHFOOD.BASE),
   ...GARAGES.map(garage=>poi('warehouse','#17d4f4',garage)),
   poi('cards','#a77bff',BLACKJACK_TABLE),
+  poi('cards','#ea2fdc',TRUCO_TABLE),
   poi('ball','#0386f0',centre(FOOSBALL_TABLES)),
+  poi('ball','#13d68a',centre(POOL_TABLES)),
   poi('toilet','#c9bff0',restroom(false)),
   poi('toilet','#c9bff0',restroom(true)),
 ];
@@ -141,7 +166,7 @@ export function createMinimap(root:HTMLElement){
     /** One path per layer; `floor`: only that floor's; `thin`: at least this half-thickness (walls stay a line wide). */
     const fill=(layer:Layer,colour:string,{floor,grow=0,thin=0}:{floor?:boolean;grow?:number;thin?:number}={})=>{
       ctx.beginPath();
-      for(const b of LAYERS.get(layer)??[]){
+      for(const b of boxesNear(layer,v.x,v.z,range)){
         if((floor!==undefined&&b.upper!==floor)||!near(b))continue;
         if(b.corners){const c=b.corners;ctx.moveTo(c[0]!,c[1]!);ctx.lineTo(c[2]!,c[3]!);ctx.lineTo(c[4]!,c[5]!);ctx.lineTo(c[6]!,c[7]!);ctx.closePath();continue;}
         const hx=Math.max(b.hx,thin)+grow,hz=Math.max(b.hz,thin)+grow;ctx.rect(b.x-hx,b.z-hz,hx*2,hz*2);
@@ -152,7 +177,7 @@ export function createMinimap(root:HTMLElement){
     fill('house',C.house);ctx.lineWidth=px;ctx.strokeStyle=C.houseEdge;ctx.stroke();
     fill('fence',C.fence,{thin:.6*px});fill('car',C.car);fill('prop',C.prop);
     ctx.beginPath();
-    for(const b of LAYERS.get('tree')??[])if(near(b)){ctx.moveTo(b.x+1.3,b.z);ctx.arc(b.x,b.z,1.3,0,TAU);}
+    for(const b of boxesNear('tree',v.x,v.z,range))if(near(b)){ctx.moveTo(b.x+1.3,b.z);ctx.arc(b.x,b.z,1.3,0,TAU);}
     ctx.fillStyle=C.tree;ctx.fill();
     // The bar: the player's floor in neon and its furniture faint. Upstairs, the slab covers the ground floor's.
     if(up){fill('furniture',C.furnitureFar,{floor:false});fill('wall',C.wallFar,{floor:false,thin:.6*px});fill('slab',C.slab);}

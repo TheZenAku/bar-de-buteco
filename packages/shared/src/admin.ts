@@ -1,4 +1,6 @@
 import {itemById} from './inventory.js';
+import {skinById} from './skins.js';
+import {skillById} from './profile.js';
 import type {PriceGroup} from './prices.js';
 
 export const MAX_COIN_BALANCE=1_000_000_000;
@@ -34,6 +36,7 @@ export interface AdminPlayerDetail {
   /** The vehicles whose key this player holds. */
   vehicles:Array<{id:string;plate:string;name:string;parts:string;mileage:number}>;
   skins:Array<{id:string;name:string;owned:boolean;acquiredAt:string|null}>;
+  skills:Array<{id:string;name:string;owned:boolean;acquiredAt:string|null}>;
   sessions:{active:number;lastLoginAt:string|null};
   stats:{gamesPlayed:number;wins:number;losses:number;draws:number};
   /** Administrative actions on this account, newest first, with their reversal state. */
@@ -46,7 +49,8 @@ export type AdminPlayerOperation=
   |{op:'verify'}
   |{op:'logout'}
   |{op:'item';itemId:string;quantity:number}
-  |{op:'skin';skinId:string;grant:boolean};
+  |{op:'skin';skinId:string;grant:boolean}
+  |{op:'skill';skillId:string;grant:boolean};
 
 /** The panel's Visão geral. */
 export interface AdminSummary {
@@ -103,11 +107,11 @@ export interface AdminServerInfo {
  */
 export const LEDGER_SOURCES={
   'boas-vindas':'Boas-vindas',bonus:'Bônus diário',trabalho:'Trabalho',estorno:'Estornos',admin:'Administração',pix:'Pix entre jogadores',trade:'Trocas entre jogadores',
-  highfood:'Entregas Highfood',veiculos:'Veículos',skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',blackjack:'Blackjack',pebolim:'Pebolim',testes:'Bots de teste',outros:'Outros',
+  highfood:'Entregas Highfood',veiculos:'Veículos',skins:'Skins',mochila:'Loja da mochila',midia:'Jukebox, TVs e telão',balcao:'Balcão',mesa:'Pedidos na mesa',palco:'Palco',blackjack:'Blackjack',truco:'Truco',pebolim:'Pebolim',sinuca:'Sinuca',testes:'Bots de teste',outros:'Outros',
 } as const;
 export type LedgerSource=keyof typeof LEDGER_SOURCES;
-const PREFIX_SOURCE:Record<string,LedgerSource>={highfood:'highfood',vehicle:'veiculos',welcome:'boas-vindas',daily:'bonus',job:'trabalho',refund:'estorno',pix:'pix',trade:'trade',skin:'skins',item:'mochila',
-  media:'midia',counter:'balcao',table:'mesa',stage:'palco',blackjack:'blackjack',foosball:'pebolim','dev-bots':'testes'};
+const PREFIX_SOURCE:Record<string,LedgerSource>={highfood:'highfood',vehicle:'veiculos',welcome:'boas-vindas',daily:'bonus',job:'trabalho',refund:'estorno',pix:'pix',trade:'trade',skin:'skins',skill:'skins',item:'mochila',
+  media:'midia',counter:'balcao',table:'mesa',stage:'palco',blackjack:'blackjack',truco:'truco',foosball:'pebolim',pool:'sinuca','dev-bots':'testes'};
 export const ledgerSource=(reason:string):LedgerSource=>reason.startsWith('{')?'admin':PREFIX_SOURCE[reason.split(':')[0]!]??'outros';
 const itemName=(id:string|undefined)=>itemById(id??'')?.name??id??'item';
 /** A sentence for one ledger row (`names`: display names by account id, for Pix). */
@@ -126,7 +130,8 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
     case 'refund':return 'Estorno de cobrança';
     case 'pix':return a==='out'?`Pix enviado para ${names[b??'']??'outro jogador'}`:`Pix recebido de ${names[b??'']??'outro jogador'}`;
     case 'trade':return a==='out'?`Moedas dadas numa troca com ${names[b??'']??'outro jogador'}`:`Moedas recebidas numa troca com ${names[b??'']??'outro jogador'}`;
-    case 'skin':return `Comprou a skin ${a}`;
+    case 'skin':return `Comprou a skin ${skinById(a)?.name??a}`;
+    case 'skill':return `Comprou a habilidade ${skillById(a)?.name??a}`;
     case 'item':return `Comprou ${b??1}× ${itemName(a)} na mochila`;
     case 'media':return a==='telao'?'Vídeo no telão':a?.startsWith('jukebox')?'Música na jukebox':'Vídeo na TV';
     case 'counter':return `${itemName(a)} no balcão`;
@@ -134,6 +139,8 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
     case 'stage':return 'Ingresso do palco';
     case 'blackjack':return a==='bet'?'Aposta no blackjack':a==='refund'?'Aposta do blackjack devolvida':'Prêmio do blackjack';
     case 'foosball':return a==='bet'?'Partida de pebolim valendo moedas':a==='refund'?'Moedas do pebolim devolvidas':'Prêmio do pebolim';
+    case 'truco':return a==='bet'?'Aposta no truco':a==='refund'?'Aposta do truco devolvida':'Prêmio do truco';
+    case 'pool':return a==='bet'?'Aposta na sinuca':a==='refund'?'Aposta da sinuca devolvida':'Prêmio da sinuca';
     case 'dev-bots':return 'Saldo dos bots de teste';
     default:return reason;
   }
@@ -143,7 +150,7 @@ const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão de
   'admin-grant':'Administrador concedido','admin-revoke':'Administrador removido','owner-bootstrap':'Conta principal habilitada',
   'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados',
   'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas',
-  'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada',
+  'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','catalog-edit':'Carta da coleção editada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
   'vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
   'report-resolve':'Denúncia resolvida','report-reopen':'Denúncia reaberta'};
@@ -197,6 +204,10 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   blackjack_round:d=>({title:'Rodada de blackjack',detail:`Apostou ${text(d.staked)||0} · recebeu ${text(d.paid)||0}${d.outcomes?` · ${text(d.outcomes)}`:''}`,amount:typeof d.net==='number'?d.net:undefined}),
   blackjack_settle_refused:d=>({title:'Prêmio do blackjack recusado',detail:`Rodada ${text(d.roundId)}: ${text(d.reason)}`}),
   foosball_match:d=>({title:'Partida de pebolim',detail:`Mesa ${text(d.table)} · ${text(d.score)} · ${d.result==='win'?'venceu':d.result==='loss'?'perdeu':'sem resultado'}${d.forfeit?' (W.O.)':''}${d.stake?` · valendo ${text(d.stake)}`:''}`,amount:typeof d.net==='number'&&d.net?d.net:undefined}),
+  truco_match:d=>({title:'Partida de truco',detail:`Nível ${text(d.level)} · ${text(d.score)} · ${text(d.stake)} moedas por pessoa · ${text(d.npcs)} NPCs`}),
+  truco_settle_refused:d=>({title:'Prêmio do truco recusado',detail:`Partida ${text(d.roundId)}: ${text(d.reason)}`}),
+  pool_match:d=>({title:'Partida de sinuca',detail:`Mesa ${text(d.table)} · ${d.result==='win'?'venceu':'perdeu'}${d.forfeit?' (desistência)':''} · ${text(d.reason)}${d.stake?` · valendo ${text(d.stake)}`:''}`,amount:typeof d.net==='number'&&d.net?d.net:undefined}),
+  pool_settle_refused:d=>({title:'Prêmio da sinuca recusado',detail:`Partida ${text(d.roundId)}: ${text(d.reason)}`}),
   foosball_settle_refused:d=>({title:'Prêmio do pebolim recusado',detail:`Partida ${text(d.roundId)}: ${text(d.reason)}`}),
   wallet_credit_refused:d=>({title:'Crédito recusado',detail:`A API recusou ${text(d.reason)}.`}),
   wallet_credit_abandoned:d=>({title:'Crédito abandonado',detail:`${text(d.amount)} moedas de ${text(d.reason)} não foram pagas.`}),

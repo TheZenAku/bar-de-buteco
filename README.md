@@ -34,7 +34,7 @@ O [ciclo de dia e noite](docs/sistemas/day-night.md) completa um dia em **40 min
 
 O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
 
-Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção: Leandro, Rafael e Read são vendidos na loja, e a skin vestida fica salva na conta. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [skins e coleção](docs/sistemas/skins.md).
+Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção de cartas: cada personagem tem suas variantes, com raridade e preço, e as habilidades também são compradas ali. A skin vestida fica salva na conta. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [skins e coleção](docs/sistemas/skins.md).
 
 | Controle | Ação |
 | --- | --- |
@@ -118,7 +118,7 @@ As animações de `assets-bar/anim`, seus usos e a conversão para os modelos es
 
 Cada skin mantém seu esqueleto nativo, com calibração própria de pose e ossos auxiliares. Para recalibrar os modelos existentes e regenerar todos os clipes, execute `npm run assets:retarget`. Veja [esqueletos nativos e adaptação de animações](docs/assets/native-rigs.md).
 
-Para conferir os personagens sem o mapa, abra **`/rigs.html`** no endereço do cliente em desenvolvimento. A tela permite comparar as seis skins, clipes, poses e esqueletos. Veja o [diagnóstico de rigs e o fluxo para estabilizar animações](docs/assets/rig-troubleshooting.md) antes de reimportar modelos.
+Para conferir os personagens sem o mapa, abra **`/rigs.html`** no endereço do cliente em desenvolvimento. A tela permite comparar as skins, clipes, poses e esqueletos. Veja o [diagnóstico de rigs e o fluxo para estabilizar animações](docs/assets/rig-troubleshooting.md) antes de reimportar modelos.
 
 O cenário e suas colisões vêm de `assets-bar/map/BarBoteco/export`, e a [cidade](docs/sistemas/cidade.md) de `export/cidade`. Para atualizar os arquivos usados pelo jogo, execute `npm run assets:map`. Veja [integração do mapa](docs/assets/map.md) para pisos, escada, nascimento, câmera e pontos de interação.
 

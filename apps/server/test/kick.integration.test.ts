@@ -9,7 +9,7 @@ const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 test('a kick throws who it touches, takes some life and lets them get up, over real WebSockets',{timeout:120000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
   const api=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;res.setHeader('content-type','application/json');
-    if(req.url?.endsWith('/validate')){const skin=raw.includes('rafa')?'rafael':'nathan';res.end(JSON.stringify({valid:true,blocked:[],role:'user',equippedSkin:skin,ownedSkins:[skin],balance:0,inventory:[]}));return;}
+    if(req.url?.endsWith('/validate')){const skin=raw.includes('rafa')?'rafael':'nathan';res.end(JSON.stringify({valid:true,blocked:[],role:'user',equippedSkin:skin,ownedSkins:[skin],ownedSkills:skin==='rafael'?['karate','air-kick']:[],balance:0,inventory:[]}));return;}
     res.end('{}');});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let room!:BarRoom;
@@ -116,6 +116,11 @@ test('a kick throws who it touches, takes some life and lets them get up, over r
     // Only Rafael has the kick; walls stop it; somebody gone is left alone.
     victim.kick('karate');await until(()=>victim.errors.length>0,2000);
     assert.match(victim.errors[0]!,/skin/);
+    // Skills are bought: the card alone does not kick.
+    const kicker=(room as any).sessions.getByUser(rafa.player().id);kicker.skills=new Set();
+    rafa.errors.length=0;rafa.kick('karate');await until(()=>rafa.errors.length>0,2000);
+    assert.match(rafa.errors[0]!,/Compre/);assert.equal(rafa.player().animationState,'idle');
+    kicker.skills=new Set(['karate','air-kick']);rafa.errors.length=0;
     at(victim,X,Z+1.15,Math.PI);victim.player().connected=false;
     rafa.kick('karate');await pause(KICKS.karate!.swingMs+600);
     assert.equal(victim.player().animationState,'idle','An absent avatar is not a target');

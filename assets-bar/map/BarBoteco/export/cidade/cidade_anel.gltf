@@ -67,7 +67,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":0,
 			"name":"ANEL_L"
@@ -81,7 +82,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":1,
 			"name":"ANEL_N"
@@ -95,7 +97,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":2,
 			"name":"ANEL_NE"
@@ -109,7 +112,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":3,
 			"name":"ANEL_NO"
@@ -123,7 +127,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":4,
 			"name":"ANEL_O"
@@ -137,7 +142,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":5,
 			"name":"ANEL_S"
@@ -151,7 +157,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":6,
 			"name":"ANEL_SE"
@@ -165,7 +172,8 @@
 				"lod_dist_m":[
 					300,
 					2000
-				]
+				],
+				"poliigon_props":{}
 			},
 			"mesh":7,
 			"name":"ANEL_SO"
@@ -176,7 +184,8 @@
 			"extras":{
 				"tile_u":2.0,
 				"tile_v":2.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Grama_Seca",
 			"pbrMetallicRoughness":{
@@ -195,13 +204,18 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":3.0,
+				"tile_v":3.0,
+				"poliigon_props":{}
 			},
 			"name":"Terra_Batida",
+			"normalTexture":{
+				"index":1,
+				"scale":0.800000011920929
+			},
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":1
+					"index":2
 				},
 				"metallicFactor":0
 			}
@@ -210,7 +224,8 @@
 			"extras":{
 				"tile_u":1.5,
 				"tile_v":1.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Brita",
 			"pbrMetallicRoughness":{
@@ -221,7 +236,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":2
+					"index":3
 				},
 				"metallicFactor":0
 			}
@@ -230,7 +245,8 @@
 			"extras":{
 				"tile_u":1.0,
 				"tile_v":1.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Trilho",
 			"pbrMetallicRoughness":{
@@ -247,7 +263,8 @@
 		{
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.0
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Metal_Branco",
 			"pbrMetallicRoughness":{
@@ -265,7 +282,8 @@
 			"extras":{
 				"tile_u":0.5,
 				"tile_v":0.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Galpao",
 			"pbrMetallicRoughness":{
@@ -276,7 +294,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":3
+					"index":4
 				},
 				"metallicFactor":0.25,
 				"roughnessFactor":0.6000000238418579
@@ -286,7 +304,8 @@
 			"extras":{
 				"tile_u":0.5,
 				"tile_v":0.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Telha_Metal",
 			"pbrMetallicRoughness":{
@@ -297,7 +316,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":4
+					"index":5
 				},
 				"metallicFactor":0.3499999940395355,
 				"roughnessFactor":0.5
@@ -307,7 +326,8 @@
 			"extras":{
 				"tile_u":0.5,
 				"tile_v":0.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Galpao_Azul",
 			"pbrMetallicRoughness":{
@@ -318,7 +338,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":5
+					"index":6
 				},
 				"metallicFactor":0.25,
 				"roughnessFactor":0.6000000238418579
@@ -328,7 +348,8 @@
 			"extras":{
 				"tile_u":3.0,
 				"tile_v":3.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Mata",
 			"pbrMetallicRoughness":{
@@ -339,20 +360,6 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":6
-				},
-				"metallicFactor":0,
-				"roughnessFactor":0.8999999761581421
-			}
-		},
-		{
-			"extras":{
-				"tile_u":1.5,
-				"tile_v":1.5
-			},
-			"name":"Folhas",
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
 					"index":7
 				},
 				"metallicFactor":0,
@@ -361,13 +368,29 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":1.5,
+				"tile_v":1.5,
+				"poliigon_props":{}
+			},
+			"name":"Folhas",
+			"pbrMetallicRoughness":{
+				"baseColorTexture":{
+					"index":8
+				},
+				"metallicFactor":0,
+				"roughnessFactor":0.8999999761581421
+			}
+		},
+		{
+			"extras":{
+				"tile_u":2.5,
+				"tile_v":2.5,
+				"poliigon_props":{}
 			},
 			"name":"Grama",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":8
+					"index":9
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.949999988079071
@@ -377,7 +400,8 @@
 			"extras":{
 				"tile_u":1.0,
 				"tile_v":1.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Agua",
 			"pbrMetallicRoughness":{
@@ -394,7 +418,8 @@
 		{
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.0
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Terra",
 			"pbrMetallicRoughness":{
@@ -409,8 +434,9 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Reboco_Creme",
 			"pbrMetallicRoughness":{
@@ -421,7 +447,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":9
+					"index":10
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.9200000166893005
@@ -430,15 +456,16 @@
 		{
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.2
+				"tile_v":1.2,
+				"poliigon_props":{}
 			},
 			"name":"Telha",
 			"normalTexture":{
-				"index":10
+				"index":11
 			},
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":11
+					"index":12
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8500000238418579
@@ -448,7 +475,8 @@
 			"extras":{
 				"tile_u":2.0,
 				"tile_v":2.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Reboco_Amarelo",
 			"pbrMetallicRoughness":{
@@ -459,7 +487,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":12
+					"index":13
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -467,8 +495,9 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Reboco_Azul",
 			"pbrMetallicRoughness":{
@@ -476,26 +505,6 @@
 					0.6000000238418579,
 					0.7200000286102295,
 					0.8600000143051147,
-					1
-				],
-				"baseColorTexture":{
-					"index":13
-				},
-				"metallicFactor":0,
-				"roughnessFactor":0.9200000166893005
-			}
-		},
-		{
-			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
-			},
-			"name":"Reboco_Ocre",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.8600000143051147,
-					0.6000000238418579,
-					0.2199999988079071,
 					1
 				],
 				"baseColorTexture":{
@@ -507,9 +516,31 @@
 		},
 		{
 			"extras":{
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
+			},
+			"name":"Reboco_Ocre",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.8600000143051147,
+					0.6000000238418579,
+					0.2199999988079071,
+					1
+				],
+				"baseColorTexture":{
+					"index":15
+				},
+				"metallicFactor":0,
+				"roughnessFactor":0.9200000166893005
+			}
+		},
+		{
+			"extras":{
 				"tile_u":2.0,
 				"tile_v":2.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Reboco_Salmao",
 			"pbrMetallicRoughness":{
@@ -517,27 +548,6 @@
 					0.9300000071525574,
 					0.6600000262260437,
 					0.550000011920929,
-					1
-				],
-				"baseColorTexture":{
-					"index":15
-				},
-				"metallicFactor":0,
-				"roughnessFactor":0.8999999761581421
-			}
-		},
-		{
-			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0,
-				"cid":true
-			},
-			"name":"Cid_Reboco_Lilas",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.7599999904632568,
-					0.699999988079071,
-					0.8600000143051147,
 					1
 				],
 				"baseColorTexture":{
@@ -550,7 +560,30 @@
 		{
 			"extras":{
 				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_v":2.0,
+				"cid":true,
+				"poliigon_props":{}
+			},
+			"name":"Cid_Reboco_Lilas",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.7599999904632568,
+					0.699999988079071,
+					0.8600000143051147,
+					1
+				],
+				"baseColorTexture":{
+					"index":17
+				},
+				"metallicFactor":0,
+				"roughnessFactor":0.8999999761581421
+			}
+		},
+		{
+			"extras":{
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Reboco_Rosa",
 			"pbrMetallicRoughness":{
@@ -561,7 +594,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":17
+					"index":18
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.9200000166893005
@@ -569,13 +602,14 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Reboco_Branco",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":18
+					"index":19
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.9200000166893005
@@ -585,7 +619,8 @@
 			"extras":{
 				"tile_u":2.0,
 				"tile_v":2.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Reboco_Turquesa",
 			"pbrMetallicRoughness":{
@@ -596,7 +631,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":19
+					"index":20
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -604,8 +639,9 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":0.6,
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Reboco_Verde",
 			"pbrMetallicRoughness":{
@@ -616,7 +652,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":20
+					"index":21
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.9200000166893005
@@ -626,7 +662,8 @@
 			"extras":{
 				"tile_u":2.0,
 				"tile_v":2.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Reboco_Cinza",
 			"pbrMetallicRoughness":{
@@ -637,7 +674,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":21
+					"index":22
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -645,13 +682,14 @@
 		},
 		{
 			"extras":{
-				"tile_u":4.0,
-				"tile_v":4.0
+				"tile_u":1.0,
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Asfalto",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":22
+					"index":23
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.949999988079071
@@ -661,7 +699,8 @@
 			"extras":{
 				"tile_u":6.0,
 				"tile_v":6.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Cana",
 			"pbrMetallicRoughness":{
@@ -672,7 +711,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":23
+					"index":24
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -681,7 +720,8 @@
 		{
 			"extras":{
 				"tile_u":0.6,
-				"tile_v":0.6
+				"tile_v":0.6,
+				"poliigon_props":{}
 			},
 			"name":"Casca",
 			"pbrMetallicRoughness":{
@@ -692,7 +732,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":24
+					"index":25
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.949999988079071
@@ -702,7 +742,8 @@
 			"extras":{
 				"tile_u":1.5,
 				"tile_v":1.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Eucalipto",
 			"pbrMetallicRoughness":{
@@ -713,7 +754,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":25
+					"index":26
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -723,7 +764,8 @@
 			"extras":{
 				"tile_u":0.5,
 				"tile_v":0.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Galpao_Verde",
 			"pbrMetallicRoughness":{
@@ -734,7 +776,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":26
+					"index":27
 				},
 				"metallicFactor":0.25,
 				"roughnessFactor":0.6000000238418579
@@ -742,13 +784,14 @@
 		},
 		{
 			"extras":{
-				"tile_u":2.0,
-				"tile_v":2.0
+				"tile_u":2.5,
+				"tile_v":2.5,
+				"poliigon_props":{}
 			},
 			"name":"Concreto",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":27
+					"index":28
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.949999988079071
@@ -757,7 +800,8 @@
 		{
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.0
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Pintura_Branca",
 			"pbrMetallicRoughness":{
@@ -775,7 +819,8 @@
 			"extras":{
 				"tile_u":0.5,
 				"tile_v":0.5,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Galpao_Creme",
 			"pbrMetallicRoughness":{
@@ -786,7 +831,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":28
+					"index":29
 				},
 				"metallicFactor":0.25,
 				"roughnessFactor":0.6000000238418579
@@ -796,7 +841,8 @@
 			"extras":{
 				"tile_u":4.0,
 				"tile_v":4.0,
-				"cid":true
+				"cid":true,
+				"poliigon_props":{}
 			},
 			"name":"Cid_Concreto_Pre",
 			"pbrMetallicRoughness":{
@@ -807,7 +853,7 @@
 					1
 				],
 				"baseColorTexture":{
-					"index":29
+					"index":30
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.8999999761581421
@@ -2253,18 +2299,6 @@
 		},
 		{
 			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		},
-		{
-			"sampler":0,
-			"source":2
-		},
-		{
-			"sampler":0,
 			"source":2
 		},
 		{
@@ -2273,11 +2307,11 @@
 		},
 		{
 			"sampler":0,
-			"source":3
+			"source":4
 		},
 		{
 			"sampler":0,
-			"source":0
+			"source":4
 		},
 		{
 			"sampler":0,
@@ -2289,47 +2323,11 @@
 		},
 		{
 			"sampler":0,
+			"source":5
+		},
+		{
+			"sampler":0,
 			"source":6
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
-		},
-		{
-			"sampler":0,
-			"source":4
 		},
 		{
 			"sampler":0,
@@ -2337,31 +2335,83 @@
 		},
 		{
 			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
 			"source":8
 		},
 		{
 			"sampler":0,
-			"source":3
-		},
-		{
-			"sampler":0,
-			"source":2
-		},
-		{
-			"sampler":0,
 			"source":9
 		},
 		{
 			"sampler":0,
-			"source":2
+			"source":10
 		},
 		{
 			"sampler":0,
-			"source":9
+			"source":7
+		},
+		{
+			"sampler":0,
+			"source":7
+		},
+		{
+			"sampler":0,
+			"source":10
+		},
+		{
+			"sampler":0,
+			"source":10
+		},
+		{
+			"sampler":0,
+			"source":7
+		},
+		{
+			"sampler":0,
+			"source":7
+		},
+		{
+			"sampler":0,
+			"source":10
+		},
+		{
+			"sampler":0,
+			"source":7
+		},
+		{
+			"sampler":0,
+			"source":10
+		},
+		{
+			"sampler":0,
+			"source":11
+		},
+		{
+			"sampler":0,
+			"source":0
+		},
+		{
+			"sampler":0,
+			"source":12
+		},
+		{
+			"sampler":0,
+			"source":5
+		},
+		{
+			"sampler":0,
+			"source":4
+		},
+		{
+			"sampler":0,
+			"source":13
+		},
+		{
+			"sampler":0,
+			"source":4
+		},
+		{
+			"sampler":0,
+			"source":14
 		}
 	],
 	"images":[
@@ -2369,6 +2419,16 @@
 			"mimeType":"image/jpeg",
 			"name":"grama",
 			"uri":"texturas/grama.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"pol_terra_n",
+			"uri":"texturas/pol_terra_n.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"pol_terra",
+			"uri":"texturas/pol_terra.jpg"
 		},
 		{
 			"mimeType":"image/jpeg",
@@ -2387,8 +2447,13 @@
 		},
 		{
 			"mimeType":"image/jpeg",
-			"name":"reboco",
-			"uri":"texturas/reboco.jpg"
+			"name":"pol_grama",
+			"uri":"texturas/pol_grama.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"pol_reboco",
+			"uri":"texturas/pol_reboco.jpg"
 		},
 		{
 			"mimeType":"image/jpeg",
@@ -2402,13 +2467,23 @@
 		},
 		{
 			"mimeType":"image/jpeg",
-			"name":"asfalto",
-			"uri":"texturas/asfalto.jpg"
+			"name":"reboco",
+			"uri":"texturas/reboco.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"pol_asfalto",
+			"uri":"texturas/pol_asfalto.jpg"
 		},
 		{
 			"mimeType":"image/jpeg",
 			"name":"madeira",
 			"uri":"texturas/madeira.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"pol_concreto",
+			"uri":"texturas/pol_concreto.jpg"
 		},
 		{
 			"mimeType":"image/jpeg",

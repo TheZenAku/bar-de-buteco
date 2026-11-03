@@ -1,8 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import {and,desc,eq,gt} from 'drizzle-orm';
-import {SKINS} from '@bar/shared';
+import {SKILLS,SKINS} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {currencyLedger,profiles,sessions,skinInventory,statistics,users,wallets} from './database/schema.js';
+import {currencyLedger,profiles,sessions,skillInventory,skinInventory,statistics,users,wallets} from './database/schema.js';
 import {createSession} from './auth/service.js';
 import type {WardrobeService} from './wardrobe.js';
 
@@ -35,6 +35,9 @@ export class DevBots {
       [user]=await this.db.select().from(users).where(eq(users.email,email));
     }
     const userId=user!.id;
+    // Also for bots made before skills and variants were sold: a bot that lands on one still has to use it.
+    for(const skin of SKINS)await this.db.insert(skinInventory).values({userId,skinId:skin.id}).onConflictDoNothing();
+    for(const skill of SKILLS)await this.db.insert(skillInventory).values({userId,skillId:skill.id}).onConflictDoNothing();
     await this.wardrobe.initialize(userId);
     await this.db.transaction(async tx=>{
       const [wallet]=await tx.select().from(wallets).where(eq(wallets.userId,userId)).for('update');

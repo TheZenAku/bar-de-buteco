@@ -21,6 +21,8 @@ export default defineConfig({
     // The bar animations: many skinned bodies, props and particles; drawn on the GPU like the stage.
     {name:'bar-animations',testMatch:'**/bar-animations.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Pebolim: the panel's canvas and the 3D ball at once, drawn on the GPU like the stage.
+    // Truco: two people's worlds at once; pages in the background must keep their timers.
+    {name:'truco',testMatch:'**/truco.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.14'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'foosball',testMatch:'**/foosball.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.6'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // The delivery bike: real keys over a real room, two players' worlds, drawn on the GPU like the stage.
     {name:'moto',testMatch:['**/moto.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
@@ -33,6 +35,8 @@ export default defineConfig({
     {name:'stage',testMatch:'**/stage.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.
     {name:'voice',testMatch:'**/voice.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.2'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
+    // The collection's fixture, and the whole flow in the game with the panel: drawn on the GPU like the stage.
+    {name:'collection',testMatch:'**/collection.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.14'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'profile',testMatch:['**/profile.spec.ts','**/achievements.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.9'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'phone',testMatch:'**/phone.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.5'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
   ],

@@ -4,6 +4,7 @@ import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LA
 import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
 import {FOOSBALL_TABLES} from './foosball.js';
+import {POOL_TABLES} from './pool/table.js';
 import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
 import {GARAGE,GARAGES} from './garage.js';
 
@@ -33,9 +34,17 @@ export const BLACKJACK_SEATS: readonly Seat[] = [-54,-18,18,54].map(degrees=>{
   return {x:BLACKJACK_TABLE.x+dx,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z+dz,rotation:Math.atan2(-dx,-dz)};
 });
 const BLACKJACK_COLLIDER:Collider={id:'blackjack',x:BLACKJACK_TABLE.x,z:BLACKJACK_TABLE.z,hx:.75,hz:.42,minY:BLACKJACK_TABLE.y,maxY:BLACKJACK_TABLE.y+.8};
+/** The truco table of the games hall: the spot and the facing the admin chose standing there (2026-11-01). */
+export const TRUCO_TABLE = {x:5.82,y:3.45,z:-5.16,rotation:-3.052,radius:.52};
+/** Its four chairs, in playing order: each next seat is to the right of the one before, so partners face each other. */
+export const TRUCO_SEATS: readonly Seat[] = [0,1,2,3].map(i=>{
+  const a=TRUCO_TABLE.rotation+i*Math.PI/2,dx=(TRUCO_TABLE.radius+.42)*Math.sin(a),dz=(TRUCO_TABLE.radius+.42)*Math.cos(a);
+  return {x:TRUCO_TABLE.x+dx,y:TRUCO_TABLE.y,z:TRUCO_TABLE.z+dz,rotation:Math.atan2(-dx,-dz)};
+});
+const TRUCO_COLLIDER:Collider={id:'truco',x:TRUCO_TABLE.x,z:TRUCO_TABLE.z,hx:.46,hz:.46,minY:TRUCO_TABLE.y,maxY:TRUCO_TABLE.y+.8};
 const JUKEBOX_COLLIDER:Collider=map.colliders.find(c=>c.id==='COL_Int_Jukebox')!;
 /** The bar's and the original neighbourhood's solids: walls, furniture (the jukebox among them), the game's props. Door leaves move; see solidColliders. */
-export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER];
+export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLIDER,TRUCO_COLLIDER];
 // Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
 // Doors start open, as authored in the map.
 const openDoors=new Map(DOORS.map(door=>[door.id,true]));
@@ -158,12 +167,16 @@ export const COUNTER_FOOTPRINT:readonly Footprint[]=map.colliders
  */
 export const SHOP_SPOT:Required<Position>={x:18.79,y:.3,z:-15.45};
 /** The same spot as HIGHFOOD.BASE (highfood.ts, which needs prices.ts and so comes after this file). */
-const HIGHFOOD_BASE={x:-3.8,y:0,z:-15.5,rotation:-1.538,reach:1.6} as const;
+const HIGHFOOD_BASE={x:-3.99,y:0,z:-13.97,rotation:1.594,reach:1.6} as const;
 export const SHOP_REACH=.7;
 export const INTERACTABLES: readonly Interactable[] = [
   {id:'blackjack-1',type:'blackjack',label:'Jogar blackjack',...BLACKJACK_TABLE,footprint:[footprint(BLACKJACK_COLLIDER)]},
+  {id:'truco-1',type:'truco',label:'Jogar truco',x:TRUCO_TABLE.x,y:TRUCO_TABLE.y,z:TRUCO_TABLE.z,footprint:[footprint(TRUCO_COLLIDER)]},
   // The pebolim tables (foosball.ts), used by touching them: E takes a free place, or watches a full table.
   ...FOOSBALL_TABLES.map(table=>({id:table.id,type:'foosball' as const,label:`Jogar pebolim · mesa ${table.number}`,x:table.x,y:table.y,z:table.z,
+    footprint:[footprint(map.colliders.find(c=>c.id===table.collider)!)]})),
+  // The pool tables (pool/table.ts), used by touching them: E takes a free place, or watches a match in play.
+  ...POOL_TABLES.map(table=>({id:table.id,type:'pool' as const,label:`Jogar sinuca · mesa ${table.number}`,x:table.x,y:table.y,z:table.z,
     footprint:[footprint(map.colliders.find(c=>c.id===table.collider)!)]})),
   {id:'counter',type:'counter',label:'Pedir uma bebida',...map.markers.Ponto_Balcao,footprint:[...COUNTER_FOOTPRINT]},
   // The point is where a player stands touching the jukebox front.
@@ -177,7 +190,7 @@ export const INTERACTABLES: readonly Interactable[] = [
   // The stage's steps: touching them, from below or from the deck, opens the pass (the room charges it).
   {id:'stage',type:'stage',label:'Subir no palco',...STAGE_ENTRY,footprint:STAGE.steps.map(footprint)},
   {id:'shop',type:'shop',label:'Comprar na loja da casa',...SHOP_SPOT,reach:SHOP_REACH},
-  // Where a Highfood shift starts: the ring on the street beside the bar (docs/sistemas/highfood.md).
+  // Where a Highfood shift starts: the ring on the street, in front of the pickup point beside the bar (docs/sistemas/highfood.md).
   {id:'highfood-base',type:'highfood',label:'Highfood',x:HIGHFOOD_BASE.x,y:HIGHFOOD_BASE.y,z:HIGHFOOD_BASE.z,rotation:HIGHFOOD_BASE.rotation,reach:HIGHFOOD_BASE.reach},
   // Where bought vehicles are kept (docs/sistemas/garagem.md); usable on foot or riding.
   ...GARAGES.map(garage=>({id:garage.id,type:'garage' as const,label:`${garage.name}: seus veículos`,x:garage.x,y:garage.y,z:garage.z,rotation:garage.rotation,reach:GARAGE.REACH})),
@@ -409,7 +422,7 @@ export function standingPosition(position:Position,rotation=0):Position {
 
 // What the camera sees through instead of pulling its boom in (the renderer's x-ray window, camera-xray.ts): furniture,
 // props, trees, cars and the stage's gear. Walls, floors, slabs, ceilings, roofs, doors and the stage's deck stop it.
-const SEE_THROUGH=/^(?:COL_(?:Mob|Ext|Int|Palco)_|COL_Predio_(?:Pergolado|Churrasqueira|GuardaCorpo)|COL_Cid_(?:Arvore|Poste|Carro|Carreta|Banco|Orelhao|Mastro|Totem|Trave|Bomba|Brinquedo|Academia|Ponto_Onibus|Alambrado|Quiosque|Pilar|Trafo)|blackjack$)/;
+const SEE_THROUGH=/^(?:COL_(?:Mob|Ext|Int|Palco)_|COL_Ponto_iFood|COL_Predio_(?:Pergolado|Churrasqueira|GuardaCorpo)|COL_Cid_(?:Arvore|Poste|Carro|Carreta|Banco|Orelhao|Mastro|Totem|Trave|Bomba|Brinquedo|Academia|Ponto_Onibus|Alambrado|Quiosque|Pilar|Trafo)|blackjack$|truco$)/;
 /** Where the segment first enters a solid (0-1 of the way; 1 when it does not), each box grown by `pad`. */
 function firstHit(start:Required<Position>,end:Required<Position>,pad:number,seeThrough:boolean):number {
   let first=1;

@@ -9,7 +9,7 @@ class Player {
   playVideo(){this.started=performance.now();this.emit(1);}
   pauseVideo(){this.time=this.getCurrentTime();this.emit(2);}
   stopVideo(){this.time=0;this.emit(2);}
-  seekTo(time){this.time=time;this.started=performance.now();}
+  seekTo(time){this.seeks=(this.seeks??0)+1;this.time=time;this.started=performance.now();}
   getCurrentTime(){return this.time+(this.state===1?(performance.now()-this.started)/1000:0);}
   getDuration(){return this.length;}
   getPlayerState(){return this.state;}

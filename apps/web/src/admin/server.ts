@@ -2,7 +2,7 @@ import type {AdminServerInfo} from '@bar/shared';
 import {ago,badge,bytes,card,duration,e,empty,meter,n,stat,uiIcon,when,type SectionFactory,type WorldSnapshot} from './kit';
 
 const TABLE_NAMES:Record<string,string>={users:'Contas',user_profiles:'Perfis',sessions:'Sessões',wallets:'Carteiras',currency_ledger:'Lançamentos de moedas',inventory_ledger:'Lançamentos de itens',
-  item_inventory:'Mochilas',skin_inventory:'Skins compradas',moderation_actions:'Ações da administração',reports:'Denúncias',game_logs:'Log de eventos',game_controls:'Comandos para o mundo',
+  item_inventory:'Mochilas',skin_inventory:'Skins compradas',skill_inventory:'Habilidades compradas',skin_catalog:'Cartas editadas',moderation_actions:'Ações da administração',reports:'Denúncias',game_logs:'Log de eventos',game_controls:'Comandos para o mundo',
   economy_prices:'Preços alterados',game_results:'Resultados de partidas',game_statistics:'Estatísticas',phone_messages:'Mensagens do Highzap',phone_media:'Mídias do Highzap',gram_posts:'Posts do Highgram',
   gram_comments:'Comentários',gram_likes:'Curtidas',gram_follows:'Seguidores',gram_profiles:'Perfis do Highgram',phone_lines:'Linhas de celular',phone_contacts:'Contatos',blocks:'Bloqueios',
   email_verifications:'Confirmações de e-mail',password_resets:'Recuperações de senha',bar_schema_migrations:'Migrações aplicadas'};

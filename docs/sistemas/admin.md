@@ -21,6 +21,7 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
 | Veículos | As motos de entrega do mapa: spawnar perto de você e despawnar ([moto.md](moto.md#spawnar-e-despawnar)) |
 | Emblemas | O catálogo de emblemas: criar, editar, apagar, conceder e retirar, com raridade, ícone da lista ou PNG enviado ([perfil.md](perfil.md#emblemas)). Os 104 emblemas ganhos jogando aparecem aqui com a quantidade que os dá ([conquistas.md](conquistas.md#na-administração)) |
+| Coleção | As cartas de personagem e as habilidades: raridade, preço, texto, situação de venda, quantos donos e quanto renderam, com a carta ao vivo ([skins.md](skins.md)) |
 | Servidor | Processos da API e do mundo, memória e disco da máquina, banco de dados e filas |
 
 O menu mostra quantas denúncias estão abertas. Nomes de jogadores em qualquer categoria (logs, denúncias, ranking, mundo) abrem a ficha do jogador.
@@ -35,11 +36,11 @@ O menu mostra quantas denúncias estão abertas. Nomes de jogadores em qualquer 
 | --- | --- |
 | Resumo | Conta criada, último login, sessões abertas, número do celular, skin em uso, partidas de blackjack, denúncias recebidas e feitas, onde está no bar agora. **Nome no jogo** com motivo (vale a partir da próxima entrada no bar), **Confirmar e-mail** e **Encerrar sessões** (desconecta a conta em todos os navegadores; se estiver no bar, sai em alguns segundos) |
 | Carteira | Ganhos e gastos dos últimos 30 dias, o ajuste manual de moedas e as últimas 40 movimentações com origem e descrição |
-| Itens e skins | A mochila (quantidade de cada item), **Entregar**/**Retirar** itens respeitando o limite de cada pilha e as 12 posições da mochila; as skins da coleção, com **Dar skin**/**Retirar skin** (retirar a skin em uso veste o Nathan). O mundo relê a mochila na hora (controle `sync`) |
+| Itens e skins | A mochila (quantidade de cada item), **Entregar**/**Retirar** itens respeitando o limite de cada pilha e as 12 posições da mochila; as skins da coleção, com **Dar skin**/**Retirar skin** (retirar a skin em uso veste o Nathan); as habilidades, com **Dar habilidade**/**Retirar habilidade**. O mundo relê a mochila na hora (controle `sync`) |
 | Moderação | Expulsar, desfazer expulsão, banir, desbanir, dar ou remover administrador, e as denúncias contra a conta |
 | Histórico | Toda ação da administração sobre a conta, com a reversão de cada uma quando ela existe |
 
-Toda alteração pede um motivo (3 a 500 caracteres) e fica registrada em `moderation_actions` com autor e motivo (`player-rename`, `player-verify`, `player-logout`, `items-add`, `items-remove`, `skin-grant`, `skin-revoke`). Enquanto uma ação roda, os controles da categoria ficam travados, inclusive os redesenhados durante a recarga da ficha.
+Toda alteração pede um motivo (3 a 500 caracteres) e fica registrada em `moderation_actions` com autor e motivo (`player-rename`, `player-verify`, `player-logout`, `items-add`, `items-remove`, `skin-grant`, `skin-revoke`, `skill-grant`, `skill-revoke`). Enquanto uma ação roda, os controles da categoria ficam travados, inclusive os redesenhados durante a recarga da ficha.
 
 ### Carteiras
 
@@ -151,6 +152,7 @@ Rotas administrativas (sessão autenticada, e-mail confirmado e papel `admin`; a
 | `GET /api/admin/economy?days=7\|30\|90` | Economia |
 | `GET` e `POST /api/admin/prices` | Preços e histórico de mudanças |
 | `GET /api/admin/badges` e demais rotas de emblemas | Emblemas ([perfil.md](perfil.md#api)) |
+| `GET` e `POST /api/admin/collection` | Cartas e habilidades ([skins.md](skins.md)) |
 | `GET /api/admin/server` | Servidor |
 
 Públicas e internas: `GET /api/prices` (tabela efetiva, sem login), `GET /api/internal/prices` e `POST /api/internal/logs` (segredo interno). A migração `008_admin_console.sql` cria `economy_prices` e `game_logs`, acrescenta a resolução às denúncias e índices por data; no desenvolvimento, `npm run dev` aplica (ou `npm run migrate -w @bar/api`).

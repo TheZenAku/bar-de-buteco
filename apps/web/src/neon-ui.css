@@ -325,13 +325,6 @@ body:has(.dev-mail) .key-hints{padding-bottom:44px}body:has(#game:not(.hidden)) 
 .statistics b{display:block;font:500 26px var(--font-mono);color:var(--vw-cyan)}
 .statistics span{font:400 10px var(--font-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted-foreground)}
 .account-card~.button{margin-top:4px}
-.skin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1px;padding-top:4px}
-.skin-card{display:flex;flex-direction:column;gap:6px;padding:8px;background:oklch(1 0 0 / 3%);text-align:left;transition:background-color .15s}
-.skin-card:hover{background:var(--secondary)}
-.skin-card.selected{outline:1px solid var(--hl-magenta);outline-offset:-1px}
-.skin-card img{width:100%;height:auto;aspect-ratio:3/4;object-fit:cover}
-.skin-card b{font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-.skin-card small{font:400 10px var(--font-mono);text-transform:uppercase;color:var(--muted-foreground)}
 .mail-message{border-bottom:1px solid var(--border);padding:16px 0}
 .mail-message small{font:400 11px var(--font-mono);color:var(--vw-cyan)}
 .mail-message h3{margin:8px 0}

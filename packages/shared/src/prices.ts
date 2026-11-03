@@ -2,6 +2,10 @@ import {ITEM_CATALOG,type ItemId} from './inventory.js';
 import {JOBS,JOB_DAILY_CAP,MEDIA_PRICES,STAGE_PASS,type MediaPriceKind} from './economy.js';
 import {BLACKJACK} from './blackjack.js';
 import {FOOSBALL} from './foosball.js';
+import {TRUCO_BET,TRUCO_LEVEL_INFO} from './truco/stakes.js';
+import {POOL_BET,POOL_LEVEL_STAKES} from './pool/index.js';
+import {DEFAULT_SKIN,SKINS} from './skins.js';
+import {SKILLS} from './profile.js';
 
 /**
  * Everything in the game that costs or pays coins, under one key each ("item:coxinha", "media:tv", "job:bar").
@@ -19,7 +23,7 @@ export type PriceTable=Readonly<Record<string,number>>;
 
 export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:string}>=[
   {id:'itens',label:'Bar e mochila',description:'Bebidas e petiscos: balcão do Magrão, pedidos na mesa e loja da mochila.'},
-  {id:'skins',label:'Skins',description:'Personagens da coleção. Quem já comprou continua com a skin.'},
+  {id:'skins',label:'Skins e habilidades',description:'As cartas da coleção e as habilidades dos personagens. Quem já comprou continua com elas.'},
   {id:'midia',label:'Jukebox, TVs e telão',description:'Cobrado a cada vídeo novo colocado no aparelho.'},
   {id:'palco',label:'Palco',description:'Ingresso para subir no palco do quintal.'},
   {id:'jogos',label:'Jogos',description:'Limites de aposta: no blackjack, por mão (dobrar e dividir repetem a aposta); no pebolim, o que cada jogador põe numa partida valendo moedas.'},
@@ -28,8 +32,6 @@ export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:
   {id:'recompensas',label:'Recompensas',description:'Moedas que entram na economia sem compra: boas-vindas e bônus diário.'},
 ];
 
-/** Skins other than the free default (DEFAULT_SKIN). Names repeat SKINS (index.ts) to avoid an import cycle. */
-const SKIN_PRICES:ReadonlyArray<readonly [id:string,name:string,price:number]>=[['leandro','Leandro',750],['rafael','Rafael',1000],['read','Read',850],['gilmar-gordo','Gilmar',900],['gabriel','Gabriel',900],['flavio-hipotetico','Flavio Hipotético',900]];
 const MEDIA_LABELS:Record<MediaPriceKind,string>={jukebox:'Jukebox',tv:'TV do salão',telao:'Telão do palco'};
 const envKey=(id:string)=>id.toUpperCase().replace(/-/g,'_');
 
@@ -37,13 +39,24 @@ let entries:PriceEntry[]|undefined;
 export function priceEntries():readonly PriceEntry[]{
   return entries??=[
     ...ITEM_CATALOG.map(item=>({key:`item:${item.id}`,group:'itens' as const,label:item.name,hint:item.id==='garrafa'||item.id==='copo'?'Balcão, mesa e mochila':item.category==='saude'?'Mochila':item.category==='peca'?'Loja da casa':'Mesa e mochila',defaultValue:item.price,min:0,max:10_000})),
-    ...SKIN_PRICES.map(([id,name,price])=>({key:`skin:${id}`,group:'skins' as const,label:name,hint:'Coleção (C)',defaultValue:price,min:0,max:1_000_000})),
+    ...SKINS.filter(skin=>skin.id!==DEFAULT_SKIN).map(skin=>({key:`skin:${skin.id}`,group:'skins' as const,label:skin.name,hint:'Coleção (C)',defaultValue:skin.price,min:0,max:1_000_000})),
+    ...SKILLS.map(skill=>({key:`skill:${skill.id}`,group:'skins' as const,label:skill.name,hint:'Habilidade, na coleção (C)',defaultValue:skill.price,min:0,max:1_000_000})),
     ...(Object.keys(MEDIA_PRICES) as MediaPriceKind[]).map(kind=>({key:`media:${kind}`,group:'midia' as const,label:MEDIA_LABELS[kind],hint:'Por vídeo novo',defaultValue:MEDIA_PRICES[kind],min:0,max:10_000})),
     {key:'stage:pass',group:'palco',label:'Ingresso do palco',hint:`Vale ${STAGE_PASS.durationMs/60_000} minutos`,defaultValue:STAGE_PASS.price,min:0,max:10_000},
     {key:'blackjack:min-bet',group:'jogos',label:'Aposta mínima do blackjack',hint:'Menor aposta por rodada',defaultValue:BLACKJACK.minBet,min:1,max:100_000},
     {key:'blackjack:max-bet',group:'jogos',label:'Aposta máxima do blackjack',hint:'Maior aposta por rodada (nunca abaixo da mínima)',defaultValue:BLACKJACK.maxBet,min:1,max:100_000},
     {key:'foosball:min-bet',group:'jogos',label:'Aposta mínima do pebolim',hint:'Menor valor por jogador numa partida valendo moedas',defaultValue:FOOSBALL.minBet,min:1,max:100_000},
     {key:'foosball:max-bet',group:'jogos',label:'Aposta máxima do pebolim',hint:'Maior valor por jogador (nunca abaixo da mínima)',defaultValue:FOOSBALL.maxBet,min:1,max:100_000},
+    {key:'truco:level-iniciante',group:'jogos',label:'Truco: nível Iniciante',hint:'Aposta por pessoa contra NPCs iniciantes',defaultValue:TRUCO_LEVEL_INFO.iniciante.stake,min:1,max:100_000},
+    {key:'truco:level-medio',group:'jogos',label:'Truco: nível Médio',hint:'Aposta por pessoa contra NPCs de nível médio',defaultValue:TRUCO_LEVEL_INFO.medio.stake,min:1,max:100_000},
+    {key:'truco:level-experiente',group:'jogos',label:'Truco: nível Experiente',hint:'Aposta por pessoa contra NPCs experientes',defaultValue:TRUCO_LEVEL_INFO.experiente.stake,min:1,max:100_000},
+    {key:'truco:min-bet',group:'jogos',label:'Aposta mínima do truco entre jogadores',hint:'Menor valor por pessoa, com gente nas duas duplas',defaultValue:TRUCO_BET.minBet,min:1,max:100_000},
+    {key:'truco:max-bet',group:'jogos',label:'Aposta máxima do truco entre jogadores',hint:'Maior valor por pessoa (nunca abaixo da mínima)',defaultValue:TRUCO_BET.maxBet,min:1,max:100_000},
+    {key:'pool:level-facil',group:'jogos',label:'Sinuca: Juca Iniciante',hint:'Aposta por pessoa contra o Juca da Sinuca iniciante',defaultValue:POOL_LEVEL_STAKES.facil,min:1,max:100_000},
+    {key:'pool:level-medio',group:'jogos',label:'Sinuca: Juca Na média',hint:'Aposta por pessoa contra o Juca da Sinuca na média',defaultValue:POOL_LEVEL_STAKES.medio,min:1,max:100_000},
+    {key:'pool:level-dificil',group:'jogos',label:'Sinuca: Juca Matador',hint:'Aposta por pessoa contra o Juca da Sinuca matador',defaultValue:POOL_LEVEL_STAKES.dificil,min:1,max:100_000},
+    {key:'pool:min-bet',group:'jogos',label:'Aposta mínima da sinuca entre jogadores',hint:'Menor valor por pessoa, com duas pessoas na mesa',defaultValue:POOL_BET.minBet,min:1,max:100_000},
+    {key:'pool:max-bet',group:'jogos',label:'Aposta máxima da sinuca entre jogadores',hint:'Maior valor por pessoa (nunca abaixo da mínima)',defaultValue:POOL_BET.maxBet,min:1,max:100_000},
     ...JOBS.map(job=>({key:`job:${job.id}`,group:'trabalho' as const,label:job.name,hint:'Pagamento por tarefa',defaultValue:job.pay,min:0,max:1000})),
     {key:'cap:job-daily',group:'trabalho',label:'Teto diário do trabalho',hint:'Máximo que um jogador ganha trabalhando por dia',defaultValue:JOB_DAILY_CAP,min:0,max:1_000_000},
     {key:'vehicle:moto',group:'highfood',label:'Moto de entrega',hint:'Venda no app HighMotors do celular',defaultValue:10_000,min:0,max:1_000_000},

@@ -13,8 +13,8 @@ function browser(t:TestContext,saved?:unknown):void {
   t.after(()=>{if(previous)Object.defineProperty(globalThis,'localStorage',previous);else Reflect.deleteProperty(globalThis,'localStorage');});
 }
 
-test('legacy camera presets restore their previous distance as free third person',async t=>{
-  for(const [camera,cameraDistance] of [['near',3],['default',6.4],['far',10.5]] as const){
+test('legacy camera presets land on perto, médio and longe in third person',async t=>{
+  for(const [camera,cameraDistance] of [['near',2.5],['default',4.2],['far',6.5]] as const){
     await t.test(camera,t=>{
       browser(t,{camera});
       const restored=createSettings().get();
@@ -24,26 +24,28 @@ test('legacy camera presets restore their previous distance as free third person
   }
 });
 
-test('a fine camera distance survives first person and browser reloads without rounding or a preset',t=>{
+test('the chosen zoom survives first person and browser reloads',t=>{
   browser(t);
   const settings=createSettings();
-  settings.update({camera:'third',cameraDistance:7.1375});
-  assert.equal(createSettings().get().cameraDistance,7.1375);
+  settings.update({camera:'third',cameraDistance:6.5});
+  assert.equal(createSettings().get().cameraDistance,6.5);
   settings.update({camera:'first'});
   const restored=createSettings();
   assert.equal(restored.get().camera,'first');
-  assert.equal(restored.get().cameraDistance,7.1375);
+  assert.equal(restored.get().cameraDistance,6.5);
   restored.update({camera:'third'});
-  assert.equal(createSettings().get().cameraDistance,7.1375);
+  assert.equal(createSettings().get().cameraDistance,6.5);
 });
 
-test('explicit free distances take precedence over legacy preset values and have no artificial maximum',t=>{
+test('a free zoom saved before the three limits becomes the nearest one',t=>{
   browser(t,{camera:'far',cameraDistance:1234.56789});
   const settings=createSettings();
   assert.equal(settings.get().camera,'third');
-  assert.equal(settings.get().cameraDistance,1234.56789);
+  assert.equal(settings.get().cameraDistance,6.5);
   settings.update({cameraDistance:.0125});
-  assert.equal(createSettings().get().cameraDistance,.0125);
+  assert.equal(createSettings().get().cameraDistance,2.5);
+  browser(t,{camera:'third',cameraDistance:4.725});
+  assert.equal(createSettings().get().cameraDistance,4.2);
 });
 
 test('malformed stored camera distances fall back while first person remains selected',async t=>{
@@ -58,11 +60,28 @@ test('malformed stored camera distances fall back while first person remains sel
 });
 
 test('invalid updates cannot erase the last usable third-person distance',t=>{
-  browser(t,{camera:'third',cameraDistance:4.725});
+  browser(t,{camera:'third',cameraDistance:2.5});
   const settings=createSettings();
   for(const cameraDistance of [0,-2,NaN,Infinity,-Infinity]){
     settings.update({camera:'first',cameraDistance});
-    assert.equal(settings.get().cameraDistance,4.725);
-    assert.equal(createSettings().get().cameraDistance,4.725);
+    assert.equal(settings.get().cameraDistance,2.5);
+    assert.equal(createSettings().get().cameraDistance,2.5);
   }
+});
+
+test('the old starting distance gives way to the new one, and a distance the player chose stays',t=>{
+  browser(t,{camera:'third',cameraDistance:6.4});
+  assert.equal(createSettings().get().cameraDistance,DEFAULT_SETTINGS.cameraDistance);
+  browser(t,{camera:'third',cameraDistance:6.5});
+  assert.equal(createSettings().get().cameraDistance,6.5);
+});
+
+test('height, sensitivity and smoothing survive a reload and come back in range',t=>{
+  browser(t);
+  const settings=createSettings();
+  assert.deepEqual(settings.get().cameraFeel,{height:0,sensitivity:1,smoothing:.5});
+  settings.update({cameraFeel:{height:.25,sensitivity:1.5,smoothing:.2}});
+  assert.deepEqual(createSettings().get().cameraFeel,{height:.25,sensitivity:1.5,smoothing:.2});
+  browser(t,{cameraFeel:{height:50,sensitivity:'fast',smoothing:7}});
+  assert.deepEqual(createSettings().get().cameraFeel,{height:.6,sensitivity:1,smoothing:1});
 });

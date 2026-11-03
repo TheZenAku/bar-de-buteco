@@ -1,3 +1,4 @@
+import {buyCard,showCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 
 const password='AdminBrowserTests2026!';
@@ -44,16 +45,17 @@ test('administração ingame: moedas, loja sincronizada, delegação, expulsão 
     };
     await adjust('set',0);await expect(page.locator('.admin-current-balance b')).toHaveText('0 moedas');
     await other.keyboard.press('c');await expect(other.locator('#wallet-balance')).toHaveText('0 moedas');
-    const rafael=other.locator('.skin-card').filter({has:other.locator('b',{hasText:'Rafael'})});await rafael.click();
+    await showCard(other,'rafael');
     await expect(other.getByRole('button',{name:'Moedas insuficientes',exact:true})).toBeDisabled();
-    await adjust('add',1500);
-    await expect(other.locator('#purchase-balance')).toHaveText('1.500',{timeout:20000});
-    await expect(other.getByRole('button',{name:'Confirmar compra'})).toBeEnabled();
+    await adjust('add',2000);
+    await expect(other.locator('#wallet-balance')).toHaveText('2.000 moedas',{timeout:20000});
+    await expect(other.locator('.cl-buy [data-cl="buy"]')).toBeEnabled();
     await page.setViewportSize({width:1280,height:1000});await page.screenshot({path:'test-results/admin-panel.png'});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.setViewportSize({width:960,height:640});
-    await other.getByRole('button',{name:'Confirmar compra'}).click();await rafael.click();
-    await expect(other.locator('#skill-button')).toBeVisible();await other.keyboard.press('c');
+    await buyCard(other,'rafael');await other.locator('.cl-buy [data-cl="equip"]').click();await expect(other.locator('.cl-buy .cl-cta')).toHaveText(/Vestindo/);
+    await other.locator('[data-skill="karate"] [data-cl="skill-buy"]').click();await other.locator('[data-skill="karate"] [data-cl="skill-confirm"]').click();
+    await expect(other.locator('[data-skill="karate"]')).toContainText('Liberada');
     await expect(other.locator('#wallet-balance')).toHaveText('500 moedas');
     await page.getByRole('button',{name:'Atualizar painel'}).click();await expect(page.locator('.admin-current-balance b')).toHaveText('500 moedas');
     await adjust('remove',200);await expect(other.locator('#wallet-balance')).toHaveText('300 moedas',{timeout:20000});

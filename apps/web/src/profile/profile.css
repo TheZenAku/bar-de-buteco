@@ -97,6 +97,9 @@
 .pf-skill-icon{flex:none;display:grid;place-items:center;width:36px;height:36px;background:oklch(.1 .04 300);color:var(--hl-cyan)}
 .pf-skill.on .pf-skill-icon{color:#fff;background:var(--active);box-shadow:var(--active-glow)}
 .pf-skill-icon .ui-icon{width:20px;height:20px}
+.pf-skill.locked .pf-skill-icon{color:var(--muted-foreground)}
+.pf-skill.locked>i{display:inline-flex;align-items:center;gap:4px;color:var(--money)}
+.pf-skill.locked>i .ui-icon{width:13px;height:13px}
 .pf-skill>span:nth-child(2){flex:1;min-width:0;display:grid;gap:1px}
 .pf-skill b{font:600 14px var(--font-display)}
 .pf-skill small{font-size:12px;line-height:1.3;color:var(--dim)}

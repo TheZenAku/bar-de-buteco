@@ -1,7 +1,7 @@
 {
-  "visualHash": "741c9608ae194dac719fd11fa5a568acefc34450fa11872233a115cdad301476",
-  "visualSourceHash": "e89063fe9978312575223bba03214151e1c56f08f99ca7a6d929dd6c7660cdb2",
-  "collisionHash": "ebe5b74590ca76c3b27288c67f13e1bb1de88c8a7e5cbce162ef94fe638c252e",
+  "visualHash": "2499a8d1f1faa6d6a09b4431f9e0d0df0ca5507bb7cae95106f0efe90d89c578",
+  "visualSourceHash": "2499a8d1f1faa6d6a09b4431f9e0d0df0ca5507bb7cae95106f0efe90d89c578",
+  "collisionHash": "7cb9ac4c2efccc9e361012fed29cb755fc3bb15b51cfd2642b2e3bc6cbb07e43",
   "bounds": {
     "minX": -400,
     "maxX": 400,
@@ -103,16 +103,16 @@
     {
       "id": "Carrinho_Espeto_FX_Fogo",
       "type": "fogo",
-      "x": 8.745815,
-      "y": 1.045191,
-      "z": 1.566219
+      "x": 8.789123,
+      "y": 1.032,
+      "z": 1.487475
     },
     {
       "id": "Carrinho_Espeto_FX_Fumaca",
       "type": "fumaca",
-      "x": 8.745815,
-      "y": 1.941523,
-      "z": 1.566219
+      "x": 8.789123,
+      "y": 1.181,
+      "z": 1.487475
     },
     {
       "id": "Chopeira_FX_Torneira_1",
@@ -2619,26 +2619,6 @@
       "hz": 7.825,
       "minY": 2.646083,
       "maxY": 3.8,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Churrasqueira",
-      "x": 3.12,
-      "z": -10.599999,
-      "hx": 0.38,
-      "hz": 0.66,
-      "minY": 0.3,
-      "maxY": 1.82,
-      "ramp": false
-    },
-    {
-      "id": "COL_Predio_Churrasqueira.001",
-      "x": 4.75,
-      "z": -25.369999,
-      "hx": 2.31,
-      "hz": 0.43,
-      "minY": 0.3,
-      "maxY": 1.82,
       "ramp": false
     },
     {
@@ -13162,816 +13142,6 @@
       "ramp": false
     },
     {
-      "id": "COL_Ext_Carro_Prata",
-      "x": 18.495001,
-      "z": 4,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho",
-      "x": -4,
-      "z": -19.504999,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.001",
-      "x": 36,
-      "z": -5.995,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.001",
-      "x": 14.005,
-      "z": -30,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco",
-      "x": -77.62513,
-      "z": 84.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul",
-      "x": -76.412994,
-      "z": 49.950001,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Branco",
-      "x": -96.050003,
-      "z": 62.68504,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.002",
-      "x": -55.950001,
-      "z": 62.96735,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.001",
-      "x": -67.329437,
-      "z": 44.049999,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.001",
-      "x": -96.050003,
-      "z": 22.882486,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.002",
-      "x": -55.950001,
-      "z": 24.270142,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.003",
-      "x": -73.687195,
-      "z": 4.05,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto",
-      "x": -66.849686,
-      "z": 4.05,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.002",
-      "x": -96.050003,
-      "z": -6.330138,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata",
-      "x": -82.79303,
-      "z": -70.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.004",
-      "x": -96.050003,
-      "z": -48.621723,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.002",
-      "x": -55.950001,
-      "z": -58.117397,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.003",
-      "x": -55.950001,
-      "z": -47.039726,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.003",
-      "x": -72.529114,
-      "z": -75.949997,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.003",
-      "x": -96.050003,
-      "z": -93.810196,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.004",
-      "x": -55.950001,
-      "z": -98.440834,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.001",
-      "x": -32.680592,
-      "z": 84.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.002",
-      "x": -33.655964,
-      "z": 49.950001,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.003",
-      "x": -25.62315,
-      "z": 44.049999,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.004",
-      "x": -50.049999,
-      "z": 33.013367,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.001",
-      "x": -50.049999,
-      "z": 26.013741,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.002",
-      "x": -26.591476,
-      "z": 4.05,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto",
-      "x": -33.062729,
-      "z": -30.049999,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.004",
-      "x": -50.049999,
-      "z": -7.450825,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.003",
-      "x": -9.95,
-      "z": -16.893259,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.005",
-      "x": -26.337963,
-      "z": -35.950001,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Branco.001",
-      "x": -21.639324,
-      "z": -70.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.005",
-      "x": -9.95,
-      "z": -52.887764,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.006",
-      "x": -21.279249,
-      "z": -75.949997,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.004",
-      "x": -28.778664,
-      "z": -110.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.005",
-      "x": -50.049999,
-      "z": -96.819832,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto.001",
-      "x": -50.049999,
-      "z": -86.809029,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.005",
-      "x": 19.163527,
-      "z": 84.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.006",
-      "x": 10.95689,
-      "z": 49.950001,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Branco.002",
-      "x": -4.05,
-      "z": 64.958908,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.006",
-      "x": 36.049999,
-      "z": 63.543133,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.007",
-      "x": 8.776773,
-      "z": 9.95,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.004",
-      "x": 36.049999,
-      "z": 21.392857,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.007",
-      "x": 23.644056,
-      "z": -35.950001,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.008",
-      "x": 17.60779,
-      "z": -70.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.006",
-      "x": -4.05,
-      "z": -47.955353,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.007",
-      "x": 36.049999,
-      "z": -55.58918,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.005",
-      "x": 36.049999,
-      "z": -49.716892,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.008",
-      "x": 23.048641,
-      "z": -75.949997,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Branco.003",
-      "x": 19.667917,
-      "z": -110.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.009",
-      "x": -4.05,
-      "z": -87.972542,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.009",
-      "x": 52.521339,
-      "z": 84.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.005",
-      "x": 53.442795,
-      "z": 49.950001,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.006",
-      "x": 41.950001,
-      "z": 72.243607,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.007",
-      "x": 82.050003,
-      "z": 67.090866,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.010",
-      "x": 55.693863,
-      "z": 44.049999,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.008",
-      "x": 66.204498,
-      "z": 9.95,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.006",
-      "x": 61.272594,
-      "z": 4.05,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.008",
-      "x": 69.093781,
-      "z": -30.049999,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.007",
-      "x": 41.950001,
-      "z": -19.481028,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto.002",
-      "x": 59.772419,
-      "z": -35.950001,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Preto.010",
-      "x": 68.337044,
-      "z": -70.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto.003",
-      "x": 71.337227,
-      "z": -75.949997,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.009",
-      "x": 65.993935,
-      "z": -110.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.008",
-      "x": 82.050003,
-      "z": -99.690865,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.011",
-      "x": 111.144196,
-      "z": 49.950001,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.009",
-      "x": 108.105865,
-      "z": 9.95,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.012",
-      "x": 87.949997,
-      "z": 27.422678,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.007",
-      "x": 87.949997,
-      "z": 21.735701,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.013",
-      "x": 128.050003,
-      "z": 33.635719,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.014",
-      "x": 103.496651,
-      "z": -30.049999,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.010",
-      "x": 87.949997,
-      "z": -12.38889,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.008",
-      "x": 128.050003,
-      "z": -12.809985,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Prata.009",
-      "x": 101.441956,
-      "z": -70.050003,
-      "hx": 2.365,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Azul.011",
-      "x": 112.348465,
-      "z": -70.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto.004",
-      "x": 87.949997,
-      "z": -54.780308,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.015",
-      "x": 128.050003,
-      "z": -51.418335,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Prata.010",
-      "x": 128.050003,
-      "z": -57.542686,
-      "hx": 0.98,
-      "hz": 2.025,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Preto.005",
-      "x": 104.24733,
-      "z": -75.949997,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Carro_Vermelho.009",
-      "x": 112.333344,
-      "z": -110.050003,
-      "hx": 2.025,
-      "hz": 0.98,
-      "minY": 0,
-      "maxY": 1.42,
-      "ramp": false
-    },
-    {
-      "id": "COL_Ext_Sedan_Branco.016",
-      "x": 128.050003,
-      "z": -94.694534,
-      "hx": 0.98,
-      "hz": 2.365,
-      "minY": 0,
-      "maxY": 1.4,
-      "ramp": false
-    },
-    {
       "id": "COL_Ext_Ponto_Onibus",
       "x": -1.55,
       "z": -52.959843,
@@ -14189,16 +13359,6 @@
       "hz": 0.2,
       "minY": 0.15,
       "maxY": 0.89,
-      "ramp": false
-    },
-    {
-      "id": "COL_Int_Carrinho_Espeto",
-      "x": 8.7,
-      "z": 1.5,
-      "hx": 0.512672,
-      "hz": 0.395009,
-      "minY": 0.15,
-      "maxY": 2.045792,
       "ramp": false
     },
     {
@@ -15679,6 +14839,46 @@
       "hz": 0.402,
       "minY": 0.900877,
       "maxY": 1.707387,
+      "ramp": false
+    },
+    {
+      "id": "COL_Ponto_iFood",
+      "x": -1.43241,
+      "z": -14.039568,
+      "hx": 0.37,
+      "hz": 0.71,
+      "minY": 0.15,
+      "maxY": 2.48,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Churrasqueira",
+      "x": 3.12,
+      "z": -10.599999,
+      "hx": 0.38,
+      "hz": 0.65,
+      "minY": 0.3,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Predio_Churrasqueira.001",
+      "x": 4.75,
+      "z": -25.369999,
+      "hx": 2.3,
+      "hz": 0.43,
+      "minY": 0.3,
+      "maxY": 1.95,
+      "ramp": false
+    },
+    {
+      "id": "COL_Int_Carrinho_Espeto",
+      "x": 8.646421,
+      "z": 1.507025,
+      "hx": 0.536477,
+      "hz": 0.404953,
+      "minY": 0.15,
+      "maxY": 1.150985,
       "ramp": false
     }
   ],
@@ -21200,7 +20400,7 @@
       },
       "magrao": {
         "file": "bar_magrao.glb",
-        "hash": "46d9d4013d2e",
+        "hash": "894c352fa442",
         "anchor": "Balcao_Lugar_Magrao",
         "height": 1.903,
         "fps": 30,

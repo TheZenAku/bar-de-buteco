@@ -1,6 +1,6 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type FoosballFrame,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
-import type {Badge,GarageView,HighfoodDialog,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
+import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import type {Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
 import {PredictedRide} from './engine/moto-motion';
 
@@ -35,6 +35,8 @@ export interface NetworkHooks {
   tradeState?:(view:TradeView)=>void;
   tradeClosed?:(closed:TradeClosed)=>void;
   foodDialog?:(dialog:HighfoodDialog|null)=>void;
+  foodLocker?:(locker:HighfoodLockerView|null)=>void;
+  foodCode?:(right:boolean)=>void;
   foodDelivered?:(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>void;
   foodReceipt?:(receipt:HighfoodReceipt)=>void;
   foodNotice?:(notice:{title:string;text:string})=>void;
@@ -68,9 +70,16 @@ export interface NetworkHooks {
   /** A frame of the other end's camera on a video call. */
   phoneVideo?:(bytes:Uint8Array)=>void;
   /** E at a pebolim table: a place was taken (or, `watching`, the table is full or playing and is watched instead). */
+  trucoView?:(view:TrucoView)=>void;
   foosballOpen?:(message:{tableId:string;watching:boolean;reason?:string})=>void;
   /** A pebolim table's ball and rods, 30 times a second while a match is on (to its players, watchers and whoever is near). */
   foosballFrame?:(frame:FoosballFrame)=>void;
+  /** E at a pool table: a seat was taken (or, `watching`, the table is full or playing and is watched instead). */
+  poolOpen?:(message:{tableId:string;watching:boolean;reason?:string})=>void;
+  /** A pool table as it is now (to its players, watchers and whoever is near), a stroke's recorded paths, the shooter's aim. */
+  poolView?:(view:PoolTableView)=>void;
+  poolShot?:(shot:PoolShotView)=>void;
+  poolAim?:(aim:PoolAimView)=>void;
 }
 /** `waiter`: who brings it (Tonico or a worker's name); `stage`: still at the counter, or on its way to the table. */
 export interface TableOrderView {id:string;seatId:string;items:ItemId[];total:number;placedAt:number;waiter?:string;stage?:'queued'|'carrying'}
@@ -156,6 +165,8 @@ export class BarNetwork {
     room.onMessage('trade.state',(view:TradeView)=>this.hooks.tradeState?.(view));
     room.onMessage('trade.closed',(closed:TradeClosed)=>this.hooks.tradeClosed?.(closed));
     room.onMessage('food.dialog',(dialog:HighfoodDialog|null)=>this.hooks.foodDialog?.(dialog));
+    room.onMessage('food.locker',(locker:HighfoodLockerView|null)=>this.hooks.foodLocker?.(locker));
+    room.onMessage('food.code',(answer:{ok:boolean})=>this.hooks.foodCode?.(answer.ok));
     room.onMessage('food.delivered',(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>this.hooks.foodDelivered?.(facts));
     room.onMessage('food.receipt',(receipt:HighfoodReceipt)=>this.hooks.foodReceipt?.(receipt));
     room.onMessage('food.notice',(notice:{title:string;text:string})=>this.hooks.foodNotice?.(notice));
@@ -177,8 +188,13 @@ export class BarNetwork {
     room.onMessage('phone.call',(call:PhoneCallView)=>this.hooks.phoneCall?.(call));
     room.onMessage('phone.ping',(ping:PhonePing)=>this.hooks.phonePing?.(ping));
     room.onMessage('phone.video',(bytes:Uint8Array)=>this.hooks.phoneVideo?.(bytes));
+    room.onMessage('truco.view',(view:TrucoView)=>this.hooks.trucoView?.(view));
     room.onMessage('foosball.open',(message:{tableId:string;watching:boolean;reason?:string})=>this.hooks.foosballOpen?.(message));
     room.onMessage('foosball.frame',(frame:FoosballFrame)=>this.hooks.foosballFrame?.(frame));
+    room.onMessage('pool.open',(message:{tableId:string;watching:boolean;reason?:string})=>this.hooks.poolOpen?.(message));
+    room.onMessage('pool.view',(view:PoolTableView)=>this.hooks.poolView?.(view));
+    room.onMessage('pool.shot',(shot:PoolShotView)=>this.hooks.poolShot?.(shot));
+    room.onMessage('pool.aim',(aim:PoolAimView)=>this.hooks.poolAim?.(aim));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));

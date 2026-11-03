@@ -12,7 +12,7 @@ const metres=(value:number)=>value>=1000?`${(value/1000).toFixed(1).replace('.',
 const stars=(value:number)=>`<span class="hf-stars" role="img" aria-label="${value.toLocaleString('pt-BR',{maximumFractionDigits:1})} de 5 estrelas" style="--value:${value/5*100}%">★★★★★</span>`;
 const clock=(ms:number)=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const STATUS:Record<HighfoodHistoryEntry['status'],string>={delivered:'Entregue',cancelled:'Cancelado por você','gave-up':'Cliente desistiu',left:'Saiu com o pedido'};
-const STEPS=[['going','A caminho'],['unload','No baú'],['carrying','Em mãos']] as const;
+const STEPS=[['pickup','Retirar'],['going','A caminho'],['unload','No baú'],['carrying','Em mãos']] as const;
 const LOGO=`${import.meta.env.BASE_URL}highfood/logo.webp`;
 
 /**
@@ -39,7 +39,8 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
   }
   const orderHead=(order:HighfoodOrderView)=>`<div class="hf-who">${customerPicture(order.customer,'npc-picture hf-face')}<div><b>${e(order.customer.name)}</b><small>${e(order.place)} · ${e(order.neighbourhood)}</small></div></div>
     <div class="hf-line">${uiIcon('store')}<span><b>${e(order.restaurant)}</b><small>${e(order.items.join(' · '))}</small></span></div>
-    <div class="hf-line">${uiIcon('mapPin')}<span><b>${e(order.address)}</b><small>${metres(order.length)} pelas ruas</small></span></div>`;
+    <div class="hf-line">${uiIcon('package')}<span><b>Retirar em ${e(order.pickup.address)}</b><small>${metres(order.pickup.length)} até o ponto · ${e(order.pickup.neighbourhood)}</small></span></div>
+    <div class="hf-line">${uiIcon('mapPin')}<span><b>${e(order.address)}</b><small>${metres(order.length)} pelas ruas, a partir do ponto</small></span></div>`;
   function homeHtml(state:HighfoodState):string {
     if(state.status==='off'){
       const owned=ctx.host.food.owned();
@@ -54,10 +55,10 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
         <div class="hf-actions"><button type="button" class="ph-pill-btn soft" data-hf="decline">Recusar</button><button type="button" class="ph-pill-btn hf-go" data-hf="accept">Aceitar</button></div></section>`;
     }
     if(state.status==='order'&&state.order){
-      const order=state.order,left=order.promiseAt-serverNow(),index=STEPS.findIndex(([id])=>id===order.stage);
-      const hint=order.stage==='going'?'Siga o GPS e desça da moto perto do cliente. O pedido sai do baú na hora.':order.stage==='unload'?'Tirando o pedido do baú…':`Leve até ${order.customer.name} e aperte E.`;
+      const order=state.order,left=order.promiseAt-serverNow(),index=order.stage==='collect'?0:STEPS.findIndex(([id])=>id===order.stage);
+      const hint=order.stage==='pickup'?'Siga o GPS até o ponto de retirada. Desça da moto, vá até a tela, aperte E e digite este código.':order.stage==='collect'?'Retirando o pedido…':order.stage==='going'?'Siga o GPS e desça da moto perto do cliente. O pedido sai do baú na hora.':order.stage==='unload'?'Tirando o pedido do baú…':`Leve até ${order.customer.name} e aperte E. Subindo na moto, o pedido vai no baú.`;
       return `<section class="hf-card"><header><small>Entrega em andamento</small><b class="hf-pay">${coins(order.pay)} <small>moedas</small></b></header>
-        <ol class="hf-steps">${STEPS.map(([,label],i)=>`<li class="${i<index?'done':i===index?'now':''}"><i></i>${label}</li>`).join('')}</ol>${orderHead(order)}
+        <ol class="hf-steps">${STEPS.map(([,label],i)=>`<li class="${i<index?'done':i===index?'now':''}"><i></i>${label}</li>`).join('')}</ol>${order.stage==='pickup'?`<div class="hf-code" role="group" aria-label="Código de retirada ${e(order.code)}"><small>Código de retirada</small><div>${[...order.code].map(digit=>`<b>${e(digit)}</b>`).join('')}</div></div>`:''}${orderHead(order)}
         <p class="hf-note ${left<0?'late':''}" data-hf-promise>${left>=0?`Prazo: ${clock(left)}`:'Atrasado: sem bônus e com menos estrelas'}</p>${order.crashes?`<p class="hf-note late">Pedido amassado em ${order.crashes} ${order.crashes===1?'queda':'quedas'}: vale menos.</p>`:''}
         <p class="ph-hint">${e(hint)}</p>
         <div class="hf-actions"><button type="button" class="ph-pill-btn soft" data-hf="map">${uiIcon('map')}Mapa</button><button type="button" class="ph-pill-btn soft danger-text" data-hf="cancel">Cancelar</button></div></section>`;

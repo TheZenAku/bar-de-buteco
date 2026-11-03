@@ -6,6 +6,8 @@ const shot=async(page:Page,name:string)=>{await page.screenshot({path:`${shots}/
 const food=(page:Page)=>page.evaluate(()=>(window as any).barDebug.food());
 const wallet=(page:Page)=>page.request.get('/api/wardrobe').then(response=>response.json()).then(view=>view.balance as number);
 const ownBike=(page:Page,id:string)=>page.evaluate(owner=>Object.values((window as any).barDebug.snapshot().world.motos??{}).find((moto:any)=>moto.ownerId===owner) as any,id);
+/** A point beside the bike, `side` metres to one side of it. */
+const besideBike=(moto:{x:number;z:number;yaw:number},side:number)=>({x:moto.x+Math.cos(moto.yaw)*side,z:moto.z-Math.sin(moto.yaw)*side});
 
 /**
  * Rides along the GPS's line with key events from inside the page, as Playwright's round trips are too slow to steer a bike with: looks ahead on the line, slows for
@@ -30,7 +32,9 @@ async function rideGps(page:Page,id:string,arrive:number,span=170_000):Promise<v
           const want=Math.atan2(look[0]!-bike.x,look[1]!-bike.z),turn=Math.atan2(Math.sin(want-bike.yaw),Math.cos(want-bike.yaw));
           if(performance.now()<reverseUntil){key('KeyW',false);key('KeyS',true);key('KeyA',turn<0);key('KeyD',turn>0);continue;}
           let corner=0;
-          if(route.length>2&&Math.hypot(route[1]![0]!-bike.x,route[1]![1]!-bike.z)<16){const d1=Math.atan2(route[1]![0]!-bike.x,route[1]![1]!-bike.z),d2=Math.atan2(route[2]![0]!-route[1]![0]!,route[2]![1]!-route[1]![1]!);corner=Math.abs(Math.atan2(Math.sin(d2-d1),Math.cos(d2-d1)));}
+          // The line's second point only joins the way just ahead: the next corner is the first one further off.
+          const bend=route.findIndex((point,i)=>i>0&&Math.hypot(point[0]!-bike.x,point[1]!-bike.z)>5);
+          if(bend>0&&route[bend+1]&&Math.hypot(route[bend]![0]!-bike.x,route[bend]![1]!-bike.z)<16){const d1=Math.atan2(route[bend]![0]!-bike.x,route[bend]![1]!-bike.z),d2=Math.atan2(route[bend+1]![0]!-route[bend]![0]!,route[bend+1]![1]!-route[bend]![1]!);corner=Math.abs(Math.atan2(Math.sin(d2-d1),Math.cos(d2-d1)));}
           const fast=gps.remaining<arrive+14?2.5:corner>.5?4:Math.abs(turn)<.4?10:Math.abs(turn)<.8?6:3;
           key('KeyA',turn>.05);key('KeyD',turn<-.05);key('KeyW',bike.speed<fast);key('KeyS',bike.speed>fast+1.5);
           if(Math.hypot(bike.x-last.x,bike.z-last.z)>.4){last={x:bike.x,z:bike.z};moved=performance.now();}
@@ -102,9 +106,9 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   const start=await selfOf(page);
   await walkTo(page,start.x,5.4,.6);
   await walkTo(page,-3.2,5.4,.6);
-  await walkTo(page,-3.2,-14.5,.6);
-  await walkTo(page,-3.8,-15.5,.5);
-  await expect.poll(async()=>{const at=await selfOf(page);return Math.hypot(at.x+3.8,at.z+15.5);},{timeout:30_000}).toBeLessThan(1.6);
+  await walkTo(page,-3.2,-13.97,.6);
+  await walkTo(page,-3.99,-13.97,.5);
+  await expect.poll(async()=>{const at=await selfOf(page);return Math.hypot(at.x+3.99,at.z+13.97);},{timeout:30_000}).toBeLessThan(1.6);
   await page.waitForTimeout(500);
   await shot(page,'05-base');
   await page.keyboard.press('e');
@@ -155,8 +159,12 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   await page.keyboard.press('k');
   await page.waitForTimeout(800);
   expect(await page.evaluate(()=>(window as any).__buzz)).toBe(before);
-  const order=(await food(page)).order;
+  const order=(await food(page)).order,pickup=order.pickup;
+  expect(order.stage).toBe('pickup');expect(order.code).toMatch(/^\d{4}$/);
+  // The GPS goes first to the pickup point, the nearest one: the kerb in front of the locker.
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.gps().route.length),{timeout:8000}).toBeGreaterThan(1);
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.gps().target?.label)).toContain('Ponto de retirada');
+  expect((await page.evaluate(()=>(window as any).barDebug.gps().target)).x).toBe(pickup.parkX);
   await shot(page,'12-minimap-route');
   // To the bike and up.
   const bike=await ownBike(page,me.id);
@@ -167,6 +175,64 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   await expect.poll(async()=>(await page.locator('#context-label').textContent())??'',{timeout:15_000}).toContain('subir');
   await page.keyboard.press('e');
   await expect.poll(async()=>(await selfOf(page)).animationState,{timeout:10_000}).toBe('ride');
+  await page.waitForTimeout(1000);
+  // At the pickup point: off the bike, up to the screen, E. It takes the code in the order and nothing else.
+  await page.evaluate(({x,z})=>(window as any).barDebug.send('test.moto.place',{x,z}),{x:pickup.parkX,z:pickup.parkZ});
+  await expect.poll(async()=>{const at=await selfOf(page);return Math.hypot(at.x-pickup.parkX,at.z-pickup.parkZ);},{timeout:10_000}).toBeLessThan(3);
+  await page.waitForTimeout(800);
+  await page.keyboard.press('e');
+  await expect.poll(async()=>(await selfOf(page)).animationState,{timeout:10_000}).not.toBe('ride');
+  expect((await food(page)).order.stage).toBe('pickup');
+  await walkTo(page,pickup.standX,pickup.standZ,.4);
+  await expect.poll(async()=>(await page.locator('#context-label').textContent())??'',{timeout:15_000}).toContain('Retirar o pedido');
+  await page.waitForTimeout(400);
+  await shot(page,'12b-at-locker');
+  await page.keyboard.press('e');
+  await expect(page.locator('#food-locker.open')).toBeVisible({timeout:10_000});
+  await expect(page.locator('.locker-title')).toHaveText('RETIRE SEU PEDIDO');
+  await page.waitForTimeout(300);
+  await shot(page,'12c-locker');
+  // The phone opens over the screen, with the code in the order.
+  await page.keyboard.press('k');
+  await expect(page.locator('#phone.open')).toBeVisible();
+  await page.locator('[data-phone-home]').click().catch(()=>{});
+  await page.locator('[data-app="highfood"]').click();
+  await expect(page.locator('.hf-code')).toContainText([...order.code].join(''),{timeout:10_000});
+  await page.waitForTimeout(400);
+  await shot(page,'12d-locker-and-code');
+  await page.keyboard.press('k');
+  await expect(page.locator('#food-locker.open')).toBeVisible();
+  // A wrong code is refused and cleared.
+  const wrong=order.code==='1111'?'2222':'1111';
+  await page.keyboard.type(wrong.slice(0,2));
+  await page.waitForTimeout(300);
+  await shot(page,'12e-locker-typing');
+  await page.keyboard.type(wrong.slice(2));
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.locker-sub')).toContainText('incorreto',{timeout:8000});
+  await expect(page.locator('.locker-code span').first()).toHaveText('');
+  await shot(page,'12f-locker-wrong');
+  expect((await food(page)).order.stage).toBe('pickup');
+  // The right one, from the screen's own keys.
+  for(const digit of order.code)await page.locator(`.locker-keys [data-locker-key="${digit}"]`).click();
+  await page.locator('.locker-open').click();
+  await expect(page.locator('.locker-done')).toBeVisible({timeout:8000});
+  await shot(page,'12g-locker-open');
+  await expect(page.locator('#food-locker')).toBeHidden({timeout:8000});
+  await expect.poll(async()=>(await food(page)).order?.stage,{timeout:15_000}).toBe('carrying');
+  expect((await selfOf(page)).parcel).toBe('bag');
+  await page.waitForTimeout(400);
+  await shot(page,'12h-collected');
+  // Back on the bike, the bag goes in the box and the GPS turns to the customer.
+  await walkTo(page,besideBike(await ownBike(page,me.id),.8).x,besideBike(await ownBike(page,me.id),.8).z,.25);
+  await page.waitForTimeout(600);
+  if(!((await page.locator('#context-label').textContent())??'').includes('subir')){const moto=await ownBike(page,me.id);await walkTo(page,besideBike(moto,-.8).x,besideBike(moto,-.8).z,.25);}
+  await expect.poll(async()=>(await page.locator('#context-label').textContent())??'',{timeout:15_000}).toContain('subir');
+  await page.keyboard.press('e');
+  await expect.poll(async()=>(await selfOf(page)).animationState,{timeout:10_000}).toBe('ride');
+  await expect.poll(async()=>(await food(page)).order?.stage,{timeout:10_000}).toBe('going');
+  expect((await selfOf(page)).parcel).toBe('');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.gps().target?.x)).toBe(order.parkX);
   await page.waitForTimeout(1000);
   // The ride, for real.
   // A stretch of the ride with real keys: the line gets shorter as the bike follows it. The rest of the city is covered by the tests of the routes.

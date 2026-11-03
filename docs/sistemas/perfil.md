@@ -23,19 +23,19 @@ No próprio perfil, além do que todos veem:
 
 ## Skills
 
-Algumas skins têm habilidades próprias, listadas em `SKILLS` (`packages/shared/src/profile.ts`). Na aba **Skill** o jogador escolhe qual fica ativa e em qual tecla. A escolha vale por skin e fica salva na conta (`user_profiles.skill_loadouts`).
+Alguns personagens têm habilidades próprias, listadas em `SKILLS` (`packages/shared/src/profile.ts`). Elas **são compradas na [coleção](skins.md#habilidades)**: a aba **Skill** mostra as bloqueadas, com o preço, e leva até lá. Entre as compradas, o jogador escolhe qual fica ativa e em qual tecla. A escolha vale por personagem, em todas as variantes dele, e fica salva na conta (`user_profiles.skill_loadouts`).
 
 | Skill | Skin | Clipe | Duração |
 | --- | --- | --- | ---: |
 | Golpe de karatê | Rafael | `Kick` | 2 s |
 | Chute voador | Rafael | `AirKick` | 2,9 s |
 
-- Sem escolha salva, a primeira skill da skin fica ativa na tecla **X**.
+- Sem escolha salva, a primeira skill comprada do personagem fica ativa na tecla **X**.
 - Valem letras e números que o jogo ainda não usa a pé: W, A, S, D, E, G, V, F, C, Q, T, M, I, B, P, K e J são recusadas. Na moto, Z, X, C e H continuam sendo os comandos dela.
-- A barra de ações mostra um botão com a skill ativa e a tecla escolhida. Ele só aparece se a skin vestida tiver skills.
-- O servidor confere se a skill é da skin vestida e se o jogador está livre (`player.skill`). A escolha de tecla fica só no cliente e na API.
+- A barra de ações mostra um botão com a skill ativa e a tecla escolhida. Ele só aparece se o jogador tiver comprado alguma skill do personagem vestido.
+- O servidor confere se a skill é do personagem vestido, se foi comprada e se o jogador está livre (`player.skill`). A escolha de tecla fica só no cliente e na API.
 
-Para criar uma skill: ponha o clipe no banco da skin (`clips` e `exclusive` em `tools/assets/convert-animations.mjs`) e acrescente a entrada em `SKILLS`, com a duração do clipe.
+Para criar uma skill: ponha o clipe no banco das skins do personagem (`clips` e `exclusive` em `tools/assets/convert-animations.mjs`) e acrescente a entrada em `SKILLS`, com a duração do clipe, a raridade e o preço. O preço entra na tabela sozinho, e a coleção passa a vendê-la.
 
 ### O chute que acerta
 
@@ -121,7 +121,7 @@ No administrador, **Ver a carta** (abaixo da prévia do formulário) mostra como
 | `GET /api/profile/:id` | O perfil. `owned` e `loadouts` vêm só no próprio |
 | `POST /api/profile/status` | `{status}` |
 | `POST /api/profile/badges` | `{badges:[id…]}`, até seis, só os que a conta tem |
-| `POST /api/profile/skill` | `{skill,key}` para a skin vestida |
+| `POST /api/profile/skill` | `{skill,key}` para o personagem vestido; exige a skill comprada |
 | `GET /api/admin/badges` · `POST /api/admin/badges` | Catálogo; criar, ou editar com `id` |
 | `POST /api/admin/badges/delete` | Apaga e tira de quem tinha |
 | `POST /api/admin/badges/images` · `POST /api/admin/badges/images/delete` | Envia um PNG (os bytes do arquivo, `Content-Type: image/png`); apaga um que nenhum emblema usa |

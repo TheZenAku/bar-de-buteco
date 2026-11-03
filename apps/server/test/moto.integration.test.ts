@@ -160,7 +160,7 @@ test('the delivery bike over real WebSockets: spawned by an administrator, mount
     staff.room.send('admin.moto.despawn',{id:spot.id});await until(()=>staff.errors.some(e=>e.includes('já saiu')));
     // A crash: flat out into a parked car the rider is thrown on with the bike's speed, nothing they press counts while on the ground, the
     // bike falls, and the body gets up by itself near where it stopped. Slowly into the same car nothing happens.
-    const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Carro_Prata')!;
+    const car=MAP_COLLIDERS.find(c=>c.id==='COL_Ext_Arquibancada')!;
     staff.player().assign({x:car.x-car.hx-2.5,y:0,z:car.z-3,rotation:Math.PI/2});
     staff.room.send('admin.moto.spawn',{});await until(()=>room.state.motos.size===1);
     const crashed=()=>[...room.state.motos.values()][0]!;

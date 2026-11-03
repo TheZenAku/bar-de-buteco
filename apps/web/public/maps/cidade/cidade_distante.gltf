@@ -57,7 +57,8 @@
 			"extras":{
 				"cid_etapa":"anel",
 				"colisao":false,
-				"ignorar_nevoa":false
+				"ignorar_nevoa":false,
+				"poliigon_props":{}
 			},
 			"mesh":0,
 			"name":"Distante_Morros_Cidade"
@@ -66,7 +67,8 @@
 			"extras":{
 				"cid_etapa":"anel",
 				"colisao":false,
-				"ignorar_nevoa":false
+				"ignorar_nevoa":false,
+				"poliigon_props":{}
 			},
 			"mesh":1,
 			"name":"Distante_Chao_Cidade"
@@ -75,7 +77,8 @@
 			"extras":{
 				"cid_etapa":"anel",
 				"colisao":false,
-				"ignorar_nevoa":true
+				"ignorar_nevoa":true,
+				"poliigon_props":{}
 			},
 			"mesh":2,
 			"name":"Distante_Panorama_Cidade"
@@ -85,7 +88,8 @@
 		{
 			"extras":{
 				"tile_u":700.0,
-				"tile_v":350.0
+				"tile_v":350.0,
+				"poliigon_props":{}
 			},
 			"name":"Morro_Distante",
 			"pbrMetallicRoughness":{
@@ -104,7 +108,8 @@
 		{
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.0
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Chao_Distante",
 			"pbrMetallicRoughness":{
@@ -129,7 +134,8 @@
 			},
 			"extras":{
 				"tile_u":1.0,
-				"tile_v":1.0
+				"tile_v":1.0,
+				"poliigon_props":{}
 			},
 			"name":"Ceu_Panorama",
 			"pbrMetallicRoughness":{

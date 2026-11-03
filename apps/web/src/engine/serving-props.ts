@@ -73,6 +73,15 @@ export function palmUp(rig:HandRig,up:pc.Vec3,front:pc.Vec3):void {
   if(along.lengthSq()>1e-6&&forward.lengthSq()>1e-6)aim(rig.hand,along,forward);
 }
 
+/** Straightens the fingers along the hand: the clips' relaxed curl, and the one some meshes are modelled with (Tonico's), would come through what rests on it. */
+export function openHand(rig:HandRig):void {
+  const {fingers}=handFrame(rig);
+  for(const name of ['index','middle','ring','pinky'] as const)rig.fingers[name]?.forEach((bone,i,chain)=>{
+    const next=chain[i+1]??bone.children[0] as pc.Entity|undefined;
+    if(next)aim(bone,new pc.Vec3().sub2(next.getPosition(),bone.getPosition()),fingers);
+  });
+}
+
 /** Where the tray rests on the open hand: over the middle of the palm. */
 export function trayCentre(rig:HandRig,up:pc.Vec3):pc.Vec3 {
   const frame=handFrame(rig);

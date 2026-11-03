@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Matrix4, Quaternion, Vector3, Box3 } from 'three';
-import { prepareCity, publishedBaseMap, writeIfChanged } from './import-city.mjs';
+import { prepareCity, publishedBaseMap, withBarPieces, writeIfChanged } from './import-city.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const source = path.join(root, 'assets-bar/map/BarBoteco/export');
@@ -16,7 +16,8 @@ function read(name) {
   if ([...(json.images ?? []), ...(json.buffers ?? [])].some(asset => asset.uri && !asset.uri.startsWith('data:'))) throw new Error(`External dependency in ${name}`);
   return { bytes, json, bin: bytes.subarray(28 + size), hash: createHash('sha256').update(bytes).digest('hex') };
 }
-const visual = read('bar_boteco.glb'), collision = read('bar_boteco_colisao.glb');
+// The pieces of 17_lugares_animacao.py, when the export lacks them, come from the last export that has them.
+const visual = withBarPieces(read('bar_boteco.glb'), () => read(path.join('anterior_2026-10-29', 'bar_boteco.glb'))), collision = read('bar_boteco_colisao.glb');
 // The whole city is checked before anything is written: an export with a missing file publishes nothing.
 const city = prepareCity({ root, exportDir: source });
 const round = n => Math.round(n * 1e6) / 1e6;
@@ -50,6 +51,8 @@ for (let i = 0; i < collision.json.nodes.length; i++) {
   if (node.name?.startsWith('COLPORTA_') && node.mesh === undefined) continue;
   // The old neighbourhood's boundary walls would close the streets into the city (22_cidade_base.py makes them obsolete).
   if (node.name?.startsWith('COL_Rua_Limite')) continue;
+  // 32_remover_carros.py took the sedans off the map but left their boxes (its list has no COL_Ext_Sedan_): invisible walls in the street.
+  if (node.name?.startsWith('COL_Ext_Sedan_')) continue;
   if (!node.name?.startsWith('COL_') || node.mesh === undefined) throw new Error('Unexpected collision node');
   const box = new Box3(), isRamp = node.name.includes('Escada_Rampa');
   // Volumes people stand on: streets, floors and slabs, stairs, balconies, and the stage (15_palco.py) with its steps.
@@ -328,7 +331,10 @@ fs.mkdirSync(destination,{recursive:true});
 const cityFiles = city.publish({publishDir:path.join(destination,'cidade'),sharedDir:path.join(root,'packages/shared/src')});
 writeIfChanged(path.join(destination,'bar_boteco.glb'),base.bytes);
 writeIfChanged(path.join(destination,'bar_boteco_colisao.glb'),collision.bytes);
+// The bar's baked occlusion and the hall's panorama (aolib.py, 51_panorama_env.py): bar-surfaces.ts reads them beside the map.
+for(const file of fs.readdirSync(source).filter(name=>/^bar_ao_.+\.jpg$|^bar_env\.png$/.test(name)))writeIfChanged(path.join(destination,file),fs.readFileSync(path.join(source,file)));
 writeIfChanged(path.join(root,'packages/shared/src/map-data.json'),Buffer.from(`${JSON.stringify(data,null,2)}\n`));
 console.log(`Map imported: ${visual.json.nodes.length} visual nodes, ${effects.length} FX anchors, ${colliders.length} solid volumes, ${doors.length} door leaves, ${surfaces.length} floor triangles, ${seats.length} seats, ${numberedTables.length} numbered tables; all textures embedded.`);
+if (visual.restored) console.log(`bar_boteco.glb lacks what 17_lugares_animacao.py adds: the published copy opens the exported freezer (its lid becomes Freezer_Bar_Tampa) and takes its inside, the tray, the long necks and the other nodes (${visual.restored.filter(name=>name!=='Freezer_Bar_Tampa').join(', ')}) from anterior_2026-10-29.`);
 const {counts} = city, barriers = Object.values(base.counts).reduce((a,b)=>a+b,0);
 console.log(`City imported: ${counts.sectors} sectors, ${counts.solids} collision boxes, ${counts.markers} markers, ${counts.lights} lights, ${cityFiles} files published (${counts.gltfs} glTF, ${counts.textures} textures). Left out of the published copies: ${counts.silhouettes} silhouette triangles, ${counts.originalLods} LOD triangles over the original neighbourhood, ${barriers} triangles of the old sawhorses and cones.`);

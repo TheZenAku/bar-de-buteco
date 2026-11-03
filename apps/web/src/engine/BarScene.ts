@@ -1,26 +1,28 @@
 import * as pc from 'playcanvas';
-import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, BLACKJACK_SEATS, BLACKJACK_TABLE, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
+import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
-import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
+import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,openHand,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
 import type { MapView, SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
+import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
 import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
 import {StageLights,type StageLightsStatus} from './stage-lights';
 import {StageShow,type StageShowStatus} from './stage-show';
-import {type FoosballFrame} from '@bar/shared';
+import {type FoosballFrame,type PoolShotView,type PoolTableView} from '@bar/shared';
 import {JUKEBOX_SYSTEMS,LIGHT_DESK,STAGE,STAGE_ENTRY,TV_SPOTS,inStageArea,onStage,type JukeboxState,type StageShowState} from '@bar/shared';
 import {MUSICIAN_REACH,MUSICIANS,STAGE_PHASES,musicianPhase,stageSpot,type MusicianState,type StagePhase,type StageSpot} from '@bar/shared';
 import {StageMusicians,musicianState,musicianTime} from './stage-musicians';
 import {BarDressing} from './bar-dressing';
 import {BAR_ANIMATIONS,CLEANABLE_TABLES,ITEM_CATALOG,URINALS,barClipMs,seatChair,barFrame,barTimeline,cornerSpot,inFrame,nearestCorner,type BarClip,type BarFrame,type BarStep,type Meal} from '@bar/shared';
 import {BarAnimations,barEndOffset,barState} from './bar-animations';
-import {FOG_SCALE,type GraphicsSettings} from '../graphics';
-import {CameraRig,type CameraMode} from './camera-rig';
+import {FOG_SCALE,textureLimit,type GraphicsSettings} from '../graphics';
+import {limitTextures,loadSharedContainer} from './gltf-textures';
+import {CameraRig,type CameraFeel,type CameraMode} from './camera-rig';
 import {Motos,seatRider,type Bike} from './moto-delivery';
 import {HighfoodProps} from './highfood-props';
 import {GARAGES,HIGHFOOD} from '@bar/shared';
@@ -30,6 +32,7 @@ import {BlowSounds} from './blow-sound';
 import {BlowEffects} from './blow-fx';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
+import {PoolBalls} from './pool-balls';
 import {completeBasePose} from './animation-tracks';
 import {shootPortrait} from './skin-portrait';
 import {KICKS,skillById} from '@bar/shared';
@@ -55,8 +58,8 @@ const DRUNK_BODY_SWAY = [0, 0, 3, 6, 6];
 const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
 // The head joint shrunk to nothing in first person, so the face and hair do not fill the view.
 const HIDDEN_HEAD = 1e-3;
-// NPCs with their own skin, not offered in the selector: the bartender is Magrão.
-const NPC_SKINS: Record<string, string> = { bartender: 'magrao' };
+// NPCs with their own skin, not offered in the selector: the bartender is Magrão, the waiter is Tonico.
+const NPC_SKINS: Record<string, string> = { bartender: 'magrao', tonico: 'tonico' };
 interface SkinnedRig {
   model: pc.Entity;
   bones: Record<SkinBone, pc.Entity>;
@@ -167,9 +170,10 @@ interface Pose {
  */
 const DEFAULT_MODEL='nathan';
 // Models and canes follow their rig version; regenerated animation banks have a separate cache version.
-const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'mixamo-20261027', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027' };
+const MOUSE_JUMP = 500;
+const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'mixamo-actions-20261031' : SKIN_VERSIONS[id];
+  const version = folder === 'animations' ? 'mixamo-actions-20261101' : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -199,7 +203,7 @@ const OBJECTIVE_COLOR = '#5fd86c';
 // A musician plays (and the stage show runs) from the start of the playing, through the loop, until putting it away.
 const LIVE_PHASES = new Set<StagePhase>(['comecando','loop']);
 /** Highfood's base: the ring's colour, how far it shows from, and where its sign stands. */
-const FOOD_COLOR='#ff3d5a',FOOD_BASE_RANGE=70,FOOD_STAND={x:-1.15,y:.15,z:-15.5};
+const FOOD_COLOR='#ff3d5a',FOOD_BASE_RANGE=70;
 /** The garages' rings, in the colour of everything about vehicles. */
 const GARAGE_COLOR='#17d4f4';
 const STAGE_BLIPS = {entry:{at:STAGE_ENTRY,color:'#ff47c2'},telao:{at:TV_SPOTS.telao!,color:'#3adfd7'},shop:{at:SHOP_SPOT,color:'#fac416'},desk:{at:LIGHT_DESK,color:'#a77bff'}} as const;
@@ -244,11 +248,12 @@ export class BarScene {
   private readonly actors = new Map<string, Avatar>();
   private readonly materials: pc.StandardMaterial[] = [];
   private readonly materialCache = new Map<string, pc.StandardMaterial>();
-  private readonly textures: pc.Texture[] = [];
   private readonly warmLights: pc.Entity[] = [];
   private readonly partyLights: pc.Entity[] = [];
   private readonly environment:EnvironmentLighting;
   private mapEffects?:MapEffects;
+  /** The bar's baked occlusion and the room's reflections (bar-surfaces.ts). */
+  private surfaces?:BarSurfaces;
   /** Fridges, warmer and counter dressed with the real props (bar-dressing.ts). */
   private dressing?:BarDressing;
   private jukeboxLights?:JukeboxLights;
@@ -261,6 +266,8 @@ export class BarScene {
   private readonly stageShow:StageShow;
   /** The balls of the pebolim matches on the games hall's tables (foosball-balls.ts). */
   private readonly foosballBalls:FoosballBalls;
+  /** The balls on the games hall's pool tables (pool-balls.ts): the rack and every stroke, for whoever is near. */
+  private readonly poolBalls:PoolBalls;
   /** The delivery bikes (moto-delivery.ts), and whether the camera is following the local player on one. */
   private readonly motos:Motos;
   private readonly speedBlur:SpeedBlur;
@@ -295,7 +302,6 @@ export class BarScene {
   private readonly stageBlips = new Map<StageBlip, Marker>();
   /** Highfood's base: its ring and its sign, near the bar. */
   private foodBase?: Marker;
-  private foodStand?: pc.Entity;
   private garageRings?: Marker[];
   private highfoodProps?: HighfoodProps;
   private readonly keys = new Set<string>();
@@ -358,7 +364,15 @@ export class BarScene {
   /** Current render scale (dynamic resolution moves it between 0.5 and the chosen scale). */
   private scale = 1;
   private goodSeconds = 0;
-  private drawClock = 0;
+  private badSeconds = 0;
+  /** The largest texture side loads keep (graphics.ts textureLimit); none until the settings arrive. */
+  private textureMax = Infinity;
+  /** Draws skipped last frame because their shader was still being built (see compileShadersInBackground). */
+  private compiling = 0;
+  private compilingLastFrame = 0;
+  /** The same for shadow maps: while any is skipped, the lamps' cached maps are drawn again once they are all built. */
+  private compilingShadows = 0;
+  private shadowsPending = false;
   /** The phone's front camera (setSelfie): the view turns to the player's face. */
   private selfie = false;
   /** Canvases the phone's camera draws into, one per size (a video call takes eight frames a second). */
@@ -375,12 +389,18 @@ export class BarScene {
     // scene once the window grew taller (F11, full screen).
     this.app.setCanvasFillMode(pc.FILLMODE_NONE);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
+    // The sky's panorama wraps all around the view: it keeps twice the detail of the rest.
+    limitTextures(this.app,asset=>/panorama/i.test(asset?.name??'')?this.textureMax*2:this.textureMax);
+    this.compileShadersInBackground();
+    this.capFrameRate();
 
     this.camera = new pc.Entity('Third-person camera');
     this.camera.addComponent('camera', {
       // The city's far hills and panorama, as its scene's camera_far_minimo_m asks. What is detailed does not depend on this
       // distance: that is the sectors' streaming (city-streaming.ts), and the fog hides everything well before it.
       clearColor: color('#9dafbd'), fov: 57, nearClip: 0.08, farClip: CITY_FAR_CLIP,
+      // A soft shoulder instead of clipping: the lamps' hot spots on the walls keep their colour. What glows skips it (environment-lighting.ts).
+      toneMapping: pc.TONEMAP_NEUTRAL,
     });
     this.app.root.addChild(this.camera);
     this.camera.setPosition(18, 9, 16);
@@ -392,11 +412,13 @@ export class BarScene {
     this.environment.update(Date.now(),0,'');
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
-    this.buildBlackjack();
+    // The blackjack and truco tables and their chairs are the map's (46_mesa_blackjack.py: BJ_* at BLACKJACK_TABLE and BLACKJACK_SEATS;
+    // 48_mesa_truco.py: TR_* at TRUCO_TABLE and TRUCO_SEATS).
     this.buildPartyLighting();
     this.environment.addPartyShadows(this.partyLights);
     this.stageShow=new StageShow(this.app);
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
+    this.poolBalls=new PoolBalls(this.app);
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
       const ear=this.camera.getPosition();
@@ -408,7 +430,8 @@ export class BarScene {
     this.staticBatchId = -1;
     for(const definition of TELEVISIONS.filter(tv=>TV_SYSTEMS.some(system=>system.screens.includes(tv.id))))this.televisions.set(definition.id,new TelevisionSurface(this.app,definition));
     this.discoBall = this.buildDiscoBall();
-    this.ready = this.loadMap();
+    // Ready once the room's reflections are made and every shader the bar needs is built: the first frames in show it whole.
+    this.ready = this.loadMap().then(() => this.surfaces?.ready).then(() => this.shadersSettled());
     this.loadProps();
     void this.ready.catch(() => {}); // The UI reports loading failures before admission.
     this.installControls();
@@ -480,7 +503,7 @@ export class BarScene {
 
   private loadMap(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}maps/bar_boteco.glb`, 'container', (error, asset) => {
+      loadSharedContainer(this.app, `${import.meta.env.BASE_URL}maps/bar_boteco.glb`, (error, asset) => {
         if (this.destroyed) { resolve(); return; }
         if (error || !asset) { reject(new Error('Não foi possível carregar o mapa do bar. Recarregue para tentar novamente.')); return; }
         const resource = asset.resource as pc.ContainerResource;
@@ -489,6 +512,8 @@ export class BarScene {
         // Older exports still carry the backdrop from before the city: its buildings and hills would stand inside it.
         (map.findByName('Fundo_Distante') as pc.Entity | null)?.destroy();
         this.app.root.addChild(map); this.mapEntity = map;
+        // The pool tables' decorative rack and cue give way to the game's balls.
+        this.poolBalls.hideMapDecor(map);
         for(const door of this.doorLeaves){
           door.entity=(map.findByName(door.leaf.id) as pc.Entity|null)??undefined;
           if(!door.entity)console.warn(`Folha de porta "${door.leaf.id}" ausente no mapa; ela não será animada.`);
@@ -496,6 +521,7 @@ export class BarScene {
         const lights = map.findComponents('light') as pc.LightComponent[];
         this.warmLights.push(...lights.map(light=>light.entity));
         this.environment.configureMap(map);
+        this.surfaces=new BarSurfaces(this.app,map,import.meta.env.BASE_URL,this.textureMax,()=>this.shadersSettled());
         // The city streams around the bar on its own time, and never holds the game back (city-streaming.ts).
         this.city=new CityStreaming(this.app,this.environment);
         this.applyCityQuality();
@@ -547,29 +573,31 @@ export class BarScene {
   preloadMusician(spot:string):void {this.musicians?.preload(spot);}
 
   /**
-   * The job objective ("blip") of the local worker: a ring on the floor around the station (faintly seen through
-   * furniture and walls). Drawn only by the worker's browser; null hides it.
+   * The local player's objective ("blip"): a ring on the floor around the worker's station, the customer or the mark.
+   * `through`: faintly seen through furniture and walls (a worker's station, up and down the bar). Drawn only by this
+   * browser; null hides it.
    * One marker is built and then moved from task to task. Destroying it also freed its ring mesh (PlayCanvas frees a
    * mesh with its last instance), and the next task's marker drew the freed mesh: every frame threw and the view froze.
    */
-  setObjective(target:Required<Position>|null):void {
+  setObjective(target:Required<Position>|null,through=false):void {
     if(!target){if(this.objective)this.objective.marker.enabled=false;return;}
-    const objective=this.objective??=this.buildMarker('Job objective',OBJECTIVE_COLOR);
+    const objective=this.objective??=this.buildMarker('Job objective',OBJECTIVE_COLOR,true);
+    objective.ring.render!.meshInstances[1]!.visible=through;
     objective.target={x:target.x,y:target.y,z:target.z};objective.marker.setPosition(target.x,target.y,target.z);objective.marker.enabled=true;
     this.animateMarker(objective);
   }
 
-  private buildMarker(name:string,hex:string):Marker {
+  /** `through`: with a faint copy drawn over whatever stands in front of it. Without it, a wall hides the ring like anything else. */
+  private buildMarker(name:string,hex:string,through=false):Marker {
     const marker=this.group(name,[0,0,0]);
     const glow=(depthTest:boolean)=>{
       const material=new pc.StandardMaterial();material.useLighting=false;material.useFog=false;material.diffuse.set(0,0,0);
       material.emissive=color(hex);material.opacity=depthTest ? .85 : .3;material.blendType=pc.BLEND_NORMAL;
       material.depthTest=depthTest;material.depthWrite=false;material.cull=pc.CULLFACE_NONE;material.update();this.materials.push(material);return material;
     };
-    // Solid on the floor where it shows, and a faint copy drawn over whatever stands in front of it, like a map blip.
     const ring=new pc.Entity(`${name} ring`);
     const torus=pc.Mesh.fromGeometry(this.app.graphicsDevice,new pc.TorusGeometry({tubeRadius:.03,ringRadius:BLIP_RADIUS,segments:48}));
-    ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true)),new pc.MeshInstance(torus,glow(false))],castShadows:false,receiveShadows:false});
+    ring.addComponent('render',{meshInstances:[new pc.MeshInstance(torus,glow(true)),...(through?[new pc.MeshInstance(torus,glow(false))]:[])],castShadows:false,receiveShadows:false});
     ring.setLocalPosition(0,.03,0);marker.addChild(ring);
     return {target:{x:0,y:0,z:0},marker,ring};
   }
@@ -591,7 +619,7 @@ export class BarScene {
       let blip=this.stageBlips.get(id);
       if(!area||up&&id!=='desk'){if(blip)blip.marker.enabled=false;continue;}
       if(!blip){
-        blip=this.buildMarker(`Stage blip ${id}`,hex);this.stageBlips.set(id,blip);
+        blip=this.buildMarker(`Stage blip ${id}`,hex,true);this.stageBlips.set(id,blip);
         blip.target={x:spot.x,y:spot.y,z:spot.z};blip.marker.setPosition(spot.x,spot.y,spot.z);
       }
       blip.marker.enabled=true;this.animateMarker(blip);
@@ -622,17 +650,13 @@ export class BarScene {
   projectFoodBase():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.foodBase);}
   /** The ring shows up to a street or two away, in the base's colour, for anyone (the base is where the job starts). */
   private updateFoodBase():void {
-    const player=this.actors.get(this.localId),p=player?.root.getPosition(),{x,y,z,rotation}=HIGHFOOD.BASE;
+    const player=this.actors.get(this.localId),p=player?.root.getPosition(),{x,y,z}=HIGHFOOD.BASE;
     const near=!!p&&this.enabled&&!this.watchingTv&&Math.hypot(p.x-x,p.z-z)<FOOD_BASE_RANGE&&Math.abs(p.y-y)<2.5;
-    if(!near){if(this.foodBase)this.foodBase.marker.enabled=false;if(this.foodStand)this.foodStand.enabled=false;return;}
+    if(!near){if(this.foodBase)this.foodBase.marker.enabled=false;return;}
     if(!this.foodBase){
       this.foodBase=this.buildMarker('Highfood base',FOOD_COLOR);this.foodBase.target={x,y,z};this.foodBase.marker.setPosition(x,y,z);
-      this.highfoodProps??=new HighfoodProps(this.app,this.materials);
-      // Back against the bar's wall, on the side of the ring, facing the street.
-      this.foodStand=this.highfoodProps.stand();this.app.root.addChild(this.foodStand);
-      this.foodStand.setPosition(FOOD_STAND.x,FOOD_STAND.y,FOOD_STAND.z);this.foodStand.setEulerAngles(0,rotation*RAD_TO_DEG,0);
     }
-    this.foodBase.marker.enabled=true;if(this.foodStand)this.foodStand.enabled=true;this.animateMarker(this.foodBase);
+    this.foodBase.marker.enabled=true;this.animateMarker(this.foodBase);
   }
 
   private projectMarker(blip:Marker|undefined):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {
@@ -711,6 +735,8 @@ export class BarScene {
   setCameraDistance(distance: number): void { this.rig.setDistance(distance); }
   /** Restore both preferences together, retaining the third-person zoom while in first person. */
   setCamera(mode: CameraMode, distance: number): void { this.rig.setDistance(distance); this.rig.setMode(mode); }
+  /** Height, sensitivity and smoothing of the view, from Configurações. */
+  setCameraFeel(feel: CameraFeel): void { this.rig.setFeel(feel); }
   getCamera() { return { ...this.rig.telemetry(), fov: +(this.camera.camera?.fov ?? 0).toFixed(2), rush: +this.rush.toFixed(3), blur: this.speedBlur.drawn }; }
 
   /**
@@ -718,7 +744,7 @@ export class BarScene {
    * fill the view; the body, the hands and what they hold stay. Any other avatar, or a later view, gets it back.
    */
   private showOwnHead(player: Avatar | undefined): void {
-    const head = this.rig.firstPerson && this.enabled && !this.watchingTv && !this.selfie ? player?.skin?.bones.head : undefined;
+    const head = this.rig.headHidden && this.enabled && !this.watchingTv && !this.selfie ? player?.skin?.bones.head : undefined;
     // (A head left by a skin change is gone with its model; scaling it back is harmless.)
     if (this.hiddenHead && this.hiddenHead !== head) this.hiddenHead.setLocalScale(this.headScale);
     if (head && head !== this.hiddenHead) this.headScale.copy(head.getLocalScale());
@@ -763,7 +789,7 @@ export class BarScene {
     const eye = this.camera.getPosition(), forward = this.camera.forward;
     let best: { id: string; distance: number } | undefined;
     for (const [id, avatar] of this.actors) {
-      if (avatar.npc || (id === this.localId && (!self || this.rig.firstPerson))) continue;
+      if (avatar.npc || (id === this.localId && (!self || this.rig.headHidden))) continue;
       const feet = avatar.root.getPosition();
       this.tempPosition.set(feet.x - eye.x, feet.y + 1 - eye.y, feet.z - eye.z);
       const distance = this.tempPosition.length();
@@ -997,6 +1023,9 @@ export class BarScene {
 
   /** A frame of a pebolim match (foosball.frame): its ball runs on the 3D table for whoever is near. */
   foosballFrame(frame:FoosballFrame):void {this.foosballBalls.frame(frame);}
+  /** A pool table's view (pool.view) and a stroke's recorded paths (pool.shot): the balls on the 3D table follow them. */
+  poolView(view:PoolTableView):void {this.poolBalls.view(view);}
+  poolShot(shot:PoolShotView,serverNow:number):void {this.poolBalls.shot(shot,serverNow);}
 
   /**
    * The light desk's view: the camera out in the backyard looking at the stage, so its panel's changes show; dragging turns
@@ -1070,7 +1099,7 @@ export class BarScene {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    this.app.autoRender = enabled && !this.graphics?.fpsCap;
+    this.app.autoRender = enabled;
     this.app.renderNextFrame = true;
     if (!enabled) {
       this.keys.clear();
@@ -1103,8 +1132,9 @@ export class BarScene {
     return labels;
   }
 
-  getPerformance(): { fps: number; actors: number } {
-    return { fps: this.fps, actors: this.actors.size };
+  getPerformance(): { fps: number; actors: number; resting: number } {
+    let resting = 0;for (const avatar of this.actors.values()) if (avatar.resting) resting++;
+    return { fps: this.fps, actors: this.actors.size, resting };
   }
 
   getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; bar?:{clip:string;time:number;placed:boolean;root:number[]}; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
@@ -1124,13 +1154,15 @@ export class BarScene {
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
+    this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
-    this.foodBase?.marker.destroy();this.foodBase=undefined;this.foodStand?.destroy();this.foodStand=undefined;
+    this.foodBase?.marker.destroy();this.foodBase=undefined;
     for(const ring of this.garageRings??[])ring.marker.destroy();this.garageRings=undefined;
     this.musicians?.destroy();this.musicians=undefined;
     this.barAnimations?.destroy();this.barAnimations=undefined;
     this.foosballBalls.destroy();
+    this.poolBalls.destroy();
     this.city?.destroy();
     this.environment.destroy();
     this.resizeObserver.disconnect();
@@ -1139,7 +1171,6 @@ export class BarScene {
     this.materials.forEach(material => material.destroy());
     this.contactMaterial?.destroy();
     this.dressing?.destroy();
-    this.textures.forEach(texture => texture.destroy());
     this.app.destroy();
     this.actors.clear();
   }
@@ -1155,35 +1186,6 @@ export class BarScene {
     material.update();
     this.materials.push(material);
     this.materialCache.set(key, material);
-    return material;
-  }
-
-  private textured(paint: (context: CanvasRenderingContext2D, width: number, height: number) => void,
-    width = 512, height = 512, unlit = false): pc.StandardMaterial {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d');
-    if (!context) return this.material('#c2a078');
-    paint(context, width, height);
-    const texture = new pc.Texture(this.app.graphicsDevice, {
-      name: 'Procedural bar artwork', width, height, mipmaps: true,
-      minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR,
-      addressU: pc.ADDRESS_REPEAT, addressV: pc.ADDRESS_REPEAT,
-    });
-    texture.setSource(canvas);
-    this.textures.push(texture);
-    const material = new pc.StandardMaterial();
-    material.diffuse = new pc.Color(1, 1, 1);
-    material.gloss = 0.15;
-    this.materials.push(material);
-    material.diffuseMap = texture;
-    if (unlit) {
-      material.emissiveMap = texture;
-      material.emissive = new pc.Color(0.7, 0.7, 0.7);
-    }
-    material.cull = pc.CULLFACE_NONE;
-    material.update();
     return material;
   }
 
@@ -1218,48 +1220,6 @@ export class BarScene {
     return cup;
   }
 
-  private buildBlackjack(): void {
-    const { x, y, z, rx, rz } = BLACKJACK_TABLE;
-    const table = this.group('Blackjack table', [x, y, z]);
-    const wood = this.material('#533c2a');
-    this.shape('Table pedestal', 'cylinder', [0, 0.36, 0], [0.24, 0.72, 0.24], wood, table);
-    this.shape('Table pedestal base', 'cylinder', [0, 0.03, 0], [rx, 0.06, rz], wood, table);
-    this.shape('Padded oval rail', 'cylinder', [0, 0.75, 0], [rx * 2, 0.07, rz * 2], this.material('#4e2f27'), table);
-    const felt = this.textured((ctx, width, height) => {
-      ctx.fillStyle = '#235846'; ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = '#d2b76c'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.ellipse(width / 2, height / 2, width * 0.44, height * 0.4, 0, 0, TAU); ctx.stroke();
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#e4cf93';
-      ctx.font = 'bold 46px Georgia'; ctx.fillText('BLACKJACK', width / 2, height * 0.4);
-      ctx.font = '17px sans-serif'; ctx.fillText('A SORTE PUXA UMA CADEIRA', width / 2, height * 0.49);
-      ctx.font = '52px Georgia'; ctx.fillText('♠   ♥   ♣   ♦', width / 2, height * 0.63);
-      for (const x of [0.22, 0.4, 0.6, 0.78]) ctx.strokeRect(width * x - 26, height * 0.76, 52, 68);
-    }, 1024, 768);
-    const feltRx = rx - 0.07, feltRz = rz - 0.07;
-    this.shape('Green felt playing surface', 'cylinder', [0, 0.787, 0], [feltRx * 2, 0.01, feltRz * 2], this.material('#245c47'), table);
-    // The printed rectangle is inscribed in the felt ellipse.
-    this.shape('Printed blackjack felt', 'plane', [0, 0.7935, 0], [feltRx * Math.SQRT2, 1, feltRz * Math.SQRT2], felt, table);
-    const card = this.material('#f2e7cd');
-    for (let i = 0; i < 2; i++) this.box('Dealt card', [-0.05 + i * 0.08, 0.796, -0.24], [0.064, 0.003, 0.09], card, table, [0, i * 12 - 6, 0]);
-    for (let i = 0; i < 4; i++) {
-      const chip = this.material(['#b94e38', '#e3c879', '#405e76', '#b94e38'][i]!);
-      for (let j = 0; j < 3; j++) this.shape('House chip', 'cylinder', [0.2 + i * 0.05, 0.797 + j * 0.008, -0.3], [0.04, 0.008, 0.04], chip, table);
-    }
-    for (const seat of BLACKJACK_SEATS) this.makeChair(seat.x, seat.z, seat.rotation * RAD_TO_DEG, seat.y);
-  }
-
-  /** Seat top at 0.47 m; the chair faces `rotation` (degrees, zero = +Z) with its back behind the sitter. */
-  private makeChair(x: number, z: number, rotation: number, y=0): void {
-    const chair = this.group('Wooden chair', [x, y, z]);
-    chair.setLocalEulerAngles(0, rotation, 0);
-    const wood = this.material('#825a34');
-    const seat = this.material('#a2733c');
-    this.box('Chair seat', [0, 0.45, 0], [0.44, 0.04, 0.42], seat, chair);
-    for (const xx of [-0.19, 0.19]) for (const zz of [-0.18, 0.18]) this.box('Chair leg', [xx, 0.215, zz], [0.035, 0.43, 0.035], wood, chair);
-    for (const xx of [-0.19, 0.19]) this.box('Chair back upright', [xx, 0.7, -0.19], [0.035, 0.46, 0.035], wood, chair);
-    for (const yy of [0.66, 0.84]) this.box('Chair back slat', [0, yy, -0.195], [0.38, 0.08, 0.02], seat, chair);
-  }
-
   private buildDiscoBall(): pc.Entity {
     // Over the ground-floor hall, between its two ceiling lights (slab underside at 3.2 m).
     const disco = this.group('Disco ball', [9.75, 2.85, -7.6]);
@@ -1289,7 +1249,7 @@ export class BarScene {
   }
 
   private usesSkin(actor: SceneActor, npc: boolean): boolean {
-    return !npc || actor.id === 'tonico' || actor.id === 'dealer' || !!NPC_SKINS[actor.id] || !!actor.skin;
+    return !npc || actor.id === 'dealer' || !!NPC_SKINS[actor.id] || !!actor.skin;
   }
 
   private loadAnimations(id: string): void {
@@ -1503,6 +1463,12 @@ export class BarScene {
     const sway = ['fallen','recover','stumble'].includes(actor.animation??'') || seated || actor.musician || bar || dedicatedDrunk ? 0 : DRUNK_BODY_SWAY[stage]!;
     root.setEulerAngles(sway * Math.sin((this.elapsed + avatar.phase) * 1.3), avatar.yaw, sway * Math.sin((this.elapsed + avatar.phase) * 0.9 + 1));
     this.shadeFeet(avatar);
+    // Out of sight and away from the camera, the body holds its pose: its clips are neither evaluated nor posed (offstage).
+    const resting = !local && !bar && !!avatar.skin && this.offstage(avatar);
+    const anim = avatar.skin?.model.anim;
+    if (anim && anim.playing === resting) anim.playing = !resting;
+    avatar.resting = resting;
+    if (resting) return;
     const pose: Pose = {
       t: this.elapsed + avatar.phase, dt,
       walking: animation.includes('walk') || animation.includes('run') || animation.includes('wander'),
@@ -1648,7 +1614,9 @@ export class BarScene {
     for (const avatar of this.actors.values()) for (const render of avatar.root.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
     for (const entry of this.servedItems.values()) if (entry.entity) for (const render of entry.entity.findComponents('render') as pc.RenderComponent[]) yield* render.meshInstances;
     if (this.barAnimations) yield* this.barAnimations.casters();
-    yield* this.motos.casters();
+    // Asked for from the first lighting update, in the constructor, before the bikes exist.
+    const motos = this.motos as Motos | undefined;
+    if (motos) yield* motos.casters();
   }
 
   /** A soft dark disc on the floor under an avatar (the lamps' shadow maps leave people out). */
@@ -1735,6 +1703,7 @@ export class BarScene {
     const wrist = shoulder.clone().add(front.clone().mulScalar(.3)).sub(up.clone().mulScalar(.27)).sub(side.clone().mulScalar(.03));
     reach(bones.upperarm_l, bones.lowerarm_l, bones.hand_l, wrist, new pc.Vec3().sub(up).sub(front.clone().mulScalar(.4)).add(side.clone().mulScalar(.6)));
     palmUp(hand, up, front);
+    openHand(hand);
     tray.entity.setPosition(trayCentre(hand, up)); tray.entity.setEulerAngles(0, avatar.yaw, 0); tray.entity.enabled = true;
     this.trayOrder = actor.carryingOrder ?? ''; this.trayFrame = this.frameId;
     // An item leaves the tray when the right hand takes it.
@@ -1986,13 +1955,72 @@ export class BarScene {
     bone.setRotation(this.tempTurn.setFromAxisAngle(axis, degrees).mul(bone.getRotation()));
   }
 
+  /**
+   * The engine builds a shader the first time something is drawn with a new combination of material and lights, and waits
+   * for the driver to finish it in the middle of the frame: a new skin, a prop or a city block froze the game for 0.3–1 s.
+   * Draws now go ahead without waiting (KHR_parallel_shader_compile builds the shader on the driver's threads): what needs
+   * it appears a frame or two later instead. That holds for shadow maps too: one shadow shader waited 2 s at the start,
+   * queued behind the colour ones. A lamp's cached map keeps what it drew, so once the last shadow shader is built, every
+   * lamp draws its map again. Other passes (the room's reflections, made once) still wait.
+   */
+  private compileShadersInBackground(): void {
+    const device = this.app.graphicsDevice as unknown as { setShader?: (shader: unknown, asyncCompile?: boolean) => void; activateShader?: () => void;
+      shader?: { ready?: boolean; failed?: boolean }; shaderValid?: boolean };
+    const setShader = device.setShader?.bind(device), activate = device.activateShader?.bind(device);
+    if (!setShader || !activate) return;
+    // The forward renderer passes `false`; the shadow renderer passes nothing, and so do the one-off passes that keep waiting.
+    const shadowPass = (shader: unknown) => /ShadowPass/.test((shader as { name?: string } | undefined)?.name ?? '');
+    device.setShader = (shader, asyncCompile) => setShader(shader, asyncCompile === false || (asyncCompile === undefined && shadowPass(shader)) ? true : asyncCompile);
+    device.activateShader = () => {
+      activate();
+      if (device.shaderValid === false && device.shader && !device.shader.failed && !device.shader.ready) { this.compiling++; if (shadowPass(device.shader)) this.compilingShadows++; }
+    };
+    this.app.on('frameend', () => {
+      if (this.compilingShadows) this.shadowsPending = true;
+      else if (this.shadowsPending) { this.shadowsPending = false; this.environment.refreshLampShadows(); }
+      this.compilingShadows = 0;
+      this.compilingLastFrame = this.compiling; this.compiling = 0;
+      // Without a steady redraw (a menu over the scene) the frame that skipped something is drawn again once it is ready.
+      if (this.compilingLastFrame) this.app.renderNextFrame = true;
+    });
+  }
+  /** After the map arrives: frames are drawn until none skips a draw for a shader still being built (at most 20 s). */
+  private shadersSettled(): Promise<void> {
+    return new Promise(resolve => {
+      const started = performance.now();let frames = 0;
+      const check = () => {
+        if (this.destroyed || (++frames > 2 && !this.compilingLastFrame) || performance.now() - started > 20000) { this.app.off('frameend', check); resolve(); return; }
+        this.app.renderNextFrame = true;
+      };
+      this.app.on('frameend', check);
+      this.app.renderNextFrame = true;
+    });
+  }
+  /**
+   * The frame cap of the settings skips whole frames, the scene's update and the engine's with them: on a 120 Hz phone
+   * capped at 60 the CPU does half the work. The engine asks for its next frame with `requestAnimationFrame(app.tick)`,
+   * reading the property each time, so a wrapped tick sees every frame the screen offers and passes on the ones due.
+   */
+  private capFrameRate(): void {
+    const app = this.app as unknown as { tick: (timestamp?: number, frame?: unknown) => void; frameRequestId?: number };
+    const tick = app.tick;let last = -1;
+    app.tick = (timestamp, frame) => {
+      const cap = this.graphics?.fpsCap ?? 0;
+      // 2.5 ms of slack: screens do not tick exactly on time, and a frame a hair early must still count.
+      if (cap && timestamp !== undefined && !frame && last >= 0 && timestamp - last < 1000 / cap - 2.5) { app.frameRequestId = requestAnimationFrame(app.tick); return; }
+      last = timestamp ?? -1;
+      tick(timestamp, frame);
+    };
+  }
+
   /** Configurações → Gráficos (apps/web/src/graphics.ts). */
   setGraphics(graphics: GraphicsSettings): void {
-    this.graphics = graphics; this.scale = graphics.renderScale; this.goodSeconds = 0;
+    this.graphics = graphics; this.scale = graphics.renderScale; this.goodSeconds = 0; this.badSeconds = 0;
+    this.textureMax = textureLimit(graphics);
     this.applyResolution();
     this.environment.setQuality(graphics.shadows, FOG_SCALE[graphics.fog]);
     this.applyCityQuality();
-    this.app.autoRender = this.enabled && !graphics.fpsCap;
+    this.app.autoRender = this.enabled;
     this.app.renderNextFrame = true;
   }
   private applyCityQuality(): void {
@@ -2004,23 +2032,22 @@ export class BarScene {
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, this.graphics?.pixelRatioCap ?? 1.5) * this.scale;
     this.resize();
   }
-  /** With a frame cap the scene still updates every display frame but draws only at the chosen rate. */
-  private shouldDraw(dt: number): boolean {
-    const cap = this.graphics?.fpsCap;
-    if (!cap || !this.enabled) return true;
-    this.drawClock += dt;
-    if (this.drawClock < 1 / cap - 0.002) return false;
-    this.drawClock = Math.min(this.drawClock - 1 / cap, 1 / cap);
-    this.app.renderNextFrame = true;
-    return true;
-  }
-  /** Dynamic resolution: below 80% of the target for a second, draw fewer pixels; give them back after 3 s of headroom. */
+  /**
+   * Dynamic resolution: below 80% of the target for two seconds running, draw fewer pixels; give them back after 4 s of
+   * headroom. Each step resizes the canvas (its buffers are made again), so a single slow second (a skin or a city block
+   * arriving) does not cost one, and the scale does not hunt up and down.
+   */
   private adaptResolution(): void {
     const graphics = this.graphics;
     if (!graphics?.dynamicResolution || !this.enabled) return;
     const target = graphics.fpsCap || 60;
-    if (this.fps < target * 0.8 && this.scale > 0.5) { this.scale = Math.max(0.5, +(this.scale - 0.1).toFixed(2)); this.goodSeconds = 0; this.applyResolution(); }
-    else if (this.fps >= target * 0.95 && this.scale < graphics.renderScale && ++this.goodSeconds >= 3) { this.scale = Math.min(graphics.renderScale, +(this.scale + 0.05).toFixed(2)); this.goodSeconds = 0; this.applyResolution(); }
+    if (this.fps < target * 0.8) {
+      this.goodSeconds = 0;
+      if (++this.badSeconds >= 2 && this.scale > 0.5) { this.scale = Math.max(0.5, +(this.scale - 0.1).toFixed(2)); this.badSeconds = 0; this.applyResolution(); }
+      return;
+    }
+    this.badSeconds = 0;
+    if (this.fps >= target * 0.95 && this.scale < graphics.renderScale && ++this.goodSeconds >= 4) { this.scale = Math.min(graphics.renderScale, +(this.scale + 0.05).toFixed(2)); this.goodSeconds = 0; this.applyResolution(); }
   }
 
   private update(dt: number): void {
@@ -2029,7 +2056,7 @@ export class BarScene {
     const wall = performance.now(), realDt = dt < .1 ? dt : Math.min((wall - this.lastFrameAt) / 1000, .5);
     this.lastFrameAt = wall;
     this.swingDoors();
-    if (this.shouldDraw(dt)) this.frames++;
+    this.frames++;
     dt = Math.min(dt, 0.1);
     this.elapsed += dt;
     if (this.frameSeconds >= 1) {
@@ -2086,9 +2113,10 @@ export class BarScene {
       // Thrown off, the view stays behind the body until it is up: never inside it.
       const riding = !!bike || player.actor.interactionState === 'thrown';
       if (riding !== this.chasing) { this.chasing = riding; this.rig.ride(this.chasing); this.motoSwitches = 0; }
-      if (bike) { this.rig.chase(bike.drawn.yaw, dt); this.cancelSignal(bike); }
+      // In real time: the body moved for all of a stalled frame, and a view told a shorter one reads it as a sprint and falls metres behind.
+      if (bike) { this.rig.chase(bike.drawn.yaw, realDt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
-      this.rig.follow(dt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
+      this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
         roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? MOTO_XRAY : {}) });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
@@ -2099,11 +2127,14 @@ export class BarScene {
     this.showOwnHead(player);
     const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();
     this.city?.update(dt, focus.x, focus.z);
+    this.environment.setFocus(player?.root.getPosition());
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
+    this.surfaces?.update(this.environment.power);
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
     this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
     const serverNow=Date.now()+this.serverClockOffset;
     this.foosballBalls.update(serverNow);
+    this.poolBalls.update();
     this.stageShow.update(dt,{stage:this.stageLive(serverNow),desk:this.showDesk,serverNow,camera:this.camera,height:this.app.graphicsDevice.height,daylight:this.environment.daylight});
     // The telão darkens under the laser's drawings.
     this.televisions.get('telao')?.setDim(this.stageShow.screenDim);
@@ -2119,6 +2150,23 @@ export class BarScene {
     this.discoBall.rotate(0, dt * (8+party*62), 0);
     this.callbacks.onMediaFrame?.();
   }
+
+  /**
+   * Animation level of detail: a skinned body more than OFFSTAGE_NEAR from the camera and outside its view (with a margin
+   * of OFFSTAGE_MARGIN around the body, so it moves again before it shows) is not animated. Evaluating the clips and posing
+   * the bones of everyone in the room, in view or not, was most of the scene's time with a crowd. Whoever does something the
+   * room depends on (a bar action, a stage spot, a bike, a fall, a kick) always moves; and only while playing (fixtures and
+   * the TV view animate everyone).
+   */
+  private offstage(avatar: Avatar): boolean {
+    const { actor } = avatar, camera = this.camera.camera;
+    if (!this.enabled || !camera || actor.musician || OFFSTAGE_BUSY.has(actor.animation ?? '')) return false;
+    const p = avatar.root.getPosition(), eye = this.camera.getPosition();
+    if ((p.x - eye.x) ** 2 + (p.y - eye.y) ** 2 + (p.z - eye.z) ** 2 < OFFSTAGE_NEAR ** 2) return false;
+    this.offstageSphere.center.set(p.x, p.y + 1, p.z);
+    return !camera.frustum.containsSphere(this.offstageSphere);
+  }
+  private readonly offstageSphere = new pc.BoundingSphere(new pc.Vec3(), OFFSTAGE_MARGIN);
 
   /** Whoever rides a bike goes where it is drawn, in the riding pose; off it, the avatar's own shadow comes back. */
   private placeRiders(): void {
@@ -2255,7 +2303,8 @@ export class BarScene {
     listen(this.canvas, 'pointermove', event => {
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (!this.dragging&&!this.mouseCaptured)) return;
       if(this.watchingTv||this.watchingStage){this.tvYaw-=event.movementX*.006;this.tvPitch+=event.movementY*.004;return;}
-      this.rig.drag(event.movementX, event.movementY);
+      // A captured pointer now and then reports a jump of thousands of pixels (a browser quirk): no hand moves that far in one event.
+      this.rig.drag(clamp(event.movementX, -MOUSE_JUMP, MOUSE_JUMP), clamp(event.movementY, -MOUSE_JUMP, MOUSE_JUMP));
     });
     listen(window, 'pointerup', event => {
       this.dragging = false;

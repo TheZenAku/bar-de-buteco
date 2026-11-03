@@ -209,18 +209,27 @@ test('API double: a TV group plays one video on every screen, heard from the nea
   // One player per screen of the ground floor, all on the shared video; upstairs stays off.
   await expect.poll(async()=>(await tv()).map((p:any)=>[p.screen,p.videoId,p.status])).toEqual([['tv-hall','M7lc1UVf-VE','playing'],['tv-left','M7lc1UVf-VE','playing'],['tv-counter','M7lc1UVf-VE','playing']]);
   expect(await page.evaluate(()=>(window as any).fixtureCreated)).toBe(4);
-  // Whoever put the video on controls it: YouTube's controls are on their screens, and only those take the pointer.
-  expect((await tv()).map((p:any)=>p.controls)).toEqual([true,true,true]);expect(await page.locator('.tv-player.controls').count()).toBe(3);
-  expect(await page.locator('.tv-player').first().evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('auto');
+  // Whoever put the video on controls it from the panel: no screen carries YouTube's controls or takes the pointer, for them neither.
+  expect((await tv()).map((p:any)=>p.controls)).toEqual([false,false,false]);expect(await page.locator('.tv-player.controls').count()).toBe(0);
+  expect(await page.locator('.tv-player').first().evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('none');
+  expect(await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).map((p:any)=>p.options.playerVars.controls))).toEqual([0,0,0]);
+  await expect(page.locator('#tv-owner')).not.toContainText('controles do player');
+  // What YouTube paints along its edges falls outside the screen: the frame is taller, the video stays the screen's size.
+  expect(await page.locator('.tv-player').first().evaluate(element=>{const frame=element.getBoundingClientRect(),inner=element.querySelector('iframe')!.getBoundingClientRect();return [getComputedStyle(element).overflow,inner.height/frame.height,(inner.top+inner.bottom)/2-(frame.top+frame.bottom)/2];})).toEqual(['hidden',1.8,0]);
   // Only the screen nearest to the listener is heard; the others are muted, so the sound never doubles.
   await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([true,false,false]);
   await expect.poll(muted).toEqual([false,true,true]);
   await page.evaluate(()=>(window as any).fixture.stand('tv-counter'));
   await expect.poll(async()=>(await tv()).map((p:any)=>p.audible)).toEqual([false,false,true]);
   await expect.poll(muted).toEqual([true,true,false]);
-  // The picture is always on its screen: any projected size, even tiny or partly off the page; no corner card.
+  // The screen keeps its standby picture for as long as YouTube paints over a player that just started, then shows it.
   const quad=(x:number,y:number,w:number,h:number)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
   const hall=page.locator('.tv-player[data-screen="tv-hall"]');
+  await page.evaluate(()=>{const players=(window as any).fixturePlayers.slice(-3);players[0].options.events.onStateChange({data:3});players[0].options.events.onStateChange({data:1});});
+  await page.evaluate(points=>(window as any).fixture.project('tv-hall',points),quad(120,80,400,225));
+  await page.waitForTimeout(600);
+  expect((await tv())[0].mode).toBe('hidden');expect(await hall.evaluate(element=>element.style.visibility)).toBe('hidden');
+  // The picture is always on its screen: any projected size, even tiny or partly off the page; no corner card.
   for(const points of [quad(120,80,400,225),quad(300,200,40,22),quad(-150,-40,300,170)]){
     await page.evaluate(points=>(window as any).fixture.project('tv-hall',points),points);
     await expect.poll(async()=>(await tv())[0].mode).toBe('tv');
@@ -238,35 +247,51 @@ test('API double: a TV group plays one video on every screen, heard from the nea
   await expect(page.locator('#tv-time')).toContainText('/ 20:00');
   await page.locator('#tv-position').fill('600');await expect.poll(async()=>(await shared()).position).toBe(600);
   await expect.poll(async()=>(await tv())[2].currentTime).toBeGreaterThanOrEqual(600);
-  // YouTube's own controls, worked on the screen by the controller (the player has the focus), go to everyone too.
+  // Pausing from the panel freezes the picture where it is: no seek for the second it was off, so nothing paints over it.
+  await expect.poll(async()=>(await shared()).position).toBeGreaterThan(0);await page.waitForTimeout(5200);
   await page.evaluate(points=>(window as any).fixture.project('tv-hall',points),quad(120,80,400,225));
   await expect.poll(async()=>(await tv())[0].mode).toBe('tv');
-  await page.waitForTimeout(2200);
-  await page.evaluate(()=>{const hall=(window as any).fixturePlayers.at(-3);hall.frame.focus();hall.pauseVideo();});
-  await expect.poll(async()=>(await shared()).status).toBe('paused');
-  await page.waitForTimeout(2200);
-  await page.evaluate(()=>(window as any).fixturePlayers.at(-3).seekTo(900));
-  await expect.poll(async()=>(await shared()).position).toBe(900);
-  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
-  // A live broadcast: the timeline jumps to its live edge (the player's length), so nobody watches it from the start.
+  await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).forEach((p:any)=>{p.seeks=0;}));
+  await page.getByRole('button',{name:'Pausar',exact:true}).click();await expect.poll(async()=>(await shared()).status).toBe('paused');
+  expect(await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).map((p:any)=>p.seeks))).toEqual([0,0,0]);
+  await expect.poll(async()=>(await tv())[0].status).toBe('paused');expect((await tv())[0].mode).toBe('tv');
+  // A live broadcast, as YouTube's really behaves: the time counts from when the stream began, and the length is about an hour ahead of
+  // anything that can be played. The timeline jumps to where the player is, so nobody watches it from the start, and nobody chases the length.
   await page.getByRole('button',{name:'Continuar',exact:true}).click();await expect.poll(async()=>(await shared()).status).toBe('playing');
-  await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).forEach((p:any)=>{p.data.isLive=true;p.length=7200;}));
-  await expect.poll(async()=>(await shared()).live).toBe(true);expect((await shared()).position).toBe(7200);
-  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.live').map((m:any)=>m.payload.edge))).toEqual([7200]);
-  await expect.poll(async()=>(await tv()).map((p:any)=>p.currentTime>=7200)).toEqual([true,true,true]);
+  await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).forEach((p:any,i:number)=>{
+    p.data.isLive=true;p.time=8200000-i*8;p.started=performance.now();p.length=8203600;p.seeks=0;
+    // Whatever is asked of a live, it cannot go past its edge: a seek there lands back where it is.
+    const edge=()=>8200000+(performance.now()-t0)/1000;const t0=performance.now();const seek=p.seekTo.bind(p);p.seekTo=(time:number)=>seek(Math.min(time,edge()-i*8));
+  }));
+  await expect.poll(async()=>(await shared()).live).toBe(true);
+  expect(Math.abs((await shared()).position-8200000)).toBeLessThan(30);
+  expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.live').length)).toBe(1);
   await expect(page.locator('#tv-live')).toBeVisible();await expect(page.locator('#tv-time')).toHaveText('No ao vivo');
   await expect(page.getByRole('button',{name:'Ir para o ao vivo',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'−30 s',exact:true})).toBeVisible();
+  // A live just plays: the players' own seconds apart are left alone, whatever the clock says, so it never rebuffers nor brings YouTube's title back.
+  await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).forEach((p:any)=>{p.seeks=0;}));
+  await page.waitForTimeout(10_000);
+  expect(await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).map((p:any)=>p.seeks))).toEqual([0,0,0]);
+  // A player that stalled is put back, once.
+  await page.evaluate(()=>{const stalled=(window as any).fixturePlayers.at(-1);stalled.time=stalled.getCurrentTime()-40;});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixturePlayers.at(-1).seeks)).toBe(1);
+  await page.waitForTimeout(7000);
+  expect(await page.evaluate(()=>(window as any).fixturePlayers.slice(-3).map((p:any)=>p.seeks))).toEqual([0,0,1]);
+  // Thirty seconds back, and back to the edge: the panel knows the edge without the length.
+  await page.getByRole('button',{name:'−30 s',exact:true}).click();await expect(page.locator('#tv-time')).toContainText('atrás do ao vivo');
+  await expect.poll(async()=>(await tv())[0].currentTime<(await shared()).position+15).toBe(true);
+  await page.getByRole('button',{name:'Ir para o ao vivo',exact:true}).click();await expect(page.locator('#tv-time')).toHaveText('No ao vivo');
+  expect(Math.abs((await shared()).position-(await tv())[0].currentTime)).toBeLessThan(40);
   // Someone else's video waits behind (without a button to take it out).
   await page.evaluate(()=>(window as any).fixture.queue({key:'q1',videoId:'aqz-KE-bpKQ',title:'Big Buck Bunny',by:'bob',byName:'Bob'}));
   await expect(page.locator('#tv-queue li')).toContainText(['Próximo · por Bob']);await expect(page.locator('#tv-queue [data-media-remove]')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Pular vídeo',exact:true})).toBeVisible();
-  // Only the player being heard reports the end of the video; the next one plays on the same screens.
+  // Only the player being heard reports the end of the video; the next one plays on the same screens. A live's report is not ignored for its length being an hour ahead.
   await page.evaluate(()=>{const players=(window as any).fixturePlayers.slice(-3);players[0].emit(0);players[2].emit(0);});
   expect(await page.evaluate(()=>(window as any).fixture.sent.filter((m:any)=>m.type==='tv.ended').length)).toBe(1);
-  // Bob controls it now: here, bare pictures that take no pointer and a panel without its controls.
+  // Bob controls it now: here, a panel without its controls.
   await expect.poll(async()=>(await tv()).map((p:any)=>[p.videoId,p.controls,p.status,p.live])).toEqual(Array(3).fill(['aqz-KE-bpKQ',false,'playing',false]));
   expect(await page.locator('.tv-player.controls').count()).toBe(0);
-  expect(await page.locator('.tv-player').first().evaluate(element=>getComputedStyle(element).pointerEvents)).toBe('none');
   await expect(page.locator('#tv-owner')).toContainText('No controle: Bob');await expect(page.locator('#tv-title')).toHaveText('Big Buck Bunny');
   await expect(page.getByRole('button',{name:'Pausar',exact:true})).toHaveCount(0);await expect(page.locator('#tv-seek')).toBeHidden();
   await expect(page.getByRole('button',{name:'Pôr na fila',exact:true})).toBeVisible();

@@ -10,12 +10,16 @@ export * from './economy.js';
 export * from './musicians.js';
 export * from './bar-animations.js';
 export * from './phone.js';
+export * from './rarity.js';
+export * from './skins.js';
 export * from './profile.js';
 export * from './achievements.js';
 export * from './stage-show.js';
 export * from './prices.js';
 export * from './blackjack.js';
 export * from './foosball.js';
+export * from './pool/index.js';
+export * from './truco/index.js';
 export * from './moto.js';
 export * from './moto-parts.js';
 export * from './moto-crash.js';
@@ -39,7 +43,7 @@ export const TICK_MS = 50;
 export const PATCH_MS = 100;
 export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
-export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,isWalkable,movePlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
+export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,isWalkable,movePlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
   /** Highfood: a customer waiting with the phone, thanking for the delivery, and the courier taking the bag from the box. */
   | 'text' | 'thank' | 'pick'
@@ -65,19 +69,6 @@ export type DrinkItem = typeof DRINK_ITEMS[number];
 /** Every drink held in the hand while drinking: the counter's beers and the drinks from the backpack. */
 export const HELD_DRINKS = [...DRINK_ITEMS, 'agua', 'refrigerante', 'cafe'] as const;
 export type HeldDrink = typeof HELD_DRINKS[number];
-// Player models (apps/web/public/models/<id>.glb), all rigged to one skeleton so they share the animations.
-export const SKINS = [{id:'nathan',name:'Nathan'},{id:'leandro',name:'Leandro'},{id:'rafael',name:'Rafael'},{id:'read',name:'Read'},{id:'gilmar-gordo',name:'Gilmar'},{id:'gabriel',name:'Gabriel'},{id:'flavio-hipotetico',name:'Flavio Hipotético'}] as const;
-export type SkinId = typeof SKINS[number]['id'];
-/** Free for every account: new players wear it, and anything not owned falls back to it. The others are sold. */
-export const DEFAULT_SKIN: SkinId = 'nathan';
-export const skinSchema = z.enum(SKINS.map(skin=>skin.id) as [SkinId,...SkinId[]]);
-export const skinMessageSchema = z.object({skin:skinSchema}).strict();
-/** The account's collection and wallet, as GET /api/wardrobe returns it. */
-export interface Wardrobe {
-  equippedSkin:string;balance:number;
-  catalog:Array<{id:string;name:string;price:number;owned:boolean}>;
-  dailyReward:number;dailyClaimed:boolean;
-}
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
 export interface PlayerInput { seq: number; dx: number; dz: number; running: boolean; rotation: number }
@@ -133,7 +124,7 @@ export interface WorldState { players: Record<string,PlayerState>; npcs: Record<
 export interface ChatMessage { id:string; playerId:string; displayName:string; text:string; sentAt:number; system?:boolean }
 /** Collision boxes the player touches to use an object; chairs have none and are reached at their seat point. */
 export type Footprint = Pick<Collider,'id'|'x'|'z'|'hx'|'hz'>;
-export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'foosball'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'|'highfood'|'garage'; label:string; rotation?:number; footprint?:Footprint[];
+export interface Interactable extends Position { id:string; type:'seat'|'counter'|'jukebox'|'blackjack'|'truco'|'foosball'|'pool'|'door'|'television'|'toilet'|'urinal'|'stage'|'musician'|'shop'|'lights'|'highfood'|'garage'; label:string; rotation?:number; footprint?:Footprint[];
   /** Without a footprint: how far from the point (metres) the player's centre may be; a chair's seat point by default. */
   reach?:number;
   /** A musician's spot on the stage (STAGE_SPOTS id). */

@@ -32,14 +32,14 @@ test('the city streams around any point: nine sectors in full, LODs beyond, noth
     const {scene}=(window as any).fixture,map=scene.mapEntity,status=scene.getMapStatus();
     return {old:!!map.findByName('Fundo_Distante'),doors:status.doors,cart:status.cartRenders,colliders:status.colliders};
   });
-  expect(bar).toEqual({old:false,doors:16,cart:expect.any(Number),colliders:1553});
+  expect(bar).toEqual({old:false,doors:16,cart:expect.any(Number),colliders:1473});
   expect(bar.cart).toBeGreaterThan(0);
   await shot(page,'1-bar');
   const nodes=await page.evaluate(()=>{
     const {scene}=(window as any).fixture,textures=scene.city.textures;
     return {shared:textures.size,names:[...textures.keys()].sort()};
   });
-  expect(nodes.shared).toBe(18);
+  expect(nodes.shared).toBe(40);
   for(const [name,x,z,y] of [['2-centro',16,-150,4],['3-olaria',-30,240,2],['4-conceicao',-250,-110,3],['5-industrial',230,-60,3],['6-norte',0,-390,2],['7-limite-oeste',-395,0,2]] as const){
     await goTo(page,x,z,y);
     await page.waitForTimeout(1500);

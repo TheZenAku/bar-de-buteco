@@ -104,3 +104,59 @@ test('a pebolim match pays its winners against the match stakes on the ledger: a
   const ledger=await api.db.select().from(currencyLedger).where(eq(currencyLedger.userId,ana.userId));
   assert.ok(ledger.some(row=>row.reason===`foosball:payout:${match}`&&row.amount===200));
 });
+
+test('a truco match pays each winner twice their own stake on the ledger, once; against NPCs both partners are paid',async t=>{
+  const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
+  const headers={'x-internal-secret':config.internalSecret};
+  const players=await Promise.all(['ana','bia'].map(async name=>{
+    const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{email:`${name}@truco.example`,username:`${name}_truco`,displayName:name,password:'CarteiraSegura2026!'}});
+    const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id as string;
+    const ticket=await api.app.inject({method:'POST',url:'/api/game-ticket',headers:{cookie},payload:{}}),{sessionId}=verifyTicket(ticket.json().ticket,config.authSecret);
+    await api.app.inject({method:'GET',url:'/api/inventory',headers:{cookie}});
+    await api.db.update(wallets).set({balance:500}).where(eq(wallets.userId,userId));
+    return {userId,sessionId};
+  }));
+  const match=randomUUID();
+  const stake=async(p:{userId:string;sessionId:string},amount:number)=>{const requestId=randomUUID();const r=await api.app.inject({method:'POST',url:'/api/internal/wallet',headers,payload:{sessionId:p.sessionId,userId:p.userId,amount:-amount,reason:`truco:bet:${match}`,requestId}});assert.equal(r.statusCode,200);return requestId;};
+  const settle=(p:{userId:string},payout:number,stakes:string[],voids:string[]=[])=>api.app.inject({method:'POST',url:'/api/internal/truco/settle',headers,payload:{userId:p.userId,roundId:match,payout,stakes,voids}});
+  const [ana,bia]=players as [typeof players[0],typeof players[0]];
+  const stakes=[await stake(ana,200),await stake(bia,200)];
+  assert.equal((await settle(ana,401,[stakes[0]!])).statusCode,409,'above twice the stake');
+  assert.equal((await settle(ana,400,[stakes[1]!])).statusCode,409,'another player\'s stake');
+  // Two partners beat two NPCs: the house covers the NPCs' parts, so both are paid though only 400 was staked.
+  assert.deepEqual((await settle(ana,400,[stakes[0]!])).json(),{balance:700,applied:400});
+  assert.deepEqual((await settle(bia,400,[stakes[1]!])).json(),{balance:700,applied:400});
+  assert.deepEqual((await settle(ana,400,[stakes[0]!])).json(),{balance:700,applied:400},'once per match and player');
+  const ledger=await api.db.select().from(currencyLedger).where(eq(currencyLedger.userId,ana.userId));
+  assert.ok(ledger.some(row=>row.reason===`truco:payout:${match}`&&row.amount===400));
+  assert.ok(ledger.some(row=>row.reason===`truco:bet:${match}`&&row.amount===-200));
+});
+
+test('a sinuca match pays the winner twice their own stake on the ledger, once, as truco does',async t=>{
+  const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
+  const headers={'x-internal-secret':config.internalSecret};
+  const players=await Promise.all(['ana','bia'].map(async name=>{
+    const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{email:`${name}@sinuca.example`,username:`${name}_sinuca`,displayName:name,password:'CarteiraSegura2026!'}});
+    const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id as string;
+    const ticket=await api.app.inject({method:'POST',url:'/api/game-ticket',headers:{cookie},payload:{}}),{sessionId}=verifyTicket(ticket.json().ticket,config.authSecret);
+    await api.app.inject({method:'GET',url:'/api/inventory',headers:{cookie}});
+    await api.db.update(wallets).set({balance:500}).where(eq(wallets.userId,userId));
+    return {userId,sessionId};
+  }));
+  const match=randomUUID();
+  const stake=async(p:{userId:string;sessionId:string},amount:number)=>{const requestId=randomUUID();const r=await api.app.inject({method:'POST',url:'/api/internal/wallet',headers,payload:{sessionId:p.sessionId,userId:p.userId,amount:-amount,reason:`pool:bet:${match}`,requestId}});assert.equal(r.statusCode,200);return requestId;};
+  const settle=(p:{userId:string},payout:number,stakes:string[],voids:string[]=[])=>api.app.inject({method:'POST',url:'/api/internal/pool/settle',headers,payload:{userId:p.userId,roundId:match,payout,stakes,voids}});
+  const [ana,bia]=players as [typeof players[0],typeof players[0]];
+  const stakes=[await stake(ana,200),await stake(bia,200)];
+  assert.equal((await settle(ana,401,[stakes[0]!])).statusCode,409,'above twice the stake');
+  assert.equal((await settle(ana,400,[stakes[1]!])).statusCode,409,'another player\'s stake');
+  // Ana beats Bia: twice her part; Bia's loss is settled at zero (and a second try changes nothing).
+  assert.deepEqual((await settle(ana,400,[stakes[0]!])).json(),{balance:700,applied:400});
+  assert.deepEqual((await settle(bia,0,[stakes[1]!])).json(),{balance:300,applied:0});
+  assert.deepEqual((await settle(ana,400,[stakes[0]!])).json(),{balance:700,applied:400},'once per match and player');
+  const ledger=await api.db.select().from(currencyLedger).where(eq(currencyLedger.userId,ana.userId));
+  assert.ok(ledger.some(row=>row.reason===`pool:payout:${match}`&&row.amount===400));
+  assert.ok(ledger.some(row=>row.reason===`pool:bet:${match}`&&row.amount===-200));
+});

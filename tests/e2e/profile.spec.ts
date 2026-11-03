@@ -47,7 +47,7 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
   await enterAsAdmin(page);
   const me=await myId(page);
   // Rafael, with the first badge.
-  for(const [url,data] of [['/api/wardrobe/buy',{skin:'rafael'}],['/api/wardrobe/equip',{skin:'rafael'}]] as const)await page.request.post(url,{data});
+  for(const [url,data] of [['/api/wardrobe/buy',{skin:'rafael'}],['/api/wardrobe/equip',{skin:'rafael'}],['/api/wardrobe/skill',{skill:'karate'}],['/api/wardrobe/skill',{skill:'air-kick'}]] as const)await page.request.post(url,{data});
   await page.request.post('/api/profile/skill',{data:{skill:'karate',key:'KeyX'}});
   // The test database survives runs: back to the first badge alone, granted to nobody here.
   await page.request.post('/api/admin/badges/grant',{data:{playerId:me,badgeId:'fundador',grant:false,reason:'Volta ao começo'}});

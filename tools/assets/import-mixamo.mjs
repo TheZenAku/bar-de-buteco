@@ -3,7 +3,7 @@
 // seams kept) and the textures embedded; then the Idle/Walk/Pose base clips are added from Nathan.
 // The mesh and its weights come from, in this order:
 //  - the download itself, when it is "FBX Binary, With Skin" (Rafael, Gabriel);
-//  - glb: a GLB already rigged with Mixamo names, with its own weights, normals and texture (Flavio Hipotético);
+//  - glb: a GLB already rigged with Mixamo names, with its own weights, normals and texture (Flavio Hipotético, Leandro, Rafael Rosé, Tonico);
 //  - rig: the character's previous AccuRig GLB, posed into the Mixamo T-pose; its weights move to the matching bones;
 //  - mesh: the unrigged source, with automatic weights (lib/auto-weights.mjs).
 // usage: node tools/assets/import-mixamo.mjs [skin...]  (default: every skin)
@@ -32,9 +32,11 @@ const skins={
   'gilmar-gordo':{name:'Gilmar',fbx:'gilmar-gordo/gilmar-gordo-mixamo.fbx',mesh:'gilmar-gordo/gilmar-gordo.fbx',textures:'gilmar-gordo/gilmar-gordo_texture',height:1.8},
   gabriel:{name:'Gabriel',fbx:'../../skins/Gabriel/Double Dagger Stab.fbx',texture:'../../skins/Gabriel/tripo_convert_7f75c99f-503e-496d-8047-73c07d69ad29.fbm/tripo_image_7f75c99f-503e-496d-8047-73c07d69ad29_0_0.jpg',height:1.8},
   'flavio-hipotetico':{name:'Flavio Hipotético',glb:'../../skins/Flavio Hipotético/Flavio Hipotetico.glb',height:1.8},
-  leandro:{name:'Leandro',fbx:'outros/leandro-mixamo.fbx',rig:'accurig/leandro.glb',height:1.86},
+  leandro:{name:'Leandro',glb:'../../skins/Leandro/Leandro.glb',height:1.86},
+  'rafael-rose':{name:'Rafael Rosé',glb:'../../skins/Rafael/Black/Rafael_GokuBlack.glb',height:1.75,strayArms:true},
   read:{name:'Read',fbx:'outros/read-mixamo.fbx',rig:'accurig/read.glb',height:1.86},
   magrao:{name:'Magrao',fbx:'outros/magrao-mixamo.fbx',rig:'accurig/magrao.glb',height:1.86},
+  tonico:{name:'Tonico',glb:'../../skins/Tonico/Tonico.glb',height:1.86},
 };
 // About the heaviest AccuRig skin (Read, 98k); several players share the screen.
 const TRIANGLES=100000;
@@ -64,7 +66,7 @@ try{
     if(missing.length)throw new Error(`${id}: Mixamo skeleton without ${missing.join(', ')}`);
     fbx.updateMatrixWorld(true);
     let meshes,textures,weights;
-    if(skin.glb){meshes=skinned;weights='mixamo';textures=embeddedImages(file);}
+    if(skin.glb){meshes=skinned;weights='mixamo';textures=embeddedImages(file);if(skin.strayArms)meshes.forEach(mesh=>dropStrayArms(skin,mesh));}
     else if(skinned.length){meshes=fromDownload(id,skin,skinned);weights='mixamo';}
     else if(skin.rig){meshes=fromRig(skin,fbx);weights='accurig';textures=embeddedTextures(path.join(mixamo,skin.rig));}
     else if(skin.mesh){meshes=fromMesh(skin,fbx);weights='automatic';}
@@ -103,6 +105,25 @@ function loadGlb(file){
     }
   }
   return root;
+}
+
+/**
+ * Auto-rigging paints the arms that hang beside the body onto what they touch: the side of the trousers followed the forearm. A vertex that mostly
+ * follows a leg loses what it has of an arm; importSkin normalizes what is left. Not the other way round: Rafael Rosé's sash is mostly arm, and its
+ * bit of leg is what keeps it at the waist when the arm goes up.
+ */
+function dropStrayArms(skin,mesh){
+  const names=mesh.skeleton.bones.map(bone=>bone.name),{skinIndex,skinWeight}=mesh.geometry.attributes;
+  const limb=name=>/^(?:upperleg|lowerleg|foot|toe)/.test(name)?'leg':/^(?:upperarm|lowerarm|hand|index|middle|ring|pinky|thumb)/.test(name)?'arm':'';
+  let cleaned=0;
+  for(let i=0;i<skinIndex.count;i++){
+    const influences=[0,1,2,3].map(k=>({k,limb:limb(names[skinIndex.getComponent(i,k)]),weight:skinWeight.getComponent(i,k)}));
+    if(influences.reduce((a,b)=>b.weight>a.weight?b:a).limb!=='leg')continue;
+    const stray=influences.filter(each=>each.limb==='arm'&&each.weight>0);
+    if(stray.length)cleaned++;
+    for(const each of stray)skinWeight.setComponent(i,each.k,0);
+  }
+  console.log(`${skin.name}: ${cleaned} of ${skinIndex.count} vertices of a leg also followed an arm`);
 }
 
 /** The download's own skinned meshes: restore normals and convert the UVs. */

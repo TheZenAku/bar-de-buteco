@@ -27,19 +27,19 @@ O importador primeiro lê e valida tudo, e só então escreve:
 - o perímetro: `COL_Cid_Limite_*` precisa cobrir os quatro lados sem buraco, com a face interna em ±400;
 - o chão: cada setor precisa de um `COL_Cid_Chao` que o cubra na altura 0.
 
-Se algo faltar, o erro cita o arquivo e nada é publicado. Arquivos iguais aos publicados não são tocados, então reimportar sem mudanças não reinicia o mundo em desenvolvimento. Os demais chegam por um nome temporário. Se um deles estiver aberto por outro processo, o Windows recusa a troca e o importador avisa: feche a aba do jogo e importe de novo. Só são removidos arquivos listados na publicação anterior (`cidade_publicacao.json`). Uma pasta `public/maps/cidade` que não tenha esse carimbo faz o importador parar. A pasta não é trocada de uma vez porque o Windows recusa renomear pasta recém-escrita enquanto o antivírus a segura.
+Se algo faltar, o erro cita o arquivo e nada é publicado. Arquivos iguais aos publicados não são tocados, então reimportar sem mudanças não reinicia o mundo em desenvolvimento. Os demais chegam por um nome temporário. Se um deles estiver aberto por outro processo, o Windows recusa a troca e o importador avisa: feche a aba do jogo e importe de novo. O próprio Vite pode manter `bar_boteco.glb` aberto por tempo indefinido, mesmo sem ninguém baixando. Nesse caso, fechar abas não resolve. O Windows permite renomear o arquivo aberto, então mova o publicado para fora de `public/maps`, coloque o novo no lugar e importe de novo; não é preciso reiniciar o `npm run dev`. Só são removidos arquivos listados na publicação anterior (`cidade_publicacao.json`). Uma pasta `public/maps/cidade` que não tenha esse carimbo faz o importador parar. A pasta não é trocada de uma vez porque o Windows recusa renomear pasta recém-escrita enquanto o antivírus a segura.
 
 ### O que é publicado
 
 ```
 apps/web/public/maps/cidade/
-  cidade_setores.json  cidade_vias.json  cidade_lotes.json  validacao.json  cidade_publicacao.json
+  cidade_setores.json  cidade_vias.json  cidade_lotes.json  pontos_ifood.json  validacao.json  cidade_publicacao.json
   cidade_anel.gltf + .bin   cidade_distante.gltf + .bin
   setores/  cidade_Sxx_yy.gltf + .bin, cidade_Sxx_yy_lod.gltf + .bin   (128 glTF)
-  texturas/ 18 JPEG compartilhados
+  texturas/ 22 JPEG compartilhados
 ```
 
-São 283 arquivos e 31,5 MB. Capturas, relatório, GLBs de colisão, `.blend` e scripts não vão para o runtime. As relações `../texturas/` e `texturas/` ficam como no export.
+São 288 arquivos e 37 MB. Capturas, relatório, GLBs de colisão, `.blend` e scripts não vão para o runtime. As relações `../texturas/` e `texturas/` ficam como no export.
 
 ### O que as cópias publicadas deixam de fora
 
@@ -49,9 +49,36 @@ Os arquivos do export não são alterados. As cópias publicadas só têm triân
 | --- | --- | --- |
 | `Silhueta_Original_LOD2` no `*_Estatico` dos setores | 2.720 | `25_cidade_anel.py` não dá coleção a esse tipo de malha, então ele caiu no LOD0: caixas por cima de cada prédio do bairro antigo e uma de 32 × 26 × 7 m fechando o bar |
 | `*_Vegetacao_LOD2` e `*_Chao_LOD2` dentro do bairro antigo | 2.274 | As árvores e o chão reais de lá estão sempre desenhados |
-| Cavaletes e cones do limite antigo em `Mapa_Bairro` (`bar_boteco.glb`) | 6.576 | Fechavam as saídas; estão fundidos na malha, sem nó próprio |
+| Cavaletes e cones do limite antigo em `Mapa_Bairro` (`bar_boteco.glb`) | 6.576 | Só nos exports de antes da cidade: fechavam as saídas e ficam fundidos na malha, sem nó próprio |
 
-O importador confere os triângulos dos cavaletes e cones (96 de 56 e 24 de 50) e falha se forem outros. Um export novo do `.blend` da cidade já vem sem eles, e a cópia sai igual ao arquivo. O nó `Fundo_Distante` antigo é destruído ao carregar o mapa, e os `COL_Rua_Limite` não entram no `map-data.json`.
+O importador confere os triângulos dos cavaletes e cones (96 de 56 e 24 de 50) e falha se forem outros. O export de 01/11/2026 já vem sem eles, sem `Fundo_Distante` e sem `COL_Rua_Limite`, então esses cortes não fazem nada. Um export antigo continua funcionando: o nó `Fundo_Distante` é destruído ao carregar o mapa, e os `COL_Rua_Limite` não entram no `map-data.json`.
+
+### O que a cópia publicada do bar recebe
+
+Desde o export de 02/11/2026 "b" (reboco `Bar_Reboco_*`, escada de granito, TV de 1,06 × 0,60 m), o `bar_boteco.glb` traz esses nós e é publicado byte a byte, junto com o `bar_magrao.glb` reexportado para a tampa nova. O resto desta seção só vale para um export que volte a vir sem eles.
+
+Os `bar_boteco.glb` de 01/11/2026 e da primeira versão de 02/11/2026 saíram de um `.blend` em que o `17_lugares_animacao.py` não rodou: vêm com o freezer fechado, sem a bandeja de copos e sem os lugares do Magrão e dos mictórios. Nesse caso, `withBarPieces` faz o seguinte na cópia publicada, sem alterar o arquivo do export:
+
+- abre o freezer exportado: tira o tampo do corpo e transforma a tampa dele, com o puxador, no nó `Freezer_Bar_Tampa`, que gira na dobradiça;
+- copia de `export/anterior_2026-10-29/bar_boteco.glb` só o interior do freezer (gelo, forro, faces de dentro das paredes e borda de borracha) e a bandeja;
+- acrescenta a `INST_A_long-neck` as 59 long necks de dentro do freezer;
+- copia os nós `Copo_Bandeja`, `Balcao_Lugar_Magrao`, `Balcao_Entrega` e `Mictorio_Lugar_1` a `3`.
+
+Por fora, o freezer do balcão fica igual aos outros.
+
+Um export com esses nós passa direto e dispensa a pasta `anterior_2026-10-29`. Isso exige rodar o `17_lugares_animacao.py` depois do `36_bar_polimento.py` e antes do `08_export.py`. Desde 02/11/2026 o script 17 faz o freezer do bar a partir do `P_Freezer` do 36.
+
+### Carros
+
+Desde 02/11/2026 não há carro parado no mapa (`32_remover_carros.py`). O script removeu os sedans visíveis, mas deixou as caixas `COL_Ext_Sedan_*` no `bar_boteco_colisao.glb`. O importador as ignora, porque seriam paredes invisíveis na rua.
+
+### Inox
+
+A cena não tem mapa de ambiente, então metal não reflete nada e fica preto. Os materiais `Inox`, `Pol_Inox` e `Pgn_Inox` chegam com metalness até 1, e `environment-lighting.ts` reduz esse valor a 0,2 ao carregar o mapa.
+
+## Pontos iFood
+
+`pontos_ifood.json` traz os 23 pontos de retirada "Highland Bar Delivery": nome, setor, posição, frente e colisor, em glTF. `npm run assets:gps` lê o arquivo e grava os pontos em `gps-data.json`. No [Highfood](highfood.md), cada pedido é retirado no ponto mais perto, com um código digitado na tela. O anel da base do Highfood fica na rua, na frente do ponto do bairro antigo, mas é independente dele. O ponto do bairro antigo está fundido em `Mapa_Bairro`, com a caixa `COL_Ponto_iFood` em `bar_boteco_colisao.glb`. Os outros 22 estão no `*_Estatico` de 22 setores, com `COL_Ponto_iFood_02` a `23` nos colisores deles. A câmera atravessa essas caixas, como faz com os pontos de ônibus, e o minimapa as desenha como os outros objetos da rua.
 
 ## Streaming
 
@@ -132,7 +159,7 @@ As placas 3D das esquinas (`P_Placa_Rua_A` e `_B`) não acompanham a rua onde es
 
 ## Testes
 
-- `tests/integration/city.test.ts`: manifesto, URIs, publicação, duplicidade, colisores, pisos, ruas, moto, setores nas bordas, marcadores, alcance a pé, limites.
+- `tests/integration/city.test.ts`: manifesto, URIs, publicação, duplicidade, colisores, pisos, ruas, moto, setores nas bordas, marcadores, alcance a pé, limites, pontos iFood.
 - `tests/integration/city-streaming.test.ts`: planejador com backend falso (3 × 3, histerese, sem duplicar, carga tardia, falhas, antecipação, qualidades).
 - `tests/tools/import-city.test.mjs`: arquivo ausente, URI inválida, manifesto errado, perímetro aberto, publicação segura.
 - `tests/e2e/city.spec.ts` (projeto `city`): streaming no navegador com três voltas sem crescer memória, noite, setor que falha e a moto saindo do bairro antigo no jogo real.
@@ -160,4 +187,4 @@ Máquina virtual VMware, Edge com a GPU virtual, 1280 × 720, Alto, fixture `env
 - `cidade_vias.json` e `cidade_lotes.json` são publicados, mas ainda não há trânsito nem portões funcionando.
 - O panorama é opaco até 26° de elevação: sol e lua baixos ficam atrás dele. Os morros distantes ficam da cor da névoa.
 - O app Mapas do celular continua desenhando só o bairro antigo.
-- `bar_boteco.glb` e `bar_boteco_colisao.glb` ainda são os exports de 28/10, anteriores à cidade. Por isso `Fundo_Distante`, cavaletes e `COL_Rua_Limite` são cortados na importação e no carregamento. Reexportar o bar pelo `.blend` da cidade tira esses cortes de cena e não exige mudar o código.
+- O `bar_boteco.glb` de 01/11/2026 não tem as peças do `17_lugares_animacao.py` (veja [O que a cópia publicada do bar recebe](#o-que-a-cópia-publicada-do-bar-recebe)).

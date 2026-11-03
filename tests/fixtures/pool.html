@@ -1,0 +1,69 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Sinuca fixture</title>
+<style>body{margin:0;background:radial-gradient(120% 90% at 30% 20%,#3a1d5c,#120726 60%,#07030f)}
+#fx{position:fixed;left:50%;top:6px;z-index:200;translate:-50% 0;display:flex;align-items:center;gap:6px;padding:3px 6px;background:#0d0519f2;border:1px solid #ea2fdc66;font:500 11px 'JetBrains Mono',monospace;color:#f3eefa;white-space:nowrap}
+#fx select,#fx button{min-height:0;height:26px;padding:0 8px;background:#2a1440;border:1px solid #ea2fdc44;color:inherit;font:inherit;white-space:nowrap}
+#fx.off{display:none}</style></head>
+<body><main id="game" class="game"><section id="pool" class="pool hud-panel" aria-label="Mesa de sinuca"></section></main>
+<div id="fx"><label for="level">Juca</label><select id="level"><option value="facil">Iniciante</option><option value="medio" selected>Na média</option><option value="dificil">Matador</option></select>
+  <button type="button" id="play">Jogar contra o Juca</button><button type="button" id="watch">Juca contra Juca</button><button type="button" id="lobby">Lobby</button></div>
+<script type="module">
+// The pool panel (apps/web/src/pool/panel.ts) without a server: the world's own table (apps/server/src/minigames/pool.ts)
+// runs in this page with the shared physics, rules and Juca da Sinuca. fixture.play(level) sits you against him,
+// fixture.watch(level) has him play himself (you watch), fixture.lobby() shows the lobby; fixture.room is the table and
+// fixture.sent the requests the panel made. Add ?clean to hide the bar, ?play or ?watch to start at once.
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import {createPoolPanel} from '../../apps/web/src/pool/panel.ts';
+import {PoolTable} from '../../apps/server/src/minigames/pool.ts';
+import {PoolPlanner} from '../../packages/shared/src/index.ts';
+const sent=[],ME='me';
+let room,clock=0,shownRevision=-1,watching=false;
+let balance=1230;
+const ui=createPoolPanel(document.querySelector('#pool'),{send:(type,payload)=>{sent.push([type,payload]);toRoom(type,payload);},now:()=>Date.now(),volume:()=>.6,balance:()=>balance,
+  notify:text=>console.info('[aviso]',text),closed:()=>{}});
+function toRoom(type,p){
+  if(!room)return;
+  try{
+    if(type==='pool.shot')room.shoot(ME,p);
+    else if(type==='pool.aim'){/* the room relays it to the others; nobody else here */}
+    else if(type==='pool.choice')room.choose(ME,p.choice);
+    else if(type==='pool.ready')void room.ready(ME,p.ready).then(sync);
+    else if(type==='pool.cpu')room.cpu(ME,p.on);
+    else if(type==='pool.config')room.configure(ME,p);
+    else if(type==='pool.seat')room.move(ME,p.seat);
+    else if(type==='pool.join')room.join(ME,'Rafael',p.seat);
+    else if(type==='pool.leave'){room.leave(ME);}
+  }catch(error){console.warn(String(error));}
+  sync();
+}
+function sync(){if(room&&room.revision!==shownRevision){shownRevision=room.revision;ui.update(room.snapshot(),ME,watching);}}
+function start(level,{me=true}={}){
+  clearInterval(clock);ui.reset();shownRevision=-1;watching=!me;
+  room=new PoolTable('sinuca-2',{onShot:shot=>{sync();ui.shot(shot);},thinkBudgetMs:8});
+  if(me){room.join(ME,'Rafael');room.configure(ME,{level});void room.ready(ME,true).then(sync);}
+  else{
+    // Two of him: a person's seat played by the same planner, so the table starts (it needs someone at it).
+    room.join('juca-2','Juca (de novo)');room.configure('juca-2',{level});void room.ready('juca-2',true).then(sync);
+  }
+  clock=setInterval(()=>{
+    if(!me&&room.phase==='choice'&&room.seats[room.choice.seat].playerId==='juca-2')room.choose('juca-2',room.choice.kind==='toss'?'break':'spot');
+    if(!me&&room.phase==='aim'&&room.seats[room.rack.turn].playerId==='juca-2'&&!room._planning){
+      room._planning=new PoolPlanner(room.rack,room.rack.turn,room.balls,level,Math.random,room.placing);
+    }
+    if(room._planning&&room._planning.step(8)){const plan=room._planning.plan();room._planning=undefined;try{room.shoot('juca-2',{shot:room.shot,...plan.stroke,...(plan.cue?{cue:plan.cue}:{})});}catch(e){console.warn(String(e));}}
+    room.tick(Date.now());sync();
+  },50);
+  window.fixture.room=room;
+  sync();
+  return room;
+}
+function lobby(){clearInterval(clock);ui.reset();shownRevision=-1;watching=false;room=new PoolTable('sinuca-1',{onShot:shot=>{sync();ui.shot(shot);}});room.join(ME,'Rafael');window.fixture.room=room;sync();clock=setInterval(()=>{room.tick(Date.now());sync();},100);}
+const level=()=>document.querySelector('#level').value;
+document.querySelector('#play').onclick=()=>start(level());
+document.querySelector('#watch').onclick=()=>start(level(),{me:false});
+document.querySelector('#lobby').onclick=()=>lobby();
+window.fixture={ui,sent,room:undefined,setBalance:v=>{balance=v;ui.refresh();},play:(l='medio')=>start(l),watch:(l='medio')=>start(l,{me:false}),lobby};
+const params=new URLSearchParams(location.search);
+if(params.has('clean'))document.querySelector('#fx').classList.add('off');
+if(params.has('watch'))start(params.get('watch')||'medio',{me:false});else if(params.has('play'))start(params.get('play')||'medio');else lobby();
+</script></body></html>

@@ -67,16 +67,16 @@ test('every sector publishes its visual, LOD and their buffers; URIs stay inside
   }
   check('cidade_anel.gltf');check('cidade_distante.gltf');
   const textures=[...seen].filter(file=>file.startsWith('texturas/'));
-  assert.equal(textures.length,18,'the 18 shared textures');
+  assert.equal(textures.length,40,'the 40 shared textures');
   assert.ok(seen.has('texturas/atlas_cidade.jpg'));
 });
 
 test('only what the game runs on is published, and the publication lists all of it',()=>{
   const files=walkFiles(published).map(file=>path.relative(published,file).replaceAll('\\','/'));
-  assert.deepEqual(files.filter(file=>/\.(md|blend|py|png|tmp)$|capturas|colisao/.test(file)),[]);
+  assert.deepEqual(files.filter(file=>/\.(md|blend|py|tmp)$|capturas|colisao/.test(file)||(file.endsWith('.png')&&file!=='texturas/pbr_folhagem.png')),[]);
   const stamp=JSON.parse(readFileSync(path.join(published,'cidade_publicacao.json'),'utf8'));
   assert.deepEqual(Object.keys(stamp.arquivos).sort(),files.filter(file=>file!=='cidade_publicacao.json').sort());
-  for(const name of ['cidade_setores.json','cidade_vias.json','cidade_lotes.json','validacao.json','cidade_anel.gltf','cidade_anel.bin','cidade_distante.gltf','cidade_distante.bin'])assert.ok(files.includes(name),name);
+  for(const name of ['cidade_setores.json','cidade_vias.json','cidade_lotes.json','pontos_ifood.json','validacao.json','cidade_anel.gltf','cidade_anel.bin','cidade_distante.gltf','cidade_distante.bin'])assert.ok(files.includes(name),name);
 });
 
 test('the ring and the far backdrop keep to their design: no collision, far hills and the panorama that ignores the fog',()=>{
@@ -116,27 +116,53 @@ test('no sector draws the original neighbourhood again: silhouettes and LOD grou
   assert.equal(walls.length,0,'S04_04 has nothing standing');
 });
 
-test('the bar map is published as exported except for the old sawhorses and cones',()=>{
+test('the bar map is published as exported, plus what 17_lugares_animacao.py adds when the export lacks it',()=>{
   const glb=(file:string)=>{const bytes=readFileSync(file),size=bytes.readUInt32LE(12);return {bytes,json:JSON.parse(bytes.subarray(20,20+size).toString()),start:28+size};};
   const exported=glb(path.join(root,'assets-bar/map/BarBoteco/export/bar_boteco.glb')),served=glb(path.join(root,'apps/web/public/maps/bar_boteco.glb'));
-  assert.equal(served.bytes.length,exported.bytes.length);
-  assert.deepEqual(served.json,exported.json,'same nodes, materials and layout');
-  // Only inside Mapa_Bairro's index data, and only as collapsed triangles.
-  const node=exported.json.nodes.find((n:any)=>n.name==='Mapa_Bairro'),ranges=exported.json.meshes[node.mesh].primitives.map((p:any)=>{
-    const a=exported.json.accessors[p.indices],view=exported.json.bufferViews[a.bufferView],base=exported.start+(view.byteOffset??0)+(a.byteOffset??0);
-    return [base,base+a.count*(a.componentType===5125?4:2)];
-  });
-  let changed=0;
-  for(let i=0;i<exported.bytes.length;i++)if(exported.bytes[i]!==served.bytes[i]){
-    changed++;
-    assert.ok(ranges.some(([a,b]:number[])=>i>=a!&&i<b!),`byte ${i} is index data`);
+  const pieces=['Freezer_Bar_Tampa','Copo_Bandeja','Balcao_Lugar_Magrao','Balcao_Entrega','Mictorio_Lugar_1','Mictorio_Lugar_2','Mictorio_Lugar_3'];
+  const furniture=exported.json.nodes.find((n:any)=>n.name==='Bar_Mobilia').mesh;
+  // Since the export of 2026-11-02 "b", script 17 ran in Blender: nothing is grafted and the map is served as exported.
+  if(pieces.every(name=>exported.json.nodes.some((n:any)=>n.name===name)))assert.ok(served.bytes.equals(exported.bytes),'the export, byte for byte');
+  else{
+    // The long necks in the hollow freezer join the map's instances: that node alone points elsewhere.
+    const necks=exported.json.nodes.findIndex((n:any)=>n.name==='INST_A_long-neck'),without=(nodes:any[])=>nodes.filter((_,index)=>index!==necks);
+    assert.deepEqual(without(served.json.nodes.slice(0,exported.json.nodes.length)),without(exported.json.nodes),'the exported nodes, in their order');
+    const instances=served.json.accessors[served.json.nodes[necks].extensions.EXT_mesh_gpu_instancing.attributes.TRANSLATION].count;
+    assert.equal(instances,exported.json.accessors[exported.json.nodes[necks].extensions.EXT_mesh_gpu_instancing.attributes.TRANSLATION].count+59,'the 59 long necks in the freezer');
+    // The exported buffer byte for byte, but for the closed freezer's indices in the furniture, retired.
+    const exportedBuffer=exported.bytes.subarray(exported.start),servedBuffer=served.bytes.subarray(served.start,served.start+exportedBuffer.length);
+    const indexBytes=exported.json.meshes[furniture].primitives.map((p:any)=>{const a=exported.json.accessors[p.indices],view=exported.json.bufferViews[a.bufferView],start=(view.byteOffset??0)+(a.byteOffset??0);return [start,start+a.count*(a.componentType===5125?4:2)];});
+    for(let i=0;i<exportedBuffer.length;i++)if(exportedBuffer[i]!==servedBuffer[i])assert.ok(indexBytes.some(([from,to]:number[])=>i>=from!&&i<to!),`byte ${i} of the exported buffer changed outside the furniture's indices`);
+    exported.json.meshes.forEach((mesh:any,index:number)=>{if(index!==furniture)assert.deepEqual(served.json.meshes[index],mesh,mesh.name);});
+    const lid=served.json.meshes[served.json.nodes.find((n:any)=>n.name==='Freezer_Bar_Tampa').mesh];
+    assert.deepEqual(lid.primitives.map((p:any)=>served.json.materials[p.material].name).sort(),['Metal_Escuro','Plastico_Branco'],'the lid is the exported freezer\'s own, handle included');
   }
-  assert.ok(changed>0,'the sawhorses are gone from this export');
-  const mesh=exported.json.meshes[node.mesh],entry={json:served.json,bin:served.bytes.subarray(served.start) as Buffer},at=(name:string)=>triangles(entry,mesh.primitives.find((p:any)=>served.json.materials[p.material].name===name));
+  for(const name of pieces)assert.ok(served.json.nodes.some((n:any)=>n.name===name),name);
+  const entry={json:served.json,bin:served.bytes.subarray(served.start) as Buffer},allOf=(mesh:any,name:string)=>mesh.primitives.filter((p:any)=>served.json.materials[p.material].name===name).flatMap((p:any)=>triangles(entry,p));
+  assert.ok(allOf(served.json.meshes[furniture],'Copo_Vidro').length>0,'the tray of glasses');
+  assert.ok(allOf(served.json.meshes[furniture],'Gelo_Freezer').length>0,'the hollow freezer');
+  assert.ok(allOf(served.json.meshes[furniture],'Geladeira_Latas').length>0,'the exported furniture stays: the new fridges');
+  assert.ok(allOf(served.json.meshes[furniture],'Pgn_Metal_Preto').length>0,'the exported furniture stays: the new railing');
+  const mesh=served.json.meshes[served.json.nodes.find((n:any)=>n.name==='Mapa_Bairro').mesh],at=(name:string)=>allOf(mesh,name) as number[][][];
   const nearOldLimit=(t:number[][])=>{const [x,z]=centroid(t);return Math.min(Math.abs(x+102.4),Math.abs(x-134.4),Math.abs(z-90.4),Math.abs(z+116.4))<=2;};
   assert.equal(at('Plastico_Laranja').filter(t=>nearOldLimit(t)&&t[0]![1]!<1).length,0,'no cone');
   assert.equal(at('Atlas_Bairro').filter(t=>nearOldLimit(t)&&t[0]![1]!>.1&&t[0]![1]!<1).length,0,'no sawhorse');
   assert.ok(at('Plastico_Laranja').length>0,'the other orange things stay');
+});
+
+test('the 23 iFood pickup points stand where pontos_ifood.json says, are solid, and their sectors find the textures',()=>{
+  const {pontos}=JSON.parse(readFileSync(path.join(published,'pontos_ifood.json'),'utf8'));
+  assert.equal(pontos.length,23);
+  for(const point of pontos){
+    const [x,,z]=point.pos_gltf,solid=[...CITY_SOLIDS,...MAP_COLLIDERS].find(c=>c.id===point.colisor);
+    assert.ok(solid,point.colisor);
+    assert.ok(Math.hypot(solid!.x-x,solid!.z-z)<.1,`${point.colisor} at the point`);
+    assert.equal(isWalkable(x,z,.15),false,`${point.nome} blocks the way`);
+    assert.ok(isWalkable(x+point.frente_gltf[0]*1.2,z+point.frente_gltf[2]*1.2,.15),`${point.nome} has free pavement at its front`);
+  }
+  const atlas=(sector:string)=>gltf(`setores/cidade_${sector}.gltf`).json.images.map((image:any)=>image.uri);
+  for(const point of pontos.slice(1))for(const name of ['ponto_ifood_atlas','ponto_ifood_escovado','ponto_ifood_pintura','ponto_ifood_pintura_n'])
+    assert.ok(atlas(point.setor).includes(`../texturas/${name}.jpg`),`${point.setor}: ${name}`);
 });
 
 test('the 64 collision files reach the shared data: walls as solids, ground as floors, none of it twice',()=>{
@@ -145,16 +171,16 @@ test('the 64 collision files reach the shared data: walls as solids, ground as f
     total+=entry.colisores;
     assert.equal((cityData.sectors as any)[name].colliders,entry.colisores,name);
   }
-  assert.equal(total,5725);
-  assert.equal(cityData.boxes.length,5725);
+  assert.equal(total,5650);
+  assert.equal(cityData.boxes.length,5650);
   const ids=CITY_SOLIDS.map(c=>c.id);
   assert.equal(new Set(ids).size,ids.length,'unique ids');
-  for(const kind of ['Casa','Muro','Arvore','Poste','Carro','Galpao','Limite_Norte'])assert.ok(ids.some(id=>id.startsWith(`COL_Cid_${kind}`)),kind);
+  for(const kind of ['Casa','Muro','Arvore','Poste','Galpao','Limite_Norte'])assert.ok(ids.some(id=>id.startsWith(`COL_Cid_${kind}`)),kind);
   for(const kind of ['Chao','Calcada','Quadra','Canteiro'])assert.equal(ids.some(id=>id.startsWith(`COL_Cid_${kind}`)),false,`${kind} is a floor, no wall`);
   const floorBoxes=CITY_FLOORS.length/2;
-  assert.equal(floorBoxes+ids.filter(id=>/^COL_Cid_(Plato|Plataforma)/.test(id)).length*-1+ids.length,5725,'solids + floors = every box');
+  assert.equal(floorBoxes+ids.filter(id=>/^COL_Cid_(Plato|Plataforma)/.test(id)).length*-1+ids.length,5650,'solids + floors = every box');
   // The bar's own stays apart, whole, without the old limits.
-  assert.equal(MAP_COLLIDERS.length,1553);
+  assert.equal(MAP_COLLIDERS.length,1473);
   assert.equal(MAP_COLLIDERS.some(c=>c.id.startsWith('COL_Rua_Limite')),false);
   assert.equal(COLLIDERS.filter(c=>c.id.startsWith('COL_Mob_Mesa')).length,MAP_COLLIDERS.filter(c=>c.id.startsWith('COL_Mob_Mesa')).length);
 });

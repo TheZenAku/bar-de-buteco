@@ -1,0 +1,101 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Truco fixture</title>
+<style>body{margin:0;background:radial-gradient(120% 90% at 30% 20%,#3a1d5c,#120726 60%,#07030f)}
+#fx{position:fixed;left:50%;top:12px;z-index:200;translate:-50% 0;display:flex;align-items:center;gap:6px;padding:3px 6px;background:#0d0519f2;border:1px solid #ea2fdc66;font:500 11px 'JetBrains Mono',monospace;color:#f3eefa;white-space:nowrap}
+#fx select,#fx button{min-height:0;height:26px;padding:0 8px;background:#2a1440;border:1px solid #ea2fdc44;color:inherit;font:inherit;white-space:nowrap}
+#fx.off{display:none}</style></head>
+<body><main id="game" class="game"><section id="truco" class="truco hud-panel" aria-label="Mesa de truco"></section></main>
+<div class="fx" id="fx"><label for="scene">Cena</label><select id="scene"></select><button type="button" id="demo">Partida demo</button><button type="button" id="live">Jogar de verdade</button></div>
+<script type="module">
+// The truco panel (apps/web/src/truco/table.ts) without a server: fixture.show(name) draws a made-up table, fixture.demo()
+// plays a scripted hand, and fixture.live() runs a real match against NPCs in this page, with the server's own table and the
+// shared rules. The requests the panel makes pile up in fixture.sent. Add ?clean to hide the scene bar, ?live to start playing.
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import {createTrucoTable} from '../../apps/web/src/truco/table.ts';
+import {TrucoTable} from '../../apps/server/src/minigames/truco.ts';
+import {demoScript,makeScenes} from './truco-scenes.js';
+const now=()=>Date.now(),sent=[];
+let balance=1230,timer=0;
+const ui=createTrucoTable(document.querySelector('#truco'),{send:(type,payload)=>{sent.push([type,payload]);if(room)toRoom(type,payload);else answer(type,payload);},now,balance:()=>balance,volume:()=>.6,notify:()=>{}});
+/** A real table in this page: the same class the world runs. */
+let room,roomClock=0;
+const ME={id:'me',name:'Rafael',color:'#b90eb2'};
+function toRoom(type,p){
+  const t=now();
+  try{
+    if(type==='truco.play')room.play(ME.id,p.card,!!p.hidden,t);
+    else if(type==='truco.call')room.call(ME.id,t);
+    else if(type==='truco.answer')room.answer(ME.id,p.answer,p.to,t);
+    else if(type==='truco.eleven')room.eleven(ME.id,p.answer,t);
+    else if(type==='truco.signal')room.signal(ME.id,p.signal,t);
+    else if(type==='truco.ready')void room.ready(ME.id,p.ready,t);
+    else if(type==='truco.again')room.again(ME.id);
+    else if(type==='truco.seat')room.move(ME.id,p.seat);
+    else if(type==='truco.config')room.configure(ME.id,p);
+    else if(type==='truco.leave'){stopRoom();show('yourTurn');return;}
+    room.tick(now());
+  }catch(error){console.warn(String(error));}
+}
+const randomBelow=n=>Math.floor(Math.random()*n);
+function live(){
+  clearTimeout(timer);stopRoom();ui.reset();
+  room=new TrucoTable('truco-1',{view:(_,view)=>{shown=view;ui.update(view);},random:randomBelow,chance:Math.random});
+  room.join(ME);room.tick(now());
+  roomClock=setInterval(()=>room.tick(now()),100);
+  window.fixture.room=room;
+  return room;
+}
+function stopRoom(){clearInterval(roomClock);room=undefined;}
+const scenes=makeScenes(now),select=document.querySelector('#scene'),bar=document.querySelector('#fx');
+const LABELS={lobby:'Antes da partida',between:'Antes da partida, entre jogadores',hide:'Vaza com encoberta',shuffle:'Embaralhando',deal:'Distribuição',yourTurn:'Sua vez',manilhaHand:'Sua vez, com manilhas',theirTurn:'Vez do adversário',trickWon:'Vaza ganha',rivalTaunt:'Provocação',truco:'Pedido de Truco',six:'Pedido de Seis',twelve:'Pedido de Doze',waiting:'Você pediu Truco',eleven:'Mão de 11',casal:'Mão de 11, Casal Maior',iron:'Mão de Ferro no escuro',handWon:'Fim da mão',victory:'Vitória',defeat:'Derrota'};
+select.innerHTML=Object.keys(LABELS).map(k=>`<option value="${k}">${LABELS[k]}</option>`).join('');
+// What a scene follows, so opening it plays its transition: the deal after the shuffle, the slam over a calm table, the score moving.
+const BEFORE={deal:'shuffle',truco:'beforeCall',six:'theirTurn',waiting:'yourTurn',trickWon:'yourTurn',handWon:'trickWon',victory:'handWon',defeat:'handWon',eleven:'shuffle',iron:'shuffle'};
+let shown,said=10;
+const draw=view=>{shown=view;ui.update(view);};
+function show(name){clearTimeout(timer);stopRoom();ui.reset();select.value=name;if(BEFORE[name])draw(scenes[BEFORE[name]]());draw(scenes[name]());}
+function demo(){
+  stopRoom();ui.reset();const script=demoScript(now);let i=0;
+  const next=()=>{const [ms,make]=script[i];draw(make());i=(i+1)%script.length;timer=setTimeout(next,ms);};
+  clearTimeout(timer);next();
+}
+/** Just enough for the buttons to answer in the prototype. The real answers come from the rules, in the next stage. */
+const STEPS={3:['Seis',6],6:['Nove',9],9:['Doze',12]};
+function answer(type,payload){
+  const view=shown;if(!view)return;
+  const after=(ms,fn)=>{clearTimeout(timer);timer=setTimeout(fn,ms);};
+  const handEnd=(winner,points,reason)=>{
+    const score=[...view.score];score[winner]+=points;
+    draw({...view,phase:'hand-end',turn:null,bet:undefined,eleven:undefined,canCall:undefined,score,seats:view.seats.map(s=>({...s,cards:0})),mine:[],table:[],result:{winner,points,reason}});
+    after(2600,()=>show('deal'));
+  };
+  const playing=(over={})=>draw({...view,phase:'playing',turn:0,deadline:now()+14000,bet:undefined,eleven:undefined,...over});
+  if(type==='truco.play'){
+    const card=view.mine.find(c=>c.id===payload.card);if(!card)return;
+    draw({...view,turn:null,phase:'trick-end',canCall:undefined,canHide:undefined,mine:view.mine.filter(c=>c.id!==card.id),seats:view.seats.map(s=>s.seat===0?{...s,cards:s.cards-1}:s),table:[...view.table,{seat:0,card:payload.hidden?{id:card.id,rank:'?',suit:''}:card,...(payload.hidden?{}:{winner:true})}],tricks:[{winner:0,seat:0},{winner:null},{winner:null}]});
+    after(2000,()=>playing({table:[],canCall:undefined}));
+  }
+  if(type==='truco.call'){
+    const label=view.canCall.label,to=view.canCall.value;
+    draw({...view,phase:'bet',turn:null,canCall:undefined,bet:{by:0,label,from:view.handValue,to,runAway:view.handValue,mine:true,answering:false,waitingFor:'Dona Neide'}});
+    after(2200,()=>playing({handValue:to,callLabel:label,canCall:undefined,table:[]}));
+  }
+  if(type==='truco.answer'){
+    if(payload.answer==='accept'){const [label,value]=STEPS[view.bet.to]??[];playing({handValue:view.bet.to,callLabel:view.bet.label,canCall:label?{value,label}:undefined});}
+    if(payload.answer==='raise'){const to=view.bet.raiseTo,label=view.bet.raiseLabel,[nextLabel,nextTo]=STEPS[to]??[];
+      draw({...view,bet:{by:0,label,from:view.bet.to,to,runAway:view.bet.to,mine:true,answering:false,waitingFor:'Dona Neide'}});
+      after(2200,()=>draw({...view,bet:{by:1,label:nextLabel??label,from:to,to:nextTo??to,...(STEPS[nextTo]?{raiseTo:STEPS[nextTo][1],raiseLabel:STEPS[nextTo][0]}:{}),runAway:to,mine:false,answering:true}}));}
+    if(payload.answer==='run')handEnd(1,view.bet.from,'Você fugiu do pedido');
+  }
+  if(type==='truco.eleven'){if(payload.answer==='play')playing({eleven:undefined,canCall:undefined});else handEnd(1,1,'Fuga na Mão de 11');}
+  if(type==='truco.signal')draw({...view,seats:view.seats.map(s=>s.seat===0?{...s,signal:{signal:payload.signal,key:++said}}:s)});
+  if(type==='truco.ready'||type==='truco.again')show('deal');
+  if(type==='truco.leave')show('yourTurn');
+}
+select.addEventListener('change',()=>show(select.value));
+document.querySelector('#demo').addEventListener('click',demo);
+document.querySelector('#live').addEventListener('click',live);
+if(new URLSearchParams(location.search).has('clean'))bar.classList.add('off');
+window.fixture={ui,sent,show,demo,live,scenes:Object.keys(LABELS)};
+if(new URLSearchParams(location.search).has('live'))live();else show(new URLSearchParams(location.search).get('scene')??'yourTurn');
+</script></body></html>

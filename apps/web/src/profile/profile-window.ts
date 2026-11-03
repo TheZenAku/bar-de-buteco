@@ -1,5 +1,6 @@
 import {BADGE_RARITY_INFO,formatPhoneNumber,isSkillKey,isTakenKey,keyLabel,loadoutOf,PROFILE,SKINS,skillsOf,type AchievementView,type Badge,type BadgeRarity,type ProfileView,type SkillLoadouts} from '@bar/shared';
 import {api,escape as e} from '../api';
+import {price} from '../prices';
 import {uiIcon} from '../ui-icons';
 import {badgeMedal,openBadgeCard,rarityAttributes} from './badge-card';
 import {floatingWindow,type FloatingWindow} from './floating-window';
@@ -14,6 +15,8 @@ export interface ProfileHooks {
   call:(person:ProfilePerson)=>void;
   /** The player chose another skill or key. */
   loadouts:(next:SkillLoadouts)=>void;
+  /** Opens the collection on this skin's card, where its skills are sold. */
+  collection:(skin:string)=>void;
   toast:(text:string,error?:boolean)=>void;
 }
 export interface ProfilePerson {id:string;name:string;color:string;number:string;photo?:number}
@@ -101,11 +104,19 @@ export function createProfileWindow(hooks:ProfileHooks){
     }catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível ler as conquistas.',true);}
   }
   function skillHtml(v:ProfileView):string {
-    const skills=skillsOf(v.skin),skin=SKINS.find(each=>each.id===v.skin)?.name??v.skin;
-    if(!skills.length)return `<p class="pf-empty">${e(skin)} ainda não tem skills. Algumas skins têm habilidades próprias, que você escolhe aqui.</p>`;
-    const loadout=loadoutOf(v.loadouts,v.skin)!;
+    const skills=skillsOf(v.skin),skin=SKINS.find(each=>each.id===v.skin)?.name??v.skin,owned=v.ownedSkills??[];
+    if(!skills.length)return `<p class="pf-empty">${e(skin)} ainda não tem skills. Algumas skins têm habilidades próprias, que você compra na coleção e escolhe aqui.</p>`;
+    const loadout=loadoutOf(v.loadouts,v.skin,owned);
+    const row=(skill:typeof skills[number])=>{
+      if(!owned.includes(skill.id))return `<button type="button" class="pf-skill locked" data-pf="skill-shop"><span class="pf-skill-icon">${uiIcon('lock')}</span><span><b>${e(skill.name)}</b><small>${e(skill.description)}</small></span><i>${uiIcon('coins')}${price(`skill:${skill.id}`).toLocaleString('pt-BR')}</i></button>`;
+      const on=skill.id===loadout!.skill;
+      return `<button type="button" class="pf-skill${on?' on':''}" role="radio" aria-checked="${on}" data-pf="skill" data-skill="${e(skill.id)}"><span class="pf-skill-icon">${uiIcon(skill.icon)}</span><span><b>${e(skill.name)}</b><small>${e(skill.description)}</small></span>${on?'<i>Ativa</i>':''}</button>`;
+    };
+    if(!loadout)return `<p class="pf-lead">As skills de <b>${e(skin)}</b> são compradas na coleção e valem em todas as variantes dele.</p>
+      <div class="pf-skills">${skills.map(row).join('')}</div>
+      <button type="button" class="button primary full" data-pf="skill-shop">${uiIcon('cards')}Abrir a coleção</button>`;
     return `<p class="pf-lead">Skills de <b>${e(skin)}</b>. Escolha a que fica ativa e a tecla que a usa.</p>
-      <div class="pf-skills" role="radiogroup" aria-label="Skill ativa">${skills.map(skill=>{const on=skill.id===loadout.skill;return `<button type="button" class="pf-skill${on?' on':''}" role="radio" aria-checked="${on}" data-pf="skill" data-skill="${e(skill.id)}"><span class="pf-skill-icon">${uiIcon(skill.icon)}</span><span><b>${e(skill.name)}</b><small>${e(skill.description)}</small></span>${on?'<i>Ativa</i>':''}</button>`;}).join('')}</div>
+      <div class="pf-skills" role="radiogroup" aria-label="Skill ativa">${skills.map(row).join('')}</div>
       <div class="pf-keyrow"><span>${uiIcon('keyboard')} Tecla</span><button type="button" class="pf-key${capturing?' listening':''}" data-pf="key" aria-label="Mudar a tecla da skill">${capturing?'Aperte uma tecla…':`<kbd>${e(keyLabel(loadout.key))}</kbd>Mudar`}</button></div>
       <p class="pf-hint${keyError?' error':''}" role="status">${e(keyError||'Letras e números que o jogo ainda não usa. Vale só para esta skin.')}</p>`;
   }
@@ -127,7 +138,7 @@ export function createProfileWindow(hooks:ProfileHooks){
     }
     const slot=window_?.body.querySelector<HTMLElement>('.pf-model');if(!slot||opened!==generation||view?.skin!==v.skin)return;
     // The store's picture stands in when the scene could not draw the skin.
-    slot.innerHTML=`<img class="${src?'':'pf-fallback'}" src="${src??`${import.meta.env.BASE_URL}skins/${encodeURIComponent(v.skin)}.jpg`}" alt="" draggable="false">`;
+    slot.innerHTML=`<img class="${src?'':'pf-fallback'}" src="${src??`${import.meta.env.BASE_URL}skins/cards/${encodeURIComponent(v.skin)}.webp`}" alt="" draggable="false">`;
   }
   function closePicker():void {picker?.close();picker=undefined;hideTip();}
   function openPicker():void {
@@ -176,7 +187,7 @@ export function createProfileWindow(hooks:ProfileHooks){
       stop();
       if(event.key!=='Escape'){
         if(isSkillKey(event.code)&&view){
-          const loadout=loadoutOf(view.loadouts,view.skin)!;
+          const loadout=loadoutOf(view.loadouts,view.skin,view.ownedSkills??[])!;
           void change(()=>api<ProfileView>('/profile/skill',{skill:loadout.skill,key:event.code})).then(ok=>{if(ok&&view?.loadouts)hooks.loadouts(view.loadouts);});
           return;
         }
@@ -205,11 +216,12 @@ export function createProfileWindow(hooks:ProfileHooks){
         case 'medal':{const badge=v.badges.find(each=>each.id===button.dataset.id);if(badge){hideTip();openBadgeCard(badge,button);}break;}
         case 'achievement':{const badge=achievements?.flatMap(series=>series.tiers).find(tier=>tier.badge.id===button.dataset.id)?.badge;if(badge){hideTip();openBadgeCard(badge,button);}break;}
         case 'skill':{
-          const key=loadoutOf(v.loadouts,v.skin)!.key,skill=button.dataset.skill!;
+          const key=loadoutOf(v.loadouts,v.skin,v.ownedSkills??[])!.key,skill=button.dataset.skill!;
           void change(()=>api<ProfileView>('/profile/skill',{skill,key})).then(ok=>{if(ok&&view?.loadouts)hooks.loadouts(view.loadouts);});
           break;
         }
         case 'key':if(capturing)cancelCapture?.();captureKey();break;
+        case 'skill-shop':hooks.collection(v.skin);break;
         case 'copy':void navigator.clipboard.writeText(v.number).then(()=>hooks.toast('Número copiado.'),()=>hooks.toast(`Seu número: ${v.number}`));break;
         case 'save':void change(async()=>{await api('/phone/contacts',{userId:v.id});hooks.contactSaved();hooks.toast('Contato salvo na agenda do celular.');return api<ProfileView>(`/profile/${encodeURIComponent(v.id)}`);});break;
         case 'message':hooks.message(person(v));break;

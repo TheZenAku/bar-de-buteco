@@ -1,5 +1,5 @@
 import {readGraphics,defaultGraphics,type GraphicsSettings} from './graphics';
-import {DEFAULT_CAMERA_DISTANCE,isCameraMode,readCameraDistance,type CameraMode} from './engine/camera-rig';
+import {DEFAULT_CAMERA_DISTANCE,DEFAULT_CAMERA_FEEL,isCameraMode,readCameraDistance,readCameraFeel,type CameraFeel,type CameraMode} from './engine/camera-rig';
 /** Per-browser preferences for sound, proximity voice, graphics and the camera. The jukebox keeps its own volume (jukebox.ts). */
 export interface GameSettings {
   /** Volumes 0–1; the microphone gain is mic × 2 (0.5 = unchanged). */
@@ -10,11 +10,15 @@ export interface GameSettings {
   graphics:GraphicsSettings;
   /** Q switches between the player's eyes and their chosen third-person distance. */
   camera:CameraMode;
-  /** Last positive third-person distance in metres; preserved while in first person. */
+  /** Perto, médio or longe, in metres (CAMERA_ZOOMS); preserved while in first person. */
   cameraDistance:number;
+  /** Height, sensitivity and smoothing of the view. */
+  cameraFeel:CameraFeel;
 }
 const KEY='bar:settings:v1';
-export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE};
+// The starting distance until 2026-11-02: saved as it was, it means the player never zoomed, so they get the new one.
+const OLD_DEFAULT_DISTANCE=6.4;
+export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE,cameraFeel:{...DEFAULT_CAMERA_FEEL}};
 const unit=(value:unknown,fallback:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 
 export function createSettings(){
@@ -31,7 +35,8 @@ export function createSettings(){
       graphics:readGraphics(saved.graphics),
       camera:isCameraMode(saved.camera)?saved.camera:current.camera,
       // Older browsers stored one of three fixed third-person views, with no separate distance.
-      cameraDistance:readCameraDistance(saved.cameraDistance,saved.camera==='near'?3:saved.camera==='far'?10.5:current.cameraDistance),
+      cameraDistance:saved.cameraDistance===OLD_DEFAULT_DISTANCE?current.cameraDistance:readCameraDistance(saved.cameraDistance,saved.camera==='near'?3:saved.camera==='far'?10.5:current.cameraDistance),
+      cameraFeel:readCameraFeel(saved.cameraFeel),
     };
   }catch{/* Private mode or malformed: defaults. */}
   return {

@@ -1,6 +1,6 @@
 # Mapa BarBoteco
 
-O cenário do bar e do bairro original é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois são publicados em `apps/web/public/maps`; a colisão como está, e o visual sem os cavaletes do limite antigo. Em volta dele fica a [cidade](../sistemas/cidade.md), de `export/cidade`, carregada por setores.
+O cenário do bar e do bairro original é `assets-bar/map/BarBoteco/export/bar_boteco.glb`, acompanhado de `bar_boteco_colisao.glb`. O jogo usa o GLB visual otimizado sem Draco: as texturas estão embutidas e não há dependência de imagens externas ou de um decodificador. Os dois são publicados em `apps/web/public/maps`: a colisão como está, e o visual com as [correções de publicação](../sistemas/cidade.md#o-que-as-cópias-publicadas-deixam-de-fora). Em volta dele fica a [cidade](../sistemas/cidade.md), de `export/cidade`, carregada por setores.
 
 Execute `npm run assets:map` depois de atualizar os exports. O importador valida o formato, registra hashes SHA-256 e gera `packages/shared/src/map-data.json` e, para a cidade, `city-data.json` e `city-roads.json`. Esses arquivos alimentam a movimentação autoritativa, a previsão do cliente, as consultas de visibilidade da câmera, o nascimento e as interações. O GLB de colisão nunca é desenhado.
 

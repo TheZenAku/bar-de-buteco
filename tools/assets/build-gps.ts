@@ -1,13 +1,14 @@
 // Builds packages/shared/src/gps-data.json from the same floors and solids the bike rides on: the grid GPS routes run over, the places a
-// delivery can be made, and the street names. Run again when the map changes: npm run assets:gps (tests/integration/gps.test.ts checks it).
+// delivery can be made, the pickup points (apps/web/public/maps/cidade/pontos_ifood.json), and the street names. Run again when the map changes: npm run assets:gps (tests/integration/gps.test.ts checks it).
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {CITY_FLOORS,CITY_SOLIDS,COLLIDERS,MAP_COLLIDERS,cityZone,floorHeight,isWalkable,motoFits,roadHeight,solidsBetween} from '@bar/shared';
+import {CITY_FLOORS,CITY_SOLIDS,COLLIDERS,HIGHFOOD,MAP_COLLIDERS,cityZone,floorHeight,isWalkable,motoFits,roadHeight,solidsBetween} from '@bar/shared';
 import {ROAD_EDGES,ROAD_NODES} from '@bar/shared/city-roads';
 import type {Collider} from '@bar/shared';
 import {REAL_STREETS,realStreet} from './street-names';
 
 const OUTPUT=fileURLToPath(new URL('../../packages/shared/src/gps-data.json',import.meta.url));
+const PICKUPS=fileURLToPath(new URL('../../apps/web/public/maps/cidade/pontos_ifood.json',import.meta.url));
 const CELL=3,MIN=-402,MAX=402,COUNT=Math.ceil((MAX-MIN)/CELL);
 /** Lower than this above the ground is the road's own surface; kerbs, pavements and yards start at 15 cm. */
 const ASPHALT_TOP=.08;
@@ -42,7 +43,7 @@ for(let z=0;z<COUNT;z++)for(let x=0;x<COUNT;x++){
 const main=new Uint8Array(COUNT*COUNT);
 let start=-1;
 for(let ring=0;ring<8&&start<0;ring++)for(let dz=-ring;dz<=ring&&start<0;dz++)for(let dx=-ring;dx<=ring;dx++){
-  const cell=at(Math.floor((-3.8-MIN)/CELL)+dx,Math.floor((-15.5-MIN)/CELL)+dz);
+  const cell=at(Math.floor((HIGHFOOD.BASE.x-MIN)/CELL)+dx,Math.floor((HIGHFOOD.BASE.z-MIN)/CELL)+dz);
   if(open[cell]&&asphalt[cell]){start=cell;break;}
 }
 if(start<0)throw new Error('A rua da base do Highfood não está na grade.');
@@ -149,6 +150,16 @@ for(let z=0;z<COUNT;z++)for(let x=0;x<COUNT;x++){
     spots.push([round(nx),round(ny),round(nz),round(Math.atan2(-dx,-dz),3),round(px),round(pz),streetIndex(street),number,placeIndex(place)]);
   }
 }
+// The pickup points: the screen faces the street, the courier stands in front of it and the bike stops at the kerb beyond.
+const pickups:number[][]=[];
+for(const {nome,pos_gltf:[x,y,z],frente_gltf:[frontX,,frontZ]} of JSON.parse(fs.readFileSync(PICKUPS,'utf8')).pontos as Array<{nome:string;pos_gltf:[number,number,number];frente_gltf:[number,number,number]}>){
+  let kerb:number|undefined;
+  for(let d=0;d<=12;d+=.25){const road=roadHeight(x+frontX*d,z+frontZ*d,0);if(road!==undefined&&road<ASPHALT_TOP){kerb=d;break;}}
+  if(kerb===undefined)throw new Error(`${nome}: a frente não dá para a rua.`);
+  const parkX=x+frontX*(kerb+1.5),parkZ=z+frontZ*(kerb+1.5),alongZ=frontX!==0;
+  if(!motoFits(parkX,parkZ,alongZ?0:Math.PI/2,0))throw new Error(`${nome}: a moto não cabe no meio-fio.`);
+  pickups.push([round(x),round(y),round(z),Math.round(frontX),Math.round(frontZ),round(parkX),round(parkZ),streetIndex(streetAt(parkX,parkZ,alongZ)),(Math.round(Math.abs(alongZ?z:x)/2)*2+10)+(frontX+frontZ>0?1:0)]);
+}
 // One label per named stretch: the middle of each long street of the graph, and of the original neighbourhood's grid.
 const labels:Array<[number,number,number,number]>=[];
 for(const {ax,az,bx,bz,name} of NAMED_EDGES){
@@ -172,7 +183,7 @@ for(const [key,name] of Object.entries(REAL_STREETS.Centro!)){
     }
   }
 }
-const output={cell:CELL,originX:MIN,originZ:MIN,columns:COUNT,rows:COUNT,grid,streets,places,spots,labels};
+const output={cell:CELL,originX:MIN,originZ:MIN,columns:COUNT,rows:COUNT,grid,streets,places,spots,pickups,labels};
 fs.writeFileSync(OUTPUT,`${JSON.stringify(output)}\n`);
 let road=0,edges=0,other=0;for(const kind of classes){if(kind===1)road++;if(kind===2)edges++;if(kind===3)other++;}
-console.log(`gps-data.json: ${(fs.statSync(OUTPUT).size/1024).toFixed(0)} KB · células ${road} meio da rua, ${edges} beira, ${other} calçada · ${spots.length} pontos de entrega · ${streets.length} ruas · ${labels.length} nomes no mapa`);
+console.log(`gps-data.json: ${(fs.statSync(OUTPUT).size/1024).toFixed(0)} KB · células ${road} meio da rua, ${edges} beira, ${other} calçada · ${spots.length} pontos de entrega · ${pickups.length} de retirada · ${streets.length} ruas · ${labels.length} nomes no mapa`);

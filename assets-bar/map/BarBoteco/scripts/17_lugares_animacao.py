@@ -15,6 +15,7 @@ DIR = r"C:\Users\rafael\BarBoteco\scripts"
 if DIR not in sys.path:
     sys.path.insert(0, DIR)
 import barlib as B
+import pollib as P
 
 T0, S1, INTB, MARC = "Interior_Terreo", "Interior_Superior", "Interativos_Bar", "Marcadores"
 ZP = B.Z_PISO
@@ -96,23 +97,28 @@ def malha_copo():
 def freezer():
     fz = next(o for o in bpy.data.objects if o.data is not None and o.data.name in ("P_Freezer", "P_Freezer_Bar")
               and (o.location.xy - Vector(FREEZER_XY)).length < 0.05)
-    me = bpy.data.meshes.get("P_Freezer_Bar")
-    if me is None:
-        m = B.Mesh("P_Freezer_Bar")
-        e = 0.045                                                  # parede
-        m.box((-0.60, -0.30, 0), (0.60, 0.30, 0.06), "Metal_Escuro", skip=('nz', 'pz'))
-        m.box((-0.65, -0.32, 0.06), (0.65, -0.32 + e, 0.775), "Plastico_Branco", skip=('nz',))
-        m.box((-0.65, 0.32 - e, 0.06), (0.65, 0.32, 0.775), "Plastico_Branco", skip=('nz',))
-        for x0 in (-0.65, 0.65 - e):
-            m.box((x0, -0.32 + e, 0.06), (x0 + e, 0.32 - e, 0.775), "Plastico_Branco", skip=('nz', 'ny', 'py'))
-        m.box((-0.65 + e, -0.32 + e, 0.06), (0.65 - e, 0.32 - e, 0.40), "Gelo_Freezer", skip=('nz', 'nx', 'px', 'ny', 'py'))
-        for (a, b_) in (((-0.65, -0.32), (0.65, -0.32 + e)), ((-0.65, 0.32 - e), (0.65, 0.32)),
-                        ((-0.65, -0.32 + e), (-0.65 + e, 0.32 - e)), ((0.65 - e, -0.32 + e), (0.65, 0.32 - e))):
-            m.box((a[0], a[1], 0.775), (b_[0], b_[1], 0.782), "Borracha_Preta", skip=('nz',))
-        for y0, y1 in ((-0.32 + e, -0.32 + e + 0.002), (0.32 - e - 0.002, 0.32 - e)):          # forro interno
-            m.box((-0.65 + e, y0, 0.40), (0.65 - e, y1, 0.775), "Freezer_Interno", skip=('nz', 'pz', 'nx', 'px'))
-        m.box((-0.40, -0.325, 0.30), (0.40, -0.32, 0.62), "Plastico_Vermelho", skip=('py',))
-        me = m.mesh()
+    # mesmo desenho do P_Freezer do 36_bar_polimento (cantos chanfrados, painel da marca, grelha), mas oco e sem a tampa
+    PB, BP, ME = "Plastico_Branco", "Borracha_Preta", "Metal_Escuro"
+    e = 0.045                                                      # parede
+    m = B.Mesh("P_Freezer_Bar")
+    P.caixa(m, (-0.65, -0.32, 0.06), (0.65, -0.32 + e, 0.775), PB, r=0.02, skip=('nz',))
+    P.caixa(m, (-0.65, 0.32 - e, 0.06), (0.65, 0.32, 0.775), PB, r=0.02, skip=('nz',))
+    for x0 in (-0.65, 0.65 - e):
+        P.caixa(m, (x0, -0.32 + e - 0.01, 0.06), (x0 + e, 0.32 - e + 0.01, 0.775), PB, r=0.02, skip=('nz',))
+    m.box((-0.65 + e, -0.32 + e, 0.06), (0.65 - e, 0.32 - e, 0.40), "Gelo_Freezer", skip=('nz', 'nx', 'px', 'ny', 'py'))
+    for y0, y1 in ((-0.32 + e, -0.32 + e + 0.002), (0.32 - e - 0.002, 0.32 - e)):              # forro interno
+        m.box((-0.65 + e, y0, 0.40), (0.65 - e, y1, 0.772), "Freezer_Interno", skip=('nz', 'pz', 'nx', 'px'))
+    for x0, x1 in ((-0.65 + e, -0.65 + e + 0.002), (0.65 - e - 0.002, 0.65 - e)):
+        m.box((x0, -0.32 + e, 0.40), (x1, 0.32 - e, 0.772), "Freezer_Interno", skip=('nz', 'pz', 'ny', 'py'))
+    for (a, b_) in (((-0.645, -0.322), (0.645, -0.32 + e)), ((-0.645, 0.32 - e), (0.645, 0.322)),     # borracha da borda
+                    ((-0.645, -0.32 + e), (-0.65 + e, 0.32 - e)), ((0.65 - e, -0.32 + e), (0.645, 0.32 - e))):
+        m.box((a[0], a[1], 0.772), (b_[0], b_[1], 0.78), BP, skip=('nz',))
+    P.caixa(m, (-0.45, -0.327, 0.28), (0.45, -0.318, 0.62), "Plastico_Vermelho", r=0.006)    # painel da marca
+    P.caixa(m, (-0.40, -0.329, 0.33), (0.40, -0.326, 0.57), "Plastico_Amarelo", r=0.0)
+    P.caixa(m, (-0.62, -0.29, 0.0), (0.62, 0.29, 0.06), ME, r=0.004, skip=('nz',))
+    for k in range(8):
+        m.box((0.66 - 0.002, -0.24 + k * 0.06, 0.10), (0.652, -0.22 + k * 0.06, 0.30), BP, skip=('nx',))
+    me = P.substituir("P_Freezer_Bar", m)
     fz.data = me
     # long-necks em pe no gelo (fileiras); fica um buraco na frente, a direita de quem abre: a que o magrao pega
     for o in list(bpy.data.objects):
@@ -130,13 +136,13 @@ def freezer():
             B.coll(T0).objects.link(o)
             k += 1
     # tampa: origem na dobradica (fundo do freezer, em cima); abre girando em -X local
-    mt = bpy.data.meshes.get("P_Freezer_Bar_Tampa")
-    if mt is None:
-        m = B.Mesh("P_Freezer_Bar_Tampa")
-        m.box((-0.65, -0.64, 0.0), (0.65, 0.0, 0.07), "Plastico_Branco", mats={'nz': "Freezer_Interno"})
-        m.box((-0.62, -0.61, -0.006), (0.62, -0.03, 0.0), "Borracha_Preta", skip=('pz',))
-        m.box((-0.25, -0.675, 0.004), (0.25, -0.64, 0.046), "Metal_Escuro", skip=('py',))
-        mt = m.mesh()
+    # mesma dobradica de antes (0; 0,32; 0,78 do freezer): a copia animada do bar_magrao.glb continua encaixando
+    m = B.Mesh("P_Freezer_Bar_Tampa")
+    P.caixa(m, (-0.655, -0.646, 0.002), (0.655, 0.006, 0.07), PB, r=0.025, mats={'nz': "Freezer_Interno"})
+    m.box((-0.62, -0.615, -0.004), (0.62, -0.025, 0.002), BP, skip=('pz',))                 # vedacao
+    m.box((-0.595, -0.59, -0.010), (0.595, -0.05, -0.004), "Freezer_Interno", skip=('pz',))   # forro interno
+    P.caixa(m, (-0.24, -0.678, 0.010), (0.24, -0.642, 0.045), ME, r=0.008)                   # puxador
+    mt = P.substituir("P_Freezer_Bar_Tampa", m)
     t = bpy.data.objects.new("Freezer_Bar_Tampa", mt)
     t.matrix_world = M @ Matrix.Translation((0.0, 0.32, 0.78))
     B.coll(INTB).objects.link(t)

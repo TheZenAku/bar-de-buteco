@@ -23,23 +23,23 @@
     "colisao": "cidade_S00_00_colisao.glb"
    },
    "kb": {
-    "visual": 359,
-    "lod": 140,
-    "colisao": 32
+    "visual": 339,
+    "lod": 141,
+    "colisao": 34
    },
-   "tris_estatico": 4406,
-   "tris_instancias": 5900,
+   "tris_estatico": 3994,
+   "tris_instancias": 30276,
    "instancias": 92,
    "malhas_instanciadas": 5,
-   "primitivas": 51,
-   "materiais": 45,
+   "primitivas": 43,
+   "materiais": 37,
    "tris_lod": {
     "S00_00_Edificios_LOD1": 314,
     "S00_00_Silhueta_LOD2": 230,
     "S00_00_Vegetacao_LOD2": 616,
     "S00_00_Chao_LOD2": 6
    },
-   "colisores": 143,
+   "colisores": 141,
    "vizinhos": [
     "S00_01",
     "S01_00",
@@ -60,23 +60,23 @@
     "colisao": "cidade_S00_01_colisao.glb"
    },
    "kb": {
-    "visual": 375,
+    "visual": 377,
     "lod": 117,
-    "colisao": 32
+    "colisao": 34
    },
-   "tris_estatico": 4310,
-   "tris_instancias": 6308,
+   "tris_estatico": 4132,
+   "tris_instancias": 19796,
    "instancias": 72,
    "malhas_instanciadas": 6,
-   "primitivas": 54,
-   "materiais": 44,
+   "primitivas": 48,
+   "materiais": 39,
    "tris_lod": {
     "S00_01_Edificios_LOD1": 378,
     "S00_01_Silhueta_LOD2": 280,
     "S00_01_Vegetacao_LOD2": 352,
     "S00_01_Chao_LOD2": 2
    },
-   "colisores": 130,
+   "colisores": 129,
    "vizinhos": [
     "S00_00",
     "S00_02",
@@ -99,23 +99,23 @@
     "colisao": "cidade_S00_02_colisao.glb"
    },
    "kb": {
-    "visual": 415,
-    "lod": 106,
-    "colisao": 29
+    "visual": 364,
+    "lod": 107,
+    "colisao": 30
    },
-   "tris_estatico": 5063,
-   "tris_instancias": 5656,
+   "tris_estatico": 3861,
+   "tris_instancias": 19480,
    "instancias": 61,
    "malhas_instanciadas": 6,
-   "primitivas": 49,
-   "materiais": 41,
+   "primitivas": 42,
+   "materiais": 34,
    "tris_lod": {
     "S00_02_Edificios_LOD1": 282,
     "S00_02_Silhueta_LOD2": 200,
     "S00_02_Vegetacao_LOD2": 368,
     "S00_02_Chao_LOD2": 5
    },
-   "colisores": 118,
+   "colisores": 115,
    "vizinhos": [
     "S00_01",
     "S00_03",
@@ -138,23 +138,23 @@
     "colisao": "cidade_S00_03_colisao.glb"
    },
    "kb": {
-    "visual": 376,
-    "lod": 92,
-    "colisao": 26
+    "visual": 380,
+    "lod": 93,
+    "colisao": 28
    },
-   "tris_estatico": 4694,
-   "tris_instancias": 5092,
+   "tris_estatico": 4528,
+   "tris_instancias": 18372,
    "instancias": 54,
    "malhas_instanciadas": 4,
-   "primitivas": 54,
-   "materiais": 46,
+   "primitivas": 50,
+   "materiais": 42,
    "tris_lod": {
     "S00_03_Edificios_LOD1": 164,
     "S00_03_Silhueta_LOD2": 120,
     "S00_03_Vegetacao_LOD2": 344,
     "S00_03_Chao_LOD2": 65
    },
-   "colisores": 109,
+   "colisores": 108,
    "vizinhos": [
     "S00_02",
     "S00_04",
@@ -177,12 +177,12 @@
     "colisao": "cidade_S00_04_colisao.glb"
    },
    "kb": {
-    "visual": 410,
-    "lod": 104,
-    "colisao": 27
+    "visual": 455,
+    "lod": 105,
+    "colisao": 29
    },
-   "tris_estatico": 4986,
-   "tris_instancias": 7372,
+   "tris_estatico": 5418,
+   "tris_instancias": 22284,
    "instancias": 63,
    "malhas_instanciadas": 5,
    "primitivas": 48,
@@ -216,16 +216,16 @@
     "colisao": "cidade_S00_05_colisao.glb"
    },
    "kb": {
-    "visual": 439,
-    "lod": 99,
-    "colisao": 28
+    "visual": 493,
+    "lod": 100,
+    "colisao": 30
    },
-   "tris_estatico": 5461,
-   "tris_instancias": 7216,
+   "tris_estatico": 6099,
+   "tris_instancias": 20680,
    "instancias": 62,
    "malhas_instanciadas": 5,
-   "primitivas": 51,
-   "materiais": 42,
+   "primitivas": 53,
+   "materiais": 43,
    "tris_lod": {
     "S00_05_Edificios_LOD1": 220,
     "S00_05_Silhueta_LOD2": 170,
@@ -255,23 +255,23 @@
     "colisao": "cidade_S00_06_colisao.glb"
    },
    "kb": {
-    "visual": 436,
+    "visual": 448,
     "lod": 99,
-    "colisao": 27
+    "colisao": 29
    },
-   "tris_estatico": 5742,
-   "tris_instancias": 5812,
+   "tris_estatico": 5848,
+   "tris_instancias": 20188,
    "instancias": 59,
    "malhas_instanciadas": 4,
-   "primitivas": 53,
-   "materiais": 45,
+   "primitivas": 46,
+   "materiais": 38,
    "tris_lod": {
     "S00_06_Edificios_LOD1": 194,
     "S00_06_Silhueta_LOD2": 150,
     "S00_06_Vegetacao_LOD2": 392,
     "S00_06_Chao_LOD2": 32
    },
-   "colisores": 113,
+   "colisores": 112,
    "vizinhos": [
     "S00_05",
     "S00_07",
@@ -294,23 +294,23 @@
     "colisao": "cidade_S00_07_colisao.glb"
    },
    "kb": {
-    "visual": 402,
-    "lod": 131,
-    "colisao": 33
+    "visual": 411,
+    "lod": 132,
+    "colisao": 36
    },
-   "tris_estatico": 4940,
-   "tris_instancias": 23684,
+   "tris_estatico": 4782,
+   "tris_instancias": 46824,
    "instancias": 114,
    "malhas_instanciadas": 5,
-   "primitivas": 45,
-   "materiais": 40,
+   "primitivas": 38,
+   "materiais": 32,
    "tris_lod": {
     "S00_07_Edificios_LOD1": 166,
     "S00_07_Silhueta_LOD2": 120,
     "S00_07_Vegetacao_LOD2": 792,
     "S00_07_Chao_LOD2": 24
    },
-   "colisores": 154,
+   "colisores": 153,
    "vizinhos": [
     "S00_06",
     "S01_06",
@@ -331,16 +331,16 @@
     "colisao": "cidade_S01_00_colisao.glb"
    },
    "kb": {
-    "visual": 354,
-    "lod": 121,
-    "colisao": 31
+    "visual": 396,
+    "lod": 122,
+    "colisao": 34
    },
-   "tris_estatico": 4461,
-   "tris_instancias": 4330,
+   "tris_estatico": 5021,
+   "tris_instancias": 17114,
    "instancias": 66,
    "malhas_instanciadas": 5,
-   "primitivas": 43,
-   "materiais": 37,
+   "primitivas": 42,
+   "materiais": 36,
    "tris_lod": {
     "S01_00_Edificios_LOD1": 408,
     "S01_00_Silhueta_LOD2": 290,
@@ -370,16 +370,16 @@
     "colisao": "cidade_S01_01_colisao.glb"
    },
    "kb": {
-    "visual": 454,
-    "lod": 100,
-    "colisao": 32
+    "visual": 709,
+    "lod": 101,
+    "colisao": 34
    },
-   "tris_estatico": 5984,
-   "tris_instancias": 5200,
+   "tris_estatico": 11742,
+   "tris_instancias": 6016,
    "instancias": 48,
    "malhas_instanciadas": 5,
-   "primitivas": 57,
-   "materiais": 45,
+   "primitivas": 59,
+   "materiais": 48,
    "tris_lod": {
     "S01_01_Edificios_LOD1": 416,
     "S01_01_Silhueta_LOD2": 310,
@@ -412,16 +412,16 @@
     "colisao": "cidade_S01_02_colisao.glb"
    },
    "kb": {
-    "visual": 355,
-    "lod": 74,
-    "colisao": 27
+    "visual": 381,
+    "lod": 75,
+    "colisao": 29
    },
-   "tris_estatico": 3855,
-   "tris_instancias": 8004,
+   "tris_estatico": 4143,
+   "tris_instancias": 10276,
    "instancias": 46,
    "malhas_instanciadas": 6,
    "primitivas": 53,
-   "materiais": 39,
+   "materiais": 38,
    "tris_lod": {
     "S01_02_Edificios_LOD1": 214,
     "S01_02_Silhueta_LOD2": 180,
@@ -454,16 +454,16 @@
     "colisao": "cidade_S01_03_colisao.glb"
    },
    "kb": {
-    "visual": 363,
-    "lod": 61,
-    "colisao": 24
+    "visual": 598,
+    "lod": 62,
+    "colisao": 26
    },
-   "tris_estatico": 3883,
-   "tris_instancias": 9820,
+   "tris_estatico": 8729,
+   "tris_instancias": 12892,
    "instancias": 45,
    "malhas_instanciadas": 5,
-   "primitivas": 51,
-   "materiais": 42,
+   "primitivas": 55,
+   "materiais": 46,
    "tris_lod": {
     "S01_03_Edificios_LOD1": 126,
     "S01_03_Silhueta_LOD2": 110,
@@ -496,23 +496,23 @@
     "colisao": "cidade_S01_04_colisao.glb"
    },
    "kb": {
-    "visual": 339,
-    "lod": 72,
-    "colisao": 21
+    "visual": 546,
+    "lod": 73,
+    "colisao": 22
    },
-   "tris_estatico": 3496,
-   "tris_instancias": 12908,
+   "tris_estatico": 7888,
+   "tris_instancias": 18188,
    "instancias": 54,
    "malhas_instanciadas": 5,
-   "primitivas": 45,
-   "materiais": 38,
+   "primitivas": 48,
+   "materiais": 41,
    "tris_lod": {
     "S01_04_Edificios_LOD1": 144,
     "S01_04_Silhueta_LOD2": 120,
     "S01_04_Vegetacao_LOD2": 248,
     "S01_04_Chao_LOD2": 30
    },
-   "colisores": 85,
+   "colisores": 84,
    "vizinhos": [
     "S00_03",
     "S00_04",
@@ -538,16 +538,16 @@
     "colisao": "cidade_S01_05_colisao.glb"
    },
    "kb": {
-    "visual": 317,
-    "lod": 51,
-    "colisao": 23
+    "visual": 554,
+    "lod": 52,
+    "colisao": 25
    },
-   "tris_estatico": 3061,
-   "tris_instancias": 16204,
+   "tris_estatico": 7979,
+   "tris_instancias": 22356,
    "instancias": 63,
    "malhas_instanciadas": 6,
-   "primitivas": 46,
-   "materiais": 33,
+   "primitivas": 49,
+   "materiais": 34,
    "tris_lod": {
     "S01_05_Edificios_LOD1": 24,
     "S01_05_Silhueta_LOD2": 20,
@@ -580,16 +580,16 @@
     "colisao": "cidade_S01_06_colisao.glb"
    },
    "kb": {
-    "visual": 391,
-    "lod": 60,
-    "colisao": 21
+    "visual": 625,
+    "lod": 61,
+    "colisao": 23
    },
-   "tris_estatico": 4026,
-   "tris_instancias": 8314,
+   "tris_estatico": 8868,
+   "tris_instancias": 11170,
    "instancias": 55,
    "malhas_instanciadas": 9,
-   "primitivas": 54,
-   "materiais": 40,
+   "primitivas": 57,
+   "materiais": 42,
    "tris_lod": {
     "S01_06_Edificios_LOD1": 142,
     "S01_06_Silhueta_LOD2": 110,
@@ -622,23 +622,23 @@
     "colisao": "cidade_S01_07_colisao.glb"
    },
    "kb": {
-    "visual": 414,
+    "visual": 408,
     "lod": 108,
-    "colisao": 28
+    "colisao": 30
    },
-   "tris_estatico": 5310,
-   "tris_instancias": 22408,
+   "tris_estatico": 5152,
+   "tris_instancias": 34840,
    "instancias": 89,
    "malhas_instanciadas": 4,
-   "primitivas": 40,
-   "materiais": 36,
+   "primitivas": 33,
+   "materiais": 28,
    "tris_lod": {
     "S01_07_Edificios_LOD1": 200,
     "S01_07_Silhueta_LOD2": 140,
     "S01_07_Vegetacao_LOD2": 544,
     "S01_07_Chao_LOD2": 24
    },
-   "colisores": 125,
+   "colisores": 124,
    "vizinhos": [
     "S00_06",
     "S00_07",
@@ -661,16 +661,16 @@
     "colisao": "cidade_S02_00_colisao.glb"
    },
    "kb": {
-    "visual": 356,
-    "lod": 124,
-    "colisao": 33
+    "visual": 401,
+    "lod": 125,
+    "colisao": 36
    },
-   "tris_estatico": 4014,
-   "tris_instancias": 6464,
+   "tris_estatico": 4446,
+   "tris_instancias": 20288,
    "instancias": 69,
    "malhas_instanciadas": 6,
    "primitivas": 52,
-   "materiais": 40,
+   "materiais": 39,
    "tris_lod": {
     "S02_00_Edificios_LOD1": 360,
     "S02_00_Silhueta_LOD2": 260,
@@ -700,23 +700,23 @@
     "colisao": "cidade_S02_01_colisao.glb"
    },
    "kb": {
-    "visual": 523,
-    "lod": 84,
-    "colisao": 28
+    "visual": 413,
+    "lod": 85,
+    "colisao": 29
    },
-   "tris_estatico": 7056,
-   "tris_instancias": 6016,
+   "tris_estatico": 5114,
+   "tris_instancias": 8224,
    "instancias": 32,
    "malhas_instanciadas": 4,
-   "primitivas": 55,
-   "materiais": 47,
+   "primitivas": 47,
+   "materiais": 38,
    "tris_lod": {
     "S02_01_Edificios_LOD1": 272,
     "S02_01_Silhueta_LOD2": 210,
     "S02_01_Vegetacao_LOD2": 112,
     "S02_01_Chao_LOD2": 86
    },
-   "colisores": 106,
+   "colisores": 101,
    "vizinhos": [
     "S01_00",
     "S01_01",
@@ -742,23 +742,23 @@
     "colisao": "cidade_S02_02_colisao.glb"
    },
    "kb": {
-    "visual": 350,
-    "lod": 75,
-    "colisao": 23
+    "visual": 556,
+    "lod": 76,
+    "colisao": 25
    },
-   "tris_estatico": 3458,
-   "tris_instancias": 11088,
+   "tris_estatico": 7850,
+   "tris_instancias": 14624,
    "instancias": 63,
    "malhas_instanciadas": 7,
-   "primitivas": 54,
-   "materiais": 45,
+   "primitivas": 56,
+   "materiais": 46,
    "tris_lod": {
     "S02_02_Edificios_LOD1": 180,
     "S02_02_Silhueta_LOD2": 160,
     "S02_02_Vegetacao_LOD2": 176,
     "S02_02_Chao_LOD2": 72
    },
-   "colisores": 97,
+   "colisores": 96,
    "vizinhos": [
     "S01_01",
     "S01_02",
@@ -784,16 +784,16 @@
     "colisao": "cidade_S02_03_colisao.glb"
    },
    "kb": {
-    "visual": 343,
+    "visual": 584,
     "lod": 58,
-    "colisao": 16
+    "colisao": 18
    },
-   "tris_estatico": 3895,
-   "tris_instancias": 4652,
+   "tris_estatico": 9029,
+   "tris_instancias": 6236,
    "instancias": 28,
    "malhas_instanciadas": 5,
-   "primitivas": 52,
-   "materiais": 42,
+   "primitivas": 56,
+   "materiais": 45,
    "tris_lod": {
     "S02_03_Edificios_LOD1": 106,
     "S02_03_Silhueta_LOD2": 90,
@@ -826,23 +826,23 @@
     "colisao": "cidade_S02_04_colisao.glb"
    },
    "kb": {
-    "visual": 297,
-    "lod": 44,
-    "colisao": 17
+    "visual": 585,
+    "lod": 45,
+    "colisao": 18
    },
-   "tris_estatico": 3958,
-   "tris_instancias": 3136,
+   "tris_estatico": 10248,
+   "tris_instancias": 4088,
    "instancias": 13,
    "malhas_instanciadas": 2,
-   "primitivas": 40,
-   "materiais": 33,
+   "primitivas": 48,
+   "materiais": 41,
    "tris_lod": {
     "S02_04_Edificios_LOD1": 54,
     "S02_04_Silhueta_LOD2": 40,
     "S02_04_Vegetacao_LOD2": 136,
     "S02_04_Chao_LOD2": 47
    },
-   "colisores": 68,
+   "colisores": 69,
    "vizinhos": [
     "S01_03",
     "S01_04",
@@ -868,23 +868,23 @@
     "colisao": "cidade_S02_05_colisao.glb"
    },
    "kb": {
-    "visual": 405,
-    "lod": 48,
+    "visual": 385,
+    "lod": 49,
     "colisao": 18
    },
-   "tris_estatico": 5176,
-   "tris_instancias": 6334,
+   "tris_estatico": 4946,
+   "tris_instancias": 8750,
    "instancias": 35,
    "malhas_instanciadas": 5,
-   "primitivas": 49,
-   "materiais": 38,
+   "primitivas": 43,
+   "materiais": 32,
    "tris_lod": {
     "S02_05_Edificios_LOD1": 90,
     "S02_05_Silhueta_LOD2": 90,
     "S02_05_Vegetacao_LOD2": 160,
     "S02_05_Chao_LOD2": 64
    },
-   "colisores": 72,
+   "colisores": 70,
    "vizinhos": [
     "S01_04",
     "S01_05",
@@ -910,23 +910,23 @@
     "colisao": "cidade_S02_06_colisao.glb"
    },
    "kb": {
-    "visual": 452,
+    "visual": 589,
     "lod": 75,
-    "colisao": 23
+    "colisao": 24
    },
-   "tris_estatico": 5434,
-   "tris_instancias": 13506,
+   "tris_estatico": 8718,
+   "tris_instancias": 18866,
    "instancias": 66,
    "malhas_instanciadas": 7,
-   "primitivas": 53,
-   "materiais": 42,
+   "primitivas": 54,
+   "materiais": 43,
    "tris_lod": {
     "S02_06_Edificios_LOD1": 150,
     "S02_06_Silhueta_LOD2": 150,
     "S02_06_Vegetacao_LOD2": 264,
     "S02_06_Chao_LOD2": 41
    },
-   "colisores": 95,
+   "colisores": 91,
    "vizinhos": [
     "S01_05",
     "S01_06",
@@ -952,23 +952,23 @@
     "colisao": "cidade_S02_07_colisao.glb"
    },
    "kb": {
-    "visual": 354,
-    "lod": 116,
-    "colisao": 28
+    "visual": 350,
+    "lod": 117,
+    "colisao": 31
    },
-   "tris_estatico": 3860,
-   "tris_instancias": 28748,
+   "tris_estatico": 3640,
+   "tris_instancias": 44744,
    "instancias": 101,
    "malhas_instanciadas": 5,
-   "primitivas": 47,
-   "materiais": 42,
+   "primitivas": 42,
+   "materiais": 36,
    "tris_lod": {
     "S02_07_Edificios_LOD1": 124,
     "S02_07_Silhueta_LOD2": 90,
     "S02_07_Vegetacao_LOD2": 688,
     "S02_07_Chao_LOD2": 49
    },
-   "colisores": 131,
+   "colisores": 130,
    "vizinhos": [
     "S01_06",
     "S01_07",
@@ -991,23 +991,23 @@
     "colisao": "cidade_S03_00_colisao.glb"
    },
    "kb": {
-    "visual": 461,
-    "lod": 114,
-    "colisao": 32
+    "visual": 363,
+    "lod": 115,
+    "colisao": 34
    },
-   "tris_estatico": 5410,
-   "tris_instancias": 6884,
+   "tris_estatico": 3402,
+   "tris_instancias": 20164,
    "instancias": 71,
    "malhas_instanciadas": 7,
-   "primitivas": 63,
-   "materiais": 51,
+   "primitivas": 55,
+   "materiais": 44,
    "tris_lod": {
     "S03_00_Edificios_LOD1": 340,
     "S03_00_Silhueta_LOD2": 250,
     "S03_00_Vegetacao_LOD2": 352,
     "S03_00_Chao_LOD2": 28
    },
-   "colisores": 136,
+   "colisores": 131,
    "vizinhos": [
     "S02_00",
     "S02_01",
@@ -1030,16 +1030,16 @@
     "colisao": "cidade_S03_01_colisao.glb"
    },
    "kb": {
-    "visual": 391,
-    "lod": 82,
-    "colisao": 29
+    "visual": 632,
+    "lod": 83,
+    "colisao": 31
    },
-   "tris_estatico": 3871,
-   "tris_instancias": 14110,
+   "tris_estatico": 8947,
+   "tris_instancias": 19334,
    "instancias": 68,
    "malhas_instanciadas": 8,
-   "primitivas": 65,
-   "materiais": 49,
+   "primitivas": 69,
+   "materiais": 53,
    "tris_lod": {
     "S03_01_Edificios_LOD1": 154,
     "S03_01_Silhueta_LOD2": 130,
@@ -1072,23 +1072,23 @@
     "colisao": "cidade_S03_02_colisao.glb"
    },
    "kb": {
-    "visual": 357,
+    "visual": 351,
     "lod": 54,
-    "colisao": 22
+    "colisao": 24
    },
-   "tris_estatico": 4048,
-   "tris_instancias": 9156,
+   "tris_estatico": 3972,
+   "tris_instancias": 12180,
    "instancias": 51,
    "malhas_instanciadas": 6,
-   "primitivas": 52,
-   "materiais": 41,
+   "primitivas": 48,
+   "materiais": 36,
    "tris_lod": {
     "S03_02_Edificios_LOD1": 84,
     "S03_02_Silhueta_LOD2": 80,
     "S03_02_Vegetacao_LOD2": 152,
     "S03_02_Chao_LOD2": 61
    },
-   "colisores": 92,
+   "colisores": 91,
    "vizinhos": [
     "S02_01",
     "S02_02",
@@ -1155,7 +1155,7 @@
    },
    "kb": {
     "visual": 34,
-    "lod": 43,
+    "lod": 44,
     "colisao": 1
    },
    "tris_estatico": 330,
@@ -1194,23 +1194,23 @@
     "colisao": "cidade_S03_05_colisao.glb"
    },
    "kb": {
-    "visual": 360,
-    "lod": 54,
-    "colisao": 14
+    "visual": 347,
+    "lod": 55,
+    "colisao": 15
    },
-   "tris_estatico": 4546,
-   "tris_instancias": 3174,
+   "tris_estatico": 4760,
+   "tris_instancias": 4006,
    "instancias": 30,
    "malhas_instanciadas": 5,
-   "primitivas": 52,
-   "materiais": 41,
+   "primitivas": 46,
+   "materiais": 36,
    "tris_lod": {
     "S03_05_Edificios_LOD1": 100,
     "S03_05_Silhueta_LOD2": 100,
     "S03_05_Vegetacao_LOD2": 136,
     "S03_05_Chao_LOD2": 54
    },
-   "colisores": 59,
+   "colisores": 57,
    "vizinhos": [
     "S02_04",
     "S02_05",
@@ -1236,23 +1236,23 @@
     "colisao": "cidade_S03_06_colisao.glb"
    },
    "kb": {
-    "visual": 585,
+    "visual": 426,
     "lod": 82,
     "colisao": 26
    },
-   "tris_estatico": 7152,
-   "tris_instancias": 15262,
+   "tris_estatico": 4014,
+   "tris_instancias": 21726,
    "instancias": 90,
    "malhas_instanciadas": 9,
-   "primitivas": 61,
-   "materiais": 45,
+   "primitivas": 54,
+   "materiais": 39,
    "tris_lod": {
     "S03_06_Edificios_LOD1": 190,
     "S03_06_Silhueta_LOD2": 190,
     "S03_06_Vegetacao_LOD2": 256,
     "S03_06_Chao_LOD2": 38
    },
-   "colisores": 109,
+   "colisores": 102,
    "vizinhos": [
     "S02_05",
     "S02_06",
@@ -1278,23 +1278,23 @@
     "colisao": "cidade_S03_07_colisao.glb"
    },
    "kb": {
-    "visual": 339,
-    "lod": 121,
-    "colisao": 30
+    "visual": 326,
+    "lod": 122,
+    "colisao": 33
    },
-   "tris_estatico": 3536,
-   "tris_instancias": 31464,
+   "tris_estatico": 3090,
+   "tris_instancias": 47888,
    "instancias": 117,
    "malhas_instanciadas": 5,
-   "primitivas": 48,
-   "materiais": 41,
+   "primitivas": 41,
+   "materiais": 33,
    "tris_lod": {
     "S03_07_Edificios_LOD1": 134,
     "S03_07_Silhueta_LOD2": 110,
     "S03_07_Vegetacao_LOD2": 744,
     "S03_07_Chao_LOD2": 29
    },
-   "colisores": 139,
+   "colisores": 138,
    "vizinhos": [
     "S02_06",
     "S02_07",
@@ -1317,23 +1317,23 @@
     "colisao": "cidade_S04_00_colisao.glb"
    },
    "kb": {
-    "visual": 335,
-    "lod": 117,
-    "colisao": 32
+    "visual": 327,
+    "lod": 118,
+    "colisao": 35
    },
-   "tris_estatico": 3509,
-   "tris_instancias": 6718,
+   "tris_estatico": 3059,
+   "tris_instancias": 21094,
    "instancias": 81,
    "malhas_instanciadas": 6,
-   "primitivas": 54,
-   "materiais": 44,
+   "primitivas": 48,
+   "materiais": 39,
    "tris_lod": {
     "S04_00_Edificios_LOD1": 356,
     "S04_00_Silhueta_LOD2": 260,
     "S04_00_Vegetacao_LOD2": 360,
     "S04_00_Chao_LOD2": 28
    },
-   "colisores": 138,
+   "colisores": 137,
    "vizinhos": [
     "S03_00",
     "S03_01",
@@ -1356,16 +1356,16 @@
     "colisao": "cidade_S04_01_colisao.glb"
    },
    "kb": {
-    "visual": 386,
-    "lod": 73,
-    "colisao": 27
+    "visual": 404,
+    "lod": 74,
+    "colisao": 29
    },
-   "tris_estatico": 4475,
-   "tris_instancias": 6672,
+   "tris_estatico": 4619,
+   "tris_instancias": 8392,
    "instancias": 35,
    "malhas_instanciadas": 5,
    "primitivas": 52,
-   "materiais": 39,
+   "materiais": 38,
    "tris_lod": {
     "S04_01_Edificios_LOD1": 212,
     "S04_01_Silhueta_LOD2": 160,
@@ -1398,16 +1398,16 @@
     "colisao": "cidade_S04_02_colisao.glb"
    },
    "kb": {
-    "visual": 410,
-    "lod": 59,
-    "colisao": 24
+    "visual": 655,
+    "lod": 60,
+    "colisao": 26
    },
-   "tris_estatico": 5372,
-   "tris_instancias": 6124,
+   "tris_estatico": 10774,
+   "tris_instancias": 7788,
    "instancias": 44,
    "malhas_instanciadas": 5,
-   "primitivas": 54,
-   "materiais": 43,
+   "primitivas": 57,
+   "materiais": 46,
    "tris_lod": {
     "S04_02_Edificios_LOD1": 130,
     "S04_02_Silhueta_LOD2": 110,
@@ -1441,7 +1441,7 @@
    },
    "kb": {
     "visual": 25,
-    "lod": 47,
+    "lod": 48,
     "colisao": 1
    },
    "tris_estatico": 220,
@@ -1520,23 +1520,23 @@
     "colisao": "cidade_S04_05_colisao.glb"
    },
    "kb": {
-    "visual": 381,
-    "lod": 50,
-    "colisao": 18
+    "visual": 624,
+    "lod": 51,
+    "colisao": 19
    },
-   "tris_estatico": 4673,
-   "tris_instancias": 5782,
+   "tris_estatico": 10387,
+   "tris_instancias": 7454,
    "instancias": 32,
    "malhas_instanciadas": 5,
-   "primitivas": 53,
-   "materiais": 42,
+   "primitivas": 56,
+   "materiais": 44,
    "tris_lod": {
     "S04_05_Edificios_LOD1": 60,
     "S04_05_Silhueta_LOD2": 60,
     "S04_05_Vegetacao_LOD2": 216,
     "S04_05_Chao_LOD2": 54
    },
-   "colisores": 80,
+   "colisores": 79,
    "vizinhos": [
     "S03_04",
     "S03_05",
@@ -1562,23 +1562,23 @@
     "colisao": "cidade_S04_06_colisao.glb"
    },
    "kb": {
-    "visual": 695,
+    "visual": 717,
     "lod": 82,
-    "colisao": 25
+    "colisao": 24
    },
-   "tris_estatico": 9579,
-   "tris_instancias": 9566,
+   "tris_estatico": 11221,
+   "tris_instancias": 12246,
    "instancias": 75,
    "malhas_instanciadas": 7,
-   "primitivas": 63,
-   "materiais": 49,
+   "primitivas": 65,
+   "materiais": 50,
    "tris_lod": {
     "S04_06_Edificios_LOD1": 260,
     "S04_06_Silhueta_LOD2": 240,
     "S04_06_Vegetacao_LOD2": 136,
     "S04_06_Chao_LOD2": 38
    },
-   "colisores": 104,
+   "colisores": 95,
    "vizinhos": [
     "S03_05",
     "S03_06",
@@ -1604,16 +1604,16 @@
     "colisao": "cidade_S04_07_colisao.glb"
    },
    "kb": {
-    "visual": 334,
-    "lod": 104,
-    "colisao": 24
+    "visual": 355,
+    "lod": 105,
+    "colisao": 26
    },
-   "tris_estatico": 4034,
-   "tris_instancias": 20748,
+   "tris_estatico": 4178,
+   "tris_instancias": 32320,
    "instancias": 83,
    "malhas_instanciadas": 4,
    "primitivas": 36,
-   "materiais": 32,
+   "materiais": 31,
    "tris_lod": {
     "S04_07_Edificios_LOD1": 180,
     "S04_07_Silhueta_LOD2": 130,
@@ -1644,22 +1644,22 @@
    },
    "kb": {
     "visual": 352,
-    "lod": 110,
-    "colisao": 28
+    "lod": 111,
+    "colisao": 30
    },
-   "tris_estatico": 3869,
-   "tris_instancias": 6186,
+   "tris_estatico": 3567,
+   "tris_instancias": 19802,
    "instancias": 72,
    "malhas_instanciadas": 6,
-   "primitivas": 55,
-   "materiais": 46,
+   "primitivas": 48,
+   "materiais": 39,
    "tris_lod": {
     "S05_00_Edificios_LOD1": 266,
     "S05_00_Silhueta_LOD2": 220,
     "S05_00_Vegetacao_LOD2": 360,
     "S05_00_Chao_LOD2": 24
    },
-   "colisores": 120,
+   "colisores": 119,
    "vizinhos": [
     "S04_00",
     "S04_01",
@@ -1682,16 +1682,16 @@
     "colisao": "cidade_S05_01_colisao.glb"
    },
    "kb": {
-    "visual": 368,
-    "lod": 86,
-    "colisao": 24
+    "visual": 612,
+    "lod": 87,
+    "colisao": 26
    },
-   "tris_estatico": 4569,
-   "tris_instancias": 4652,
+   "tris_estatico": 9967,
+   "tris_instancias": 6316,
    "instancias": 35,
    "malhas_instanciadas": 5,
-   "primitivas": 56,
-   "materiais": 45,
+   "primitivas": 58,
+   "materiais": 48,
    "tris_lod": {
     "S05_01_Edificios_LOD1": 298,
     "S05_01_Silhueta_LOD2": 230,
@@ -1724,23 +1724,23 @@
     "colisao": "cidade_S05_02_colisao.glb"
    },
    "kb": {
-    "visual": 417,
-    "lod": 54,
+    "visual": 333,
+    "lod": 55,
     "colisao": 22
    },
-   "tris_estatico": 4687,
-   "tris_instancias": 9152,
+   "tris_estatico": 3125,
+   "tris_instancias": 12352,
    "instancias": 48,
    "malhas_instanciadas": 7,
-   "primitivas": 56,
-   "materiais": 44,
+   "primitivas": 50,
+   "materiais": 37,
    "tris_lod": {
     "S05_02_Edificios_LOD1": 72,
     "S05_02_Silhueta_LOD2": 60,
     "S05_02_Vegetacao_LOD2": 168,
     "S05_02_Chao_LOD2": 71
    },
-   "colisores": 90,
+   "colisores": 86,
    "vizinhos": [
     "S04_01",
     "S04_02",
@@ -1766,11 +1766,11 @@
     "colisao": "cidade_S05_03_colisao.glb"
    },
    "kb": {
-    "visual": 223,
+    "visual": 261,
     "lod": 25,
     "colisao": 7
    },
-   "tris_estatico": 3230,
+   "tris_estatico": 4300,
    "tris_instancias": 560,
    "instancias": 4,
    "malhas_instanciadas": 1,
@@ -1806,12 +1806,12 @@
     "colisao": "cidade_S05_04_colisao.glb"
    },
    "kb": {
-    "visual": 163,
-    "lod": 23,
-    "colisao": 8
+    "visual": 177,
+    "lod": 24,
+    "colisao": 9
    },
-   "tris_estatico": 1733,
-   "tris_instancias": 1872,
+   "tris_estatico": 1869,
+   "tris_instancias": 2704,
    "instancias": 8,
    "malhas_instanciadas": 2,
    "primitivas": 30,
@@ -1846,15 +1846,15 @@
     "colisao": "cidade_S05_05_colisao.glb"
    },
    "kb": {
-    "visual": 291,
+    "visual": 322,
     "lod": 51,
-    "colisao": 14
+    "colisao": 15
    },
-   "tris_estatico": 3067,
-   "tris_instancias": 5756,
+   "tris_estatico": 3671,
+   "tris_instancias": 7820,
    "instancias": 36,
    "malhas_instanciadas": 6,
-   "primitivas": 44,
+   "primitivas": 45,
    "materiais": 33,
    "tris_lod": {
     "S05_05_Edificios_LOD1": 80,
@@ -1888,15 +1888,15 @@
     "colisao": "cidade_S05_06_colisao.glb"
    },
    "kb": {
-    "visual": 530,
-    "lod": 75,
-    "colisao": 22
+    "visual": 687,
+    "lod": 76,
+    "colisao": 23
    },
-   "tris_estatico": 6969,
-   "tris_instancias": 9894,
+   "tris_estatico": 11009,
+   "tris_instancias": 13198,
    "instancias": 69,
    "malhas_instanciadas": 6,
-   "primitivas": 60,
+   "primitivas": 61,
    "materiais": 48,
    "tris_lod": {
     "S05_06_Edificios_LOD1": 182,
@@ -1904,7 +1904,7 @@
     "S05_06_Vegetacao_LOD2": 168,
     "S05_06_Chao_LOD2": 38
    },
-   "colisores": 92,
+   "colisores": 88,
    "vizinhos": [
     "S04_05",
     "S04_06",
@@ -1930,16 +1930,16 @@
     "colisao": "cidade_S05_07_colisao.glb"
    },
    "kb": {
-    "visual": 372,
-    "lod": 107,
-    "colisao": 28
+    "visual": 606,
+    "lod": 108,
+    "colisao": 30
    },
-   "tris_estatico": 3935,
-   "tris_instancias": 24192,
+   "tris_estatico": 8781,
+   "tris_instancias": 37136,
    "instancias": 93,
    "malhas_instanciadas": 6,
-   "primitivas": 49,
-   "materiais": 39,
+   "primitivas": 51,
+   "materiais": 40,
    "tris_lod": {
     "S05_07_Edificios_LOD1": 172,
     "S05_07_Silhueta_LOD2": 130,
@@ -1969,16 +1969,16 @@
     "colisao": "cidade_S06_00_colisao.glb"
    },
    "kb": {
-    "visual": 172,
-    "lod": 66,
-    "colisao": 22
+    "visual": 207,
+    "lod": 67,
+    "colisao": 24
    },
-   "tris_estatico": 1725,
-   "tris_instancias": 4680,
+   "tris_estatico": 2163,
+   "tris_instancias": 17736,
    "instancias": 48,
    "malhas_instanciadas": 3,
-   "primitivas": 32,
-   "materiais": 24,
+   "primitivas": 33,
+   "materiais": 25,
    "tris_lod": {
     "S06_00_Edificios_LOD1": 78,
     "S06_00_Silhueta_LOD2": 60,
@@ -2008,16 +2008,16 @@
     "colisao": "cidade_S06_01_colisao.glb"
    },
    "kb": {
-    "visual": 184,
-    "lod": 37,
-    "colisao": 14
+    "visual": 210,
+    "lod": 38,
+    "colisao": 15
    },
-   "tris_estatico": 1821,
-   "tris_instancias": 3980,
+   "tris_estatico": 2237,
+   "tris_instancias": 5372,
    "instancias": 15,
    "malhas_instanciadas": 3,
    "primitivas": 30,
-   "materiais": 25,
+   "materiais": 24,
    "tris_lod": {
     "S06_01_Edificios_LOD1": 52,
     "S06_01_Silhueta_LOD2": 40,
@@ -2050,23 +2050,23 @@
     "colisao": "cidade_S06_02_colisao.glb"
    },
    "kb": {
-    "visual": 179,
+    "visual": 443,
     "lod": 46,
-    "colisao": 17
+    "colisao": 19
    },
-   "tris_estatico": 1307,
-   "tris_instancias": 10160,
+   "tris_estatico": 6599,
+   "tris_instancias": 14200,
    "instancias": 39,
    "malhas_instanciadas": 4,
-   "primitivas": 28,
-   "materiais": 23,
+   "primitivas": 37,
+   "materiais": 31,
    "tris_lod": {
     "S06_02_Edificios_LOD1": 52,
     "S06_02_Silhueta_LOD2": 40,
     "S06_02_Vegetacao_LOD2": 200,
     "S06_02_Chao_LOD2": 21
    },
-   "colisores": 75,
+   "colisores": 76,
    "vizinhos": [
     "S05_01",
     "S05_02",
@@ -2092,16 +2092,16 @@
     "colisao": "cidade_S06_03_colisao.glb"
    },
    "kb": {
-    "visual": 284,
-    "lod": 47,
-    "colisao": 20
+    "visual": 535,
+    "lod": 48,
+    "colisao": 22
    },
-   "tris_estatico": 3758,
-   "tris_instancias": 2668,
+   "tris_estatico": 9398,
+   "tris_instancias": 3916,
    "instancias": 11,
    "malhas_instanciadas": 2,
-   "primitivas": 40,
-   "materiais": 33,
+   "primitivas": 43,
+   "materiais": 36,
    "tris_lod": {
     "S06_03_Edificios_LOD1": 104,
     "S06_03_Silhueta_LOD2": 80,
@@ -2134,23 +2134,23 @@
     "colisao": "cidade_S06_04_colisao.glb"
    },
    "kb": {
-    "visual": 198,
+    "visual": 165,
     "lod": 27,
-    "colisao": 13
+    "colisao": 12
    },
-   "tris_estatico": 1712,
-   "tris_instancias": 5080,
-   "instancias": 21,
-   "malhas_instanciadas": 4,
-   "primitivas": 36,
-   "materiais": 27,
+   "tris_estatico": 1262,
+   "tris_instancias": 5912,
+   "instancias": 16,
+   "malhas_instanciadas": 3,
+   "primitivas": 27,
+   "materiais": 20,
    "tris_lod": {
     "S06_04_Edificios_LOD1": 26,
     "S06_04_Silhueta_LOD2": 20,
     "S06_04_Vegetacao_LOD2": 80,
     "S06_04_Chao_LOD2": 22
    },
-   "colisores": 51,
+   "colisores": 45,
    "vizinhos": [
     "S05_03",
     "S05_04",
@@ -2176,22 +2176,22 @@
     "colisao": "cidade_S06_05_colisao.glb"
    },
    "kb": {
-    "visual": 236,
+    "visual": 202,
     "lod": 16,
     "colisao": 8
    },
-   "tris_estatico": 3064,
-   "tris_instancias": 2952,
+   "tris_estatico": 2452,
+   "tris_instancias": 4464,
    "instancias": 9,
    "malhas_instanciadas": 2,
-   "primitivas": 28,
-   "materiais": 25,
+   "primitivas": 22,
+   "materiais": 18,
    "tris_lod": {
     "S06_05_Edificios_LOD1": 2,
     "S06_05_Vegetacao_LOD2": 88,
     "S06_05_Chao_LOD2": 2
    },
-   "colisores": 31,
+   "colisores": 29,
    "vizinhos": [
     "S05_04",
     "S05_05",
@@ -2217,15 +2217,15 @@
     "colisao": "cidade_S06_06_colisao.glb"
    },
    "kb": {
-    "visual": 174,
+    "visual": 204,
     "lod": 32,
-    "colisao": 12
+    "colisao": 13
    },
-   "tris_estatico": 1573,
-   "tris_instancias": 4964,
+   "tris_estatico": 2177,
+   "tris_instancias": 7164,
    "instancias": 18,
    "malhas_instanciadas": 3,
-   "primitivas": 31,
+   "primitivas": 32,
    "materiais": 26,
    "tris_lod": {
     "S06_06_Edificios_LOD1": 28,
@@ -2259,23 +2259,23 @@
     "colisao": "cidade_S06_07_colisao.glb"
    },
    "kb": {
-    "visual": 228,
+    "visual": 213,
     "lod": 74,
-    "colisao": 27
+    "colisao": 29
    },
-   "tris_estatico": 2281,
-   "tris_instancias": 20304,
+   "tris_estatico": 1835,
+   "tris_instancias": 31720,
    "instancias": 86,
    "malhas_instanciadas": 4,
-   "primitivas": 33,
-   "materiais": 29,
+   "primitivas": 27,
+   "materiais": 22,
    "tris_lod": {
     "S06_07_Edificios_LOD1": 80,
     "S06_07_Silhueta_LOD2": 60,
     "S06_07_Vegetacao_LOD2": 464,
     "S06_07_Chao_LOD2": 22
    },
-   "colisores": 125,
+   "colisores": 124,
    "vizinhos": [
     "S05_06",
     "S05_07",
@@ -2298,12 +2298,12 @@
     "colisao": "cidade_S07_00_colisao.glb"
    },
    "kb": {
-    "visual": 289,
+    "visual": 338,
     "lod": 62,
-    "colisao": 22
+    "colisao": 24
    },
-   "tris_estatico": 4100,
-   "tris_instancias": 2484,
+   "tris_estatico": 4996,
+   "tris_instancias": 15064,
    "instancias": 41,
    "malhas_instanciadas": 2,
    "primitivas": 31,
@@ -2335,23 +2335,23 @@
     "colisao": "cidade_S07_01_colisao.glb"
    },
    "kb": {
-    "visual": 246,
+    "visual": 457,
     "lod": 37,
-    "colisao": 16
+    "colisao": 17
    },
-   "tris_estatico": 2613,
-   "tris_instancias": 3652,
+   "tris_estatico": 7243,
+   "tris_instancias": 5164,
    "instancias": 14,
    "malhas_instanciadas": 3,
-   "primitivas": 38,
-   "materiais": 31,
+   "primitivas": 41,
+   "materiais": 34,
    "tris_lod": {
     "S07_01_Edificios_LOD1": 78,
     "S07_01_Silhueta_LOD2": 60,
     "S07_01_Vegetacao_LOD2": 72,
     "S07_01_Chao_LOD2": 20
    },
-   "colisores": 67,
+   "colisores": 66,
    "vizinhos": [
     "S06_00",
     "S06_01",
@@ -2374,23 +2374,23 @@
     "colisao": "cidade_S07_02_colisao.glb"
    },
    "kb": {
-    "visual": 263,
-    "lod": 37,
-    "colisao": 16
+    "visual": 248,
+    "lod": 38,
+    "colisao": 17
    },
-   "tris_estatico": 2801,
-   "tris_instancias": 6224,
+   "tris_estatico": 2491,
+   "tris_instancias": 8672,
    "instancias": 27,
    "malhas_instanciadas": 3,
-   "primitivas": 38,
-   "materiais": 33,
+   "primitivas": 32,
+   "materiais": 26,
    "tris_lod": {
     "S07_02_Edificios_LOD1": 52,
     "S07_02_Silhueta_LOD2": 40,
     "S07_02_Vegetacao_LOD2": 112,
     "S07_02_Chao_LOD2": 22
    },
-   "colisores": 72,
+   "colisores": 71,
    "vizinhos": [
     "S06_01",
     "S06_02",
@@ -2413,23 +2413,23 @@
     "colisao": "cidade_S07_03_colisao.glb"
    },
    "kb": {
-    "visual": 359,
-    "lod": 42,
-    "colisao": 20
+    "visual": 585,
+    "lod": 43,
+    "colisao": 21
    },
-   "tris_estatico": 4849,
-   "tris_instancias": 2152,
+   "tris_estatico": 10031,
+   "tris_instancias": 2984,
    "instancias": 10,
    "malhas_instanciadas": 2,
-   "primitivas": 41,
-   "materiais": 37,
+   "primitivas": 43,
+   "materiais": 39,
    "tris_lod": {
     "S07_03_Edificios_LOD1": 78,
     "S07_03_Silhueta_LOD2": 60,
     "S07_03_Vegetacao_LOD2": 64,
     "S07_03_Chao_LOD2": 42
    },
-   "colisores": 78,
+   "colisores": 77,
    "vizinhos": [
     "S06_02",
     "S06_03",
@@ -2452,23 +2452,23 @@
     "colisao": "cidade_S07_04_colisao.glb"
    },
    "kb": {
-    "visual": 305,
-    "lod": 31,
-    "colisao": 15
+    "visual": 519,
+    "lod": 32,
+    "colisao": 16
    },
-   "tris_estatico": 4027,
-   "tris_instancias": 2292,
+   "tris_estatico": 8907,
+   "tris_instancias": 2868,
    "instancias": 11,
    "malhas_instanciadas": 2,
-   "primitivas": 38,
-   "materiais": 32,
+   "primitivas": 40,
+   "materiais": 33,
    "tris_lod": {
     "S07_04_Edificios_LOD1": 52,
     "S07_04_Silhueta_LOD2": 40,
     "S07_04_Vegetacao_LOD2": 56,
     "S07_04_Chao_LOD2": 22
    },
-   "colisores": 59,
+   "colisores": 58,
    "vizinhos": [
     "S06_03",
     "S06_04",
@@ -2491,23 +2491,23 @@
     "colisao": "cidade_S07_05_colisao.glb"
    },
    "kb": {
-    "visual": 198,
+    "visual": 155,
     "lod": 26,
     "colisao": 11
    },
-   "tris_estatico": 1943,
-   "tris_instancias": 3840,
+   "tris_estatico": 1051,
+   "tris_instancias": 5488,
    "instancias": 14,
    "malhas_instanciadas": 3,
-   "primitivas": 33,
-   "materiais": 28,
+   "primitivas": 27,
+   "materiais": 22,
    "tris_lod": {
     "S07_05_Edificios_LOD1": 28,
     "S07_05_Silhueta_LOD2": 20,
     "S07_05_Vegetacao_LOD2": 80,
     "S07_05_Chao_LOD2": 2
    },
-   "colisores": 44,
+   "colisores": 42,
    "vizinhos": [
     "S06_04",
     "S06_05",
@@ -2530,23 +2530,23 @@
     "colisao": "cidade_S07_06_colisao.glb"
    },
    "kb": {
-    "visual": 337,
-    "lod": 33,
-    "colisao": 15
+    "visual": 528,
+    "lod": 34,
+    "colisao": 16
    },
-   "tris_estatico": 4263,
-   "tris_instancias": 2952,
+   "tris_estatico": 8673,
+   "tris_instancias": 4536,
    "instancias": 9,
    "malhas_instanciadas": 2,
-   "primitivas": 35,
-   "materiais": 33,
+   "primitivas": 38,
+   "materiais": 36,
    "tris_lod": {
     "S07_06_Edificios_LOD1": 52,
     "S07_06_Silhueta_LOD2": 40,
     "S07_06_Vegetacao_LOD2": 72,
     "S07_06_Chao_LOD2": 22
    },
-   "colisores": 62,
+   "colisores": 60,
    "vizinhos": [
     "S06_05",
     "S06_06",
@@ -2569,16 +2569,16 @@
     "colisao": "cidade_S07_07_colisao.glb"
    },
    "kb": {
-    "visual": 324,
-    "lod": 82,
-    "colisao": 27
+    "visual": 393,
+    "lod": 83,
+    "colisao": 29
    },
-   "tris_estatico": 4146,
-   "tris_instancias": 19056,
+   "tris_estatico": 5454,
+   "tris_instancias": 30408,
    "instancias": 75,
    "malhas_instanciadas": 3,
    "primitivas": 29,
-   "materiais": 26,
+   "materiais": 24,
    "tris_lod": {
     "S07_07_Edificios_LOD1": 64,
     "S07_07_Silhueta_LOD2": 50,
@@ -2593,14 +2593,14 @@
    ]
   }
  },
- "texturas_kb": 2276,
- "texturas_arquivos": 18,
  "cidade_anel.gltf": {
-  "kb": 2371,
+  "kb": 2373,
   "tris": 38510
  },
  "cidade_distante.gltf": {
-  "kb": 160,
+  "kb": 161,
   "tris": 4558
- }
+ },
+ "texturas_kb": 6374,
+ "texturas_arquivos": 42
 }

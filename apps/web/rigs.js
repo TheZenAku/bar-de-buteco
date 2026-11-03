@@ -3,8 +3,8 @@ import {readClip,readSource,readTarget,convert,boneName} from '/src/engine/mixam
 import {BAR_ANIMATIONS} from '../../packages/shared/src/index.ts';
 import {completeBasePose} from '/src/engine/animation-tracks.ts';
 
-const $=id=>document.getElementById(id),ids=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico'];
-const labels=['Nathan','Leandro','Rafael','Read','Magrão','Gilmar','Gabriel','Flavio Hipotético'];
+const $=id=>document.getElementById(id),ids=['nathan','leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico'];
+const labels=['Nathan','Leandro','Rafael','Rafael Rosé','Read','Magrão','Tonico','Gilmar','Gabriel','Flavio Hipotético'];
 const app=new pc.Application($('world'),{graphicsDeviceOptions:{antialias:true,alpha:false,preserveDrawingBuffer:true}});
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);app.setCanvasResolution(pc.RESOLUTION_AUTO);app.scene.ambientLight=new pc.Color(.55,.58,.65);
 app.scene.toneMapping=pc.TONEMAP_ACES;

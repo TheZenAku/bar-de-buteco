@@ -28,15 +28,19 @@ test('full map renders through daylight, dusk and night with correct light direc
   await page.waitForTimeout(1000);const day=await status(),dayBrightness=await luminance();
   expect(day.hour).toBeCloseTo(12);expect(day.sun!.direction[1]).toBeLessThan(-.9);expect(day.sun!.cascades).toBe(2);
   expect(day.lamps.filter(l=>l.outside).every(l=>!l.enabled)).toBe(true);
-  expect(day.lamps.filter(l=>!l.outside).every(l=>l.shadows&&l.direction[1]<-.99)).toBe(true);
-  expect(day.lamps.filter(l=>l.street).length).toBe(12);
-  expect(day.realtimeLocalShadows).toBe(0);
+  // Every ceiling lamp shines down; one per fixture (49_luzes_bar.py), those named _Sombra with a cached shadow map.
+  expect(day.lamps.filter(l=>!l.outside&&l.name!=='Ceiling halo').every(l=>l.direction[1]<-.99)).toBe(true);
+  expect(day.lamps.filter(l=>l.name==='Ceiling halo').every(l=>l.direction[1]>.99&&!l.shadows)).toBe(true);
+  expect(day.lamps.filter(l=>!l.street&&l.name.endsWith('_Sombra')).every(l=>l.shadows)).toBe(true);
+  expect(day.lamps.filter(l=>l.street).length).toBe(12);expect(day.lamps.filter(l=>l.street).every(l=>!l.shadows)).toBe(true);
+  // Only the lamps above the player (here the camera) redraw every frame, people included.
+  expect(day.realtimeLocalShadows).toBeLessThanOrEqual(2);
   await page.screenshot({path:previewPath('day-night-noon.png')});
   await page.evaluate(()=>(window as any).fixture.hour(18));await expect.poll(async()=>(await status()).hour).toBeCloseTo(18);
   await page.screenshot({path:previewPath('day-night-dusk.png')});
   await page.evaluate(()=>(window as any).fixture.hour(0));await expect.poll(async()=>(await status()).moon?.enabled).toBe(true);
   const night=await status(),nightBrightness=await luminance();expect(night.sun!.enabled).toBe(false);expect(night.moon!.direction[1]).toBeLessThan(-.9);
-  expect(night.lamps.every(l=>l.enabled&&l.shadows)).toBe(true);expect(nightBrightness).toBeLessThan(dayBrightness);expect(nightBrightness).toBeGreaterThan(.04);
+  expect(night.lamps.every(l=>l.enabled)).toBe(true);expect(nightBrightness).toBeLessThan(dayBrightness);expect(nightBrightness).toBeGreaterThan(.04);
   await page.screenshot({path:previewPath('day-night-midnight.png')});
   await page.evaluate(()=>(window as any).fixture.view([10,2.4,-4.5],[15,1.2,-8]));
   await page.screenshot({path:previewPath('day-night-interior.png')});
@@ -70,7 +74,7 @@ test('the lit facade keeps its colours, the map jukebox lights up with the video
   const noon=await status();
   expect(noon.facade.materials.map(m=>m.name).sort()).toEqual(['Letreiro_Highland','Neon_Magenta','Placa_Highland']);
   for(const material of noon.facade.materials)expect(material.intensity*noon.exposure).toBeCloseTo(1,2);
-  expect(noon.facade.light).toMatchObject({type:'omni',enabled:false});
+  expect(noon.facade.light).toMatchObject({type:'spot',enabled:false});
   await page.evaluate(()=>{const f=(window as any).fixture;f.hour(0);f.view([-4.6,5.2,1.4],[3.08,5.05,-3.08]);});
   await expect.poll(async()=>(await status()).facade.light?.enabled).toBe(true);
   const sign=await block();expect(Math.max(...sign)).toBeGreaterThan(110);

@@ -7,7 +7,7 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
+import {PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
@@ -247,6 +247,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return {...result,user:await getUser(db,request.auth!.user.id)};
   });
   app.post('/api/wardrobe/buy',{preHandler:authenticated},request=>wardrobe.buy(request.auth!.user,skinMessageSchema.parse(request.body).skin));
+  app.post('/api/wardrobe/skill',{preHandler:authenticated},request=>wardrobe.buySkill(request.auth!.user,skillPurchaseSchema.parse(request.body).skill));
   app.post('/api/wardrobe/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
   app.get('/api/inventory',{preHandler:authenticated},request=>inventory.view(request.auth!.user.id));
   app.post('/api/inventory/buy',{preHandler:authenticated},request=>{
@@ -397,6 +398,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({...base,op:z.literal('logout')}).strict(),
       z.object({...base,op:z.literal('item'),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(-100).max(100)}).strict(),
       z.object({...base,op:z.literal('skin'),skinId:z.string().max(32),grant:z.boolean()}).strict(),
+      z.object({...base,op:z.literal('skill'),skillId:z.string().max(32),grant:z.boolean()}).strict(),
     ]).parse(request.body);
     const {playerId,reason,...operation}=body;
     const result=await adminConsole.changePlayer(request.auth!.user.id,playerId,operation,reason);
@@ -416,6 +418,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   app.get('/api/admin/economy',{preHandler:administrator},request=>adminConsole.economy(Number(z.object({days:z.enum(['7','30','90']).default('30')}).strict().parse(request.query).days)));
   app.get('/api/admin/prices',{preHandler:administrator},async request=>({rows:await pricing.rows(),changes:await administration.audits(request.auth!.user,eq(tables.moderationActions.action,'price-set'),20)}));
+  app.get('/api/admin/collection',{preHandler:administrator},async()=>({entries:await wardrobe.adminCatalog()}));
+  app.post('/api/admin/collection',{preHandler:administrator},async request=>({entries:await wardrobe.saveCatalogEntry(request.auth!.user.id,catalogEntrySchema.parse(request.body))}));
   app.post('/api/admin/prices',{preHandler:administrator},request=>{
     const body=z.object({changes:z.array(z.object({key:z.string().min(1).max(64),value:z.number().int().nullable()}).strict()).min(1).max(64),reason:reasonSchema}).strict().parse(request.body);
     return pricing.change(request.auth!.user.id,body.changes,body.reason);
@@ -510,6 +514,18 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
       stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
     return wallet.settleFoosball(body);
+  });
+  // The end of a truco match for one player.
+  app.post('/api/internal/truco/settle',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
+      stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
+    return wallet.settleTruco(body);
+  });
+  // The end of a sinuca match for one player.
+  app.post('/api/internal/pool/settle',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
+      stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
+    return wallet.settlePool(body);
   });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);

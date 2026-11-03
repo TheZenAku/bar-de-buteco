@@ -18,6 +18,15 @@ export const profiles = pgTable('user_profiles', {
 export const wallets=pgTable('wallets',{
   userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),balance:integer('balance').notNull().default(0),
 });
+/** The skills a player bought; they work in every variant of the character (WardrobeService). */
+export const skillInventory=pgTable('skill_inventory',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),skillId:text('skill_id').notNull(),acquiredAt:date('acquired_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.skillId]})]);
+/** What the administration changed on a card or skill (`skin:<id>`, `skill:<id>`). Without a row, the defaults in packages/shared stand. */
+export const skinCatalog=pgTable('skin_catalog',{
+  key:text('key').primaryKey(),rarity:text('rarity').notNull(),description:text('description').notNull(),availability:text('availability').notNull().default('sale'),
+  updatedAt:date('updated_at').notNull().defaultNow(),updatedBy:text('updated_by').references(()=>users.id),
+});
 export const skinInventory=pgTable('skin_inventory',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),skinId:text('skin_id').notNull(),acquiredAt:date('acquired_at').notNull().defaultNow(),
 },t=>[primaryKey({columns:[t.userId,t.skinId]})]);

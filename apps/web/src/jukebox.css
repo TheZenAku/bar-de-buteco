@@ -1,9 +1,11 @@
 /* The players sit under the canvas (#world). A TV's player is projected onto its screen and shows through
    that screen's transparent aperture; the jukebox's player only provides sound and never shows. */
 #app{isolation:isolate}#world{z-index:1}#labels,.vignette{z-index:2}.game{z-index:3}
-/* Only the video's controller can reach its player (its own controls); for everyone else the picture takes no pointer,
-   so nobody pauses or seeks just their own copy. The probe checks a link before it is queued and never shows. */
+/* The picture takes no pointer, so nobody pauses or seeks just their own copy; only a window's controller reaches its player.
+   The probe checks a link before it is queued and never shows. */
 #media-players{display:contents}.media-player{position:fixed;left:0;top:0;z-index:0;width:640px;height:360px;transform-origin:0 0;background:#080808;pointer-events:none}.media-player.controls{pointer-events:auto}.media-player iframe{display:block;width:100%;height:100%;border:0}
+/* YouTube letterboxes the video in a taller frame, so what it paints along its top and bottom edges (title, notices, logo) falls outside the screen. */
+.media-player.media-crop{overflow:hidden}.media-player.media-crop iframe{height:180%;margin-top:-144px}
 .media-player.audio-only{opacity:0;transform:scale(.01);pointer-events:none}
 .media-player.media-probe{width:200px;height:200px;opacity:0;pointer-events:none}
 .media-player video{display:block;width:100%;height:100%;background:#080808;object-fit:contain}.media-player .fb-video,.media-player .fb-video>span{display:block;width:100%!important;height:100%!important}

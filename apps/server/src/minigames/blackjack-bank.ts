@@ -16,7 +16,7 @@ export interface BankHooks {
   wallet?(userId: string, change: WalletChange): void;
 }
 /** The games whose coins go through a bank: each has its own journal, ledger reasons and settle route. */
-export type BankGame = 'blackjack' | 'foosball';
+export type BankGame = 'blackjack' | 'foosball' | 'truco' | 'pool';
 
 const key = (roundId: string, userId: string) => `${roundId}:${userId}`;
 

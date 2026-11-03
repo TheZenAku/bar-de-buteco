@@ -127,5 +127,21 @@ export function routeProgress(route:ReadonlyArray<readonly [number,number]>,x:nu
 export interface DeliverySpot {x:number;y:number;z:number;yaw:number;parkX:number;parkZ:number;street:string;number:number;place:string}
 const streets:readonly string[]=data.streets,places:readonly string[]=data.places;
 export const DELIVERY_SPOTS:readonly DeliverySpot[]=(data.spots as number[][]).map(([x,y,z,yaw,parkX,parkZ,street,number,place])=>({x:x!,y:y!,z:z!,yaw:yaw!,parkX:parkX!,parkZ:parkZ!,street:streets[street!]!,number:number!,place:places[place!]!}));
+/** How far in front of a pickup point (metres from its middle) someone stands at its screen. */
+const PICKUP_STAND=1;
+/** A place orders are collected from (pontos_ifood.json): the locker, the side its screen faces, where to stand and where the bike stops. */
+export interface PickupPoint {x:number;y:number;z:number;frontX:number;frontZ:number;standX:number;standZ:number;parkX:number;parkZ:number;street:string;number:number}
+export const PICKUP_POINTS:readonly PickupPoint[]=(data.pickups as number[][]).map(([x,y,z,frontX,frontZ,parkX,parkZ,street,number])=>({x:x!,y:y!,z:z!,frontX:frontX!,frontZ:frontZ!,standX:x!+frontX!*PICKUP_STAND,standZ:z!+frontZ!*PICKUP_STAND,parkX:parkX!,parkZ:parkZ!,street:streets[street!]!,number:number!}));
+/** Only this many, the closest in a straight line, are measured along the streets: a route costs milliseconds, and the room runs on. */
+const PICKUPS_MEASURED=4;
+/** The pickup point nearest along the streets, and how far it is. */
+export function nearestPickup(from:{x:number;z:number}):{point:PickupPoint;length:number}|undefined {
+  let best:{point:PickupPoint;length:number}|undefined;
+  for(const point of [...PICKUP_POINTS].sort((a,b)=>Math.hypot(a.parkX-from.x,a.parkZ-from.z)-Math.hypot(b.parkX-from.x,b.parkZ-from.z)).slice(0,PICKUPS_MEASURED)){
+    const route=gpsRoute(from,{x:point.parkX,z:point.parkZ});
+    if(route&&(!best||route.length<best.length))best={point,length:route.length};
+  }
+  return best;
+}
 /** Street names to write on the map: where and at what angle. */
 export const STREET_LABELS:ReadonlyArray<{name:string;x:number;z:number;angle:number}>=(data.labels as Array<[number,number,number,number]>).map(([name,x,z,angle])=>({name:streets[name]!,x,z,angle}));
