@@ -26,6 +26,8 @@ import {BarAnimations,barEndOffset,barState} from './bar-animations';
 import {FOG_SCALE,textureLimit,type GraphicsSettings} from '../graphics';
 import {limitTextures,loadSharedContainer} from './gltf-textures';
 import {CameraRig,type CameraFeel,type CameraMode} from './camera-rig';
+import {HeadLookPose} from './head-look';
+import {headLookAt,type HeadLook} from '@bar/shared';
 import {Motos,seatRider,type Bike} from './moto-delivery';
 import {HighfoodProps} from './highfood-props';
 import {GARAGES,HIGHFOOD} from '@bar/shared';
@@ -83,6 +85,7 @@ interface SkinnedRig {
   hip?: pc.Entity;
 }
 interface Avatar {
+  headLook?:HeadLookPose;
   root: pc.Entity;
   body: pc.Entity;
   /** Procedural pivots: NPCs, and players while the player model loads. */
@@ -176,9 +179,9 @@ interface Pose {
 const DEFAULT_MODEL='nathan';
 // Models and canes follow their rig version; regenerated animation banks have a separate cache version.
 const MOUSE_JUMP = 500;
-const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103' };
+const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'mixamo-actions-20261101' : SKIN_VERSIONS[id];
+  const version = folder === 'animations' ? (id==='tiao'?'mixamo-actions-20261103-v2':'mixamo-actions-20261101') : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -463,6 +466,7 @@ export class BarScene {
     this.cleanup.push(() => window.removeEventListener('resize', onWindowResize));
     this.resize();
     this.app.on('update', this.update, this);
+    this.app.on('frameupdate',this.restoreHeadLooks,this);
     this.app.start();
   }
 
@@ -755,6 +759,28 @@ export class BarScene {
   setCamera(mode: CameraMode, distance: number): void { this.rig.setDistance(distance); this.rig.setMode(mode); }
   /** Height, sensitivity and smoothing of the view, from Configurações. */
   setCameraFeel(feel: CameraFeel): void { this.rig.setFeel(feel); }
+
+  /** Before PlayCanvas evaluates any clip, remove last frame's additive head rotation. */
+  private restoreHeadLooks():void {
+    for(const avatar of this.actors.values())avatar.headLook?.restore();
+  }
+
+  /** The animation has already posed the skeleton; only the head joint receives the camera offset. */
+  private applyHeadLooks(dt:number):void {
+    for(const [id,avatar] of this.actors){
+      if(avatar.npc||avatar.resting)continue;
+      const head=avatar.skin?.bones.head??avatar.limbs?.head;
+      if(!head)continue;
+      const actor=avatar.actor,local=id===this.localId,bodyYaw=avatar.yaw/RAD_TO_DEG;
+      // Mouth/phone props and physical falls retain their authored head pose.
+      const free=this.enabled&&!actor.musician&&!actor.holding&&!avatar.riding&&!avatar.ragdoll&&
+        !['drink','text','kick','fallen','recover','stumble','ragdoll','ride'].includes(actor.animation??'')&&
+        (!avatar.bar||avatar.bar.clip==='sentado_loop')&&!(local&&(this.selfie||this.watchingTv||this.watchingStage));
+      const look:HeadLook=!free?{headYaw:0,headPitch:0}:local?headLookAt(this.rig.yaw,this.rig.pitch,bodyYaw):
+        {headYaw:actor.headYaw??0,headPitch:actor.headPitch??0};
+      (avatar.headLook??=new HeadLookPose()).apply(head,bodyYaw,look,dt);
+    }
+  }
   getCamera() { return { ...this.rig.telemetry(), fov: +(this.camera.camera?.fov ?? 0).toFixed(2), rush: +this.rush.toFixed(3), blur: this.speedBlur.drawn }; }
 
   /**
@@ -941,10 +967,11 @@ export class BarScene {
     const yaw = this.rig.yaw;
     const dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * vertical) / length;
     const dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * vertical) / length;
-    if (dx || dz) this.lastRotation = Math.atan2(dx, dz);
-    // In first person, standing still, the body turns with the view (no shoulder in front of the eyes).
-    else if (this.rig.firstPerson) this.lastRotation = Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
-    return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'), rotation: this.lastRotation };
+    // The body keeps following travel; looking around at rest only turns the head.
+    const actor=this.actors.get(this.localId)?.actor;
+    if((dx||dz)&&!actor?.interactionState&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
+    return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'), rotation: this.lastRotation,
+      ...headLookAt(yaw,this.rig.pitch,this.lastRotation) };
   }
 
   setWorld(world: WorldState, localId: string): void {
@@ -1176,9 +1203,10 @@ export class BarScene {
     return { fps: this.fps, actors: this.actors.size, resting };
   }
 
-  getAnimations(): Array<{ id: string; skin?: string; clip?: string; time?: number; height?: number; speed?:number; bar?:{clip:string;time:number;placed:boolean;root:number[]}; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
+  getAnimations(): Array<{ id: string; facing:number; look?:{yaw:number;pitch:number;bone:number[]}; skin?: string; clip?: string; time?: number; height?: number; speed?:number; bar?:{clip:string;time:number;placed:boolean;root:number[]}; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
     const now=Date.now()+this.serverClockOffset,point=(p:pc.Vec3)=>[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];
-    return [...this.actors].map(([id, avatar]) => ({ id, skin: avatar.skinId, clip: avatar.skin?.clip,
+    return [...this.actors].map(([id, avatar]) => ({ id, facing:avatar.yaw/RAD_TO_DEG, skin: avatar.skinId, clip: avatar.skin?.clip,
+      look:avatar.headLook?{yaw:avatar.headLook.yaw,pitch:avatar.headLook.pitch,bone:(()=>{const q=(avatar.skin?.bones.head??avatar.limbs!.head).getLocalRotation();return [q.x,q.y,q.z,q.w];})()}:undefined,
       bar:avatar.bar?{clip:avatar.bar.clip,time:+avatar.bar.time.toFixed(3),placed:!!avatar.bar.frame,root:point(avatar.root.getPosition())}:undefined,
       musician:avatar.actor.musician?{spot:avatar.actor.musician.id,phase:musicianPhase(avatar.actor.musician,now)?.phase,root:point(avatar.root.getPosition()),
         hip:avatar.skin?point((avatar.skin.model.findByName('hip') as pc.Entity|null)?.getPosition()??avatar.root.getPosition()):undefined}:undefined,
@@ -1207,6 +1235,7 @@ export class BarScene {
     this.resizeObserver.disconnect();
     this.cleanup.forEach(cleanup => cleanup());
     this.app.off('update', this.update, this);
+    this.app.off('frameupdate',this.restoreHeadLooks,this);
     this.materials.forEach(material => material.destroy());
     this.contactMaterial?.destroy();
     this.dressing?.destroy();
@@ -2169,6 +2198,7 @@ export class BarScene {
       this.camera.lookAt(14,1.8,-6);
       this.rig.idle();
     }
+    this.applyHeadLooks(dt);
     this.showOwnHead(player);
     this.updateProfiler.mark('camera');
     const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();

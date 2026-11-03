@@ -59,6 +59,8 @@ O arquivo pintou o antebraço em 68 vértices da lateral da calça. A opção `s
 
 Importado em 03/11/2026 de `assets-bar/skins/Tiao/tiao.glb`, da Tripo. O arquivo traz 65 ossos Mixamo, 10.695 triângulos, normais, pesos e uma textura de cor JPEG embutida. A altura de origem é de aproximadamente 1 m, normalizada para 1,80 m, sem simplificar a malha. É uma carta Rara da coleção, por 900 moedas (`SKIN_PRICE_TIAO`), com bancos próprios de ações e danças, bengala e arte da carta com giro.
 
+A revisão do arquivo recebida em 03/11/2026 foi reimportada com `node tools/assets/import-mixamo.mjs tiao`, seguida de `node tools/assets/convert-animations.mjs tiao` e `node tools/assets/render-skin-cards.mjs tiao`. Modelo, ações e arte usam a versão de cache `20261103-v2`, para que navegadores com a revisão anterior carreguem o boneco atualizado. O esqueleto manteve a estrutura, então os bancos regenerados permaneceram idênticos.
+
 ## Flavio Hipotético
 
 Skin da loja, por 900 moedas (`SKIN_PRICE_FLAVIO_HIPOTETICO`), feita na Tripo. O GLB traz 65 ossos com nomes do Mixamo, 10.447 triângulos, abaixo do orçamento e sem simplificação, normais, pesos e uma textura de cor de 1024 px. Vem sem mapa de normais nem de rugosidade, sem animação e com 1 m de altura, que o importador leva a 1,80 m. A pose de bind é em A; o retarget calibra pela direção real dos ossos.

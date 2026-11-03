@@ -263,7 +263,7 @@ test('squeezed against a wall the head hides, without counting as first person',
   aim(rig,-Math.PI/2,0);
   settle();
   assert.equal(rig.headHidden,true,`${rig.telemetry().fromHead} m from the head`);
-  assert.equal(rig.firstPerson,false,'So the body does not start turning with the view');
+  assert.equal(rig.firstPerson,false,'An obstacle does not change the camera mode');
   aim(rig,Math.PI/2,0);
   settle();
   assert.equal(rig.headHidden,false);

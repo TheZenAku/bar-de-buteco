@@ -175,7 +175,7 @@ export class CameraRig {
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
 
-  /** In the eyes: the body turns with the view when standing. */
+  /** In the eyes: used to hide the local head, name and ring. */
   get firstPerson():boolean {return this.inside>.7;}
   /** Also when an obstacle has squeezed the view against the head: the head is hidden, as are the name and the ring at the feet. */
   get headHidden():boolean {return this.firstPerson||this.headClose;}

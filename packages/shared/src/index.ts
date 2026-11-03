@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import {HEAD_LOOK_YAW,HEAD_LOOK_PITCH,type HeadLook} from './head-look.js';
+export * from './head-look.js';
 export * from './admin.js';
 export * from './jukebox.js';
 export * from './media-links.js';
@@ -71,13 +73,15 @@ export const HELD_DRINKS = [...DRINK_ITEMS, 'agua', 'refrigerante', 'cafe'] as c
 export type HeldDrink = typeof HELD_DRINKS[number];
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
-export interface PlayerInput { seq: number; dx: number; dz: number; running: boolean; rotation: number }
-export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2)}).strict();
+export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number }
+export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional()}).strict();
 export interface PublicUser { id: string; username: string; displayName: string; email: string; verified: boolean; role: 'user' | 'admin'; color: string; equippedSkin?:string; isOwner?:boolean }
 export interface PlayerState extends Position { id: string; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
    *  since/until when (server clock): the same time as at a table (consumeMs). They walk around meanwhile. */
   holding?: string; holdingSince?: number; holdingUntil?: number;
+  /** Camera-driven head offsets; the body's rotation remains independent. */
+  headYaw?:number; headPitch?:number;
   /** Needs, as whole points (see needs.ts); condition: normal, stumbling, fainted or recovering. */
   hp?: number; hpMax?: number; stamina?: number; hunger?: number; thirst?: number; bladder?: number; drunk?: number;
   exhausted?: boolean; condition?: string; conditionUntil?: number; faintCause?: string;

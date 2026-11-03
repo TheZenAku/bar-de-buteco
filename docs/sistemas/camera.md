@@ -2,10 +2,14 @@
 
 A câmera de terceira pessoa segue o estilo da exploração do GTA V: fica atrás do personagem, um pouco acima dos ombros, gira 360° com o mouse, tem três zooms na rodinha (perto, médio e longe) e não atravessa o cenário. **Q** alterna entre primeira e terceira pessoa e conserva a distância escolhida. Nenhuma dessas ações mostra aviso ou toast.
 
+O olhar da câmera move **somente o osso da cabeça**, na horizontal e na vertical, em primeira e terceira pessoa. Parado, girar o mouse não gira o corpo; andando, o corpo continua apontando para o deslocamento. O giro adicional da cabeça é suavizado e limitado a 80° para cada lado e 50° para cima/baixo. Quando a câmera fica atrás, a cabeça mantém esse limite em vez de torcer o pescoço. O servidor replica os dois ângulos separadamente da orientação do corpo, inclusive sentado. Clipes que usam a boca, celular, quedas, palco e moto mantêm sua pose própria.
+
+O giro é aplicado depois da animação e removido antes de avaliar o quadro seguinte. Assim, não se acumula nem altera pescoço, tronco, quadril ou a orientação do personagem. `head-look.ts` na engine aplica a rotação em eixos do mundo, compatível com os eixos diferentes das skins. `tests/integration/head-look.test.ts` verifica esses limites, preservação das animações, pais intactos, taxas de quadros, contrato de rede e envios parados; `tests/e2e/camera.spec.ts` verifica cabeça e corpo com Nathan e Tião nas duas visões.
+
 | Visão | Como fica |
 | --- | --- |
 | Terceira pessoa | Atrás do personagem, 30 cm à direita, orbitando a altura dos ombros, a 2,5 m (perto), 4,2 m (médio, onde todo mundo começa) ou 6,5 m (longe). |
-| Primeira pessoa | Nos olhos do personagem: logo acima e à frente da articulação da cabeça, então acompanha o corpo sentado, no mictório ou fumando. A cabeça do próprio personagem some, mas mãos, braços e o que elas seguram aparecem. Parado, o corpo vira junto com a visão. O nome e o anel do próprio jogador não aparecem. |
+| Primeira pessoa | Nos olhos do personagem: logo acima e à frente da articulação da cabeça, então acompanha o corpo sentado, no mictório ou fumando. A cabeça do próprio personagem some, mas mãos, braços e o que elas seguram aparecem. Parado, o corpo conserva a direção; só o osso da cabeça acompanha a visão. O nome e o anel do próprio jogador não aparecem. |
 
 ## Como ajustar
 

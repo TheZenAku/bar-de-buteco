@@ -10,6 +10,8 @@ export interface SceneActor {
   y?: number;
   z: number;
   rotation?: number;
+  headYaw?:number;
+  headPitch?:number;
   animation?: string;
   animationStartedAt?: number;
   interactionState?: string;
@@ -57,6 +59,8 @@ export interface SceneWorld {
 }
 
 export interface SceneInput {
+  headYaw?:number;
+  headPitch?:number;
   dx: number;
   dz: number;
   running: boolean;

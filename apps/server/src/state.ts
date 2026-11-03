@@ -12,6 +12,8 @@ export class Player extends Schema {
   @type('float32') y = 0;
   @type('float32') z = 8;
   @type('float32') rotation = 0;
+  @type('float32') headYaw = 0;
+  @type('float32') headPitch = 0;
   @type('string') animationState = 'idle';
   @type('number') animationStartedAt = 0;
   /** Drawn at random each time the player starts dancing; every client plays the same clip of its dance bank with it. */

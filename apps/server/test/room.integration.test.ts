@@ -67,9 +67,12 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     await assert.rejects(() => browser.joinOrCreate('bar', { ticket: ticket('carol') }), /BAR_FULL/);
     const player = authoritative!.state.players.get('alice')!;
     const startX = player.x;
-    first.send('player.input', { seq: 0, dx: 1, dz: 0, running: false, rotation: 0 });
+    first.send('player.input', { seq: 0, dx: 1, dz: 0, running: false, rotation: 0, headYaw:.4, headPitch:-.2 });
     await eventually(() => first.state.players.get('alice').lastProcessedInput === 0);
     assert.ok(Math.abs(player.x - startX - 0.175) < 0.001);
+    assert.equal(player.rotation,0,'Head look does not change body rotation');
+    assert.equal(player.headYaw,.4);assert.equal(player.headPitch,-.2);
+    await eventually(()=>Math.abs(second.state.players.get('alice').headYaw-.4)<1e-5&&Math.abs(second.state.players.get('alice').headPitch+.2)<1e-5);
     first.send('player.input', { seq: 1, dx: 500, dz: 0, running: true, rotation: 0 });
     await eventually(() => errors.includes('Comando inválido.'));
     assert.equal(player.lastProcessedInput, 0);

@@ -956,6 +956,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       const input = presence.queue.shift();
       let moving = false, running = false;
       if (input) {
+        player.headYaw=input.headYaw??0;player.headPitch=input.headPitch??0;
         if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);

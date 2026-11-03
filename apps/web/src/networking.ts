@@ -213,13 +213,19 @@ export class BarNetwork {
     if(!self)return;
     // On a bike the frames keep the time (rideFrame).
     if(isRidingMoto(self.interactionState)){this.wasMoving=false;return;}
-    if(self.interactionState||self.currentTableId){this.wasMoving=false;return;}
-    const intention=this.hooks.input();
+    const locked=!!(self.interactionState||self.currentTableId);
+    const requested=this.hooks.input();
+    const intention=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
     const moving=!!(intention.dx||intention.dz);
-    if(!moving&&!this.wasMoving)return;
+    // Head look is independent of body rotation, also while standing or seated.
+    const last=this.pending.at(-1)??self;
+    const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
+    if(!moving&&!this.wasMoving&&!looking)return;
     this.wasMoving=moving;
     const input={...intention,seq:++this.seq};
-    this.pending.push(input);this.position=this.predict(input,self);this.hooks.position(this.position);this.send('player.input',input);
+    this.pending.push(input);
+    if(!locked){this.position=this.predict(input,self);this.hooks.position(this.position);}
+    this.send('player.input',input);
   }
   /**
    * Each frame, riding: the bike's ticks are counted from the frames' real time and not by a timer, which on a busy page fires
