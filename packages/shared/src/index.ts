@@ -139,3 +139,4 @@ import type {TurnedBox} from './city.js';
 /** `hx` and `hz` are the box along x and z. A box turned about the vertical (the city's) also has `turn`, its real shape, and they enclose it. */
 export interface Collider extends Position { id:string; hx:number; hz:number; minY?:number; maxY?:number; ramp?:boolean; turn?:TurnedBox }
 export interface Seat extends Position { rotation:number }
+export type {ServerPerformance} from './performance.js';

@@ -1,4 +1,7 @@
 import {adminConsole} from './admin/console';
+import {PerformanceMonitor} from './performance/monitor';
+import {createPerformanceHud} from './performance/hud';
+import './performance/performance.css';
 import {itemCost,loadPrices,price as livePrice,setPrices} from './prices';
 import './assets/fonts/neon-ui.css';
 import './neon-ui.css';
@@ -310,6 +313,7 @@ const network=new BarNetwork({
     renderJobCard();
   },
   adminWorld:snapshot=>administration?.world(snapshot),
+  serverPerformance:snapshot=>performanceMonitor.receiveServer(snapshot),
   // The room's price table: on entering and whenever the administration changes a price (Preços).
   prices:table=>setPrices(table),
   phoneCall:call=>phone.call(call),
@@ -332,9 +336,9 @@ const network=new BarNetwork({
   },
   // A media panel waiting for its own command shows the refusal itself.
   error:message=>{if(!media.some(m=>m.reject(message)))toast(message,true);},
-  ping:ms=>{netPing=`${ms} ms`;renderNet();},
+  ping:ms=>{netPing=`${ms} ms`;performanceMonitor.receivePing(ms);renderNet();},
   status:(message,isConnected)=>{
-    connected=isConnected;scene?.setEnabled(sceneActive());audio.setActive(inGame&&connected);
+    connected=isConnected;scene?.setEnabled(sceneActive());audio.setActive(inGame&&connected);performanceMonitor.refresh();
     if(!isConnected&&watchingTv)stopWatchingTv();media.forEach(m=>m.setWorld(world,user?.id??'',connected));
     if(!isConnected)phone.disconnected();
     netStatus=isConnected?'Na área!':'Reconectando…';renderNet();
@@ -345,6 +349,12 @@ const network=new BarNetwork({
     if(isConnected)voice.syncState();
   }
 });
+
+const performanceMonitor=new PerformanceMonitor({
+  allowed:()=>inGame&&connected&&user?.role==='admin',capturing:()=>sceneActive(),pending:()=>network.telemetry().pending,
+  position:positionText,requestServer:()=>network.send('admin.performance'),observe:callback=>scene?.setPerformanceObserver(callback),
+});
+createPerformanceHud($('#game'),performanceMonitor);
 
 /** The phone (K): calls through the room, Highzap, Highgram and HighBank through the API (apps/web/src/phone). */
 const phone=createPhone($('#game'),{
@@ -374,6 +384,7 @@ async function enterBar():Promise<void> {
   // Entering is a click: the browser lets this page play voices from now on.
   voice.unlock();audio.unlock();
   inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
+  performanceMonitor.forUser(user.id);
   try{
     $('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;
     if(!admission.isCurrentEntry(attempt))return;
@@ -393,7 +404,7 @@ function leaveBar():Promise<void> {
 }
 function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   if(leavingPromise)return leavingPromise;
-  profile.close();
+  profile.close();performanceMonitor.forUser('');
   const task=(async()=>{
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   gps.reset();foodDialog.reset();lockerPad.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
@@ -760,7 +771,7 @@ async function admin():Promise<void> {
   if(user?.role!=='admin'){toast('Acesso exclusivo da administração.',true);return;}
   // The administration's console (apps/web/src/admin): categories on the left, the chosen one on the right.
   showModal('Administração do bar','<div id="admin-console"></div>','admin');
-  administration=adminConsole($('#admin-console'),{user:()=>user,send:(type,payload)=>network.send(type,payload),position:positionText,
+  administration=adminConsole($('#admin-console'),{performance:performanceMonitor,user:()=>user,send:(type,payload)=>network.send(type,payload),position:positionText,
     changedWallet:()=>{wardrobe=undefined;void refreshAdministration();},denied:()=>{void refreshAdministration();}});
 }
 async function refreshAdministration():Promise<void>{
@@ -770,12 +781,13 @@ async function refreshAdministration():Promise<void>{
     const accountResult=await api<{user:PublicUser}>('/auth/me');if(user?.id!==owner||!inGame)return;
     const changed=user.role!==accountResult.user.role;user={...user,role:accountResult.user.role,isOwner:accountResult.user.isOwner};
     $('#admin-button').classList.toggle('hidden',user.role!=='admin');
+    performanceMonitor.refresh();
     if(user.role!=='admin'&&activeModal==='admin')closeModal();
     if(changed)toast(user.role==='admin'?'Você recebeu acesso à administração.':'Sua permissão administrativa foi removida.');
     const [result,inventoryResult]=await Promise.all([api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);if(user?.id!==owner||!inGame)return;wardrobe=result;inventory=inventoryResult;renderBalance();
     knownSkills=result.skills.filter(skill=>skill.owned).map(skill=>skill.id);
     collection?.update(result);
-  }catch(error){if(error instanceof ApiError&&error.status===401&&user?.id===owner){user={...user,role:'user',isOwner:false};$('#admin-button').classList.add('hidden');if(activeModal==='admin')closeModal();}}
+  }catch(error){if(error instanceof ApiError&&error.status===401&&user?.id===owner){user={...user,role:'user',isOwner:false};performanceMonitor.refresh();$('#admin-button').classList.add('hidden');if(activeModal==='admin')closeModal();}}
   finally{refreshingAdministration=false;}
 }
 setInterval(()=>{void refreshAdministration();},5000);

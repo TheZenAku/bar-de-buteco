@@ -4,7 +4,7 @@ import {studs} from '../profile/badge-card';
 import './collection.css';
 
 // Change after rendering the art again (npm run assets:cards): the files are cached for long.
-const CARD_ART='20261101';
+const CARD_ART='20261103';
 const art=(folder:string,id:string)=>`${import.meta.env.BASE_URL}skins/${folder}/${encodeURIComponent(id)}.webp?v=${CARD_ART}`;
 export const cardArt=(id:string)=>art('cards',id);
 const turnArt=(id:string)=>art('turn',id);

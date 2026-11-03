@@ -82,6 +82,8 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   await shot(page,'01-highmotors');
   const bought=(await page.request.get('/api/vehicles').then(r=>r.json())).owned;
   if(!bought){
+    await page.getByRole('tab',{name:'Loja',exact:true}).click();
+    await page.locator('[data-hm="offer"]').click();
     await page.locator('[data-hm="buy"]').click();
     await shot(page,'02-confirm');
     await page.locator('[data-hm="confirm"]').click();

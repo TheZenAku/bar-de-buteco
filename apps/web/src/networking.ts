@@ -3,8 +3,10 @@ import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,moto
 import type {Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
 import {PredictedRide} from './engine/moto-motion';
+import type {ServerPerformance} from '@bar/shared';
 
 export interface NetworkHooks {
+  serverPerformance?:(snapshot:ServerPerformance)=>void;
   /** The player just got a badge (docs/sistemas/conquistas.md). */
   achievement?:(badge:Badge)=>void;
   state:(world:WorldState)=>void; position:(position:Position)=>void;
@@ -197,6 +199,7 @@ export class BarNetwork {
     room.onMessage('pool.aim',(aim:PoolAimView)=>this.hooks.poolAim?.(aim));
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
+    room.onMessage('admin.performance',(snapshot:ServerPerformance)=>this.hooks.serverPerformance?.(snapshot));
     room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));
     room.onError((_code:number,message?:string)=>this.hooks.error(message||'A conexão encontrou um problema.'));
     room.onDrop(()=>{this.transportReady=false;this.stopTimers();this.pending=[];this.pendingMoto=[];this.hooks.status('Conexão interrompida. Tentando reconectar…',false);});

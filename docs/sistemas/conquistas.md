@@ -1,6 +1,6 @@
 # Conquistas
 
-Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **série de quatro níveis**: ao chegar à quantidade de cada nível, o emblema aparece sozinho na coleção do jogador. São 26 séries, 104 emblemas no total, todos em `ACHIEVEMENT_SERIES` (`packages/shared/src/achievements.ts`).
+Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **série de quatro níveis**: ao chegar à quantidade de cada nível, o emblema aparece sozinho na coleção do jogador. São 29 séries, 116 emblemas no total, todos em `ACHIEVEMENT_SERIES` (`packages/shared/src/achievements.ts`).
 
 ## O que o jogador vê
 
@@ -39,7 +39,10 @@ Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **séri
 | Freguês | Pedidos entregues na mesa | 5, 25, 100, 500 | Mundo |
 | Rei do 21 | Mãos ganhas no blackjack | 5, 25, 100, 500 | Mundo |
 | Craque do Pebolim | Partidas ganhas, sem contar W.O. | 1, 10, 50, 200 | Mundo |
+| Mestre da Sinuca | Partidas ganhas, sem contar desistência ou W.O. | 1, 10, 50, 200 | Mundo |
+| Rei do Truco | Partidas completas ganhas pela dupla | 1, 10, 50, 200 | Mundo |
 | Motoboy | Km de moto | 1, 10, 50, 250 | Mundo |
+| Entregador | Entregas pelo Highfood | 10, 100, 500, 2.000 | Mundo |
 | Barbeiro | Batidas que lançaram o piloto | 1, 10, 50, 200 | Mundo |
 | Mecânico | Consertos de moto | 1, 10, 50, 200 | Mundo |
 | Andarilho | Km a pé | 1, 10, 50, 250 | Mundo |
@@ -59,6 +62,8 @@ Atropelar pessoas de propósito não vale emblema, para não premiar quem atrapa
 - **O que dura** (dança, palco, tempo na cidade) é lido a cada 5 segundos. Personagem parado também conta, inclusive dançando com o jogador longe do teclado: o cliente envia comandos mesmo parado, então o servidor não sabe distinguir, e essas séries não valem moedas.
 - **O que uma tecla poderia repetir** tem intervalo mínimo (`everyMs`) ou um custo real: tempo do clipe, moedas ou a bexiga.
 - **Vídeo conta quando começa a tocar**, não quando entra na fila: um vídeo tirado da fila devolve as moedas e não conta.
+- **Sinuca** conta quando o juiz encerra a partida e declara o vencedor, contra pessoas ou o Juca. Desistência e W.O. por desconexão não contam. Repetir a tacada, a visão do resultado ou os ticks da mesa não soma outra vitória.
+- **Truco** conta a partida inteira, ao atingir 12 tentos, para cada pessoa da dupla vencedora que permaneceu na mesa. Ganhar uma mão ou vaza não conta. Quem saiu e foi substituído por NPC não recebe o emblema, mesmo que sua dupla vença depois. Partida cancelada por falta de saldo não conta.
 - Bots de desenvolvimento não ganham nada.
 
 ## Como funciona
@@ -74,13 +79,15 @@ Um emblema é dado **só quando o contador cruza o nível**. Assim, um emblema r
 
 ## Na administração
 
-Os 104 emblemas aparecem em **Administração → Emblemas**, com a linha "Automático, ao chegar a…". O administrador pode editar nome, descrição, raridade e arte, inclusive enviando um PNG: o emblema continua sendo dado do mesmo jeito. Apagar faz o emblema deixar de ser dado e sair de quem o tinha. Com imagem enviada, o número do nível não aparece na medalha, porque a arte fica sozinha.
+Os 116 emblemas aparecem em **Administração → Emblemas**, com a linha "Automático, ao chegar a…". O administrador pode editar nome, descrição, raridade e arte, inclusive enviando um PNG: o emblema continua sendo dado do mesmo jeito. Apagar faz o emblema deixar de ser dado e sair de quem o tinha. Com imagem enviada, o número do nível não aparece na medalha, porque a arte fica sozinha.
 
 As quantidades de cada nível ficam no código, não no painel. Texto de emblema editado no painel não muda sozinho se a quantidade mudar depois.
 
 ## Migração
 
 `infra/migrations/012_achievements.sql` cria `user_achievements`, a coluna `user_badges.notified_at` e os emblemas. Ela também aproveita o que o banco já sabia: mãos ganhas no blackjack, mensagens do Highzap, fotos do Highgram e Pix enviados. Quem já tinha chegado a um nível recebe o emblema e o aviso ao entrar. O resto (cervejas, por exemplo) começa do zero, porque não havia registro.
+
+`016_minigame_achievements.sql` acrescenta os oito emblemas de sinuca e truco. As duas séries começam do zero a partir da atualização; a migração não presume vitórias antigas. Ela preserva os emblemas existentes e suas edições administrativas. A migração `013_highfood.sql` já havia acrescentado os quatro de Entregador.
 
 ## Criar uma série
 
@@ -99,4 +106,5 @@ As quantidades de cada nível ficam no código, não no painel. Texto de emblema
 
 - `apps/api/test/achievements.test.ts`: catálogo, níveis, aviso único, retirada, emblema apagado e editado, celular, migração sobre dados antigos.
 - `apps/server/test/achievements.integration.test.ts`: bebida real na mão, aceno, chat, caminhada, banheiro, dança, API fora do ar, avisos e bots.
+- `apps/server/test/minigame-achievements.integration.test.ts`: resultados reais das mesas passando pelos hooks do mundo e pelo relatório; dupla vencedora, partida versus mão, abandono, W.O., Juca, bots e resultado repetido.
 - `tests/e2e/achievements.spec.ts`: tecla real, aviso, carta, aba, coleção e administração no navegador.

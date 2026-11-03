@@ -70,6 +70,6 @@ for(const [from,to] of [['Fallen','Run'],['Sit','Drink'],['Recover','CardsSit'],
 
 // Both newly selected Mixamo clips must restore a complete pose, including the
 // Nathan root and each native rig's hip, after actions with different translations.
-for(const skin of ['nathan','leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico']){
+for(const skin of ['nathan','leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico','tiao']){
   for(const [from,to] of [['Sit','Idle'],['Drink','Idle'],['AngrySit','Walk'],['Walk','AngrySit']])transition(skin,from,to);
 }

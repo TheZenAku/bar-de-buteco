@@ -105,7 +105,7 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
   // Badges: granted in the administration, chosen in the player's own window, described under the mouse.
   await page.getByRole('button',{name:'Administração'}).click();
   await page.locator('[data-admin-nav="badges"]').click();
-  await expect(page.locator('#admin-section')).toContainText('Fundador');
+  await page.locator('[data-badge="new"]').click();
   await page.locator('[data-badge-form="save"] [name="name"]').fill('Rei do Pebolim');
   await page.locator('[data-badge-form="save"] [name="description"]').fill('Ganhou dez partidas seguidas no salão de jogos.');
   await page.locator('[data-badge-icon="ball"]').click();
@@ -123,16 +123,17 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
   await expect(page.locator('#admin-section'),'Esc closes the card, not the administration').toBeVisible();
   await page.locator('[data-badge-form="save"] [name="reason"]').fill('Emblema de teste');
   await page.locator('[data-badge-form="save"] button[type="submit"]').click();
-  await expect(page.locator('#admin-section')).toContainText('Rei do Pebolim');
-  await expect(page.locator('tr',{hasText:'Rei do Pebolim'}).locator('.admin-badge')).toHaveText('Lendário');
-  await expect(page.locator('tr',{hasText:'Fundador'}).locator('.admin-badge')).toHaveText('Comum');
+  await page.locator('[name="badge-query"]').fill('Rei do Pebolim');
+  await expect(page.locator('.admin-badge-item',{hasText:'Rei do Pebolim'}).locator('.admin-badge')).toHaveText('Lendário');
+  await page.locator('[name="badge-query"]').fill('Fundador');
+  await expect(page.locator('.admin-badge-item',{hasText:'Fundador'}).locator('.admin-badge')).toHaveText('Comum');
   await shot(page,'02-admin');
   await page.locator('[data-badge="select"][data-id="fundador"]').click();
   await page.locator('[data-badge-form="grant"] [name="search"]').pressSequentially('primary_admin');
   await page.locator('[data-badge-target]').first().click();
   await page.locator('[data-badge-form="grant"] [name="reason"]').fill('Dono do bar');
   await page.locator('[data-badge-form="grant"] button[type="submit"]').click();
-  await expect(page.locator('#admin-section table').nth(1)).toContainText('primary_admin');
+  await expect(page.locator('#admin-section table')).toContainText('primary_admin');
   await page.request.post('/api/admin/badges/grant',{data:{playerId:me,badgeId:'rei-do-pebolim',grant:true,reason:'Teste'}});
   await page.getByRole('button',{name:'Fechar janela'}).click();
   await page.locator('[data-pf="badges"]').waitFor({state:'attached'}).catch(()=>{});
@@ -266,7 +267,7 @@ test('a badge with a PNG of your own: sent to the server, in the medal and in th
   const file=(name:string,mimeType:string)=>({name,mimeType,buffer:Buffer.from(art,'base64')});
   await page.getByRole('button',{name:'Administração'}).click();
   await page.locator('[data-admin-nav="badges"]').click();
-  await expect(page.locator('#admin-section')).toContainText('Fundador');
+  await page.locator('[data-badge="new"]').click();
   const form=page.locator('[data-badge-form="save"]');
   await form.locator('[name="name"]').fill('Emblema com PNG');
   await page.locator('[data-badge-file]').setInputFiles(file('foto.jpg','image/jpeg'));
@@ -291,6 +292,7 @@ test('a badge with a PNG of your own: sent to the server, in the medal and in th
   await form.locator('[name="description"]').fill('Tem um PNG enviado no lugar do ícone.');
   await form.locator('[name="reason"]').fill('Emblema de teste');
   await form.locator('button[type="submit"]').click();
+  await page.locator('[name="badge-query"]').fill('Emblema com PNG');
   await expect(page.locator('.admin-badge-cell .pf-art img')).toHaveCount(1);
   await shot(page,'10-admin-image');
   // Picking an icon takes the image out of the draft; the image stays on the list.
@@ -308,8 +310,10 @@ test('a badge with a PNG of your own: sent to the server, in the medal and in th
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
   await page.getByRole('button',{name:'Administração'}).click();
   await page.locator('[data-admin-nav="badges"]').click();
-  await expect(page.locator('[data-badge-image]')).toHaveCount(1);
+  await page.locator('[name="badge-query"]').fill('Emblema com PNG');
   await expect.poll(()=>page.locator('.admin-badge-cell .pf-art img').evaluate((image:HTMLImageElement)=>image.naturalWidth),{timeout:20000}).toBe(256);
+  await page.locator('[data-badge="edit"][data-id="emblema-com-png"]').click();
+  await expect(page.locator('[data-badge-image]')).toHaveCount(1);
   await page.getByRole('button',{name:'Fechar janela'}).click();
   await openFromWorld(page,'primary_admin');
   const medal=page.locator('.pf-grid .pf-slot.filled .pf-art img');

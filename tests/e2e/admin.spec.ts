@@ -1,5 +1,6 @@
 import {buyCard,showCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
 
 const password='AdminBrowserTests2026!';
 test.beforeEach(async({request})=>{
@@ -18,6 +19,52 @@ async function ready(page:Page){
 /** A category of the administration (the menu on the left) and a tab of the player's file. */
 const section=(page:Page,id:string)=>page.locator(`[data-admin-nav="${id}"]`).click();
 const fileTab=(page:Page,name:RegExp|string)=>page.getByRole('tab',{name}).click();
+
+test('desempenho: coleta real, HUD fora da administração, pausas, preferências e relatório',async({page})=>{
+  test.setTimeout(180000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
+  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'performance');
+  const collect=page.getByRole('checkbox',{name:'Coletar desempenho',exact:true});
+  await collect.check();
+  await page.getByRole('checkbox',{name:'Mostrar HUD de desempenho',exact:true}).check();
+  await page.getByRole('checkbox',{name:'Memória JS do cliente',exact:true}).check();
+  for(const checkbox of await page.locator('[data-perf-metric]').all())await checkbox.check();
+  await page.getByLabel('Posição do HUD',{exact:true}).selectOption('top-left');
+  await page.getByRole('button',{name:'Zerar análise',exact:true}).click();
+  await expect(page.locator('[data-perf-server]')).toContainText('RAM do processo (RSS)');
+  await expect(page.locator('[data-perf-status]')).toContainText('pausada');
+  await page.setViewportSize({width:1280,height:900});await page.screenshot({path:'test-results/previews/admin-performance.png'});
+  await page.getByRole('button',{name:'Fechar janela',exact:true}).click();
+  const overlay=page.locator('#performance-hud');
+  await expect(overlay).toBeVisible();await expect(overlay).toHaveAttribute('data-corner','top-left');
+  await expect(overlay).toContainText('Memória JS do cliente');
+  await expect(overlay.locator('footer')).not.toContainText('· 0 frames',{timeout:30000});
+  await page.screenshot({path:'test-results/previews/performance-hud.png'});
+  await page.setViewportSize({width:960,height:640});
+  expect(await overlay.evaluate(el=>el.scrollHeight<=el.clientHeight)).toBe(true);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect(await overlay.evaluate(el=>el.scrollHeight<=el.clientHeight)).toBe(true);
+  await page.setViewportSize({width:960,height:640});
+  // One real main-thread stall must remain measurable above the engine's clamped delta time.
+  await page.evaluate(()=>{const start=performance.now();while(performance.now()-start<180){/* deliberate test stall */}});
+  await expect(overlay.locator('header')).toContainText('AO VIVO');
+  await page.getByRole('button',{name:'Administração',exact:true}).click();
+  await expect(page.locator('[data-perf-status]')).toContainText('pausada');
+  await expect(page.locator('[data-perf-events-count]')).not.toHaveText(/^0 registros/);
+  const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Exportar relatório JSON',exact:true}).click()]);
+  const report=JSON.parse(await readFile((await download.path())!,'utf8'));
+  expect(report.frames.samples).toBeGreaterThan(0);expect(report.frames.max).toBeGreaterThan(100);expect(report.collecting).toBe(false);expect(report.server.tick.targetHz).toBe(20);
+  expect(report.server.process.rss).toBeGreaterThan(0);expect(report.events.some((event:{ms:number})=>event.ms>=100)).toBe(true);
+  expect(report.preferences.corner).toBe('top-left');expect(report.preferences.metrics).toContain('memory');
+  await page.getByRole('button',{name:'Zerar análise',exact:true}).click();await expect(page.locator('[data-perf-status]')).toContainText('0 frames');
+  await page.reload();await page.getByRole('button',{name:'Entrar no bar',exact:true}).click();await ready(page);
+  await expect(overlay).toBeVisible();await expect(overlay).toHaveAttribute('data-corner','top-left');
+  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'performance');
+  await expect(collect).toBeChecked();await expect(page.getByRole('checkbox',{name:'Memória JS do cliente',exact:true})).toBeChecked();
+  await collect.uncheck();await expect(overlay).toBeHidden();
+  expect(errors).toEqual([]);
+});
 
 test('administração ingame: moedas, loja sincronizada, delegação, expulsão e banimento',async({page,browser})=>{
   test.setTimeout(360000);

@@ -1,0 +1,26 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<div class="modal-backdrop"><section class="modal admin-modal"><header class="modal-header"><h2>Administração</h2></header><div id="modal-content"><div id="admin-console"><div class="admin-console"><aside class="admin-nav"><div class="admin-nav-head"><b>Administrador</b></div><nav><button aria-current="true">Emblemas</button></nav></aside><div class="admin-main"><header class="admin-main-head"><h3>Emblemas</h3><p class="admin-feedback" role="status"></p></header><div class="admin-section" id="admin-section"></div></div></div></div></div></section></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/admin.css';
+import {achievementBadges,BADGE_RARITIES} from '../../packages/shared/src/index.ts';
+import {badgesSection} from '../../apps/web/src/admin/badges.ts';
+import {lock} from '../../apps/web/src/admin/kit.ts';
+let badges=[...achievementBadges().map(badge=>({...badge,image:null,holders:3})),...Array.from({length:25},(_,i)=>({id:`manual-${i}`,name:`Emblema ${String(i+1).padStart(2,'0')}`,description:`Descrição do emblema manual ${i+1}.`,icon:'trophy',color:'#fac416',rarity:BADGE_RARITIES[i%5],image:null,holders:i}))];
+const requests=[],writes=[],root=document.querySelector('#admin-section'),feedback=document.querySelector('.admin-feedback');
+const holders=new Map();let failNext=false;
+const api=async(path,data)=>{
+  requests.push(path);
+  if(data){writes.push({path,data});if(failNext){failNext=false;throw new Error('Falha temporária. Tente novamente.');}}
+  if(path==='/admin/badges/delete'){badges=badges.filter(badge=>badge.id!==data.id);return {badges};}
+  if(path==='/admin/badges'&&data){const id=data.id??'created';badges=[...badges.filter(badge=>badge.id!==id),{...data,id,holders:0}];return {badges};}
+  if(path==='/admin/badges')return {badges,images:[]};
+  if(path.endsWith('/holders'))return {holders:holders.get(path.split('/')[3])??[]};
+  if(path.startsWith('/admin/overview')){const search=new URLSearchParams(path.split('?')[1]).get('search');await new Promise(resolve=>setTimeout(resolve,search==='anterior'?600:10));return {users:[{id:search,displayName:search,username:search}]};}
+  if(path==='/admin/badges/grant'){const list=holders.get(data.badgeId)??[];holders.set(data.badgeId,data.grant?[...list,{id:data.playerId,name:data.playerId,grantedAt:new Date().toISOString()}]:list.filter(person=>person.id!==data.playerId));return {};}
+  throw new Error(`Unexpected request: ${path}`);
+};
+const section=badgesSection(root,{api,go:()=>{},async run(job,success){const unlock=lock(root);try{await job();feedback.textContent=success;return true;}catch(error){feedback.textContent=error.message;return false;}finally{unlock();}}},{});
+window.fixture={requests,writes,fail:()=>{failNext=true;},destroy:()=>section.destroy()};
+</script></body></html>

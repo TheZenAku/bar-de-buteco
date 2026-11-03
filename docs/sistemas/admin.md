@@ -20,9 +20,10 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 | Logs | Uma linha do tempo de tudo o que ficou registrado, com filtros |
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
 | Veículos | As motos de entrega do mapa: spawnar perto de você e despawnar ([moto.md](moto.md#spawnar-e-despawnar)) |
-| Emblemas | O catálogo de emblemas: criar, editar, apagar, conceder e retirar, com raridade, ícone da lista ou PNG enviado ([perfil.md](perfil.md#emblemas)). Os 104 emblemas ganhos jogando aparecem aqui com a quantidade que os dá ([conquistas.md](conquistas.md#na-administração)) |
+| Emblemas | O catálogo de emblemas: criar, editar, apagar, conceder e retirar, com raridade, ícone da lista ou PNG enviado ([perfil.md](perfil.md#emblemas)). Os 116 emblemas ganhos jogando aparecem aqui com a quantidade que os dá, incluindo sinuca e truco ([conquistas.md](conquistas.md#na-administração)) |
 | Coleção | As cartas de personagem e as habilidades: raridade, preço, texto, situação de venda, quantos donos e quanto renderam, com a carta ao vivo ([skins.md](skins.md)) |
 | Servidor | Processos da API e do mundo, memória e disco da máquina, banco de dados e filas |
+| Desempenho | FPS, 1% low, tempo de frame, travadas, CPU/GPU, memória, rede e tick do servidor; seleção de métricas para o HUD e relatório JSON ([desempenho.md](desempenho.md)) |
 
 O menu mostra quantas denúncias estão abertas. Nomes de jogadores em qualquer categoria (logs, denúncias, ranking, mundo) abrem a ficha do jogador.
 
@@ -132,6 +133,12 @@ O mundo guarda os eventos em uma fila e envia em lotes a cada rodada de manuten�
 ## Veículos
 
 A coluna Situação mostra quem pilota cada moto e se ela está estacionada, desgovernada, caída ou sendo levantada ([batidas](moto.md#batidas)). O mapa não tem moto até alguém criar uma aqui. **Spawnar moto** (`admin.moto.spawn`) põe uma na rua livre mais perto de você; **Despawnar** e **Despawnar todas** (`admin.moto.despawn`) tiram do mapa, e quem estiver pilotando desce na hora. A sala confere o papel `admin` em cada comando e registra `admin_moto_spawn` e `admin_moto_despawn` no log. Detalhes em [moto.md](moto.md#spawnar-e-despawnar).
+
+## Emblemas
+
+O catálogo mostra oito emblemas por página, com busca instantânea por nome, descrição ou identificador (sem distinguir acentos), filtros de raridade e origem (conquistas automáticas ou concessão manual) e ordenação por nome, raridade ou quantidade de jogadores. **Novo emblema** abre a criação; **Editar** abre o formulário direto no topo, sem atravessar a lista. **Catálogo** volta à página, aos filtros e à posição anteriores.
+
+Dentro de um emblema, **Editar emblema** e **Quem tem** separam o formulário da concessão e retirada de jogadores. Os jogadores só são carregados ao abrir essa área. Nome, descrição e motivo são preservados ao mudar a aparência ou alternar entre as duas áreas; **Cancelar** descarta a edição. A barra de salvar fica acessível durante a rolagem. No celular, os cartões e o formulário ficam em uma coluna; as galerias de ícones e imagens têm rolagem própria.
 
 ## Servidor
 

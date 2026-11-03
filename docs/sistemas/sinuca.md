@@ -162,6 +162,10 @@ Para ver o painel sem servidor, abra `tests/fixtures/pool.html` pela Vite (`/@fs
 - `fixture.lobby()` mostra o lobby.
 - `?clean` esconde a barra, e `?play` ou `?watch` começa direto.
 
+## Conquistas
+
+**Mestre da Sinuca I–IV**: 1, 10, 50 e 200 partidas vencidas, contra pessoas ou o Juca. O juiz da mesa confirma o resultado antes da contagem; desistência e W.O. por desconexão não contam. Progresso, avisos e emblemas ficam no perfil e na administração ([conquistas.md](conquistas.md)).
+
 ## Mensagens
 
 | Do navegador | O que faz |

@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import {ServerPerformanceSampler} from './performance.js';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
@@ -15,7 +16,7 @@ import { KICK, KICKS, kickAim, kickClear, kickLaunch, kickTouches, kickWindow } 
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
-import { TrucoTable } from './minigames/truco.js';
+import { TrucoTable, type TrucoSummary } from './minigames/truco.js';
 import { BlackjackBank, GameBank, type BankEntry } from './minigames/blackjack-bank.js';
 import { FoosballTable, type FoosballSummary } from './minigames/foosball.js';
 import { PoolTable, type PoolSummary } from './minigames/pool.js';
@@ -242,7 +243,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private truco = new TrucoTable('truco-1', {
     view: (playerId, view) => this.sessions.getByUser(playerId)?.client.send('truco.view', view),
     notice: (playerId, message) => this.sessions.getByUser(playerId)?.client.send('error', { message }),
-    onMatch: summary => this.log('truco_match', { ...summary, score: summary.score.join(' x ') }),
+    onMatch: summary => this.trucoMatch(summary),
     bank: this.trucoBank,
     stakes: () => trucoStakes(this.prices),
     random: randomInt,
@@ -303,7 +304,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
     for (const job of JOBS) this.state.jobs.set(job.id, new JobSlotState());
     this.syncJobs();
-    this.setFixedTimestep(() => { const started = performance.now(); this.step(); worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', performance.now() - started); }, 1000 / TICK_MS);
+    this.setFixedTimestep(() => { const started = performance.now(); this.step(); const ms=performance.now()-started;this.performanceSampler.record(ms);worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', ms); }, 1000 / TICK_MS);
     health.roomId = this.roomId;
     worldMetrics.gauge('bar_world_players_connected', 'Players connected to the bar', () => [...this.state.players.values()].filter(p => p.connected).length);
     worldMetrics.gauge('bar_world_avatars', 'Avatars in the bar, including those waiting offline', () => this.state.players.size);
@@ -484,7 +485,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { this.performanceSampler.destroy();this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -722,6 +723,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     // Administration and debugging (role from the session, refreshed every maintenance round).
     this.handle('admin.world',z.object({}).strict(),2,client=>{this.requireAdmin(client);client.send('admin.world',this.adminSnapshot());});
+    this.handle('admin.performance',z.object({}).strict(),1,client=>{
+      this.requireAdmin(client);
+      client.send('admin.performance',this.performanceSampler.snapshot({players:this.state.occupancy,capacity:this.state.capacity,npcs:this.state.npcs.size,motos:this.state.motos.size,
+        walletRetries:this.walletRetries.size,resultOutbox:this.results.pending,logQueue:this.logQueue.length,apiAgeMs:health.apiOkAt?Date.now()-health.apiOkAt:null}));
+    });
     this.handle('admin.job',z.object({jobId:z.string().max(32),enabled:z.boolean().optional(),pay:z.number().int().min(0).max(100).optional(),slots:z.number().int().min(0).max(16).optional(),endShiftOf:z.string().max(64).optional()}).strict(),5,(client,command)=>{
       const admin=this.requireAdmin(client);
       if(command.endShiftOf){const target=this.state.players.get(command.endShiftOf);if(!target||!this.jobs.shift(target.id))throw new Error('Este jogador não está trabalhando.');this.endShift(target,'Um administrador encerrou o seu turno.');}
@@ -2169,6 +2175,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     return presence.ticket.userId;
   }
   /** What the in-game administration panel shows to debug the world: people, orders, jobs, devices, queues. */
+  private performanceSampler=new ServerPerformanceSampler();
   private adminSnapshot(){
     const now=Date.now();
     return {
@@ -2545,6 +2552,12 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   // ── Truco ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+  /** A whole match, after the final score: only the winning people still at the table earn a victory. */
+  private trucoMatch(summary: TrucoSummary): void {
+    this.log('truco_match', { ...summary, score: summary.score.join(' x ') });
+    for (const player of summary.players) if (player.won) this.achieved(player.id, 'rei-do-truco');
+  }
+
   /** E at the truco table: a chair, and the panel opens. The table says where; a match in play has no chair to give. */
   private joinTruco(client: Client): void {
     const player = this.player(client), object = INTERACTABLES.find(i => i.id === 'truco-1')!;
@@ -2836,6 +2849,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const place = POOL_TABLES.find(t => t.id === summary.tableId)!;
     for (const p of summary.players) this.log('pool_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, seat: p.seat, result: p.result, rack: summary.rack,
       reason: summary.reason, forfeit: summary.forfeit, cpu: summary.cpu, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
+    if (!summary.forfeit) for (const player of summary.players) if (player.result === 'win') this.achieved(player.playerId, 'mestre-da-sinuca');
     const origin = this.state.players.get(summary.players[0]?.playerId ?? '');
     if (origin) this.systemMessage(`Sinuca, mesa ${place.number}: ${summary.winner} venceu ${summary.loser} (${summary.reason.charAt(0).toLowerCase()}${summary.reason.slice(1)})${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
   }

@@ -17,7 +17,7 @@ export interface Badge {id:string;name:string;description:string;icon:string;col
 /** A badge image's id: the SHA-256 of the file. */
 export const BADGE_IMAGE_ID=/^[0-9a-f]{64}$/;
 /** The icons a badge can carry (apps/web/src/ui-icons.ts). */
-export const BADGE_ICONS=['trophy','shield','heart','bolt','sparkles','party','flame','beer','music','mic','cards','ball','bike','wrench','coins','gift','moon','sun','compass','ghost','hand','flag','key','seat','food','smoke','toilet','dizzy','briefcase','clock','chat','messageCircle','gram','transfer','phone'] as const;
+export const BADGE_ICONS=['trophy','shield','heart','bolt','sparkles','party','flame','beer','music','mic','cards','ball','pool','bike','wrench','coins','gift','moon','sun','compass','ghost','hand','flag','key','seat','food','smoke','toilet','dizzy','briefcase','clock','chat','messageCircle','gram','transfer','phone'] as const;
 
 // Durations of the source FBX clips (tools/assets/convert-animations.mjs).
 export const KICK_DURATION_MS = 2000;

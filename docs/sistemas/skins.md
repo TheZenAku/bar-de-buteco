@@ -20,6 +20,7 @@ Um **personagem** tem um original e, se houver, **variantes**. Cada variante é 
 | Gilmar | | Raro | 900 |
 | Gabriel | | Raro | 900 |
 | Flavio Hipotético | | Raro | 900 |
+| Tião | | Raro | 900 |
 | Rafael | | Épico | 1.000 |
 | Rafael Rosé | Rafael | Lendário | 2.500 |
 

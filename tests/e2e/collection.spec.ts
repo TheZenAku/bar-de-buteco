@@ -12,7 +12,7 @@ test.describe('the collection, on its own',()=>{
 
   test('one card per character, variants beside the one in focus, and the keys go through them',async({page})=>{
     const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-    await expect(page.locator('.cl-hand-card')).toHaveCount(7);
+    await expect(page.locator('.cl-hand-card')).toHaveCount(8);
     await expect(page.locator('.cl-hand-card[aria-selected="true"]')).toHaveAttribute('data-base','rafael');
     await expect(page.locator('.cl-variant')).toHaveCount(2);
     await expect(page.locator('.cl-name')).toHaveText('Rafael');
@@ -41,7 +41,7 @@ test.describe('the collection, on its own',()=>{
     await page.keyboard.press('Enter');
     await expect(page.locator('.cl-reveal')).toHaveCount(0);
     await expect(page.locator('.cl-buy .cl-cta')).toHaveText(/Vestindo/);
-    await expect(page.locator('.cl-progress small')).toHaveText('3 de 8 cartas');
+    await expect(page.locator('.cl-progress small')).toHaveText('3 de 9 cartas');
     // The hand shows what is being worn.
     await expect(page.locator('.cl-hand-card[data-base="rafael"] .sc-card')).toHaveAttribute('data-skin','rafael-rose');
   });

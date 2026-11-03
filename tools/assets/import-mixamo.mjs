@@ -3,7 +3,7 @@
 // seams kept) and the textures embedded; then the Idle/Walk/Pose base clips are added from Nathan.
 // The mesh and its weights come from, in this order:
 //  - the download itself, when it is "FBX Binary, With Skin" (Rafael, Gabriel);
-//  - glb: a GLB already rigged with Mixamo names, with its own weights, normals and texture (Flavio Hipotético, Leandro, Rafael Rosé, Tonico);
+//  - glb: a GLB already rigged with Mixamo names, with its own weights, normals and texture (Flavio Hipotético, Leandro, Rafael Rosé, Tonico, Tião);
 //  - rig: the character's previous AccuRig GLB, posed into the Mixamo T-pose; its weights move to the matching bones;
 //  - mesh: the unrigged source, with automatic weights (lib/auto-weights.mjs).
 // usage: node tools/assets/import-mixamo.mjs [skin...]  (default: every skin)
@@ -37,6 +37,7 @@ const skins={
   read:{name:'Read',fbx:'outros/read-mixamo.fbx',rig:'accurig/read.glb',height:1.86},
   magrao:{name:'Magrao',fbx:'outros/magrao-mixamo.fbx',rig:'accurig/magrao.glb',height:1.86},
   tonico:{name:'Tonico',glb:'../../skins/Tonico/Tonico.glb',height:1.86},
+  tiao:{name:'Tião',glb:'../../skins/Tiao/tiao.glb',height:1.8},
 };
 // About the heaviest AccuRig skin (Read, 98k); several players share the screen.
 const TRIANGLES=100000;

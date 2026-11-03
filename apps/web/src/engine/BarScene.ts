@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import type {RenderPerformance} from '../performance/monitor';
 import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
@@ -173,7 +174,7 @@ interface Pose {
 const DEFAULT_MODEL='nathan';
 // Models and canes follow their rig version; regenerated animation banks have a separate cache version.
 const MOUSE_JUMP = 500;
-const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101' };
+const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103' };
 const skinAsset = (folder: string, file: string, id: string): string => {
   const version = folder === 'animations' ? 'mixamo-actions-20261101' : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
@@ -389,6 +390,14 @@ export class BarScene {
     this.callbacks = callbacks;
     this.app = new pc.Application(canvas, {
       graphicsDeviceOptions: { alpha: true, premultipliedAlpha:false, antialias: true, powerPreference: 'high-performance' },
+    });
+    this.app.on('frameend',()=>{
+      if(!this.performanceObserver)return;
+      if(!this.enabled||document.hidden){this.performanceObserver(null);return;}
+      const stats=this.app.stats,device=this.app.graphicsDevice;
+      this.performanceObserver({updateMs:stats.cpuUpdateTime,renderMs:stats.cpuRenderTime,gpuMs:stats.gpuFrameTime??null,
+        drawCalls:stats.drawCallCount,primitives:stats.primitiveCount??null,vram:stats.vramTotalBytes,
+        width:device.width,height:device.height,scale:this.scale,actors:this.actors.size,compiling:this.compilingLastFrame});
     });
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     // The canvas fills its box (resize): PlayCanvas's default keeps the first size's aspect, which left a band under the
@@ -1138,6 +1147,14 @@ export class BarScene {
     return labels;
   }
 
+  private performanceObserver:((frame:RenderPerformance|null)=>void)|undefined;
+  private previousGpuProfiling=false;
+  setPerformanceObserver(observer:((frame:RenderPerformance|null)=>void)|undefined):void {
+    const profiler=this.app.graphicsDevice.gpuProfiler;
+    if(observer&&!this.performanceObserver){this.previousGpuProfiling=profiler?.enabled??false;if(profiler)profiler.enabled=true;}
+    if(!observer&&this.performanceObserver&&profiler)profiler.enabled=this.previousGpuProfiling;
+    this.performanceObserver=observer;
+  }
   getPerformance(): { fps: number; actors: number; resting: number } {
     let resting = 0;for (const avatar of this.actors.values()) if (avatar.resting) resting++;
     return { fps: this.fps, actors: this.actors.size, resting };

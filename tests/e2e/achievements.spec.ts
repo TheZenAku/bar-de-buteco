@@ -1,5 +1,6 @@
 import {test,expect,type APIRequestContext,type Browser,type Page} from '@playwright/test';
 import {internalSecret} from '@bar/shared/tickets';
+import {achievementBadges} from '../../packages/shared/src/achievements';
 import {enterAsAdmin} from './moto-helpers';
 
 const API='http://127.0.0.1:3111';
@@ -54,7 +55,7 @@ test('badges earned by playing: the notice, the card, the progress tab and the c
   await page.locator('.pf-tabs [data-tab="achievements"]').click();
   const bebum=page.locator('.pf-ach[data-series="bebum"]');
   await expect(bebum.locator('small')).toHaveText('10 de 50 cervejas');
-  await expect(page.locator('.pf-panel .pf-lead')).toContainText('de 108 emblemas');
+  await expect(page.locator('.pf-panel .pf-lead')).toContainText(`de ${achievementBadges().length} emblemas`);
   await expect(page.locator('.pf-panel .pf-lead b')).toHaveText('1');
   await expect(bebum.locator('button.pf-ach-medal')).toHaveCount(1);await expect(bebum.locator('span.pf-ach-medal')).toHaveCount(3);
   // A started series comes before one nobody touched.
@@ -106,7 +107,14 @@ test('the administration: what gives a badge by itself, and a manual grant reach
   await expect(toast(page,'Motoboy III')).toBeVisible({timeout:15000});
   await page.getByRole('button',{name:'Administração'}).click();
   await page.locator('[data-admin-nav="badges"]').click();
+  await page.locator('[name="badge-query"]').fill('Bebum IV');
   await expect(page.locator('#admin-section')).toContainText('Automático, ao chegar a 1.000 cervejas');
+  for(const name of ['Mestre da Sinuca','Rei do Truco']){
+    await page.locator('[name="badge-query"]').fill(name);
+    await expect(page.locator('.admin-badge-item h4')).toHaveText(['I','II','III','IV'].map(tier=>`${name} ${tier}`));
+    await expect(page.locator('.admin-badge-item .admin-badge-earned').first()).toContainText('Automático, ao chegar a 1 partida');
+    await expect(page.locator('.admin-badge-item .admin-badge-earned').last()).toContainText('200 partidas');
+  }
   await shot(page,'achievement-admin');
   await context.close();
 });

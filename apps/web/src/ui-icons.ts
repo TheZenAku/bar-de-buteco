@@ -145,6 +145,7 @@ const paths:Record<string,string>={
   percent:'<line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
   // Pebolim: a football (drawn in Lucide's stroke style; Lucide has none), the trophy and raising the figures.
   ball:'<circle cx="12" cy="12" r="10"/><path d="m12 7 4.3 3.1-1.6 5H9.3l-1.6-5z"/><path d="M12 2v5"/><path d="m21.5 9.5-5.2.6"/><path d="m18.2 19.8-3.5-4.7"/><path d="m5.8 19.8 3.5-4.7"/><path d="m2.5 9.5 5.2.6"/>',
+  pool:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="10.5" rx="1.5" ry="1.2"/><ellipse cx="12" cy="13.2" rx="1.8" ry="1.5"/>',
   trophy:'<path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/>',
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
 };

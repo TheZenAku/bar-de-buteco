@@ -1,10 +1,12 @@
 import type {PublicUser} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
+import type {PerformanceMonitor} from '../performance/monitor';
 
 export {e,uiIcon};
 /** What every section of the administration gets from the console (console.ts). */
 export interface AdminContext {
+  performance:PerformanceMonitor;
   api:typeof api;
   user:()=>PublicUser|undefined;
   /** The world's last admin.world snapshot (null until it arrives), and how to ask for a new one. */
@@ -21,7 +23,7 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'highfood'|'badges'|'collection'|'server';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 

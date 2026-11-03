@@ -122,6 +122,10 @@ lobby → shuffling → dealing → (eleven) → playing ⇄ bet
 
 Quem sai é substituído por um NPC na hora, e a partida continua. Sem nenhuma pessoa na mesa, ela volta ao lobby.
 
+## Conquistas
+
+**Rei do Truco I–IV**: 1, 10, 50 e 200 partidas completas vencidas. A vitória conta para cada pessoa da dupla vencedora que permaneceu até o fim, contra pessoas ou NPCs. Mãos e vazas isoladas não contam; quem abandona não ganha se a dupla vencer depois. Progresso, avisos e emblemas ficam no perfil e na administração ([conquistas.md](conquistas.md)).
+
 ## Privacidade
 
 As cartas nunca entram no estado sincronizado da sala. `TrucoTable.viewFor` monta a visão de cada lugar, e a sala envia por mensagem (`truco.view`) só para aquela pessoa. As outras mãos aparecem como uma contagem de cartas. `partnerCards` só existe para a dupla na Mão de 11, enquanto decide. No Escuro, nem a própria mão vem aberta.

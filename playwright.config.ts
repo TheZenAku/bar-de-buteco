@@ -9,7 +9,7 @@ export default defineConfig({
   projects:[
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
-    {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts','**/mouse-capture.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
+    {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts','**/mouse-capture.spec.ts','**/admin-badges.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
     {name:'camera',testMatch:'**/camera.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.4'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'media',testMatch:['**/jukebox.spec.ts','**/media-platforms.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'media-firefox',testMatch:'**/media-firefox.spec.ts',use:{browserName:'firefox',channel:'',launchOptions:{args:[]}}},
@@ -30,7 +30,7 @@ export default defineConfig({
     {name:'kick',testMatch:'**/kick.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.12'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     // The city: streamed sectors, the real game on the bike; drawn on the GPU like the stage.
     {name:'garage',testMatch:'**/garage-trade.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.13'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
-    {name:'highfood',testMatch:'**/highfood.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.11'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
+    {name:'highfood',testMatch:['**/highfood.spec.ts','**/highmotors.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.11'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'city',testMatch:'**/city.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.8'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'stage',testMatch:'**/stage.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // Chromium's fake microphone; localhost is a secure context, so getUserMedia works without HTTPS.

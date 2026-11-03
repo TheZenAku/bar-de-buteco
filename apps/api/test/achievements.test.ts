@@ -46,6 +46,11 @@ test('the migration counts what the database already knows, and leaves earlier b
   assert.deepEqual(given.map(row=>`${row.user_id}:${row.badge_id}`),['ana:fofoqueiro-1','ana:fundador','ana:pix-1','ana:rei-do-21-1','ana:rei-do-21-2','bia:influencer-1']);
   assert.ok(given.find(row=>row.badge_id==='fundador')!.notified_at,'a badge from before is not news');
   assert.equal(given.find(row=>row.badge_id==='pix-1')!.notified_at,null,'one the migration gives is');
+  const minigameMigration=await readFile(join(defaultMigrationFolder,'016_minigame_achievements.sql'),'utf8');
+  await db.query("UPDATE badges SET name='Taco de ouro' WHERE id='mestre-da-sinuca-1'");
+  await db.exec(minigameMigration);
+  assert.equal((await db.query<{name:string}>("SELECT name FROM badges WHERE id='mestre-da-sinuca-1'")).rows[0]!.name,'Taco de ouro','replaying the insert preserves administrator edits');
+  assert.equal((await db.query<{count:number}>("SELECT count(*)::int AS count FROM badges WHERE id LIKE 'mestre-da-sinuca-%' OR id LIKE 'rei-do-truco-%'")).rows[0]!.count,8);
 });
 
 test('achievements: counters, badges at each goal, told once, and what the phone counts',async t=>{
@@ -144,4 +149,23 @@ test('achievements: counters, badges at each goal, told once, and what the phone
   await ana.get('/api/wardrobe');await api.db.update(wallets).set({balance:50}).where(eq(wallets.userId,ana.id));
   await pix(firstPix);await pix(firstPix);
   assert.equal((await series(ana,'pix')).value,1);assert.ok((await owned(ana)).includes('pix-1'));
+
+  // The new games use the same persistence, profile, administration and single notification per tier.
+  for(const id of ['mestre-da-sinuca','rei-do-truco']){
+    const player=await register(id==='rei-do-truco'?'truqueiro':'sinuqueiro');
+    assert.deepEqual((await series(player,id)).tiers.map((tier:any)=>tier.goal),[1,10,50,200]);
+    const badge=achievementBadges().find(badge=>badge.id===`${id}-1`)!;
+    const edited=await owner.post('/api/admin/badges',{...badge,reason:'Revisão do novo emblema'});
+    assert.equal(edited.statusCode,200,edited.body);
+    for(const [amount,level,rarity] of [[1,1,'common'],[9,2,'uncommon'],[40,3,'rare'],[150,4,'legendary']] as const){
+      const unlocked=await report([{userId:player.id,series:id,amount}],[player.id]);
+      assert.deepEqual(unlocked.map(each=>[each.userId,each.badge.id,each.badge.rarity]),[[player.id,`${id}-${level}`,rarity]]);
+      assert.deepEqual(await report([],[player.id]),[],'a result poll does not give or announce it twice');
+    }
+    assert.equal((await series(player,id)).value,200);
+    assert.deepEqual((await owned(player)).sort(),[1,2,3,4].map(level=>`${id}-${level}`));
+    assert.equal((await owner.post('/api/admin/badges/grant',{playerId:player.id,badgeId:`${id}-1`,grant:false,reason:'Retirada para teste'})).statusCode,200);
+    await report([{userId:player.id,series:id,amount:1}],[player.id]);
+    assert.equal((await owned(player)).includes(`${id}-1`),false,'a revoked game badge stays revoked');
+  }
 });

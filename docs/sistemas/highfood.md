@@ -32,7 +32,11 @@ A **nota** é a média das últimas 50 entregas. Cada entrega vale 5 estrelas, m
 
 ## App HighMotors
 
-O anúncio com foto, preço e **Comprar**, com confirmação e o saldo depois, e os veículos do jogador: placa, estado geral, quilômetros rodados, onde está, o que precisa de conserto, **Marcar no mapa** ou **Ir à garagem**, e **Guincho**. Dá para ter mais de uma moto, até 10.
+O app abre em **Meus veículos**, separado da aba **Loja**. O saldo fica no cabeçalho. Dá para ter mais de uma moto, até 10.
+
+- **Meus veículos:** lista compacta com foto, nome, placa, quilômetros, localização e aviso de peças com desgaste. Busca por nome ou placa (sem exigir acentos ou pontuação) e filtros **Todos**, **Na garagem**, **Na rua** e **Atenção**. Ao abrir um veículo, aparecem o estado de todas as peças, **Marcar no mapa** ou **Ir à garagem** e **Guincho**. Voltar preserva a busca, o filtro e a posição na lista.
+- **Loja:** anúncio identificado como **À venda**, com foto, preço e quantos daquele modelo você já tem. **Ver detalhes** abre as especificações e **Comprar veículo**, seguido da confirmação com o saldo depois. A compra concluída leva a **Ver meus veículos**, à rota até a garagem ou ao Highfood. Saldo insuficiente e limite de veículos explicam por que não é possível comprar.
+- Sem veículos, a garagem mostra **Explorar a loja**. Falha ao carregar oferece **Tentar novamente**. As duas abas aceitam navegação pelas setas do teclado, Home e End e acompanham os temas claro e escuro do celular.
 
 - A moto fica na [garagem](garagem.md). Sem o dono por 60 s, ela volta para lá, com o estado salvo.
 - **Guincho (30 moedas):** traz a moto até a rua mais perto do jogador, esteja onde estiver.

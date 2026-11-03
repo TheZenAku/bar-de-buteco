@@ -1,0 +1,18 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0;background:#25282b}#phone{transform:none!important;transition:none!important}.ph-app{animation:none!important}</style></head><body>
+<div id="phone" class="open"><div class="phone-device"><div class="phone-screen dk in-app" data-app="highmotors"><div class="ph-app-host"><div class="ph-app ph-app-highmotors"></div></div><div class="ph-status"><span>14:32</span><span class="ph-status-right"><small>5G</small><span class="ph-battery"><b></b></span></span></div><div class="ph-island"></div><div class="ph-home-bar"></div></div></div></div>
+<script type="module">
+import '../../apps/web/src/phone/phone.css';
+import '../../apps/web/src/highfood/highfood.css';
+import '../../apps/web/src/trade/trade.css';
+import {highmotors} from '../../apps/web/src/phone/apps/motors.ts';
+let balance=25000,destroy;
+const events=[],world={players:{me:{x:-5,y:0,z:-5}},motos:{}},view=document.querySelector('.ph-app');
+const host={user:()=>({id:'me'}),world:()=>world,wallet:()=>balance,balance:value=>{balance=value;events.push({type:'balance',value});},send:(type,data)=>events.push({type,data}),error:text=>events.push({type:'error',text}),gps:{setWaypoint:data=>events.push({type:'waypoint',data})},food:{setOwned:value=>events.push({type:'owned',value})}};
+const ctx={host,open:app=>events.push({type:'open',app})};
+function open(options={}){destroy?.();if(options.balance!==undefined)balance=options.balance;if(options.motos)world.motos=options.motos;destroy=highmotors.open(view,ctx);}
+function layout(){const scale=Math.min(.88,(innerHeight-24)/864,(innerWidth-24)/410);document.querySelector('#phone').style.setProperty('--phone-scale',scale);}
+addEventListener('resize',layout);layout();
+window.fixture={events,world,open,destroy:()=>destroy?.(),theme:dark=>document.querySelector('.phone-screen').classList.toggle('dk',dark)};
+open();
+</script></body></html>

@@ -14,7 +14,7 @@ function animate(model,bank,name){
   return {nodes,at(t){mixer.setTime(t);nodes[0].updateMatrixWorld(true);}};
 }
 const limbs={upperarm:'lowerarm',lowerarm:'hand',upperleg:'lowerleg',lowerleg:'foot'};
-for(const id of ['leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico']){
+for(const id of ['leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico','tiao']){
   test(`${id}: native limbs follow the source motion across different A/T poses without stretching`,()=>{
     const model=load(id),reference=load('nathan'),rig=createRetarget(objects(model.json),objects(reference.json));
     const rest=objects(model.json),lengths=rest.map(n=>n.parent?n.getWorldPosition(new Vector3()).distanceTo(n.parent.getWorldPosition(new Vector3())):0);

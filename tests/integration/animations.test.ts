@@ -16,7 +16,7 @@ const DANCES = ['Dancing', 'Dancing Twerk', 'Hip Hop Dancing', 'Hip Hop Dancing 
   'Hip Hop Dancing (8)', 'Salsa Dancing', 'Salsa Dancing (2)', 'Samba Dancing', 'Swing Dancing', 'Twist Dance', 'Wave Hip Hop Dance'].map(name => `Dance ${name}`);
 
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico']) for (const file of [skin, `${skin}-dances`]) {
+  for (const skin of ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico', 'tiao']) for (const file of [skin, `${skin}-dances`]) {
     const { json, bin } = glb(`animations/${file}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
@@ -81,6 +81,7 @@ const MIXAMO_SKINS = [
   {id:'gilmar-gordo',name:'Gilmar',joints:41,weights:'automatic'},
   {id:'gabriel',name:'Gabriel',joints:34,weights:'mixamo'},
   {id:'flavio-hipotetico',name:'Flavio Hipotético',joints:65,weights:'mixamo'},
+  {id:'tiao',name:'Tião',joints:65,weights:'mixamo'},
 ] as const;
 for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has its own Mixamo skeleton, normalized ${source} weights and embedded materials`, () => {
   const {json,bin}=glb(`models/${id}.glb`);
@@ -106,7 +107,7 @@ for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has it
     const material=json.materials[primitive.material];
     assert.ok(material.pbrMetallicRoughness.baseColorTexture);
     // Tripo delivered these with a colour map only.
-    if(!['gabriel','rafael','rafael-rose','leandro','tonico','flavio-hipotetico'].includes(id))assert.ok(material.normalTexture);
+    if(!['gabriel','rafael','rafael-rose','leandro','tonico','flavio-hipotetico','tiao'].includes(id))assert.ok(material.normalTexture);
     // Mixamo downloads drop the normals; the importer restores them.
     assert.ok(primitive.attributes.NORMAL!==undefined);
     // Simplification must not bridge distant parts (e.g. a fingertip to the hip), which stretch in every pose.

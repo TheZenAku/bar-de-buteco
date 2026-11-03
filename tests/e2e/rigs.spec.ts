@@ -7,7 +7,7 @@ test('all rendered rigs return to the same pose after actions without resetting 
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.goto('/rigs.html');
   await page.evaluate(()=>(window as any).rigFixture.ready);
-  await expect(page.locator('#skin option')).toHaveCount(11);
+  await expect(page.locator('#skin option')).toHaveCount(12);
 
   // Use the actual loaded render entities and AnimComponent. The inspector normally resets
   // between selections for visual comparison; these transitions deliberately keep the graph.
@@ -51,7 +51,7 @@ test('all rendered rigs return to the same pose after actions without resetting 
     }
     return results;
   });
-  expect(comparisons).toHaveLength(50);
+  expect(comparisons).toHaveLength(55);
   for(const {from,to,skin,maxError,bone} of comparisons)
     expect(maxError,`${skin}: ${bone} retained a pose from ${from} when entering ${to}`).toBeLessThan(.0001);
   expect(errors).toEqual([]);

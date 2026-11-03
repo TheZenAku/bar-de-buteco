@@ -11,6 +11,7 @@ Cada personagem tem o próprio esqueleto Mixamo, auto-rigado no próprio corpo. 
 | Leandro | `assets-bar/skins/Leandro/Leandro.glb` (GLB já riggado) | Do próprio arquivo, com as normais | O JPEG embutido no GLB |
 | Rafael Rosé (`rafael-rose`) | `assets-bar/skins/Rafael/Black/Rafael_GokuBlack.glb` (GLB já riggado) | Do próprio arquivo, com as normais | O JPEG embutido no GLB |
 | Tonico (só o NPC, fora da coleção) | `assets-bar/skins/Tonico/Tonico.glb` (GLB já riggado) | Do próprio arquivo, com as normais | O JPEG embutido no GLB |
+| Tião (`tiao`) | `assets-bar/skins/Tiao/tiao.glb` (GLB já riggado) | Do próprio arquivo, com as normais | O JPEG embutido no GLB |
 | Read, Magrão | `outros/<id>-mixamo.fbx` | Rig AccuRig anterior em `assets-bar/mixamo/accurig/<id>.glb` | As do rig anterior |
 
 ## Fluxo
@@ -28,7 +29,7 @@ Cada personagem tem o próprio esqueleto Mixamo, auto-rigado no próprio corpo. 
 - **Rig anterior** (`rig`): o modelo AccuRig é posto na T-pose do Mixamo (cada membro alinhado à direção do esqueleto novo) e a malha deformada vira a nova pose de bind. Os pesos passam para os ossos Mixamo correspondentes: torções vão para o membro; dedos médio, anelar e mínimo vão para o indicador (o esqueleto Mixamo tem polegar e indicador); ossos de cotovelo, joelho e planta do pé dividem o peso entre os dois lados da articulação. As juntas Mixamo são ajustadas aos pivôs do rig anterior, para os quais os pesos foram pintados (deslocamentos de até 15 cm).
 - **Malha sem rig** (`mesh`): pesos automáticos (`tools/assets/lib/auto-weights.mjs`, no estilo "bone heat"). Cada vértice se prende ao osso mais próximo que enxerga de dentro do corpo. Camadas soltas, como a barra da camisa sobre o short, ficam com o osso atrás do menor número de superfícies. A coxa e o braço não alcançam o que está acima da própria articulação, então o quadril fica com a pelve e o short não atravessa a camisa ao andar. Depois os pesos se difundem pela superfície, com no máximo quatro influências por vértice e corte abaixo de 4%.
 
-Em todos os casos, a malha é simplificada para até 100 mil triângulos com meshoptimizer (costuras de UV preservadas) e a altura é normalizada (Rafael e Rafael Rosé 1,75 m; Gilmar, Gabriel e Flavio Hipotético 1,80 m; os demais 1,86 m). As texturas são incorporadas: cor base e normal em JPEG 2048, metálico/rugosidade em PNG 512, ou as do rig anterior. Quem só tem a cor (`texture`) leva o arquivo como veio. Depois são acrescentados Idle, Walk e Pose a partir do Nathan.
+Em todos os casos, a malha é simplificada para até 100 mil triângulos com meshoptimizer (costuras de UV preservadas) e a altura é normalizada (Rafael e Rafael Rosé 1,75 m; Gilmar, Gabriel, Flavio Hipotético e Tião 1,80 m; os demais 1,86 m). As texturas são incorporadas: cor base e normal em JPEG 2048, metálico/rugosidade em PNG 512, ou as do rig anterior. Quem só tem a cor (`texture`) leva o arquivo como veio. Depois são acrescentados Idle, Walk e Pose a partir do Nathan.
 
 O cliente acrescenta `?v=` às URLs do modelo, do banco e da bengala das skins reimportadas (`SKIN_VERSIONS` em `BarScene.ts`), para que o navegador não misture arquivos de esqueletos diferentes.
 
@@ -53,6 +54,10 @@ Substituído em 01/11/2026 pelo personagem da Tripo em `assets-bar/skins/Leandro
 Variante de Rafael, em `assets-bar/skins/Rafael/Black`, de quimono escuro e faixa vermelha. 65 ossos, 10.597 triângulos, 1,75 m como Rafael. É uma carta própria ([coleção](../sistemas/skins.md)), com banco de animações próprio, que inclui os clipes `Kick` e `AirKick` de Rafael (`exclusive` em `tools/assets/convert-animations.mjs`). A tabela de golpes (`kick-paths.ts`) é medida em `rafael.glb` e vale para as duas cartas.
 
 O arquivo pintou o antebraço em 68 vértices da lateral da calça. A opção `strayArms` do importador tira essa influência dos vértices que seguem principalmente a perna. A limpeza é só nessa direção: a faixa vermelha é majoritariamente braço, e é o pouco de perna que a mantém na cintura quando o braço sobe. O topo da calça fecha com um leque de triângulos escondido sob a faixa, com arestas de 14% da altura, e por isso o teste de arestas aceita até 15% nesta skin.
+
+## Tião
+
+Importado em 03/11/2026 de `assets-bar/skins/Tiao/tiao.glb`, da Tripo. O arquivo traz 65 ossos Mixamo, 10.695 triângulos, normais, pesos e uma textura de cor JPEG embutida. A altura de origem é de aproximadamente 1 m, normalizada para 1,80 m, sem simplificar a malha. É uma carta Rara da coleção, por 900 moedas (`SKIN_PRICE_TIAO`), com bancos próprios de ações e danças, bengala e arte da carta com giro.
 
 ## Flavio Hipotético
 

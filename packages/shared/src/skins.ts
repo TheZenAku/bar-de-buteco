@@ -6,7 +6,7 @@ import {RARITIES,type Rarity} from './rarity.js';
  * own model (apps/web/public/models/<id>.glb) sold on its own. What stands here are the defaults; the administration overrides the rarity,
  * the text and whether a card is sold (skin_catalog), and the price (the price table).
  */
-export const SKIN_IDS=['nathan','leandro','rafael','rafael-rose','read','gilmar-gordo','gabriel','flavio-hipotetico'] as const;
+export const SKIN_IDS=['nathan','leandro','rafael','rafael-rose','read','gilmar-gordo','gabriel','flavio-hipotetico','tiao'] as const;
 export type SkinId=typeof SKIN_IDS[number];
 export interface Skin {
   id:SkinId;
@@ -31,6 +31,7 @@ export const SKINS:readonly Skin[]=[
   {id:'gilmar-gordo',name:'Gilmar',base:'gilmar-gordo',variant:'Original',rarity:'rare',price:900,accent:'#f0a13c',description:'Camisa florida, chapéu de palha e chinelo. Quando ele chega, a mesa aumenta e a conta também.'},
   {id:'gabriel',name:'Gabriel',base:'gabriel',variant:'Original',rarity:'rare',price:900,accent:'#3cc7f0',description:'Veio direto da pelada, de chuteira e tudo. Sempre de saída e nunca vai embora.'},
   {id:'flavio-hipotetico',name:'Flavio Hipotético',base:'flavio-hipotetico',variant:'Original',rarity:'rare',price:900,accent:'#b46cff',description:'Terno, faixa no peito e discurso pronto. Em tese, está no bar. Na prática, também.'},
+  {id:'tiao',name:'Tião',base:'tiao',variant:'Original',rarity:'rare',price:900,accent:'#c68c4f',description:'Chapéu, casaco de couro e bota empoeirada. Veio de longe e só vai embora depois da última rodada.'},
 ];
 /** Free for every account: new players wear it, and anything not owned falls back to it. The others are sold. */
 export const DEFAULT_SKIN:SkinId='nathan';

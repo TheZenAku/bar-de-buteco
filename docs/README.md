@@ -29,6 +29,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 ## Sistemas do jogo
 
 - [Administração](sistemas/admin.md)
+- [Análise de desempenho e HUD](sistemas/desempenho.md)
 - [Blackjack: regras de cassino, apostas e o painel da mesa](sistemas/blackjack.md)
 - [Câmera: primeira e terceira pessoa, suavização e raio-X](sistemas/camera.md)
 - [Truco: regras da Copag, duplas, NPCs e sinais de rosto](sistemas/truco.md)

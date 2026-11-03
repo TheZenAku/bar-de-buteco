@@ -13,6 +13,8 @@ import {badgesSection} from './badges';
 import {collectionSection} from './collection';
 import {highfoodSection} from './highfood';
 import {serverSection} from './server';
+import {performanceSection} from './performance';
+import type {PerformanceMonitor} from '../performance/monitor';
 
 /** The administration's categories, in the menu's order. */
 const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:string;factory:SectionFactory}>=[
@@ -28,11 +30,13 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'badges',label:'Emblemas',icon:'trophy',description:'Os emblemas da cidade: crie, edite, conceda e retire. Cada jogador escolhe até seis para mostrar no perfil.',factory:badgesSection},
   {id:'collection',label:'Coleção',icon:'cards',description:'As cartas de personagem e as habilidades: raridade, preço, texto e se estão à venda. Veja também quem comprou e o que rendeu.',factory:collectionSection},
   {id:'server',label:'Servidor',icon:'server',description:'Processos, memória, disco, banco de dados e filas entre a API e o mundo.',factory:serverSection},
+  {id:'performance',label:'Desempenho',icon:'activity',description:'FPS, estabilidade dos frames, memória, rede e tick do mundo. Escolha as métricas para acompanhar por cima do jogo.',factory:performanceSection},
 ];
 // The section the administration was on: reopening the window goes back to it.
 let lastSection:SectionId='overview';
 
 export interface AdminConsoleHooks {
+  performance:PerformanceMonitor;
   user:()=>PublicUser|undefined;
   send:(type:string,payload?:unknown)=>void;
   position:()=>string;
@@ -56,6 +60,7 @@ export function adminConsole(container:HTMLElement,hooks:AdminConsoleHooks){
   const root=container.querySelector<HTMLElement>('#admin-section')!,feedback=container.querySelector<HTMLElement>('.admin-feedback')!;
   const message=(text:string,error=false)=>{feedback.textContent=text;feedback.classList.toggle('error',error);};
   const ctx:AdminContext={
+    performance:hooks.performance,
     api,user:hooks.user,world:()=>snapshot,requestWorld:()=>hooks.send('admin.world'),send:hooks.send,message,
     go:(id,params)=>open(id,params),
     reports:open=>{const count=container.querySelector<HTMLElement>('.admin-count');if(count){count.hidden=!open;count.textContent=String(open);}},
