@@ -1,4 +1,5 @@
 import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
 import {defineConfig} from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import {redirectHttpToHttps} from './http-redirect.js';
@@ -11,6 +12,10 @@ const https=process.env.BAR_HTTPS!=='0';
 // "debug" for the engine's checks and messages, "profiler" for its timings (app.stats.frame, draw calls per pass).
 const engineBuild={debug:'playcanvas.dbg.mjs',profiler:'playcanvas.prf.mjs'}[process.env.BAR_PLAYCANVAS??'']??'playcanvas.min.mjs';
 const engine=createRequire(import.meta.url).resolve(`playcanvas/build/${engineBuild}`);
+let diagnosticCommit:string|null=null;
+let diagnosticDirty:boolean|null=null;
+try{diagnosticCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();}catch{/* Source archives may not include git metadata. */}
+try{diagnosticDirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();}catch{/* Optional revision information. */}
 // Vite appends the engine's source map to the module it serves (6 MB of the 9): players do not need it. BAR_PLAYCANVAS keeps it.
 const engineWithoutMap={name:'bar-engine-without-map',enforce:'post' as const,
   transform(code:string,id:string){return !process.env.BAR_PLAYCANVAS&&/\/\.vite\/deps\/playcanvas\.js$/.test(id.split('?')[0]!)?{code,map:{mappings:''}}:undefined;}};
@@ -19,6 +24,7 @@ const proxy={
   '/game':{target:`http://127.0.0.1:${process.env.GAME_PORT||2567}`,ws:true,changeOrigin:false,xfwd:true,rewrite:(requestPath:string)=>requestPath.replace(/^\/game/,'')},
 };
 export default defineConfig(({command})=>({
+  define:{__BAR_BUILD__:JSON.stringify({commit:diagnosticCommit,dirty:diagnosticDirty,builtAt:new Date().toISOString(),mode:command==='serve'?'development':'production',engineBuild:command==='serve'?engineBuild:'release'})},
   plugins:[...(https?[basicSsl({name:'bar-de-buteco'}),redirectHttpToHttps()]:[]),engineWithoutMap],
   // The production build picks the release engine by itself (and shakes out what the game does not use).
   resolve:command==='serve'?{alias:[{find:/^playcanvas$/,replacement:engine}]}:{},

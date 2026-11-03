@@ -14,7 +14,7 @@ async function enter(page:Page,username:string,email:string){
 }
 async function ready(page:Page){
   await expect(page.locator('#game')).toBeVisible();await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
-  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId]?.connected;})).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug?.snapshot();return d?.world?.players?.[d.localId]?.connected;})).toBe(true);
 }
 /** A category of the administration (the menu on the left) and a tab of the player's file. */
 const section=(page:Page,id:string)=>page.locator(`[data-admin-nav="${id}"]`).click();
@@ -27,6 +27,8 @@ test('desempenho: coleta real, HUD fora da administração, pausas, preferência
   await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'performance');
   const collect=page.getByRole('checkbox',{name:'Coletar desempenho',exact:true});
   await collect.check();
+  await page.getByLabel('Cenário desta análise',{exact:true}).fill('Validação do relatório detalhado');
+  await page.getByLabel('Cenário desta análise',{exact:true}).blur();
   await page.getByRole('checkbox',{name:'Mostrar HUD de desempenho',exact:true}).check();
   await page.getByRole('checkbox',{name:'Memória JS do cliente',exact:true}).check();
   for(const checkbox of await page.locator('[data-perf-metric]').all())await checkbox.check();
@@ -52,11 +54,24 @@ test('desempenho: coleta real, HUD fora da administração, pausas, preferência
   await page.getByRole('button',{name:'Administração',exact:true}).click();
   await expect(page.locator('[data-perf-status]')).toContainText('pausada');
   await expect(page.locator('[data-perf-events-count]')).not.toHaveText(/^0 registros/);
+  await page.getByRole('button',{name:'Marcar ponto no relatório',exact:true}).click();
   const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Exportar relatório JSON',exact:true}).click()]);
   const report=JSON.parse(await readFile((await download.path())!,'utf8'));
   expect(report.frames.samples).toBeGreaterThan(0);expect(report.frames.max).toBeGreaterThan(100);expect(report.collecting).toBe(false);expect(report.server.tick.targetHz).toBe(20);
   expect(report.server.process.rss).toBeGreaterThan(0);expect(report.events.some((event:{ms:number})=>event.ms>=100)).toBe(true);
   expect(report.preferences.corner).toBe('top-left');expect(report.preferences.metrics).toContain('memory');
+  expect(report.version).toBe(2);expect(report.inventoryError).toBeNull();
+  expect(report.recording.totalFrames).toBeGreaterThan(0);expect(report.recording.totalStutters).toBeGreaterThan(0);
+  expect(report.recording.buckets.some((b:any)=>b.phases.avatars?.samples>0&&b.details.minimap?.samples>0)).toBe(true);
+  expect(report.inventory.engine.version).toBe('2.23.3');expect(report.inventory.scene.uniqueMeshes).toBeGreaterThan(0);
+  expect(report.inventory.textures.items.length).toBeGreaterThan(0);expect(report.inventory.characters.items.length).toBeGreaterThan(0);
+  expect(report.inventory.materials.items.some((m:any)=>m.textures.length>0)).toBe(true);
+  expect(report.inventory.textures.items.find((t:any)=>t.name.includes('nathan_diffuse'))?.source).toBe('/models/nathan.glb');
+  expect(report.session.scenario).toBe('Validação do relatório detalhado');expect(report.session.markers).toHaveLength(1);
+  expect(report.serverSamples.length).toBeGreaterThan(0);expect(report.contextSamples.length).toBeGreaterThan(0);
+  expect(report.environment.build.commit).toMatch(/^[0-9a-f]{40}$/);expect(report.claudePrompt).toContain('PlayCanvas');
+  expect(report.analysis.phaseRanking.length).toBeGreaterThan(0);
+  await download.saveAs('test-results/performance-report-example.json');
   await page.getByRole('button',{name:'Zerar análise',exact:true}).click();await expect(page.locator('[data-perf-status]')).toContainText('0 frames');
   await page.reload();await page.getByRole('button',{name:'Entrar no bar',exact:true}).click();await ready(page);
   await expect(overlay).toBeVisible();await expect(overlay).toHaveAttribute('data-corner','top-left');

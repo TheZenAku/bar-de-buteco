@@ -1,5 +1,7 @@
 import * as pc from 'playcanvas';
 import type {RenderPerformance} from '../performance/monitor';
+import {UpdateProfiler} from '../performance/recording';
+import {collectSceneInventory} from '../performance/inventory';
 import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
@@ -397,7 +399,8 @@ export class BarScene {
       const stats=this.app.stats,device=this.app.graphicsDevice;
       this.performanceObserver({updateMs:stats.cpuUpdateTime,renderMs:stats.cpuRenderTime,gpuMs:stats.gpuFrameTime??null,
         drawCalls:stats.drawCallCount,primitives:stats.primitiveCount??null,vram:stats.vramTotalBytes,
-        width:device.width,height:device.height,scale:this.scale,actors:this.actors.size,compiling:this.compilingLastFrame});
+        width:device.width,height:device.height,scale:this.scale,actors:this.actors.size,resting:this.getPerformance().resting,compiling:this.compilingLastFrame,
+        animationMs:stats.cpuAnimationTime,physicsMs:stats.cpuPhysicsTime,systemUpdateMs:stats.cpuSystemUpdateTime,systemPostUpdateMs:stats.cpuSystemPostUpdateTime,phases:{...this.updateProfiler.timings}});
     });
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     // The canvas fills its box (resize): PlayCanvas's default keeps the first size's aspect, which left a band under the
@@ -1148,12 +1151,25 @@ export class BarScene {
   }
 
   private performanceObserver:((frame:RenderPerformance|null)=>void)|undefined;
+  private updateProfiler=new UpdateProfiler();
   private previousGpuProfiling=false;
   setPerformanceObserver(observer:((frame:RenderPerformance|null)=>void)|undefined):void {
     const profiler=this.app.graphicsDevice.gpuProfiler;
     if(observer&&!this.performanceObserver){this.previousGpuProfiling=profiler?.enabled??false;if(profiler)profiler.enabled=true;}
     if(!observer&&this.performanceObserver&&profiler)profiler.enabled=this.previousGpuProfiling;
     this.performanceObserver=observer;
+    this.updateProfiler.enabled=!!observer;
+  }
+  getDiagnosticInventory(){
+    return collectSceneInventory(this.app,[...this.actors.values()].map(a=>({root:a.root,model:a.skin?.model,skin:a.skinId,clip:a.skin?.clip,resting:!!a.resting,npc:a.npc,local:a.actor.id===this.localId})));
+  }
+  getDiagnosticContext(){
+    const eye=this.camera.getPosition(),focus=this.actors.get(this.localId)?.root.getPosition();
+    return {actors:this.getPerformance(),camera:{mode:this.rig.mode,position:[eye.x,eye.y,eye.z],fov:this.camera.camera?.fov,farClip:this.camera.camera?.farClip},
+      position:focus?[focus.x,focus.y,focus.z]:null,scale:this.scale,width:this.app.graphicsDevice.width,height:this.app.graphicsDevice.height,
+      streaming:this.city?.telemetry()??null,compiling:this.compilingLastFrame,graphics:this.getGraphics(),
+      resources:{assets:this.app.assets.list().length,textures:this.app.graphicsDevice.textures.size,vram:this.app.stats.vramTotalBytes,textureVram:this.app.stats.vramTextureBytes,
+        skinModels:this.skinModels.size,animationBanks:this.animationBanks.size,danceBanks:this.danceBanks.size,propModels:this.propModels.size,televisions:this.televisions.size}};
   }
   getPerformance(): { fps: number; actors: number; resting: number } {
     let resting = 0;for (const avatar of this.actors.values()) if (avatar.resting) resting++;
@@ -2074,6 +2090,7 @@ export class BarScene {
   }
 
   private update(dt: number): void {
+    this.updateProfiler.begin();
     this.frameSeconds += dt;
     // The engine stops counting at a tenth of a second: below 10 FPS the bike must still ride in real time.
     const wall = performance.now(), realDt = dt < .1 ? dt : Math.min((wall - this.lastFrameAt) / 1000, .5);
@@ -2090,12 +2107,16 @@ export class BarScene {
     }
     this.frameId++;
     this.barPlayed.clear();
+    this.updateProfiler.mark('setup');
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    this.updateProfiler.mark('avatars');
     this.callbacks.onFrame?.(realDt);
+    this.updateProfiler.mark('client');
     this.motos.update(dt, this.camera, this.app.scene.exposure);
     this.placeRiders();
     this.placeThrown(dt);
     this.blowEffects.update(dt, this.camera);
+    this.updateProfiler.mark('vehicles');
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
     // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
@@ -2104,6 +2125,7 @@ export class BarScene {
     const bartender=this.actors.get('bartender');
     // The tap runs while the chopp pours (Prop_Jato in Magrão's clip).
     this.mapEffects?.update(this.elapsed,!!this.barAnimations?.pouring()||bartender?.skin?.clip==='Bartend');
+    this.updateProfiler.mark('barEffects');
     const player = this.actors.get(this.localId);
     this.feelSpeed(this.enabled ? this.motos.ridden(this.localId) : undefined, dt);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
@@ -2148,19 +2170,23 @@ export class BarScene {
       this.rig.idle();
     }
     this.showOwnHead(player);
+    this.updateProfiler.mark('camera');
     const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();
     this.city?.update(dt, focus.x, focus.z);
+    this.updateProfiler.mark('streaming');
     this.environment.setFocus(player?.root.getPosition());
     this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
     this.surfaces?.update(this.environment.power);
     this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
     this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
+    this.updateProfiler.mark('lighting');
     const serverNow=Date.now()+this.serverClockOffset;
     this.foosballBalls.update(serverNow);
     this.poolBalls.update();
     this.stageShow.update(dt,{stage:this.stageLive(serverNow),desk:this.showDesk,serverNow,camera:this.camera,height:this.app.graphicsDevice.height,daylight:this.environment.daylight});
     // The telão darkens under the laser's drawings.
     this.televisions.get('telao')?.setDim(this.stageShow.screenDim);
+    this.updateProfiler.mark('stage');
     this.animateMarker(this.objective);
     this.updateStageBlips();
     this.updateFoodBase();
@@ -2171,7 +2197,9 @@ export class BarScene {
       if (light){light.intensity = party * (2 + Math.sin(this.elapsed * 3 + i * Math.PI));light.enabled=light.intensity>.015;}
     }
     this.discoBall.rotate(0, dt * (8+party*62), 0);
+    this.updateProfiler.mark('markers');
     this.callbacks.onMediaFrame?.();
+    this.updateProfiler.mark('media');
   }
 
   /**

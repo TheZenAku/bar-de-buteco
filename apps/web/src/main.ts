@@ -1,5 +1,6 @@
 import {adminConsole} from './admin/console';
 import {PerformanceMonitor} from './performance/monitor';
+import {UpdateProfiler} from './performance/recording';
 import {createPerformanceHud} from './performance/hud';
 import './performance/performance.css';
 import {itemCost,loadPrices,price as livePrice,setPrices} from './prices';
@@ -350,9 +351,15 @@ const network=new BarNetwork({
   }
 });
 
+const mediaProfiler=new UpdateProfiler();
 const performanceMonitor=new PerformanceMonitor({
   allowed:()=>inGame&&connected&&user?.role==='admin',capturing:()=>sceneActive(),pending:()=>network.telemetry().pending,
-  position:positionText,requestServer:()=>network.send('admin.performance'),observe:callback=>scene?.setPerformanceObserver(callback),
+  position:positionText,requestServer:()=>network.send('admin.performance'),observe:callback=>{
+    mediaProfiler.enabled=!!callback;
+    scene?.setPerformanceObserver(callback?frame=>{if(frame)frame.detailPhases={...mediaProfiler.timings};callback(frame);}:undefined);
+  },
+  inventory:()=>scene?.getDiagnosticInventory()??null,
+  context:()=>({scene:scene?.getDiagnosticContext()??null,graphics:settings.get().graphics,network:network.telemetry()}),
 });
 createPerformanceHud($('#game'),performanceMonitor);
 
@@ -1149,7 +1156,15 @@ async function start():Promise<void>{
     },
     motoVolume:()=>settings.get().master,
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
-    onMediaFrame:()=>{mouseCapture.sync();media.forEach(m=>m.frame());minimap.render(inGame?()=>scene?.mapView():null);scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}},
+    onMediaFrame:()=>{
+      mediaProfiler.begin();mouseCapture.sync();mediaProfiler.mark('mouse');
+      media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));mediaProfiler.mark('video');
+      minimap.render(inGame?()=>scene?.mapView():null);mediaProfiler.mark('minimap');
+      objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');
+      const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');mediaProfiler.mark('blips');
+      voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
+      const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}mediaProfiler.mark('audioButton');
+    },
   });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   const params=new URLSearchParams(location.search);
