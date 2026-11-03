@@ -7,6 +7,54 @@ import {SHOW_PROGRAMS} from '../../packages/shared/src/stage-show';
 type EnvironmentStatus=ReturnType<EnvironmentLighting['telemetry']>;
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
 
+test('the 3D scene starts and offscreen animations pause and resume safely',async({page})=>{
+  test.setTimeout(120000);
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.goto(fixture);
+  await page.waitForFunction(()=>(window as any).fixture?.scene);
+  await page.evaluate(()=>(window as any).fixture.ready);
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getMapStatus().loaded)).toBe(true);
+  await page.evaluate(()=>{
+    const f=(window as any).fixture;
+    f.view([18,2,56],[18,1,46]);
+    f.scene.updateState({players:[{id:'remote',skin:'nathan',x:18,y:.3,z:46,animation:'idle'}],npcs:[]},'');
+    f.scene.setEnabled(true);
+  });
+  const status=()=>page.evaluate(()=>{
+    const scene=(window as any).fixture.scene,avatar=scene.actors.get('remote'),anim=avatar?.skin?.model.anim;
+    return {resting:scene.getPerformance().resting,playing:anim?.playing,clip:avatar?.skin?.clip,time:anim?.baseLayer.activeStateCurrentTime};
+  });
+  await expect.poll(status).toMatchObject({resting:0,playing:true,clip:'Idle'});
+  await page.evaluate(()=>(window as any).fixture.view([18,9,16],[14,1.8,-6]));
+  await expect.poll(status).toMatchObject({resting:1,playing:false});
+  const paused=(await status()).time;
+  await page.evaluate(async()=>{
+    const app=(window as any).fixture.scene.app;
+    for(let frame=0;frame<3;frame++)await new Promise<void>(resolve=>app.once('postrender',()=>resolve()));
+  });
+  expect((await status()).time).toBe(paused);
+  await page.evaluate(()=>(window as any).fixture.view([18,2,56],[18,1,46]));
+  await expect.poll(status).toMatchObject({resting:0,playing:true});
+  await expect.poll(async()=>(await status()).time).not.toBe(paused);
+  // A rider remains animated even behind the camera; nearby people also keep moving.
+  await page.evaluate(()=>{
+    const f=(window as any).fixture;
+    f.view([18,9,16],[14,1.8,-6]);
+    f.scene.updateState({players:[{id:'remote',skin:'nathan',x:18,y:.3,z:46,animation:'ride'}],npcs:[]},'');
+  });
+  await expect.poll(status).toMatchObject({resting:0,playing:true,clip:'Sit'});
+  await page.evaluate(()=>{
+    const f=(window as any).fixture;
+    f.scene.updateState({players:[{id:'remote',skin:'nathan',x:18,y:.3,z:46,animation:'idle'}],npcs:[]},'');
+  });
+  await expect.poll(status).toMatchObject({resting:1,playing:false});
+  await page.evaluate(()=>(window as any).fixture.view([18,2,44],[18,2,20]));
+  await expect.poll(status).toMatchObject({resting:0,playing:true,clip:'Idle'});
+  expect(errors).toEqual([]);
+});
+
 test('the authored skewer cart has visible geometry below its fire and smoke FX',async({page})=>{
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
   expect(await page.evaluate(()=>(window as any).fixture.scene.getMapStatus().cartRenders)).toBeGreaterThan(0);

@@ -117,6 +117,8 @@ interface Avatar {
   glideNext?: number;
   /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
   riding?: boolean;
+  /** The offscreen animation is paused until the avatar is near or visible again. */
+  resting?: boolean;
   /** Thrown from a bike or by a kick (moto-ragdoll.ts): the body as it flies and lies, until the getting-up clip has taken over. */
   ragdoll?: RagdollPuppet;
   /** The kick whose leg was last heard cutting the air (its animationStartedAt). */
@@ -185,6 +187,10 @@ const PLAYER_MODEL_SCALE = 1;
 const BOX_AVATAR_SCALE: V3 = [0.75, 0.9, 0.75];
 // Name labels float just above head height.
 const LABEL_HEIGHT = 2.15;
+// Keep nearby bodies and actions with moving props or physics animated even outside the view.
+const OFFSTAGE_NEAR = 8;
+const OFFSTAGE_MARGIN = 2;
+const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble']);
 // Approximate ground pace at 1×, measured from the Mixamo feet's backward travel while planted (metres/second).
 // Run is Standard Run's own root motion, which the converter prints: 4 m/s on Nathan (3.4–4.4 across the skins).
 // The cadence follows actual movement, capped at 2.2× so fast players do not spin their legs.
