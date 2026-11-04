@@ -141,7 +141,7 @@ O efeito entra aos poucos e sai mais rápido, para não ficar preso depois de um
 
 | O quê | Onde |
 | --- | --- |
-| Tamanho da moto (desenho, rodas, colisão e altura do banco acompanham) | `SCALE` em `packages/shared/src/moto.ts` (hoje 0,8 do modelo) |
+| Tamanho da moto (desenho, rodas, colisão e altura do banco acompanham) | `SCALE` em `packages/shared/src/moto.ts` (v4: 1,0; modelo em metros) |
 | Motor, freios, velocidade máxima, direção, máximo de motos no mapa | `MOTO` no mesmo arquivo |
 | A partir de quanto a batida derruba (`CRASH_SPEED`), o que conta como raspão (`GLANCING`), tempo para levantar a moto (`LIFT_MS`) | `MOTO` no mesmo arquivo |
 | Como a moto rola sozinha e tomba | Constantes de `packages/shared/src/moto-crash.ts` |
@@ -161,7 +161,7 @@ O jogo usa PlayCanvas sem motor de física: o movimento é decidido pelo servido
 
 - **Modelo de bicicleta:** o eixo traseiro segue a direção da moto e a roda dianteira a faz girar. Forças em newtons sobre 150 kg, com velocidade máxima de 55 km/h e ré de 2,5 m/s. O ângulo da direção diminui com a velocidade.
 - **Chão:** consulta a altura nas duas rodas e nos cantos do casco. A inclinação entre os eixos vem daí, e a moto sobe o meio-fio de 15 cm. Só anda em superfícies de rua (`COL_Rua*` e, na cidade, `COL_Cid_Chao`, `_Quadra`, `_Quadra_Faixa`, `_Calcada` e `_Canteiro`): o piso do bar, o quintal e o palco funcionam como parede. Caixas giradas da cidade são testadas pela forma real.
-- **Colisão:** caixa orientada de 0,51 × 1,58 m (a do `moto_delivery_colisao.glb`, sem espelhos, na escala da moto) contra os mesmos sólidos do jogador e as outras motos, com checagem a cada 10 cm, para não atravessar nada nem a 55 km/h. De frente ela para e, acima de 3 m/s, volta um pouco; de lado, desliza pela parede perdendo velocidade. `advanceMoto` também devolve a batida: a velocidade, quanto dela foi contra o obstáculo, a direção da face atingida e o que foi atingido.
+- **Colisão:** caixa orientada de 0,842 × 2,004 m e altura de 1,20 m, incluindo os espelhos da v4, contra os mesmos sólidos do jogador e as outras motos, com checagem a cada 10 cm, para não atravessar nada nem a 55 km/h. De frente ela para e, acima de 3 m/s, volta um pouco; de lado, desliza pela parede perdendo velocidade. `advanceMoto` também devolve a batida: a velocidade, quanto dela foi contra o obstáculo, a direção da face atingida e o que foi atingido.
 - **Em pé:** montada, ela não tomba. A inclinação na curva é só visual, no osso `chassi`.
 - **Estado das peças:** `motoHandling` transforma o motor e as partes em força, freio, curva, resistência e puxão. O passo recebe esse resultado, e a sala e a previsão do piloto calculam o mesmo a partir de `MotoState.parts` e `engine`. Com tudo novo, a moto anda exatamente como antes.
 
@@ -215,17 +215,25 @@ Medido a 55 km/h, em cada quadro (`tests/e2e/moto.spec.ts` verifica a velocidade
 
 ### Desenho
 
-`MotoRig` (`apps/web/src/engine/moto-delivery.ts`) é o `moto_delivery.js` portado para TypeScript, com os mesmos campos e contas, porque o cliente não usa componentes de script. Recebe só `velocidade` e `direcao`, e `anguloDirecao` acompanha o ângulo real da roda naquela velocidade.
+`MotoRig` (`apps/web/src/engine/moto-delivery.ts`) porta os campos da v4: velocidade, direção, freio, acelerador, descanso e curso da suspensão. O ângulo de direção acompanha a simulação; a inclinação continua derivada da aceleração lateral real, inclusive em ré, em vez de apenas do comando do guidão. A suspensão, a balança e o descanso preservam o repouso dos ossos. As cinco malhas de luz usam materiais emissivos independentes por moto; os pontos da v4 posicionam halos, luzes e placa.
 
-Não existe animação de pilotar. `seatRider` parte do clipe `Sit` e, depois dele em cada quadro, põe o quadril no banco, curva o tronco e leva mãos e pés às manoplas e ao assoalho por IK de dois ossos, no espaço do mundo. Os corpos de braços mais curtos curvam o tronco até alcançar, com até 32°.
+Não existe animação de pilotar. `seatRider` parte do clipe `Sit` e, depois dele em cada quadro, põe o quadril no banco, curva o tronco e leva mãos e pés às manoplas e às pedaleiras por IK de dois ossos, no espaço do mundo. Os corpos de braços mais curtos curvam o tronco até alcançar, com até 32°.
 
 A câmera (`CameraRig.ride` e `chase`) vai para a terceira pessoa ao montar e devolve a vista anterior ao descer.
 
-O modelo é desenhado a 80% do tamanho do arquivo, sem mudar o `.glb`: `MotoRig` e `seatRider` trabalham no espaço do mundo, então acompanham a escala. Com a moto menor, as manoplas ficaram mais perto, e o piloto vai mais ereto.
+O modelo v4 é desenhado a 100% (`SCALE = 1`), pois já usa metros: roda de raio 0,30 m, entre-eixos de 1,361 m e banco a aproximadamente 0,80 m. A caixa total medida é X ±0,420034 m, Y 0 a 1,199489 m e Z −1,016950 a +0,986000 m; os valores compartilhados arredondam essa caixa para fora. O GLB de colisão mede aproximadamente 0,598 × 1,019 × 1,999 m; usa-se a caixa visual maior para proteger também os espelhos. Os contatos exportados são Z +0,686 na frente e −0,675 atrás; preservam-se os nós do arquivo.
+
+A bag é um item separado da v3. Fora do Highfood, a moto não recebe bag automaticamente. Durante o turno, montar na moto encaixa a bag em `ponto_bau` e esconde a mochila; desmontar remove a bag da moto e mostra a mochila novamente. Cada cliente deriva esse encaixe dos estados públicos `courier` e `riderId`, inclusive para outros jogadores. O carregamento assíncrono verifica novamente se a moto e o piloto ainda estão presentes antes de encaixar, para não deixar bag órfã após desmontar ou despawnar.
+
+`const bag = await motos.criarBag()` cria uma entidade fora da cena; `moto.encaixarBag(bag)` coloca-a em `ponto_bau`, com posição/rotação locais zeradas. `bag.script.motoBag.aberta = true` abre a tampa; `bag.destroy()` remove o item. O módulo `moto-bag.ts` porta o script original, preservando a textura embutida com logos dos dois lados e atrás. A inclinação de 13° de `bag_raiz` já vem no arquivo e não deve ser duplicada. O encaixe também pode ser usado por itens fora do turno, sem fundir a bag à malha da moto.
+
+As [ações de veículos](veiculos-acoes.md) incluem buzina em F, grau na moto em movimento com Shift e empinada com relincho no cavalo com Shift. Elas são validadas e replicadas pelo servidor.
 
 ## Publicar uma nova versão
 
-`npm run assets:moto` confere os nós de `assets-bar/map/BarBoteco/export/moto/moto_delivery.glb` e copia o arquivo para `apps/web/public/moto`. O script que gera o modelo é `assets-bar/map/BarBoteco/scripts/20_moto_delivery.py`, no Blender.
+`npm run assets:moto` confere os nós, malhas e texturas embutidas de `export/moto_v4/moto_delivery.glb` e publica a moto, sua colisão e seu script em `apps/web/public/moto`. Publica também `moto_bag.glb` e `moto_bag.js` de `export/moto_v3`. Os arquivos-fonte ficam em `assets-bar/map/BarBoteco`; nenhum script do Blender é executado. A geração da v4 está em `export/moto_v4/scripts/57_moto_v4.py` e contém caminhos de outra máquina.
+
+O mesmo comando renderiza `moto/foto-v4.webp` a partir do GLB publicado, usando PlayCanvas e o navegador de testes (`tools/assets/render-moto-photo.mjs`). Essa é a foto usada na loja HighMotors, nos detalhes da oferta e nos veículos comprados. A oferta aparece como “Moto de entrega”, com aviso de que a bag não acompanha a moto. O identificador persistido continua `moto-delivery`, preservando as motos e chaves já compradas; compras novas e retiradas na garagem usam a v4.
 
 ## Testes
 
@@ -238,6 +246,8 @@ O modelo é desenhado a 80% do tamanho do arquivo, sem mudar o `.glb`: `MotoRig`
 | `apps/server/test/moto-parts.integration.test.ts` | Sobre WebSockets reais: partida e motor puxando só depois de pegar, motor que morre, W tentando de novo, cada falha com seu clipe, previsão igual à sala com a moto gasta, atropelamento (vida, aviso, ragdoll), golpe fatal desmaiando só ao cair, desgaste de batida de frente, conserto (longe, sem peça, parte perfeita, ninguém sobe, peça gasta, +40%) |
 | `apps/server/test/moto.integration.test.ts` | Mapa sem moto, spawn e despawn só para administradores, limite, montar, previsão igual à sala, entradas irregulares, um piloto só, descer à esquerda, queda e desmaio soltam a moto, moto sozinha até o chão, levantar à mão, batida de leve e batida forte, atropelamento, despawn com piloto |
 | `tests/e2e/moto.spec.ts` | Teclado e administração reais, com dois jogadores: spawn, aviso, câmera, farol à frente, rodas, suavidade para quem pilota e para quem olha, curva à direita, parede devagar, despawn. As imagens vão para `test-results/moto` |
+| `tests/integration/moto-model.test.ts` | Arquivos publicados idênticos aos fontes v4/v3, bag separada, texturas embutidas, dimensões reais e caixa compartilhada contendo o GLB completo |
+| `tests/e2e/moto-v4.spec.ts` | Servidor real, pilotagem e pose por IK, luzes e screenshots parada/andando/virando com e sem bag, logos, tampa e remoção. Imagens e telemetria em `test-results/moto-v4` |
 | `tests/e2e/moto-parts.spec.ts` | Teclado e mouse reais, com dois jogadores: botão direito, menu e painel, sons ouvidos pelos dois (o que tocou, ganho e tom), zoom e borrão em velocidade, atropelar, aviso e vida, painel depois da batida, consertar e subir de novo. As imagens vão para `test-results/moto-parts` |
 | `tests/e2e/moto-crash.spec.ts` | Teclado real, com dois jogadores: cada luz acesa e vista pelo outro, batida a toda contra o carro, o mesmo corpo nos dois navegadores, moto no chão, levantar do chão, levantar a moto e montar de novo. As imagens vão para `test-results/moto-crash` |
 

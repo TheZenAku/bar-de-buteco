@@ -15,6 +15,7 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   game_results:{id:['text'],user_id:['text'],result:['text'],created_at:['timestamp with time zone',false,'now()']},
   game_controls:{id:['text'],payload:['jsonb'],created_at:['timestamp with time zone',false,'now()'],acknowledged:['boolean',false,'false'],status:['text',false,"'pending'::text"],lease_owner:['text',true],lease_expires_at:['timestamp with time zone',true],attempts:['integer',false,'0'],applied_at:['timestamp with time zone',true],last_error:['text',true]},
   wallets:{user_id:['text'],balance:['integer',false,'0']},
+  fuel_services:{id:['text'],user_id:['text'],budget:['integer'],total:['integer',false,'0'],settled:['boolean',false,'false']},
   skin_inventory:{user_id:['text'],skin_id:['text'],acquired_at:['timestamp with time zone',false,'now()']},
   skill_inventory:{user_id:['text'],skill_id:['text'],acquired_at:['timestamp with time zone',false,'now()']},
   skin_catalog:{key:['text'],rarity:['text'],description:['text'],availability:['text',false,"'sale'::text"],updated_at:['timestamp with time zone',false,'now()'],updated_by:['text',true]},
@@ -44,7 +45,7 @@ const columns:Record<string,Record<string,ColumnSpec>>={
 
 const primaryKeys:Record<string,string>={
   bar_schema_migrations:'name',
-  users:'id',user_profiles:'user_id',sessions:'id',email_verifications:'token_hash',password_resets:'token_hash',
+  users:'id',user_profiles:'user_id',sessions:'id',email_verifications:'token_hash',password_resets:'token_hash',fuel_services:'id',
   blocks:'user_id,blocked_id',reports:'id',moderation_actions:'id',game_statistics:'user_id',game_results:'id',
   game_controls:'id',wallets:'user_id',skin_inventory:'user_id,skin_id',skill_inventory:'user_id,skill_id',skin_catalog:'key',currency_ledger:'id',item_inventory:'user_id,item_id',inventory_ledger:'id',
   phone_lines:'user_id',phone_contacts:'owner_id,contact_id',phone_messages:'id',gram_posts:'id',gram_likes:'post_id,user_id',gram_comments:'id',

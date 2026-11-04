@@ -16,6 +16,7 @@ import {createMouseCapture} from './mouse-capture';
 import './lobby-hero.css';
 import {createHudPanels} from './hud-panels';
 import {createVehicleHud} from './vehicle-hud';
+import {createFuelHud,fuelContext} from './fuel-hud';
 import {createNotifications} from './notifications';
 import {createCollection} from './collection/collection';
 import {GARAGE,VEHICLE_KEY,keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
@@ -77,6 +78,7 @@ createLobbyHero(document.querySelector<HTMLElement>('#lobby')!);
 
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
 const hud=createHudPanels($('#game'));
+const fuelHud=createFuelHud($('#game'),()=>network.send('fuel.cancel',{}));
 const vehicleHud=createVehicleHud($('#vehicle-hud'),action=>{
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id],vehicle=Object.values(world.motos??{}).find(each=>vehicleSeat(each,user!.id)>=0);
@@ -272,6 +274,7 @@ const network=new BarNetwork({
   garage:view=>{if(activeModal==='garage')$('#modal-content').innerHTML=garagePanelHtml(view);else showModal('GARAGEM',garagePanelHtml(view),'garage');garageShown=view.garageId;},
   garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();notices.show({variant:'acao',title:'Veículo na rua',text:`O veículo ${plate} está esperando, trancado. A chave permite destrancar.`});gps.setWaypoint({x,y:0,z,source:'bike',label:`Veículo ${plate}`});},
   motoLocked:({plate,locked})=>{keyChirp(settings.get().master,locked);notices.show({variant:'acao',title:locked?'Veículo trancado':'Veículo destrancado',text:locked?`Acesso ao veículo ${plate} fechado.`:`Acesso ao veículo ${plate} liberado.`});if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
+  fuelReceipt:receipt=>notices.show({variant:'acao',title:'Atendimento concluído',text:`${receipt.litres.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} L abastecidos · ${receipt.paid} moedas pagas. ${receipt.message}`,duration:9000}),
   tradeInvite:invite=>trade.invited(invite),
   tradeUninvite:id=>trade.uninvited(id),
   tradeSent:name=>notices.show({variant:'acao',title:'Negociação',text:`Esperando ${name} responder.`}),
@@ -458,7 +461,9 @@ function renderWorld():void {
   if(!world||!user)return;
   const self=world.players[user.id];
   $('#vehicle-hud').dataset.raining=String(weatherAt(world.serverTime,world.environment).rain>.15);
-  const mounted=vehicleHud.update(connected?self:undefined,world.motos??{},world.serverTime);
+  const mounted=vehicleHud.update(connected?self:undefined,world.motos??{},world.serverTime,world.fuelServices);
+  const fuel=fuelContext(connected?self:undefined,world);
+  fuelHud.update(fuel.service,fuel.vehicle,fuel.vehicle?.riderId===self?.id);
   $('#game').classList.toggle('vehicle-mounted',mounted);hud.setAvailable('actions',!mounted);
   renderBalance();
   needsHud.update(self);
@@ -485,6 +490,8 @@ function renderWorld():void {
   $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?(courier.state().order?.stage==='collect'?'Retirando o pedido…':courier.state().order?.transport==='horse'?'Pegando o pedido na mochila…':'Tirando o pedido do baú…'):self?.interactionState==='food-locker'?'Digitando o código':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':'');
   const event=world.event;
   if(isRidingHorse(self?.interactionState))$('#context-label').textContent='Desmontar do cavalo';
+  if(fuel.service)$('#context-label').textContent='Frentista realizando abastecimento';
+  else if(fuel.pump)$('#context-label').textContent=fuel.occupied?'Bomba ocupada':(fuel.vehicle?.fuel??100)>=99.999?'Tanque cheio':'Solicitar abastecimento';
   const eventName={BLACKOUT:'Quem esqueceu de pagar a luz?',DRUNK_NPC:'O Zé acordou inspirado.',PARTY:'Essa rodada é de dança!'};
   $('#event-banner').classList.toggle('hidden',!event?.type);
   if(event?.type)$('#event-banner').innerHTML=`<span class="event-spark">${uiIcon('party')}</span><div><small>Aconteceu no bar</small><b>${eventName[event.type]}</b></div><span class="event-time">${Math.max(0,Math.ceil((event.startedAt+event.durationMs-serverNow())/1000))}s</span>`;
@@ -668,7 +675,7 @@ function watchOwnEngine(self:PlayerState|undefined):void {
   const before=ownEngine?.id===moto.id?ownEngine.engine:undefined;
   ownEngine={id:moto.id,engine:moto.engine};
   if(moto.engine!==MOTO_ENGINE.OFF||before===undefined||before===MOTO_ENGINE.OFF)return;
-  notices.show({variant:'aviso',title:(moto.fuel??100)<=0?'Combustível acabou':before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:(moto.fuel??100)<=0?'Abasteça junto a uma garagem.':'Use o motor no painel ou aperte W para tentar de novo. Confira as condições do veículo.'});
+  notices.show({variant:'aviso',title:(moto.fuel??100)<=0?'Combustível acabou':before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:(moto.fuel??100)<=0?'Abasteça no posto.':'Use o motor no painel ou aperte W para tentar de novo. Confira as condições do veículo.'});
 }
 /** The key's button (L, the bike's menu or its panel). */
 function lockOwnBike():void {
@@ -681,6 +688,9 @@ function lockOwnBike():void {
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
+  const fuel=fuelContext(self,world);
+  if(fuel.service)return;
+  if(fuel.pump&&fuel.vehicle){sendVehicleControl(fuel.vehicle.id,'refuel');return;}
   const food=foodPrompt(self);
   if(food){network.send(food.send,{});return;}
   if(self.currentTableId){blackjackUi.requestLeave();return;}
@@ -1212,7 +1222,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility

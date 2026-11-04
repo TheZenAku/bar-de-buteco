@@ -15,3 +15,13 @@ Only ground.mp3 is used. credits.txt is preserved from the original archive.
 Game adaptation: decoded to mono 32 kHz PCM WAV, peak normalized, 1 ms edge fades.
 The same pack attribution and CC BY 4.0 license apply to the adapted gallop.wav.
 Retrieved on 2026-11-03. No endorsement by the authors is implied.
+
+
+Neighing of a horse (#0460)
+Author: Joseph SARDIN / BigSoundBank / LaSonotheque
+Source: https://bigsoundbank.com/neighing-of-a-horse-s0460.html
+Download: https://bigsoundbank.com/UPLOAD/mp3/0460.mp3
+License: CC0 (public domain equivalent), verified 2026-11-04.
+License details: https://bigsoundbank.com/licenses.html
+The recording may be edited and redistributed in commercial games. Attribution is optional.
+Original MP3 retained without modification as neigh.mp3.

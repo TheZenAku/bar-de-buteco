@@ -6,7 +6,7 @@ export type VehicleModel=typeof VEHICLE_MODELS[number];
 export interface VehicleOffer {model:string;name:string;price:number;seats:number;photo:string}
 export const isCar=(vehicle:{model?:string}|undefined)=>vehicle?.model===CAR_MODEL;
 export const vehicleName=(model:string)=>model===CAR_MODEL?CAR_NAME:'Highland Bar Delivery';
-export const vehiclePhoto=(model:string)=>model===CAR_MODEL?'carro/foto.png':'moto/foto.webp';
+export const vehiclePhoto=(model:string)=>model===CAR_MODEL?'carro/foto.png':'moto/foto-v4.webp';
 /** Measured from the supplied rig, at its authored metre scale. */
 export const CAR={SCALE:1,WHEELBASE:2.314,WHEEL_TRACK:1.33,WHEEL_RADIUS:.285,HALF_WIDTH:.76,HALF_LENGTH:1.80,CENTRE_Z:0,HEIGHT:1.39,
   MASS:850,ENGINE:3800,REVERSE:1800,BRAKE:8000,HANDBRAKE:7000,ROLLING:120,DRAG:2.45,TOP_SPEED:38.9,REVERSE_SPEED:4.5,

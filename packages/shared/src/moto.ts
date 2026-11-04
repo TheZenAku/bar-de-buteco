@@ -6,16 +6,16 @@ import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
 import {CAR,CAR_MODEL,isPassenger,vehicleOccupants} from './vehicle-models.js';
 
-/** How much smaller than moto_delivery.glb the bike is drawn: its measurements below all follow. */
-const SCALE=.8;
+/** v4 is authored in metres (30 cm tyres and an 80 cm seat). No scooter scale correction. */
+const SCALE=1;
 /**
  * The bike's measurements (moto_delivery.glb at SCALE) and its handling: about 150 kg with the rider and 55 km/h flat out, like a
  * scooter. Forces in newtons; ENGINE − ROLLING = DRAG × TOP_SPEED² is what sets the top speed.
  */
 export const MOTO={
-  SCALE,WHEELBASE:1.342*SCALE,WHEEL_RADIUS:.225*SCALE,
-  /** The hull (moto_delivery_colisao.glb's box, without the mirrors) and how far its middle is behind the origin. */
-  HALF_WIDTH:.32*SCALE,HALF_LENGTH:.99*SCALE,CENTRE_Z:-.05*SCALE,HEIGHT:1.42*SCALE,
+  SCALE,WHEELBASE:1.361*SCALE,WHEEL_RADIUS:.30*SCALE,
+  /** v4's complete render bounds, including mirrors/plate, rounded outwards (no bag). */
+  HALF_WIDTH:.421*SCALE,HALF_LENGTH:1.002*SCALE,CENTRE_Z:-.0155*SCALE,HEIGHT:1.2*SCALE,
   MASS:150,ENGINE:660,REVERSE:300,BRAKE:1350,HANDBRAKE:1050,ROLLING:60,DRAG:2.56,TOP_SPEED:15.3,REVERSE_SPEED:2.5,
   /** The handlebar's lock, and the sideways grip that narrows it as speed rises (metres per second squared). */
   MAX_STEER:28*Math.PI/180,GRIP:20,
@@ -51,11 +51,11 @@ export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
  * starting, `gas` whether the throttle is open, and `parts` the condition of each part in MOTO_PARTS's order.
  */
 export interface MotoState extends MotoBody {id:string;/** Who holds its key (docs/sistemas/garagem.md). '' for the administration's, which anyone may ride. */ownerId?:string;/** The key holder's name, the plate on its back, and the row it is in the API. */ownerName?:string;plate?:string;vehicleId?:string;/** Only the key holder gets on it. */locked?:boolean;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
-export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number;ignition?:boolean;fuel?:number}
-export interface MotoIntent {throttle:number;steer:number;brake:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
+export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number;ignition?:boolean;fuel?:number;horn?:boolean;wheelie?:number}
+export interface MotoIntent {throttle:number;steer:number;brake:boolean;horn?:boolean;wheelie?:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
 /** W/S (forward, brake and reverse), A/D (+1 is right), the handbrake and the switches. */
 export interface MotoInput extends MotoIntent {seq:number}
-export const motoInputSchema=z.object({seq:z.number().int().min(0).max(2147483647),throttle:z.number().finite().min(-1).max(1),steer:z.number().finite().min(-1).max(1),brake:z.boolean(),lights:z.number().int().min(0).max(15).optional()}).strict();
+export const motoInputSchema=z.object({seq:z.number().int().min(0).max(2147483647),throttle:z.number().finite().min(-1).max(1),steer:z.number().finite().min(-1).max(1),brake:z.boolean(),lights:z.number().int().min(0).max(15).optional(),horn:z.boolean().optional(),wheelie:z.boolean().optional()}).strict();
 export const motoMountSchema=z.object({motoId:z.string().max(32),seat:z.number().int().min(0).max(3).optional()}).strict();
 export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 

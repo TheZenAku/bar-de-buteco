@@ -37,6 +37,7 @@ export interface SceneActor {
   carryingOrder?: string;
   /** A Highfood shift: the backpack, and the bag in hand. */
   courier?: boolean;
+  horseRearAt?:number;
   parcel?: string;
   /** With the phone in front of them: standing still they look at it (the Text clip, with a phone in hand). */
   looking?: boolean;
@@ -59,6 +60,7 @@ export interface SceneWorld {
 }
 
 export interface SceneInput {
+  rear?:boolean;
   headYaw?:number;
   headPitch?:number;
   dx: number;

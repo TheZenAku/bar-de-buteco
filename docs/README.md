@@ -74,3 +74,4 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 - [Validação de 21/10/2026](validacao/validation.md)
 - [Mapa BarBoteco](validacao/validation-map.md)
+- [Abastecimento com frentista NPC](sistemas/abastecimento.md)

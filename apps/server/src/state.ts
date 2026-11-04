@@ -60,6 +60,7 @@ export class Player extends Schema {
   @type('string') phone = '';
   /** On a Highfood shift, and the bag in hand ('' or 'bag'): both are drawn for everyone. */
   @type('boolean') courier = false;
+  @type('number') horseRearAt = 0;
   @type('string') parcel = '';
   /** Has the phone out, so everyone sees them look at it while standing. */
   @type('boolean') looking = false;
@@ -81,6 +82,21 @@ export class Npc extends Schema {
   /** A Highfood customer's body and what they have in hand. */
   @type('string') skin = '';
   @type('string') parcel = '';
+}
+export class FuelService extends Schema {
+  @type('string') id='';
+  @type('string') npcId='';
+  @type('string') phase:import('@bar/shared').FuelPhase='idle';
+  @type('number') startedAt=0;
+  @type('string') playerId='';
+  @type('string') vehicleId='';
+  @type('float64') litres=0;
+  @type('uint32') total=0;
+  @type('number') price=6;
+  @type('string') message='';
+  @type('float32') tankX=0;
+  @type('float32') tankY=0;
+  @type('float32') tankZ=0;
 }
 /** Something served on a table top (apps/server/src/world/served.ts). */
 export class ServedItem extends Schema {
@@ -259,6 +275,8 @@ export class Moto extends Schema {
   @type('boolean') hood = false;
   @type('boolean') trunk = false;
   @type('boolean') wipers = false;
+  @type('boolean') horn = false;
+  @type('float32') wheelie = 0;
   @type('uint8') headlights = 0;
   @type('boolean') ignition = false;
   @type('float32') fuel = 100;
@@ -377,6 +395,7 @@ export class BarState extends Schema {
   @type({ map: ServedItem }) served = new MapSchema<ServedItem>();
   @type({ map: MusicianSpot }) musicians = new MapSchema<MusicianSpot>();
   @type({ map: Moto }) motos = new MapSchema<Moto>();
+  @type({ map: FuelService }) fuelServices = new MapSchema<FuelService>();
   @type({ map: RagdollState }) ragdolls = new MapSchema<RagdollState>();
   @type(StageShowState) stageShow = new StageShowState();
   @type(EventState) event = new EventState();

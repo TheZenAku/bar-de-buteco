@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {HORSE} from '@bar/shared';
+import {HORSE,HORSE_REAR,horseRearLevel} from '@bar/shared';
 import {closeHand} from './drink-props';
 import {aim,palmUp,reach} from './serving-props';
 import type {RiderRig} from './moto-delivery';
@@ -12,29 +12,48 @@ export class HorseMount {
   private readonly reins:pc.Entity[][]=[];
   private clip='';
   private effort=0;
+  private rear=0;
+  private rearZ=-.8;
   constructor(resource:pc.ContainerResource,parent:pc.Entity){
     this.entity=new pc.Entity('Tião horse');parent.addChild(this.entity);
     this.model=resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});this.entity.addChild(this.model);
     this.saddle=this.model.findByName('HorseSaddle') as pc.Entity;
     if(!this.saddle)throw new Error('HorseSaddle missing from imported horse');
+    const back=['tripo::1_Left_Limb_2','tripo::1_Right_Limb_3'].map(name=>this.model.findByName(name) as pc.Entity);
+    if(back.every(Boolean)){
+      const midpoint=back[0]!.getPosition().clone().add(back[1]!.getPosition()).mulScalar(.5);
+      this.rearZ=new pc.Mat4().copy(this.entity.getWorldTransform()).invert().transformPoint(midpoint).z;
+    }
     this.model.addComponent('anim',{activate:true});
     for(const asset of resource.animations){const track=asset.resource as pc.AnimTrack;this.model.anim!.assignAnimation(track.name,track,undefined,1,true);}
     const leather=new pc.StandardMaterial();leather.diffuse=new pc.Color(.13,.065,.025);leather.gloss=5;leather.update();
     this.entity.once('destroy',()=>leather.destroy());
     for(let side=0;side<2;side++)this.reins.push(Array.from({length:4},()=>{const strap=new pc.Entity('Rédea');strap.addComponent('render',{type:'cylinder',material:leather,castShadows:false,receiveShadows:true});this.entity.addChild(strap);return strap;}));
   }
-  update(speed:number,state:string|undefined,resting=false):void {
+  update(speed:number,state:string|undefined,resting=false,rearAt=0,now=Date.now()):void {
     this.entity.enabled=true;
+    this.rear=state==='horse-rear'?horseRearLevel(rearAt,now):0;
+    const angle=this.rear*HORSE_REAR.angle*Math.PI/180;
+    this.entity.setLocalEulerAngles(-angle*180/Math.PI,0,0);
+    this.entity.setLocalPosition(0,-this.rearZ*Math.sin(angle),this.rearZ*(1-Math.cos(angle)));
     const clip=state==='horse-gallop'?'HorseGallop':state==='horse-walk'?'HorseWalk':'HorseIdle',anim=this.model.anim!;
     if(clip!==this.clip){anim.baseLayer?.transition(clip,this.clip?.18:0);this.clip=clip;}
     // Baked stride * model scale / (cycle duration * stance fraction), as in import-horse.mjs.
     const pace=clip==='HorseGallop'?.32*2.4/(.82*.21):clip==='HorseWalk'?.25*2.4/(.85*.65):0;
     anim.speed=pace?pc.math.clamp(speed/pace,.35,4.2):1;anim.playing=!resting;
     this.effort=pc.math.clamp((speed-HORSE.walkSpeed)/(HORSE.fastSpeed-HORSE.walkSpeed),0,1);
+    if(this.rear>.01)for(const name of ['tripo::0_Left_Limb_2','tripo::0_Right_Limb_2']){
+      const hoof=this.model.findByName(name) as pc.Entity,lower=hoof?.parent as pc.Entity,upper=lower?.parent as pc.Entity;
+      if(!hoof||!lower||!upper)continue;
+      const front=this.entity.forward.clone().mulScalar(-1),up=this.entity.up.clone();
+      const target=hoof.getPosition().clone().add(up.clone().mulScalar(.35*this.rear)).sub(front.clone().mulScalar(.18*this.rear));
+      reach(upper,lower,hoof,target,front.clone().add(up));
+    }
   }
   /** A local seated clip supplies the torso/fingers. IK puts the rider around the saddle. */
   seat(rider:RiderRig):void {
-    const {root,hip}=rider,parent=this.entity.parent!,left=parent.right.clone(),front=parent.forward.clone().mulScalar(-1),up=pc.Vec3.UP;
+    const {root,hip}=rider,parent=this.entity.parent!,left=this.entity.right.clone(),front=this.entity.forward.clone().mulScalar(-1),up=this.entity.up.clone();
+    root.setRotation(new pc.Quat().slerp(parent.getRotation(),this.entity.getRotation(),.6));
     const seat=this.saddle.getPosition().clone();
     const wanted=seat.clone().add(up.clone().mulScalar(.105));
     root.setPosition(root.getPosition().clone().add(wanted.sub(hip.getPosition())));
@@ -58,5 +77,5 @@ export class HorseMount {
       this.reins[side==='l'?0:1]!.forEach((strap,i)=>{const a=curve(i/4),b=curve((i+1)/4),direction=b.clone().sub(a);strap.setPosition(a.clone().add(b).mulScalar(.5));strap.setRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,direction.clone().normalize()));strap.setLocalScale(.009,direction.length(),.009);});
     }
   }
-  telemetry(){const p=this.saddle.getPosition();return {clip:this.clip,time:this.model.anim?.baseLayer?.activeStateCurrentTime,rate:this.model.anim?.speed,saddle:[p.x,p.y,p.z]};}
+  telemetry(){const p=this.saddle.getPosition();return {clip:this.clip,rear:this.rear,rearAngle:this.rear*HORSE_REAR.angle,time:this.model.anim?.baseLayer?.activeStateCurrentTime,rate:this.model.anim?.speed,saddle:[p.x,p.y,p.z]};}
 }

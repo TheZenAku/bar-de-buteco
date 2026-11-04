@@ -33,5 +33,7 @@ try{
   samples.forEach((sample,i)=>wav.writeInt16LE(Math.round(Math.max(-1,Math.min(1,sample))*32767),44+i*2));
   fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,'gallop.wav'),wav);
   fs.copyFileSync(path.join(input,'SOURCE.txt'),path.join(output,'CREDITS.txt'));
+  fs.copyFileSync(path.join(input,'neigh.mp3'),path.join(output,'neigh.mp3'));
+  fs.appendFileSync(path.join(output,'CREDITS.txt'),'\n\n'+fs.readFileSync(path.join(input,'NEIGH_SOURCE.txt'),'utf8'));
   console.log(`gallop.wav: ${(samples.length/rate).toFixed(3)} s, ${wav.length} bytes, mono ${rate} Hz`);
 }finally{await browser.close();}

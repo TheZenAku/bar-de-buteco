@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {eq} from 'drizzle-orm';import {CAR_MODEL,GARAGES,MOTO_ENGINE,PLAYER_RADIUS,STOPPED_VEHICLE,vehicleSpeed,boxContains,inputSchema,motoObstacle,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
+import {eq} from 'drizzle-orm';import {CAR_MODEL,FUEL_PUMPS,GARAGES,MOTO_ENGINE,PLAYER_RADIUS,STOPPED_VEHICLE,vehicleSpeed,boxContains,inputSchema,motoObstacle,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
 import {createApi} from '../../api/src/app.js';import {readConfig} from '../../api/src/config.js';import {itemInventory,playerVehicles,wallets} from '../../api/src/database/schema.js';
 import {BarRoom} from '../src/BarRoom.js';
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -43,7 +43,9 @@ test('four people share one car; only the driver moves it, a fifth is refused, a
     owner.room.send('moto.input',{seq:2,throttle:1,steer:0,brake:false});await pause(200);assert.equal(car.engine,MOTO_ENGINE.OFF,'W cannot bypass the empty ignition slot');
     await control('ignition');await control('engine');await until(()=>car.engine===MOTO_ENGINE.ON);
     car.fuel=.000001;await until(()=>car.engine===MOTO_ENGINE.OFF);assert.equal(car.fuel,0);assert.equal(car.headlights,0);
-    await control('refuel');assert.equal(car.fuel,100,'the garage supplies fuel while parked with engine off');
+    await control('refuel');assert.equal(car.fuel,0,'garages no longer provide instant fuel');
+    const pump=FUEL_PUMPS[0]!;car.assign({x:pump.x-3.3,y:pump.y,z:pump.z-1,yaw:Math.PI,fuel:99});
+    await control('refuel');await until(()=>world.state.fuelServices.get(pump.id)?.phase==='idle'&&car.fuel===100,20000);
     await control('engine');await until(()=>car.engine===MOTO_ENGINE.ON);
     await until(()=>car.fuel<100);assert.ok(car.fuel<100,'idling consumes real fuel');
     car.assign({x:50,y:0,z:7,yaw:Math.PI/2});let seq=2;

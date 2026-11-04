@@ -32,7 +32,7 @@
     "assets:map": "node tools/assets/repair-map-cart.mjs && node tools/assets/import-map.mjs",
     "assets:repair-cart": "node tools/assets/repair-map-cart.mjs",
     "assets:drinks": "node tools/assets/import-drinks.mjs",
-    "assets:moto": "node tools/assets/import-moto.mjs",
+    "assets:moto": "node tools/assets/import-moto.mjs && node tools/assets/render-moto-photo.mjs",
     "assets:carro": "node tools/assets/import-car.mjs",
     "assets:horse": "node tools/assets/import-horse.mjs",
     "assets:horse:sound": "node tools/assets/import-horse-sounds.mjs",

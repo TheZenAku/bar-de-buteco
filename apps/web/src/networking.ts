@@ -1,4 +1,5 @@
 import {vehicleMoving} from '@bar/shared';
+import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
@@ -8,6 +9,7 @@ import {PredictedRide} from './engine/moto-motion';
 import type {ServerPerformance} from '@bar/shared';
 
 export interface NetworkHooks {
+  fuelReceipt?:(receipt:FuelReceipt)=>void;
   serverPerformance?:(snapshot:ServerPerformance)=>void;
   /** The player just got a badge (docs/sistemas/conquistas.md). */
   achievement?:(badge:Badge)=>void;
@@ -110,6 +112,7 @@ export class BarNetwork {
   private generation=0;
   private transportReady=false;
   private wasMoving=false;
+  private sentRear=false;
   user?:PublicUser;
   constructor(private hooks:NetworkHooks){}
   async connect():Promise<void> {
@@ -130,7 +133,7 @@ export class BarNetwork {
   }
   private attach(room:Room):void {
     let removal:{kind:'kick'|'ban';reason:string}|undefined;
-    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;
+    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;this.sentRear=false;this.sentLamps=0;
     Object.assign(room.reconnection,{minUptime:0,minDelay:500,maxDelay:2000,delay:500,maxRetries:15,maxEnqueuedMessages:0});
     this.hooks.status('Você está no bar',true);
     room.onStateChange((state:any)=>{
@@ -165,6 +168,7 @@ export class BarNetwork {
     room.onMessage('garage.state',(view:GarageView)=>this.hooks.garage?.(view));
     room.onMessage('garage.taken',(taken:{plate:string;x:number;z:number})=>this.hooks.garageTaken?.(taken));
     room.onMessage('moto.locked',(lock:{plate:string;locked:boolean})=>this.hooks.motoLocked?.(lock));
+    room.onMessage('fuel.receipt',(receipt:FuelReceipt)=>this.hooks.fuelReceipt?.(receipt));
     room.onMessage('trade.invite',(invite:TradeInvite)=>this.hooks.tradeInvite?.(invite));
     room.onMessage('trade.uninvite',(message:{id:string})=>this.hooks.tradeUninvite?.(message.id));
     room.onMessage('trade.sent',(message:{name:string})=>this.hooks.tradeSent?.(message.name));
@@ -225,8 +229,9 @@ export class BarNetwork {
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
-    if(!moving&&!this.wasMoving&&!looking)return;
+    if(!moving&&!this.wasMoving&&!looking&&!!intention.rear===this.sentRear)return;
     this.wasMoving=moving;
+    this.sentRear=!!intention.rear;
     // A drawn vehicle can have many complete turns. Never let that heading poison the unacknowledged walking queue.
     const input={...intention,rotation:normalizeHeading(intention.rotation),seq:++this.seq};
     this.pending.push(input);
@@ -245,11 +250,13 @@ export class BarNetwork {
   }
   /** A step of the bike per tick, here and in the room; at rest with nothing pressed, nothing to send. */
   private stepRide(body:MotoBody):MotoBody {
+    if(vehicleFuelBusy(this.world?.fuelServices,this.motoId)){this.pendingMoto=[];return body;}
     if(this.pendingMoto.length>24)return body;
     const intent=this.hooks.motoInput?.()??NO_MOTO_INTENT;
     // A switch thrown at rest still has to reach the others.
-    const lamps=(intent.lights??0)|(intent.brake?16:0),changed=lamps!==this.sentLamps;
-    if(!changed&&!intent.throttle&&!intent.steer&&!vehicleMoving(body)&&!body.steer)return body;
+    const lamps=(intent.lights??0)|(intent.brake?16:0)|(intent.horn?32:0)|(intent.wheelie?64:0),changed=lamps!==this.sentLamps;
+    // Held horns/rears need keepalives even at rest; release must also cross the otherwise-idle input stream.
+    if(!changed&&!intent.horn&&!intent.wheelie&&!intent.throttle&&!intent.steer&&!vehicleMoving(body)&&!body.steer)return body;
     this.sentLamps=lamps;
     const input={...intent,seq:++this.seq};
     this.pendingMoto.push(input);this.send('moto.input',input);
@@ -272,7 +279,7 @@ export class BarNetwork {
       if(this.ride){this.hooks.moto?.(this.motoId,undefined);this.ride=undefined;this.pendingMoto=[];}
       return;
     }
-    this.pendingMoto=this.pendingMoto.filter(input=>input.seq>self.lastProcessedInput);
+    this.pendingMoto=vehicleFuelBusy(world.fuelServices,moto.id)?[]:this.pendingMoto.filter(input=>input.seq>self.lastProcessedInput);
     const rideOf=this.motoId;
     let body:MotoBody=moto;
     this.motoId=moto.id;
@@ -285,7 +292,7 @@ export class BarNetwork {
    * a pass. The raw input is what is sent.
    */
   private predict(input:PlayerInput,self:PlayerState):Position {
-    if(isRidingHorse(self.interactionState))return moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
+    if(isRidingHorse(self.interactionState))return self.animationState==='horse-rear'?this.position:moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
     return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle));
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}

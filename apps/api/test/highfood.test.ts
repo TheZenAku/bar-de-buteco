@@ -20,6 +20,26 @@ async function setup(t:{after(fn:()=>Promise<void>|void):void}){
 }
 const order=(userId:string,over:Record<string,unknown>={})=>({userId,orderId:randomUUID(),customerId:'dona-cida',customer:'Dona Cida',restaurant:'Pizzaria',items:['Pizza'],address:'Rua X, 10',length:300,durationMs:60_000,onTime:true,crashes:0,wornBox:false,...over});
 
+test('catalog visibility never grants a motorcycle to new accounts, and ownership audit requires internal access',async t=>{
+  const {app,db,internal,session}=await setup(t);
+  const accounts=await Promise.all([session('sem_moto_a'),session('sem_moto_b')]);
+  for(const {cookie} of accounts){
+    const view=(await app.inject({method:'GET',url:'/api/vehicles',headers:{cookie}})).json();
+    assert.equal(view.owned,false);assert.equal(view.vehicles.length,0);
+    assert.ok(view.models.some((model:any)=>model.model==='moto-delivery'));
+    assert.equal((await app.inject({method:'GET',url:'/api/inventory',headers:{cookie}})).json().keys.length,0);
+  }
+  assert.equal((await app.inject({method:'GET',url:'/api/internal/vehicles/ownership-audit'})).statusCode,401);
+  const audit=await app.inject({method:'GET',url:'/api/internal/vehicles/ownership-audit',headers:internal});
+  assert.equal(audit.statusCode,200);assert.equal(audit.json().motorcycles,0);assert.equal(audit.json().motorcycle_owners,0);
+  await db.update(wallets).set({balance:12000}).where(eq(wallets.userId,accounts[0]!.id));
+  assert.equal((await app.inject({method:'POST',url:'/api/vehicles/buy',headers:{cookie:accounts[0]!.cookie},payload:{requestId:randomUUID()}})).statusCode,200);
+  const untouched=(await app.inject({method:'GET',url:'/api/vehicles',headers:{cookie:accounts[1]!.cookie}})).json();
+  assert.equal(untouched.owned,false);assert.equal(untouched.vehicles.length,0);
+  const after=(await app.inject({method:'GET',url:'/api/internal/vehicles/ownership-audit',headers:internal})).json();
+  assert.equal(after.motorcycles,1);assert.equal(after.motorcycle_owners,1);assert.equal(after.purchases,1);
+});
+
 test('the bike: sold for its price, the same purchase once, refused without the coins, and the world hears about it',async t=>{
   const {app,db,internal,session}=await setup(t),{cookie,id}=await session('comprador');
   const view=await app.inject({method:'GET',url:'/api/vehicles',headers:{cookie}});

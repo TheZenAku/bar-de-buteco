@@ -21,7 +21,8 @@ test('running into something says how hard: the part of the speed that goes stra
   assert.equal(hit.nx,-1,'The face it hit looks back at it');
   assert.equal(hit.solid,car.id);
   // At a slant only part of it does, and it scrapes along.
-  body=at(car.x-1,car.z+car.hz+.5,Math.PI/2+.2,12);hit=undefined;
+  // Start outside the current hull, including the v4 mirrors, before moving into the side.
+  body=at(car.x-1,car.z+car.hz+MOTO.HALF_WIDTH*Math.cos(.2)+MOTO.HALF_LENGTH*Math.sin(.2)+.05,Math.PI/2+.2,12);hit=undefined;
   for(let i=0;i<20&&!hit;i++){const step=advanceMoto(body,THROTTLE);body=step.body;hit=step.hit;}
   assert.ok(hit,'It touched');
   assert.ok(hit.closing<hit.speed*.5,`Slanted: ${hit.closing} of ${hit.speed}`);

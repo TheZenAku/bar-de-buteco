@@ -8,12 +8,15 @@ import {lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-ligh
 import {MotoSounds} from './moto-sound';
 import {CarRig,CarLights} from './car-rig';
 import {CarSounds} from './car-sound';
+import {MotoBag} from './moto-bag';
+import {VehicleHorns} from './vehicle-horn';
+import {wheeliePose} from '@bar/shared';
 import {CAR_MODEL,isCar,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
 
 const RAD_TO_DEG=180/Math.PI;
-const BONES=['chassi','direcao','roda_dianteira','roda_traseira'] as const;
+const BONES=['chassi','direcao','suspensao_diant','balanca','descanso','roda_dianteira','roda_traseira'] as const;
 /**
- * moto_delivery.js (assets-bar/map/BarBoteco/export/moto), ported to the client's modules: the game has no script
+ * moto_v4/moto_delivery.js, ported to the client's modules: the game has no vehicle script
  * components, and the same fields and arithmetic drive the bones. Only what is drawn: speed and steering come from the
  * body the room simulates (stepMoto in packages/shared/src/moto.ts).
  */
@@ -23,27 +26,56 @@ export class MotoRig {
   lateralAcceleration=0;
   /** −1 left .. +1 right: the handlebar and the lean go there smoothly. */
   direcao=0;
+  freio=0;
+  acelerador=0;
+  descansoAberto=false;
+  curso=.07;
+  grau=0;
   anguloDirecao=28;
   /** 0 with nobody holding it: its lean is the whole bike's then (the room's pose). */
   inclinacaoMax=10;
   velocidadeInclinacao=10;
   raioRoda=MOTO.WHEEL_RADIUS;
   suavizacao=8;
-  private readonly ossos=new Map<string,{entidade:pc.Entity;repouso:pc.Quat}>();
+  private readonly ossos=new Map<string,{entidade:pc.Entity;repouso:pc.Quat;pos:pc.Vec3}>();
   private readonly pontos=new Map<string,pc.Entity>();
   private giroRodas=0;
   private guidao=0;
   private inclinacao=0;
+  private mergulho=0;
+  private descanso=0;
+  private freioVis=0;
+  private acelVis=0;
+  private readonly v=new pc.Vec3();
+  private readonly luzes=new Map<string,{materials:pc.StandardMaterial[];cor:pc.Color;level:number}>();
   private readonly q=new pc.Quat();
   private readonly tmp=new pc.Quat();
 
   constructor(readonly entity:pc.Entity) {
     for(const nome of BONES){
       const entidade=this.ponto(nome);
-      if(entidade)this.ossos.set(nome,{entidade,repouso:entidade.getLocalRotation().clone()});
+      if(entidade)this.ossos.set(nome,{entidade,repouso:entidade.getLocalRotation().clone(),pos:entidade.getLocalPosition().clone()});
       else console.warn(`moto: osso "${nome}" não encontrado`);
     }
   }
+  /** glTF front is +Z; PlayCanvas forward is -Z. */
+  frente():pc.Vec3 {return this.entity.forward.clone().mulScalar(-1);}
+  encaixarBag(bag:pc.Entity):void {
+    bag.reparent(this.ponto('ponto_bau'));bag.setLocalPosition(0,0,0);bag.setLocalRotation(pc.Quat.IDENTITY);
+  }
+  /** Clone emissive materials per bike so another player's switches cannot change this bike. */
+  luz(nome:string,ligada:boolean,intensidade=1):void {
+    let lamp=this.luzes.get(nome);
+    if(!lamp){
+      const render=this.ponto(nome)?.render;if(!render)return;
+      const colours:Record<string,[number,number,number]>={Luz_Farol:[1,.96,.82],Luz_Seta_E:[1,.55,.05],Luz_Seta_D:[1,.55,.05],Luz_Lanterna:[1,.06,.04],Luz_Freio:[1,.1,.06]};
+      const materials=render.meshInstances.map(mi=>{const material=(mi.material as pc.StandardMaterial).clone();mi.material=material;return material;});
+      lamp={materials,cor:new pc.Color(...(colours[nome]??[1,1,1])),level:-1};this.luzes.set(nome,lamp);
+    }
+    const level=ligada?intensidade:0;if(lamp.level===level)return;lamp.level=level;
+    for(const material of lamp.materials){material.emissive.copy(lamp.cor);material.emissiveIntensity=level;material.update();}
+  }
+  destroy():void {for(const lamp of this.luzes.values())for(const material of lamp.materials)material.destroy();this.luzes.clear();}
   /** A node of the rig by name: the attachment points and the bones. */
   ponto(nome:string):pc.Entity {
     let node=this.pontos.get(nome);
@@ -57,7 +89,7 @@ export class MotoRig {
   }
   update(dt:number):void {
     const k=1-Math.exp(-this.suavizacao*dt),dir=pc.math.clamp(this.direcao,-1,1);
-    this.guidao=dir*this.anguloDirecao;
+    this.guidao+=(dir*this.anguloDirecao-this.guidao)*k;
     const lean=pc.math.clamp(-Math.atan(this.lateralAcceleration/9.81)*RAD_TO_DEG,-this.inclinacaoMax,this.inclinacaoMax);
     this.inclinacao+=(lean-this.inclinacao)*k;
     this.giroRodas=(this.giroRodas+this.velocidade*dt/this.raioRoda*RAD_TO_DEG)%360;
@@ -65,11 +97,20 @@ export class MotoRig {
     this.girar('roda_traseira',this.giroRodas,0,0);
     this.girar('direcao',0,-this.guidao,0);          // +Y local turns left; direcao +1 is right
     this.girar('chassi',0,0,this.inclinacao);        // +Z local leans the top to the right (−X)
+    this.freioVis+=(pc.math.clamp(this.freio,0,1)-this.freioVis)*k;
+    this.acelVis+=(pc.math.clamp(this.acelerador,0,1)-this.acelVis)*k;
+    this.mergulho+=(this.freioVis*this.curso-this.mergulho)*k;
+    const suspension=this.ossos.get('suspensao_diant');
+    if(suspension){this.v.set(0,this.mergulho,0);suspension.repouso.transformVector(this.v,this.v);suspension.entidade.setLocalPosition(this.v.add(suspension.pos));}
+    this.girar('balanca',this.freioVis*-2+this.acelVis*1.5,0,0);
+    this.descanso+=((this.descansoAberto?1:0)-this.descanso)*k*.6;
+    this.girar('descanso',-90*this.descanso,0,0);
   }
   telemetry() {
     // How far the top of the rear wheel has rolled towards the headlight (+1 at a quarter turn), read from the bone itself.
     const topo=this.ponto('roda_traseira').up,frente=this.entity.forward;
-    return {guidao:+this.guidao.toFixed(2),inclinacao:+this.inclinacao.toFixed(2),rodas:+this.giroRodas.toFixed(1),topoRoda:+(-topo.dot(frente)).toFixed(3)};
+    const bag=this.ponto('ponto_bau').children.find(child=>child.name==='Bag_Rig') as pc.Entity|undefined;
+    return {grau:this.grau,frontWheelY:this.ponto('roda_dianteira').getPosition().y,rearWheelY:this.ponto('roda_traseira').getPosition().y,guidao:+this.guidao.toFixed(2),inclinacao:+this.inclinacao.toFixed(2),rodas:+this.giroRodas.toFixed(1),topoRoda:+(-topo.dot(frente)).toFixed(3),mergulho:this.mergulho,descanso:this.descanso,luzes:Object.fromEntries([...this.luzes].map(([name,lamp])=>[name,lamp.level])),bag:bag?{parent:bag.parent!.name,local:bag.getLocalPosition().toArray(),aberta:bag.script!.get(MotoBag)!.aberta,tampa:bag.findByName('bag_tampa')!.getLocalEulerAngles().x}:null};
   }
 }
 
@@ -86,16 +127,21 @@ export interface Bike {
   /** The local rider's own bike as it should be drawn this frame (moto-motion.ts); everybody else's follows `track`. */
   plate?:{material:pc.StandardMaterial;texture:pc.Texture}|undefined;
   predicted?:MotoBody;track:RoomTrack;riddenHere:boolean;gap:{x:number;z:number;yaw:number};
-  drawn:{x:number;y:number;z:number;yaw:number;pitch:number};
+  drawn:{x:number;y:number;z:number;yaw:number;pitch:number;wheelie?:number};
+  deliveryBag?:pc.Entity;bagPending?:boolean;bagWanted?:boolean;
 }
 
 /** The delivery bikes the room syncs, drawn between its patches (and the rider's prediction, for the local one). */
-/** Under the plate lamp (moto-lights.ts), in the tail node's space. */
-const PLATE_AT=[.016,-.295,.03] as const,PLATE_SIZE=[.21,.08,.006] as const;
+/** v4's authored plate dimensions; its attachment is ponto_placa. */
+const PLATE_SIZE=[.2,.17,.002] as const;
 export class Motos {
   private carModel?:pc.ContainerResource;
   private readonly carSounds:CarSounds;
+  private readonly horns:VehicleHorns;
   private model?:pc.ContainerResource;
+  private bagModel?:Promise<pc.ContainerResource>;
+  private courierRiders=new Set<string>();
+  private destroyed=false;
   private states:readonly MotoState[]=[];
   private readonly bikes=new Map<string,Bike>();
   /**
@@ -121,6 +167,7 @@ export class Motos {
     this.lampMaterials=new MotoLampMaterials();
     this.sounds=new MotoSounds(volume,import.meta.env.BASE_URL);
     this.carSounds=new CarSounds(volume);
+    this.horns=new VehicleHorns(volume);
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}carro/carro_hatch.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Carro hatch indisponível.',error);return;}
       this.carModel=asset.resource as pc.ContainerResource;this.place();
@@ -129,6 +176,28 @@ export class Motos {
       if(error||!asset){console.warn('Moto de entrega indisponível.',error);return;}
       this.model=asset.resource as pc.ContainerResource;this.place();
     });
+  }
+  /** Create a detached v3 bag; encaixarBag brings it into the scene. No bike gets one by default. */
+  async criarBag():Promise<pc.Entity> {
+    this.bagModel??=new Promise((resolve,reject)=>this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_bag.glb`,'container',(error,asset)=>{
+      if(error||!asset){this.bagModel=undefined;reject(error??new Error('Bag indisponível'));}else resolve(asset.resource as pc.ContainerResource);
+    }));
+    const bag=(await this.bagModel).instantiateRenderEntity({castShadows:true,receiveShadows:true});
+    bag.addComponent('script');bag.script!.create(MotoBag);
+    return bag;
+  }
+  /** Courier state is public: every client derives the same bag attachment from the rider's shift. */
+  couriers(ids:Iterable<string>):void {this.courierRiders=new Set(ids);}
+  private deliveryBag(bike:Bike):void {
+    const wanted=bike.rig instanceof MotoRig&&!!bike.state.riderId&&this.courierRiders.has(bike.state.riderId)&&!bike.state.phase;
+    bike.bagWanted=wanted;
+    if(!wanted){bike.deliveryBag?.destroy();bike.deliveryBag=undefined;return;}
+    if(bike.deliveryBag||bike.bagPending)return;
+    bike.bagPending=true;
+    void this.criarBag().then(bag=>{
+      if(this.destroyed||this.bikes.get(bike.state.id)!==bike||!bike.bagWanted){bag.destroy();return;}
+      (bike.rig as MotoRig).encaixarBag(bag);bike.deliveryBag=bag;
+    }).catch(error=>console.warn('Bag de entrega indisponível.',error)).finally(()=>{bike.bagPending=false;});
   }
   /** The plate on the bike's back, under the lamp that lights it: Mercosul colours, on a thin box on the tail's node. */
   private plate(rig:MotoRig,text:string):{material:pc.StandardMaterial;texture:pc.Texture} {
@@ -146,9 +215,10 @@ export class Motos {
     const entity=new pc.Entity('Placa');
     entity.addComponent('render',{type:'box',castShadows:false,receiveShadows:false});
     entity.render!.meshInstances[0]!.material=material;
-    const [x,y,z]=PLATE_AT;
-    entity.setLocalPosition(x,y,z);entity.setLocalScale(PLATE_SIZE[0],PLATE_SIZE[1],PLATE_SIZE[2]);
-    rig.ponto('ponto_lanterna').addChild(entity);
+    // Replace the authored plate face; point_placa is in world axes at rest (the plate slopes 15 degrees).
+    rig.ponto('Moto_Placa').enabled=false;
+    entity.setLocalEulerAngles(15,0,0);entity.setLocalScale(PLATE_SIZE[0],PLATE_SIZE[1],PLATE_SIZE[2]);
+    rig.ponto('ponto_placa').addChild(entity);
     return {material,texture};
   }
   sync(states:Record<string,MotoState>|undefined):void {
@@ -169,7 +239,7 @@ export class Motos {
       const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate):undefined;
       this.bikes.set(state.id,{entity,rig,plate,lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
-    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){if(bike.rig instanceof CarRig)bike.rig.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
+    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.rig.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
   }
   /** The local rider's own bike as it should be drawn this frame (undefined off the bike). */
   predict(id:string,body:MotoBody|undefined):void {const bike=this.bikes.get(id);if(bike)bike.predicted=body;}
@@ -182,6 +252,7 @@ export class Motos {
     this.clock+=dt*1000;
     this.clock=Math.abs(wall-this.clock)>CLOCK_RESTART_MS?wall:this.clock+(wall-this.clock)*CLOCK_PULL;
     for(const bike of this.bikes.values()){
+      this.deliveryBag(bike);
       const target=bike.predicted??bike.track.sample(this.clock)??bike.state,{drawn,gap}=bike;
       // Fallen, or going on by itself: how the room says it lies, nothing to smooth (its samples are already drawn late).
       const lying=!bike.predicted&&bike.state.phase?target as MotoBody&Partial<MotoState>:undefined;
@@ -197,11 +268,14 @@ export class Motos {
       drawn.x=target.x+gap.x;drawn.z=target.z+gap.z;drawn.yaw=target.yaw+gap.yaw;
       const lift=lying?1:1-Math.exp(-LIFT_CATCH_UP*dt);
       drawn.y+=(target.y-drawn.y)*lift;drawn.pitch+=(target.pitch-drawn.pitch)*lift;
-      bike.entity.setPosition(drawn.x,drawn.y,drawn.z);
+      drawn.wheelie=((drawn.wheelie??0)+((!lying&&bike.rig instanceof MotoRig?bike.state.wheelie??0:0)-(drawn.wheelie??0))*(1-Math.exp(-12*dt)));
+      const grau=wheeliePose(drawn.wheelie);
+      if(bike.rig instanceof MotoRig)bike.rig.grau=grau.angle;
+      bike.entity.setPosition(drawn.x+Math.sin(drawn.yaw)*grau.z,drawn.y+grau.y,drawn.z+Math.cos(drawn.yaw)*grau.z);
       if(lying&&lying.qw!==undefined)bike.entity.setRotation(lying.qx!,lying.qy!,lying.qz!,lying.qw);
       else{
         // The heading, then the slope between the axles (+X leans the front down).
-        this.turn.setFromEulerAngles(0,drawn.yaw*RAD_TO_DEG,0);this.tilt.setFromEulerAngles(-drawn.pitch*RAD_TO_DEG,0,0);
+        this.turn.setFromEulerAngles(0,drawn.yaw*RAD_TO_DEG,0);this.tilt.setFromEulerAngles(-drawn.pitch*RAD_TO_DEG-grau.angle,0,0);
         bike.entity.setRotation(this.turn.mul(this.tilt));
       }
       const {rig}=bike;
@@ -211,14 +285,16 @@ export class Motos {
       rig.lateralAcceleration=target.speed*(target.yawRate??0);
       // The handlebar turns as far as the wheel really does at this speed; the lean follows the whole intent.
       rig.anguloDirecao=motoSteerAngle(target.speed,bike.state.model)*RAD_TO_DEG;
-      rig.update(dt);
       const power=vehiclePowered(bike.state),mode=bike.state.headlights??1;
       const lamps:LampState=lampState(power,bike.predicted&&this.localLamps?.id===bike.state.id?this.localLamps.bits:bike.state.lights);
       lamps.lit=power&&mode>0;lamps.high=power&&mode===2;
+      if(rig instanceof MotoRig){rig.freio=lamps.brake?1:0;rig.acelerador=power&&(bike.predicted&&this.localGas?.id===bike.state.id?this.localGas.open:bike.state.gas)?1:0;}
+      rig.update(dt);
       const parts=readDriveParts(bike.state),seed=bike.state.id.charCodeAt(bike.state.id.length-1)||0;
       bike.lights.update(lamps,now,camera,exposure,motoLampLevel(parts.farol,parts.bateria,now,seed),motoLampLevel(parts.lanterna,parts.bateria,now,seed+1));
     }
     const ear=camera.getPosition();
+    this.horns.update([...this.bikes.values()].map(bike=>({state:bike.state,position:bike.drawn})),ear,camera.forward,camera.up);
     this.sounds.update(dt,[...this.bikes.values()].filter(bike=>!isCar(bike.state)).map(bike=>({id:bike.state.id,x:bike.drawn.x,y:bike.drawn.y,z:bike.drawn.z,
       view:{engine:bike.state.engine??MOTO_ENGINE.OFF,engineAt:bike.state.engineAt??0,crank:bike.state.crank??0,gas:!!bike.state.gas,speed:bike.predicted?.speed??bike.state.speed,parts:bike.state.parts??''},
       ...(bike.predicted&&this.localGas?.id===bike.state.id?{gasNow:this.localGas.open}:{})})),ear,camera.forward,camera.up);
@@ -243,8 +319,8 @@ export class Motos {
     }
     return best;
   }
-  soundTelemetry(id?:string) {return id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);}
-  destroy():void {this.sounds.destroy();this.carSounds.destroy();for(const bike of this.bikes.values())if(bike.rig instanceof CarRig)bike.rig.destroy();}
+  soundTelemetry(id?:string) {const engine=id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);return {...engine,horn:id?this.horns.telemetry(id):undefined};}
+  destroy():void {this.destroyed=true;this.sounds.destroy();this.carSounds.destroy();this.horns.destroy();for(const bike of this.bikes.values()){bike.deliveryBag?.destroy();bike.rig.destroy();}}
   ridden(playerId:string):Bike|undefined {for(const bike of this.bikes.values())if(vehicleSeat(bike.state,playerId)>=0)return bike;}
   /** The bike nearest to a point, not far off. */
   nearest(point:{x:number;z:number}):Bike|undefined {
@@ -269,7 +345,7 @@ export interface RiderRig {
 }
 /**
  * The hip joint over the seat's surface and ahead of `ponto_piloto`, the upper body bowed to the handlebar, the wrist short of
- * the grip's point and on its inner half, the ankle over the footboard.
+ * the grip's point and on its inner half, the ankle over the foot peg.
  */
 const HIP_OVER_SEAT=.1,HIP_FORWARD=.09,LEAN=12,WRIST_BACK=.07,WRIST_UP=.035,WRIST_IN=.05,ANKLE_OVER_FLOOR=.09;
 /** Short arms bow further, up to this many degrees more; turning the spine moves the shoulders by about this many metres per radian. */
@@ -280,7 +356,7 @@ const GRIP_CURL=[52,60,40] as const;
 const footTurn=new pc.Quat(),leanTurn=new pc.Quat();
 /**
  * The Sit clip made into a riding pose, drawn after the clip this frame (and after the bike): hips on the seat, the
- * chassis's lean and heading, hands on the moving grips and feet on the footboard by two-bone IK in world space, so every
+ * chassis's lean and heading, hands on the moving grips and feet on the pegs by two-bone IK in world space, so every
  * skin's own bone axes do not matter. The grips are far for the shorter arms: those bodies bow until they reach.
  */
 export function seatRider(moto:MotoRig,rider:RiderRig):void {

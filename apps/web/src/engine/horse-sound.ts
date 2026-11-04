@@ -3,7 +3,7 @@ import {placeListener} from './moto-sound';
 
 const AUDIBLE=45,VOICES=4,FADE=.06;
 interface Position {x:number;y:number;z:number}
-export interface HorseSoundView extends Position {id:string;speed:number;animation?:string}
+export interface HorseSoundView extends Position {id:string;speed:number;animation?:string;rearAt?:number}
 interface Voice {source:AudioBufferSourceNode;gain:GainNode;panner:PannerNode}
 
 /** One recorded gallop cycle, played from each nearby horse with the rider's cadence. */
@@ -11,6 +11,9 @@ export class HorseSounds {
   private context?:AudioContext;
   private bus?:GainNode;
   private buffer?:AudioBuffer;
+  private neighBuffer?:AudioBuffer;
+  private readonly neighAt=new Map<string,number>();
+  private readonly neighing=new Map<string,Voice>();
   private loading=false;
   private destroyed=false;
   private readonly voices=new Map<string,Voice>();
@@ -44,6 +47,9 @@ export class HorseSounds {
     }).then(data=>context.decodeAudioData(data)).then(buffer=>{
       if(!this.destroyed)this.buffer=buffer;
     }).catch(error=>{if(!this.destroyed)console.warn('Cavalo: som de galope indisponível.',error);});
+    void fetch(`${this.base}mounts/sound/neigh.mp3`).then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.arrayBuffer();})
+      .then(data=>context.decodeAudioData(data)).then(buffer=>{if(!this.destroyed)this.neighBuffer=buffer;})
+      .catch(error=>{if(!this.destroyed)console.warn('Cavalo: relincho indisponível.',error);});
   }
   private stop(id:string):void {
     const voice=this.voices.get(id),context=this.context;
@@ -60,14 +66,27 @@ export class HorseSounds {
     const near=document.hidden?[]:horses.filter(horse=>horse.animation==='horse-gallop'&&horse.speed>.35&&distance(horse)<AUDIBLE)
       .sort((a,b)=>distance(a)-distance(b)).slice(0,VOICES);
     for(const id of this.voices.keys())if(!near.some(horse=>horse.id===id))this.stop(id);
-    if(!near.length&&!this.context)return;
-    const context=this.context??(near.length&&this.level()>0?this.graph():undefined);
+    const rearing=document.hidden?[]:horses.filter(h=>h.animation==='horse-rear'&&h.rearAt&&distance(h)<AUDIBLE).sort((a,b)=>distance(a)-distance(b)).slice(0,VOICES);
+    for(const id of this.neighAt.keys())if(!horses.some(h=>h.id===id))this.neighAt.delete(id);
+    if(!near.length&&!rearing.length&&!this.context)return;
+    const context=this.context??((near.length||rearing.length)&&this.level()>0?this.graph():undefined);
     if(!context||!this.bus)return;
     const at=context.currentTime;
     this.bus.gain.setTargetAtTime(document.hidden?0:this.level(),at,.03);
     placeListener(context,ear.x,ear.y,ear.z,forward,up);
-    if(!near.length)return;
     this.load(context);
+    for(const horse of rearing){
+      if(!this.neighBuffer||this.neighAt.get(horse.id)===horse.rearAt)continue;
+      this.neighAt.set(horse.id,horse.rearAt!);
+      const source=context.createBufferSource(),gain=context.createGain(),panner=context.createPanner();
+      source.buffer=this.neighBuffer;gain.gain.value=.85;
+      panner.panningModel='equalpower';panner.distanceModel='inverse';panner.refDistance=5;panner.maxDistance=AUDIBLE;panner.rolloffFactor=1.3;
+      panner.positionX.value=horse.x;panner.positionY.value=horse.y+1.5;panner.positionZ.value=horse.z;
+      source.connect(gain).connect(panner).connect(this.bus);
+      const voice={source,gain,panner};this.neighing.set(horse.id,voice);
+      source.onended=()=>{source.disconnect();gain.disconnect();panner.disconnect();if(this.neighing.get(horse.id)===voice)this.neighing.delete(horse.id);};source.start();
+    }
+    if(!near.length)return;
     if(!this.buffer)return;
     for(const horse of near){
       let voice=this.voices.get(horse.id);
@@ -89,7 +108,7 @@ export class HorseSounds {
   }
   telemetry(id?:string){
     const voice=id?this.voices.get(id):undefined;
-    return {state:this.context?.state??'',ready:!!this.buffer,volume:this.bus?.gain.value??0,voices:this.voices.size,
+    return {state:this.context?.state??'',ready:!!this.buffer,neighReady:!!this.neighBuffer,neighing:id?this.neighing.has(id):this.neighing.size>0,neighAt:id?this.neighAt.get(id):undefined,volume:this.bus?.gain.value??0,voices:this.voices.size,
       playing:!!voice,rate:voice?.source.playbackRate.value??0,gain:voice?.gain.gain.value??0,
       position:voice?[voice.panner.positionX.value,voice.panner.positionY.value,voice.panner.positionZ.value]:undefined};
   }
@@ -97,7 +116,7 @@ export class HorseSounds {
     this.destroyed=true;
     for(const event of ['pointerdown','keydown'])window.removeEventListener(event,this.unlock);
     document.removeEventListener('visibilitychange',this.hidden);
-    this.clear();this.buffer=undefined;
+    this.clear();for(const voice of this.neighing.values())voice.source.stop();this.neighing.clear();this.buffer=undefined;this.neighBuffer=undefined;this.neighAt.clear();
     void this.context?.close().catch(()=>{});
   }
 }

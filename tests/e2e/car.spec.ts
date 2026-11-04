@@ -108,7 +108,7 @@ test('vehicle dashboard adapts to car, passenger, motorcycle and horse, restores
   const url='/@fs/'+fileURLToPath(new URL('../fixtures/vehicle-hud.html',import.meta.url)).replaceAll('\\','/');
   await page.setViewportSize({width:1440,height:900});await page.goto(url);
   const panel=page.locator('#vehicle-hud');await expect(panel).toBeVisible();await expect(page.locator('[data-panel="actions"]')).toBeHidden();
-  await expect(panel.locator('[data-vh-speed]')).toHaveText('60');await expect(panel.locator('meter')).toHaveAttribute('value','42');
+  await expect(panel.locator('[data-vh-speed]')).toHaveText('60');await expect(panel.locator('[data-vh-meter="fuel"]')).toHaveAttribute('value','42');
   await page.evaluate(()=>(window as any).fixture.set({speed:-3,lateralSpeed:4}));
   await expect(panel.locator('[data-vh-speed]')).toHaveText('18');await expect(panel.locator('[data-vh-gear]')).toHaveText('R');
   await page.evaluate(()=>(window as any).fixture.set({speed:16.7,lateralSpeed:0}));
@@ -123,6 +123,90 @@ test('vehicle dashboard adapts to car, passenger, motorcycle and horse, restores
   await page.evaluate(()=>(window as any).fixture.horse());await expect(panel).toHaveAttribute('data-kind','horse');await expect(panel.locator('[data-vcontrol="engine"]')).toHaveCount(0);await expect(panel.getByText('Seu fôlego')).toBeVisible();
   await page.evaluate(()=>(window as any).fixture.unmount());await expect(panel).toBeHidden();await expect(page.locator('[data-panel="actions"]')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('neon vehicle HUD keeps telemetry live, preserves focus, and derives range from real consumption',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const url='/@fs/'+fileURLToPath(new URL('../fixtures/vehicle-hud.html',import.meta.url)).replaceAll('\\','/');
+  await page.goto(url);
+  const panel=page.locator('#vehicle-hud'),engine=panel.locator('[data-vcontrol="engine"]');
+  await expect(panel.locator('.vh-dial-scale text')).toHaveText(['0','20','40','60','80','100','120','140','160','180','200']);
+  const range=await page.evaluate(()=>(window as any).fixture.range());
+  await expect(panel.locator('[data-vh="fuel-state"]')).toHaveText(`${range.toLocaleString('pt-BR')} km`);
+  await engine.focus();
+  await page.evaluate(()=>{(window as any).originalNeedle=document.querySelector('.vh-needle');(window as any).fixture.set({fuel:21,gas:true});});
+  await expect(engine).toBeFocused();
+  expect(await page.evaluate(()=>(window as any).originalNeedle===document.querySelector('.vh-needle'))).toBe(true);
+  const acceleratedRange=await page.evaluate(()=>(window as any).fixture.range());expect(acceleratedRange).toBeLessThan(range/2);
+  await expect(panel.locator('[data-vh="fuel-state"]')).toHaveText(`${acceleratedRange.toLocaleString('pt-BR')} km`);
+  await page.evaluate(()=>(window as any).fixture.parts({motor:24,carroceria:10}));
+  await expect(panel.locator('[data-vh="engine-percent"]')).toHaveText('24%');
+  await expect(panel.locator('[data-vh="engine-state"]')).toHaveText('Danificado');
+  await expect(panel.locator('[data-vh="body-percent"]')).toHaveText('91%');
+  await expect(panel.locator('[data-vh-meter="engine"]')).toHaveJSProperty('value',24);
+  await page.evaluate(()=>(window as any).fixture.predicted({speed:-3,lateralSpeed:4}));
+  await expect(panel.locator('[data-vh-speed]')).toHaveText('18');
+  await expect(panel.locator('[data-vh-position="R"]')).toHaveAttribute('aria-current','true');
+  await page.evaluate(()=>(window as any).fixture.set({speed:0,lateralSpeed:0}));
+  await expect(panel.locator('[data-vh-gear]')).toHaveText('N');
+  await expect(panel.locator('[data-vh="fuel-state"]')).toHaveText(`${acceleratedRange.toLocaleString('pt-BR')} km`);
+  await page.evaluate(()=>(window as any).fixture.set({engine:0}));
+  await expect(panel.locator('[data-vh-gear]')).toHaveText('P');
+  await page.evaluate(()=>(window as any).fixture.set({fuel:0}));
+  await expect(panel.locator('[data-vh="fuel-state"]')).toHaveText('0 km');await expect(engine).toBeDisabled();
+  await page.evaluate(()=>(window as any).fixture.set({fuel:undefined}));
+  await expect(panel.locator('[data-vh="fuel-percent"]')).toHaveText('—');
+  await expect(panel.locator('[data-vh-meter="fuel"]')).not.toHaveAttribute('value');
+  await page.evaluate(()=>{(window as any).fixture.unmount();(window as any).fixture.car({speed:0,id:'another-car'});});
+  await expect(panel.locator('[data-vh="fuel-state"]')).toHaveText('— km');
+  await page.evaluate(()=>(window as any).fixture.set({speed:100}));
+  await expect(panel.locator('[data-vh-speed]')).toHaveText('360');
+  await expect(panel).toHaveCSS('--vh-angle','125deg');
+  expect(errors).toEqual([]);
+});
+
+test('neon vehicle HUD follows switches, rain, broken parts and passenger permissions',async({page})=>{
+  const url='/@fs/'+fileURLToPath(new URL('../fixtures/vehicle-hud.html',import.meta.url)).replaceAll('\\','/');
+  await page.goto(url);const panel=page.locator('#vehicle-hud');
+  const control=(name:string)=>panel.locator(`[data-vcontrol="${name}"]`);
+  await expect(control('headlights')).toHaveAttribute('aria-pressed','true');
+  await page.evaluate(()=>(window as any).fixture.set({speed:0,locked:true,wipers:true,lights:6,doors:1,passengers:['a','b','c']}));
+  for(const name of ['lock','wipers','hazard','left','right','doors'])await expect(control(name)).toHaveAttribute('aria-pressed','true');
+  await expect(panel.locator('[data-vh="seat"]')).toHaveText('Motorista - 4/4');
+  for(const name of ['headlights','wipers','lock','hazard','left','right','doors','engine','info','camera','exit'])await control(name).click();
+  expect(await page.evaluate(()=>(window as any).fixture.actions)).toEqual(['headlights','wipers','lock','hazard','left','right','doors','engine','info','camera','exit']);
+  await page.evaluate(()=>{(window as any).fixture.set({wipers:false});(window as any).fixture.rain(true);});
+  await expect(control('wipers')).toHaveAttribute('aria-pressed','true');
+  await expect(control('wipers')).toHaveAttribute('title',/Automático/);
+  await page.evaluate(()=>(window as any).fixture.parts({limpadores:0,farol:0}));
+  await expect(control('wipers')).toHaveAttribute('aria-pressed','false');await expect(control('wipers')).toBeDisabled();
+  await expect(control('headlights')).toHaveAttribute('aria-pressed','false');
+  await page.evaluate(()=>(window as any).fixture.set({engine:0}));
+  for(const name of ['headlights','wipers','hazard','left','right'])await expect(control(name)).toHaveAttribute('aria-pressed','false');
+  await control('ignition').click();
+  await expect(control('refuel')).toBeHidden();
+  await page.evaluate(()=>(window as any).fixture.set({x:-256.891,z:81.405,y:.15}));
+  await expect(control('refuel')).toBeVisible();await control('refuel').click();
+  await page.evaluate(()=>(window as any).fixture.passenger());
+  for(const name of ['engine','ignition','lock','headlights','wipers','hazard','left','right','doors'])await expect(control(name)).toBeDisabled();
+  await expect(control('info')).toBeEnabled();await expect(control('exit')).toBeEnabled();await expect(control('refuel')).toBeHidden();
+  await expect(panel.locator('[data-vh="engine-percent"]')).toHaveText('100%');
+  await expect(panel.locator('[data-vcontrol="seatbelt"], [data-vcontrol="cruise"], [data-vcontrol="stability"]')).toHaveCount(0);
+});
+
+test('neon vehicle HUD fits screen sizes without covering the minimap and honors reduced motion',async({page})=>{
+  const url='/@fs/'+fileURLToPath(new URL('../fixtures/vehicle-hud.html',import.meta.url)).replaceAll('\\','/');
+  await page.goto(url);
+  for(const [width,height] of [[1920,1080],[1440,900],[1280,720],[960,640],[844,390],[760,600],[390,844],[320,568]]){
+    await page.setViewportSize({width:width!,height:height!});
+    const panel=page.locator('#vehicle-hud'),box=(await panel.boundingBox())!,map=(await page.locator('.minimap').boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x+box.width).toBeLessThanOrEqual(width!);expect(box.y+box.height).toBeLessThanOrEqual(height!);
+    expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+    expect(box.x>=map.x+map.width||box.y>=map.y+map.height||box.x+box.width<=map.x||box.y+box.height<=map.y).toBe(true);
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(page.locator('.vh-needle')).toHaveCSS('transition-duration','0s');
 });
 
 test('arcade car steering and handbrake are predicted by the driver and replicated to an observer',async({page,browser})=>{

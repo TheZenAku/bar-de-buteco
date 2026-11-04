@@ -49,7 +49,7 @@ test('the delivery bike over real WebSockets: spawned by an administrator, mount
     await until(()=>moto().engine===MOTO_ENGINE.ON);
     // Walking inputs do not move a rider; the bike's do, one a tick, the same steps a browser predicts.
     rider.room.send('player.input',{seq:1,dx:1,dz:0,running:false,rotation:0});await pause(120);
-    assert.equal(rider.player().x,spot.x);
+    assert.ok(Math.abs(rider.player().x-spot.x)<1e-9,'Walking input cannot move the seated rider (allow floating-point spawn arithmetic)');
     let seq=10,predicted:MotoBody={x:spot.x,y:spot.y,z:spot.z,yaw:spot.yaw,pitch:0,speed:0,steer:0};
     for(let i=0;i<30;i++){const input={seq:++seq,throttle:1,steer:0,brake:false};predicted=stepMoto(predicted,input);rider.room.send('moto.input',input);await pause(55);}
     await until(()=>rider.player().lastProcessedInput===seq);

@@ -1,5 +1,6 @@
 import {vehicleSpeed as groundVehicleSpeed} from '@bar/shared';
 import * as pc from 'playcanvas';
+import {FuelProps} from './fuel-props';
 import {HORSE,isRidingHorse,normalizeHeading} from '@bar/shared';
 import {HorseMount} from './horse-mount';
 import {HorseSounds} from './horse-sound';
@@ -34,7 +35,8 @@ import {limitTextures,loadSharedContainer} from './gltf-textures';
 import {CameraRig,type CameraFeel,type CameraMode} from './camera-rig';
 import {HeadLookPose} from './head-look';
 import {headLookAt,type HeadLook} from '@bar/shared';
-import {Motos,seatRider,type Bike} from './moto-delivery';
+import {Motos,MotoRig,seatRider,type Bike} from './moto-delivery';
+import {MotoBag} from './moto-bag';
 import {HighfoodProps} from './highfood-props';
 import {GARAGES,HIGHFOOD} from '@bar/shared';
 import {SpeedBlur} from './speed-blur';
@@ -257,6 +259,7 @@ const DUST_FROM = 2.5;
  */
 export class BarScene {
   readonly app: pc.Application;
+  readonly fuelProps:FuelProps;
   readonly ready: Promise<void>;
   private televisions=new Map<string,TelevisionSurface>();
   private watchingTv='';
@@ -362,7 +365,7 @@ export class BarScene {
       this.loadHorse();
       if(!this.horseModel||!avatar.skin)continue;
       const horse=avatar.horse??=new HorseMount(this.horseModel,avatar.root);
-      horse.update(avatar.speed??0,avatar.actor.animation,avatar.resting);
+      horse.update(avatar.speed??0,avatar.actor.animation,avatar.resting,avatar.actor.horseRearAt??0,Date.now()+this.serverClockOffset);
       const skin=avatar.skin,hip=skin.hip??=(skin.model.findByName('hip') as pc.Entity|null)??undefined;
       avatar.spine??=(skin.model.findByName('spine_02') as pc.Entity|null)??null;
       if(hip&&!avatar.resting)horse.seat({root:avatar.body,hip,spine:avatar.spine,...skin.bones,handRigL:skin.drinkHand,handRigR:skin.rightHand});
@@ -481,6 +484,7 @@ export class BarScene {
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
     this.poolBalls=new PoolBalls(this.app);
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
+    this.fuelProps=new FuelProps(this.app);
     this.horseSounds=new HorseSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
       const ear=this.camera.getPosition();
@@ -965,7 +969,7 @@ export class BarScene {
       return { ...NO_MOTO_INTENT, lights: this.motoSwitches };
     }
     const held = (...codes: string[]) => Number(codes.some(code => this.keys.has(code)));
-    const input = { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space'), lights: this.motoSwitches };
+    const input = { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space'), lights: this.motoSwitches,horn:this.keys.has('KeyF'),wheelie:!isCar(vehicle?.state)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')) };
     const bike = this.motos.ridden(this.localId), speed = bike?.predicted?.speed ?? 0;
     const braking = input.brake || (input.throttle < 0 && speed > .1) || (input.throttle > 0 && speed < -.1);
     if (bike) { this.motos.lamps(bike.state.id, this.motoSwitches | (braking ? MOTO_LIGHT.BRAKE : 0)); this.motos.gas(bike.state.id, input.throttle > 0 && bike.state.engine === MOTO_ENGINE.ON); }
@@ -995,7 +999,25 @@ export class BarScene {
   getMotos() {
     return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id,model:state.model,color:state.color,passengers:state.passengers, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer, lateralSpeed:predicted?.lateralSpeed??state.lateralSpeed??0,yawRate:predicted?.yawRate??state.yawRate??0,
       position: [entity.getPosition().x, entity.getPosition().y, entity.getPosition().z], yaw: drawn.yaw, front: [-entity.forward.x, -entity.forward.y, -entity.forward.z], rig: rig.telemetry(),
-      points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna'].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
+      rider: this.motoRiderPose(state.riderId), points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna', ...(rig instanceof MotoRig?['ponto_piloto','ponto_pe_E','ponto_pe_D','ponto_bau']:[])].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
+  }
+
+  private motoRiderPose(id:string) {
+    const skin=this.actors.get(id)?.skin;if(!skin)return undefined;
+    return Object.fromEntries(['hand_l','hand_r','foot_l','foot_r'].map(name=>{
+      const p=skin.bones[name as 'hand_l'|'hand_r'|'foot_l'|'foot_r'].getPosition();return [name,[p.x,p.y,p.z]];
+    }));
+  }
+  /** Development inspection of the standalone item; uses the same creation/attachment API as gameplay items. */
+  async debugMotoBag(action:'attach'|'remove'|'open'|'close',id?:string):Promise<void> {
+    const bike=[...this.motos.all()].find(b=>!id||b.state.id===id);
+    if(!(bike?.rig instanceof MotoRig))throw new Error('Moto não encontrada');
+    const point=bike.rig.ponto('ponto_bau');
+    const bag=point.children.find(child=>child.name==='Bag_Rig') as pc.Entity|undefined;
+    if(action==='remove'){bag?.destroy();return;}
+    if(action==='attach'){if(!bag)bike.rig.encaixarBag(await this.motos.criarBag());return;}
+    if(!bag)throw new Error('Bag não encaixada');
+    bag.script!.get(MotoBag)!.aberta=action==='open';
   }
 
   /** Where a bike's middle is on the view, in CSS pixels (tests and telemetry). */
@@ -1031,7 +1053,7 @@ export class BarScene {
     // The body keeps following travel; looking around at rest only turns the head.
     const actor=this.actors.get(this.localId)?.actor;
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
-    return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'), rotation: this.lastRotation,
+    return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),rear:isRidingHorse(actor?.interactionState)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')), rotation: this.lastRotation,
       ...headLookAt(yaw,this.rig.pitch,this.lastRotation) };
   }
 
@@ -1043,6 +1065,8 @@ export class BarScene {
     this.stageState=world.televisions?.telao;
     this.stageSpots=Object.values(world.musicians??{});
     this.motos.sync(world.motos);
+    this.fuelProps.sync(world.fuelServices??{});
+    this.motos.couriers(Object.values(world.players).filter(player=>player.courier).map(player=>player.id));
     this.ragdollStarts=world.ragdolls??{};
     this.showDesk=world.stageShow;
     for(const door of this.doorLeaves){
@@ -1283,7 +1307,7 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
-    this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();this.horseSounds.destroy();
+    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -1553,6 +1577,11 @@ export class BarScene {
     const rightArm = this.group('Right shoulder', [0.4, 1.4, 0], body);
     for (const arm of [leftArm, rightArm]) {
       this.box('Sleeve', [0, -0.15, 0], [0.22, 0.35, 0.26], clothing, arm);
+      if(actor.id.startsWith('attendant-')){
+        const elbow=this.group('Fuel elbow',[0,-.32,0],arm);
+        this.box('Forearm',[0,-.14,0],[.18,.28,.2],skin,elbow);
+        this.box('Hand',[0,-.28,.015],[.19,.15,.2],skin,elbow);continue;
+      }
       this.box('Forearm', [0, -0.43, 0], [0.18, 0.3, 0.2], skin, arm);
       this.box('Hand', [0, -0.6, 0.015], [0.19, 0.15, 0.2], skin, arm);
     }
@@ -1607,7 +1636,7 @@ export class BarScene {
       walking: animation.includes('walk') || animation.includes('run') || animation.includes('wander'),
       running: animation.includes('run'),
       seated: avatar.seatedBlend = lerp(avatar.seatedBlend ?? 0, seated ? 1 : 0, 1 - Math.exp(-12 * dt)),
-      dancing: !bar && (animation.includes('dance') || (avatar.npc && this.eventType === 'PARTY')),
+      dancing: !bar && (animation.includes('dance') || (avatar.npc && actor.role!=='fuel-service' && this.eventType === 'PARTY')),
       drinking: !bar && (animation.includes('drink') || (avatar.npc && animation.includes('drunk'))),
       waving: animation.includes('wave'),
     };
@@ -1627,6 +1656,14 @@ export class BarScene {
     if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
     else if (avatar.tray) avatar.tray.entity.enabled = false;
     if (avatar.skin) this.dressCourier(avatar, avatar.skin, !!bar); else if (avatar.parcelProp || avatar.packProp) this.dressCourier(avatar, undefined, true);
+    if(actor.id.startsWith('attendant-')){
+      const bones=avatar.skin?.bones,hand=bones?.hand_r??avatar.limbs?.rightArm.findByName('Hand') as pc.Entity|undefined;
+      const upper=bones?.upperarm_r??avatar.limbs?.rightArm;
+      const lower=bones?.lowerarm_r??avatar.limbs?.rightArm.findByName('Fuel elbow') as pc.Entity|undefined;
+      const torso=avatar.skin?.model.findByName('spine_01') as pc.Entity|undefined;
+      const legs=bones?[{upper:bones.upperleg_l,lower:bones.lowerleg_l,foot:bones.foot_l},{upper:bones.upperleg_r,lower:bones.lowerleg_r,foot:bones.foot_r}]:undefined;
+      if(hand&&upper)this.fuelProps.pose(actor.id,{upper,lower,hand,grip:avatar.skin?.rightHand,root,body:avatar.body,torso,legs},Date.now()+this.serverClockOffset);
+    }
   }
 
   /** The bag in hand (a courier's on the way to the door, a customer's once it is theirs) and the backpack on a courier on foot. */
@@ -2203,6 +2240,7 @@ export class BarScene {
     this.frameId++;
     this.barPlayed.clear();
     this.updateProfiler.mark('setup');
+    this.fuelProps.begin(this.camera.getPosition());
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
     this.updateProfiler.mark('avatars');
     this.callbacks.onFrame?.(realDt);
@@ -2212,7 +2250,7 @@ export class BarScene {
     this.placeHorseRiders();
     this.horseSounds.update([...this.actors.values()].filter(a=>a.horse).map(a=>{
       const position=a.root.getPosition();
-      return {id:a.actor.id,speed:a.speed??0,animation:a.actor.animation,x:position.x,y:position.y+.2,z:position.z};
+      return {id:a.actor.id,speed:a.speed??0,animation:a.actor.animation,rearAt:a.actor.horseRearAt??0,x:position.x,y:position.y+.2,z:position.z};
     }),this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.placeThrown(dt);
     this.blowEffects.update(dt, this.camera);
@@ -2438,6 +2476,7 @@ export class BarScene {
       // On a bike, the switches on the bars take these keys over.
       const vehicle=this.motos.ridden(this.localId);
       if(vehicle&&vehicle.state.riderId===this.localId){
+        if(event.code==='KeyF'){event.preventDefault();this.keys.add(event.code);return;}
         const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',...(isCar(vehicle.state)?{KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'}:{})};
         if(action[event.code]){event.preventDefault();if(!event.repeat)this.callbacks.onVehicleControl?.(vehicle.state.id,action[event.code]!);return;}
       }

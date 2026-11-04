@@ -1,0 +1,24 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Posto · atendimento 3D</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#13171c}canvas{width:100%;height:100%;display:block}</style><canvas id="world"></canvas><script type="module">
+import {BarScene} from '/src/engine/BarScene.ts';
+import {FUEL_PUMPS,FUEL,pumpHome,pumpStand,vehicleFiller,fillerStand,CAR_MODEL,DEFAULT_ENVIRONMENT,NEW_CAR_PARTS,parkedMoto} from '../../packages/shared/src/index.ts';
+const pump=FUEL_PUMPS[0],car={...parkedMoto({id:'hatch',x:pump.x-3.3,y:pump.y,z:pump.z-1,yaw:Math.PI}),model:CAR_MODEL,color:'#9d3439',plate:'BAR1C80',parts:NEW_CAR_PARTS,engine:0,riderId:'driver',passengers:['','',''],fuel:90};
+const npc={id:pump.npcId,displayName:'Frentista',skin:'nathan',color:'#e6a12f',...pumpHome(pump),rotation:0,animationState:'idle',animationStartedAt:Date.now(),behavior:'fuel-service'};
+const service={id:pump.id,npcId:pump.npcId,phase:'idle',startedAt:Date.now(),playerId:'driver',vehicleId:car.id,litres:0,total:0,price:6,message:'',tankX:0,tankY:0,tankZ:0};
+const world={players:{driver:{id:'driver',displayName:'Motorista',skin:'nathan',...car,rotation:car.yaw,animationState:'ride',interactionState:'moto:hatch',currentTableId:'',connected:true}},npcs:{[npc.id]:npc},tables:{},motos:{hatch:car},fuelServices:{[pump.id]:service},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:1,capacity:32,serverTime:Date.now(),environment:{...DEFAULT_ENVIRONMENT,hour:12,paused:true,weather:'clear'}};
+const tank=vehicleFiller(car);Object.assign(service,{tankX:tank.x,tankY:tank.y,tankZ:tank.z});
+let progress=0,walking=false,walkT=0;
+const scene=new BarScene(document.querySelector('canvas'),{onMediaFrame:()=>{scene.camera.setPosition(pump.x-6.3,pump.y+2.5,pump.z+4.6);scene.camera.lookAt(pump.x-1.8,pump.y+1,pump.z);scene.environment.sky.setPosition(scene.camera.getPosition());scene.app.autoRender=true;}});
+scene.setWorld(world,'driver');scene.setEnabled(false);
+scene.app.on('update',dt=>{
+  service.startedAt=Date.now()-progress*FUEL.ACTION_MS;
+  if(walking){walkT=Math.min(1,walkT+dt*.65);const a=pumpHome(pump),b=pumpStand(pump);Object.assign(npc,{x:a.x+(b.x-a.x)*walkT,y:a.y,z:a.z+(b.z-a.z)*walkT,rotation:Math.atan2(b.x-a.x,b.z-a.z),animationState:'walk'});}
+  world.serverTime=Date.now();scene.setWorld(world,'driver');
+});
+window.fixture={scene,ready:scene.ready,pump,car,world,status:()=>scene.fuelProps.telemetry(),
+  phase(phase,t=.5){walking=false;service.phase=phase;progress=t;const stand=['insert','fueling','remove'].includes(phase)?fillerStand(car):['idle','home'].includes(phase)?pumpHome(pump):pumpStand(pump);Object.assign(npc,stand,{animationState:['to-car','return'].includes(phase)?'walk':'idle',rotation:Math.atan2((phase==='insert'||phase==='fueling'||phase==='remove'?tank.x:pump.x)-stand.x,(phase==='insert'||phase==='fueling'||phase==='remove'?tank.z:pump.z)-stand.z)});world.serverTime=Date.now();scene.setWorld(world,'driver');},
+  walk(){walking=true;walkT=0;service.phase='to-pump';},
+  fallback(){const avatar=scene.actors.get(npc.id);avatar.actor.skin='';world.npcs[npc.id].skin='';scene.replaceAvatar(npc.id,avatar);},
+  missingClips(){const avatar=scene.actors.get(npc.id);avatar.skin.tracks.clear();},
+};
+</script></html>

@@ -7,6 +7,7 @@ export default defineConfig({
   // API's per-address limit, including observer contexts. Limits stay enabled;
   // the trusted local Vite proxy forwards these test-only headers.
   projects:[
+    {name:'refueling',testMatch:'**/refueling.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.18'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu']}}},
     {name:'car',testMatch:'**/car.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.17'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'horse',testMatch:['**/horse.spec.ts','**/horse-sound.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.16'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
@@ -27,7 +28,7 @@ export default defineConfig({
     {name:'truco',testMatch:'**/truco.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.14'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'foosball',testMatch:'**/foosball.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.6'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // The delivery bike: real keys over a real room, two players' worlds, drawn on the GPU like the stage.
-    {name:'moto',testMatch:['**/moto.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
+    {name:'moto',testMatch:['**/moto.spec.ts','**/moto-v4.spec.ts','**/moto-actions.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     // Rafael's kicks: two players' worlds at once, drawn on the GPU like the stage.
     {name:'kick',testMatch:'**/kick.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.12'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     // The city: streamed sectors, the real game on the bike; drawn on the GPU like the stage.

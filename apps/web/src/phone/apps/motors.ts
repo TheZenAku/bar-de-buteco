@@ -5,14 +5,14 @@ import {uiIcon} from '../../ui-icons';
 import {header,type PhoneApp} from '../core';
 import {CAR_MODEL,DEFAULT_CAR_COLOR,vehicleParts,vehiclePhoto,readVehicleParts} from '@bar/shared';
 
-const SPECS:ReadonlyArray<readonly [string,string,string]>=[['gauge','Velocidade','55 km/h'],['package','Baú','Pedidos do Highfood'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']];
+const SPECS:ReadonlyArray<readonly [string,string,string]>=[['gauge','Velocidade','55 km/h'],['package','Bag','Item separado, não inclusa'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']];
 type Tab='garage'|'shop';
 type Filter='all'|'stored'|'out'|'attention';
 const FILTERS:ReadonlyArray<readonly [Filter,string]>=[['all','Todos'],['stored','Na garagem'],['out','Na rua'],['attention','Atenção']];
 const money=(value:number)=>value.toLocaleString('pt-BR');
 const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]/g,'');
 // Artwork belongs to the model; future models without a photo get a neutral placeholder.
-const photo=(model:string)=>`<img src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy">`;
+const photo=(model:string)=>model===MOTO_MODEL||model===CAR_MODEL?`<img class="${model===MOTO_MODEL?'hm-photo-moto':''}" src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy">`:uiIcon('bike');
 
 /** Ownership and shopping have separate lists. Maintenance and actions live in each vehicle's detail view. */
 export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',tint:'linear-gradient(160deg,#39414f,#0e1116)',open(view,ctx){
@@ -79,7 +79,7 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
     const offers=item.models??[{...item,seats:1,photo:vehiclePhoto(item.model)}];
     return `<div class="hm-page-title"><small>ENCONTRE SEU PRÓXIMO</small><h2>Loja de veículos</h2><p>Escolha seu próximo veículo para rodar pela cidade.</p></div>${offers.map(offer=>{
       const owned=item.vehicles.filter(each=>each.model===offer.model).length;
-      return `<article class="hm-sale" data-model="${offer.model}"><div class="hm-sale-photo">${photo(offer.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-sale-info"><small>${offer.model===CAR_MODEL?'Hatch · 4 lugares · Cor personalizável':'Scooter · Entregas Highfood'}</small><h3>${e(offer.name)}</h3>${owned?`<p class="hm-already">${uiIcon('key')}Você já tem ${owned} deste modelo</p>`:''}<p class="hm-price">${money(offer.price)} <small>moedas</small></p><button type="button" class="ph-pill-btn wide" data-hm="offer" data-model="${offer.model}">Ver detalhes</button></div></article>`;
+      return `<article class="hm-sale" data-model="${offer.model}"><div class="hm-sale-photo">${photo(offer.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-sale-info"><small>${offer.model===CAR_MODEL?'Hatch · 4 lugares · Cor personalizável':'Moto de entrega · Bag não inclusa'}</small><h3>${e(offer.name)}</h3>${owned?`<p class="hm-already">${uiIcon('key')}Você já tem ${owned} deste modelo</p>`:''}<p class="hm-price">${money(offer.price)} <small>moedas</small></p><button type="button" class="ph-pill-btn wide" data-hm="offer" data-model="${offer.model}">Ver detalhes</button></div></article>`;
     }).join('')}<p class="hm-shop-note">${uiIcon('key')}Comprou? Ele aparece em <b>Meus veículos</b>.</p>`;
   }
   function detailHtml(item:OwnedVehicle):string {
@@ -94,7 +94,7 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
   }
   function offerHtml(item:VehicleView):string {
     const specs=item.model===CAR_MODEL?[['gauge','Velocidade','Até 140 km/h'],['users','Lugares','4: motorista e 3 passageiros'],['wrench','Manutenção','18 peças individuais'],['palette','Pintura','Personalizável por carro']]:SPECS;
-    return `${header('Detalhes do veículo')}<div class="ph-body hm-detail"><div class="hm-detail-photo">${photo(item.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-detail-info"><div class="hm-detail-title"><small>${item.model===MOTO_MODEL?'Scooter de entrega':'Hatch de quatro lugares'}</small><h2>${e(item.name)}</h2><p class="hm-price">${money(item.price)} <small>moedas</small></p></div><ul class="hm-specs">${specs.map(([icon,label,value])=>`<li>${uiIcon(icon!)}<span><small>${label}</small>${value}</span></li>`).join('')}</ul>${item.model===CAR_MODEL?paintHtml(paintColor):'<p class="hm-note">Com a moto você pode entregar pelo Highfood. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila.</p>'}<button type="button" class="ph-pill-btn wide" data-hm="buy" ${buyBlocked()?'disabled':''}>${buyLabel()}</button></div></div>`;
+    return `${header('Detalhes do veículo')}<div class="ph-body hm-detail"><div class="hm-detail-photo">${photo(item.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-detail-info"><div class="hm-detail-title"><small>${item.model===MOTO_MODEL?'Moto de entrega':'Hatch de quatro lugares'}</small><h2>${e(item.name)}</h2><p class="hm-price">${money(item.price)} <small>moedas</small></p></div><ul class="hm-specs">${specs.map(([icon,label,value])=>`<li>${uiIcon(icon!)}<span><small>${label}</small>${value}</span></li>`).join('')}</ul>${item.model===CAR_MODEL?paintHtml(paintColor):'<p class="hm-note">Com a moto você pode entregar pelo Highfood. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. A bag é um item separado e não acompanha a moto.</p>'}<button type="button" class="ph-pill-btn wide" data-hm="buy" ${buyBlocked()?'disabled':''}>${buyLabel()}</button></div></div>`;
   }
   function render():void {
     if(closed)return;

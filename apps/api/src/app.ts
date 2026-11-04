@@ -18,6 +18,7 @@ import {AdminService} from './admin-service.js';
 import {AdminConsole} from './admin-console.js';
 import {PricingService} from './pricing-service.js';
 import {HighfoodService} from './highfood-service.js';
+import {FuelPayments} from './fuel-service.js';
 import {TradeService} from './trade-service.js';
 import {DevBots} from './dev-bots.js';
 import {ensureOwnerAdministrator,isOwnerEmail} from './admin-policy.js';
@@ -56,6 +57,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const wardrobe=new WardrobeService(db,pricing);
   const inventory=new InventoryService(db,wardrobe);
   const wallet=new WalletService(db,wardrobe);
+  const fuelPayments=new FuelPayments(db);
   const highfood=new HighfoodService(db,pricing);
   const trade=new TradeService(db,highfood);
   const achievements=new AchievementService(db);
@@ -90,6 +92,9 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if ((origin && !allowedOrigins.has(origin) && !sameHost) || request.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origem da requisição não permitida.');
   });
   app.setErrorHandler((error, request, reply) => {
+    for(let cause:unknown=error;cause&&typeof cause==='object';cause=(cause as {cause?:unknown}).cause){
+      if((cause as {constraint?:string}).constraint==='fuel_wallet_reservation')return reply.code(409).send({error:'Saldo reservado para o abastecimento em andamento.'});
+    }
     if (error instanceof ZodError || error instanceof Error && error.name==='ZodError' && 'issues' in error) return reply.code(400).send({ error: (error as ZodError).issues[0]?.message ?? 'Dados inválidos.' });
     if (error instanceof HttpError) return reply.code(error.statusCode).send({ error: error.message });
     const status = error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
@@ -510,6 +515,17 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
     return wallet.change(body);
   });
+  app.post('/api/internal/fuel/reserve',internalOptions,async request=>{
+    const body=z.object({sessionId:uuidSchema,userId:uuidSchema,id:uuidSchema,maximum:z.number().int().min(1).max(100_000)}).strict().parse(request.body);
+    const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
+    if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
+    return fuelPayments.reserve(body.userId,body.id,body.maximum);
+  });
+  // Reserved services finish even after logout, like game settlements.
+  app.post('/api/internal/fuel/settle',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,id:uuidSchema,total:z.number().int().min(0).max(100_000)}).strict().parse(request.body);
+    return fuelPayments.settle(body.userId,body.id,body.total);
+  });
   // The end of a blackjack round for one player: paid against the round's bets on the ledger, once (wallet-service.ts).
   app.post('/api/internal/blackjack/settle',internalOptions,async request=>{
     const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
@@ -552,6 +568,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await highfood.saveVehicles(updates);
     return {ok:true};
   });
+  app.get('/api/internal/vehicles/ownership-audit',internalOptions,()=>highfood.ownershipAudit());
   // Trades between players (docs/sistemas/troca.md): everything moves here, once per id; the world only says what was agreed.
   app.post('/api/internal/trades/commit',internalOptions,request=>trade.commit(tradeCommitSchema.parse(request.body)));
   app.get('/api/internal/prices', internalOptions, async () => ({ prices: await pricing.table() }));

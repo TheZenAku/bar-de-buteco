@@ -27,6 +27,7 @@ export * from './pool/index.js';
 export * from './truco/index.js';
 export * from './moto.js';
 export * from './vehicle-models.js';
+export * from './vehicle-actions.js';
 export * from './car-parts.js';
 export * from './vehicle-parts.js';
 export * from './vehicle-controls.js';
@@ -55,7 +56,7 @@ export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
 export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,isWalkable,movePlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
-  | 'horse-idle' | 'horse-walk' | 'horse-gallop'
+  | 'horse-idle' | 'horse-walk' | 'horse-gallop' | 'horse-rear'
   /** Highfood: a customer waiting with the phone, thanking for the delivery, and the courier taking the bag from the box. */
   | 'text' | 'thank' | 'pick'
   | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend'
@@ -82,8 +83,8 @@ export const HELD_DRINKS = [...DRINK_ITEMS, 'agua', 'refrigerante', 'cafe'] as c
 export type HeldDrink = typeof HELD_DRINKS[number];
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
-export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number }
-export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional()}).strict();
+export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;rear?:boolean }
+export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional()}).strict();
 export interface PublicUser { id: string; username: string; displayName: string; email: string; verified: boolean; role: 'user' | 'admin'; color: string; equippedSkin?:string; isOwner?:boolean }
 export interface PlayerState extends Position { id: string; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
@@ -100,7 +101,7 @@ export interface PlayerState extends Position { id: string; displayName: string;
   /** A worker's tray (a table order taken for a customer), like Tonico's: comma-separated items and the order's id. */
   carrying?: string; carryingOrder?: string;
   /** On a Highfood shift, and the delivery in hand. */
-  courier?: boolean; parcel?: string;
+  courier?: boolean; parcel?: string;horseRearAt?:number;
   /** Has the phone in front of them: standing still, they look at it. */
   looking?: boolean }
 export interface NpcState extends Position { id: string; displayName: string; color: string; rotation: number; animationState: AnimationState; animationStartedAt: number; behavior: string;
@@ -124,6 +125,7 @@ export interface BlackjackTable { id: string; phase: BlackjackPhase; round: numb
   dealerCards: BlackjackCard[]; dealerTotal: number; dealerSoft: boolean; turnPlayerId: string; turnHand: number; deadline: number; minBet: number; maxBet: number }
 export interface ActiveEvent { id: string; type: EventType | ''; startedAt: number; durationMs: number }
 export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; jobs?:Record<string,JobSlotsView>; served?:Record<string,ServedItemState>;
+  fuelServices?:Record<string,import('./refueling.js').FuelServiceState>;
   environment?:EnvironmentState;
   /** The stage's musicians' spots, by spot id (musicians.ts). */
   musicians?:Record<string,MusicianState>;
@@ -154,3 +156,4 @@ import type {TurnedBox} from './city.js';
 export interface Collider extends Position { id:string; hx:number; hz:number; minY?:number; maxY?:number; ramp?:boolean; turn?:TurnedBox }
 export interface Seat extends Position { rotation:number }
 export type {ServerPerformance} from './performance.js';
+export * from './refueling.js';

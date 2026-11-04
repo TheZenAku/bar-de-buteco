@@ -20,7 +20,7 @@ export class NpcDirector {
   update(npcs: Iterable<Npc>, players: Iterable<Position>, event: string, now: number): void {
     const people = [...players];
     for (const npc of npcs) {
-      if (npc.id === 'dealer') continue; // Table animation is controlled by the blackjack phase.
+      if (npc.id === 'dealer' || npc.id.startsWith('attendant-')) continue; // Owned by their services.
       if (npc.behavior === 'serving') continue; // Seu Zé finishes an order whatever happens.
       if (event === 'DRUNK_NPC' && npc.id === 'tonico' && npc.animationState === 'fallen') continue;
       if (event === 'PARTY') { npc.animationState = 'dance'; npc.behavior = 'reacting'; continue; }

@@ -25,6 +25,16 @@ export class HighfoodService {
   async owned(userId:string):Promise<OwnedVehicle[]>{
     return (await this.db.select().from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(asc(playerVehicles.boughtAt),asc(playerVehicles.id))).map(toVehicle);
   }
+  /** Internal aggregate audit: inspect grants/purchases without opening a live embedded database twice. */
+  async ownershipAudit(){
+    const result=await this.db.execute(sql`select
+      (select count(*)::int from users) as accounts,
+      (select count(distinct user_id)::int from player_vehicles where model='moto-delivery') as motorcycle_owners,
+      (select count(*)::int from player_vehicles where model='moto-delivery') as motorcycles,
+      (select count(*)::int from currency_ledger where reason='vehicle:moto-delivery' and amount<0) as purchases,
+      (select count(*)::int from moderation_actions where action='vehicle-grant') as grants`);
+    return result.rows[0];
+  }
   async vehicle(userId:string,model:string=MOTO_MODEL):Promise<VehicleView>{
     const [prices,vehicles]=await Promise.all([this.pricing.table(),this.owned(userId)]);
     const models=[{model:MOTO_MODEL,name:MOTO_NAME,price:priceOf(prices,'vehicle:moto'),seats:1,photo:vehiclePhoto(MOTO_MODEL)},

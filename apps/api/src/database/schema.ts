@@ -18,6 +18,10 @@ export const profiles = pgTable('user_profiles', {
 export const wallets=pgTable('wallets',{
   userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),balance:integer('balance').notNull().default(0),
 });
+export const fuelServices=pgTable('fuel_services',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  budget:integer('budget').notNull(),total:integer('total').notNull().default(0),settled:boolean('settled').notNull().default(false),
+});
 /** The skills a player bought; they work in every variant of the character (WardrobeService). */
 export const skillInventory=pgTable('skill_inventory',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),skillId:text('skill_id').notNull(),acquiredAt:date('acquired_at').notNull().defaultNow(),
