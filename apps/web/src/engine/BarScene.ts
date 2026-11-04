@@ -14,7 +14,7 @@ import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
 import {CarRig,seatCar} from './car-rig';
-import {isCar,vehicleSeat,vehiclePhysics} from '@bar/shared';
+import {isCar,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
 import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
@@ -129,6 +129,7 @@ interface Avatar {
   glideNext?: number;
   /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
   riding?: boolean;
+  carScale?:pc.Vec3;
   /** The offscreen animation is paused until the avatar is near or visible again. */
   resting?: boolean;
   /** Thrown from a bike or by a kick (moto-ragdoll.ts): the body as it flies and lies, until the getting-up clip has taken over. */
@@ -399,6 +400,7 @@ export class BarScene {
   private readonly rig: CameraRig;
   /** The local avatar's head joint first person hid, and its own scale to give back. */
   private hiddenHead?: pc.Entity;
+  private readonly hiddenCarFace=new Map<pc.GraphNode,pc.Vec3>();
   private readonly headScale = new pc.Vec3(1, 1, 1);
   private dragging = false;
   /** Where a press began: the right button released close by and quickly is a click on whoever is under it (onWorldMenu). */
@@ -800,6 +802,7 @@ export class BarScene {
 
   /** Before PlayCanvas evaluates any clip, remove last frame's additive head rotation. */
   private restoreHeadLooks():void {
+    for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
     for(const avatar of this.actors.values())avatar.headLook?.restore();
   }
 
@@ -827,6 +830,15 @@ export class BarScene {
    */
   private showOwnHead(player: Avatar | undefined): void {
     const head = this.rig.headHidden && this.enabled && !this.watchingTv && !this.selfie ? player?.skin?.bones.head : undefined;
+    const carHead=!!head&&!!player&&this.motos.ridden(player.actor.id)?.rig instanceof CarRig;
+    if(!carHead||head!==this.hiddenHead){for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();}
+    if(carHead&&head){
+      const neck=head.parent;
+      if(neck&&/neck/i.test(neck.name)){this.hiddenCarFace.set(neck,neck.getLocalScale().clone());neck.setLocalScale(HIDDEN_HEAD,HIDDEN_HEAD,HIDDEN_HEAD);}
+      // Facial joints can compensate their parent's scale; hide their subtree too, while preserving the hands and body.
+      const hide=(node:pc.GraphNode)=>{for(const child of node.children){if(!this.hiddenCarFace.has(child))this.hiddenCarFace.set(child,child.getLocalScale().clone());child.setLocalScale(HIDDEN_HEAD,HIDDEN_HEAD,HIDDEN_HEAD);hide(child);}};
+      hide(head);
+    }
     // (A head left by a skin change is gone with its model; scaling it back is harmless.)
     if (this.hiddenHead && this.hiddenHead !== head) this.hiddenHead.setLocalScale(this.headScale);
     if (head && head !== this.hiddenHead) this.headScale.copy(head.getLocalScale());
@@ -935,13 +947,16 @@ export class BarScene {
       const q = avatar.root.getPosition();
       others.push({ id, x: q.x, y: q.y, z: q.z, npc: avatar.npc });
     }
-    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others, riding: !!self.actor.interactionState?.startsWith('moto:') || isRidingHorse(self.actor.interactionState) };
+    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others, riding: !!this.motos.ridden(this.localId) || isRidingHorse(self.actor.interactionState) };
   }
 
   /** The bike the local player rides, as predicted (networking.ts). */
   predictMoto(id: string, body: MotoBody | undefined): void { this.motos.predict(id, body); }
   /** W/S: throttle, brake and reverse; A/D: +1 is right; Space: the handbrake. */
   getMotoInput(): MotoIntent {
+    const vehicle=this.motos.ridden(this.localId);
+    if(!vehicle||!vehiclePowered(vehicle.state))this.motoSwitches=0;
+    else this.motoSwitches=(this.motoSwitches&~MOTO_LIGHT.HIGH)|(vehicle.state.headlights===2?MOTO_LIGHT.HIGH:0);
     // The switches stay as they are while the chat is open or the tab hidden.
     if (!this.enabled || this.inputHasFocus() || document.hidden) {
       const riding = this.motos.ridden(this.localId);
@@ -957,12 +972,18 @@ export class BarScene {
   }
   /** Z and C: the blinkers, X: both (hazard), H: the high beam. A blinker cancels itself once the turn is over, as on a real bike. */
   private motoSwitch(code: string): void {
+    const vehicle=this.motos.ridden(this.localId);
+    if(!vehicle||vehicle.state.riderId!==this.localId||!vehiclePowered(vehicle.state))return;
     const { LEFT, RIGHT, HIGH } = MOTO_LIGHT, signals = LEFT | RIGHT, now = this.motoSwitches & signals;
     if (code === 'KeyH') { this.motoSwitches ^= HIGH; return; }
     const wanted = code === 'KeyZ' ? LEFT : code === 'KeyC' ? RIGHT : signals;
     this.motoSwitches = (this.motoSwitches & ~signals) | (now === wanted ? 0 : wanted);
     this.signalYaw = undefined;
   }
+  /** The dashboard and keyboard share the same switches and input prediction. */
+  vehicleSignal(signal:'left'|'right'|'hazard'):void {this.motoSwitch(signal==='left'?'KeyZ':signal==='right'?'KeyC':'KeyX');}
+  vehicleCamera():void {this.callbacks.onCameraChange?.(this.rig.cycle(),this.rig.reach);}
+  vehicleSpeed():number|undefined {const bike=this.motos.ridden(this.localId);return bike?.predicted?.speed??bike?.state.speed;}
   private cancelSignal(bike: Bike): void {
     const { LEFT, RIGHT } = MOTO_LIGHT, signal = this.motoSwitches & (LEFT | RIGHT);
     if (!signal || signal === (LEFT | RIGHT)) { this.signalYaw = undefined; return; }
@@ -971,7 +992,7 @@ export class BarScene {
     if (turned > SIGNAL_CANCEL_TURN && Math.abs(bike.predicted?.steer ?? 0) < .1) { this.motoSwitches &= ~(LEFT | RIGHT); this.signalYaw = undefined; }
   }
   getMotos() {
-    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
+    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id,model:state.model,color:state.color,passengers:state.passengers, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
       position: [entity.getPosition().x, entity.getPosition().y, entity.getPosition().z], yaw: drawn.yaw, front: [-entity.forward.x, -entity.forward.y, -entity.forward.z], rig: rig.telemetry(),
       points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna'].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
   }
@@ -2238,7 +2259,8 @@ export class BarScene {
       // In real time: the body moved for all of a stalled frame, and a view told a shorter one reads it as a sprint and falls metres behind.
       if (bike) { this.rig.chase(bike.drawn.yaw, realDt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
-      this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
+      const eyes=bike?.rig instanceof CarRig&&vehicleSeat(bike.state,this.localId)===0?bike.rig.ponto('ponto_olhos').getPosition():player.skin?.bones.head.getPosition();
+      this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: eyes, facing: player.yaw / RAD_TO_DEG,
         roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? {...MOTO_XRAY,clearance:vehiclePhysics(bike.state.model).HALF_LENGTH} : {}) });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
@@ -2301,6 +2323,8 @@ export class BarScene {
   private placeRiders(): void {
     for (const [id, avatar] of this.actors) {
       const bike = avatar.skin && avatar.actor.animation === 'ride' ? this.motos.ridden(id) : undefined;
+      if(bike?.rig instanceof CarRig){avatar.carScale??=avatar.root.getLocalScale().clone();}
+      else if(avatar.carScale){avatar.root.setLocalScale(avatar.carScale);avatar.carScale=undefined;}
       if (!!bike !== !!avatar.riding) { avatar.riding = !!bike; avatar.contact.enabled = !bike; }
       if (!bike || !avatar.skin) continue;
       this.seat(avatar, avatar.skin, bike);
@@ -2377,7 +2401,7 @@ export class BarScene {
     if (!hip) return;
     avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
     const rider={ root: avatar.root, hip, spine: avatar.spine, ...skin.bones, handRigL: skin.drinkHand, handRigR: skin.rightHand };
-    if(bike.rig instanceof CarRig)seatCar(bike.rig,rider,vehicleSeat(bike.state,avatar.actor.id));else seatRider(bike.rig,rider);
+    if(bike.rig instanceof CarRig)seatCar(bike.rig,rider,vehicleSeat(bike.state,avatar.actor.id),avatar.carScale);else seatRider(bike.rig,rider);
   }
 
   /** Something plays on the stage: a video on the telão, or a musician at a spot. */
@@ -2411,8 +2435,8 @@ export class BarScene {
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
       // On a bike, the switches on the bars take these keys over.
       const vehicle=this.motos.ridden(this.localId);
-      if(vehicle&&isCar(vehicle.state)&&vehicle.state.riderId===this.localId){
-        const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'};
+      if(vehicle&&vehicle.state.riderId===this.localId){
+        const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',...(isCar(vehicle.state)?{KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'}:{})};
         if(action[event.code]){event.preventDefault();if(!event.repeat)this.callbacks.onVehicleControl?.(vehicle.state.id,action[event.code]!);return;}
       }
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }

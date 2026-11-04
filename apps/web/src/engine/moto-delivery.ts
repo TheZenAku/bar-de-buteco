@@ -7,7 +7,7 @@ import {lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-ligh
 import {MotoSounds} from './moto-sound';
 import {CarRig,CarLights} from './car-rig';
 import {CarSounds} from './car-sound';
-import {CAR_MODEL,isCar,readDriveParts,vehiclePhysics,vehicleSeat} from '@bar/shared';
+import {CAR_MODEL,isCar,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
 
 const RAD_TO_DEG=180/Math.PI;
 const BONES=['chassi','direcao','roda_dianteira','roda_traseira'] as const;
@@ -208,9 +208,9 @@ export class Motos {
       // The handlebar turns as far as the wheel really does at this speed; the lean follows the whole intent.
       rig.anguloDirecao=motoSteerAngle(target.speed,bike.state.model)*RAD_TO_DEG;
       rig.update(dt);
-      // On while someone rides it, and until it comes to rest after a crash.
-      const {phase,riderId}=bike.state,lit=!!riderId||phase==='loose'||phase==='tumble';
-      const lamps:LampState=lampState(lit,bike.predicted&&this.localLamps?.id===bike.state.id?this.localLamps.bits:bike.state.lights);
+      const power=vehiclePowered(bike.state),mode=bike.state.headlights??1;
+      const lamps:LampState=lampState(power,bike.predicted&&this.localLamps?.id===bike.state.id?this.localLamps.bits:bike.state.lights);
+      lamps.lit=power&&mode>0;lamps.high=power&&mode===2;
       const parts=readDriveParts(bike.state),seed=bike.state.id.charCodeAt(bike.state.id.length-1)||0;
       bike.lights.update(lamps,now,camera,exposure,motoLampLevel(parts.farol,parts.bateria,now,seed),motoLampLevel(parts.lanterna,parts.bateria,now,seed+1));
     }

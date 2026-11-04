@@ -1,4 +1,4 @@
-import {index, boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
+import {index, boolean, customType, doublePrecision, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
 import type { BadgeRarity } from '@bar/shared';
 
 const date = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -157,6 +157,7 @@ export const playerVehicles=pgTable('player_vehicles',{
   id:text('id').primaryKey(),plate:text('plate').notNull().unique(),
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),model:text('model').notNull(),parts:text('parts').notNull(),mileage:integer('mileage').notNull().default(0),
   color:text('color').notNull().default('#ccc9c2'),
+  fuel:doublePrecision('fuel').notNull().default(100),
   boughtAt:date('bought_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
 },t=>[index('player_vehicles_owner_idx').on(t.userId,t.boughtAt)]);
 /** Every trade that happened (trade-service.ts), written with what it moved: a retry finds it and changes nothing. */

@@ -1,0 +1,24 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Painel dos veículos</title><style>body{margin:0;background:radial-gradient(ellipse at 45% 30%,#3c4b49,#152129 65%,#080e14)}#world{opacity:0}</style></head><body><div id="app"></div><script type="module">
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/minimap.css';
+import '../../apps/web/src/needs.css';
+import {gameUi} from '../../apps/web/src/game-ui.ts';
+import {createHudPanels} from '../../apps/web/src/hud-panels.ts';
+import {createVehicleHud} from '../../apps/web/src/vehicle-hud.ts';
+import {createMinimap} from '../../apps/web/src/minimap.ts';
+import {createNeedsHud} from '../../apps/web/src/needs-hud.ts';
+import {CAR_MODEL,NEW_CAR_PARTS,NEW_MOTO_PARTS,parkedMoto} from '../../packages/shared/src/index.ts';
+document.querySelector('#app').innerHTML=gameUi();
+document.querySelector('#lobby').classList.add('hidden');
+const game=document.querySelector('#game');game.classList.remove('hidden');
+const hud=createHudPanels(game);hud.forUser('vehicle-fixture');
+const minimap=createMinimap(game),needs=createNeedsHud(game,()=>{},()=>Date.now());
+const self={id:'driver',x:50,y:0,z:7,rotation:0,animationState:'ride',interactionState:'moto:hatch',currentTableId:'',hp:90,hpMax:100,stamina:75,hunger:100,thirst:100,bladder:0,drunk:0};needs.update(self);
+let vehicle={...parkedMoto({id:'hatch',x:50,y:0,z:7,yaw:0}),model:CAR_MODEL,plate:'BAR1C80',parts:NEW_CAR_PARTS,riderId:'driver',passengers:['','',''],engine:2,ignition:true,headlights:1,fuel:42,speed:16.7};
+const actions=[],panel=createVehicleHud(document.querySelector('#vehicle-hud'),action=>actions.push(action));
+function render(){const mounted=panel.update(self,vehicle?{[vehicle.id]:vehicle}:{},Date.now());game.classList.toggle('vehicle-mounted',mounted);hud.setAvailable('actions',!mounted);}
+window.fixture={actions,hud,set(patch){Object.assign(vehicle,patch);render();},passenger(){vehicle.passengers=['driver','',''];vehicle.riderId='other';self.interactionState='moto-passenger:hatch:1';render();},moto(){vehicle={...vehicle,model:'moto-delivery',parts:NEW_MOTO_PARTS,passengers:[],riderId:'driver'};render();},horse(){vehicle=undefined;self.interactionState='horse';render();},unmount(){vehicle=undefined;self.interactionState='';render();}};
+render();
+requestAnimationFrame(function frame(){minimap.render(()=>({x:50,z:7,yaw:0,facing:0,others:[],riding:true}));requestAnimationFrame(frame);});
+</script></body></html>

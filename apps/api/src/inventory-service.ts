@@ -1,4 +1,5 @@
 import {and,desc,eq,sql} from 'drizzle-orm';
+import {vehicleName} from '@bar/shared';
 import {INVENTORY_CAPACITY,ITEM_IDS,MOTO_NAME,STARTER_ITEMS,itemById,type InventoryView,type ItemId,type PublicUser} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {currencyLedger,inventoryLedger,itemInventory,playerVehicles,wallets} from './database/schema.js';
@@ -29,11 +30,11 @@ export class InventoryService {
       this.db.select().from(itemInventory).where(eq(itemInventory.userId,userId)),
       this.db.select().from(wallets).where(eq(wallets.userId,userId)),
       this.db.select().from(inventoryLedger).where(eq(inventoryLedger.userId,userId)).orderBy(desc(inventoryLedger.createdAt)).limit(20),
-      this.db.select({vehicleId:playerVehicles.id,plate:playerVehicles.plate}).from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(playerVehicles.boughtAt),
+      this.db.select({vehicleId:playerVehicles.id,plate:playerVehicles.plate,model:playerVehicles.model}).from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(playerVehicles.boughtAt),
     ]);
     const valid=stacks.filter(row=>!!itemById(row.itemId)&&row.quantity>0).map(row=>({itemId:row.itemId as ItemId,quantity:row.quantity}))
       .sort((a,b)=>ITEM_IDS.indexOf(a.itemId)-ITEM_IDS.indexOf(b.itemId));
-    return {stacks:valid,capacity:INVENTORY_CAPACITY,usedSlots:valid.length,balance:wallet?.balance??0,keys:vehicles.map(vehicle=>({...vehicle,name:MOTO_NAME})),
+    return {stacks:valid,capacity:INVENTORY_CAPACITY,usedSlots:valid.length,balance:wallet?.balance??0,keys:vehicles.map(({model,...vehicle})=>({...vehicle,name:vehicleName(model)})),
       history:history.filter(row=>!!itemById(row.itemId)).map(row=>({id:row.id,itemId:row.itemId as ItemId,quantity:row.quantity,reason:row.reason,createdAt:row.createdAt.toISOString()}))};
   }
 

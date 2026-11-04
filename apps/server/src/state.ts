@@ -260,6 +260,8 @@ export class Moto extends Schema {
   @type('boolean') trunk = false;
   @type('boolean') wipers = false;
   @type('uint8') headlights = 0;
+  @type('boolean') ignition = false;
+  @type('float32') fuel = 100;
   @type('string') id = '';
   /** Whoever holds its key ('' for the administration's), their name, the plate on its back and its row in the API. */
   @type('string') ownerId = '';

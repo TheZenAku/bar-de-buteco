@@ -142,7 +142,7 @@ export class MotoLights {
     // The shield's panels: dim white while lit, the blinkers when asked.
     this.lamp('positionL',leftOn?LENS.signal:lit&&!left?LENS.position:0,leftOn?AMBER:WHITE,exposure,camera);
     this.lamp('positionR',rightOn?LENS.signal:lit&&!right?LENS.position:0,rightOn?AMBER:WHITE,exposure,camera);
-    this.lamp('tail',lit?(brake?LENS.brake:LENS.tail)*tailLamp:0,undefined,exposure,camera);
+    this.lamp('tail',(brake?LENS.brake:lit?LENS.tail:0)*tailLamp,undefined,exposure,camera);
     this.lamp('plate',lit?LENS.plate*tailLamp:0,undefined,exposure,camera);
     this.lamp('rearL',leftOn?LENS.signal*tailLamp:0,undefined,exposure,camera);
     this.lamp('rearR',rightOn?LENS.signal*tailLamp:0,undefined,exposure,camera);
@@ -152,7 +152,7 @@ export class MotoLights {
     beamLight.enabled=lit&&near&&head>0;
     if(beamLight.enabled){beamLight.range=beam.range;beamLight.intensity=beam.intensity*head;this.headLight.setLocalEulerAngles(-90+beam.tilt,0,0);}
     const tail=this.tailLight.light!,glow=brake?BRAKE_LIGHT:TAIL_LIGHT;
-    tail.enabled=lit&&near&&tailLamp>0;
+    tail.enabled=(lit||brake)&&near&&tailLamp>0;
     if(tail.enabled){tail.range=glow.range;tail.intensity=glow.intensity*tailLamp;}
     const closeBy=distance<SIGNAL_LIGHT_REACH;
     this.signalLeft.light!.enabled=leftOn&&closeBy;

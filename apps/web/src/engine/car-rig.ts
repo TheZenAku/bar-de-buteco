@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {CAR,CAR_SEATS,DEFAULT_CAR_COLOR,readCarParts,type MotoState} from '@bar/shared';
+import {CAR,CAR_SEATS,DEFAULT_CAR_COLOR,readCarParts,vehiclePowered,type MotoState} from '@bar/shared';
 import {closeHand} from './drink-props';
 import {palmUp,reach} from './serving-props';
 import type {RiderRig} from './moto-delivery';
@@ -8,10 +8,23 @@ import type {LampState} from './moto-lights';
 const DEGREES=180/Math.PI;
 const BONES=['chassi','volante','direcao_E','direcao_D','roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D','porta_E','porta_D','capo','tampa_traseira','limpador_E','limpador_D','limpador_traseiro'];
 const LENSES=['Luz_Farol','Luz_Lanterna','Luz_Re','Luz_Seta_E','Luz_Seta_D'];
+const adjustedPlateMeshes=new WeakSet<pc.Mesh>();
+
+function offsetRearPlate(mesh:pc.Mesh):void {
+  // All cars share this mesh. Move the rear plate 12 mm clear of the hatch handle once,
+  // keeping its original skin weights so it still follows the opening hatch.
+  if(adjustedPlateMeshes.has(mesh))return;
+  const positions:number[]=[];mesh.getPositions(positions);
+  for(let z=2;z<positions.length;z+=3)if(positions[z]!<0)positions[z]!-=.012;
+  mesh.setPositions(positions);mesh.update();mesh.boneAabb=null;
+  adjustedPlateMeshes.add(mesh);
+}
+
 /** ESM port of the supplied carro_hatch.js. The model, names and rest transforms are preserved. */
 export class CarRig {
   velocidade=0;direcao=0;anguloDirecao=33;inclinacaoMax=3.5;
   headlightMode=0;
+  powered=false;
   private bones=new Map<string,{node:pc.Entity;rest:pc.Quat}>();
   private materials=new Map<string,pc.StandardMaterial>();
   private levels=new Map<string,number>();
@@ -24,6 +37,7 @@ export class CarRig {
     for(const name of BONES){const node=this.ponto(name);if(node)this.bones.set(name,{node,rest:node.getLocalRotation().clone()});}
     for(const render of entity.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
       const source=instance.material;
+      if(source?.name==='Carro_Placa'&&instance.mesh)offsetRearPlate(instance.mesh);
       if(source instanceof pc.StandardMaterial&&(source.name==='Carro_Pintura'||source.name==='Carro_Placa'||LENSES.includes(source.name))){
         let material=this.materials.get(source.name);if(!material){material=source.clone();this.materials.set(source.name,material);}instance.material=material;
       }
@@ -43,7 +57,8 @@ export class CarRig {
   }
   setState(state:MotoState,raining:boolean):void {
     this.state=state;
-    this.headlightMode=state.headlights??0;
+    this.powered=vehiclePowered(state);
+    this.headlightMode=this.powered?(state.headlights??0):0;
     const color=state.color??DEFAULT_CAR_COLOR;
     if(color!==this.color){this.color=color;const paint=this.materials.get('Carro_Pintura');if(paint){paint.diffuse.fromString(color);paint.update();}}
     if(state.plate&&state.plate!==this.plateText)this.plate(state.plate);
@@ -72,7 +87,7 @@ export class CarRig {
     this.hood+=((state?.hood?1:0)-this.hood)*k;this.hatch+=((state?.trunk?1:0)-this.hatch)*k;
     this.rotate('porta_E',0,-68*this.doorL,0);this.rotate('porta_D',0,68*this.doorR,0);this.rotate('capo',-52*this.hood,0,0);this.rotate('tampa_traseira',78*this.hatch,0,0);
     for(const [name,id] of [['porta_E','porta_esquerda'],['porta_D','porta_direita'],['capo','capo'],['tampa_traseira','porta_malas']])this.ponto(name!).setLocalScale(parts[id!]!<=0?0:1,parts[id!]!<=0?0:1,parts[id!]!<=0?0:1);
-    const wiping=(state?.wipers||this.raining)&&parts.limpadores!>0&&parts.bateria!>0;
+    const wiping=this.powered&&(state?.wipers||this.raining)&&parts.limpadores!>0&&parts.bateria!>0;
     if(wiping)this.wipe+=dt/1.6*Math.max(.25,parts.limpadores!/100);else this.wipe+=(Math.ceil(this.wipe)-this.wipe)*k;
     const sweep=Math.sin(Math.PI*(this.wipe%1));this.rotate('limpador_E',0,-82*sweep,0);this.rotate('limpador_D',0,-82*sweep,0);this.rotate('limpador_traseiro',0,-165*sweep,0);
   }
@@ -92,24 +107,28 @@ export class CarLights {
     this.rear=new pc.Entity('Car rear light');this.rear.addComponent('light',{type:'omni',color:new pc.Color(1,.03,.02),range:3,intensity:0,castShadows:false});rig.ponto('ponto_lanterna_E').addChild(this.rear);
   }
   update(state:LampState,now:number,camera:pc.Entity,exposure:number,head=1,tail=1):void {
+    if(!this.rig.powered){head=0;tail=0;state={lit:false,brake:false,left:false,right:false,high:false};}
     this.current=state;this.headLevel=head;this.tailLevel=tail;
     const blink=Math.floor(now/333)%2===0,near=this.rig.entity.getPosition().distance(camera.getPosition())<55;
     const lit=this.rig.headlightMode>0,high=this.rig.headlightMode===2;
     this.rig.lens('Luz_Farol',lit?(high?3.5:2)*head:0,exposure);
     this.rig.lens('Luz_Lanterna',(state.brake?3:lit?1.2:0)*tail,exposure);
-    this.rig.lens('Luz_Re',this.rig.velocidade<-.05?2.5*tail:0,exposure);
+    this.rig.lens('Luz_Re',this.rig.powered&&this.rig.velocidade<-.05?2.5*tail:0,exposure);
     this.rig.lens('Luz_Seta_E',state.left&&blink?2.5*tail:0,exposure);this.rig.lens('Luz_Seta_D',state.right&&blink?2.5*tail:0,exposure);
     for(const entity of this.heads){const light=entity.light!;light.enabled=near&&lit&&head>0;light.range=high?45:28;light.intensity=(high?4:2.5)*head;}
     this.rear.light!.enabled=near&&tail>0&&(state.brake||lit);this.rear.light!.intensity=(state.brake?.6:.15)*tail;
   }
-  telemetry(){const head=this.heads[0]!,beam=head.up.clone().mulScalar(-1);return {...this.current,levels:{head:this.headLevel,tail:this.tailLevel},headlight:head.light!.enabled,tail:this.rear.light!.enabled,beam:beam.toArray(),lens:{head:head.light!.enabled,re:this.rig.velocidade<-.05}};}
+  telemetry(){const head=this.heads[0]!,beam=head.up.clone().mulScalar(-1);return {...this.current,levels:{head:this.headLevel,tail:this.tailLevel},headlight:head.light!.enabled,tail:this.rear.light!.enabled,beam:beam.toArray(),lens:{head:head.light!.enabled,re:this.rig.powered&&this.tailLevel>0&&this.rig.velocidade<-.05}};}
 }
 
 /** A seated clip placed on the authored bench, with driver's hands and feet on the moving wheel and pedals. */
-export function seatCar(car:CarRig,rider:RiderRig,seat:number):void {
+export function seatCar(car:CarRig,rider:RiderRig,seat:number,originalScale:pc.Vec3=pc.Vec3.ONE):void {
   const anchor=car.ponto(CAR_SEATS[seat]!.node),up=car.entity.up.clone(),front=car.entity.forward.clone().mulScalar(-1),left=car.entity.right.clone();
+  // Different skeletons have different seated heights. Keep the head below the low hatch roof and restore the scale on exit.
+  const torso=Math.max(.4,(rider.head.getPosition().y-rider.hip.getPosition().y)/Math.max(.01,rider.root.getLocalScale().y));
+  const fit=Math.min(1,.65/torso);rider.root.setLocalScale(originalScale.x*fit,originalScale.y*fit,originalScale.z*fit);
   rider.root.setRotation(car.ponto('chassi').getRotation());
-  const hip=anchor.getPosition().clone().add(up.clone().mulScalar(.08));rider.root.setPosition(rider.root.getPosition().clone().add(hip.sub(rider.hip.getPosition())));
+  const hip=anchor.getPosition().clone();rider.root.setPosition(rider.root.getPosition().clone().add(hip.sub(rider.hip.getPosition())));
   if(seat!==0)return;
   for(const [side,sign] of [['l',1],['r',-1]] as const){
     const point=car.ponto(side==='l'?'ponto_mao_E':'ponto_mao_D').getPosition().clone();

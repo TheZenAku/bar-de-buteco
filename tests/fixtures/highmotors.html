@@ -9,7 +9,7 @@ import {highmotors} from '../../apps/web/src/phone/apps/motors.ts';
 let balance=25000,destroy;
 const events=[],world={players:{me:{x:-5,y:0,z:-5}},motos:{}},view=document.querySelector('.ph-app');
 const host={user:()=>({id:'me'}),world:()=>world,wallet:()=>balance,balance:value=>{balance=value;events.push({type:'balance',value});},send:(type,data)=>events.push({type,data}),error:text=>events.push({type:'error',text}),gps:{setWaypoint:data=>events.push({type:'waypoint',data})},food:{setOwned:value=>events.push({type:'owned',value})}};
-const ctx={host,open:app=>events.push({type:'open',app})};
+const ctx={host,open:app=>events.push({type:'open',app}),banner:(app,title,text)=>events.push({type:'banner',app,title,text})};
 function open(options={}){destroy?.();if(options.balance!==undefined)balance=options.balance;if(options.motos)world.motos=options.motos;destroy=highmotors.open(view,ctx);}
 function layout(){const scale=Math.min(.88,(innerHeight-24)/864,(innerWidth-24)/410);document.querySelector('#phone').style.setProperty('--phone-scale',scale);}
 addEventListener('resize',layout);layout();

@@ -548,7 +548,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/internal/highfood/complete',internalOptions,async request=>highfood.complete(highfoodCompleteSchema.parse(request.body)));
   app.post('/api/internal/highfood/lost',internalOptions,async request=>{await highfood.lost(highfoodCancelSchema.parse(request.body));return {ok:true};});
   app.post('/api/internal/vehicles',internalOptions,async request=>{
-    const {updates}=z.object({updates:z.array(z.object({vehicleId:uuidSchema,parts:z.string().max(80).regex(/^[\d,]+$/),mileage:z.number().int().min(0).max(2_000_000_000)}).strict()).max(512)}).strict().parse(request.body);
+    const {updates}=z.object({updates:z.array(z.object({vehicleId:uuidSchema,parts:z.string().max(80).regex(/^[\d,]+$/),mileage:z.number().int().min(0).max(2_000_000_000),fuel:z.number().finite().min(0).max(100).optional()}).strict()).max(512)}).strict().parse(request.body);
     await highfood.saveVehicles(updates);
     return {ok:true};
   });

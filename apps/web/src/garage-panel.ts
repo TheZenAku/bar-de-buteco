@@ -1,19 +1,20 @@
 import {GARAGE,MOTO_PARTS,garageById,motoPartStatus,readMotoParts,type GarageVehicle,type GarageView} from '@bar/shared';
 import {escape as e} from './api';
 import {uiIcon} from './ui-icons';
+import {vehicleParts,vehiclePhoto,readVehicleParts} from '@bar/shared';
 
 export const plateHtml=(plate:string)=>`<span class="car-plate" aria-label="Placa ${e(plate)}"><i>BRASIL</i>${e(plate)}</span>`;
 const km=(metres:number)=>`${(metres/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})} km`;
 
 function vehicleHtml(vehicle:GarageVehicle,view:GarageView,anotherOut:boolean):string {
-  const parts=readMotoParts(vehicle.parts),values=MOTO_PARTS.map(part=>({name:part.name,value:Math.round(parts[part.id])}));
+  const parts=readVehicleParts(vehicle.model,vehicle.parts),values=vehicleParts(vehicle.model).map(part=>({name:part.name,value:Math.round(parts[part.id]!)}));
   const overall=Math.round(values.reduce((sum,part)=>sum+part.value,0)/values.length),worn=values.filter(part=>part.value<70).sort((a,b)=>a.value-b.value).slice(0,3);
   const action=!vehicle.out
     ?`<button type="button" class="button primary" data-action="garage-take" data-vehicle="${e(vehicle.id)}" ${anotherOut?'disabled':''}>${uiIcon('key')}Retirar</button>`
     :vehicle.far
       ?`<button type="button" class="button" data-action="garage-store" data-recall="true">${uiIcon('truck')}Trazer de guincho · ${view.towPrice.toLocaleString('pt-BR')}</button>`
       :`<button type="button" class="button" data-action="garage-store">${uiIcon('warehouse')}Guardar</button>`;
-  return `<article class="garage-vehicle" data-plate="${e(vehicle.plate)}"><img src="${import.meta.env.BASE_URL}moto/foto.webp" alt="" draggable="false">
+  return `<article class="garage-vehicle" data-plate="${e(vehicle.plate)}"><img src="${import.meta.env.BASE_URL}${vehiclePhoto(vehicle.model)}" alt="" draggable="false">
     <div class="garage-vehicle-body"><header><b>${e(vehicle.name)}</b>${plateHtml(vehicle.plate)}</header>
       <p class="garage-facts"><span>${overall}% de estado</span><span>${km(vehicle.mileage)}</span><span class="${vehicle.out?'out':''}">${vehicle.out?(vehicle.far?'Na rua, longe daqui':'Na rua, aqui perto'):'Guardada'}</span></p>
       ${worn.length?`<p class="garage-worn">${worn.map(part=>`<span class="status-${motoPartStatus(part.value)}">${e(part.name)} ${part.value}%</span>`).join('')}</p>`:''}

@@ -1,4 +1,5 @@
-/* The vehicle's panel (moto-panel.ts): parts on the left, the bike from above and the chosen part on the right; the small right-click menu. */
+/* The vehicle's panel (moto-panel.ts): parts on the left, vehicle and chosen part on the right. */
+.car-controls{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.car-seats{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin:12px 0}.car-seats span{display:flex;align-items:center;gap:4px}.car-paint{display:flex;align-items:center;gap:12px;padding:12px 0}.car-paint input[type=color]{width:62px;height:38px;padding:2px}.moto-drawing .moto-plan g{stroke-width:2}
 .modal.moto-modal{width:820px}
 .moto-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-bottom:12px;background:var(--border)}
 .moto-summary>div{padding:6px 14px;background:oklch(.12 .045 300)}

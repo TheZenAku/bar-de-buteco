@@ -52,6 +52,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Jukebox e TVs](sistemas/jukebox.md)
 - [Necessidades do personagem](sistemas/needs.md)
 - [Moto de entrega: controles, física e rede](sistemas/moto.md)
+- [Hatch 80: quatro lugares, pintura, garagem e estado das peças](sistemas/carro.md)
 - [Highfood: entregas, HighMotors, GPS e o balanço das moedas](sistemas/highfood.md)
 - [Garagem: veículos guardados, estado salvo, placa, chave e tranca](sistemas/garagem.md)
 - [Troca entre jogadores: como negociar e por que não duplica](sistemas/troca.md)

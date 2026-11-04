@@ -50,7 +50,7 @@ export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
  * starting, `gas` whether the throttle is open, and `parts` the condition of each part in MOTO_PARTS's order.
  */
 export interface MotoState extends MotoBody {id:string;/** Who holds its key (docs/sistemas/garagem.md). '' for the administration's, which anyone may ride. */ownerId?:string;/** The key holder's name, the plate on its back, and the row it is in the API. */ownerName?:string;plate?:string;vehicleId?:string;/** Only the key holder gets on it. */locked?:boolean;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
-export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number}
+export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number;ignition?:boolean;fuel?:number}
 export interface MotoIntent {throttle:number;steer:number;brake:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
 /** W/S (forward, brake and reverse), A/D (+1 is right), the handbrake and the switches. */
 export interface MotoInput extends MotoIntent {seq:number}
@@ -62,7 +62,7 @@ export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
 export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:')||isPassenger(interaction);
 export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
-export const motoSpawnSchema=z.object({}).strict();
+export const motoSpawnSchema=z.object({model:z.enum(['moto-delivery','carro-hatch']).optional()}).strict();
 /** How far a body is from the hull, seen from above. */
 export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position)=>hullGap(moto,position);
 /** One bike, or every bike when there is no id. */
@@ -163,7 +163,7 @@ export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:read
   let speed=body.speed+drive/spec.MASS*dt;
   const loss=stop/spec.MASS*dt;
   speed=Math.abs(speed)<=loss?0:speed-Math.sign(speed)*loss;
-  if(!speed)return {body:{...body,speed,steer}};
+  if(!speed)return {body:{...(body.model?{model:body.model}:{}),x:body.x,y:body.y,z:body.z,yaw:body.yaw,pitch:body.pitch,speed,steer}};
   const turn=speed*Math.tan(clamp(steer+handling.pull,-1,1)*handling.turn*motoSteerAngle(speed,body.model))/spec.WHEELBASE;
   const steps=Math.max(1,Math.ceil(Math.abs(speed*dt)/spec.SUBSTEP)),reach=spec.HALF_LENGTH+Math.abs(spec.CENTRE_Z)+Math.abs(speed*dt)+.1;
   const near=solidsBetween(body.x-reach,body.z-reach,body.x+reach,body.z+reach),solids=obstacles.length?[...near,...obstacles]:near;

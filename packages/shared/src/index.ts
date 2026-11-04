@@ -29,6 +29,7 @@ export * from './moto.js';
 export * from './vehicle-models.js';
 export * from './car-parts.js';
 export * from './vehicle-parts.js';
+export * from './vehicle-controls.js';
 export * from './moto-parts.js';
 export * from './moto-crash.js';
 export * from './ragdoll.js';

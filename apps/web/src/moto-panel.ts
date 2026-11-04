@@ -2,16 +2,18 @@ import {MOTO_ENGINE,MOTO_PARTS,MOTO_REPAIR,MOTO_STATUS_LABELS,motoPartStatus,rea
 import {escape as e} from './api';
 import {plateHtml} from './garage-panel';
 import {uiIcon} from './ui-icons';
+import {isCar} from '@bar/shared';
+import {carPanelHtml} from './car-panel';
 
 /** What the panel shows at this moment; nothing here is drawn from anything but the room's bike and the player's backpack. */
 export interface MotoPanelView {
-  moto:MotoState;selected:MotoPartId;pieces:number;
+  moto:MotoState;selected:string;pieces:number;viewerId?:string;
   /** This player holds the key. */
   keyHolder:boolean;
   /** Why the chosen part cannot be fixed right now ('' when it can). */
   blocked:string;
   /** The part this player is working on, and how long ago that started (ms). */
-  working?:{part:MotoPartId;motoId:string;elapsed:number}|undefined;
+  working?:{part:string;motoId:string;elapsed:number}|undefined;
 }
 /** The bike seen from above, nose up: every part a shape of its own, painted by its condition (panel's CSS). */
 const OUTLINE=`<svg class="moto-plan" viewBox="0 0 200 420" role="img" aria-label="A moto vista de cima">
@@ -36,7 +38,9 @@ const hue=(condition:number)=>Math.round(condition*1.25);
  * The vehicle's panel (right click on a bike, Informações do veículo): every part and its condition on the left, the bike seen from above with
  * each part painted by how it is, and the chosen part's card: what its state means and fixing it. Anyone can open it for any bike.
  */
-export function motoPanelHtml({moto,selected,pieces,blocked,working,keyHolder}:MotoPanelView):string {
+export function motoPanelHtml(view:MotoPanelView):string {
+  if(isCar(view.moto))return carPanelHtml(view);
+  const {moto,selected:chosen,pieces,blocked,working,keyHolder}=view,selected=chosen as MotoPartId;
   const parts=readMotoParts(moto.parts),part=MOTO_PARTS.find(each=>each.id===selected)!,condition=parts[selected],status=motoPartStatus(condition);
   const overall=Math.round(MOTO_PARTS.reduce((sum,each)=>sum+parts[each.id],0)/MOTO_PARTS.length);
   const engine=moto.engine===MOTO_ENGINE.ON?'Ligado':moto.engine===MOTO_ENGINE.CRANKING?'Dando partida':'Desligado';

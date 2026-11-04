@@ -7,6 +7,7 @@ export default defineConfig({
   // API's per-address limit, including observer contexts. Limits stay enabled;
   // the trusted local Vite proxy forwards these test-only headers.
   projects:[
+    {name:'car',testMatch:'**/car.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.17'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'horse',testMatch:['**/horse.spec.ts','**/horse-sound.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.16'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},

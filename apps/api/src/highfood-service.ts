@@ -11,7 +11,7 @@ const startOfDay=(now=new Date())=>new Date(now.getFullYear(),now.getMonth(),now
 const RECENT=30;
 export interface DeliveryRecord extends DeliveryFacts {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;durationMs:number}
 export interface LostOrder {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;length:number;reason:'cancelled'|'gave-up'|'left'}
-const toVehicle=(row:typeof playerVehicles.$inferSelect):OwnedVehicle=>({id:row.id,model:row.model,name:vehicleName(row.model),plate:row.plate,parts:row.parts,mileage:row.mileage,color:row.color,boughtAt:row.boughtAt.getTime()});
+const toVehicle=(row:typeof playerVehicles.$inferSelect):OwnedVehicle=>({id:row.id,model:row.model,name:vehicleName(row.model),plate:row.plate,parts:row.parts,mileage:row.mileage,color:row.color,fuel:row.fuel,boughtAt:row.boughtAt.getTime()});
 const toProfile=(row:typeof highfoodCustomers.$inferSelect):CustomerProfile=>({id:row.id,name:row.name,skin:row.skin,look:row.look as CustomerLook,image:row.image,lines:row.lines as string[],active:row.active});
 
 /**
@@ -73,8 +73,8 @@ export class HighfoodService {
     return this.vehicle(userId,CAR_MODEL);
   }
   /** What the world keeps of a bike: how it is and how far it has gone. */
-  async saveVehicles(updates:ReadonlyArray<{vehicleId:string;parts:string;mileage:number}>):Promise<void>{
-    for(const {vehicleId,parts,mileage} of updates)await this.db.update(playerVehicles).set({parts,mileage,updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
+  async saveVehicles(updates:ReadonlyArray<{vehicleId:string;parts:string;mileage:number;fuel?:number}>):Promise<void>{
+    for(const {vehicleId,parts,mileage,fuel} of updates)await this.db.update(playerVehicles).set({parts,mileage,...(fuel!==undefined?{fuel}:{}),updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
   }
   async access(userId:string):Promise<{vehicles:OwnedVehicle[]}>{
     return {vehicles:await this.owned(userId)};

@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import {CAR_MODEL,CAR_SEATS,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts} from '@bar/shared';
+import {CAR_MODEL,CAR_SEATS,NEW_CAR_PARTS,NEW_MOTO_PARTS,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts} from '@bar/shared';
 import {applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt} from '@bar/shared';
 import {HORSE,horseFits,isRidingHorse,moveHorse} from '@bar/shared';
 import {ServerPerformanceSampler} from './performance.js';
@@ -12,7 +12,7 @@ import { Access, InternalApiError, internal, validateAccess, type Control } from
 import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
 import { HighfoodDesk, customerLine, type FoodOrder } from './world/highfood.js';
 import { TradeDesk, type Trade } from './world/trades.js';
-import { GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
+import { atVehicleFuelPump, vehicleFuelUse, vehiclePowered, GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
 import { WALK_SPEED, type Position } from '@bar/shared';
 import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, atPickup, foodCodeSchema, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt, type HighfoodState } from '@bar/shared';
 import { KICK, KICKS, kickAim, kickClear, kickLaunch, kickTouches, kickWindow } from '@bar/shared';
@@ -537,7 +537,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       p.motoQueue.push(input);
     });
     this.handle('moto.mount', motoMountSchema, 4, (client, { motoId,seat }) => this.mountMoto(client, motoId,seat));
-    this.handle('vehicle.control',z.object({vehicleId:z.string().max(32),action:z.enum(['left-door','right-door','hood','trunk','wipers','engine','headlights'])}).strict(),5,(client,{vehicleId,action})=>this.controlCar(client,vehicleId,action));
+    this.handle('vehicle.control',z.object({vehicleId:z.string().max(32),action:z.enum(['left-door','right-door','hood','trunk','wipers','engine','headlights','ignition','lock','refuel'])}).strict(),5,(client,{vehicleId,action})=>this.controlVehicle(client,vehicleId,action));
     this.handle('moto.tow', z.object({ vehicleId: z.string().uuid().optional() }).strict(), 2, (client, { vehicleId }) => this.towOwnMoto(client, vehicleId));
     this.handle('moto.lock', z.object({ locked: z.boolean() }).strict(), 4, (client, { locked }) => this.lockMoto(client, locked));
     this.handle('garage.take', z.object({ garageId: z.string().max(32), vehicleId: z.string().uuid() }).strict(), 3, (client, { garageId, vehicleId }) => this.takeFromGarage(client, garageId, vehicleId));
@@ -760,14 +760,14 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
     });
     // The delivery bikes exist only while the administration keeps them on the map.
-    this.handle('admin.moto.spawn',motoSpawnSchema,5,client=>{
+    this.handle('admin.moto.spawn',motoSpawnSchema,5,(client,{model})=>{
       const admin=this.requireAdmin(client),player=this.player(client);
       if([...this.state.motos.values()].filter(moto=>!moto.ownerId).length>=MOTO.LIMIT)throw new Error(`O mapa já tem ${MOTO.LIMIT} motos. Despawne alguma antes.`);
-      const spot=motoSpawnSpot(player,player.rotation,[...this.state.motos.values()]);
+      const spot=motoSpawnSpot(player,player.rotation,[...this.state.motos.values()],[],model);
       if(!spot)throw new Error('Não há rua livre perto de você. Vá para a rua e tente de novo.');
       const id=`moto-${++this.motoSerial}`;
       // Anyone's to ride, and plated like every other vehicle; the plate lasts as long as the bike does.
-      this.state.motos.set(id,new Moto().assign({...parkedMoto({id,...spot}),plate:makePlate()}));
+      this.state.motos.set(id,new Moto().assign({...parkedMoto({id,...spot}),model:model??'moto-delivery',parts:model===CAR_MODEL?NEW_CAR_PARTS:NEW_MOTO_PARTS,plate:makePlate()}));
       this.log('admin_moto_spawn',{playerId:admin,id,x:+spot.x.toFixed(1),z:+spot.z.toFixed(1)});client.send('admin.world',this.adminSnapshot());
     });
     this.handle('admin.moto.despawn',motoDespawnSchema,5,(client,{id})=>{
@@ -989,7 +989,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         } else if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
-          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player));
+          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), [...this.state.motos.values()].map(motoObstacle));
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
           if (moving) this.achieved(id, 'andarilho', Math.hypot(position.x - player.x, position.z - player.z));
@@ -1074,6 +1074,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** The brake light is the room's (it knows the speed), the rest are the rider's switches. */
   private motoLights(moto: Moto, input: MotoIntent): number {
+    if(!vehiclePowered(moto))return 0;
     const braking = input.brake || (input.throttle < 0 && moto.speed > .1) || (input.throttle > 0 && moto.speed < -.1);
     return ((input.lights ?? 0) & ~MOTO_LIGHT.BRAKE) | (braking ? MOTO_LIGHT.BRAKE : 0);
   }
@@ -1103,16 +1104,23 @@ export class BarRoom extends Room<{ state: BarState }> {
   private setEngine(moto: Moto, engine: number, now: number): void {
     if (moto.engine === engine) return;
     moto.engine = engine; moto.engineAt = now;
-    if (engine !== MOTO_ENGINE.ON) moto.gas = false;
+    if (engine !== MOTO_ENGINE.ON) {moto.gas = false;moto.lights=0;moto.headlights=0;moto.wipers=false;}
+    else moto.headlights=1;
   }
   /** One try at starting: its outcome is decided here and every browser plays that clip. */
   private crankEngine(moto: Moto, now: number): void {
+    if(!moto.ignition||moto.fuel<=0)return;
     moto.crank = motoCrank(readDriveParts(moto));
     this.engineOf(moto).crankEnds = now + MOTO_CRANK_MS[moto.crank]!;
     this.setEngine(moto, MOTO_ENGINE.CRANKING, now);
   }
   /** A try at starting coming to its end, and a tired engine dying by itself. */
   private stepEngine(moto: Moto, now: number): void {
+    if(moto.engine===MOTO_ENGINE.ON){
+      moto.fuel=Math.max(0,moto.fuel-vehicleFuelUse(moto.model,moto.speed,moto.gas,TICK_MS/1000));
+      if(moto.ownerId)this.markOwned(moto.ownerId);
+      if(moto.fuel<=0||!moto.ignition){this.setEngine(moto,MOTO_ENGINE.OFF,now);return;}
+    }
     const engine = this.engineOf(moto);
     if (moto.engine === MOTO_ENGINE.CRANKING) {
       if (now < engine.crankEnds) return;
@@ -1346,7 +1354,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       const occupants=vehicleOccupants(moto),chosen=seat??occupants.findIndex(id=>!id);
       if(chosen<0||chosen>3||occupants[chosen])throw new Error('Este lugar já está ocupado. O carro comporta quatro pessoas.');
       if(!canMountMoto(moto,player,INTERACTION_SLACK,player.id))throw new Error('Chegue mais perto da porta do carro.');
-      if(chosen===0){moto.riderId=player.id;moto.headlights=1;}else moto.passengers[chosen-1]=player.id;
+      if(chosen===0){moto.riderId=player.id;moto.ignition=true;}else moto.passengers[chosen-1]=player.id;
       this.dropParcel(player);const order=this.highfood.orderOf(player.id);if(order){order.transport='moto';this.sendFood(player.id);}
       Object.assign(player,seatPosition(moto,chosen));player.rotation=moto.yaw;
       player.interactionState=chosen===0?motoInteraction(moto.id):passengerInteraction(moto.id,chosen);
@@ -1367,7 +1375,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     if (!canMountMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
-    moto.riderId = player.id; moto.lights = 0;
+    moto.riderId = player.id; moto.lights = 0;moto.ignition=true;
     this.dropParcel(player);
     const order=this.highfood.orderOf(player.id);
     if(order){order.transport='moto';this.sendFood(player.id);}
@@ -1400,17 +1408,40 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
     }
   }
-  private controlCar(client:Client,id:string,action:string):void {
+  private controlVehicle(client:Client,id:string,action:string):void {
     const player=this.player(client),car=this.state.motos.get(id);
-    if(!car||!isCar(car))throw new Error('Esse carro não está no mapa.');
+    if(!car)throw new Error('Esse veículo não está no mapa.');
     if(!isConscious(player))throw new Error('Espere recuperar os sentidos.');
-    if(car.riderId!==player.id&&(car.ownerId!==player.id||motoDistance(car,player)>3))throw new Error('Só o motorista ou o dono perto do carro pode fazer isso.');
+    if(car.riderId!==player.id&&(car.ownerId!==player.id||motoDistance(car,player)>3))throw new Error('Só o motorista ou o dono perto do veículo pode fazer isso.');
+    if(action==='lock'){car.locked=!car.locked;client.send('moto.locked',{plate:car.plate,locked:car.locked});return;}
+    if(action==='refuel'){
+      if(car.engine!==MOTO_ENGINE.OFF||Math.abs(car.speed)>.05)throw new Error('Pare e desligue o motor para abastecer.');
+      if(!atVehicleFuelPump(car))throw new Error('Abasteça junto a uma garagem.');
+      car.fuel=100;this.markOwned(car.ownerId,true);return;
+    }
+    if(action==='ignition'){
+      if(car.riderId!==player.id)throw new Error('Entre no lugar do motorista.');
+      if(car.engine!==MOTO_ENGINE.OFF||Math.abs(car.speed)>.05)throw new Error('Pare e desligue o motor antes de retirar a chave.');
+      car.ignition=!car.ignition;return;
+    }
     if(action==='engine'){
       if(car.riderId!==player.id)throw new Error('Entre no lugar do motorista.');
-      if(car.engine===MOTO_ENGINE.OFF)this.crankEngine(car,Date.now());else this.setEngine(car,MOTO_ENGINE.OFF,Date.now());return;
+      if(car.engine===MOTO_ENGINE.OFF){
+        if(!car.ignition)throw new Error('Coloque a chave na ignição.');
+        if(car.fuel<=0)throw new Error('Tanque vazio. Abasteça junto a uma garagem.');
+        this.crankEngine(car,Date.now());
+      }else this.setEngine(car,MOTO_ENGINE.OFF,Date.now());return;
     }
-    if(action==='wipers'){car.wipers=!car.wipers;return;}
-    if(action==='headlights'){car.headlights=(car.headlights+1)%3;return;}
+    if(action==='headlights'){
+      if(!vehiclePowered(car))throw new Error('Ligue o motor para usar os faróis.');
+      car.headlights=(car.headlights+1)%3;return;
+    }
+    if(!isCar(car))throw new Error('Este comando só está disponível em carros.');
+    if(action==='wipers'){
+      if(!vehiclePowered(car))throw new Error('Ligue o motor para usar os limpadores.');
+      if(readVehicleParts(car.model,car.parts).limpadores!<=0)throw new Error('Os limpadores precisam de conserto.');
+      car.wipers=!car.wipers;return;
+    }
     if(Math.abs(car.speed)>vehiclePhysics(car.model).DISMOUNT_SPEED)throw new Error('Pare o carro antes de abrir ou fechar.');
     if(action==='hood')car.hood=!car.hood;
     else if(action==='trunk')car.trunk=!car.trunk;
@@ -1436,15 +1467,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.ownedMotos.delete(userId);
   }
   /** What is on its way to the API, by vehicle: only the latest of each matters. */
-  private vehicleUpdates = new Map<string, { vehicleId: string; parts: string; mileage: number }>();
+  private vehicleUpdates = new Map<string, { vehicleId: string; parts: string; mileage: number; fuel:number }>();
   private savingVehicles?: Promise<void>;
   private vehiclesKeptAt = 0;
   private keepVehicle(userId: string, owned: { vehicleId: string; mileage: number; dirty: boolean; broken: boolean }, moto: Moto): void {
     owned.dirty = false; owned.broken = false;
-    const update = { vehicleId: owned.vehicleId, parts: moto.parts, mileage: Math.round(owned.mileage) };
+    const update = { vehicleId: owned.vehicleId, parts: moto.parts, mileage: Math.round(owned.mileage),fuel:Math.round(moto.fuel*10000)/10000 };
     this.vehicleUpdates.set(owned.vehicleId, update);
     const held = this.sessions.getByUser(userId)?.vehicles.find(vehicle => vehicle.id === owned.vehicleId);
-    if (held) { held.parts = update.parts; held.mileage = update.mileage; }
+    if (held) { held.parts = update.parts; held.mileage = update.mileage;held.fuel=update.fuel; }
   }
   /** `all`: the odometers too (each maintenance round), otherwise only what changed on the bike itself. */
   private keepVehicles(all: boolean): void {
@@ -1471,7 +1502,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private setVehicles(presence: Presence, list: readonly OwnedVehicle[]): void {
     presence.vehicles = list.map(vehicle => {
       const pending = this.vehicleUpdates.get(vehicle.id);
-      return pending ? { ...vehicle, parts: pending.parts, mileage: pending.mileage } : { ...vehicle };
+      return pending ? { ...vehicle, parts: pending.parts, mileage: pending.mileage,fuel:pending.fuel } : { ...vehicle };
     });
     const out=this.ownMoto(presence.ticket.userId),held=out&&presence.vehicles.find(v=>v.id===out.vehicleId);
     if(out&&held){out.color=held.color??'#ccc9c2';out.ownerName=presence.ticket.displayName;}
@@ -1483,7 +1514,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const spot = motoSpawnSpot(near, yaw, [...this.state.motos.values()], GARAGES.map(garage => ({ x: garage.x, z: garage.z, radius: GARAGE.REACH + spec.HALF_LENGTH + spec.REACH + .2 })),vehicle.model);
     if (!spot) throw new Error('Não há rua livre por perto para a moto.');
     const id = `moto-${++this.motoSerial}`;
-    const moto = new Moto().assign({ ...parkedMoto({ id, ...spot }),model:vehicle.model,color:vehicle.color??'#ccc9c2', ownerId: userId, ownerName: this.state.players.get(userId)?.displayName ?? '', plate: vehicle.plate, vehicleId: vehicle.id, locked: true, parts: vehicle.parts });
+    const moto = new Moto().assign({ ...parkedMoto({ id, ...spot }),model:vehicle.model,color:vehicle.color??'#ccc9c2',fuel:vehicle.fuel??100, ownerId: userId, ownerName: this.state.players.get(userId)?.displayName ?? '', plate: vehicle.plate, vehicleId: vehicle.id, locked: true, parts: vehicle.parts });
     this.state.motos.set(id, moto);
     this.ownedMotos.set(userId, { vehicleId: vehicle.id, motoId: id, mileage: vehicle.mileage, wearLeft: HIGHFOOD.WEAR_EVERY_M, dirty: false, broken: false });
     return moto;
@@ -1538,7 +1569,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     return {
       garageId, towPrice: priceOf(this.prices, 'vehicle:tow'),
       vehicles: presence.vehicles.map(vehicle => out?.vehicleId === vehicle.id
-        ? { ...vehicle, parts: out.parts, mileage: Math.round(owned!.mileage), out: true, far: Math.hypot(out.x - garage.x, out.z - garage.z) > GARAGE.STORE_REACH }
+        ? { ...vehicle, parts: out.parts, mileage: Math.round(owned!.mileage),fuel:out.fuel, out: true, far: Math.hypot(out.x - garage.x, out.z - garage.z) > GARAGE.STORE_REACH }
         : { ...vehicle, out: false }),
     };
   }
@@ -2307,7 +2338,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         orders:s.orders.map(o=>({...publicOrder(o.order),customer:o.customer,table:o.table,picked:o.picked}))}))})),
       dirtyTables:this.served.dirtyTables(),
       highfood:[...this.highfood.shifts.values()].map(s=>({playerId:s.userId,name:this.state.players.get(s.userId)?.displayName??s.userId.slice(0,8),status:s.status,done:s.done,earned:s.earned,order:s.order?.customer.name??'',address:s.order?.address??''})),
-      motos:[...this.state.motos.values()].map(m=>({owner:m.ownerId?m.ownerName||m.ownerId.slice(0,8):'',plate:m.plate,locked:m.locked,id:m.id,x:+m.x.toFixed(1),y:+m.y.toFixed(1),z:+m.z.toFixed(1),speed:+m.speed.toFixed(1),phase:m.phase,riderId:m.riderId,rider:m.riderId?this.state.players.get(m.riderId)?.displayName??'':''})),
+      motos:[...this.state.motos.values()].map(m=>({model:m.model,color:m.color,occupants:vehicleOccupants(m).filter(Boolean).length,owner:m.ownerId?m.ownerName||m.ownerId.slice(0,8):'',plate:m.plate,locked:m.locked,id:m.id,x:+m.x.toFixed(1),y:+m.y.toFixed(1),z:+m.z.toFixed(1),speed:+m.speed.toFixed(1),phase:m.phase,riderId:m.riderId,rider:m.riderId?this.state.players.get(m.riderId)?.displayName??'':''})),
       media:[...[...this.state.jukeboxes.values()].map(m=>({kind:'jukebox',...m.toJSON()})),...[...this.state.televisions.values()].map(m=>({kind:'tv',...m.toJSON()}))],
       musicians:this.musicians.snapshot(),prices:this.prices,pricesLoaded:this.pricesLoaded,logQueue:this.logQueue.length,walletRetries:this.walletRetries.size,
       process:{uptimeS:Math.round(process.uptime()),node:process.version,pid:process.pid,rss:process.memoryUsage().rss,heapUsed:process.memoryUsage().heapUsed,
@@ -3107,7 +3138,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (out && !list.some(vehicle => vehicle.id === out.vehicleId)) this.despawnMoto(out.id, '');
     this.setVehicles(presence, list);
     const owned = this.ownedMotos.get(id), moto = owned && this.state.motos.get(owned.motoId), held = owned && presence.vehicles.find(vehicle => vehicle.id === owned.vehicleId);
-    if (moto && held) { held.parts = moto.parts; held.mileage = Math.round(owned!.mileage); }
+    if (moto && held) { held.parts = moto.parts; held.mileage = Math.round(owned!.mileage);held.fuel=moto.fuel; }
     if (player && !list.length && !this.canDeliverByHorse(player)) this.stopHighfood(player, 'Você precisa de uma moto ou de Tião com a habilidade Cavalo para continuar no Highfood.');
     this.sendInventory(presence);
     presence.client.send('food.owned', { owned: list.length > 0 });

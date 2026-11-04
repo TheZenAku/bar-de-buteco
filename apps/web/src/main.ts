@@ -1,5 +1,6 @@
 import {adminConsole} from './admin/console';
-import {isRidingHorse} from '@bar/shared';
+import {isRidingHorse,vehicleSeat,weatherAt} from '@bar/shared';
+import {CAR_MODEL,CAR_SEATS,isCar,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts} from '@bar/shared';
 import {PerformanceMonitor} from './performance/monitor';
 import {UpdateProfiler} from './performance/recording';
 import {createPerformanceHud} from './performance/hud';
@@ -14,6 +15,7 @@ import {createFullscreen} from './fullscreen';
 import {createMouseCapture} from './mouse-capture';
 import './lobby-hero.css';
 import {createHudPanels} from './hud-panels';
+import {createVehicleHud} from './vehicle-hud';
 import {createNotifications} from './notifications';
 import {createCollection} from './collection/collection';
 import {GARAGE,VEHICLE_KEY,keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
@@ -75,6 +77,18 @@ createLobbyHero(document.querySelector<HTMLElement>('#lobby')!);
 
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
 const hud=createHudPanels($('#game'));
+const vehicleHud=createVehicleHud($('#vehicle-hud'),action=>{
+  if(!connected||!world||!user||activeModal)return;
+  const self=world.players[user.id],vehicle=Object.values(world.motos??{}).find(each=>vehicleSeat(each,user!.id)>=0);
+  if(action==='exit'){network.send('player.interact',{objectId:'stand'});return;}
+  if(action==='camera'){scene?.vehicleCamera();return;}
+  if(!vehicle)return;
+  if(action==='info'){void openMotoPanel(vehicle.id).catch(error=>toast(errorMessage(error),true));return;}
+  if(vehicle.riderId!==self?.id)return;
+  if(action==='left'||action==='right'||action==='hazard'){scene?.vehicleSignal(action);return;}
+  if(action==='doors')action='left-door';
+  sendVehicleControl(vehicle.id,action);
+});
 const notices=createNotifications($('#toasts'));
 // Highfood (docs/sistemas/highfood.md): the shift as the room tells it, the GPS's line and the customer's dialog.
 const courier=createCourier();
@@ -256,8 +270,8 @@ const network=new BarNetwork({
   foodBase:({owned,out,state})=>{courier.setOwned(owned);showModal('HIGHFOOD',basePanelHtml(owned,out,state,livePrice('vehicle:moto'),livePrice('cap:highfood-daily')),'highfood');},
   foodOwned:owned=>courier.setOwned(owned),
   garage:view=>{if(activeModal==='garage')$('#modal-content').innerHTML=garagePanelHtml(view);else showModal('GARAGEM',garagePanelHtml(view),'garage');garageShown=view.garageId;},
-  garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();notices.show({variant:'acao',title:'Moto na rua',text:`A moto ${plate} está esperando, trancada. Só quem tem a chave sobe nela.`});gps.setWaypoint({x,y:0,z,source:'bike',label:`Moto ${plate}`});},
-  motoLocked:({plate,locked})=>{keyChirp(settings.get().master,locked);notices.show({variant:'acao',title:locked?'Trancada':'Destrancada',text:locked?`Só você sobe na moto ${plate}.`:`Qualquer um pode subir na moto ${plate} agora. Ela continua sendo sua.`});if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
+  garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();notices.show({variant:'acao',title:'Veículo na rua',text:`O veículo ${plate} está esperando, trancado. A chave permite destrancar.`});gps.setWaypoint({x,y:0,z,source:'bike',label:`Veículo ${plate}`});},
+  motoLocked:({plate,locked})=>{keyChirp(settings.get().master,locked);notices.show({variant:'acao',title:locked?'Veículo trancado':'Veículo destrancado',text:locked?`Acesso ao veículo ${plate} fechado.`:`Acesso ao veículo ${plate} liberado.`});if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
   tradeInvite:invite=>trade.invited(invite),
   tradeUninvite:id=>trade.uninvited(id),
   tradeSent:name=>notices.show({variant:'acao',title:'Negociação',text:`Esperando ${name} responder.`}),
@@ -342,7 +356,7 @@ const network=new BarNetwork({
   status:(message,isConnected)=>{
     connected=isConnected;scene?.setEnabled(sceneActive());audio.setActive(inGame&&connected);performanceMonitor.refresh();
     if(!isConnected&&watchingTv)stopWatchingTv();media.forEach(m=>m.setWorld(world,user?.id??'',connected));
-    if(!isConnected)phone.disconnected();
+    if(!isConnected){phone.disconnected();vehicleHud.reset();$('#game').classList.remove('vehicle-mounted');hud.setAvailable('actions',true);}
     netStatus=isConnected?'Na área!':'Reconectando…';renderNet();
     $('#waiting-message').textContent=message;
     $('#waiting').classList.toggle('hidden',isConnected||!inGame);
@@ -415,6 +429,7 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   profile.close();performanceMonitor.forUser('');
   const task=(async()=>{
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
+  vehicleHud.reset();$('#game').classList.remove('vehicle-mounted');hud.setAvailable('actions',true);
   gps.reset();foodDialog.reset();lockerPad.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
   inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#truco').classList.add('hidden');trucoUi.reset();trucoView=undefined;$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';$('#pool').classList.add('hidden');poolUi.reset();poolWatching='';poolViews.clear();closeModal();renderAuth();
@@ -442,6 +457,9 @@ function renderBalance():void {const node=$('#hud-balance'),text=wardrobe?wardro
 function renderWorld():void {
   if(!world||!user)return;
   const self=world.players[user.id];
+  $('#vehicle-hud').dataset.raining=String(weatherAt(world.serverTime,world.environment).rain>.15);
+  const mounted=vehicleHud.update(connected?self:undefined,world.motos??{},world.serverTime);
+  $('#game').classList.toggle('vehicle-mounted',mounted);hud.setAvailable('actions',!mounted);
   renderBalance();
   needsHud.update(self);
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
@@ -612,7 +630,7 @@ function openTableMenu():void {
 function renderTableMenu():void {$('#modal-content').innerHTML=tableMenuHtml(inventory?.balance??0,tableOrder,workersOnShift());}
 function openJobs():void {showModal('Trabalhar no bar',jobsHtml(world,jobTask),'jobs');}
 // The vehicle's panel: which bike and part it shows, and what it last drew (the room's patches come ten times a second).
-let panelMoto='',panelPart:MotoPartId=MOTO_PARTS[0].id,panelDrawn='',repairSeen='',repairStart=0;
+let panelMoto='',panelPart:string=MOTO_PARTS[0].id,panelDrawn='',repairSeen='',repairStart=0;
 async function openMotoPanel(id:string):Promise<void>{
   if(!inGame||!connected||!world?.motos?.[id])return;
   panelMoto=id;panelPart=MOTO_PARTS[0].id;panelDrawn='';
@@ -626,29 +644,36 @@ function renderMotoPanel():void {
   if(activeModal!=='moto')return;
   const moto=world?.motos?.[panelMoto],self=world?.players[user?.id??''];
   if(!moto||!self){$('#modal-content').innerHTML='<p class="modal-description">Essa moto não está mais no mapa.</p>';panelDrawn='';return;}
-  const parts=readMotoParts(moto.parts),pieces=inventory?.stacks.find(stack=>stack.itemId===MOTO_REPAIR.item)?.quantity??0;
+  const parts=readVehicleParts(moto.model,moto.parts),repairRule=vehicleRepair(moto.model),pieces=inventory?.stacks.find(stack=>stack.itemId===repairRule.item)?.quantity??0;
   const repair=repairOf(self.interactionState);
   if(self.interactionState!==repairSeen){repairSeen=self.interactionState??'';repairStart=performance.now();}
   // The same cases the room refuses, said before trying.
-  const blocked=parts[panelPart]>=100?'Esta parte está perfeita.':moto.riderId?'Alguém está pilotando esta moto.':moto.phase&&moto.phase!=='down'?'Espere a moto parar.':Math.abs(moto.speed)>0?'Espere a moto parar.'
-    :!canRepairMoto(moto,self,0)?'Chegue mais perto da moto para consertar.':self.interactionState||self.currentTableId?'Encerre o que está fazendo primeiro.':pieces<MOTO_REPAIR.pieces?'Você precisa de uma peça de moto. A loja da casa vende.':'';
-  const key=[moto.parts,moto.engine,moto.locked,pieces,blocked,panelPart,repairSeen].join('|');
+  const blocked=parts[panelPart]!>=100?'Esta parte está perfeita.':vehicleOccupants(moto).some(Boolean)?'Alguém está usando o veículo.':moto.phase&&moto.phase!=='down'?'Espere o veículo parar.':Math.abs(moto.speed)>0?'Espere o veículo parar.'
+    :!canRepairMoto(moto,self,0)?'Chegue mais perto do veículo para consertar.':self.interactionState||self.currentTableId?'Encerre o que está fazendo primeiro.':pieces<repairRule.pieces?`Você precisa de uma peça de ${isCar(moto)?'carro':'moto'}. A loja da casa vende.`:'';
+  const key=[moto.parts,moto.engine,moto.locked,moto.color,moto.doors,moto.hood,moto.trunk,moto.wipers,moto.headlights,moto.riderId,moto.passengers?.join(','),pieces,blocked,panelPart,repairSeen].join('|');
   if(key===panelDrawn)return;
   panelDrawn=key;
-  $('#modal-content').innerHTML=motoPanelHtml({moto,selected:panelPart,pieces,blocked,keyHolder:!!moto.ownerId&&moto.ownerId===self.id,working:repair?{...repair,elapsed:performance.now()-repairStart}:undefined});
+  const active=document.activeElement;if(active instanceof HTMLInputElement&&active.matches('[data-car-color]'))return;
+  $('#modal-content').innerHTML=motoPanelHtml({moto,selected:panelPart,pieces,blocked,viewerId:self.id,keyHolder:!!moto.ownerId&&moto.ownerId===self.id,working:repair?{...repair,elapsed:performance.now()-repairStart}:undefined});
 }
 // What the rider's own engine just did: the sound says it, and this says what to do about it.
 let ownEngine:{id:string;engine:number}|undefined;
+function sendVehicleControl(vehicleId:string,action:string):void {
+  if(action==='engine'&&world?.motos?.[vehicleId]?.engine!==MOTO_ENGINE.OFF)ownEngine=undefined;
+  network.send('vehicle.control',{vehicleId,action});
+}
 function watchOwnEngine(self:PlayerState|undefined):void {
   const moto=self&&isRidingMoto(self.interactionState)?Object.values(world?.motos??{}).find(each=>each.riderId===self.id):undefined;
   if(!moto){ownEngine=undefined;return;}
   const before=ownEngine?.id===moto.id?ownEngine.engine:undefined;
   ownEngine={id:moto.id,engine:moto.engine};
   if(moto.engine!==MOTO_ENGINE.OFF||before===undefined||before===MOTO_ENGINE.OFF)return;
-  notices.show({variant:'aviso',title:before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:'Aperte W para tentar de novo. O estado da moto está nas informações do veículo.'});
+  notices.show({variant:'aviso',title:(moto.fuel??100)<=0?'Combustível acabou':before===MOTO_ENGINE.ON?'O motor morreu':'Não pegou',text:(moto.fuel??100)<=0?'Abasteça junto a uma garagem.':'Use o motor no painel ou aperte W para tentar de novo. Confira as condições do veículo.'});
 }
 /** The key's button (L, the bike's menu or its panel). */
 function lockOwnBike():void {
+  const ridden=Object.values(world?.motos??{}).find(moto=>moto.riderId===user?.id);
+  if(ridden){network.send('vehicle.control',{vehicleId:ridden.id,action:'lock'});return;}
   const bike=Object.values(world?.motos??{}).find(moto=>moto.ownerId===user?.id);
   if(!bike){toast('Sua moto não está na rua.',true);return;}
   network.send('moto.lock',{locked:!bike.locked});
@@ -956,6 +981,11 @@ app.addEventListener('click',event=>{
       case 'table-cancel':network.send('table.cancel');closeModal();break;
       case 'moto-part':panelPart=button.dataset.part as MotoPartId;renderMotoPanel();break;
       case 'moto-repair':network.send('moto.repair',{motoId:panelMoto,part:button.dataset.part});break;
+      case 'vehicle-control':sendVehicleControl(panelMoto,button.dataset.control!);break;
+      case 'car-paint':{
+        const car=world?.motos?.[panelMoto],color=document.querySelector<HTMLInputElement>('[data-car-color]')?.value;
+        if(car?.vehicleId&&color){await api('/vehicles/paint',{vehicleId:car.vehicleId,color});network.send('inventory.sync');toast('Pintura salva para este carro.');panelDrawn='';}break;
+      }
       case 'jobs':openJobs();break;
       case 'job-start':network.send('job.start',{jobId:button.dataset.job});closeModal();break;
       case 'job-stop':network.send('job.stop');closeModal();break;
@@ -1154,11 +1184,12 @@ async function start():Promise<void>{
         ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
         ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
+        ...(bike&&isCar(bike)?CAR_SEATS.filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${CAR_SEATS.indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:CAR_SEATS.indexOf(seat)})})):[]),
         ...(bike?.ownerId&&bike.ownerId===user?.id?[{id:'lock',icon:bike.locked?'unlock':'lock',label:bike.locked?'Destrancar':'Trancar',choose:()=>lockOwnBike()}]:[]),
       ],bike?.plate?`${plateHtml(bike.plate)}<span>${bike.ownerId?`de ${e(bike.ownerName||'outro jogador')}${bike.locked?' · trancada':''}`:'Moto do bar'}</span>`:'');
     },
     motoVolume:()=>settings.get().master,
-    onVehicleControl:(vehicleId,action)=>network.send('vehicle.control',{vehicleId,action}),
+    onVehicleControl:(vehicleId,action)=>sendVehicleControl(vehicleId,action),
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
     onMediaFrame:()=>{
       mediaProfiler.begin();mouseCapture.sync();mediaProfiler.mark('mouse');
@@ -1207,6 +1238,7 @@ setInterval(()=>{
   }
   for(const [id,label] of worldLabels)if(!seen.has(id)){label.node.remove();worldLabels.delete(id);}
   if(jobTask)renderJobCard();
+  const vehicleSpeed=scene.vehicleSpeed();if(vehicleSpeed!==undefined)vehicleHud.speed(vehicleSpeed);
   if(!hud.isHidden('chat'))$('[data-action="chat"]').removeAttribute('data-unread');
   consumingHud.render(consumptions(world,world.players[user?.id||''],usedItem,serverNow()),serverNow());
   const table=world.tables[world.players[user?.id||'']?.currentTableId];

@@ -260,10 +260,11 @@ function inOpenDoorway(x:number,z:number,y:number):boolean {
     return Math.abs(dx*Math.sin(yaw)+dz*Math.cos(yaw))<.6&&Math.abs(dx*Math.cos(yaw)-dz*Math.sin(yaw))<.4*door.leaves.length;
   });
 }
-function obstructed(x:number,z:number,y:number,ignored?:Set<string>):boolean {
+function obstructed(x:number,z:number,y:number,ignored?:Set<string>,obstacles:readonly Collider[]=[]):boolean {
   const body=inOpenDoorway(x,z,y)?DOORWAY_RADIUS:PLAYER_RADIUS;
   if(x<WORLD.minX+PLAYER_RADIUS||x>WORLD.maxX-PLAYER_RADIUS||z<WORLD.minZ+PLAYER_RADIUS||z>WORLD.maxZ-PLAYER_RADIUS)return true;
-  for(const c of solidsAt(x,z)){
+  const nearby=solidsAt(x,z);
+  for(const c of obstacles.length?[...nearby,...obstacles]:nearby){
     if(c.ramp||ignored?.has(c.id))continue;
     if((c.maxY??Infinity)<=y+.26||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
     // Below knee height only the feet collide, so the body may lean over a step edge (the stage's 30 cm treads).
@@ -303,14 +304,16 @@ function throughDoorway(fromX:number,fromZ:number,x:number,z:number,y:number,wx:
   }
 }
 /** `stagePass`: may step onto the stage (a paid pass); without one the steps stop the body, as a wall would. */
-export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false):Required<Position> {
+export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false,obstacles:readonly Collider[]=[]):Required<Position> {
   const magnitude=Math.hypot(input.dx,input.dz);
   const scale=(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
+  // A vehicle can stop over someone. Let them leave its hull, then block re-entry.
+  const trapped=new Set(obstacles.filter(c=>(c.maxY??Infinity)>y+.26&&(c.minY??-Infinity)<y+PLAYER_HEIGHT-.04&&boxContains(c,x,z,PLAYER_RADIUS-.01)).map(c=>c.id));
   // Whoever is already up there (a pass that ran out) may still move about and come down, never back up.
   const gated=!stagePass&&!onStage({x,y,z});
-  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py)&&!(gated&&onStage({x:px,y:py,z:pz}));
+  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py,trapped,obstacles)&&!(gated&&onStage({x:px,y:py,z:pz}));
   for(let step=0;step<steps;step++){
     const wx=input.dx*scale/steps,wz=input.dz*scale/steps,fromX=x,fromZ=z;
     const nx=x+wx,nz=z+wz;
@@ -319,7 +322,8 @@ export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'r
     nextY=floorHeight(x,nz,y);
     if(nextY!==undefined&&allowed(x,nz,nextY)){z=nz;y=nextY;}
     const guided=throughDoorway(fromX,fromZ,x,z,y,wx,wz);
-    if(guided){x=guided.x;z=guided.z;}
+    if(guided&&allowed(guided.x,guided.z,y)){x=guided.x;z=guided.z;}
+    for(const c of obstacles)if(trapped.has(c.id)&&!boxContains(c,x,z,PLAYER_RADIUS))trapped.delete(c.id);
   }
   return {x,y,z};
 }
