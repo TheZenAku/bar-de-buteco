@@ -20,6 +20,7 @@ export const selfOf=(page:Page)=>page.evaluate(()=>{const d=(window as any).barD
  * Stopped by something (a bin, a tree), a step to the side first.
  */
 export async function walkTo(page:Page,x:number,z:number,tolerance=.25):Promise<void>{
+  await page.bringToFront();
   const press=async(keys:string[],ms:number)=>{for(const key of keys)await page.keyboard.down(key);await page.waitForTimeout(ms);for(const key of keys)await page.keyboard.up(key);};
   const deadline=Date.now()+45_000;
   let last={x:Infinity,z:Infinity},side=1;
@@ -66,7 +67,8 @@ export async function inVehicles(page:Page,act:()=>Promise<void>):Promise<void>{
  * A bike on the kerb in front of the bar, nose to −X along the street: the admin stands on the street facing that way (the camera
  * turned first, so A is exactly −X) and spawns it just ahead, by the real button.
  */
-export async function spawnBikeOnStreet(page:Page):Promise<void>{
+export async function spawnBikeOnStreet(page:Page,options:{directPlacement?:boolean}={}):Promise<void>{
+  await page.bringToFront();
   // The room lives as long as the stack: what an earlier spec left goes first.
   await inVehicles(page,async()=>{
     const despawn=page.locator('[data-vehicle="despawn"]');
@@ -77,10 +79,28 @@ export async function spawnBikeOnStreet(page:Page):Promise<void>{
   const heading=(yaw:number)=>Math.atan2(Math.sin(yaw),Math.cos(yaw));
   const squareView=async()=>{
     const yaw=heading(await page.evaluate(()=>(window as any).barDebug.camera().yaw));
-    if(Math.abs(yaw)>.02){await orbit(page,Math.round(yaw/.006));await page.waitForTimeout(500);}
+    if(Math.abs(yaw)>.02){
+      await orbit(page,Math.round(yaw/.006));await page.waitForTimeout(500);
+      const after=heading(await page.evaluate(()=>(window as any).barDebug.camera().yaw));
+      // Some Windows headless runs report zero movementX for CDP mouse drags.
+      // Keep a real pointer held on the canvas and supply its relative deltas.
+      if(Math.abs(after-yaw)<.00001){
+        await page.mouse.move(40,300);await page.mouse.down();
+        await page.evaluate(dx=>{const canvas=document.querySelector('canvas')!;const steps=Math.max(8,Math.ceil(Math.abs(dx)/80));for(let i=0;i<steps;i++)canvas.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:1,pointerType:'mouse',buttons:1,movementX:dx/steps}));},yaw/.006);
+        await page.mouse.up();await page.waitForTimeout(100);
+      }
+    }
     return Math.abs(yaw);
   };
-  await expect.poll(async()=>{
+  if(options.directPlacement){
+    // Tests of parts/sound can skip the unrelated walk to the spawn point.
+    // The main driving test still exercises that entire walk with real keys.
+    await page.evaluate(()=>{
+      (window as any).barDebug.send('test.player.place',{x:60,y:0,z:7,rotation:-Math.PI/2});
+    });
+    await expect.poll(async()=>(await selfOf(page)).x).toBeCloseTo(60,1);
+    await expect.poll(async()=>Math.abs(heading((await selfOf(page)).rotation+Math.PI/2))).toBeLessThan(.03);
+  }else await expect.poll(async()=>{
     await expect.poll(squareView,{timeout:15_000}).toBeLessThan(.02);
     await walkTo(page,15.8,3.85); // the silver car starts at x 16.5
     await page.keyboard.down('a');await page.waitForTimeout(220);await page.keyboard.up('a');

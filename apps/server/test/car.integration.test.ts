@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {eq} from 'drizzle-orm';import {CAR_MODEL,GARAGES,MOTO_ENGINE,PLAYER_RADIUS,boxContains,inputSchema,motoObstacle,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
+import {eq} from 'drizzle-orm';import {CAR_MODEL,GARAGES,MOTO_ENGINE,PLAYER_RADIUS,STOPPED_VEHICLE,vehicleSpeed,boxContains,inputSchema,motoObstacle,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
 import {createApi} from '../../api/src/app.js';import {readConfig} from '../../api/src/config.js';import {itemInventory,playerVehicles,wallets} from '../../api/src/database/schema.js';
 import {BarRoom} from '../src/BarRoom.js';
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -51,6 +51,19 @@ test('four people share one car; only the driver moves it, a fifth is refused, a
     assert.ok(car.x>51);for(let i=0;i<3;i++){const p=people[i]!.state();assert.ok(Math.hypot(p.x-car.x,p.z-car.z)<1.5);}
     await until(()=>people[2]!.room.state.motos.get(car.id)?.passengers[0]===people[0]!.id);
     for(let i=0;i<16;i++){owner.room.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:true});await pause(55);}await until(()=>car.speed===0);
+    // Exercise real input messages and replication of the transient dynamics.
+    car.assign({x:50,y:0,z:7,yaw:Math.PI/2,speed:10,lateralSpeed:0,yawRate:0,steer:0});
+    for(let i=0;i<5;i++){owner.room.send('moto.input',{seq:++seq,throttle:0,steer:1,brake:false});await pause(55);}
+    assert.ok(car.yawRate<-.2);const ordinarySlip=Math.abs(car.lateralSpeed);
+    let mostSlip=ordinarySlip;
+    for(let i=0;i<8;i++){owner.room.send('moto.input',{seq:++seq,throttle:0,steer:1,brake:true});await pause(55);mostSlip=Math.max(mostSlip,Math.abs(car.lateralSpeed));}
+    assert.ok(mostSlip>ordinarySlip+.2,'the rear brake produces real lateral slip');
+    await until(()=>Math.abs(people[2]!.room.state.motos.get(car.id)?.lateralSpeed??0)>.2);
+    assert.ok(Number.isFinite(people[2]!.room.state.motos.get(car.id)!.yawRate));
+    assert.equal(car.passengers.filter(Boolean).length,3,'a slide keeps all passengers seated');
+    for(let i=0;i<30;i++){owner.room.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:true});await pause(55);}
+    await until(()=>!vehicleSpeed(car)&&!car.yawRate);
+    car.assign({x:55,y:0,z:7,yaw:Math.PI/2,...STOPPED_VEHICLE});
     assert.ok(Number.isFinite((world as any).ownedMotos.get(owner.id).mileage),'braking to rest must preserve a finite odometer');
     fifth.state().assign({x:car.x-4,y:car.y,z:car.z});
     for(let i=0;i<30;i++){fifth.room.send('player.input',{seq:i+1,dx:1,dz:0,running:true,rotation:Math.PI/2});await pause(55);}
@@ -83,6 +96,6 @@ test('four people share one car; only the driver moves it, a fifth is refused, a
     const persisted=(await api.db.select().from(playerVehicles).where(eq(playerVehicles.id,row.id)))[0]!;assert.equal(persisted.color,'#aa5522');assert.equal(readCarParts(persisted.parts).farol,12);assert.ok(persisted.mileage>0);
     assert.ok(persisted.fuel>0&&persisted.fuel<100);
     owner.room.send('garage.take',{garageId:garage.id,vehicleId:row.id});await until(()=>world.state.motos.size===1);const restored=[...world.state.motos.values()][0]!;assert.equal(restored.color,'#aa5522');assert.equal(readCarParts(restored.parts).pneu_de,40);
-    assert.equal(restored.fuel,persisted.fuel);
+    assert.equal(restored.fuel,persisted.fuel);assert.equal(restored.lateralSpeed,0);assert.equal(restored.yawRate,0);
   }finally{await Promise.allSettled(joined.filter(r=>r.connection?.isOpen).map(r=>r.leave()));await server.gracefullyShutdown(false);await api.app.close();if(previous===undefined)delete process.env.API_INTERNAL_URL;else process.env.API_INTERNAL_URL=previous;}
 });

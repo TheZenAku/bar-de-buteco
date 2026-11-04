@@ -277,6 +277,8 @@ export class Moto extends Schema {
   @type('float32') pitch = 0;
   @type('float32') speed = 0;
   @type('float32') steer = 0;
+  @type('float32') lateralSpeed = 0;
+  @type('float32') yawRate = 0;
   /** '' while parked. */
   @type('string') riderId = '';
   /** Its steps so far. */

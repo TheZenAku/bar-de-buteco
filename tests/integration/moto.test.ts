@@ -81,7 +81,8 @@ test('steering right turns it right, tighter when slow, and the rear wheel follo
   assert.ok(turned.steer>.9);
   const left=ride(start,{steer:-1,throttle:.3},15);
   assert.ok(left.yaw>.2&&left.x>start.x);
-  assert.ok(ride(start,{steer:1},1).steer<.2,'The handlebar takes time to turn');
+  const firstSteer=ride(start,{steer:1},1).steer;
+  assert.ok(firstSteer>0&&firstSteer<.3,'Responsive steering still ramps rather than snapping to full lock');
   assert.ok(motoSteerAngle(1)>motoSteerAngle(15));
   assert.ok(Math.abs(ride(left,{},20).steer)<1e-9,'It comes back by itself');
   // In reverse the nose goes the other way.

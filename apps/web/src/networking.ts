@@ -1,3 +1,4 @@
+import {vehicleMoving} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
@@ -148,6 +149,9 @@ export class BarNetwork {
         this.reconcileMoto(world,self);
       }
     });
+    // The test server acknowledges explicit placement so pending prediction and
+    // the local body's heading cannot overwrite a test fixture's new pose.
+    room.onMessage('test.player.placed',(at:Position&{rotation?:number})=>{this.pending=[];this.wasMoving=false;this.position=at;this.hooks.position(at);});
     room.onMessage('chat.message',(message:ChatMessage)=>this.hooks.chat(message));
     room.onMessage('jukebox.open',(message:{id:string})=>this.hooks.jukebox?.(message.id));
     room.onMessage('jukebox.result',()=>{});
@@ -245,7 +249,7 @@ export class BarNetwork {
     const intent=this.hooks.motoInput?.()??NO_MOTO_INTENT;
     // A switch thrown at rest still has to reach the others.
     const lamps=(intent.lights??0)|(intent.brake?16:0),changed=lamps!==this.sentLamps;
-    if(!changed&&!intent.throttle&&!intent.steer&&!body.speed&&!body.steer)return body;
+    if(!changed&&!intent.throttle&&!intent.steer&&!vehicleMoving(body)&&!body.steer)return body;
     this.sentLamps=lamps;
     const input={...intent,seq:++this.seq};
     this.pendingMoto.push(input);this.send('moto.input',input);

@@ -1,3 +1,4 @@
+import {motoHandling} from '@bar/shared';
 import * as pc from 'playcanvas';
 import {MOTO,MOTO_ENGINE,motoLampLevel,motoSteerAngle,readMotoParts,type MotoBody,type MotoState} from '@bar/shared';
 import {closeHand,type HandRig} from './drink-props';
@@ -19,6 +20,7 @@ const BONES=['chassi','direcao','roda_dianteira','roda_traseira'] as const;
 export class MotoRig {
   /** m/s; negative is reverse (the wheels turn by the distance covered). */
   velocidade=0;
+  lateralAcceleration=0;
   /** −1 left .. +1 right: the handlebar and the lean go there smoothly. */
   direcao=0;
   anguloDirecao=28;
@@ -55,9 +57,9 @@ export class MotoRig {
   }
   update(dt:number):void {
     const k=1-Math.exp(-this.suavizacao*dt),dir=pc.math.clamp(this.direcao,-1,1);
-    this.guidao+=(dir*this.anguloDirecao-this.guidao)*k;
-    const fator=pc.math.clamp(Math.abs(this.velocidade)/this.velocidadeInclinacao,0,1);
-    this.inclinacao+=(dir*this.inclinacaoMax*fator-this.inclinacao)*k;
+    this.guidao=dir*this.anguloDirecao;
+    const lean=pc.math.clamp(-Math.atan(this.lateralAcceleration/9.81)*RAD_TO_DEG,-this.inclinacaoMax,this.inclinacaoMax);
+    this.inclinacao+=(lean-this.inclinacao)*k;
     this.giroRodas=(this.giroRodas+this.velocidade*dt/this.raioRoda*RAD_TO_DEG)%360;
     this.girar('roda_dianteira',this.giroRodas,0,0); // +X local: the top of the wheel goes forward (+Z)
     this.girar('roda_traseira',this.giroRodas,0,0);
@@ -204,7 +206,9 @@ export class Motos {
       }
       const {rig}=bike;
       if(rig instanceof CarRig)rig.setState(bike.state,raining);
-      rig.velocidade=target.speed;rig.direcao=target.steer;rig.inclinacaoMax=lying?0:10;
+      const handling=motoHandling(bike.state);
+      rig.velocidade=target.speed;rig.direcao=Math.max(-1,Math.min(1,target.steer+handling.pull))*handling.turn;rig.inclinacaoMax=lying?0:10;
+      rig.lateralAcceleration=target.speed*(target.yawRate??0);
       // The handlebar turns as far as the wheel really does at this speed; the lean follows the whole intent.
       rig.anguloDirecao=motoSteerAngle(target.speed,bike.state.model)*RAD_TO_DEG;
       rig.update(dt);

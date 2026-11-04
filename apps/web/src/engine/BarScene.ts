@@ -1,3 +1,4 @@
+import {vehicleSpeed as groundVehicleSpeed} from '@bar/shared';
 import * as pc from 'playcanvas';
 import {HORSE,isRidingHorse,normalizeHeading} from '@bar/shared';
 import {HorseMount} from './horse-mount';
@@ -858,7 +859,7 @@ export class BarScene {
   }
   /** Going fast on the local rider's own bike: the view and the edges of the screen, eased on the frames' time. */
   private feelSpeed(bike: Bike | undefined, dt: number): void {
-    const share = bike?.predicted ? Math.abs(bike.predicted.speed) / MOTO.TOP_SPEED : 0;
+    const share = bike?.predicted ? groundVehicleSpeed(bike.predicted) / vehiclePhysics(bike.state.model).TOP_SPEED : 0;
     const wanted = clamp((share - RUSH_FROM) / (RUSH_FULL - RUSH_FROM), 0, 1), goal = wanted * wanted * (3 - 2 * wanted);
     this.rush += (goal - this.rush) * (1 - Math.exp(-(goal > this.rush ? RUSH_IN : RUSH_OUT) * dt));
     if (this.rush < .002) this.rush = goal ? this.rush : 0;
@@ -983,7 +984,7 @@ export class BarScene {
   /** The dashboard and keyboard share the same switches and input prediction. */
   vehicleSignal(signal:'left'|'right'|'hazard'):void {this.motoSwitch(signal==='left'?'KeyZ':signal==='right'?'KeyC':'KeyX');}
   vehicleCamera():void {this.callbacks.onCameraChange?.(this.rig.cycle(),this.rig.reach);}
-  vehicleSpeed():number|undefined {const bike=this.motos.ridden(this.localId);return bike?.predicted?.speed??bike?.state.speed;}
+  vehicleSpeed():Pick<MotoBody,'speed'|'lateralSpeed'>|undefined {const bike=this.motos.ridden(this.localId);const body=bike?.predicted??bike?.state;return body?{speed:body.speed,lateralSpeed:body.lateralSpeed??0}:undefined;}
   private cancelSignal(bike: Bike): void {
     const { LEFT, RIGHT } = MOTO_LIGHT, signal = this.motoSwitches & (LEFT | RIGHT);
     if (!signal || signal === (LEFT | RIGHT)) { this.signalYaw = undefined; return; }
@@ -992,7 +993,7 @@ export class BarScene {
     if (turned > SIGNAL_CANCEL_TURN && Math.abs(bike.predicted?.steer ?? 0) < .1) { this.motoSwitches &= ~(LEFT | RIGHT); this.signalYaw = undefined; }
   }
   getMotos() {
-    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id,model:state.model,color:state.color,passengers:state.passengers, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer,
+    return [...this.motos.all()].map(({ state, drawn, rig, entity, predicted, lights }) => ({ id: state.id,model:state.model,color:state.color,passengers:state.passengers, riderId: state.riderId, phase: state.phase, engine: state.engine, crank: state.crank, gas: state.gas, parts: state.parts, sound: this.motos.soundTelemetry(state.id), lights: lights.telemetry(), screen: this.bikeOnScreen(entity), up: +entity.up.y.toFixed(3), speed: predicted?.speed ?? state.speed, steer: predicted?.steer ?? state.steer, lateralSpeed:predicted?.lateralSpeed??state.lateralSpeed??0,yawRate:predicted?.yawRate??state.yawRate??0,
       position: [entity.getPosition().x, entity.getPosition().y, entity.getPosition().z], yaw: drawn.yaw, front: [-entity.forward.x, -entity.forward.y, -entity.forward.z], rig: rig.telemetry(),
       points: Object.fromEntries(['ponto_mao_E', 'ponto_mao_D', 'ponto_farol', 'ponto_lanterna'].map(point => { const p = rig.ponto(point).getPosition(); return [point, [p.x, p.y, p.z]]; })) }));
   }

@@ -70,6 +70,11 @@ A simulação determinística existente foi parametrizada por modelo: carro de 8
 
 Arquivos principais: `vehicle-models.ts`, `car-parts.ts`, `vehicle-parts.ts` e `moto.ts` em `packages/shared/src`; `car-rig.ts`, `car-sound.ts` e `moto-delivery.ts` no renderizador; `car-panel.ts`, HighMotors, garagem e os serviços persistentes da API.
 
+O carro agora usa dinâmica planar de dois eixos, com velocidade lateral e angular,
+aderência por eixo e derrapagem controlável pelo freio de mão. A moto mantém seu
+modelo de bicicleta recalibrado. A arquitetura, as medições de curvas, os testes
+e as referências estão em [Condução de carro e moto](conducao.md).
+
 ## Validação
 
 - `tests/integration/car.test.ts`: dimensões, direção, determinismo, quatro lugares, garagem, saída e peças.

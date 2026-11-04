@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
-import {enterAsAdmin} from './moto-helpers';
+import {enterAsAdmin,orbit} from './moto-helpers';
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/car.html',import.meta.url)).replaceAll('\\','/');
 test('hatch rig: four occupants, individual paint and plates, lights at night, steering, reverse, doors and interior',async({page})=>{
   test.setTimeout(150000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -109,6 +109,9 @@ test('vehicle dashboard adapts to car, passenger, motorcycle and horse, restores
   await page.setViewportSize({width:1440,height:900});await page.goto(url);
   const panel=page.locator('#vehicle-hud');await expect(panel).toBeVisible();await expect(page.locator('[data-panel="actions"]')).toBeHidden();
   await expect(panel.locator('[data-vh-speed]')).toHaveText('60');await expect(panel.locator('meter')).toHaveAttribute('value','42');
+  await page.evaluate(()=>(window as any).fixture.set({speed:-3,lateralSpeed:4}));
+  await expect(panel.locator('[data-vh-speed]')).toHaveText('18');await expect(panel.locator('[data-vh-gear]')).toHaveText('R');
+  await page.evaluate(()=>(window as any).fixture.set({speed:16.7,lateralSpeed:0}));
   await panel.locator('[data-vcontrol="headlights"]').click();expect(await page.evaluate(()=>(window as any).fixture.actions)).toEqual(['headlights']);
   await page.screenshot({path:'test-results/previews/vehicle-hud-desktop.png'});
   await page.setViewportSize({width:390,height:844});
@@ -120,4 +123,57 @@ test('vehicle dashboard adapts to car, passenger, motorcycle and horse, restores
   await page.evaluate(()=>(window as any).fixture.horse());await expect(panel).toHaveAttribute('data-kind','horse');await expect(panel.locator('[data-vcontrol="engine"]')).toHaveCount(0);await expect(panel.getByText('Seu fôlego')).toBeVisible();
   await page.evaluate(()=>(window as any).fixture.unmount());await expect(panel).toBeHidden();await expect(page.locator('[data-panel="actions"]')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('arcade car steering and handbrake are predicted by the driver and replicated to an observer',async({page,browser})=>{
+  test.setTimeout(150000);
+  const context=await browser.newContext({viewport:{width:960,height:640}}),observer=await context.newPage();
+  let carId='';
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));observer.on('pageerror',error=>errors.push(error.message));
+  try{
+    await enterAsAdmin(page);
+    expect((await observer.request.post('/api/auth/login',{data:{email:'jogador2@bar.local',password:process.env.DEMO_PASSWORD||'ButecoDemo2026!'}})).ok()).toBe(true);
+    await observer.goto('/');await observer.getByRole('button',{name:'Entrar no bar'}).click();
+    await expect(observer.locator('#waiting')).toBeHidden({timeout:60000});
+    await expect.poll(()=>observer.evaluate(()=>!!(window as any).barDebug?.snapshot().localId)).toBe(true);
+    await page.evaluate(()=>{
+      const d=(window as any).barDebug;d.send('admin.moto.despawn',{});d.send('test.player.place',{x:50,y:0,z:7,rotation:Math.PI/2});
+    });
+    await expect.poll(()=>page.evaluate(()=>Object.keys((window as any).barDebug.snapshot().world.motos).length)).toBe(0);
+    await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug,s=d.snapshot();return s.world.players[s.localId].x;})).toBeCloseTo(50,1);
+    await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug,s=d.snapshot();return s.world.players[s.localId].rotation;})).toBeCloseTo(Math.PI/2,2);
+    await page.evaluate(()=>(window as any).barDebug.send('admin.moto.spawn',{model:'carro-hatch'}));
+    const car=(p=page)=>p.evaluate(id=>Object.values((window as any).barDebug.snapshot().world.motos).find((v:any)=>id?v.id===id:v.model==='carro-hatch') as any,carId);
+    await expect.poll(async()=>!!await car()).toBe(true);const parked=await car();carId=parked.id;
+    await observer.evaluate(at=>(window as any).barDebug.send('test.player.place',at),{x:parked.x+8,y:0,z:parked.z-3});
+    await expect.poll(()=>observer.evaluate(()=>{const d=(window as any).barDebug,s=d.snapshot();return s.world.players[s.localId].x;})).toBeCloseTo(parked.x+8,1);
+    await page.evaluate(at=>(window as any).barDebug.send('test.player.place',at),{x:parked.x+Math.cos(parked.yaw)*1.3,y:parked.y,z:parked.z-Math.sin(parked.yaw)*1.3});
+    await page.waitForTimeout(300);await page.keyboard.press('e');
+    await expect.poll(async()=>(await car())?.riderId??'').not.toBe('');
+    await page.keyboard.down('w');await expect.poll(async()=>(await car())?.speed??0,{timeout:12000}).toBeGreaterThan(8);
+    await page.keyboard.down('d');await expect.poll(async()=>(await car()).steer).toBeGreaterThan(.8);await page.keyboard.up('w');
+    await page.evaluate(()=>{const w=window as any;w.handlingSamples=[];w.handlingTimer=setInterval(()=>{const m=Object.values(w.barDebug.snapshot().world.motos).find((v:any)=>v.model==='carro-hatch') as any;if(m)w.handlingSamples.push({lateral:m.lateralSpeed,yawRate:m.yawRate});},30);});
+    await page.keyboard.down('Space');
+    await expect.poll(()=>page.evaluate(()=>(window as any).handlingSamples.some((v:any)=>Math.abs(v.lateral)>.3&&Math.abs(v.yawRate)>.2)),{timeout:6000}).toBe(true);
+    await page.screenshot({path:'test-results/previews/car-arcade-handbrake-driver.png'});
+    await page.keyboard.up('d');await page.keyboard.up('Space');
+    const samples=await page.evaluate(()=>{const w=window as any;clearInterval(w.handlingTimer);return w.handlingSamples;});
+    expect(samples.some((v:any)=>Math.abs(v.lateral)>.3&&Math.abs(v.yawRate)>.2)).toBe(true);
+    await test.info().attach('handling-samples',{body:JSON.stringify(samples,null,2),contentType:'application/json'});
+    await expect.poll(async()=>Number.isFinite((await car(observer))?.lateralSpeed)).toBe(true);
+    await expect.poll(()=>observer.evaluate(id=>(window as any).barDebug.motos().some((v:any)=>v.id===id),carId)).toBe(true);
+    await page.keyboard.down('Space');await expect.poll(async()=>{const v=await car();return Math.hypot(v.speed,v.lateralSpeed);}).toBeLessThan(.05);await page.keyboard.up('Space');
+    await expect.poll(async()=>Math.abs((await car()).yawRate)).toBeLessThan(.01);
+    const target=await car(observer),view=await observer.evaluate(()=>{const d=(window as any).barDebug,s=d.snapshot();return {...s.world.players[s.localId],cameraYaw:d.camera().yaw};});
+    const wanted=Math.atan2(-(target.x-view.x),-(target.z-view.z));
+    const turn=Math.atan2(Math.sin(view.cameraYaw-wanted),Math.cos(view.cameraYaw-wanted));
+    await orbit(observer,Math.round(turn/.006));
+    await expect.poll(()=>observer.evaluate(id=>{const v=(window as any).barDebug.motos().find((v:any)=>v.id===id);return !!v&&v.screen[0]>0&&v.screen[0]<innerWidth&&v.screen[1]>0&&v.screen[1]<innerHeight;},carId)).toBe(true);
+    await observer.screenshot({path:'test-results/previews/car-arcade-handbrake-observer.png'});
+    expect(errors).toEqual([]);
+  }finally{
+    await page.keyboard.up('w');await page.keyboard.up('d');await page.keyboard.up('Space');
+    if(carId)await page.evaluate(id=>(window as any).barDebug.send('admin.moto.despawn',{id}),carId).catch(()=>{});
+    await context.close();
+  }
 });

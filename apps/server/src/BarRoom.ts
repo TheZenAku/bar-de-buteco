@@ -1,3 +1,4 @@
+import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity} from '@bar/shared';
 import { randomInt, randomUUID } from 'node:crypto';
 import {CAR_MODEL,CAR_SEATS,NEW_CAR_PARTS,NEW_MOTO_PARTS,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts} from '@bar/shared';
 import {applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt} from '@bar/shared';
@@ -549,9 +550,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('trade.confirm', tradeConfirmSchema, 6, (client, { tradeId, version }) => this.confirmTrade(client, tradeId, version));
     this.handle('trade.cancel', tradeCancelSchema, 6, (client, { tradeId }) => this.cancelTrade(client, tradeId));
     // Browser tests only (tests/e2e/server.mjs runs the world with NODE_ENV=test): a ride across the city is covered once, not at every step of a test.
-    if (process.env.NODE_ENV === 'test') this.handle('test.player.place', z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }).strict(), 5, (client, at) => {
+    if (process.env.NODE_ENV === 'test') this.handle('test.player.place', z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite(),rotation:z.number().finite().min(-Math.PI).max(Math.PI).optional() }).strict(), 5, (client, at) => {
       const player = this.player(client), presence = this.forClient(client)!;
       Object.assign(player, at); presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+      client.send('test.player.placed',at);
     });
     if (process.env.NODE_ENV === 'test') this.handle('test.moto.parts', z.object({ parts: z.string().max(80) }).strict(), 5, (client, { parts }) => {
       const player = this.player(client), moto = this.ownMoto(player.id);
@@ -561,7 +563,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (process.env.NODE_ENV === 'test') this.handle('test.moto.place', z.object({ x: z.number().finite(), z: z.number().finite() }).strict(), 5, (client, { x, z: at }) => {
       const player = this.player(client), moto = this.ownMoto(player.id);
       if (!moto) throw new Error('Sem moto.');
-      moto.assign({ x, z: at, speed: 0, steer: 0 }); moto.ticks++;
+      moto.assign({ x, z: at, ...STOPPED_VEHICLE, steer: 0 }); moto.ticks++;
       if (moto.riderId === player.id) { player.x = x; player.z = at; }
     });
     this.handle('phone.look', z.object({ on: z.boolean() }).strict(), 6, (client, { on }) => { this.player(client).looking = on; });
@@ -1044,7 +1046,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (moto.riderId && !riding) {
         this.freeMoto(moto, rider);
         // Still fast with nobody on it: it goes on by itself, and falls when it stops holding itself up.
-        if (Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) { this.letLoose(moto, (Math.random() - .5) * 1.2); continue; }
+        if (vehicleMotionSpeed(moto) > MOTO.DISMOUNT_SPEED) { this.letLoose(moto, (Math.random() - .5) * 1.2); continue; }
       }
       const obstacles = this.motoObstacles(moto);
       let intent = moto.riderId ? NO_MOTO_INTENT : { ...NO_MOTO_INTENT, brake: true };
@@ -1066,7 +1068,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         if (now - presence.motoInputAt < 250) continue;
         moto.gas = false;
       }
-      if (!moto.speed && !moto.steer && !intent.throttle && !intent.steer) continue;
+      if (!vehicleMoving(moto) && !moto.steer && !intent.throttle && !intent.steer) continue;
       if (this.stepRidden(moto, intent, obstacles, riding ? rider : undefined)) continue;
       if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = normalizeHeading(moto.yaw); this.strikeWalkers(moto, rider); }
     }
@@ -1117,7 +1119,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** A try at starting coming to its end, and a tired engine dying by itself. */
   private stepEngine(moto: Moto, now: number): void {
     if(moto.engine===MOTO_ENGINE.ON){
-      moto.fuel=Math.max(0,moto.fuel-vehicleFuelUse(moto.model,moto.speed,moto.gas,TICK_MS/1000));
+      moto.fuel=Math.max(0,moto.fuel-vehicleFuelUse(moto.model,vehicleSpeed(moto),moto.gas,TICK_MS/1000));
       if(moto.ownerId)this.markOwned(moto.ownerId);
       if(moto.fuel<=0||!moto.ignition){this.setEngine(moto,MOTO_ENGINE.OFF,now);return;}
     }
@@ -1146,7 +1148,7 @@ export class BarRoom extends Room<{ state: BarState }> {
    * over, a glancing one leaves it rolling by itself until it falls (moto-crash.ts). A bike it ran into gets its share of the blow too.
    */
   private crashMoto(moto: Moto, hit: MotoHit, rider?: Player): void {
-    if(isCar(moto)){this.wearMoto(moto,hit.closing,motoHitArea(moto.yaw,hit.nx,hit.nz));moto.speed=0;return;}
+    if(isCar(moto)){this.wearMoto(moto,hit.closing,motoHitArea(moto.yaw,hit.nx,hit.nz));moto.assign(STOPPED_VEHICLE);return;}
     const vx = Math.sin(moto.yaw) * hit.speed, vz = Math.cos(moto.yaw) * hit.speed;
     this.wearMoto(moto, hit.closing, motoHitArea(moto.yaw, hit.nx, hit.nz));
     if (rider) this.throwRider(moto, rider, vx, vz, hit.closing);
@@ -1245,22 +1247,22 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** On foot in the way of a bike going fast enough to crash: both go down. */
   private strikeWalkers(moto: Moto, rider?: Player): void {
-    const speed = Math.abs(moto.speed);
+    const speed = vehicleSpeed(moto);
     if (speed < MOTO.CRASH_SPEED) return;
     for (const player of this.state.players.values()) {
       if (player === rider || !player.connected || player.interactionState || player.currentTableId || !motoStrikes(moto, player)) continue;
-      const way = Math.sign(moto.speed), vx = Math.sin(moto.yaw) * speed * way, vz = Math.cos(moto.yaw) * speed * way;
+      const {x:vx,z:vz}=vehicleVelocity(moto);
       const hurt = motoStrikeHp(speed);
       this.startThrown(player, { x: player.x, y: player.y ?? moto.y, z: player.z, yaw: player.rotation, vx: vx * .95, vz: vz * .95, closing: speed * .6, seated: false, seed: Math.floor(Math.random() * 0xffffffff) }, hurt);
       this.log('moto_strike', { playerId: player.id, moto: moto.id, speed: +speed.toFixed(1), hp: hurt });
       this.sessions.getByUser(player.id)?.client.send('moto.struck', { hp: hurt, by: rider?.displayName ?? '' });
-      this.crashMoto(moto, { speed: moto.speed, closing: speed * .45, nx: -Math.sin(moto.yaw) * way, nz: -Math.cos(moto.yaw) * way }, rider);
+      this.crashMoto(moto, { speed: moto.speed, closing: speed * .45, nx: -vx/speed, nz: -vz/speed }, rider);
       return;
     }
   }
 
   private letLoose(moto: Moto, rollRate: number): void {
-    if(isCar(moto)){moto.speed=0;return;}
+    if(isCar(moto)){moto.assign(STOPPED_VEHICLE);return;}
     const loose = { roll: Math.sign(rollRate) * .02, rollRate };
     this.fallenMotos.set(moto.id, { loose });
     moto.phase = 'loose'; moto.riderId = '';
@@ -1268,7 +1270,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   /** Knocked over: a rider on it comes off, and it goes down with the blow it took. */
   private knockMoto(moto: Moto, vx: number, vz: number, speed = moto.speed): void {
-    if(isCar(moto)){this.wearMoto(moto,Math.hypot(vx,vz),'side');moto.speed=0;return;}
+    if(isCar(moto)){this.wearMoto(moto,Math.hypot(vx,vz),'side');moto.assign(STOPPED_VEHICLE);return;}
     if (moto.riderId) { const rider = this.state.players.get(moto.riderId); if (rider) this.throwRider(moto, rider, Math.sin(moto.yaw) * moto.speed + vx, Math.cos(moto.yaw) * moto.speed + vz, Math.hypot(vx, vz)); }
     moto.riderId = '';
     this.setEngine(moto, MOTO_ENGINE.OFF, Date.now());
@@ -1296,11 +1298,11 @@ export class BarRoom extends Room<{ state: BarState }> {
         const other = hit.solid?.startsWith('moto:') ? this.state.motos.get(hit.solid.slice('moto:'.length)) : undefined;
         if (other && !other.phase) { this.wearMoto(other, hit.closing * .55, 'side'); this.knockMoto(other, Math.sin(moto.yaw) * hit.speed * .55, Math.cos(moto.yaw) * hit.speed * .55); }
         sim.wreck = startWreck(moto, sim.loose.roll, sim.loose.rollRate, hit.speed);
-      } else if (fell || !moto.speed) sim.wreck = startWreck(moto, sim.loose.roll, sim.loose.rollRate || (Math.random() < .5 ? -.4 : .4), moto.speed);
+      } else if (fell || !vehicleMoving(moto)) sim.wreck = startWreck(moto, sim.loose.roll, sim.loose.rollRate || (Math.random() < .5 ? -.4 : .4), moto.speed);
       if (sim.wreck) {
         sim.loose = undefined; moto.phase = 'tumble';
         this.setEngine(moto, MOTO_ENGINE.OFF, now);
-        this.wearMoto(moto, Math.max(MOTO_WEAR_FROM, Math.abs(moto.speed) * MOTO_FALL_FORCE), 'fall');
+        this.wearMoto(moto, Math.max(MOTO_WEAR_FROM, vehicleSpeed(moto) * MOTO_FALL_FORCE), 'fall');
         this.showMoto(moto, wreckPose(sim.wreck));
       }
       else this.showMoto(moto, loosePose(moto, sim.loose));
@@ -1312,7 +1314,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     // Its bars flop towards the side it lies on.
     moto.steer += (motoLeanSide(moto) < 0 ? 1 : -1) * .1; moto.steer = Math.max(-1, Math.min(1, moto.steer));
     if (!lies) return;
-    moto.speed = 0; moto.phase = 'down'; moto.lights = 0; this.fallenMotos.delete(moto.id);
+    moto.assign(STOPPED_VEHICLE); moto.phase = 'down'; moto.lights = 0; this.fallenMotos.delete(moto.id);
   }
 
   /** Near a fallen bike, E lifts it: the body beside it, by the seat, and in a moment it is on its wheels. */
@@ -1339,7 +1341,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       moto.ticks++;
       return;
     }
-    moto.assign({ ...lift.at, speed: 0, steer: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
+    moto.assign({ ...lift.at, ...STOPPED_VEHICLE, steer: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
     moto.phase = ''; moto.lifterId = ''; moto.ticks++; this.fallenMotos.delete(moto.id);
     lifter.interactionState = ''; lifter.animationState = 'idle'; lifter.animationStartedAt = now;
   }
@@ -1350,7 +1352,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (player.interactionState || player.currentTableId || player.animationState === 'kick' || !isConscious(player)) throw new Error('Encerre a ação atual antes de subir na moto.');
     if (moto.locked && moto.ownerId !== player.id && !moto.phase) throw new Error(`Essa moto está trancada. Placa ${moto.plate}, de ${moto.ownerName || 'outra pessoa'}.`);
     if(isCar(moto)){
-      if(Math.abs(moto.speed)>.5)throw new Error('Espere o carro parar para entrar.');
+      if(vehicleMotionSpeed(moto)>.5)throw new Error('Espere o carro parar para entrar.');
       const occupants=vehicleOccupants(moto),chosen=seat??occupants.findIndex(id=>!id);
       if(chosen<0||chosen>3||occupants[chosen])throw new Error('Este lugar já está ocupado. O carro comporta quatro pessoas.');
       if(!canMountMoto(moto,player,INTERACTION_SLACK,player.id))throw new Error('Chegue mais perto da porta do carro.');
@@ -1415,13 +1417,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     if(car.riderId!==player.id&&(car.ownerId!==player.id||motoDistance(car,player)>3))throw new Error('Só o motorista ou o dono perto do veículo pode fazer isso.');
     if(action==='lock'){car.locked=!car.locked;client.send('moto.locked',{plate:car.plate,locked:car.locked});return;}
     if(action==='refuel'){
-      if(car.engine!==MOTO_ENGINE.OFF||Math.abs(car.speed)>.05)throw new Error('Pare e desligue o motor para abastecer.');
+      if(car.engine!==MOTO_ENGINE.OFF||vehicleMotionSpeed(car)>.05)throw new Error('Pare e desligue o motor para abastecer.');
       if(!atVehicleFuelPump(car))throw new Error('Abasteça junto a uma garagem.');
       car.fuel=100;this.markOwned(car.ownerId,true);return;
     }
     if(action==='ignition'){
       if(car.riderId!==player.id)throw new Error('Entre no lugar do motorista.');
-      if(car.engine!==MOTO_ENGINE.OFF||Math.abs(car.speed)>.05)throw new Error('Pare e desligue o motor antes de retirar a chave.');
+      if(car.engine!==MOTO_ENGINE.OFF||vehicleMotionSpeed(car)>.05)throw new Error('Pare e desligue o motor antes de retirar a chave.');
       car.ignition=!car.ignition;return;
     }
     if(action==='engine'){
@@ -1442,7 +1444,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(readVehicleParts(car.model,car.parts).limpadores!<=0)throw new Error('Os limpadores precisam de conserto.');
       car.wipers=!car.wipers;return;
     }
-    if(Math.abs(car.speed)>vehiclePhysics(car.model).DISMOUNT_SPEED)throw new Error('Pare o carro antes de abrir ou fechar.');
+    if(vehicleMotionSpeed(car)>vehiclePhysics(car.model).DISMOUNT_SPEED)throw new Error('Pare o carro antes de abrir ou fechar.');
     if(action==='hood')car.hood=!car.hood;
     else if(action==='trunk')car.trunk=!car.trunk;
     else {const bit=action==='left-door'?1:2;car.doors^=bit;const timer=this.carDoorTimers.get(id);if(timer){if(bit===1)timer.left=0;else timer.right=0;}}
@@ -1591,7 +1593,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.player(client), presence = this.forClient(client)!, garage = this.atGarage(player, garageId), moto = this.ownMoto(player.id);
     if (this.trades.committing(player.id)) throw new Error('Espere a negociação terminar.');
     if (!moto) throw new Error('Você não tem veículo na rua.');
-    if (moto.riderId === player.id && Math.abs(moto.speed) > MOTO.DISMOUNT_SPEED) throw new Error('Pare a moto para guardar.');
+    if (moto.riderId === player.id && vehicleMotionSpeed(moto) > MOTO.DISMOUNT_SPEED) throw new Error('Pare a moto para guardar.');
     const far = Math.hypot(moto.x - garage.x, moto.z - garage.z) > GARAGE.STORE_REACH, price = far ? priceOf(this.prices, 'vehicle:tow') : 0;
     if (far && !recall) throw new Error('A moto está longe: só o guincho traz.');
     const charge = randomUUID();
@@ -1952,7 +1954,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       owned.goneAt ??= now;
       const moto = this.state.motos.get(owned.motoId);
       if (!moto) { this.ownedMotos.delete(userId); continue; }
-      if (now - owned.goneAt >= HIGHFOOD.ABSENT_OWNER_MS && !vehicleOccupants(moto).some(Boolean) && !moto.speed) this.despawnMoto(moto.id, '');
+      if (now - owned.goneAt >= HIGHFOOD.ABSENT_OWNER_MS && !vehicleOccupants(moto).some(Boolean) && !vehicleMoving(moto)) this.despawnMoto(moto.id, '');
     }
   }
   /** Waiting for the bike, they look up at whoever is coming and wave once; handed over, they wave, turn and go. */
@@ -2034,10 +2036,10 @@ export class BarRoom extends Room<{ state: BarState }> {
   private dismountMoto(player: Player): void {
     const moto = this.state.motos.get(vehicleOfInteraction(player.interactionState));
     if (!moto) { player.interactionState = ''; player.animationState = 'idle'; return; }
-    if (Math.abs(moto.speed) > vehiclePhysics(moto.model).DISMOUNT_SPEED) throw new Error('Diminua a velocidade para sair do veículo.');
+    if (vehicleMotionSpeed(moto) > vehiclePhysics(moto.model).DISMOUNT_SPEED) throw new Error('Diminua a velocidade para sair do veículo.');
     if(isPassenger(player.interactionState)){this.freeMoto(moto,player);return;}
     this.freeMoto(moto, player);
-    moto.speed = 0; moto.steer = 0; moto.lights = 0;
+    moto.assign(STOPPED_VEHICLE); moto.steer = 0; moto.lights = 0;
     const order = this.highfood.orderOf(player.id);
     if (order?.stage === 'going' && moto.ownerId === player.id && Math.hypot(order.x - player.x, order.z - player.z) <= HIGHFOOD.UNLOAD_REACH) this.startUnload(player, order, moto);
   }

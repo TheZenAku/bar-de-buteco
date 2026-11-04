@@ -69,7 +69,7 @@ export const motoStallChance=(parts:MotoParts):number=>parts.motor>=35?0:.02+.16
  * multiplies the engine (0 when it is not running), `brake` the brakes, `turn` the front wheel's angle, `rolling` the rolling resistance, and
  * `pull` is how far the handlebar sits off centre (−1..1, as MotoIntent.steer).
  */
-export interface MotoHandling {power:number;brake:number;turn:number;rolling:number;pull:number}
+export interface MotoHandling {power:number;brake:number;turn:number;rolling:number;pull:number;frontGrip?:number;rearGrip?:number}
 export const FULL_HANDLING:MotoHandling={power:1,brake:1,turn:1,rolling:1,pull:0};
 /** From `mark` up nothing changes; at 0 the value is `least`. */
 const fade=(condition:number,mark:number,least:number)=>condition>=mark?1:least+(1-least)*condition/mark;
@@ -82,6 +82,7 @@ export function motoHandling(moto:{id:string;model?:string;parts?:string;engine?
     power:running?fade(parts.motor,60,.45)*fade(parts.pneu_traseiro,25,.7)*fade(parts.escapamento,35,.9):0,
     brake:fade(parts.freios,70,.3),
     turn:Math.min(fade(parts.pneu_dianteiro,25,.55),fade(parts.suspensao,35,.75)),
+    ...(moto.model===CAR_MODEL?{frontGrip:fade(parts.pneu_dianteiro,40,.35)*fade(parts.suspensao,35,.75),rearGrip:fade(parts.pneu_traseiro,40,.35)*fade(parts.suspensao,35,.75)}:{}),
     rolling:flat(parts.pneu_dianteiro)+flat(parts.pneu_traseiro)-1,
     pull:parts.direcao>=35?0:side*(1-parts.direcao/35)*.28,
   };

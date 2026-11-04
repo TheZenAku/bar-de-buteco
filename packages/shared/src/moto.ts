@@ -1,3 +1,4 @@
+import {carSteerAngle,stepCarDynamics} from './car-dynamics.js';
 import {z} from 'zod';
 import {findSpawn,floorHeight,isWalkable,PLAYER_RADIUS,roadHeight,solidsBetween,WORLD} from './world.js';
 import type {Collider,Position} from './index.js';
@@ -17,9 +18,9 @@ export const MOTO={
   HALF_WIDTH:.32*SCALE,HALF_LENGTH:.99*SCALE,CENTRE_Z:-.05*SCALE,HEIGHT:1.42*SCALE,
   MASS:150,ENGINE:660,REVERSE:300,BRAKE:1350,HANDBRAKE:1050,ROLLING:60,DRAG:2.56,TOP_SPEED:15.3,REVERSE_SPEED:2.5,
   /** The handlebar's lock, and the sideways grip that narrows it as speed rises (metres per second squared). */
-  MAX_STEER:28*Math.PI/180,GRIP:14,
+  MAX_STEER:28*Math.PI/180,GRIP:20,
   /** How fast the handlebar turns (full lock per second), and how fast it comes back. */
-  STEER_RATE:3.2,STEER_RETURN:5,
+  STEER_RATE:4.5,STEER_RETURN:6,
   /** Metres between collision checks: a wall is never skipped, even flat out. */
   SUBSTEP:.1,
   /** How far the rider's centre may be from the hull to get on. */
@@ -39,7 +40,7 @@ export const MOTO={
 type VehiclePhysics={[K in keyof typeof MOTO]:number};
 const CAR_PHYSICS:VehiclePhysics={...MOTO,...CAR};
 export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===CAR_MODEL?CAR_PHYSICS:MOTO;
-export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number}
+export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number;/** Local +X velocity (m/s), and yaw velocity (rad/s). Absent legacy fields read as zero. */lateralSpeed?:number;yawRate?:number}
 /** Which lamps are lit beyond the ones always on (MotoState.lights). */
 export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
 /**
@@ -61,7 +62,7 @@ export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 /** The rider's Player.interactionState. */
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
 export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:')||isPassenger(interaction);
-export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
+export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,lateralSpeed:0,yawRate:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
 export const motoSpawnSchema=z.object({model:z.enum(['moto-delivery','carro-hatch']).optional()}).strict();
 /** How far a body is from the hull, seen from above. */
 export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position)=>hullGap(moto,position);
@@ -69,8 +70,22 @@ export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Po
 export const motoDespawnSchema=z.object({id:z.string().max(32).optional()}).strict();
 
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
+/** Total ground speed; the signed longitudinal component still selects D/R. */
+export const vehicleSpeed=(body:Pick<MotoBody,'speed'|'lateralSpeed'>)=>Math.hypot(body.speed,body.lateralSpeed??0);
+/** Clearance-sensitive actions also account for a spinning hull's corners. */
+export function vehicleMotionSpeed(body:Pick<MotoBody,'speed'|'lateralSpeed'|'yawRate'|'model'>):number {
+  const spec=vehiclePhysics(body.model);
+  return Math.max(vehicleSpeed(body),Math.abs(body.yawRate??0)*Math.hypot(spec.HALF_LENGTH,spec.HALF_WIDTH));
+}
+export const vehicleMoving=(body:Pick<MotoBody,'speed'|'lateralSpeed'|'yawRate'>)=>vehicleSpeed(body)>.001||Math.abs(body.yawRate??0)>.001;
+export function vehicleVelocity(body:Pick<MotoBody,'speed'|'lateralSpeed'|'yaw'>){
+  const s=Math.sin(body.yaw),c=Math.cos(body.yaw),side=body.lateralSpeed??0;
+  return {x:s*body.speed+c*side,z:c*body.speed-s*side};
+}
+export const STOPPED_VEHICLE={speed:0,lateralSpeed:0,yawRate:0} as const;
 /** The most the front wheel may turn at this speed (radians): full lock while slow, less as the tyres would let go. */
 export function motoSteerAngle(speed:number,model?:string):number {
+  if(model===CAR_MODEL)return carSteerAngle(speed);
   const spec=vehiclePhysics(model);
   return Math.min(spec.MAX_STEER,Math.atan(spec.WHEELBASE*spec.GRIP/Math.max(speed*speed,.01)));
 }
@@ -143,6 +158,46 @@ export function motoFits(x:number,z:number,yaw:number,reference:number,model?:st
 /** A blow: how fast it was going, and how much of that went straight into what stopped it (m/s), the way back out of it, and what it was. */
 export interface MotoHit {speed:number;closing:number;nx:number;nz:number;solid?:string}
 
+/** Car tyre integration, with swept translation AND corner rotation checks. */
+function advanceCar(body:MotoBody,input:MotoIntent,dt:number,obstacles:readonly Collider[],handling:MotoHandling):{body:MotoBody;hit?:MotoHit} {
+  let current:MotoBody&{lateralSpeed:number;yawRate:number}={model:body.model,x:body.x,y:body.y,z:body.z,yaw:body.yaw,pitch:body.pitch,
+    speed:body.speed,steer:body.steer,lateralSpeed:body.lateralSpeed??0,yawRate:body.yawRate??0};
+  if(dt<=0)return {body:current};
+  const spec=CAR_PHYSICS;
+  const reach=spec.HALF_LENGTH+vehicleSpeed(body)*dt+spec.ENGINE/spec.MASS*dt*dt+1;
+  const near=solidsBetween(body.x-reach,body.z-reach,body.x+reach,body.z+reach),solids=obstacles.length?[...near,...obstacles]:near;
+  const free=!overlaps(body.x,body.z,body.yaw,body.y,solids,spec);
+  let remaining=dt,blow:MotoHit|undefined;
+  while(remaining>1e-9){
+    const h=Math.min(remaining,.01,spec.SUBSTEP/Math.max(1,vehicleSpeed(current)+Math.abs(current.yawRate)*spec.HALF_LENGTH+5));
+    const next=stepCarDynamics(current,input,h,handling);
+    const heading=current.yaw+(next.yawRate??0)*h,middle=(current.yaw+heading)/2;
+    const velocity=vehicleVelocity({...next,yaw:middle}),dx=velocity.x*h,dz=velocity.z*h;
+    // A sudden change of yaw velocity must also sweep the hull's corners.
+    const sweeps=Math.max(1,Math.ceil((Math.hypot(dx,dz)+Math.abs(heading-current.yaw)*spec.HALF_LENGTH)/spec.SUBSTEP));
+    for(let i=0;i<sweeps;i++){
+      const yaw=current.yaw+(heading-current.yaw)/(sweeps-i),x=current.x+dx/sweeps,z=current.z+dz/sweeps;
+      const floor=ground(x,z,yaw,current.y,spec),solid=floor?overlapping(x,z,yaw,floor.y,solids,spec):undefined;
+      if(floor&&(!free||!solid)){current={...current,x,z,yaw,y:floor.y,pitch:floor.pitch};continue;}
+      const normal=solid&&solid!==WORLD_EDGE?faceOf(solid,x,z,yaw,spec):{nx:-velocity.x/(Math.hypot(velocity.x,velocity.z)||1),nz:-velocity.z/(Math.hypot(velocity.x,velocity.z)||1)};
+      const closing=Math.max(0,-velocity.x*normal.nx-velocity.z*normal.nz);
+      blow??={speed:vehicleSpeed(next),closing,...normal,...(solid&&solid!==WORLD_EDGE?{solid:solid.id}:{})};
+      // Remove the inward velocity, retaining the tangent. Stop the yaw that
+      // would push a corner through the wall; no teleport or bounce energy.
+      const vx=velocity.x+normal.nx*closing,vz=velocity.z+normal.nz*closing;
+      const slideX=current.x+vx*h/sweeps,slideZ=current.z+vz*h/sweeps;
+      const slideFloor=ground(slideX,slideZ,current.yaw,current.y,spec);
+      const canSlide=slideFloor&&(!free||!overlaps(slideX,slideZ,current.yaw,slideFloor.y,solids,spec));
+      const s=Math.sin(current.yaw),c=Math.cos(current.yaw);
+      return {body:{...current,...(canSlide?{x:slideX,z:slideZ,y:slideFloor.y,pitch:slideFloor.pitch}:{}),steer:next.steer,
+        speed:canSlide?vx*s+vz*c:0,lateralSpeed:canSlide?vx*c-vz*s:0,yawRate:0},hit:blow};
+    }
+    current={...current,speed:next.speed,lateralSpeed:next.lateralSpeed??0,yawRate:next.yawRate??0,steer:next.steer};
+    remaining-=h;
+  }
+  return {body:current};
+}
+
 /**
  * One step of the bike, the same on the server and in the rider's prediction (no second physics engine: the same floors and
  * solids as the players). A bicycle model: the rear axle follows the heading and the front wheel turns it. It stays upright;
@@ -152,6 +207,7 @@ export interface MotoHit {speed:number;closing:number;nx:number;nz:number;solid?
 export function stepMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):MotoBody {return advanceMoto(body,input,dt,obstacles,handling).body;}
 /** The same step, also telling what it ran into (the room throws the rider off by that: moto-crash.ts). */
 export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):{body:MotoBody;hit?:MotoHit} {
+  if(body.model===CAR_MODEL)return advanceCar(body,input,dt,obstacles,handling);
   const spec=vehiclePhysics(body.model);
   const throttle=clamp(input.throttle,-1,1),wanted=clamp(input.steer,-1,1);
   const rate=(wanted===0||wanted*body.steer<0?spec.STEER_RETURN:spec.STEER_RATE)*dt;
@@ -163,7 +219,7 @@ export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:read
   let speed=body.speed+drive/spec.MASS*dt;
   const loss=stop/spec.MASS*dt;
   speed=Math.abs(speed)<=loss?0:speed-Math.sign(speed)*loss;
-  if(!speed)return {body:{...(body.model?{model:body.model}:{}),x:body.x,y:body.y,z:body.z,yaw:body.yaw,pitch:body.pitch,speed,steer}};
+  if(!speed)return {body:{...(body.model?{model:body.model}:{}),x:body.x,y:body.y,z:body.z,yaw:body.yaw,pitch:body.pitch,speed,steer,lateralSpeed:0,yawRate:0}};
   const turn=speed*Math.tan(clamp(steer+handling.pull,-1,1)*handling.turn*motoSteerAngle(speed,body.model))/spec.WHEELBASE;
   const steps=Math.max(1,Math.ceil(Math.abs(speed*dt)/spec.SUBSTEP)),reach=spec.HALF_LENGTH+Math.abs(spec.CENTRE_Z)+Math.abs(speed*dt)+.1;
   const near=solidsBetween(body.x-reach,body.z-reach,body.x+reach,body.z+reach),solids=obstacles.length?[...near,...obstacles]:near;
@@ -201,7 +257,7 @@ export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:read
   }
   // A hard knock throws it back a little.
   speed=hit?(Math.abs(speed)>3?-speed*.18:0):speed*kept;
-  return {body:{...(body.model?{model:body.model}:{}),x,y,z,yaw,pitch,speed,steer},hit:blow};
+  return {body:{...(body.model?{model:body.model}:{}),x,y,z,yaw,pitch,speed,steer,lateralSpeed:0,yawRate:hit?0:-turn*kept},hit:blow};
 }
 
 /**
@@ -245,11 +301,11 @@ function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position):nu
 }
 /** Close enough to get on (the server allows `slack` more for latency), on its floor, on its wheels, nobody riding it. */
 export function canMountMoto(moto:MotoState,position:Position,slack=0,who?:string):boolean {
-  return (moto.model===CAR_MODEL?vehicleOccupants(moto).filter(Boolean).length<CAR.SEATS&&Math.abs(moto.speed)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
+  return (moto.model===CAR_MODEL?vehicleOccupants(moto).filter(Boolean).length<CAR.SEATS&&vehicleMotionSpeed(moto)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
 }
 /** Close enough to work on it, standing or lying, and nobody on it, nobody lifting it, and it is not moving. */
 export function canRepairMoto(moto:MotoState,position:Position,slack=0):boolean {
-  return !vehicleOccupants(moto).some(Boolean)&&!moto.lifterId&&(moto.phase===''||moto.phase==='down')&&!moto.speed&&Math.abs((position.y??moto.y)-moto.y)<.7&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+.6+slack;
+  return !vehicleOccupants(moto).some(Boolean)&&!moto.lifterId&&(moto.phase===''||moto.phase==='down')&&!vehicleMoving(moto)&&Math.abs((position.y??moto.y)-moto.y)<.7&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+.6+slack;
 }
 /** Close enough to lift it (a bit more than to get on: it is lying down, and only just landed there). */
 export function canLiftMoto(moto:MotoState,position:Position,slack=0):boolean {

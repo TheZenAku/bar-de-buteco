@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CAR_MODEL,headLookAt,inputSchema,motoDismountSpot,motoObstacle,movePlayer,parkedMoto,type PlayerInput} from '@bar/shared';
+import {CAR_MODEL,NEW_CAR_PARTS,NO_MOTO_INTENT,headLookAt,inputSchema,motoDismountSpot,motoObstacle,movePlayer,parkedMoto,stepMoto,type PlayerInput} from '@bar/shared';
 import {BarNetwork} from '../../apps/web/src/networking';
 
 test('after leaving a car or motorcycle with accumulated turns, camera and stop inputs stay valid and walking resumes',()=>{
@@ -39,4 +39,23 @@ test('after leaving a car or motorcycle with accumulated turns, camera and stop 
     assert.deepEqual(errors,[],'stopping must also normalize the heading');
     assert.equal(network.pending.length,0);
   }
+});
+
+test('prediction sends ticks during a sideways slide and replays unacknowledged steering after a correction',()=>{
+  const car={...parkedMoto({id:'car',x:50,y:0,z:7,yaw:Math.PI/2}),model:CAR_MODEL,parts:NEW_CAR_PARTS,riderId:'driver',speed:0,lateralSpeed:3};
+  const self={id:'driver',interactionState:'moto:car',lastProcessedInput:0};
+  const sent:any[]=[];
+  const network:any=Object.assign(Object.create(BarNetwork.prototype),{
+    transportReady:true,stopped:false,motoId:car.id,world:{motos:{car},players:{driver:self}},seq:0,pendingMoto:[],sentLamps:0,
+    hooks:{motoInput:()=>NO_MOTO_INTENT},room:{send:(_type:string,message:any)=>sent.push(message)},
+  });
+  const next=network.stepRide(car);
+  assert.equal(sent.length,1,'lateral motion must not be mistaken for a parked vehicle');
+  assert.ok(next.z<car.z);assert.ok(Math.abs(next.lateralSpeed)<car.lateralSpeed);
+  network.pendingMoto=[{seq:2,throttle:0,steer:1,brake:false},{seq:3,throttle:0,steer:0,brake:false}];
+  const corrected={...car,speed:8,lateralSpeed:1,yawRate:-.3};self.lastProcessedInput=2;
+  network.reconcileMoto({motos:{car:corrected},players:{driver:self}},self);
+  const expected=stepMoto(corrected,network.pendingMoto[0],.05,[],network.handling());
+  assert.deepEqual(network.ride.pose(),expected);
+  assert.equal(network.pendingMoto.length,1);
 });

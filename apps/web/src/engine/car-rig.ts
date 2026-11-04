@@ -22,7 +22,7 @@ function offsetRearPlate(mesh:pc.Mesh):void {
 
 /** ESM port of the supplied carro_hatch.js. The model, names and rest transforms are preserved. */
 export class CarRig {
-  velocidade=0;direcao=0;anguloDirecao=33;inclinacaoMax=3.5;
+  velocidade=0;direcao=0;lateralAcceleration=0;anguloDirecao=33;inclinacaoMax=3.5;
   headlightMode=0;
   powered=false;
   private bones=new Map<string,{node:pc.Entity;rest:pc.Quat}>();
@@ -76,8 +76,8 @@ export class CarRig {
   }
   update(dt:number):void {
     const k=1-Math.exp(-7*dt),state=this.state,parts=readCarParts(state?.parts);
-    this.steer+=(Math.max(-1,Math.min(1,this.direcao))*this.anguloDirecao-this.steer)*k;
-    this.roll+=(this.direcao*3.5*Math.min(1,Math.abs(this.velocidade)/15)-this.roll)*k;
+    this.steer=Math.max(-1,Math.min(1,this.direcao))*this.anguloDirecao;
+    this.roll+=(Math.max(-3.5,Math.min(3.5,-this.lateralAcceleration*.22))-this.roll)*k;
     this.wheel=(this.wheel+this.velocidade*dt/CAR.WHEEL_RADIUS*DEGREES)%360;
     for(const name of ['roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D'])this.rotate(name,this.wheel,0,0);
     this.rotate('direcao_E',0,-this.steer,0);this.rotate('direcao_D',0,-this.steer,0);

@@ -1,3 +1,4 @@
+import {vehicleVelocity} from '@bar/shared';
 import {PATCH_MS,TICK_MS,type MotoBody,type MotoState} from '@bar/shared';
 
 /**
@@ -31,7 +32,7 @@ const turnBetween=(from:number,to:number)=>Math.atan2(Math.sin(to-from),Math.cos
 type Lying=Partial<Pick<MotoState,'qx'|'qy'|'qz'|'qw'>>;
 /** The pose between two states; speed and handlebar are the newer one's. */
 function blend(a:MotoBody&Lying,b:MotoBody&Lying,t:number):MotoBody {
-  const pose:MotoBody&Lying={...b,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t,yaw:a.yaw+turnBetween(a.yaw,b.yaw)*t,pitch:a.pitch+(b.pitch-a.pitch)*t};
+  const pose:MotoBody&Lying={...b,steer:a.steer+(b.steer-a.steer)*t,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t,yaw:a.yaw+turnBetween(a.yaw,b.yaw)*t,pitch:a.pitch+(b.pitch-a.pitch)*t,lateralSpeed:(a.lateralSpeed??0)+((b.lateralSpeed??0)-(a.lateralSpeed??0))*t,yawRate:(a.yawRate??0)+((b.yawRate??0)-(a.yawRate??0))*t};
   if(a.qw!==undefined&&b.qw!==undefined){
     // The shorter way round, normalised: close enough at 20 samples a second.
     const same=a.qx!*b.qx!+a.qy!*b.qy!+a.qz!*b.qz!+a.qw*b.qw<0?-1:1;
@@ -114,6 +115,7 @@ export class RoomTrack {
       return Math.hypot(newer.body.x-older.body.x,newer.body.z-older.body.z)>SNAP_DISTANCE?newer.body:blend(older.body,newer.body,(at-older.at)/(newer.at-older.at));
     }
     const {body,at:last}=samples[samples.length-1]!,ahead=Math.min(at-last,MAX_EXTRAPOLATION_MS)/1000;
-    return {...body,x:body.x+Math.sin(body.yaw)*body.speed*ahead,z:body.z+Math.cos(body.yaw)*body.speed*ahead};
+    const velocity=vehicleVelocity({...body,yaw:body.yaw+(body.yawRate??0)*ahead/2});
+    return {...body,x:body.x+velocity.x*ahead,z:body.z+velocity.z*ahead,yaw:body.yaw+(body.yawRate??0)*ahead};
   }
 }

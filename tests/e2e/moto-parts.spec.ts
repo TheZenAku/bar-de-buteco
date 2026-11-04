@@ -15,8 +15,16 @@ const feel=(page:Page)=>page.evaluate(()=>(window as any).barDebug.camera());
 const shot=async(page:Page,name:string)=>{fs.mkdirSync(SHOTS,{recursive:true});await page.screenshot({path:`${SHOTS}/${name}.png`});};
 /** Right click on where the bike is drawn, and Informações do veículo. */
 const openPanel=async(page:Page)=>{
+  await page.bringToFront();
   await expect.poll(async()=>{
     const {screen}=await moto(page);
+    const viewport=page.viewportSize()!;
+    if(screen[1]>viewport.height*.75){
+      // A fallen bike is low beside the player's feet. Zoom out until its
+      // projected centre clears the actions panel before right-clicking it.
+      await page.mouse.move(viewport.width/2,viewport.height/3);await page.mouse.wheel(0,400);
+      await page.waitForTimeout(300);return false;
+    }
     await page.mouse.click(screen[0],screen[1],{button:'right'});
     return page.locator('.world-menu').isVisible();
   },{timeout:15_000,intervals:[500]}).toBe(true);
@@ -32,6 +40,7 @@ const setPieces=async(page:Page,quantity:number)=>{
     return (await fetch('/api/admin/player',{method:'POST',headers:{'content-type':'application/json','x-requested-with':'fetch'},credentials:'include',body:JSON.stringify({playerId:id,reason:'Teste das peças da moto',op:'item',itemId:'peca_moto',quantity:quantity-have})})).status;
   },{id,quantity});
   expect(status).toBeLessThan(300);
+  await page.evaluate(()=>(window as any).barDebug.send('inventory.sync',{}));
   await page.waitForTimeout(1200);
 };
 const partValue=async(page:Page,id:string)=>Number((await page.locator(`.moto-part[data-part="${id}"] b`).textContent())?.replace('%',''));
@@ -47,7 +56,7 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   await other.getByRole('button',{name:'Entrar no bar'}).click();
   await expect(other.locator('#waiting')).toBeHidden({timeout:60_000});
   await setPieces(page,0);
-  await spawnBikeOnStreet(page);
+  await spawnBikeOnStreet(page,{directPlacement:true});
   const parked=await roomMoto(page);
   expect(parked.engine,'Parked, the engine is off').toBe(0);
 
@@ -76,10 +85,14 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   await page.getByRole('button',{name:'Fechar janela'}).click();
 
   // Someone stands in the street, ahead of the bike.
-  const standAt={x:parked.x-26,z:parked.z};
-  await walkTo(other,standAt.x,standAt.z,.4);
+  const standAt={x:parked.x-40,z:parked.z};
+  // Position the impact target directly: this test measures the collision and
+  // sound, while walking across the neighbourhood is covered separately.
+  await other.evaluate(at=>(window as any).barDebug.send('test.player.place',at),{...standAt,y:parked.y});
+  await expect.poll(async()=>(await self(other)).x).toBeCloseTo(standAt.x,1);
   const before=await self(other);
   expect(Math.hypot(before.x-standAt.x,before.z-standAt.z)).toBeLessThan(1);
+  await other.evaluate(()=>{const w=window as any;w.trackImpact=true;w.sawThrown=false;w.sawImpactNotice=false;const sample=()=>{if(!w.trackImpact)return;const s=w.barDebug.snapshot();w.sawThrown||=s.world.players[s.localId]?.interactionState==='thrown';w.sawImpactNotice||=[...document.querySelectorAll('.notice,.toast,[class*=notice]')].some(el=>el.textContent?.includes('Atropelado'));requestAnimationFrame(sample);};sample();});
 
   // Getting on starts the engine: LIGA, then the loops; W answers after it has caught.
   await page.mouse.click(40,300);
@@ -102,12 +115,17 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   expect(still.rush).toBe(0);expect(still.fov).toBe(57);
   const drawnBefore=still.blur;
   // A short pull and letting go: the revs falling (PARANDO).
-  await page.keyboard.down('w');await page.waitForTimeout(1300);await page.keyboard.up('w');
+  await page.bringToFront();await page.mouse.click(40,300);await page.keyboard.down('w');
+  await expect.poll(async()=>(await roomMoto(page)).speed,{timeout:12000}).toBeGreaterThan(4);
+  await page.keyboard.up('w');
   await expect.poll(async()=>(await moto(page)).sound.played,{timeout:4000}).toContain('parando');
   expect((await moto(page)).sound.voice.coast,'It covers the riding loop').toBeGreaterThan(.5);
   await expect.poll(async()=>(await moto(other)).sound.played,{timeout:4000}).toContain('parando');
   await page.keyboard.down('w');
   let fastest=0,rushed=0,widest=0,rate=0,drive=0,boom=0,caught=false;
+  // Screenshots can take several simulation ticks. Measure peak speed in the
+  // rendered frames as well, so an impact during a capture cannot hide it.
+  await page.evaluate(()=>{const w=window as any;w.drivePeak=0;w.trackDrive=true;const sample=()=>{if(!w.trackDrive)return;const m=w.barDebug.motos()[0];if(m)w.drivePeak=Math.max(w.drivePeak,Math.abs(m.speed));requestAnimationFrame(sample);};sample();});
   await expect.poll(async()=>{
     const [now,view,state]=await Promise.all([moto(page),feel(page),self(page)]);
     fastest=Math.max(fastest,Math.abs(now.speed));rushed=Math.max(rushed,view.rush);widest=Math.max(widest,view.fov);
@@ -118,10 +136,12 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   },{timeout:40_000,intervals:[60]}).toBe('ragdoll');
   await page.keyboard.up('w');
   // The walker first: the body is up again in a few seconds, and a screenshot here can take that long.
-  await expect.poll(async()=>(await self(other)).interactionState,{timeout:4000,intervals:[60]}).toBe('thrown');
-  await expect(other.locator('.notice, .toast, [class*=notice]').filter({hasText:'Atropelado'}).first()).toBeVisible({timeout:5000});
+  await expect.poll(()=>other.evaluate(()=>(window as any).sawThrown),{timeout:4000,intervals:[60]}).toBe(true);
+  await expect.poll(()=>other.evaluate(()=>(window as any).sawImpactNotice),{timeout:5000}).toBe(true);
   await shot(other,'7-atropelado');
   await shot(page,'6-atropelou');
+  await other.evaluate(()=>{(window as any).trackImpact=false;});
+  fastest=Math.max(fastest,await page.evaluate(()=>{const w=window as any;w.trackDrive=false;return w.drivePeak;}));
   expect(fastest,'Fast enough').toBeGreaterThan(9);
   expect(rushed,`The feeling of speed came in at ${fastest} m/s`).toBeGreaterThan(.2);
   expect(widest).toBeGreaterThan(57.5);
@@ -144,8 +164,8 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
 
   // The panel now tells what the blow did.
   const lying=await roomMoto(page);
-  // Right up to it (a bike is no obstacle on foot): wherever it landed, there may be a wall or a car on any one side.
-  await walkTo(page,lying.x,lying.z,.6);
+  // Approach the side rather than trying to walk into its solid hull.
+  await walkTo(page,lying.x+Math.cos(lying.yaw)*.9,lying.z-Math.sin(lying.yaw)*.9,.25);
   await page.waitForTimeout(500);
   await openPanel(page);
   await shot(page,'8-painel-batida');
@@ -164,8 +184,10 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   await page.locator('.moto-part[data-part="carenagem"]').click();
   const shell=await partValue(page,'carenagem');
   await expect(page.locator('[data-action="moto-repair"]')).toBeEnabled();
+  await page.evaluate(()=>{const w=window as any;w.sawRepair=false;w.repairObserver=new MutationObserver(()=>{w.sawRepair||=!!document.querySelector('.moto-work');});w.repairObserver.observe(document.querySelector('#modal-content'),{childList:true,subtree:true});});
   await page.locator('[data-action="moto-repair"]').click();
-  await expect(page.locator('.moto-work')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>(window as any).sawRepair)).toBe(true);
+  await page.evaluate(()=>(window as any).repairObserver.disconnect());
   await shot(page,'9-consertando');
   await expect.poll(()=>partValue(page,'carenagem'),{timeout:10_000}).toBe(Math.min(100,shell+40));
   await expect(page.locator('[data-moto-pieces]')).toHaveText('1');
