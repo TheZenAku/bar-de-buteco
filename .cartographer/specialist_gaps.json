@@ -1,0 +1,177 @@
+{
+  "gaps": [
+    {
+      "segment": "api@apps/api",
+      "file_count": 16,
+      "integrations": [
+        "jest",
+        "filesystem",
+        "postgres"
+      ],
+      "directory_prefix": "apps/api",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "packages/shared/src/truco",
+      "file_count": 47,
+      "integrations": [
+        "websocket",
+        "jest",
+        "playwright"
+      ],
+      "directory_prefix": "",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "stripe@apps/web",
+      "file_count": 40,
+      "integrations": [
+        "stripe"
+      ],
+      "directory_prefix": "apps/web",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/web",
+      "file_count": 40,
+      "integrations": [],
+      "directory_prefix": "apps/web",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "stripe@apps/web#2",
+      "file_count": 26,
+      "integrations": [
+        "stripe"
+      ],
+      "directory_prefix": "apps/web",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/web#2",
+      "file_count": 40,
+      "integrations": [],
+      "directory_prefix": "apps/web",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "postgres@apps/api/src",
+      "file_count": 19,
+      "integrations": [
+        "postgres"
+      ],
+      "directory_prefix": "apps/api/src",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/server/src/world",
+      "file_count": 19,
+      "integrations": [],
+      "directory_prefix": "apps/server/src",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "stripe@packages/shared/src/pool",
+      "file_count": 7,
+      "integrations": [
+        "stripe"
+      ],
+      "directory_prefix": "packages/shared/src",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/server/src/minigames",
+      "file_count": 12,
+      "integrations": [],
+      "directory_prefix": "apps/server/src/minigames",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/server/src",
+      "file_count": 9,
+      "integrations": [],
+      "directory_prefix": "apps/server/src",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "tools/ops",
+      "file_count": 8,
+      "integrations": [],
+      "directory_prefix": "tools/ops",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/api/src/database",
+      "file_count": 6,
+      "integrations": [
+        "filesystem"
+      ],
+      "directory_prefix": "apps/api/src/database",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "packages",
+      "file_count": 5,
+      "integrations": [],
+      "directory_prefix": "packages",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    },
+    {
+      "segment": "apps/web#3",
+      "file_count": 6,
+      "integrations": [],
+      "directory_prefix": "apps/web",
+      "assigned_agent": "generalist-reviewer",
+      "score": 0,
+      "reason": "low score (0) \u2014 no specialist matched well",
+      "runners_up": []
+    }
+  ],
+  "threshold": 1500,
+  "stats": {
+    "count": 15,
+    "total_segments": 15
+  }
+}

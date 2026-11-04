@@ -1,0 +1,6 @@
+apps/server/src/minigames/blackjack-bank.ts
+apps/server/src/minigames/blackjack.ts
+apps/server/src/minigames/foosball-cpu.ts
+apps/server/src/minigames/foosball.ts
+apps/server/src/minigames/pool.ts
+apps/server/src/minigames/truco.ts

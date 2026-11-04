@@ -38,6 +38,10 @@ test('generated animations bind to existing skins and contain valid skeletal rot
         if (animation.name === 'AirKick') assert.equal(Math.round(input.max[0] * 1000), AIR_KICK_DURATION_MS);
         if (animation.name === 'Drink') assert.equal(Math.round(input.max[0] * 1000), DRINK_DURATION_MS);
         if (animation.name === 'Idle') assert.equal(Math.round(input.max[0] * 1000), 4000, 'The trimmed Mixamo idle replaces the model\'s original idle');
+        if (animation.name === 'Walk') {
+          assert.equal(Math.round(input.max[0] * 1000), 1400, 'The walking cycle is stretched by 20%');
+          assert.equal(input.count, 85, 'Walking uses spherical cubic interpolation sampled at 60 Hz');
+        }
         if (animation.name === 'AngrySit') assert.equal(Math.round(input.max[0] * 1000), 3333, 'The seated loss reaction uses Sitting Angry');
         if (animation.name === 'Sit') assert.equal(Math.round(input.max[0] * 1000), 1167, 'The seated loop is Sitting.fbx');
         if (animation.name === 'Run') assert.equal(Math.round(input.max[0] * 1000), 733, 'The run is Standard Run.fbx');

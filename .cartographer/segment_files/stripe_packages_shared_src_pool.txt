@@ -1,0 +1,7 @@
+packages/shared/src/bar-animations.ts
+packages/shared/src/pool/ai.ts
+packages/shared/src/pool/aim.ts
+packages/shared/src/pool/index.ts
+packages/shared/src/pool/physics.ts
+packages/shared/src/pool/rules.ts
+packages/shared/src/pool/table.ts

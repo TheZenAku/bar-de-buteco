@@ -23,8 +23,8 @@ function sync(page:Page,actors:Actor[],serve?:[state:string,ago:number],served:R
     for(const [id,skin,x,y,z,rotation,state,ago,place,drunk] of actors){
       const actor={id,displayName:id,color:'#fff',skin,x,y,z,rotation,drunk:drunk??0,animationState:state,animationStartedAt:now-ago,
         interactionState:place??'',currentTableId:'',lastProcessedInput:0,connected:true};
-      // Magrão is an NPC-only skin; an ordinary player requesting it falls back to Nathan.
-      if(id==='bartender')npcs[id]={...actor,behavior:'idle'};else players[id]=actor;
+      // Magrão and Tonico use NPC-only skins; requesting them as a player falls back to Nathan.
+      if(id==='bartender'||id==='tonico')npcs[id]={...actor,behavior:'idle'};else players[id]=actor;
     }
     if(serve)npcs.bartender={id:'bartender',displayName:'Magrão',color:'#fff',x:magrao.x,y:magrao.y,z:magrao.z,rotation:magrao.yaw,animationState:serve[0],animationStartedAt:now-serve[1],behavior:'serving'};
     for(const item of Object.values(served) as any[])item.placedAt=now+item.placedAt;
@@ -52,7 +52,7 @@ test('Mixamo locomotion and seated idle remain active on every skin after the au
   await expect.poll(()=>bars(page),{timeout:60000}).toEqual(Object.fromEntries(skins.map(skin=>[actorId(skin),'cair'])));
 
   for(const [state,drunk,clip,duration] of [
-    ['idle',0,'Idle',4],['walk',0,'Walk',7/6],['run',0,'Run',22/30],
+    ['idle',0,'Idle',4],['walk',0,'Walk',1.4],['run',0,'Run',22/30],
     ['walk',75,'DrunkWalk',3],['idle',55,'DrunkIdle',119/30],
   ] as const){
     await sync(page,street(state,drunk));
@@ -219,6 +219,54 @@ test('a whole cigarette (fumar_mixamo) on every skin: pack and lighter in hand, 
   await sync(page,smokers('idle',0));
   await expect.poll(()=>bars(page)).toEqual(Object.fromEntries(ids.map(id=>[id,'Idle'])));
   expect((await status(page)).leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro')).toHaveLength(skins.length);
+  expect(errors).toEqual([]);
+  await page.evaluate(()=>(window as any).fixture.scene.destroy());
+});
+
+test('smoking contacts follow the lips and fingers of every skin without stretching the arms',async({page})=>{
+  test.setTimeout(240000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao','tonico','rafael-rose'];
+  const id=(skin:string)=>skin==='magrao'?'bartender':skin==='tonico'?'tonico':`contact-${skin}`;
+  const actors=(state:string,ago:number):Actor[]=>skins.map((skin,i)=>[id(skin),skin,9+i,.15,1.6,i%2?0:Math.PI,state,ago]);
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  const measure=()=>page.evaluate(async()=>{
+    const {SMOKING_LIPS}=await import('/src/engine/smoking-pose.ts' as string);
+    const scene=(window as any).fixture.scene,bar=scene.barAnimations;
+    return [...scene.actors.values()].map((actor:any)=>{
+      const bones=bar.actors.get(actor.actor.id).bones,target=bar.targets.get(actor.skinId),head=bones.get('head');
+      const delta=head.getRotation().clone().mul(target.rest.get('head').q.clone().invert());
+      const offset=head.getPosition().clone().set(...SMOKING_LIPS[actor.skinId]);
+      const mouth=delta.transformVector(offset).add(head.getPosition());
+      const kit=bar.actors.get(actor.actor.id).kits.get(actor.bar.clip==='fumar_mixamo'?'fumar_mixamo':'fumar');
+      const cigar=kit.props.get('Prop_Cigarro'),base=cigar.getPosition(),tip=kit.props.get('FX_Fumaca_Ponta').getPosition();
+      const lengths=['l','r'].flatMap(side=>[['upperarm','lowerarm'],['lowerarm','hand']].map(([a,b])=>{
+        const from=`${a}_${side}`,to=`${b}_${side}`;
+        return Math.abs(bones.get(from).getPosition().distance(bones.get(to).getPosition())-target.rest.get(from).p.distance(target.rest.get(to).p));
+      }));
+      return {skin:actor.skinId,mouth:base.distance(mouth),tip:base.distance(tip),
+        smoke:kit.props.get('FX_Fumaca_Boca').getPosition().distance(mouth),lengths,
+        flame:kit.props.get('Prop_Chama').getPosition().distance(tip)};
+    });
+  });
+  for(const [state,ago,clip,lighting] of [
+    ['smoke',3500,'fumar_acender',true],['smoke',8767,'fumar_loop',false],
+    ['smoke-stop',1700,'fumar_apagar',false],['cigarette',6600,'fumar_mixamo',true],
+  ] as const){
+    await sync(page,actors(state,ago));
+    await expect.poll(()=>bars(page),{timeout:90000}).toEqual(Object.fromEntries(skins.map(skin=>[id(skin),clip])));
+    await page.waitForTimeout(400);
+    const samples=await measure();
+    expect(samples.map(sample=>sample.skin).sort()).toEqual([...skins].sort());
+    for(const sample of samples){
+      expect(sample.mouth,`${sample.skin}/${clip}: filter at the lips`).toBeLessThan(.018);
+      expect(sample.smoke,`${sample.skin}/${clip}: exhale at the lips`).toBeLessThan(.002);
+      expect(sample.tip,`${sample.skin}/${clip}: smoke stays on the cigarette tip`).toBeGreaterThan(.075);
+      expect(sample.tip,`${sample.skin}/${clip}: smoke stays on the cigarette tip`).toBeLessThan(.09);
+      for(const drift of sample.lengths)expect(drift,`${sample.skin}/${clip}: arm keeps its bone lengths`).toBeLessThan(.001);
+      if(lighting)expect(sample.flame,`${sample.skin}/${clip}: lighter reaches the ember`).toBeLessThan(.025);
+    }
+  }
   expect(errors).toEqual([]);
   await page.evaluate(()=>(window as any).fixture.scene.destroy());
 });

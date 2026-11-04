@@ -7,6 +7,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import {appendOldCane} from './lib/old-cane.mjs';
 import {createRetarget} from './lib/animation-retarget.mjs';
 import {mixamoBoneName} from './lib/mixamo-names.mjs';
+import {polishWalkCycle} from './lib/walk-cycle.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const anim = path.join(root, 'assets-bar/anim');
@@ -163,9 +164,8 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
       source.quaternion.premultiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -Math.atan2(forward.x, forward.z)));
     }
     const samples = Math.ceil(duration * 30);
-    const times = Array.from({ length: samples + 1 }, (_, i) => Math.min(i / 30, duration));
-    const input = accessor(times, 1);
-    const rotations = model.nodes.map(() => []), translations = model.nodes.map(() => []);
+    let times = Array.from({ length: samples + 1 }, (_, i) => Math.min(i / 30, duration));
+    let rotations = model.nodes.map(() => []), translations = model.nodes.map(() => []);
     const basePositions = model.nodes.map(n => n.position.clone()), baseRotations = model.nodes.map(n => n.quaternion.clone());
     const scale = model.byName.get('hip').getWorldPosition(new Vector3()).y / 0.956;
     // The steady travel of a root-motion clip, taken out frame by frame: the loop then starts and ends on the same spot.
@@ -222,6 +222,12 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
         for (let axis = 0; axis < 3; axis++) translations[index][frame * 3 + axis] += (translations[index][axis] - translations[index][frame * 3 + axis]) * smooth;
       });
     }
+    let outputDuration=duration;
+    if(name==='Walk'){
+      const polished=polishWalkCycle(times,rotations,translations);
+      ({times,rotations,translations}=polished);outputDuration=polished.duration;
+    }
+    const input=accessor(times,1);
     const animation = { name, channels: [], samplers: [] };
     model.nodes.forEach((node, index) => {
       if (model.json.nodes[index].mesh !== undefined) return;
@@ -235,8 +241,8 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
         animation.channels.push({ sampler, target: { node: index, path: property } });
       }
     });
-    json.animations.push(animation); manifest[name] = Math.round(duration * 1000);
-    console.log(`${id}: ${name}, ${duration.toFixed(2)}s`);
+    json.animations.push(animation); manifest[name] = Math.round(outputDuration * 1000);
+    console.log(`${id}: ${name}, ${outputDuration.toFixed(2)}s`);
     mixer.stopAllAction(); mixer.uncacheRoot(source);
   }
   const actions = bank(), dancing = bank();

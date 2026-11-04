@@ -105,6 +105,8 @@ async function openDatabase(options:DatabaseOptions={}):Promise<OpenDatabase>{
     const lockTimeoutMs=options.migrationLockTimeoutMs??defaultMigrationLockTimeoutMs;
     if(!Number.isInteger(lockTimeoutMs)||lockTimeoutMs<1)throw new MigrationError('MIGRATION_LOCK_TIMEOUT_MS inválido.');
     const pool=new pg.Pool({connectionString:options.url,max:10});
+    // An idle client can fail (a database restart, a dropped connection); without a listener Node exits the process.
+    pool.on('error',error=>console.error('postgres_pool_error',error));
     const executor=postgresExecutor(pool);
     return {db:postgresDrizzle(pool,{schema}) as unknown as Database,close:()=>pool.end(),driver:'postgres',executor,coordinator:postgresCoordinator(pool,options.migrationRole,lockTimeoutMs)};
   }

@@ -1,0 +1,2667 @@
+.dockerignore
+.env.example
+.gitattributes
+.github/workflows/ci.yml
+.gitignore
+.nvmrc
+README.md
+apps/api/package.json
+apps/api/src/achievement-service.ts
+apps/api/src/admin-console.ts
+apps/api/src/admin-policy.ts
+apps/api/src/admin-service.ts
+apps/api/src/admin.ts
+apps/api/src/app.ts
+apps/api/src/auth/service.ts
+apps/api/src/config.ts
+apps/api/src/control-outbox.ts
+apps/api/src/database/index.ts
+apps/api/src/database/migrate.ts
+apps/api/src/database/migrations.ts
+apps/api/src/database/schema-contract.ts
+apps/api/src/database/schema.ts
+apps/api/src/dev-bots.ts
+apps/api/src/fuel-service.ts
+apps/api/src/highfood-service.ts
+apps/api/src/index.ts
+apps/api/src/inventory-service.ts
+apps/api/src/mail.ts
+apps/api/src/observability.ts
+apps/api/src/phone-service.ts
+apps/api/src/pricing-service.ts
+apps/api/src/profile-service.ts
+apps/api/src/seed.ts
+apps/api/src/trade-service.ts
+apps/api/src/wallet-service.ts
+apps/api/src/wardrobe.ts
+apps/api/test/achievements.test.ts
+apps/api/test/admin-console.test.ts
+apps/api/test/admin.test.ts
+apps/api/test/auth.test.ts
+apps/api/test/car.test.ts
+apps/api/test/control-outbox.test.ts
+apps/api/test/dev-bots.test.ts
+apps/api/test/fuel.test.ts
+apps/api/test/highfood.test.ts
+apps/api/test/inventory.test.ts
+apps/api/test/migrations.test.ts
+apps/api/test/observability.test.ts
+apps/api/test/phone.test.ts
+apps/api/test/postgres-smoke.test.ts
+apps/api/test/profile.test.ts
+apps/api/test/trade.test.ts
+apps/api/test/vehicle-migration.test.ts
+apps/api/test/wallet.test.ts
+apps/api/test/wardrobe.test.ts
+apps/api/tsconfig.json
+apps/server/package.json
+apps/server/src/BarRoom.ts
+apps/server/src/config.ts
+apps/server/src/http.ts
+apps/server/src/index.ts
+apps/server/src/internal.ts
+apps/server/src/minigames/blackjack-bank.ts
+apps/server/src/minigames/blackjack.ts
+apps/server/src/minigames/foosball-cpu.ts
+apps/server/src/minigames/foosball.ts
+apps/server/src/minigames/pool.ts
+apps/server/src/minigames/truco.ts
+apps/server/src/observability.ts
+apps/server/src/performance.ts
+apps/server/src/room/session-registry.ts
+apps/server/src/state.ts
+apps/server/src/world/achievements.ts
+apps/server/src/world/bartender.ts
+apps/server/src/world/bots.ts
+apps/server/src/world/events.ts
+apps/server/src/world/highfood.ts
+apps/server/src/world/jobs.ts
+apps/server/src/world/media-check.ts
+apps/server/src/world/musicians.ts
+apps/server/src/world/navigation.ts
+apps/server/src/world/needs.ts
+apps/server/src/world/npcs.ts
+apps/server/src/world/outbox.ts
+apps/server/src/world/phone-calls.ts
+apps/server/src/world/refueling.ts
+apps/server/src/world/relays.ts
+apps/server/src/world/served.ts
+apps/server/src/world/trades.ts
+apps/server/src/world/waiter.ts
+apps/server/src/world/wallet.ts
+apps/server/test/achievements.integration.test.ts
+apps/server/test/admin-console.integration.test.ts
+apps/server/test/bar-animations.integration.test.ts
+apps/server/test/bartender.test.ts
+apps/server/test/blackjack.test.ts
+apps/server/test/bots.test.ts
+apps/server/test/car.integration.test.ts
+apps/server/test/doors.integration.test.ts
+apps/server/test/economy.integration.test.ts
+apps/server/test/environment.integration.test.ts
+apps/server/test/events.test.ts
+apps/server/test/foosball.room.test.ts
+apps/server/test/foosball.test.ts
+apps/server/test/garage-trade.integration.test.ts
+apps/server/test/highfood-horse.integration.test.ts
+apps/server/test/highfood.integration.test.ts
+apps/server/test/horse.integration.test.ts
+apps/server/test/inventory.integration.test.ts
+apps/server/test/jobs.test.ts
+apps/server/test/jukebox.integration.test.ts
+apps/server/test/kick.integration.test.ts
+apps/server/test/media-check.test.ts
+apps/server/test/media-platforms.integration.test.ts
+apps/server/test/minigame-achievements.integration.test.ts
+apps/server/test/moderation.integration.test.ts
+apps/server/test/moto-parts.integration.test.ts
+apps/server/test/moto.integration.test.ts
+apps/server/test/musicians.integration.test.ts
+apps/server/test/musicians.test.ts
+apps/server/test/navigation.test.ts
+apps/server/test/needs.integration.test.ts
+apps/server/test/npcs.test.ts
+apps/server/test/observability.integration.test.ts
+apps/server/test/outbox.test.ts
+apps/server/test/performance.test.ts
+apps/server/test/phone.integration.test.ts
+apps/server/test/pool.room.test.ts
+apps/server/test/pool.test.ts
+apps/server/test/refueling.integration.test.ts
+apps/server/test/refueling.test.ts
+apps/server/test/room.integration.test.ts
+apps/server/test/served.test.ts
+apps/server/test/session-registry.test.ts
+apps/server/test/stage-show.integration.test.ts
+apps/server/test/stage.integration.test.ts
+apps/server/test/truco-rules.test.ts
+apps/server/test/truco-table.test.ts
+apps/server/test/vehicle-actions.integration.test.ts
+apps/server/test/voice.integration.test.ts
+apps/server/test/waiter.test.ts
+apps/server/tsconfig.json
+apps/web/http-redirect.ts
+apps/web/index.html
+apps/web/package.json
+apps/web/public/animacoes/bar_banheiro.glb
+apps/web/public/animacoes/bar_cadeira.glb
+apps/web/public/animacoes/bar_fumar.glb
+apps/web/public/animacoes/bar_fumar_mixamo.glb
+apps/web/public/animacoes/bar_locomocao.glb
+apps/web/public/animacoes/bar_magrao.glb
+apps/web/public/animacoes/bar_mesa.glb
+apps/web/public/animacoes/bar_vomitar.glb
+apps/web/public/animations/durations.json
+apps/web/public/animations/flavio-hipotetico-dances.glb
+apps/web/public/animations/flavio-hipotetico.glb
+apps/web/public/animations/gabriel-dances.glb
+apps/web/public/animations/gabriel.glb
+apps/web/public/animations/gilmar-gordo-dances.glb
+apps/web/public/animations/gilmar-gordo.glb
+apps/web/public/animations/leandro-dances.glb
+apps/web/public/animations/leandro.glb
+apps/web/public/animations/magrao-dances.glb
+apps/web/public/animations/magrao.glb
+apps/web/public/animations/nathan-dances.glb
+apps/web/public/animations/nathan.glb
+apps/web/public/animations/rafael-dances.glb
+apps/web/public/animations/rafael-rose-dances.glb
+apps/web/public/animations/rafael-rose.glb
+apps/web/public/animations/rafael.glb
+apps/web/public/animations/read-dances.glb
+apps/web/public/animations/read.glb
+apps/web/public/animations/tiao-dances.glb
+apps/web/public/animations/tiao.glb
+apps/web/public/animations/tonico-dances.glb
+apps/web/public/animations/tonico.glb
+apps/web/public/apple-touch-icon.png
+apps/web/public/audio/ambient/817787-e586bb19d2.m4a
+apps/web/public/audio/ambient/817788-e67ccb617e.m4a
+apps/web/public/audio/ambient/817790-59d2301af3.m4a
+apps/web/public/audio/ambient/817791-b6990672b0.m4a
+apps/web/public/audio/ambient/817793-56893d155f.m4a
+apps/web/public/audio/ambient/817794-cf5729d325.m4a
+apps/web/public/carro/carro_hatch.glb
+apps/web/public/carro/carro_hatch_colisao.glb
+apps/web/public/carro/foto.png
+apps/web/public/favicon-192.png
+apps/web/public/favicon-32.png
+apps/web/public/highfood/logo-icon.webp
+apps/web/public/highfood/logo.webp
+apps/web/public/kick/sound/ar-1.wav
+apps/web/public/kick/sound/ar-2.wav
+apps/web/public/kick/sound/ar-3.wav
+apps/web/public/kick/sound/ar-longo.wav
+apps/web/public/kick/sound/chute-1.wav
+apps/web/public/kick/sound/chute-2.wav
+apps/web/public/kick/sound/chute-3.wav
+apps/web/public/kick/sound/chute-4.wav
+apps/web/public/kick/sound/chute-peso.wav
+apps/web/public/kick/sound/queda-1.wav
+apps/web/public/kick/sound/queda-2.wav
+apps/web/public/kick/sound/queda-3.wav
+apps/web/public/kick/sound/queda-4.wav
+apps/web/public/maps/bar_ao_bar_estrutura.jpg
+apps/web/public/maps/bar_boteco.glb
+apps/web/public/maps/bar_boteco_colisao.glb
+apps/web/public/maps/bar_env.png
+apps/web/public/maps/cidade/cidade_anel.bin
+apps/web/public/maps/cidade/cidade_anel.gltf
+apps/web/public/maps/cidade/cidade_distante.bin
+apps/web/public/maps/cidade/cidade_distante.gltf
+apps/web/public/maps/cidade/cidade_lotes.json
+apps/web/public/maps/cidade/cidade_publicacao.json
+apps/web/public/maps/cidade/cidade_setores.json
+apps/web/public/maps/cidade/cidade_vias.json
+apps/web/public/maps/cidade/pontos_ifood.json
+apps/web/public/maps/cidade/setores/cidade_S00_00.bin
+apps/web/public/maps/cidade/setores/cidade_S00_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_01.bin
+apps/web/public/maps/cidade/setores/cidade_S00_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_02.bin
+apps/web/public/maps/cidade/setores/cidade_S00_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_03.bin
+apps/web/public/maps/cidade/setores/cidade_S00_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_04.bin
+apps/web/public/maps/cidade/setores/cidade_S00_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_05.bin
+apps/web/public/maps/cidade/setores/cidade_S00_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_06.bin
+apps/web/public/maps/cidade/setores/cidade_S00_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_07.bin
+apps/web/public/maps/cidade/setores/cidade_S00_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S00_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S00_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_00.bin
+apps/web/public/maps/cidade/setores/cidade_S01_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_01.bin
+apps/web/public/maps/cidade/setores/cidade_S01_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_02.bin
+apps/web/public/maps/cidade/setores/cidade_S01_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_03.bin
+apps/web/public/maps/cidade/setores/cidade_S01_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_04.bin
+apps/web/public/maps/cidade/setores/cidade_S01_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_05.bin
+apps/web/public/maps/cidade/setores/cidade_S01_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_06.bin
+apps/web/public/maps/cidade/setores/cidade_S01_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_07.bin
+apps/web/public/maps/cidade/setores/cidade_S01_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S01_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S01_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_00.bin
+apps/web/public/maps/cidade/setores/cidade_S02_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_01.bin
+apps/web/public/maps/cidade/setores/cidade_S02_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_02.bin
+apps/web/public/maps/cidade/setores/cidade_S02_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_03.bin
+apps/web/public/maps/cidade/setores/cidade_S02_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_04.bin
+apps/web/public/maps/cidade/setores/cidade_S02_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_05.bin
+apps/web/public/maps/cidade/setores/cidade_S02_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_06.bin
+apps/web/public/maps/cidade/setores/cidade_S02_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_07.bin
+apps/web/public/maps/cidade/setores/cidade_S02_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S02_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S02_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_00.bin
+apps/web/public/maps/cidade/setores/cidade_S03_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_01.bin
+apps/web/public/maps/cidade/setores/cidade_S03_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_02.bin
+apps/web/public/maps/cidade/setores/cidade_S03_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_03.bin
+apps/web/public/maps/cidade/setores/cidade_S03_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_04.bin
+apps/web/public/maps/cidade/setores/cidade_S03_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_05.bin
+apps/web/public/maps/cidade/setores/cidade_S03_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_06.bin
+apps/web/public/maps/cidade/setores/cidade_S03_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_07.bin
+apps/web/public/maps/cidade/setores/cidade_S03_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S03_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S03_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_00.bin
+apps/web/public/maps/cidade/setores/cidade_S04_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_01.bin
+apps/web/public/maps/cidade/setores/cidade_S04_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_02.bin
+apps/web/public/maps/cidade/setores/cidade_S04_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_03.bin
+apps/web/public/maps/cidade/setores/cidade_S04_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_04.bin
+apps/web/public/maps/cidade/setores/cidade_S04_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_05.bin
+apps/web/public/maps/cidade/setores/cidade_S04_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_06.bin
+apps/web/public/maps/cidade/setores/cidade_S04_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_07.bin
+apps/web/public/maps/cidade/setores/cidade_S04_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S04_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S04_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_00.bin
+apps/web/public/maps/cidade/setores/cidade_S05_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_01.bin
+apps/web/public/maps/cidade/setores/cidade_S05_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_02.bin
+apps/web/public/maps/cidade/setores/cidade_S05_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_03.bin
+apps/web/public/maps/cidade/setores/cidade_S05_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_04.bin
+apps/web/public/maps/cidade/setores/cidade_S05_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_05.bin
+apps/web/public/maps/cidade/setores/cidade_S05_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_06.bin
+apps/web/public/maps/cidade/setores/cidade_S05_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_07.bin
+apps/web/public/maps/cidade/setores/cidade_S05_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S05_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S05_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_00.bin
+apps/web/public/maps/cidade/setores/cidade_S06_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_01.bin
+apps/web/public/maps/cidade/setores/cidade_S06_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_02.bin
+apps/web/public/maps/cidade/setores/cidade_S06_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_03.bin
+apps/web/public/maps/cidade/setores/cidade_S06_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_04.bin
+apps/web/public/maps/cidade/setores/cidade_S06_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_05.bin
+apps/web/public/maps/cidade/setores/cidade_S06_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_06.bin
+apps/web/public/maps/cidade/setores/cidade_S06_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_07.bin
+apps/web/public/maps/cidade/setores/cidade_S06_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S06_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S06_07_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_00.bin
+apps/web/public/maps/cidade/setores/cidade_S07_00.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_00_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_00_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_01.bin
+apps/web/public/maps/cidade/setores/cidade_S07_01.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_01_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_01_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_02.bin
+apps/web/public/maps/cidade/setores/cidade_S07_02.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_02_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_02_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_03.bin
+apps/web/public/maps/cidade/setores/cidade_S07_03.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_03_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_03_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_04.bin
+apps/web/public/maps/cidade/setores/cidade_S07_04.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_04_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_04_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_05.bin
+apps/web/public/maps/cidade/setores/cidade_S07_05.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_05_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_05_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_06.bin
+apps/web/public/maps/cidade/setores/cidade_S07_06.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_06_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_06_lod.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_07.bin
+apps/web/public/maps/cidade/setores/cidade_S07_07.gltf
+apps/web/public/maps/cidade/setores/cidade_S07_07_lod.bin
+apps/web/public/maps/cidade/setores/cidade_S07_07_lod.gltf
+apps/web/public/maps/cidade/texturas/asfalto.jpg
+apps/web/public/maps/cidade/texturas/atlas_bairro.jpg
+apps/web/public/maps/cidade/texturas/atlas_cidade.jpg
+apps/web/public/maps/cidade/texturas/concreto.jpg
+apps/web/public/maps/cidade/texturas/folhas.jpg
+apps/web/public/maps/cidade/texturas/grama.jpg
+apps/web/public/maps/cidade/texturas/madeira.jpg
+apps/web/public/maps/cidade/texturas/metal_ondulado.jpg
+apps/web/public/maps/cidade/texturas/morro.jpg
+apps/web/public/maps/cidade/texturas/panorama.jpg
+apps/web/public/maps/cidade/texturas/pbr_casca.jpg
+apps/web/public/maps/cidade/texturas/pbr_casca_eucalipto.jpg
+apps/web/public/maps/cidade/texturas/pbr_casca_eucalipto_n.jpg
+apps/web/public/maps/cidade/texturas/pbr_casca_n.jpg
+apps/web/public/maps/cidade/texturas/pbr_copa_ipe_lod.jpg
+apps/web/public/maps/cidade/texturas/pbr_folhagem.png
+apps/web/public/maps/cidade/texturas/pedra_portuguesa.jpg
+apps/web/public/maps/cidade/texturas/pol_asfalto.jpg
+apps/web/public/maps/cidade/texturas/pol_carvalho.jpg
+apps/web/public/maps/cidade/texturas/pol_concreto.jpg
+apps/web/public/maps/cidade/texturas/pol_feltro.jpg
+apps/web/public/maps/cidade/texturas/pol_grama.jpg
+apps/web/public/maps/cidade/texturas/pol_madeira_escura.jpg
+apps/web/public/maps/cidade/texturas/pol_metal_ondulado.jpg
+apps/web/public/maps/cidade/texturas/pol_metal_ondulado_n.jpg
+apps/web/public/maps/cidade/texturas/pol_metal_preto.jpg
+apps/web/public/maps/cidade/texturas/pol_plastico.jpg
+apps/web/public/maps/cidade/texturas/pol_reboco.jpg
+apps/web/public/maps/cidade/texturas/pol_terra.jpg
+apps/web/public/maps/cidade/texturas/pol_terra_n.jpg
+apps/web/public/maps/cidade/texturas/pol_tijolo.jpg
+apps/web/public/maps/cidade/texturas/pol_tijolo_n.jpg
+apps/web/public/maps/cidade/texturas/ponto_ifood_atlas.jpg
+apps/web/public/maps/cidade/texturas/ponto_ifood_escovado.jpg
+apps/web/public/maps/cidade/texturas/ponto_ifood_pintura.jpg
+apps/web/public/maps/cidade/texturas/ponto_ifood_pintura_n.jpg
+apps/web/public/maps/cidade/texturas/reboco.jpg
+apps/web/public/maps/cidade/texturas/telha.jpg
+apps/web/public/maps/cidade/texturas/telha_n.jpg
+apps/web/public/maps/cidade/texturas/terra_batida.jpg
+apps/web/public/maps/cidade/validacao.json
+apps/web/public/models/flavio-hipotetico.glb
+apps/web/public/models/gabriel.glb
+apps/web/public/models/gilmar-gordo.glb
+apps/web/public/models/leandro.glb
+apps/web/public/models/magrao.glb
+apps/web/public/models/nathan.glb
+apps/web/public/models/rafael-rose.glb
+apps/web/public/models/rafael.glb
+apps/web/public/models/read.glb
+apps/web/public/models/tiao.glb
+apps/web/public/models/tonico.glb
+apps/web/public/moto/foto-v4.webp
+apps/web/public/moto/foto.webp
+apps/web/public/moto/moto_bag.glb
+apps/web/public/moto/moto_bag.js
+apps/web/public/moto/moto_delivery.glb
+apps/web/public/moto/moto_delivery.js
+apps/web/public/moto/moto_delivery_colisao.glb
+apps/web/public/moto/sound/acelerando.wav
+apps/web/public/moto/sound/desliga.wav
+apps/web/public/moto/sound/falha-1.wav
+apps/web/public/moto/sound/falha-2.wav
+apps/web/public/moto/sound/falha-3.wav
+apps/web/public/moto/sound/falha-4.wav
+apps/web/public/moto/sound/idle.wav
+apps/web/public/moto/sound/liga.wav
+apps/web/public/moto/sound/parando.wav
+apps/web/public/mounts/sound/CREDITS.txt
+apps/web/public/mounts/sound/gallop.wav
+apps/web/public/mounts/sound/neigh.mp3
+apps/web/public/mounts/tiao-horse.glb
+apps/web/public/palco/palco_bateria.glb
+apps/web/public/palco/palco_cavaquinho.glb
+apps/web/public/palco/palco_violao.glb
+apps/web/public/palco/palco_vocal.glb
+apps/web/public/phone/vibrate.wav
+apps/web/public/props/agua-decor.glb
+apps/web/public/props/agua.glb
+apps/web/public/props/cafe-decor.glb
+apps/web/public/props/cafe.glb
+apps/web/public/props/copo-decor.glb
+apps/web/public/props/copo.glb
+apps/web/public/props/coxinha-decor.glb
+apps/web/public/props/coxinha.glb
+apps/web/public/props/garrafa-decor.glb
+apps/web/public/props/garrafa.glb
+apps/web/public/props/old-cane-flavio-hipotetico.glb
+apps/web/public/props/old-cane-gabriel.glb
+apps/web/public/props/old-cane-gilmar-gordo.glb
+apps/web/public/props/old-cane-leandro.glb
+apps/web/public/props/old-cane-magrao.glb
+apps/web/public/props/old-cane-nathan.glb
+apps/web/public/props/old-cane-rafael-rose.glb
+apps/web/public/props/old-cane-rafael.glb
+apps/web/public/props/old-cane-read.glb
+apps/web/public/props/old-cane-tiao.glb
+apps/web/public/props/old-cane-tonico.glb
+apps/web/public/props/pastel-decor.glb
+apps/web/public/props/pastel.glb
+apps/web/public/props/refrigerante-decor.glb
+apps/web/public/props/refrigerante.glb
+apps/web/public/props/torresmo-decor.glb
+apps/web/public/props/torresmo.glb
+apps/web/public/skins/cards/flavio-hipotetico.webp
+apps/web/public/skins/cards/gabriel.webp
+apps/web/public/skins/cards/gilmar-gordo.webp
+apps/web/public/skins/cards/leandro.webp
+apps/web/public/skins/cards/nathan.webp
+apps/web/public/skins/cards/rafael-rose.webp
+apps/web/public/skins/cards/rafael.webp
+apps/web/public/skins/cards/read.webp
+apps/web/public/skins/cards/tiao.webp
+apps/web/public/skins/turn/flavio-hipotetico.webp
+apps/web/public/skins/turn/gabriel.webp
+apps/web/public/skins/turn/gilmar-gordo.webp
+apps/web/public/skins/turn/leandro.webp
+apps/web/public/skins/turn/nathan.webp
+apps/web/public/skins/turn/rafael-rose.webp
+apps/web/public/skins/turn/rafael.webp
+apps/web/public/skins/turn/read.webp
+apps/web/public/skins/turn/tiao.webp
+apps/web/public/ui/items/agua.png
+apps/web/public/ui/items/cafe.png
+apps/web/public/ui/items/chave.svg
+apps/web/public/ui/items/copo.png
+apps/web/public/ui/items/coxinha.png
+apps/web/public/ui/items/curativo.png
+apps/web/public/ui/items/garrafa.png
+apps/web/public/ui/items/pastel.png
+apps/web/public/ui/items/peca_moto.png
+apps/web/public/ui/items/refrigerante.png
+apps/web/public/ui/items/torresmo.png
+apps/web/public/ui/logo-highland-hud.webp
+apps/web/public/ui/logo-highland.webp
+apps/web/public/ui/moeda.png
+apps/web/rigs.html
+apps/web/rigs.js
+apps/web/src/admin.css
+apps/web/src/admin/badges.ts
+apps/web/src/admin/charts.ts
+apps/web/src/admin/collection.ts
+apps/web/src/admin/console.ts
+apps/web/src/admin/economy.ts
+apps/web/src/admin/environment.ts
+apps/web/src/admin/highfood.ts
+apps/web/src/admin/kit.ts
+apps/web/src/admin/logs.ts
+apps/web/src/admin/overview.ts
+apps/web/src/admin/performance.ts
+apps/web/src/admin/players.ts
+apps/web/src/admin/prices.ts
+apps/web/src/admin/reports.ts
+apps/web/src/admin/server.ts
+apps/web/src/admin/vehicles.ts
+apps/web/src/admin/world.ts
+apps/web/src/admission-lifecycle.ts
+apps/web/src/ambient-mix.ts
+apps/web/src/api.ts
+apps/web/src/assets/ambient.json
+apps/web/src/assets/fonts/chakra-petch-400.woff2
+apps/web/src/assets/fonts/chakra-petch-500.woff2
+apps/web/src/assets/fonts/chakra-petch-600.woff2
+apps/web/src/assets/fonts/chakra-petch-700.woff2
+apps/web/src/assets/fonts/chakrapetch-OFL.txt
+apps/web/src/assets/fonts/jetbrains-mono-400.woff2
+apps/web/src/assets/fonts/jetbrains-mono-500.woff2
+apps/web/src/assets/fonts/jetbrainsmono-OFL.txt
+apps/web/src/assets/fonts/neon-ui.css
+apps/web/src/audio.ts
+apps/web/src/bar-animations-debug.ts
+apps/web/src/blackjack/blackjack.css
+apps/web/src/blackjack/sounds.ts
+apps/web/src/blackjack/table.ts
+apps/web/src/car-panel.ts
+apps/web/src/collection/card-sounds.ts
+apps/web/src/collection/collection.css
+apps/web/src/collection/collection.ts
+apps/web/src/collection/skin-card.ts
+apps/web/src/consuming-hud.ts
+apps/web/src/consumption.ts
+apps/web/src/economy-ui.ts
+apps/web/src/economy.css
+apps/web/src/engine/BarScene.ts
+apps/web/src/engine/animation-tracks.ts
+apps/web/src/engine/bar-animations.ts
+apps/web/src/engine/bar-dressing.ts
+apps/web/src/engine/bar-surfaces.ts
+apps/web/src/engine/blow-fx.ts
+apps/web/src/engine/blow-sound.ts
+apps/web/src/engine/camera-rig.ts
+apps/web/src/engine/camera-xray.ts
+apps/web/src/engine/car-rig.ts
+apps/web/src/engine/car-sound.ts
+apps/web/src/engine/city-plan.ts
+apps/web/src/engine/city-streaming.ts
+apps/web/src/engine/day-night.ts
+apps/web/src/engine/drink-props.ts
+apps/web/src/engine/environment-lighting.ts
+apps/web/src/engine/foosball-balls.ts
+apps/web/src/engine/fuel-props.ts
+apps/web/src/engine/gltf-textures.ts
+apps/web/src/engine/head-look.ts
+apps/web/src/engine/highfood-props.ts
+apps/web/src/engine/horse-mount.ts
+apps/web/src/engine/horse-sound.ts
+apps/web/src/engine/jukebox-lights.ts
+apps/web/src/engine/laser-font.ts
+apps/web/src/engine/map-effects.ts
+apps/web/src/engine/mixamo-retarget.ts
+apps/web/src/engine/moto-bag.ts
+apps/web/src/engine/moto-delivery.ts
+apps/web/src/engine/moto-lights.ts
+apps/web/src/engine/moto-motion.ts
+apps/web/src/engine/moto-ragdoll.ts
+apps/web/src/engine/moto-sound.ts
+apps/web/src/engine/pool-balls.ts
+apps/web/src/engine/scene-types.ts
+apps/web/src/engine/serving-props.ts
+apps/web/src/engine/skin-portrait.ts
+apps/web/src/engine/speed-blur.ts
+apps/web/src/engine/stage-lights.ts
+apps/web/src/engine/stage-musicians.ts
+apps/web/src/engine/stage-show.ts
+apps/web/src/engine/television-surface.ts
+apps/web/src/engine/vehicle-horn.ts
+apps/web/src/engine/video-colours.ts
+apps/web/src/engine/video-palette.ts
+apps/web/src/engine/weather-effects.ts
+apps/web/src/engine/weather-sound.ts
+apps/web/src/foosball/foosball.css
+apps/web/src/foosball/panel.ts
+apps/web/src/foosball/render.ts
+apps/web/src/foosball/sounds.ts
+apps/web/src/fuel-hud.css
+apps/web/src/fuel-hud.ts
+apps/web/src/fullscreen.ts
+apps/web/src/game-ui.ts
+apps/web/src/garage-panel.ts
+apps/web/src/gps.ts
+apps/web/src/graphics.ts
+apps/web/src/highfood/courier.ts
+apps/web/src/highfood/highfood.css
+apps/web/src/highfood/locker.ts
+apps/web/src/highfood/npc-avatar.ts
+apps/web/src/hud-panels.ts
+apps/web/src/jukebox.css
+apps/web/src/jukebox.ts
+apps/web/src/light-desk.css
+apps/web/src/light-desk.ts
+apps/web/src/lobby-hero.css
+apps/web/src/lobby-hero.ts
+apps/web/src/lobby-menu.ts
+apps/web/src/main.ts
+apps/web/src/media/file.ts
+apps/web/src/media/platforms.ts
+apps/web/src/media/player.ts
+apps/web/src/minimap.css
+apps/web/src/minimap.ts
+apps/web/src/moto-panel.css
+apps/web/src/moto-panel.ts
+apps/web/src/mouse-capture.ts
+apps/web/src/needs-hud.ts
+apps/web/src/needs.css
+apps/web/src/neon-ui.css
+apps/web/src/networking.ts
+apps/web/src/notifications.ts
+apps/web/src/objective-blip.ts
+apps/web/src/performance/browser.ts
+apps/web/src/performance/frames.ts
+apps/web/src/performance/hud.ts
+apps/web/src/performance/inventory.ts
+apps/web/src/performance/monitor.ts
+apps/web/src/performance/performance.css
+apps/web/src/performance/recording.ts
+apps/web/src/performance/report.ts
+apps/web/src/performance/view.ts
+apps/web/src/phone/apps/bank.ts
+apps/web/src/phone/apps/camera.ts
+apps/web/src/phone/apps/gram.ts
+apps/web/src/phone/apps/highfood.ts
+apps/web/src/phone/apps/maps.ts
+apps/web/src/phone/apps/motors.ts
+apps/web/src/phone/apps/telefone.ts
+apps/web/src/phone/apps/tools.ts
+apps/web/src/phone/apps/zap.ts
+apps/web/src/phone/core.ts
+apps/web/src/phone/filters.ts
+apps/web/src/phone/media.ts
+apps/web/src/phone/phone.css
+apps/web/src/phone/phone.ts
+apps/web/src/phone/wallpapers.ts
+apps/web/src/pool/panel.ts
+apps/web/src/pool/pool.css
+apps/web/src/pool/render.ts
+apps/web/src/pool/sounds.ts
+apps/web/src/prices.ts
+apps/web/src/profile/badge-card.css
+apps/web/src/profile/badge-card.ts
+apps/web/src/profile/floating-window.ts
+apps/web/src/profile/profile-window.ts
+apps/web/src/profile/profile.css
+apps/web/src/settings.ts
+apps/web/src/trade/trade.css
+apps/web/src/trade/trade.ts
+apps/web/src/truco/card.ts
+apps/web/src/truco/sounds.ts
+apps/web/src/truco/table.ts
+apps/web/src/truco/truco.css
+apps/web/src/ui-icons.ts
+apps/web/src/vehicle-hud.css
+apps/web/src/vehicle-hud.ts
+apps/web/src/voice.css
+apps/web/src/voice.ts
+apps/web/src/world-menu.ts
+apps/web/src/youtube-player.ts
+apps/web/tsconfig.json
+apps/web/vite.config.ts
+assets-bar/anim/A_Male_Walk_OldCane.fbx
+assets-bar/anim/A_Male_Walk_OldCane_walkstyle.fbx
+assets-bar/anim/Bartending.fbx
+assets-bar/anim/Dancing.fbx
+assets-bar/anim/Sitting Drinking.fbx
+assets-bar/anim/Sitting-2.fbx
+assets-bar/anim/Sitting-3.fbx
+assets-bar/anim/Sitting-4.fbx
+assets-bar/anim/Sitting.fbx
+assets-bar/anim/Standard Run.fbx
+assets-bar/anim/bebado-caido.fbx
+assets-bar/anim/bebendo.fbx
+assets-bar/anim/carta-distribui.fbx
+assets-bar/anim/carta-recomeco.fbx
+assets-bar/anim/carta-sentado.fbx
+assets-bar/anim/dance/Dancing (1).fbx
+assets-bar/anim/dance/Dancing Twerk.fbx
+assets-bar/anim/dance/Dancing.fbx
+assets-bar/anim/dance/Female Dance Pose (1).fbx
+assets-bar/anim/dance/Female Dance Pose.fbx
+assets-bar/anim/dance/Hip Hop Dancing (1).fbx
+assets-bar/anim/dance/Hip Hop Dancing (2).fbx
+assets-bar/anim/dance/Hip Hop Dancing (3).fbx
+assets-bar/anim/dance/Hip Hop Dancing (4).fbx
+assets-bar/anim/dance/Hip Hop Dancing (5).fbx
+assets-bar/anim/dance/Hip Hop Dancing (6).fbx
+assets-bar/anim/dance/Hip Hop Dancing (7).fbx
+assets-bar/anim/dance/Hip Hop Dancing (8).fbx
+assets-bar/anim/dance/Hip Hop Dancing.fbx
+assets-bar/anim/dance/Male Dance Pose.fbx
+assets-bar/anim/dance/Salsa Dancing (1).fbx
+assets-bar/anim/dance/Salsa Dancing (2).fbx
+assets-bar/anim/dance/Salsa Dancing.fbx
+assets-bar/anim/dance/Samba Dancing.fbx
+assets-bar/anim/dance/Swing Dancing.fbx
+assets-bar/anim/dance/Twist Dance.fbx
+assets-bar/anim/dance/Wave Hip Hop Dance (1).fbx
+assets-bar/anim/dance/Wave Hip Hop Dance.fbx
+assets-bar/anim/karate-kick.fbx
+assets-bar/anim/misc/Acknowledging.fbx
+assets-bar/anim/misc/Action Adventure Pack/Remy.fbx
+assets-bar/anim/misc/Action Adventure Pack/cover to stand (2).fbx
+assets-bar/anim/misc/Action Adventure Pack/cover to stand.fbx
+assets-bar/anim/misc/Action Adventure Pack/crouched sneaking left.fbx
+assets-bar/anim/misc/Action Adventure Pack/crouched sneaking right.fbx
+assets-bar/anim/misc/Action Adventure Pack/falling idle.fbx
+assets-bar/anim/misc/Action Adventure Pack/falling to roll.fbx
+assets-bar/anim/misc/Action Adventure Pack/hard landing.fbx
+assets-bar/anim/misc/Action Adventure Pack/idle (2).fbx
+assets-bar/anim/misc/Action Adventure Pack/idle (3).fbx
+assets-bar/anim/misc/Action Adventure Pack/idle (4).fbx
+assets-bar/anim/misc/Action Adventure Pack/idle (5).fbx
+assets-bar/anim/misc/Action Adventure Pack/idle.fbx
+assets-bar/anim/misc/Action Adventure Pack/jumping up.fbx
+assets-bar/anim/misc/Action Adventure Pack/left cover sneak.fbx
+assets-bar/anim/misc/Action Adventure Pack/left turn.fbx
+assets-bar/anim/misc/Action Adventure Pack/right cover sneak.fbx
+assets-bar/anim/misc/Action Adventure Pack/right turn.fbx
+assets-bar/anim/misc/Action Adventure Pack/run to stop.fbx
+assets-bar/anim/misc/Action Adventure Pack/running.fbx
+assets-bar/anim/misc/Action Adventure Pack/stand to cover (2).fbx
+assets-bar/anim/misc/Action Adventure Pack/stand to cover.fbx
+assets-bar/anim/misc/Action Adventure Pack/walking.fbx
+assets-bar/anim/misc/Aim Pistol.fbx
+assets-bar/anim/misc/Angry Gesture.fbx
+assets-bar/anim/misc/Backward Right Turn (1).fbx
+assets-bar/anim/misc/Backward Right Turn.fbx
+assets-bar/anim/misc/Backward Walking Turn.fbx
+assets-bar/anim/misc/Backwards Rifle Walk (1).fbx
+assets-bar/anim/misc/Backwards Rifle Walk.fbx
+assets-bar/anim/misc/Baseball Bunt.fbx
+assets-bar/anim/misc/Baseball Hit (1).fbx
+assets-bar/anim/misc/Baseball Hit (2).fbx
+assets-bar/anim/misc/Baseball Hit.fbx
+assets-bar/anim/misc/Beckoning (1).fbx
+assets-bar/anim/misc/Beckoning.fbx
+assets-bar/anim/misc/Bicycle Crunch.fbx
+assets-bar/anim/misc/Big Side Hit.fbx
+assets-bar/anim/misc/Block With Rifle (1).fbx
+assets-bar/anim/misc/Block With Rifle.fbx
+assets-bar/anim/misc/Block.fbx
+assets-bar/anim/misc/Body Block (1).fbx
+assets-bar/anim/misc/Body Block.fbx
+assets-bar/anim/misc/Bouncing Fight Idle.fbx
+assets-bar/anim/misc/Box Jump.fbx
+assets-bar/anim/misc/Braced Hang Hop Left.fbx
+assets-bar/anim/misc/Breakdance 1990 (1).fbx
+assets-bar/anim/misc/Breakdance 1990 (2).fbx
+assets-bar/anim/misc/Breakdance 1990.fbx
+assets-bar/anim/misc/Breakdance Ending 1.fbx
+assets-bar/anim/misc/Breakdance Ending 2.fbx
+assets-bar/anim/misc/Breakdance Freeze Var 2.fbx
+assets-bar/anim/misc/Breakdance Freeze Var 3.fbx
+assets-bar/anim/misc/Breakdance Ready.fbx
+assets-bar/anim/misc/Breakdance Uprock Var 1.fbx
+assets-bar/anim/misc/Breakdance Uprock Var 2.fbx
+assets-bar/anim/misc/Butterfly Twirl.fbx
+assets-bar/anim/misc/Button Pushing (1).fbx
+assets-bar/anim/misc/Button Pushing.fbx
+assets-bar/anim/misc/Capoeira.fbx
+assets-bar/anim/misc/Cards.fbx
+assets-bar/anim/misc/Catwalk Idle To Twist R.fbx
+assets-bar/anim/misc/Catwalk Idle To Walk Forward.fbx
+assets-bar/anim/misc/Catwalk Idle Twist R.fbx
+assets-bar/anim/misc/Catwalk Twist L To Walk 180.fbx
+assets-bar/anim/misc/Catwalk Twist R To Walk 180.fbx
+assets-bar/anim/misc/Catwalk Walk Forward Arc 90R.fbx
+assets-bar/anim/misc/Catwalk Walk Forward HighKnees.fbx
+assets-bar/anim/misc/Catwalk Walk Start Turn 180 Right.fbx
+assets-bar/anim/misc/Catwalk Walk Stop Twist R.fbx
+assets-bar/anim/misc/Center Block.fbx
+assets-bar/anim/misc/Change Direction (1).fbx
+assets-bar/anim/misc/Change Direction.fbx
+assets-bar/anim/misc/Chapa Giratoria 2.fbx
+assets-bar/anim/misc/Checking Dice (1).fbx
+assets-bar/anim/misc/Checking Dice.fbx
+assets-bar/anim/misc/Cheering.fbx
+assets-bar/anim/misc/Circle Crunch.fbx
+assets-bar/anim/misc/Clapping.fbx
+assets-bar/anim/misc/Climbing Ladder.fbx
+assets-bar/anim/misc/Climbing To Top (1).fbx
+assets-bar/anim/misc/Climbing To Top.fbx
+assets-bar/anim/misc/Cow Milking.fbx
+assets-bar/anim/misc/Crawling (1).fbx
+assets-bar/anim/misc/Crawling.fbx
+assets-bar/anim/misc/Crossleg Freeze.fbx
+assets-bar/anim/misc/Crouch To Stand.fbx
+assets-bar/anim/misc/Crouch Torch Turn Right 90.fbx
+assets-bar/anim/misc/Crouch Turn Left 90.fbx
+assets-bar/anim/misc/Crouch Turn Right 90.fbx
+assets-bar/anim/misc/Crouch Turn To Stand.fbx
+assets-bar/anim/misc/Crouch Walk Right.fbx
+assets-bar/anim/misc/Crouch Walking.fbx
+assets-bar/anim/misc/Crouched Sneaking Left.fbx
+assets-bar/anim/misc/Crouched To Standing.fbx
+assets-bar/anim/misc/Dancing (1).fbx
+assets-bar/anim/misc/Dancing Twerk.fbx
+assets-bar/anim/misc/Dancing.fbx
+assets-bar/anim/misc/Death From Right.fbx
+assets-bar/anim/misc/Death From The Front.fbx
+assets-bar/anim/misc/Defeat.fbx
+assets-bar/anim/misc/Defeated.fbx
+assets-bar/anim/misc/Dig And Plant Seeds (1).fbx
+assets-bar/anim/misc/Dig And Plant Seeds.fbx
+assets-bar/anim/misc/Dismissing Gesture (1).fbx
+assets-bar/anim/misc/Dismissing Gesture.fbx
+assets-bar/anim/misc/Dodge While Sitting.fbx
+assets-bar/anim/misc/Dodging (1).fbx
+assets-bar/anim/misc/Dodging.fbx
+assets-bar/anim/misc/Double Dagger Stab (1).fbx
+assets-bar/anim/misc/Double Dagger Stab.fbx
+assets-bar/anim/misc/Draw Sword 1 (1).fbx
+assets-bar/anim/misc/Draw Sword 1.fbx
+assets-bar/anim/misc/Dribble.fbx
+assets-bar/anim/misc/Drop Kick.fbx
+assets-bar/anim/misc/Drunk Idle Variation.fbx
+assets-bar/anim/misc/Drunk Walk.fbx
+assets-bar/anim/misc/Dying.fbx
+assets-bar/anim/misc/Elbow Punch.fbx
+assets-bar/anim/misc/Emerging.fbx
+assets-bar/anim/misc/Entry (1).fbx
+assets-bar/anim/misc/Entry (2).fbx
+assets-bar/anim/misc/Entry (3).fbx
+assets-bar/anim/misc/Entry.fbx
+assets-bar/anim/misc/Esquiva 5.fbx
+assets-bar/anim/misc/Excited (1).fbx
+assets-bar/anim/misc/Excited.fbx
+assets-bar/anim/misc/Fall B Land To Standing Idle.fbx
+assets-bar/anim/misc/Fall Flat.fbx
+assets-bar/anim/misc/Falling To Roll.fbx
+assets-bar/anim/misc/Falling.fbx
+assets-bar/anim/misc/Female Crouch Pose.fbx
+assets-bar/anim/misc/Female Dance Pose (1).fbx
+assets-bar/anim/misc/Female Dance Pose.fbx
+assets-bar/anim/misc/Female Dynamic Pose.fbx
+assets-bar/anim/misc/Female Laying Pose (1).fbx
+assets-bar/anim/misc/Female Laying Pose (2).fbx
+assets-bar/anim/misc/Female Laying Pose.fbx
+assets-bar/anim/misc/Female Peek And Aim.fbx
+assets-bar/anim/misc/Female Sitting Pose (1).fbx
+assets-bar/anim/misc/Female Sitting Pose.fbx
+assets-bar/anim/misc/Female Standing Pose.fbx
+assets-bar/anim/misc/Female Walk.fbx
+assets-bar/anim/misc/Firing Rifle (1).fbx
+assets-bar/anim/misc/Firing Rifle.fbx
+assets-bar/anim/misc/Fishing Cast.fbx
+assets-bar/anim/misc/Fist Fight A.fbx
+assets-bar/anim/misc/Fist Fight B.fbx
+assets-bar/anim/misc/Flying Knee Punch Combo (1).fbx
+assets-bar/anim/misc/Flying Knee Punch Combo.fbx
+assets-bar/anim/misc/Freehang Climb (1).fbx
+assets-bar/anim/misc/Freehang Climb.fbx
+assets-bar/anim/misc/Ginga Variation 3.fbx
+assets-bar/anim/misc/Goalkeeper Catch (1).fbx
+assets-bar/anim/misc/Goalkeeper Catch (2).fbx
+assets-bar/anim/misc/Goalkeeper Catch (3).fbx
+assets-bar/anim/misc/Goalkeeper Catch (4).fbx
+assets-bar/anim/misc/Goalkeeper Catch.fbx
+assets-bar/anim/misc/Goalkeeper Diving Save.fbx
+assets-bar/anim/misc/Goalkeeper Drop Kick.fbx
+assets-bar/anim/misc/Goalkeeper Sidestep.fbx
+assets-bar/anim/misc/Golf Bad Shot (1).fbx
+assets-bar/anim/misc/Golf Bad Shot.fbx
+assets-bar/anim/misc/Golf Drive.fbx
+assets-bar/anim/misc/Golf Pre-Putt (1).fbx
+assets-bar/anim/misc/Golf Pre-Putt.fbx
+assets-bar/anim/misc/Grab And Put Back Rifle.fbx
+assets-bar/anim/misc/Grab And Slam.fbx
+assets-bar/anim/misc/Grab Rifle And Put Back.fbx
+assets-bar/anim/misc/Grabbing Ammo (1).fbx
+assets-bar/anim/misc/Grabbing Ammo.fbx
+assets-bar/anim/misc/Great Sword 180 Turn.fbx
+assets-bar/anim/misc/Great Sword Blocking.fbx
+assets-bar/anim/misc/Great Sword Run.fbx
+assets-bar/anim/misc/Great Sword Slash (1).fbx
+assets-bar/anim/misc/Great Sword Slash.fbx
+assets-bar/anim/misc/Guitar Playing.fbx
+assets-bar/anim/misc/Gunplay.fbx
+assets-bar/anim/misc/Hanging Idle.fbx
+assets-bar/anim/misc/Hard Landing.fbx
+assets-bar/anim/misc/Head Hit (1).fbx
+assets-bar/anim/misc/Head Hit (2).fbx
+assets-bar/anim/misc/Head Hit.fbx
+assets-bar/anim/misc/Headbutt (1).fbx
+assets-bar/anim/misc/Headbutt.fbx
+assets-bar/anim/misc/Hip Hop Dancing (1).fbx
+assets-bar/anim/misc/Hip Hop Dancing (2).fbx
+assets-bar/anim/misc/Hip Hop Dancing (3).fbx
+assets-bar/anim/misc/Hip Hop Dancing (4).fbx
+assets-bar/anim/misc/Hip Hop Dancing (5).fbx
+assets-bar/anim/misc/Hip Hop Dancing (6).fbx
+assets-bar/anim/misc/Hip Hop Dancing (7).fbx
+assets-bar/anim/misc/Hip Hop Dancing (8).fbx
+assets-bar/anim/misc/Hip Hop Dancing.fbx
+assets-bar/anim/misc/Hit To Side Of Body.fbx
+assets-bar/anim/misc/Holding Walk.fbx
+assets-bar/anim/misc/Hook Punch.fbx
+assets-bar/anim/misc/Hook.fbx
+assets-bar/anim/misc/Hostage Situation Idle - Villain.fbx
+assets-bar/anim/misc/Hurricane Kick (1).fbx
+assets-bar/anim/misc/Hurricane Kick.fbx
+assets-bar/anim/misc/Idle (1).fbx
+assets-bar/anim/misc/Idle (2).fbx
+assets-bar/anim/misc/Idle (3).fbx
+assets-bar/anim/misc/Idle.fbx
+assets-bar/anim/misc/Illegal Elbow Punch (1).fbx
+assets-bar/anim/misc/Illegal Elbow Punch.fbx
+assets-bar/anim/misc/Injured Run.fbx
+assets-bar/anim/misc/Injured Walk Backwards.fbx
+assets-bar/anim/misc/Jog In Circle (1).fbx
+assets-bar/anim/misc/Jog In Circle.fbx
+assets-bar/anim/misc/Jogging (1).fbx
+assets-bar/anim/misc/Jogging With Box.fbx
+assets-bar/anim/misc/Jogging.fbx
+assets-bar/anim/misc/Jump (1).fbx
+assets-bar/anim/misc/Jump Attack.fbx
+assets-bar/anim/misc/Jump Down.fbx
+assets-bar/anim/misc/Jump Push Up.fbx
+assets-bar/anim/misc/Jump Up.fbx
+assets-bar/anim/misc/Jump.fbx
+assets-bar/anim/misc/Jumping Down (1).fbx
+assets-bar/anim/misc/Jumping Down (2).fbx
+assets-bar/anim/misc/Jumping Down (3).fbx
+assets-bar/anim/misc/Jumping Down (4).fbx
+assets-bar/anim/misc/Jumping Down (5).fbx
+assets-bar/anim/misc/Jumping Down.fbx
+assets-bar/anim/misc/Kick To The Groin.fbx
+assets-bar/anim/misc/Kicking.fbx
+assets-bar/anim/misc/Kidney Hit.fbx
+assets-bar/anim/misc/Kiss.fbx
+assets-bar/anim/misc/Kneeling Down.fbx
+assets-bar/anim/misc/Laying Breathless.fbx
+assets-bar/anim/misc/Lead Jab (1).fbx
+assets-bar/anim/misc/Lead Jab.fbx
+assets-bar/anim/misc/Left Block.fbx
+assets-bar/anim/misc/Left Strafe Walking.fbx
+assets-bar/anim/misc/Left Strafing Jump.fbx
+assets-bar/anim/misc/Left Turn (1).fbx
+assets-bar/anim/misc/Left Turn 45 (1).fbx
+assets-bar/anim/misc/Left Turn 45.fbx
+assets-bar/anim/misc/Left Turn W_Briefcase.fbx
+assets-bar/anim/misc/Left Turn.fbx
+assets-bar/anim/misc/Long Step Forward.fbx
+assets-bar/anim/misc/Look Over Shoulder (1).fbx
+assets-bar/anim/misc/Look Over Shoulder.fbx
+assets-bar/anim/misc/Macaco Side.fbx
+assets-bar/anim/misc/Male Action Pose.fbx
+assets-bar/anim/misc/Male Dance Pose.fbx
+assets-bar/anim/misc/Male Dynamic Pose.fbx
+assets-bar/anim/misc/Male Laying Pose.fbx
+assets-bar/anim/misc/Male Locomotion Pack.zip
+assets-bar/anim/misc/Male Locomotion Pose.fbx
+assets-bar/anim/misc/Male Sitting Pose (1).fbx
+assets-bar/anim/misc/Male Sitting Pose.fbx
+assets-bar/anim/misc/Male Standing Pose.fbx
+assets-bar/anim/misc/Medium Hit To Head (1).fbx
+assets-bar/anim/misc/Medium Hit To Head.fbx
+assets-bar/anim/misc/Mma Kick.fbx
+assets-bar/anim/misc/Moving Object.fbx
+assets-bar/anim/misc/Mutant Flexing Muscles (1).fbx
+assets-bar/anim/misc/Mutant Flexing Muscles.fbx
+assets-bar/anim/misc/Mutant Idle.fbx
+assets-bar/anim/misc/Mutant Walking.fbx
+assets-bar/anim/misc/Northern Soul Spin.fbx
+assets-bar/anim/misc/Offensive Idle.fbx
+assets-bar/anim/misc/Old Man Idle.fbx
+assets-bar/anim/misc/Opening (1).fbx
+assets-bar/anim/misc/Opening (2).fbx
+assets-bar/anim/misc/Opening Door Inwards (1).fbx
+assets-bar/anim/misc/Opening Door Inwards.fbx
+assets-bar/anim/misc/Opening.fbx
+assets-bar/anim/misc/Paddling.fbx
+assets-bar/anim/misc/Pain Gesture.fbx
+assets-bar/anim/misc/Pick Fruit (1).fbx
+assets-bar/anim/misc/Pick Fruit.fbx
+assets-bar/anim/misc/Picking Up Object.fbx
+assets-bar/anim/misc/Pilot Flips Switches (1).fbx
+assets-bar/anim/misc/Pilot Flips Switches.fbx
+assets-bar/anim/misc/Pistol Kneeling Idle.fbx
+assets-bar/anim/misc/Pontera.fbx
+assets-bar/anim/misc/Prone Backwards Stop.fbx
+assets-bar/anim/misc/Prone Firing Rifle.fbx
+assets-bar/anim/misc/Prone Left Turn.fbx
+assets-bar/anim/misc/Pulling Lever.fbx
+assets-bar/anim/misc/Punching Bag (1).fbx
+assets-bar/anim/misc/Punching Bag.fbx
+assets-bar/anim/misc/Punching.fbx
+assets-bar/anim/misc/Reaction.fbx
+assets-bar/anim/misc/Receive Uppercut To The Face (1).fbx
+assets-bar/anim/misc/Receive Uppercut To The Face.fbx
+assets-bar/anim/misc/Receiving An Uppercut.fbx
+assets-bar/anim/misc/Rejected.fbx
+assets-bar/anim/misc/Reload.fbx
+assets-bar/anim/misc/Reloading (1).fbx
+assets-bar/anim/misc/Reloading.fbx
+assets-bar/anim/misc/Remy.fbx
+assets-bar/anim/misc/Rifle Aiming Idle (1).fbx
+assets-bar/anim/misc/Rifle Aiming Idle.fbx
+assets-bar/anim/misc/Rifle Block.fbx
+assets-bar/anim/misc/Rifle Crouch Idle To Walk.fbx
+assets-bar/anim/misc/Rifle Crouch Turn.fbx
+assets-bar/anim/misc/Rifle Run To Stop.fbx
+assets-bar/anim/misc/Rifle Turn (1).fbx
+assets-bar/anim/misc/Rifle Turn (2).fbx
+assets-bar/anim/misc/Rifle Turn And Kick.fbx
+assets-bar/anim/misc/Rifle Turn.fbx
+assets-bar/anim/misc/Right Strafe Walk.fbx
+assets-bar/anim/misc/Right Strafe Walking.fbx
+assets-bar/anim/misc/Right Turn W_ Briefcase (1).fbx
+assets-bar/anim/misc/Right Turn W_ Briefcase.fbx
+assets-bar/anim/misc/Right Turn.fbx
+assets-bar/anim/misc/Rummaging (1).fbx
+assets-bar/anim/misc/Rummaging.fbx
+assets-bar/anim/misc/Run (1).fbx
+assets-bar/anim/misc/Run Backwards (1).fbx
+assets-bar/anim/misc/Run Backwards.fbx
+assets-bar/anim/misc/Run Forward.fbx
+assets-bar/anim/misc/Run Look Back.fbx
+assets-bar/anim/misc/Run To Rolling.fbx
+assets-bar/anim/misc/Run To Stop (1).fbx
+assets-bar/anim/misc/Run To Stop.fbx
+assets-bar/anim/misc/Run.fbx
+assets-bar/anim/misc/Running (1).fbx
+assets-bar/anim/misc/Running (2).fbx
+assets-bar/anim/misc/Running (3).fbx
+assets-bar/anim/misc/Running (4).fbx
+assets-bar/anim/misc/Running (5).fbx
+assets-bar/anim/misc/Running (6).fbx
+assets-bar/anim/misc/Running Arc.fbx
+assets-bar/anim/misc/Running Jump.fbx
+assets-bar/anim/misc/Running To Stop.fbx
+assets-bar/anim/misc/Running To Turn (1).fbx
+assets-bar/anim/misc/Running To Turn.fbx
+assets-bar/anim/misc/Running.fbx
+assets-bar/anim/misc/Salsa Dancing (1).fbx
+assets-bar/anim/misc/Salsa Dancing (2).fbx
+assets-bar/anim/misc/Salsa Dancing.fbx
+assets-bar/anim/misc/Salute.fbx
+assets-bar/anim/misc/Samba Dancing.fbx
+assets-bar/anim/misc/Scary Clown Walk.fbx
+assets-bar/anim/misc/Seated Idle.fbx
+assets-bar/anim/misc/Sheathing Sword.fbx
+assets-bar/anim/misc/Shooting Arrow (1).fbx
+assets-bar/anim/misc/Shooting Arrow.fbx
+assets-bar/anim/misc/Shooting Gun.fbx
+assets-bar/anim/misc/Short Left Side Step.fbx
+assets-bar/anim/misc/Shoved (1).fbx
+assets-bar/anim/misc/Shoved Reaction With Spin.fbx
+assets-bar/anim/misc/Shoved.fbx
+assets-bar/anim/misc/Shuffling.fbx
+assets-bar/anim/misc/Sitting And Pointing (1).fbx
+assets-bar/anim/misc/Sitting And Pointing.fbx
+assets-bar/anim/misc/Sitting Angry.fbx
+assets-bar/anim/misc/Sitting Clap.fbx
+assets-bar/anim/misc/Sitting Laughing.fbx
+assets-bar/anim/misc/Sitting Talking.fbx
+assets-bar/anim/misc/Sitting Thumbs Up.fbx
+assets-bar/anim/misc/Sitting Weapon Grab.fbx
+assets-bar/anim/misc/Sitting.fbx
+assets-bar/anim/misc/Situp To Idle (1).fbx
+assets-bar/anim/misc/Situp To Idle.fbx
+assets-bar/anim/misc/Situps.fbx
+assets-bar/anim/misc/Skateboarding (1).fbx
+assets-bar/anim/misc/Skateboarding.fbx
+assets-bar/anim/misc/Skinning Test.fbx
+assets-bar/anim/misc/Slow Jog Backwards (1).fbx
+assets-bar/anim/misc/Slow Jog Backwards.fbx
+assets-bar/anim/misc/Snatch (1).fbx
+assets-bar/anim/misc/Snatch.fbx
+assets-bar/anim/misc/Soccer Trip.fbx
+assets-bar/anim/misc/Spin In Place.fbx
+assets-bar/anim/misc/Sprint Backward.fbx
+assets-bar/anim/misc/Stable Sword Inward Slash.fbx
+assets-bar/anim/misc/Stand To Cover (1).fbx
+assets-bar/anim/misc/Stand To Cover.fbx
+assets-bar/anim/misc/Standard Walk.fbx
+assets-bar/anim/misc/Standing 2H Magic Attack 01.fbx
+assets-bar/anim/misc/Standing Aim Idle 01.fbx
+assets-bar/anim/misc/Standing Block End.fbx
+assets-bar/anim/misc/Standing Block React Large.fbx
+assets-bar/anim/misc/Standing Clap.fbx
+assets-bar/anim/misc/Standing Death Backward 01.fbx
+assets-bar/anim/misc/Standing Death Forward 01.fbx
+assets-bar/anim/misc/Standing Death Left 01.fbx
+assets-bar/anim/misc/Standing Greeting (1).fbx
+assets-bar/anim/misc/Standing Greeting.fbx
+assets-bar/anim/misc/Standing Idle 03.fbx
+assets-bar/anim/misc/Standing Idle To Fight Idle.fbx
+assets-bar/anim/misc/Standing Melee Attack Downward.fbx
+assets-bar/anim/misc/Standing React Large From Front.fbx
+assets-bar/anim/misc/Standing React Large From Left.fbx
+assets-bar/anim/misc/Standing React Large From Right.fbx
+assets-bar/anim/misc/Standing React Small From Back.fbx
+assets-bar/anim/misc/Standing React Small From Left.fbx
+assets-bar/anim/misc/Standing Run Forward.fbx
+assets-bar/anim/misc/Standing Run Left.fbx
+assets-bar/anim/misc/Standing Taunt Battlecry.fbx
+assets-bar/anim/misc/Standing Torch Idle 01.fbx
+assets-bar/anim/misc/Standing Torch Jump.fbx
+assets-bar/anim/misc/Standing Torch Melee Attack 01.fbx
+assets-bar/anim/misc/Standing Torch Melee Attack 04.fbx
+assets-bar/anim/misc/Standing Torch Melee Attack Stab.fbx
+assets-bar/anim/misc/Standing Torch Run Forward Stop.fbx
+assets-bar/anim/misc/Standing Torch Turn Left 180.fbx
+assets-bar/anim/misc/Standing Torch Turn Right 180.fbx
+assets-bar/anim/misc/Standing Up (1).fbx
+assets-bar/anim/misc/Standing Up.fbx
+assets-bar/anim/misc/Standing Walk Back.fbx
+assets-bar/anim/misc/Standing Walk Right.fbx
+assets-bar/anim/misc/Start Plank.fbx
+assets-bar/anim/misc/Start Walking (1).fbx
+assets-bar/anim/misc/Start Walking.fbx
+assets-bar/anim/misc/Stop Walking With Rifle.fbx
+assets-bar/anim/misc/Strafe (1).fbx
+assets-bar/anim/misc/Strafe (2).fbx
+assets-bar/anim/misc/Strafe Right Stop.fbx
+assets-bar/anim/misc/Strafe Right.fbx
+assets-bar/anim/misc/Strafe.fbx
+assets-bar/anim/misc/Strafing (1).fbx
+assets-bar/anim/misc/Strafing (2).fbx
+assets-bar/anim/misc/Strafing (3).fbx
+assets-bar/anim/misc/Strafing (4).fbx
+assets-bar/anim/misc/Strafing.fbx
+assets-bar/anim/misc/Stroke Shaking Head.fbx
+assets-bar/anim/misc/Strut Walking (1).fbx
+assets-bar/anim/misc/Strut Walking.fbx
+assets-bar/anim/misc/Sumo High Pull.fbx
+assets-bar/anim/misc/Surprised.fbx
+assets-bar/anim/misc/Swing Dancing.fbx
+assets-bar/anim/misc/Swing To Land.fbx
+assets-bar/anim/misc/Swinging (1).fbx
+assets-bar/anim/misc/Swinging.fbx
+assets-bar/anim/misc/Sword And Shield Attack (1).fbx
+assets-bar/anim/misc/Sword And Shield Attack.fbx
+assets-bar/anim/misc/Sword And Shield Block.fbx
+assets-bar/anim/misc/Sword And Shield Jump.fbx
+assets-bar/anim/misc/Sword And Shield Run.fbx
+assets-bar/anim/misc/Sword Fight One.fbx
+assets-bar/anim/misc/Taking Cover Idle.fbx
+assets-bar/anim/misc/Taking Punch.fbx
+assets-bar/anim/misc/Talking At Watercooler.fbx
+assets-bar/anim/misc/Talking On Phone.fbx
+assets-bar/anim/misc/Taunt (1).fbx
+assets-bar/anim/misc/Taunt.fbx
+assets-bar/anim/misc/Telling A Secret.fbx
+assets-bar/anim/misc/Texting While Standing.fbx
+assets-bar/anim/misc/Thankful.fbx
+assets-bar/anim/misc/Thoughtful Head Shake.fbx
+assets-bar/anim/misc/Throw Grenade (1).fbx
+assets-bar/anim/misc/Throw Grenade.fbx
+assets-bar/anim/misc/Throw.fbx
+assets-bar/anim/misc/Turn 90 Left.fbx
+assets-bar/anim/misc/Turn Left 45 Degrees.fbx
+assets-bar/anim/misc/Turn Left.fbx
+assets-bar/anim/misc/Turning.fbx
+assets-bar/anim/misc/Twist Dance.fbx
+assets-bar/anim/misc/Unarmed Idle 01 (1).fbx
+assets-bar/anim/misc/Unarmed Idle 01.fbx
+assets-bar/anim/misc/Unarmed Idle Looking Ver. 1.fbx
+assets-bar/anim/misc/Unarmed Idle Looking Ver. 2.fbx
+assets-bar/anim/misc/Unarmed Idle.fbx
+assets-bar/anim/misc/Unarmed Jump.fbx
+assets-bar/anim/misc/Unarmed Run Forward.fbx
+assets-bar/anim/misc/Unarmed Turn Left 90.fbx
+assets-bar/anim/misc/Walk Crouching Right.fbx
+assets-bar/anim/misc/Walk Forward Arc Right (1).fbx
+assets-bar/anim/misc/Walk Forward Arc Right.fbx
+assets-bar/anim/misc/Walk Forward Left.fbx
+assets-bar/anim/misc/Walk Left.fbx
+assets-bar/anim/misc/Walk Right.fbx
+assets-bar/anim/misc/Walk To Stop (1).fbx
+assets-bar/anim/misc/Walk To Stop.fbx
+assets-bar/anim/misc/Walk With Rifle (1).fbx
+assets-bar/anim/misc/Walk With Rifle (2).fbx
+assets-bar/anim/misc/Walk With Rifle.fbx
+assets-bar/anim/misc/Walking Backward Arc Right.fbx
+assets-bar/anim/misc/Walking Backwards.fbx
+assets-bar/anim/misc/Walking.fbx
+assets-bar/anim/misc/Wave Hip Hop Dance (1).fbx
+assets-bar/anim/misc/Wave Hip Hop Dance.fbx
+assets-bar/anim/misc/Waving Gesture.fbx
+assets-bar/anim/misc/Wheelbarrow Idle.fbx
+assets-bar/anim/misc/Wheelbarrow Walk.fbx
+assets-bar/anim/misc/Yelling While Standing.fbx
+assets-bar/anim/misc/Zombie Idle.fbx
+assets-bar/anim/misc/Zombie Neck Bite.fbx
+assets-bar/anim/misc/Zombie Stand Up (1).fbx
+assets-bar/anim/misc/Zombie Stand Up.fbx
+assets-bar/anim/misc/Zombie Transition.fbx
+assets-bar/anim/misc/Zombie Walk.fbx
+assets-bar/anim/misc/cover to stand (2).fbx
+assets-bar/anim/misc/cover to stand.fbx
+assets-bar/anim/misc/crouched sneaking right.fbx
+assets-bar/anim/misc/falling idle.fbx
+assets-bar/anim/misc/idle (4).fbx
+assets-bar/anim/misc/idle (5).fbx
+assets-bar/anim/misc/jumping up.fbx
+assets-bar/anim/misc/left cover sneak.fbx
+assets-bar/anim/misc/right cover sneak.fbx
+assets-bar/anim/misc/stand to cover (2).fbx
+assets-bar/anim/sit-angry.fbx
+assets-bar/icons/Highbeerlong-icone.png
+assets-bar/icons/agua-icone.png
+assets-bar/icons/cafe-icone.png
+assets-bar/icons/copoamericano-icone.png
+assets-bar/icons/coxinha-icone.png
+assets-bar/icons/curativo-icone.png
+assets-bar/icons/highcola-icone.png
+assets-bar/icons/moeda-icone.png
+assets-bar/icons/pastel-icone.png
+assets-bar/icons/peca-moto-icone.png
+assets-bar/icons/torresmo-icone.png
+assets-bar/logo/highland-bar-delivery.png
+assets-bar/logo/logo-upscayl.png
+assets-bar/logo/logo.png
+assets-bar/map/BarBoteco/anim/bar_ref.blend
+assets-bar/map/BarBoteco/anim/palco_ref.blend
+assets-bar/map/BarBoteco/anim/previa/_tmp.png
+assets-bar/map/BarBoteco/anim/previa/bateria_comecar_tocar.png
+assets-bar/map/BarBoteco/anim/previa/bateria_parar_sair.png
+assets-bar/map/BarBoteco/anim/previa/bateria_sentar_pegar.png
+assets-bar/map/BarBoteco/anim/previa/bateria_tocando_loop.png
+assets-bar/map/BarBoteco/anim/previa/cavaquinho_comecar_tocar.png
+assets-bar/map/BarBoteco/anim/previa/cavaquinho_parar_sair.png
+assets-bar/map/BarBoteco/anim/previa/cavaquinho_sentar_pegar.png
+assets-bar/map/BarBoteco/anim/previa/cavaquinho_tocando_loop.png
+assets-bar/map/BarBoteco/anim/previa/teste_maos.png
+assets-bar/map/BarBoteco/anim/previa/teste_pose.png
+assets-bar/map/BarBoteco/anim/previa/violao_comecar_tocar.png
+assets-bar/map/BarBoteco/anim/previa/violao_det_maos.png
+assets-bar/map/BarBoteco/anim/previa/violao_det_sentar.png
+assets-bar/map/BarBoteco/anim/previa/violao_parar_sair.png
+assets-bar/map/BarBoteco/anim/previa/violao_q_sentar_pegar.png
+assets-bar/map/BarBoteco/anim/previa/violao_sentar_pegar.png
+assets-bar/map/BarBoteco/anim/previa/violao_tocando_loop.png
+assets-bar/map/BarBoteco/anim/previa/vocal_cantando_loop.png
+assets-bar/map/BarBoteco/anim/previa/vocal_chegar_pegar.png
+assets-bar/map/BarBoteco/anim/previa/vocal_comecar_cantar.png
+assets-bar/map/BarBoteco/anim/previa/vocal_parar_sair.png
+assets-bar/map/BarBoteco/anim/previa_bar/_tmp.png
+assets-bar/map/BarBoteco/anim/previa_bar/andar_bebado_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/andar_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/cair.png
+assets-bar/map/BarBoteco/anim/previa_bar/comer_comecar.png
+assets-bar/map/BarBoteco/anim/previa_bar/comer_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/comer_terminar.png
+assets-bar/map/BarBoteco/anim/previa_bar/fumar_acender.png
+assets-bar/map/BarBoteco/anim/previa_bar/fumar_apagar.png
+assets-bar/map/BarBoteco/anim/previa_bar/fumar_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/levantar.png
+assets-bar/map/BarBoteco/anim/previa_bar/levantar_chao.png
+assets-bar/map/BarBoteco/anim/previa_bar/limpar_mesa.png
+assets-bar/map/BarBoteco/anim/previa_bar/magrao_chopp.png
+assets-bar/map/BarBoteco/anim/previa_bar/magrao_longneck.png
+assets-bar/map/BarBoteco/anim/previa_bar/parado_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/sentado_loop.png
+assets-bar/map/BarBoteco/anim/previa_bar/sentar.png
+assets-bar/map/BarBoteco/anim/previa_bar/urinar.png
+assets-bar/map/BarBoteco/anim/previa_bar/vomitar.png
+assets-bar/map/BarBoteco/bar_boteco.blend
+assets-bar/map/BarBoteco/bar_boteco.blend1
+assets-bar/map/BarBoteco/export/PROMPT_INTEGRACAO_ANIMACOES.md
+assets-bar/map/BarBoteco/export/PROMPT_INTEGRACAO_FUMAR_MIXAMO.md
+assets-bar/map/BarBoteco/export/PROMPT_atualizar_mapa.md
+assets-bar/map/BarBoteco/export/animacoes/animacoes_bar.js
+assets-bar/map/BarBoteco/export/animacoes/bar_banheiro.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_cadeira.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_fumar.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_fumar_mixamo.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_locomocao.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_magrao.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_mesa.glb
+assets-bar/map/BarBoteco/export/animacoes/bar_vomitar.glb
+assets-bar/map/BarBoteco/export/animacoes/fbx/andar_bebado_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/andar_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/bateria_comecar_tocar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/bateria_parar_sair.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/bateria_sentar_pegar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/bateria_tocando_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/cair.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/cavaquinho_comecar_tocar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/cavaquinho_parar_sair.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/cavaquinho_sentar_pegar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/cavaquinho_tocando_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/comer_comecar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/comer_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/comer_terminar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/fumar_acender.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/fumar_apagar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/fumar_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/fumar_mixamo.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/levantar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/levantar_chao.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/limpar_mesa.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/magrao_chopp.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/magrao_chopp_escuro.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/magrao_longneck.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/parado_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/sentado_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/sentar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/urinar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/violao_comecar_tocar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/violao_parar_sair.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/violao_sentar_pegar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/violao_tocando_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/vocal_cantando_loop.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/vocal_chegar_pegar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/vocal_comecar_cantar.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/vocal_parar_sair.fbx
+assets-bar/map/BarBoteco/export/animacoes/fbx/vomitar.fbx
+assets-bar/map/BarBoteco/export/animacoes/palco_bateria.glb
+assets-bar/map/BarBoteco/export/animacoes/palco_cavaquinho.glb
+assets-bar/map/BarBoteco/export/animacoes/palco_musicos.js
+assets-bar/map/BarBoteco/export/animacoes/palco_violao.glb
+assets-bar/map/BarBoteco/export/animacoes/palco_vocal.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-23/bar_boteco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-23/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-23/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-27/bar_boteco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-27/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-27/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-27/integracao_highland.js
+assets-bar/map/BarBoteco/export/anterior_2026-10-28/bar_boteco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-28/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-28/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-28/integracao_highland.js
+assets-bar/map/BarBoteco/export/anterior_2026-10-28_b/bar_boteco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-28_b/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-28_b/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-29/bar_boteco.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-29/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/anterior_2026-10-29/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/bar_ao_bar_estrutura.jpg
+assets-bar/map/BarBoteco/export/bar_boteco.glb
+assets-bar/map/BarBoteco/export/bar_boteco_colisao.glb
+assets-bar/map/BarBoteco/export/bar_boteco_draco.glb
+assets-bar/map/BarBoteco/export/bar_env.png
+assets-bar/map/BarBoteco/export/carro/PROMPT_integracao_carro.md
+assets-bar/map/BarBoteco/export/carro/carro_atlas.png
+assets-bar/map/BarBoteco/export/carro/carro_hatch.glb
+assets-bar/map/BarBoteco/export/carro/carro_hatch.js
+assets-bar/map/BarBoteco/export/carro/carro_hatch_colisao.glb
+assets-bar/map/BarBoteco/export/carro/carro_placa.png
+assets-bar/map/BarBoteco/export/carro/previa_playcanvas.png
+assets-bar/map/BarBoteco/export/cidade/RELATORIO_CIDADE.md
+assets-bar/map/BarBoteco/export/cidade/capturas/aerea_centro.png
+assets-bar/map/BarBoteco/export/cidade/capturas/aerea_distrito_industrial.png
+assets-bar/map/BarBoteco/export/cidade/capturas/aerea_geral.png
+assets-bar/map/BarBoteco/export/cidade/capturas/aerea_jardim_conceicao.png
+assets-bar/map/BarBoteco/export/cidade/capturas/mapa_topo.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_av_da_industria.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_bar_spawn.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_centro_prefeitura.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_jardim_conceicao_rotatoria.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_limite_norte.png
+assets-bar/map/BarBoteco/export/cidade/capturas/rua_parque_olaria.png
+assets-bar/map/BarBoteco/export/cidade/cidade_anel.bin
+assets-bar/map/BarBoteco/export/cidade/cidade_anel.gltf
+assets-bar/map/BarBoteco/export/cidade/cidade_distante.bin
+assets-bar/map/BarBoteco/export/cidade/cidade_distante.gltf
+assets-bar/map/BarBoteco/export/cidade/cidade_lotes.json
+assets-bar/map/BarBoteco/export/cidade/cidade_setores.json
+assets-bar/map/BarBoteco/export/cidade/cidade_vias.json
+assets-bar/map/BarBoteco/export/cidade/pontos_ifood.json
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S00_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S01_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S02_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S03_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S04_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S05_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S06_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_00.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_00.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_00_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_00_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_00_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_01.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_01.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_01_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_01_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_01_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_02.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_02.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_02_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_02_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_02_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_03.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_03.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_03_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_03_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_03_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_04.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_04.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_04_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_04_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_04_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_05.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_05.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_05_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_05_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_05_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_06.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_06.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_06_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_06_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_06_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_07.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_07.gltf
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_07_colisao.glb
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_07_lod.bin
+assets-bar/map/BarBoteco/export/cidade/setores/cidade_S07_07_lod.gltf
+assets-bar/map/BarBoteco/export/cidade/texturas/asfalto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/atlas_bairro.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/atlas_cidade.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/concreto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/folhas.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/folhas_ipe.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/grama.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/madeira.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/metal_ondulado.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/morro.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/panorama.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_casca.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_casca_eucalipto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_casca_eucalipto_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_casca_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_copa_ipe_lod.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pbr_folhagem.png
+assets-bar/map/BarBoteco/export/cidade/texturas/pedra_portuguesa.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_asfalto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_carvalho.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_concreto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_feltro.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_grama.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_madeira_escura.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_metal_ondulado.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_metal_ondulado_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_metal_preto.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_plastico.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_reboco.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_terra.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_terra_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_tijolo.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/pol_tijolo_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/ponto_ifood_atlas.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/ponto_ifood_escovado.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/ponto_ifood_pintura.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/ponto_ifood_pintura_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/reboco.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/telha.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/telha_n.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/terra_batida.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/tijolo.jpg
+assets-bar/map/BarBoteco/export/cidade/texturas/tijolo_n.jpg
+assets-bar/map/BarBoteco/export/cidade/validacao.json
+assets-bar/map/BarBoteco/export/integracao_highland.js
+assets-bar/map/BarBoteco/export/moto/PROMPT_integracao_moto.md
+assets-bar/map/BarBoteco/export/moto/moto_delivery.glb
+assets-bar/map/BarBoteco/export/moto/moto_delivery.js
+assets-bar/map/BarBoteco/export/moto/moto_delivery_atlas.png
+assets-bar/map/BarBoteco/export/moto/moto_delivery_colisao.glb
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_ACELERANDO.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_DESLIGA.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_IDLE.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_LIGA-FALHA-1.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_LIGA-FALHA-2.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_LIGA-FALHA-3.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_LIGA-FALHA-4.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_LIGA.flac
+assets-bar/map/BarBoteco/export/moto/sound/SCOOTER_PARANDO-DE-ACELERAR.flac
+assets-bar/map/BarBoteco/export/moto_v2/PROMPT_integracao_moto_v2.md
+assets-bar/map/BarBoteco/export/moto_v2/moto_atlas.png
+assets-bar/map/BarBoteco/export/moto_v2/moto_bau.png
+assets-bar/map/BarBoteco/export/moto_v2/moto_delivery.glb
+assets-bar/map/BarBoteco/export/moto_v2/moto_delivery.js
+assets-bar/map/BarBoteco/export/moto_v2/moto_delivery_colisao.glb
+assets-bar/map/BarBoteco/export/moto_v2/moto_placa.png
+assets-bar/map/BarBoteco/export/moto_v2/scripts/54_moto_tripo.py
+assets-bar/map/BarBoteco/export/moto_v2/scripts/carro_textura.py
+assets-bar/map/BarBoteco/export/moto_v2/scripts/moto_textura.py
+assets-bar/map/BarBoteco/export/moto_v3/PROMPT_integracao_moto_v3.md
+assets-bar/map/BarBoteco/export/moto_v3/moto_atlas.png
+assets-bar/map/BarBoteco/export/moto_v3/moto_bag.glb
+assets-bar/map/BarBoteco/export/moto_v3/moto_bag.js
+assets-bar/map/BarBoteco/export/moto_v3/moto_bag.png
+assets-bar/map/BarBoteco/export/moto_v3/moto_delivery.glb
+assets-bar/map/BarBoteco/export/moto_v3/moto_delivery.js
+assets-bar/map/BarBoteco/export/moto_v3/moto_delivery_colisao.glb
+assets-bar/map/BarBoteco/export/moto_v3/moto_metal_rugosidade.png
+assets-bar/map/BarBoteco/export/moto_v3/moto_placa.png
+assets-bar/map/BarBoteco/export/moto_v3/scripts/54_moto_tripo.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/55_moto_v3.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/56_moto_bag.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/carro_textura.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/moto_ref.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/moto_textura.py
+assets-bar/map/BarBoteco/export/moto_v3/scripts/moto_textura3.py
+assets-bar/map/BarBoteco/export/moto_v4/moto_atlas.png
+assets-bar/map/BarBoteco/export/moto_v4/moto_delivery.glb
+assets-bar/map/BarBoteco/export/moto_v4/moto_delivery.js
+assets-bar/map/BarBoteco/export/moto_v4/moto_delivery_colisao.glb
+assets-bar/map/BarBoteco/export/moto_v4/moto_metal_rugosidade.png
+assets-bar/map/BarBoteco/export/moto_v4/moto_placa.png
+assets-bar/map/BarBoteco/export/moto_v4/scripts/54_moto_tripo.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/55_moto_v3.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/57_moto_v4.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/carro_textura.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/moto_ref.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/moto_textura.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/moto_textura3.py
+assets-bar/map/BarBoteco/export/moto_v4/scripts/moto_textura4.py
+assets-bar/map/BarBoteco/scripts/01_texturas.py
+assets-bar/map/BarBoteco/scripts/02_materiais.py
+assets-bar/map/BarBoteco/scripts/03_rua.py
+assets-bar/map/BarBoteco/scripts/04_predio.py
+assets-bar/map/BarBoteco/scripts/05_props.py
+assets-bar/map/BarBoteco/scripts/06_interior.py
+assets-bar/map/BarBoteco/scripts/07_exterior.py
+assets-bar/map/BarBoteco/scripts/08_export.py
+assets-bar/map/BarBoteco/scripts/09_assets.py
+assets-bar/map/BarBoteco/scripts/10_validar.py
+assets-bar/map/BarBoteco/scripts/11_animacoes.py
+assets-bar/map/BarBoteco/scripts/12_jukebox.py
+assets-bar/map/BarBoteco/scripts/13_fachada.py
+assets-bar/map/BarBoteco/scripts/14_mesas.py
+assets-bar/map/BarBoteco/scripts/15_palco.py
+assets-bar/map/BarBoteco/scripts/16_animacoes_palco.py
+assets-bar/map/BarBoteco/scripts/17_lugares_animacao.py
+assets-bar/map/BarBoteco/scripts/18_animacoes_bar.py
+assets-bar/map/BarBoteco/scripts/19_fumar_mixamo.py
+assets-bar/map/BarBoteco/scripts/20_moto_delivery.py
+assets-bar/map/BarBoteco/scripts/21_carro_hatch.py
+assets-bar/map/BarBoteco/scripts/21_cidade_texturas.py
+assets-bar/map/BarBoteco/scripts/22_cidade_base.py
+assets-bar/map/BarBoteco/scripts/23_cidade_edificios.py
+assets-bar/map/BarBoteco/scripts/24_cidade_props.py
+assets-bar/map/BarBoteco/scripts/25_cidade_anel.py
+assets-bar/map/BarBoteco/scripts/26_cidade_lod.py
+assets-bar/map/BarBoteco/scripts/27_cidade_validar.py
+assets-bar/map/BarBoteco/scripts/28_cidade_export.py
+assets-bar/map/BarBoteco/scripts/29_cidade_visibilidade.py
+assets-bar/map/BarBoteco/scripts/30_ponto_ifood_texturas.py
+assets-bar/map/BarBoteco/scripts/31_ponto_ifood.py
+assets-bar/map/BarBoteco/scripts/32_remover_carros.py
+assets-bar/map/BarBoteco/scripts/33_texturas_pbr.py
+assets-bar/map/BarBoteco/scripts/34_arvores.py
+assets-bar/map/BarBoteco/scripts/35_churrasqueira.py
+assets-bar/map/BarBoteco/scripts/36_bar_polimento.py
+assets-bar/map/BarBoteco/scripts/37_texturas_poliigon.py
+assets-bar/map/BarBoteco/scripts/38_materiais_poliigon.py
+assets-bar/map/BarBoteco/scripts/39_carrinho_espeto.py
+assets-bar/map/BarBoteco/scripts/40_guardacorpo.py
+assets-bar/map/BarBoteco/scripts/41_geladeira_textura.py
+assets-bar/map/BarBoteco/scripts/42_geladeira_expositor.py
+assets-bar/map/BarBoteco/scripts/43_texturas_bar.py
+assets-bar/map/BarBoteco/scripts/44_bar_paredes_escada.py
+assets-bar/map/BarBoteco/scripts/45_texturas_blackjack.py
+assets-bar/map/BarBoteco/scripts/46_mesa_blackjack.py
+assets-bar/map/BarBoteco/scripts/47_texturas_truco.py
+assets-bar/map/BarBoteco/scripts/48_mesa_truco.py
+assets-bar/map/BarBoteco/scripts/54_moto_tripo.py
+assets-bar/map/BarBoteco/scripts/55_moto_v3.py
+assets-bar/map/BarBoteco/scripts/56_moto_bag.py
+assets-bar/map/BarBoteco/scripts/barlib.py
+assets-bar/map/BarBoteco/scripts/carro_textura.py
+assets-bar/map/BarBoteco/scripts/cidadelib.py
+assets-bar/map/BarBoteco/scripts/moto_ref.py
+assets-bar/map/BarBoteco/scripts/moto_textura.py
+assets-bar/map/BarBoteco/scripts/moto_textura3.py
+assets-bar/map/BarBoteco/scripts/pollib.py
+assets-bar/map/BarBoteco/texturas/asfalto.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_banqueta_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_banqueta_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_cadeira-vermelha_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_cadeira-vermelha_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_carrinhoespeto_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_carrinhoespeto_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_chopeira_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_chopeira_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_copo_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_copo_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_jukebox_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_jukebox_luz_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_jukebox_luz_mascara.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_jukebox_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_long-neck_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_long-neck_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_mesa-vermelha_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_mesa-vermelha_normal.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_numeracao_mesa_cor.jpg
+assets-bar/map/BarBoteco/texturas/assets/A_numeracao_mesa_normal.jpg
+assets-bar/map/BarBoteco/texturas/atlas_bairro.jpg
+assets-bar/map/BarBoteco/texturas/atlas_cidade.jpg
+assets-bar/map/BarBoteco/texturas/atlas_placas.jpg
+assets-bar/map/BarBoteco/texturas/azulejo.jpg
+assets-bar/map/BarBoteco/texturas/bj_carta.jpg
+assets-bar/map/BarBoteco/texturas/bj_couro.jpg
+assets-bar/map/BarBoteco/texturas/bj_couro_n.jpg
+assets-bar/map/BarBoteco/texturas/bj_feltro.jpg
+assets-bar/map/BarBoteco/texturas/bj_feltro_n.jpg
+assets-bar/map/BarBoteco/texturas/bj_fichas.png
+assets-bar/map/BarBoteco/texturas/bj_madeira.jpg
+assets-bar/map/BarBoteco/texturas/bj_madeira_n.jpg
+assets-bar/map/BarBoteco/texturas/brasa.jpg
+assets-bar/map/BarBoteco/texturas/concreto.jpg
+assets-bar/map/BarBoteco/texturas/folhas.jpg
+assets-bar/map/BarBoteco/texturas/folhas_ipe.jpg
+assets-bar/map/BarBoteco/texturas/forro.jpg
+assets-bar/map/BarBoteco/texturas/grama.jpg
+assets-bar/map/BarBoteco/texturas/letreiro_highland.jpg
+assets-bar/map/BarBoteco/texturas/madeira.jpg
+assets-bar/map/BarBoteco/texturas/metal_ondulado.jpg
+assets-bar/map/BarBoteco/texturas/morro.jpg
+assets-bar/map/BarBoteco/texturas/numeros_mesa.png
+assets-bar/map/BarBoteco/texturas/palco_grade.jpg
+assets-bar/map/BarBoteco/texturas/palco_tapete.jpg
+assets-bar/map/BarBoteco/texturas/palco_tecido.jpg
+assets-bar/map/BarBoteco/texturas/palco_testeira.jpg
+assets-bar/map/BarBoteco/texturas/panorama.jpg
+assets-bar/map/BarBoteco/texturas/pedra_portuguesa.jpg
+assets-bar/map/BarBoteco/texturas/piso_ceramico.jpg
+assets-bar/map/BarBoteco/texturas/placa_highland.jpg
+assets-bar/map/BarBoteco/texturas/predios_distantes.jpg
+assets-bar/map/BarBoteco/texturas/reboco.jpg
+assets-bar/map/BarBoteco/texturas/sombra_contato.png
+assets-bar/map/BarBoteco/texturas/telao_highland.jpg
+assets-bar/map/BarBoteco/texturas/telha.jpg
+assets-bar/map/BarBoteco/texturas/telha_n.jpg
+assets-bar/map/BarBoteco/texturas/terra_batida.jpg
+assets-bar/map/BarBoteco/texturas/tijolo.jpg
+assets-bar/map/BarBoteco/texturas/tijolo_n.jpg
+assets-bar/map/BarBoteco/texturas/tr_cartas.png
+assets-bar/map/BarBoteco/texturas/tr_couro.jpg
+assets-bar/map/BarBoteco/texturas/tr_couro_n.jpg
+assets-bar/map/BarBoteco/texturas/tr_feltro.jpg
+assets-bar/map/BarBoteco/texturas/tr_feltro_n.jpg
+assets-bar/map/BarBoteco/texturas/tr_madeira.jpg
+assets-bar/map/BarBoteco/texturas/tr_madeira_n.jpg
+assets-bar/map/BarBoteco_mapa_2026-11-01.zip
+assets-bar/map/BarBoteco_mapa_2026-11-02.zip
+assets-bar/map/BarBoteco_mapa_2026-11-02_b.zip
+assets-bar/mixamo/accurig/leandro.glb
+assets-bar/mixamo/accurig/magrao.glb
+assets-bar/mixamo/accurig/read.glb
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo-mixamo.fbx
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo.fbx
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo.mtl
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo.obj
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo_texture.png
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo_texture_metallic.png
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo_texture_normal.png
+assets-bar/mixamo/download/gilmar-gordo/gilmar-gordo_texture_roughness.png
+assets-bar/mixamo/download/icon/Clipboard Image 2026-10-27 19-11-56.png
+assets-bar/mixamo/download/icon/bacon.png
+assets-bar/mixamo/download/icon/cerveja.png
+assets-bar/mixamo/download/icon/copo-americano.png
+assets-bar/mixamo/download/icon/coxinha.png
+assets-bar/mixamo/download/icon/pastel.png
+assets-bar/mixamo/download/icon/refrigerante.png
+assets-bar/mixamo/download/icon/water.png
+assets-bar/mixamo/download/outros/leandro-mixamo.fbx
+assets-bar/mixamo/download/outros/magrao-mixamo.fbx
+assets-bar/mixamo/download/outros/read-mixamo.fbx
+assets-bar/mixamo/download/rafael/rafael-mixamo.fbx
+assets-bar/mixamo/download/rafael/rafael.fbx
+assets-bar/mixamo/download/rafael/rafael_texture.png
+assets-bar/mixamo/download/rafael/rafael_texture_metallic.png
+assets-bar/mixamo/download/rafael/rafael_texture_normal.png
+assets-bar/mixamo/download/rafael/rafael_texture_roughness.png
+assets-bar/objects/Banqueta/banqueta_texture.fbx
+assets-bar/objects/Banqueta/banqueta_texture.png
+assets-bar/objects/Banqueta/banqueta_texture_metallic.png
+assets-bar/objects/Banqueta/banqueta_texture_normal.png
+assets-bar/objects/Banqueta/banqueta_texture_roughness.png
+assets-bar/objects/Cadeira de bar/cadeiradebar_texture.fbx
+assets-bar/objects/Cadeira de bar/cadeiradebar_texture.png
+assets-bar/objects/Cadeira de bar/cadeiradebar_texture_metallic.png
+assets-bar/objects/Cadeira de bar/cadeiradebar_texture_normal.png
+assets-bar/objects/Cadeira de bar/cadeiradebar_texture_roughness.png
+assets-bar/objects/Cafe/cafe.png
+assets-bar/objects/Cafe/cafe_texture.fbx
+assets-bar/objects/Cafe/cafe_texture.png
+assets-bar/objects/Cafe/cafe_texture_metallic.png
+assets-bar/objects/Cafe/cafe_texture_normal.png
+assets-bar/objects/Cafe/cafe_texture_roughness.png
+assets-bar/objects/Chopeira/chopeira_texture.fbx
+assets-bar/objects/Chopeira/chopeira_texture.png
+assets-bar/objects/Chopeira/chopeira_texture_metallic.png
+assets-bar/objects/Chopeira/chopeira_texture_metallic_roughness.png
+assets-bar/objects/Chopeira/chopeira_texture_normal.png
+assets-bar/objects/Chopeira/chopeira_texture_roughness.png
+assets-bar/objects/Coxinha/coxinha_texture.fbx
+assets-bar/objects/Coxinha/coxinha_texture.png
+assets-bar/objects/Coxinha/coxinha_texture_metallic.png
+assets-bar/objects/Coxinha/coxinha_texture_normal.png
+assets-bar/objects/Coxinha/coxinha_texture_roughness.png
+assets-bar/objects/Garrafa de Agua/Agua.png
+assets-bar/objects/Garrafa de Agua/agua_texture.fbx
+assets-bar/objects/Garrafa de Agua/agua_texture.png
+assets-bar/objects/Garrafa de Agua/agua_texture_metallic.png
+assets-bar/objects/Garrafa de Agua/agua_texture_normal.png
+assets-bar/objects/Garrafa de Agua/agua_texture_roughness.png
+assets-bar/objects/Geladeira de Cerveja/Dr-Pepper.jpeg
+assets-bar/objects/Geladeira de Cerveja/Pepsi.png
+assets-bar/objects/Geladeira de Cerveja/budwiser.jpeg
+assets-bar/objects/Geladeira de Cerveja/cantop.png
+assets-bar/objects/Geladeira de Cerveja/cokecan.jpeg
+assets-bar/objects/Geladeira de Cerveja/gingerale.jpeg
+assets-bar/objects/Geladeira de Cerveja/labatt50.jpeg
+assets-bar/objects/Geladeira de Cerveja/labbat.jpeg
+assets-bar/objects/Geladeira de Cerveja/modelo.jpeg
+assets-bar/objects/Geladeira de Cerveja/path_fridge_openPBR_shader1_BaseColor.1001 - Copia.png
+assets-bar/objects/Geladeira de Cerveja/path_fridge_openPBR_shader1_BaseColor.1001.png
+assets-bar/objects/Geladeira de Cerveja/path_fridge_openPBR_shader1_Emissive.1001.png
+assets-bar/objects/Geladeira de Cerveja/path_fridge_openPBR_shader1_Normal.1001.png
+assets-bar/objects/Geladeira de Cerveja/path_fridge_stocked.fbx
+assets-bar/objects/Geladeira de Cerveja/source/path_fridge_stocked.fbx
+assets-bar/objects/Geladeira de Cerveja/sprite.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/Dr-Pepper.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/Pepsi.png
+assets-bar/objects/Geladeira de Cerveja/textures/budwiser.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/cantop.png
+assets-bar/objects/Geladeira de Cerveja/textures/cokecan.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/gingerale.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/labatt50.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/labbat.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/modelo.jpeg
+assets-bar/objects/Geladeira de Cerveja/textures/path_fridge_openPBR_shader1_BaseColor.1001 - Copia.png
+assets-bar/objects/Geladeira de Cerveja/textures/path_fridge_openPBR_shader1_BaseColor.1001.png
+assets-bar/objects/Geladeira de Cerveja/textures/path_fridge_openPBR_shader1_Emissive.1001.png
+assets-bar/objects/Geladeira de Cerveja/textures/path_fridge_openPBR_shader1_Normal.1001.png
+assets-bar/objects/Geladeira de Cerveja/textures/sprite.jpeg
+assets-bar/objects/Mesa de Bar/mesadebar_texture.fbx
+assets-bar/objects/Mesa de Bar/mesadebar_texture.png
+assets-bar/objects/Mesa de Bar/mesadebar_texture_metallic.png
+assets-bar/objects/Mesa de Bar/mesadebar_texture_normal.png
+assets-bar/objects/Mesa de Bar/mesadebar_texture_roughness.png
+assets-bar/objects/Pastel/pastel_texture.fbx
+assets-bar/objects/Pastel/pastel_texture.png
+assets-bar/objects/Pastel/pastel_texture_metallic.png
+assets-bar/objects/Pastel/pastel_texture_normal.png
+assets-bar/objects/Pastel/pastel_texture_roughness.png
+"assets-bar/objects/Por\303\247\303\243o de Torresmo/torresmo_texture.fbx"
+"assets-bar/objects/Por\303\247\303\243o de Torresmo/torresmo_texture.png"
+"assets-bar/objects/Por\303\247\303\243o de Torresmo/torresmo_texture_metallic.png"
+"assets-bar/objects/Por\303\247\303\243o de Torresmo/torresmo_texture_normal.png"
+"assets-bar/objects/Por\303\247\303\243o de Torresmo/torresmo_texture_roughness.png"
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture.fbx
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture.png
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture_metallic.png
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture_metallic_roughness.png
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture_normal.png
+assets-bar/objects/carrinho de espeto/carrinhoespeto_texture_roughness.png
+assets-bar/objects/copo americano/copo_texture.fbx
+assets-bar/objects/copo americano/copo_texture.png
+assets-bar/objects/copo americano/copo_texture_metallic.png
+assets-bar/objects/copo americano/copo_texture_normal.png
+assets-bar/objects/copo americano/copo_texture_roughness.png
+assets-bar/objects/garrafa de cerveja/garrafa_texture.fbx
+assets-bar/objects/garrafa de cerveja/garrafa_texture.png
+assets-bar/objects/garrafa de cerveja/garrafa_texture_metallic.png
+assets-bar/objects/garrafa de cerveja/garrafa_texture_normal.png
+assets-bar/objects/garrafa de cerveja/garrafa_texture_roughness.png
+assets-bar/objects/highcola/highcola.png
+assets-bar/objects/highcola/highcola_texture.fbx
+assets-bar/objects/highcola/highcola_texture.png
+assets-bar/objects/highcola/highcola_texture_metallic.png
+assets-bar/objects/highcola/highcola_texture_normal.png
+assets-bar/objects/highcola/highcola_texture_roughness.png
+"assets-bar/skins/Flavio Hipot\303\251tico/Flavio Hipotetico.glb"
+assets-bar/skins/Gabriel/Double Dagger Stab.fbx
+assets-bar/skins/Gabriel/athlete 3d model.glb
+assets-bar/skins/Gabriel/tripo_convert_7f75c99f-503e-496d-8047-73c07d69ad29.fbm/tripo_image_7f75c99f-503e-496d-8047-73c07d69ad29_0_0.jpg
+assets-bar/skins/Gabriel/tripo_convert_7f75c99f-503e-496d-8047-73c07d69ad29.fbx
+assets-bar/skins/Leandro/LEIAME.txt
+assets-bar/skins/Leandro/Leandro-Rigged.zip
+assets-bar/skins/Leandro/Leandro.fbm/Leandro_textura.jpg
+assets-bar/skins/Leandro/Leandro.fbx
+assets-bar/skins/Leandro/Leandro.glb
+assets-bar/skins/Rafael/Black/Rafael_GokuBlack.glb
+assets-bar/skins/Rafael/Rafael-Rigged.zip
+assets-bar/skins/Rafael/rafael-rigged-corrigido.fbm/tripo_rgb_8daec337-10ef-4108-a10a-28d56e876aac.png
+assets-bar/skins/Rafael/rafael-rigged-corrigido.fbx
+assets-bar/skins/Tiao/cavalo/Cavalo.glb
+assets-bar/skins/Tiao/tiao.glb
+assets-bar/skins/Tonico/LEIAME.txt
+assets-bar/skins/Tonico/Tonico-Rigged.zip
+assets-bar/skins/Tonico/Tonico.fbm/Tonico_textura.jpg
+assets-bar/skins/Tonico/Tonico.fbx
+assets-bar/skins/Tonico/Tonico.glb
+assets-bar/sound/ambient/817787__tferrino__rio-de-janeiro-brasil-gas-van-music.m4a
+assets-bar/sound/ambient/817788__tferrino__night-atmo-distant-city-rumble.m4a
+assets-bar/sound/ambient/817790__tferrino__distant-motorcycle-gathering-night.m4a
+assets-bar/sound/ambient/817791__tferrino__afternoon-atmo-dogs-bark-baker-horn-bells-distant-city-01.m4a
+assets-bar/sound/ambient/817793__tferrino__night-atmo-dogs-bark-neighbors-argue-distant-city-01.m4a
+assets-bar/sound/ambient/817794__tferrino__night-atmo-dogs-bark-neighbors-go-crazy-distant-city-02.m4a
+assets-bar/sound/freesound/182855_qubodup_vibration-cell-phone.mp3
+assets-bar/sounds/cavalo/NEIGH_SOURCE.txt
+assets-bar/sounds/cavalo/SOURCE.txt
+assets-bar/sounds/cavalo/credits.txt
+assets-bar/sounds/cavalo/ground.mp3
+assets-bar/sounds/cavalo/neigh.mp3
+assets-bar/sounds/golpes/hits/hit10.mp3.flac
+assets-bar/sounds/golpes/hits/hit11.mp3.flac
+assets-bar/sounds/golpes/hits/hit15.mp3.flac
+assets-bar/sounds/golpes/hits/hit23.mp3.flac
+assets-bar/sounds/golpes/hits/hit34.mp3.flac
+assets-bar/sounds/golpes/swoshes/swosh-15.flac
+assets-bar/sounds/golpes/swoshes/swosh-20.flac
+assets-bar/sounds/golpes/swoshes/swosh-22.flac
+assets-bar/sounds/golpes/swoshes/swosh-29.flac
+assets-bar/sounds/golpes/wet_towel_on_floor/wet_towel_on_floor-03.flac
+assets-bar/sounds/golpes/wet_towel_on_floor/wet_towel_on_floor-07.flac
+assets-bar/sounds/golpes/wet_towel_on_floor/wet_towel_on_floor-08.flac
+assets-bar/sounds/golpes/wet_towel_on_floor/wet_towel_on_floor-10.flac
+assets-bar/ui/midnight-neon-menu-main/.gitignore
+assets-bar/ui/midnight-neon-menu-main/.lovable/project.json
+assets-bar/ui/midnight-neon-menu-main/.prettierignore
+assets-bar/ui/midnight-neon-menu-main/.prettierrc
+assets-bar/ui/midnight-neon-menu-main/AGENTS.md
+assets-bar/ui/midnight-neon-menu-main/README.md
+assets-bar/ui/midnight-neon-menu-main/bun.lock
+assets-bar/ui/midnight-neon-menu-main/bunfig.toml
+assets-bar/ui/midnight-neon-menu-main/components.json
+assets-bar/ui/midnight-neon-menu-main/eslint.config.js
+assets-bar/ui/midnight-neon-menu-main/package.json
+assets-bar/ui/midnight-neon-menu-main/public/favicon.ico
+assets-bar/ui/midnight-neon-menu-main/public/robots.txt
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/accordion.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/alert-dialog.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/alert.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/aspect-ratio.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/avatar.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/badge.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/breadcrumb.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/button.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/calendar.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/card.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/carousel.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/chart.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/checkbox.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/collapsible.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/command.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/context-menu.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/dialog.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/drawer.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/dropdown-menu.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/form.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/hover-card.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/input-otp.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/input.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/label.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/menubar.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/navigation-menu.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/pagination.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/popover.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/progress.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/radio-group.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/resizable.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/scroll-area.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/select.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/separator.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/sheet.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/sidebar.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/skeleton.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/slider.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/sonner.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/switch.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/table.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/tabs.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/textarea.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/toggle-group.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/toggle.tsx
+assets-bar/ui/midnight-neon-menu-main/src/components/ui/tooltip.tsx
+assets-bar/ui/midnight-neon-menu-main/src/hooks/use-mobile.tsx
+assets-bar/ui/midnight-neon-menu-main/src/lib/error-capture.ts
+assets-bar/ui/midnight-neon-menu-main/src/lib/error-page.ts
+assets-bar/ui/midnight-neon-menu-main/src/lib/lovable-error-reporting.ts
+assets-bar/ui/midnight-neon-menu-main/src/lib/utils.ts
+assets-bar/ui/midnight-neon-menu-main/src/routeTree.gen.ts
+assets-bar/ui/midnight-neon-menu-main/src/router.tsx
+assets-bar/ui/midnight-neon-menu-main/src/routes/README.md
+assets-bar/ui/midnight-neon-menu-main/src/routes/__root.tsx
+assets-bar/ui/midnight-neon-menu-main/src/routes/index.tsx
+assets-bar/ui/midnight-neon-menu-main/src/server.ts
+assets-bar/ui/midnight-neon-menu-main/src/start.ts
+assets-bar/ui/midnight-neon-menu-main/src/styles.css
+assets-bar/ui/midnight-neon-menu-main/src/test/app-routing.test.tsx
+assets-bar/ui/midnight-neon-menu-main/src/test/setup.ts
+assets-bar/ui/midnight-neon-menu-main/tsconfig.json
+assets-bar/ui/midnight-neon-menu-main/vite.config.ts
+assets-bar/ui/midnight-neon-menu-main/vitest.config.ts
+docs/README.md
+docs/arquitetura/architecture.md
+docs/arquitetura/implementation-contract.md
+docs/arquitetura/networking.md
+docs/assets/animations.md
+docs/assets/map.md
+docs/assets/native-rigs.md
+docs/assets/old-cane.md
+docs/assets/rig-troubleshooting.md
+docs/assets/skins-mixamo.md
+docs/assets/sons-cavalo.md
+docs/assets/sons-golpes.md
+docs/auditoria/00-RESUMO-EXECUTIVO.md
+docs/auditoria/01-ESTADO-ATUAL.md
+docs/auditoria/02-PROBLEMAS-E-RISCOS.md
+docs/auditoria/03-COMPARATIVO-ENGINES.md
+docs/auditoria/04-ARQUITETURA-RECOMENDADA.md
+docs/auditoria/05-PIPELINE-ASSETS.md
+docs/auditoria/06-MULTIPLAYER-BACKEND.md
+docs/auditoria/07-GAMEPLAY-E-ECONOMIA.md
+docs/auditoria/08-UI-UX-E-RENDERIZACAO.md
+docs/auditoria/09-ASSETS-E-FERRAMENTAS.md
+docs/auditoria/10-ROADMAP.md
+docs/auditoria/11-CRITERIOS-DE-ACEITE.md
+docs/auditoria/12-DECISOES-PENDENTES.md
+docs/auditoria/PROMPT-MESTRE-CLAUDE.md
+docs/execucao/DECISOES.md
+docs/execucao/ESTADO.md
+docs/execucao/PLANO.md
+docs/execucao/PROBLEMAS.md
+docs/execucao/TESTES.md
+docs/previews/admin-panel.png
+docs/previews/blackjack.png
+docs/previews/day-night-border-fog.png
+docs/previews/day-night-dusk.png
+docs/previews/day-night-interior.png
+docs/previews/day-night-midnight.png
+docs/previews/day-night-noon.png
+docs/previews/door-closed.png
+docs/previews/door-open.png
+docs/previews/drink-grip.png
+docs/previews/drink-sip.png
+docs/previews/festa.png
+docs/previews/interface-game.png
+docs/previews/interface-lobby.png
+docs/previews/interface-mobile.png
+docs/previews/jukebox-controls.png
+docs/previews/jukebox-mobile.png
+docs/previews/jukebox-tv-angle.png
+docs/previews/jukebox-tv.png
+docs/previews/leandro-accurig.png
+docs/previews/lobby.png
+docs/previews/map-exterior.png
+docs/previews/map-upper-floor.png
+docs/previews/native-rigs-dance.png
+docs/previews/native-rigs-walk.png
+docs/previews/nova-ui-desktop.png
+docs/previews/nova-ui-lobby.png
+docs/previews/nova-ui-mobile.png
+docs/previews/nova-ui-toast.png
+docs/previews/old-cane.png
+docs/projeto/assets-recomendados.md
+docs/projeto/funcionalidades.md
+docs/projeto/game-design.md
+docs/projeto/mvp-specification.md
+docs/sistemas/abastecimento.md
+docs/sistemas/admin.md
+docs/sistemas/ambient.md
+docs/sistemas/animacoes-bar.md
+docs/sistemas/blackjack.md
+docs/sistemas/camera.md
+docs/sistemas/carro.md
+docs/sistemas/cavalo.md
+docs/sistemas/celular.md
+docs/sistemas/cidade.md
+docs/sistemas/conducao.md
+docs/sistemas/conquistas.md
+docs/sistemas/day-night.md
+docs/sistemas/desempenho.md
+docs/sistemas/doors.md
+docs/sistemas/drinks.md
+docs/sistemas/economia.md
+docs/sistemas/garagem.md
+docs/sistemas/graficos.md
+docs/sistemas/highfood.md
+docs/sistemas/interface.md
+docs/sistemas/inventory.md
+docs/sistemas/jukebox.md
+docs/sistemas/moto-v4-validacao.md
+docs/sistemas/moto.md
+docs/sistemas/needs.md
+docs/sistemas/palco.md
+docs/sistemas/pebolim.md
+docs/sistemas/perfil.md
+docs/sistemas/sinuca.md
+docs/sistemas/skins.md
+docs/sistemas/troca.md
+docs/sistemas/truco.md
+docs/sistemas/veiculos-acoes.md
+docs/sistemas/velocimetro.md
+docs/sistemas/voice.md
+docs/validacao/relatorios/load-32.json
+docs/validacao/relatorios/map-load-32.json
+docs/validacao/validation-map.md
+docs/validacao/validation.md
+infra/README.md
+infra/compose.yml
+infra/docker/Dockerfile
+infra/docker/nginx.conf
+infra/migrations/001_initial.sql
+infra/migrations/002_characters.sql
+infra/migrations/003_inventory.sql
+infra/migrations/004_control_outbox.sql
+infra/migrations/005_retire_character_creator.sql
+infra/migrations/006_phone.sql
+infra/migrations/007_phone_social.sql
+infra/migrations/008_admin_console.sql
+infra/migrations/009_profile.sql
+infra/migrations/010_badge_images.sql
+infra/migrations/011_badge_rarity.sql
+infra/migrations/012_achievements.sql
+infra/migrations/013_highfood.sql
+infra/migrations/014_garage_trade.sql
+infra/migrations/015_collection.sql
+infra/migrations/016_minigame_achievements.sql
+infra/migrations/017_car_color.sql
+infra/migrations/018_vehicle_fuel.sql
+infra/migrations/019_fuel_services.sql
+infra/postgres/010-roles.sh
+infra/postgres/Dockerfile
+infra/production.env.example
+package-lock.json
+package.json
+packages/shared/package.json
+packages/shared/src/achievements.ts
+packages/shared/src/admin.ts
+packages/shared/src/bar-animations.ts
+packages/shared/src/blackjack.ts
+packages/shared/src/car-dynamics.ts
+packages/shared/src/car-parts.ts
+packages/shared/src/city-data.json
+packages/shared/src/city-roads.json
+packages/shared/src/city-roads.ts
+packages/shared/src/city.ts
+packages/shared/src/doors.ts
+packages/shared/src/economy.ts
+packages/shared/src/environment.ts
+packages/shared/src/foosball.ts
+packages/shared/src/garage.ts
+packages/shared/src/gps-data.json
+packages/shared/src/gps.ts
+packages/shared/src/head-look.ts
+packages/shared/src/highfood.ts
+packages/shared/src/horse.ts
+packages/shared/src/index.ts
+packages/shared/src/inventory.ts
+packages/shared/src/jukebox.ts
+packages/shared/src/kick-paths.ts
+packages/shared/src/kick.ts
+packages/shared/src/map-data.json
+packages/shared/src/media-links.ts
+packages/shared/src/metrics.ts
+packages/shared/src/moto-crash.ts
+packages/shared/src/moto-parts.ts
+packages/shared/src/moto.ts
+packages/shared/src/musicians.ts
+packages/shared/src/needs.ts
+packages/shared/src/performance.ts
+packages/shared/src/phone.ts
+packages/shared/src/pool/ai.ts
+packages/shared/src/pool/aim.ts
+packages/shared/src/pool/index.ts
+packages/shared/src/pool/physics.ts
+packages/shared/src/pool/rules.ts
+packages/shared/src/pool/table.ts
+packages/shared/src/prices.ts
+packages/shared/src/profile.ts
+packages/shared/src/ragdoll.ts
+packages/shared/src/rarity.ts
+packages/shared/src/refueling.ts
+packages/shared/src/skins.ts
+packages/shared/src/stage-show.ts
+packages/shared/src/tickets.ts
+packages/shared/src/trade.ts
+packages/shared/src/truco/ai.ts
+packages/shared/src/truco/betting.ts
+packages/shared/src/truco/cards.ts
+packages/shared/src/truco/game.ts
+packages/shared/src/truco/index.ts
+packages/shared/src/truco/scoring.ts
+packages/shared/src/truco/stakes.ts
+packages/shared/src/vehicle-actions.ts
+packages/shared/src/vehicle-controls.ts
+packages/shared/src/vehicle-models.ts
+packages/shared/src/vehicle-parts.ts
+packages/shared/src/voice.ts
+packages/shared/src/world.ts
+packages/shared/tsconfig.json
+playwright.config.ts
+tests/e2e/achievements.spec.ts
+tests/e2e/admin-badges.spec.ts
+tests/e2e/admin.spec.ts
+tests/e2e/ambient.spec.ts
+tests/e2e/badge-card.spec.ts
+tests/e2e/bar-animations.spec.ts
+tests/e2e/bar.spec.ts
+tests/e2e/camera-helpers.ts
+tests/e2e/camera.spec.ts
+tests/e2e/car.spec.ts
+tests/e2e/city.spec.ts
+tests/e2e/collection-helpers.ts
+tests/e2e/collection.spec.ts
+tests/e2e/doors.spec.ts
+tests/e2e/economy.spec.ts
+tests/e2e/environment.spec.ts
+tests/e2e/foosball.spec.ts
+tests/e2e/garage-trade.spec.ts
+tests/e2e/highfood.spec.ts
+tests/e2e/highmotors.spec.ts
+tests/e2e/horse-sound.spec.ts
+tests/e2e/horse.spec.ts
+tests/e2e/inventory.spec.ts
+tests/e2e/jukebox.spec.ts
+tests/e2e/kick.spec.ts
+tests/e2e/media-firefox.spec.ts
+tests/e2e/media-fixture.ts
+tests/e2e/media-platforms.spec.ts
+tests/e2e/moto-actions.spec.ts
+tests/e2e/moto-crash.spec.ts
+tests/e2e/moto-helpers.ts
+tests/e2e/moto-parts.spec.ts
+tests/e2e/moto-v4.spec.ts
+tests/e2e/moto.spec.ts
+tests/e2e/mouse-capture.spec.ts
+tests/e2e/nova-ui.spec.ts
+tests/e2e/old-cane.spec.ts
+tests/e2e/phone.spec.ts
+tests/e2e/preview-path.ts
+tests/e2e/profile.spec.ts
+tests/e2e/refueling.spec.ts
+tests/e2e/rigs.spec.ts
+tests/e2e/server.mjs
+tests/e2e/stage.spec.ts
+tests/e2e/truco.spec.ts
+tests/e2e/voice.spec.ts
+tests/e2e/walk.ts
+tests/e2e/weather.spec.ts
+tests/e2e/zz-hud-preview.ts
+tests/fixtures/admin-badges.html
+tests/fixtures/ambient.html
+tests/fixtures/badge-card.html
+tests/fixtures/blackjack.html
+tests/fixtures/car.html
+tests/fixtures/collection.html
+tests/fixtures/collection.js
+tests/fixtures/environment.html
+tests/fixtures/foosball.html
+tests/fixtures/highmotors.html
+tests/fixtures/horse-sound.html
+tests/fixtures/hud.html
+tests/fixtures/jukebox-controller.html
+tests/fixtures/moto-card-render.html
+tests/fixtures/moto-card-render.js
+tests/fixtures/notifications.html
+tests/fixtures/pool.html
+tests/fixtures/refueling.html
+tests/fixtures/skin-card-render.html
+tests/fixtures/skin-card-render.js
+tests/fixtures/truco-scenes.js
+tests/fixtures/truco.html
+tests/fixtures/tv-controller.html
+tests/fixtures/vehicle-hud.html
+tests/fixtures/youtube-api-mock.js
+tests/integration/admission-lifecycle.test.ts
+tests/integration/ambient.test.ts
+tests/integration/animations.test.ts
+tests/integration/bar-animations.test.ts
+tests/integration/camera-settings.test.ts
+tests/integration/camera.test.ts
+tests/integration/car.test.ts
+tests/integration/city-streaming.test.ts
+tests/integration/city.test.ts
+tests/integration/consumption.test.ts
+tests/integration/day-night.test.ts
+tests/integration/doors.test.ts
+tests/integration/drinks.test.ts
+tests/integration/environment.test.ts
+tests/integration/gps-follow.test.ts
+tests/integration/head-look.test.ts
+tests/integration/highfood.test.ts
+tests/integration/horse-network.test.ts
+tests/integration/horse.test.ts
+tests/integration/jukebox.test.ts
+tests/integration/kick.test.ts
+tests/integration/map.test.ts
+tests/integration/media-links.test.ts
+tests/integration/mixamo-retarget.test.ts
+tests/integration/moto-crash.test.ts
+tests/integration/moto-model.test.ts
+tests/integration/moto-motion.test.ts
+tests/integration/moto-parts.test.ts
+tests/integration/moto.test.ts
+tests/integration/needs.test.ts
+tests/integration/performance.test.ts
+tests/integration/phone-filters.test.ts
+tests/integration/preview-path.test.ts
+tests/integration/shared.test.ts
+tests/integration/shop.test.ts
+tests/integration/stage-show.test.ts
+tests/integration/street-names.test.ts
+tests/integration/vehicle-actions.test.ts
+tests/integration/vehicle-handling.test.ts
+tests/integration/vehicle-network.test.ts
+tests/integration/voice.test.ts
+tests/load/bots-planner.ts
+tests/load/bots.ts
+tests/load/room.ts
+tests/tools/animation-transitions.test.mjs
+tests/tools/horse.test.mjs
+tests/tools/import-city.test.mjs
+tests/tools/infra.test.mjs
+tests/tools/old-cane.test.mjs
+tests/tools/postgres-backup.test.mjs
+tests/tools/retarget.test.mjs
+tools/README.md
+tools/abrir-jogo.bat
+tools/assets/build-gps.ts
+tools/assets/convert-animations.mjs
+tools/assets/export-mixamo.mjs
+tools/assets/import-ambient.mjs
+tools/assets/import-car.mjs
+tools/assets/import-city.mjs
+tools/assets/import-drinks.mjs
+tools/assets/import-highfood-logo.mjs
+tools/assets/import-horse-sounds.mjs
+tools/assets/import-horse.mjs
+tools/assets/import-icons.mjs
+tools/assets/import-kick-sounds.mjs
+tools/assets/import-map.mjs
+tools/assets/import-mixamo.mjs
+tools/assets/import-moto-sounds.mjs
+tools/assets/import-moto.mjs
+tools/assets/import-phone-sounds.mjs
+tools/assets/lib/animation-retarget.mjs
+tools/assets/lib/auto-weights.mjs
+tools/assets/lib/character-gltf.mjs
+tools/assets/lib/mixamo-names.mjs
+tools/assets/lib/old-cane.mjs
+tools/assets/measure-kicks.mjs
+tools/assets/render-moto-photo.mjs
+tools/assets/render-skin-cards.mjs
+tools/assets/repair-map-cart.mjs
+tools/assets/retarget-skins.mjs
+tools/assets/street-names.ts
+tools/atualizar.bat
+tools/bar.ps1
+tools/bots.bat
+tools/contas-demo.bat
+tools/iniciar.bat
+tools/liberar-firewall.bat
+tools/logs.bat
+tools/ops/postgres-backup-lib.mjs
+tools/ops/postgres-backup.mjs
+tools/ops/postgres-restore-check.mjs
+tools/ops/pseudonym.mjs
+tools/parar.bat
+tools/reiniciar.bat
+tools/status.bat
+tools/testar.bat
+tools/vehicle-handling-metrics.ts
+tsconfig.base.json
+tsconfig.json

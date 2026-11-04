@@ -216,9 +216,9 @@ export class Motos {
     entity.addComponent('render',{type:'box',castShadows:false,receiveShadows:false});
     entity.render!.meshInstances[0]!.material=material;
     // Replace the authored plate face; point_placa is in world axes at rest (the plate slopes 15 degrees).
-    rig.ponto('Moto_Placa').enabled=false;
+    const authored=rig.ponto('Moto_Placa');if(authored)authored.enabled=false;
     entity.setLocalEulerAngles(15,0,0);entity.setLocalScale(PLATE_SIZE[0],PLATE_SIZE[1],PLATE_SIZE[2]);
-    rig.ponto('ponto_placa').addChild(entity);
+    const anchor=rig.ponto('ponto_placa');if(anchor)anchor.addChild(entity);
     return {material,texture};
   }
   sync(states:Record<string,MotoState>|undefined):void {

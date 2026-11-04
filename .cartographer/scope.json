@@ -1,0 +1,10 @@
+{
+  "goal": "health check",
+  "skip_paths": ["assets-bar/", "tools/assets/", "node_modules/", "playwright-report/", "test-results/", "debug.log"],
+  "known_issues": [],
+  "ground_truth": null,
+  "style_standard": null,
+  "sensitive_paths": [],
+  "test_posture": "signal_only",
+  "budget_hint": "medium"
+}

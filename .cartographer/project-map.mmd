@@ -1,0 +1,1051 @@
+graph LR
+  n__local_audit_vehicle_ownership_ts[".local/audit-vehicle-ownership.ts"]
+  n_apps_api_src_config_ts["apps/api/src/config.ts"]
+  n__local_audit_vehicle_ownership_ts --> n_apps_api_src_config_ts
+  n_apps_api_src_database_index_ts["apps/api/src/database/index.ts"]
+  n__local_audit_vehicle_ownership_ts --> n_apps_api_src_database_index_ts
+  n__local_horse_config_ts[".local/horse.config.ts"]
+  n_playwright_config_ts["playwright.config.ts"]
+  n__local_horse_config_ts --> n_playwright_config_ts
+  n__local_vehicle_hud_playwright_config_ts[".local/vehicle-hud.playwright.config.ts"]
+  n__local_vehicle_hud_playwright_config_ts --> n_playwright_config_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv[".local/tools/merge-backup-2026-10-22T15-51-35-333Z/apps/server/src/BarRoom.ts"]
+  n_apps_web_src_phone_core_ts["apps/web/src/phone/core.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_apps_web_src_phone_core_ts
+  n_apps_api_src_database_schema_ts["apps/api/src/database/schema.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_apps_api_src_database_schema_ts
+  n_packages_shared_src_tickets_ts["packages/shared/src/tickets.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_packages_shared_src_tickets_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_apps_api_src_database_schema_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_apps_web_src_phone_core_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_serv --> n_packages_shared_src_tickets_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_[".local/tools/merge-backup-2026-10-22T15-51-35-333Z/apps/web/src/main.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_ --> n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_
+  n_apps_web_src_networking_ts["apps/web/src/networking.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_ --> n_apps_web_src_networking_ts
+  n_apps_web_src_api_ts["apps/web/src/api.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_ --> n_apps_web_src_api_ts
+  n_apps_web_src_audio_ts["apps/web/src/audio.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_ --> n_apps_web_src_audio_ts
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_ --> n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_apps_web_
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_tests_int[".local/tools/merge-backup-2026-10-22T15-51-35-333Z/tests/integration/shared.test.ts"]
+  n__local_tools_merge_backup_2026_10_22T15_51_35_333Z_tests_int --> n_packages_shared_src_tickets_ts
+  n_apps_api_src_admin_console_ts["apps/api/src/admin-console.ts"]
+  n_packages_shared_src_metrics_ts["packages/shared/src/metrics.ts"]
+  n_apps_api_src_admin_console_ts --> n_packages_shared_src_metrics_ts
+  n_apps_api_src_app_ts["apps/api/src/app.ts"]
+  n_apps_api_src_app_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_src_config_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_src_observability_ts["apps/api/src/observability.ts"]
+  n_apps_api_src_observability_ts --> n_packages_shared_src_metrics_ts
+  n_apps_api_test_achievements_test_ts["apps/api/test/achievements.test.ts"]
+  n_apps_api_test_achievements_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_admin_console_test_ts["apps/api/test/admin-console.test.ts"]
+  n_apps_api_test_admin_console_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_auth_test_ts["apps/api/test/auth.test.ts"]
+  n_apps_api_test_auth_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_dev_bots_test_ts["apps/api/test/dev-bots.test.ts"]
+  n_apps_api_test_dev_bots_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_fuel_test_ts["apps/api/test/fuel.test.ts"]
+  n_apps_api_test_fuel_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_highfood_test_ts["apps/api/test/highfood.test.ts"]
+  n_apps_api_test_highfood_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_inventory_test_ts["apps/api/test/inventory.test.ts"]
+  n_apps_api_test_inventory_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_trade_test_ts["apps/api/test/trade.test.ts"]
+  n_apps_api_test_trade_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_wallet_test_ts["apps/api/test/wallet.test.ts"]
+  n_apps_api_test_wallet_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_api_test_wardrobe_test_ts["apps/api/test/wardrobe.test.ts"]
+  n_apps_api_test_wardrobe_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_src_BarRoom_ts["apps/server/src/BarRoom.ts"]
+  n_apps_server_src_BarRoom_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_src_BarRoom_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_src_BarRoom_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_src_config_ts["apps/server/src/config.ts"]
+  n_apps_server_src_config_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_src_http_ts["apps/server/src/http.ts"]
+  n_apps_server_src_http_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_src_index_ts["apps/server/src/index.ts"]
+  n_apps_server_src_index_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_src_internal_ts["apps/server/src/internal.ts"]
+  n_apps_server_src_internal_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_src_observability_ts["apps/server/src/observability.ts"]
+  n_apps_server_src_observability_ts --> n_packages_shared_src_metrics_ts
+  n_apps_server_src_observability_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_src_state_ts["apps/server/src/state.ts"]
+  n_apps_server_src_state_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_src_world_musicians_ts["apps/server/src/world/musicians.ts"]
+  n_apps_server_src_world_musicians_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_src_world_served_ts["apps/server/src/world/served.ts"]
+  n_apps_server_src_world_served_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_test_achievements_integration_test_ts["apps/server/test/achievements.integration.test.ts"]
+  n_apps_server_test_achievements_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_admin_console_integration_test_ts["apps/server/test/admin-console.integration.test.ts"]
+  n_apps_server_test_admin_console_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_admin_console_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_bar_animations_integration_test_ts["apps/server/test/bar-animations.integration.test.ts"]
+  n_apps_server_test_bar_animations_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_car_integration_test_ts["apps/server/test/car.integration.test.ts"]
+  n_apps_server_test_car_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_doors_integration_test_ts["apps/server/test/doors.integration.test.ts"]
+  n_apps_server_test_doors_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_economy_integration_test_ts["apps/server/test/economy.integration.test.ts"]
+  n_apps_server_test_economy_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_environment_integration_test_ts["apps/server/test/environment.integration.test.ts"]
+  n_apps_server_test_environment_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_environment_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_foosball_room_test_ts["apps/server/test/foosball.room.test.ts"]
+  n_apps_server_test_foosball_room_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_foosball_room_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_garage_trade_integration_test_ts["apps/server/test/garage-trade.integration.test.ts"]
+  n_apps_server_test_garage_trade_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_garage_trade_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_highfood_horse_integration_test_ts["apps/server/test/highfood-horse.integration.test.ts"]
+  n_apps_server_test_highfood_horse_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_highfood_horse_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_highfood_integration_test_ts["apps/server/test/highfood.integration.test.ts"]
+  n_apps_server_test_highfood_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_highfood_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_horse_integration_test_ts["apps/server/test/horse.integration.test.ts"]
+  n_apps_server_test_horse_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_horse_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_inventory_integration_test_ts["apps/server/test/inventory.integration.test.ts"]
+  n_apps_server_test_inventory_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_inventory_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_jukebox_integration_test_ts["apps/server/test/jukebox.integration.test.ts"]
+  n_apps_server_test_jukebox_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_kick_integration_test_ts["apps/server/test/kick.integration.test.ts"]
+  n_apps_server_test_kick_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_media_platforms_integration_test_ts["apps/server/test/media-platforms.integration.test.ts"]
+  n_apps_server_test_media_platforms_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_minigame_achievements_integration_test_ts["apps/server/test/minigame-achievements.integration.test.ts"]
+  n_apps_server_test_minigame_achievements_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_minigame_achievements_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_moderation_integration_test_ts["apps/server/test/moderation.integration.test.ts"]
+  n_apps_server_test_moderation_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_moderation_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_moto_parts_integration_test_ts["apps/server/test/moto-parts.integration.test.ts"]
+  n_apps_server_test_moto_parts_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_moto_integration_test_ts["apps/server/test/moto.integration.test.ts"]
+  n_apps_server_test_moto_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_musicians_integration_test_ts["apps/server/test/musicians.integration.test.ts"]
+  n_apps_server_test_musicians_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_musicians_test_ts["apps/server/test/musicians.test.ts"]
+  n_apps_server_test_musicians_test_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_test_needs_integration_test_ts["apps/server/test/needs.integration.test.ts"]
+  n_apps_server_test_needs_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_observability_integration_test_ts["apps/server/test/observability.integration.test.ts"]
+  n_apps_server_test_observability_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_observability_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_outbox_test_ts["apps/server/test/outbox.test.ts"]
+  n_apps_server_test_outbox_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_performance_test_ts["apps/server/test/performance.test.ts"]
+  n_apps_server_test_performance_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_performance_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_phone_integration_test_ts["apps/server/test/phone.integration.test.ts"]
+  n_apps_server_test_phone_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_pool_room_test_ts["apps/server/test/pool.room.test.ts"]
+  n_apps_server_test_pool_room_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_pool_room_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_refueling_integration_test_ts["apps/server/test/refueling.integration.test.ts"]
+  n_apps_server_test_refueling_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_room_integration_test_ts["apps/server/test/room.integration.test.ts"]
+  n_apps_server_test_room_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_room_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_served_test_ts["apps/server/test/served.test.ts"]
+  n_apps_server_test_served_test_ts --> n_apps_api_src_database_schema_ts
+  n_apps_server_test_stage_show_integration_test_ts["apps/server/test/stage-show.integration.test.ts"]
+  n_apps_server_test_stage_show_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_stage_integration_test_ts["apps/server/test/stage.integration.test.ts"]
+  n_apps_server_test_stage_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_vehicle_actions_integration_test_ts["apps/server/test/vehicle-actions.integration.test.ts"]
+  n_apps_server_test_vehicle_actions_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_vehicle_actions_integration_test_ts --> n_packages_shared_src_tickets_ts
+  n_apps_server_test_vehicle_actions_integration_test_ts --> n_apps_server_src_BarRoom_ts
+  n_apps_server_test_voice_integration_test_ts["apps/server/test/voice.integration.test.ts"]
+  n_apps_server_test_voice_integration_test_ts --> n_apps_web_src_phone_core_ts
+  n_apps_server_test_waiter_test_ts["apps/server/test/waiter.test.ts"]
+  n_apps_server_test_waiter_test_ts --> n_apps_api_src_database_schema_ts
+  n_apps_web_src_ambient_mix_ts["apps/web/src/ambient-mix.ts"]
+  n_apps_web_src_audio_ts --> n_apps_web_src_ambient_mix_ts
+  n_apps_web_src_bar_animations_debug_ts["apps/web/src/bar-animations-debug.ts"]
+  n_apps_web_src_engine_BarScene_ts["apps/web/src/engine/BarScene.ts"]
+  n_apps_web_src_bar_animations_debug_ts --> n_apps_web_src_engine_BarScene_ts
+  n_apps_web_src_car_panel_ts["apps/web/src/car-panel.ts"]
+  n_apps_web_src_car_panel_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_garage_panel_ts["apps/web/src/garage-panel.ts"]
+  n_apps_web_src_car_panel_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_ui_icons_ts["apps/web/src/ui-icons.ts"]
+  n_apps_web_src_car_panel_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_moto_panel_ts["apps/web/src/moto-panel.ts"]
+  n_apps_web_src_car_panel_ts --> n_apps_web_src_moto_panel_ts
+  n_apps_web_src_consuming_hud_ts["apps/web/src/consuming-hud.ts"]
+  n_apps_web_src_consuming_hud_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_consuming_hud_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_consumption_ts["apps/web/src/consumption.ts"]
+  n_apps_web_src_consuming_hud_ts --> n_apps_web_src_consumption_ts
+  n_apps_web_src_economy_ui_ts["apps/web/src/economy-ui.ts"]
+  n_apps_web_src_economy_ui_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_economy_ui_ts --> n_apps_web_src_networking_ts
+  n_apps_web_src_graphics_ts["apps/web/src/graphics.ts"]
+  n_apps_web_src_economy_ui_ts --> n_apps_web_src_graphics_ts
+  n_apps_web_src_economy_ui_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_prices_ts["apps/web/src/prices.ts"]
+  n_apps_web_src_economy_ui_ts --> n_apps_web_src_prices_ts
+  n_apps_web_src_fullscreen_ts["apps/web/src/fullscreen.ts"]
+  n_apps_web_src_fullscreen_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_game_ui_ts["apps/web/src/game-ui.ts"]
+  n_apps_web_src_game_ui_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_needs_hud_ts["apps/web/src/needs-hud.ts"]
+  n_apps_web_src_game_ui_ts --> n_apps_web_src_needs_hud_ts
+  n_apps_web_src_lobby_menu_ts["apps/web/src/lobby-menu.ts"]
+  n_apps_web_src_game_ui_ts --> n_apps_web_src_lobby_menu_ts
+  n_apps_web_src_lobby_hero_ts["apps/web/src/lobby-hero.ts"]
+  n_apps_web_src_game_ui_ts --> n_apps_web_src_lobby_hero_ts
+  n_apps_web_src_garage_panel_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_garage_panel_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_engine_city_plan_ts["apps/web/src/engine/city-plan.ts"]
+  n_apps_web_src_graphics_ts --> n_apps_web_src_engine_city_plan_ts
+  n_apps_web_src_hud_panels_ts["apps/web/src/hud-panels.ts"]
+  n_apps_web_src_hud_panels_ts --> n_apps_web_src_game_ui_ts
+  n_apps_web_src_hud_panels_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_jukebox_ts["apps/web/src/jukebox.ts"]
+  n_apps_web_src_media_platforms_ts["apps/web/src/media/platforms.ts"]
+  n_apps_web_src_jukebox_ts --> n_apps_web_src_media_platforms_ts
+  n_apps_web_src_media_player_ts["apps/web/src/media/player.ts"]
+  n_apps_web_src_jukebox_ts --> n_apps_web_src_media_player_ts
+  n_apps_web_src_engine_television_surface_ts["apps/web/src/engine/television-surface.ts"]
+  n_apps_web_src_jukebox_ts --> n_apps_web_src_engine_television_surface_ts
+  n_apps_web_src_light_desk_ts["apps/web/src/light-desk.ts"]
+  n_apps_web_src_light_desk_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_light_desk_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_lobby_menu_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_lobby_menu_ts --> n_apps_web_src_prices_ts
+  n_apps_web_src_lobby_menu_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_main_ts["apps/web/src/main.ts"]
+  n_apps_web_src_admin_console_ts["apps/web/src/admin/console.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_admin_console_ts
+  n_apps_web_src_performance_monitor_ts["apps/web/src/performance/monitor.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_recording_ts["apps/web/src/performance/recording.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_hud_ts["apps/web/src/performance/hud.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_performance_hud_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_prices_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_game_ui_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_lobby_menu_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_lobby_hero_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_fullscreen_ts
+  n_apps_web_src_mouse_capture_ts["apps/web/src/mouse-capture.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_mouse_capture_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_hud_panels_ts
+  n_apps_web_src_vehicle_hud_ts["apps/web/src/vehicle-hud.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_vehicle_hud_ts
+  n_apps_web_src_fuel_hud_ts["apps/web/src/fuel-hud.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_fuel_hud_ts
+  n_apps_web_src_notifications_ts["apps/web/src/notifications.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_notifications_ts
+  n_apps_web_src_collection_collection_ts["apps/web/src/collection/collection.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_collection_collection_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_engine_BarScene_ts
+  n_apps_web_src_engine_camera_rig_ts["apps/web/src/engine/camera-rig.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_engine_camera_rig_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_networking_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_audio_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_jukebox_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_light_desk_ts
+  n_apps_web_src_settings_ts["apps/web/src/settings.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_settings_ts
+  n_apps_web_src_voice_ts["apps/web/src/voice.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_voice_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_needs_hud_ts
+  n_apps_web_src_minimap_ts["apps/web/src/minimap.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_minimap_ts
+  n_apps_web_src_admission_lifecycle_ts["apps/web/src/admission-lifecycle.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_admission_lifecycle_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_moto_panel_ts
+  n_apps_web_src_world_menu_ts["apps/web/src/world-menu.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_world_menu_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_trade_trade_ts["apps/web/src/trade/trade.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_trade_trade_ts
+  n_apps_web_src_highfood_courier_ts["apps/web/src/highfood/courier.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_highfood_courier_ts
+  n_apps_web_src_highfood_locker_ts["apps/web/src/highfood/locker.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_highfood_locker_ts
+  n_apps_web_src_gps_ts["apps/web/src/gps.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_gps_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_networking_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_economy_ui_ts
+  n_apps_web_src_objective_blip_ts["apps/web/src/objective-blip.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_objective_blip_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_consuming_hud_ts
+  n_apps_web_src_blackjack_table_ts["apps/web/src/blackjack/table.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_blackjack_table_ts
+  n_apps_web_src_foosball_panel_ts["apps/web/src/foosball/panel.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_foosball_panel_ts
+  n_apps_web_src_pool_panel_ts["apps/web/src/pool/panel.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_pool_panel_ts
+  n_apps_web_src_truco_table_ts["apps/web/src/truco/table.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_truco_table_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_consumption_ts
+  n_apps_web_src_phone_phone_ts["apps/web/src/phone/phone.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_phone_phone_ts
+  n_apps_web_src_main_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_profile_profile_window_ts["apps/web/src/profile/profile-window.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_profile_profile_window_ts
+  n_apps_web_src_profile_badge_card_ts["apps/web/src/profile/badge-card.ts"]
+  n_apps_web_src_main_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_engine_scene_types_ts["apps/web/src/engine/scene-types.ts"]
+  n_apps_web_src_minimap_ts --> n_apps_web_src_engine_scene_types_ts
+  n_apps_web_src_minimap_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_moto_panel_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_moto_panel_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_moto_panel_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_moto_panel_ts --> n_apps_web_src_car_panel_ts
+  n_apps_web_src_needs_hud_ts --> n_apps_web_src_notifications_ts
+  n_apps_web_src_networking_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_engine_moto_motion_ts["apps/web/src/engine/moto-motion.ts"]
+  n_apps_web_src_networking_ts --> n_apps_web_src_engine_moto_motion_ts
+  n_apps_web_src_notifications_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_settings_ts --> n_apps_web_src_graphics_ts
+  n_apps_web_src_settings_ts --> n_apps_web_src_engine_camera_rig_ts
+  n_apps_web_src_vehicle_hud_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_vehicle_hud_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_voice_ts --> n_apps_web_src_settings_ts
+  n_apps_web_src_world_menu_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_world_menu_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_admin_badges_ts["apps/web/src/admin/badges.ts"]
+  n_apps_web_src_admin_badges_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_admin_badges_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_admin_kit_ts["apps/web/src/admin/kit.ts"]
+  n_apps_web_src_admin_badges_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_charts_ts["apps/web/src/admin/charts.ts"]
+  n_apps_web_src_admin_charts_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_collection_ts["apps/web/src/admin/collection.ts"]
+  n_apps_web_src_collection_skin_card_ts["apps/web/src/collection/skin-card.ts"]
+  n_apps_web_src_admin_collection_ts --> n_apps_web_src_collection_skin_card_ts
+  n_apps_web_src_admin_collection_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_overview_ts["apps/web/src/admin/overview.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_overview_ts
+  n_apps_web_src_admin_players_ts["apps/web/src/admin/players.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_players_ts
+  n_apps_web_src_admin_reports_ts["apps/web/src/admin/reports.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_reports_ts
+  n_apps_web_src_admin_economy_ts["apps/web/src/admin/economy.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_economy_ts
+  n_apps_web_src_admin_prices_ts["apps/web/src/admin/prices.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_prices_ts
+  n_apps_web_src_admin_logs_ts["apps/web/src/admin/logs.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_logs_ts
+  n_apps_web_src_admin_world_ts["apps/web/src/admin/world.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_world_ts
+  n_apps_web_src_admin_environment_ts["apps/web/src/admin/environment.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_environment_ts
+  n_apps_web_src_admin_vehicles_ts["apps/web/src/admin/vehicles.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_vehicles_ts
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_badges_ts
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_collection_ts
+  n_apps_web_src_admin_highfood_ts["apps/web/src/admin/highfood.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_highfood_ts
+  n_apps_web_src_admin_server_ts["apps/web/src/admin/server.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_server_ts
+  n_apps_web_src_admin_performance_ts["apps/web/src/admin/performance.ts"]
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_admin_performance_ts
+  n_apps_web_src_admin_console_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_admin_economy_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_economy_ts --> n_apps_web_src_admin_charts_ts
+  n_apps_web_src_admin_economy_ts --> n_apps_web_src_admin_overview_ts
+  n_apps_web_src_admin_environment_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_highfood_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_highfood_npc_avatar_ts["apps/web/src/highfood/npc-avatar.ts"]
+  n_apps_web_src_admin_highfood_ts --> n_apps_web_src_highfood_npc_avatar_ts
+  n_apps_web_src_admin_highfood_ts --> n_apps_web_src_admin_badges_ts
+  n_apps_web_src_admin_highfood_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_kit_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_admin_kit_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_admin_kit_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_admin_logs_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_overview_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_performance_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_performance_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_view_ts["apps/web/src/performance/view.ts"]
+  n_apps_web_src_admin_performance_ts --> n_apps_web_src_performance_view_ts
+  n_apps_web_src_admin_players_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_admin_players_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_admin_players_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_admin_players_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_players_ts --> n_apps_web_src_admin_overview_ts
+  n_apps_web_src_admin_prices_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_reports_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_reports_ts --> n_apps_web_src_admin_overview_ts
+  n_apps_web_src_admin_server_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_vehicles_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_admin_vehicles_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_world_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_admin_world_ts --> n_apps_web_src_admin_overview_ts
+  n_apps_web_src_blackjack_table_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_blackjack_table_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_blackjack_sounds_ts["apps/web/src/blackjack/sounds.ts"]
+  n_apps_web_src_blackjack_table_ts --> n_apps_web_src_blackjack_sounds_ts
+  n_apps_web_src_collection_collection_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_collection_collection_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_collection_collection_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_collection_collection_ts --> n_apps_web_src_collection_skin_card_ts
+  n_apps_web_src_collection_card_sounds_ts["apps/web/src/collection/card-sounds.ts"]
+  n_apps_web_src_collection_collection_ts --> n_apps_web_src_collection_card_sounds_ts
+  n_apps_web_src_collection_skin_card_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_collection_skin_card_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_engine_bar_animations_ts["apps/web/src/engine/bar-animations.ts"]
+  n_apps_web_src_engine_mixamo_retarget_ts["apps/web/src/engine/mixamo-retarget.ts"]
+  n_apps_web_src_engine_bar_animations_ts --> n_apps_web_src_engine_mixamo_retarget_ts
+  n_apps_web_src_engine_smoking_pose_ts["apps/web/src/engine/smoking-pose.ts"]
+  n_apps_web_src_engine_bar_animations_ts --> n_apps_web_src_engine_smoking_pose_ts
+  n_apps_web_src_engine_fuel_props_ts["apps/web/src/engine/fuel-props.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_fuel_props_ts
+  n_apps_web_src_engine_horse_mount_ts["apps/web/src/engine/horse-mount.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_horse_mount_ts
+  n_apps_web_src_engine_horse_sound_ts["apps/web/src/engine/horse-sound.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_horse_sound_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_inventory_ts["apps/web/src/performance/inventory.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_performance_inventory_ts
+  n_apps_web_src_engine_drink_props_ts["apps/web/src/engine/drink-props.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_serving_props_ts["apps/web/src/engine/serving-props.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_scene_types_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_television_surface_ts
+  n_apps_web_src_engine_environment_lighting_ts["apps/web/src/engine/environment-lighting.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_environment_lighting_ts
+  n_apps_web_src_engine_car_rig_ts["apps/web/src/engine/car-rig.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_car_rig_ts
+  n_apps_web_src_engine_bar_surfaces_ts["apps/web/src/engine/bar-surfaces.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_bar_surfaces_ts
+  n_apps_web_src_engine_city_streaming_ts["apps/web/src/engine/city-streaming.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_city_streaming_ts
+  n_apps_web_src_engine_map_effects_ts["apps/web/src/engine/map-effects.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_map_effects_ts
+  n_apps_web_src_engine_jukebox_lights_ts["apps/web/src/engine/jukebox-lights.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_jukebox_lights_ts
+  n_apps_web_src_engine_stage_lights_ts["apps/web/src/engine/stage-lights.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_stage_lights_ts
+  n_apps_web_src_engine_stage_show_ts["apps/web/src/engine/stage-show.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_stage_show_ts
+  n_apps_web_src_engine_stage_musicians_ts["apps/web/src/engine/stage-musicians.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_stage_musicians_ts
+  n_apps_web_src_engine_bar_dressing_ts["apps/web/src/engine/bar-dressing.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_bar_dressing_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_bar_animations_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_graphics_ts
+  n_apps_web_src_engine_gltf_textures_ts["apps/web/src/engine/gltf-textures.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_gltf_textures_ts
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_camera_rig_ts
+  n_apps_web_src_engine_head_look_ts["apps/web/src/engine/head-look.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_head_look_ts
+  n_apps_web_src_engine_moto_delivery_ts["apps/web/src/engine/moto-delivery.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_moto_delivery_ts
+  n_apps_web_src_engine_moto_bag_ts["apps/web/src/engine/moto-bag.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_moto_bag_ts
+  n_apps_web_src_engine_highfood_props_ts["apps/web/src/engine/highfood-props.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_highfood_props_ts
+  n_apps_web_src_engine_speed_blur_ts["apps/web/src/engine/speed-blur.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_speed_blur_ts
+  n_apps_web_src_engine_moto_ragdoll_ts["apps/web/src/engine/moto-ragdoll.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_moto_ragdoll_ts
+  n_apps_web_src_engine_blow_sound_ts["apps/web/src/engine/blow-sound.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_blow_sound_ts
+  n_apps_web_src_engine_blow_fx_ts["apps/web/src/engine/blow-fx.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_blow_fx_ts
+  n_apps_web_src_engine_foosball_balls_ts["apps/web/src/engine/foosball-balls.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_foosball_balls_ts
+  n_apps_web_src_engine_pool_balls_ts["apps/web/src/engine/pool-balls.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_pool_balls_ts
+  n_apps_web_src_engine_animation_tracks_ts["apps/web/src/engine/animation-tracks.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_animation_tracks_ts
+  n_apps_web_src_engine_skin_portrait_ts["apps/web/src/engine/skin-portrait.ts"]
+  n_apps_web_src_engine_BarScene_ts --> n_apps_web_src_engine_skin_portrait_ts
+  n_apps_web_src_engine_moto_sound_ts["apps/web/src/engine/moto-sound.ts"]
+  n_apps_web_src_engine_blow_sound_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_apps_web_src_engine_camera_xray_ts["apps/web/src/engine/camera-xray.ts"]
+  n_apps_web_src_engine_camera_rig_ts --> n_apps_web_src_engine_camera_xray_ts
+  n_apps_web_src_engine_car_rig_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_car_rig_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_car_rig_ts --> n_apps_web_src_engine_moto_delivery_ts
+  n_apps_web_src_engine_moto_lights_ts["apps/web/src/engine/moto-lights.ts"]
+  n_apps_web_src_engine_car_rig_ts --> n_apps_web_src_engine_moto_lights_ts
+  n_apps_web_src_engine_car_sound_ts["apps/web/src/engine/car-sound.ts"]
+  n_apps_web_src_engine_car_sound_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_apps_web_src_engine_city_streaming_ts --> n_apps_web_src_engine_city_plan_ts
+  n_apps_web_src_engine_city_streaming_ts --> n_apps_web_src_engine_environment_lighting_ts
+  n_apps_web_src_engine_city_streaming_ts --> n_apps_web_src_engine_gltf_textures_ts
+  n_apps_web_src_engine_day_night_ts["apps/web/src/engine/day-night.ts"]
+  n_packages_shared_src_environment_ts["packages/shared/src/environment.ts"]
+  n_apps_web_src_engine_day_night_ts --> n_packages_shared_src_environment_ts
+  n_apps_web_src_engine_environment_lighting_ts --> n_apps_web_src_engine_day_night_ts
+  n_apps_web_src_engine_weather_effects_ts["apps/web/src/engine/weather-effects.ts"]
+  n_apps_web_src_engine_environment_lighting_ts --> n_apps_web_src_engine_weather_effects_ts
+  n_apps_web_src_engine_weather_sound_ts["apps/web/src/engine/weather-sound.ts"]
+  n_apps_web_src_engine_environment_lighting_ts --> n_apps_web_src_engine_weather_sound_ts
+  n_apps_web_src_engine_fuel_props_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_fuel_props_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_horse_mount_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_horse_mount_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_horse_mount_ts --> n_apps_web_src_engine_moto_delivery_ts
+  n_apps_web_src_engine_horse_sound_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_apps_web_src_engine_video_palette_ts["apps/web/src/engine/video-palette.ts"]
+  n_apps_web_src_engine_jukebox_lights_ts --> n_apps_web_src_engine_video_palette_ts
+  n_apps_web_src_engine_video_colours_ts["apps/web/src/engine/video-colours.ts"]
+  n_apps_web_src_engine_jukebox_lights_ts --> n_apps_web_src_engine_video_colours_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_moto_motion_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_moto_lights_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_car_rig_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_car_sound_ts
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_moto_bag_ts
+  n_apps_web_src_engine_vehicle_horn_ts["apps/web/src/engine/vehicle-horn.ts"]
+  n_apps_web_src_engine_moto_delivery_ts --> n_apps_web_src_engine_vehicle_horn_ts
+  n_apps_web_src_engine_moto_lights_ts --> n_apps_web_src_engine_moto_delivery_ts
+  n_apps_web_src_engine_moto_ragdoll_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_scene_types_ts --> n_apps_web_src_engine_camera_rig_ts
+  n_apps_web_src_engine_serving_props_ts --> n_apps_web_src_engine_drink_props_ts
+  n_apps_web_src_engine_skin_portrait_ts --> n_apps_web_src_engine_animation_tracks_ts
+  n_apps_web_src_engine_smoking_pose_ts --> n_apps_web_src_engine_serving_props_ts
+  n_apps_web_src_engine_smoking_pose_ts --> n_apps_web_src_engine_mixamo_retarget_ts
+  n_apps_web_src_engine_stage_lights_ts --> n_apps_web_src_engine_video_palette_ts
+  n_apps_web_src_engine_stage_lights_ts --> n_apps_web_src_engine_video_colours_ts
+  n_apps_web_src_engine_stage_musicians_ts --> n_apps_web_src_engine_mixamo_retarget_ts
+  n_apps_web_src_engine_laser_font_ts["apps/web/src/engine/laser-font.ts"]
+  n_apps_web_src_engine_stage_show_ts --> n_apps_web_src_engine_laser_font_ts
+  n_apps_web_src_engine_vehicle_horn_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_apps_web_src_engine_video_colours_ts --> n_apps_web_src_engine_video_palette_ts
+  n_apps_web_src_foosball_panel_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_foosball_panel_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_foosball_render_ts["apps/web/src/foosball/render.ts"]
+  n_apps_web_src_foosball_panel_ts --> n_apps_web_src_foosball_render_ts
+  n_apps_web_src_foosball_sounds_ts["apps/web/src/foosball/sounds.ts"]
+  n_apps_web_src_foosball_panel_ts --> n_apps_web_src_foosball_sounds_ts
+  n_apps_web_src_highfood_courier_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_highfood_courier_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_highfood_courier_ts --> n_apps_web_src_highfood_npc_avatar_ts
+  n_apps_web_src_highfood_locker_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_highfood_locker_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_media_file_ts["apps/web/src/media/file.ts"]
+  n_apps_web_src_media_file_ts --> n_apps_web_src_media_player_ts
+  n_apps_web_src_youtube_player_ts["apps/web/src/youtube-player.ts"]
+  n_apps_web_src_media_platforms_ts --> n_apps_web_src_youtube_player_ts
+  n_apps_web_src_media_platforms_ts --> n_apps_web_src_media_player_ts
+  n_apps_web_src_media_platforms_ts --> n_apps_web_src_media_file_ts
+  n_apps_web_src_performance_browser_ts["apps/web/src/performance/browser.ts"]
+  n_apps_web_src_performance_browser_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_hud_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_performance_hud_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_hud_ts --> n_apps_web_src_performance_view_ts
+  n_apps_web_src_performance_inventory_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_frames_ts["apps/web/src/performance/frames.ts"]
+  n_apps_web_src_performance_monitor_ts --> n_apps_web_src_performance_frames_ts
+  n_apps_web_src_performance_monitor_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_monitor_ts --> n_apps_web_src_performance_browser_ts
+  n_apps_web_src_performance_report_ts["apps/web/src/performance/report.ts"]
+  n_apps_web_src_performance_monitor_ts --> n_apps_web_src_performance_report_ts
+  n_apps_web_src_performance_monitor_ts --> n_apps_web_src_performance_inventory_ts
+  n_apps_web_src_performance_recording_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_report_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_report_ts --> n_apps_web_src_performance_inventory_ts
+  n_apps_web_src_performance_report_ts --> n_apps_web_src_performance_recording_ts
+  n_apps_web_src_performance_view_ts --> n_apps_web_src_admin_kit_ts
+  n_apps_web_src_performance_view_ts --> n_apps_web_src_performance_monitor_ts
+  n_apps_web_src_performance_view_ts --> n_apps_web_src_performance_frames_ts
+  n_apps_web_src_phone_core_ts --> n_apps_web_src_gps_ts
+  n_apps_web_src_phone_core_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_media_ts["apps/web/src/phone/media.ts"]
+  n_apps_web_src_phone_media_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_engine_day_night_ts
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_telefone_ts["apps/web/src/phone/apps/telefone.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_telefone_ts
+  n_apps_web_src_phone_apps_zap_ts["apps/web/src/phone/apps/zap.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_zap_ts
+  n_apps_web_src_phone_apps_gram_ts["apps/web/src/phone/apps/gram.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_gram_ts
+  n_apps_web_src_phone_apps_camera_ts["apps/web/src/phone/apps/camera.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_camera_ts
+  n_apps_web_src_phone_apps_maps_ts["apps/web/src/phone/apps/maps.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_maps_ts
+  n_apps_web_src_phone_apps_bank_ts["apps/web/src/phone/apps/bank.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_bank_ts
+  n_apps_web_src_phone_apps_highfood_ts["apps/web/src/phone/apps/highfood.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_highfood_ts
+  n_apps_web_src_phone_apps_motors_ts["apps/web/src/phone/apps/motors.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_motors_ts
+  n_apps_web_src_phone_apps_tools_ts["apps/web/src/phone/apps/tools.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_apps_tools_ts
+  n_apps_web_src_phone_wallpapers_ts["apps/web/src/phone/wallpapers.ts"]
+  n_apps_web_src_phone_phone_ts --> n_apps_web_src_phone_wallpapers_ts
+  n_apps_web_src_phone_apps_bank_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_bank_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_bank_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_camera_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_camera_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_camera_ts --> n_apps_web_src_phone_media_ts
+  n_apps_web_src_phone_apps_camera_ts --> n_apps_web_src_phone_wallpapers_ts
+  n_apps_web_src_phone_apps_gram_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_gram_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_gram_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_filters_ts["apps/web/src/phone/filters.ts"]
+  n_apps_web_src_phone_apps_gram_ts --> n_apps_web_src_phone_filters_ts
+  n_apps_web_src_phone_apps_gram_ts --> n_apps_web_src_phone_media_ts
+  n_apps_web_src_phone_apps_highfood_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_highfood_ts --> n_apps_web_src_highfood_npc_avatar_ts
+  n_apps_web_src_phone_apps_highfood_ts --> n_apps_web_src_prices_ts
+  n_apps_web_src_phone_apps_highfood_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_highfood_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_maps_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_maps_ts --> n_apps_web_src_minimap_ts
+  n_apps_web_src_phone_apps_maps_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_maps_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_motors_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_motors_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_phone_apps_motors_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_motors_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_telefone_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_telefone_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_telefone_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_tools_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_tools_ts --> n_apps_web_src_engine_day_night_ts
+  n_apps_web_src_phone_apps_tools_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_tools_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_tools_ts --> n_apps_web_src_phone_wallpapers_ts
+  n_apps_web_src_phone_apps_zap_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_phone_apps_zap_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_phone_apps_zap_ts --> n_apps_web_src_phone_core_ts
+  n_apps_web_src_phone_apps_zap_ts --> n_apps_web_src_phone_media_ts
+  n_apps_web_src_pool_panel_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_pool_panel_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_pool_render_ts["apps/web/src/pool/render.ts"]
+  n_apps_web_src_pool_panel_ts --> n_apps_web_src_pool_render_ts
+  n_apps_web_src_pool_sounds_ts["apps/web/src/pool/sounds.ts"]
+  n_apps_web_src_pool_panel_ts --> n_apps_web_src_pool_sounds_ts
+  n_apps_web_src_profile_badge_card_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_profile_badge_card_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_profile_floating_window_ts["apps/web/src/profile/floating-window.ts"]
+  n_apps_web_src_profile_floating_window_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_profile_profile_window_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_profile_profile_window_ts --> n_apps_web_src_prices_ts
+  n_apps_web_src_profile_profile_window_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_profile_profile_window_ts --> n_apps_web_src_profile_badge_card_ts
+  n_apps_web_src_profile_profile_window_ts --> n_apps_web_src_profile_floating_window_ts
+  n_apps_web_src_trade_trade_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_trade_trade_ts --> n_apps_web_src_garage_panel_ts
+  n_apps_web_src_trade_trade_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_truco_sounds_ts["apps/web/src/truco/sounds.ts"]
+  n_apps_web_src_truco_sounds_ts --> n_apps_web_src_blackjack_sounds_ts
+  n_apps_web_src_truco_table_ts --> n_apps_web_src_api_ts
+  n_apps_web_src_truco_table_ts --> n_apps_web_src_highfood_npc_avatar_ts
+  n_apps_web_src_truco_table_ts --> n_apps_web_src_ui_icons_ts
+  n_apps_web_src_truco_card_ts["apps/web/src/truco/card.ts"]
+  n_apps_web_src_truco_table_ts --> n_apps_web_src_truco_card_ts
+  n_apps_web_src_truco_table_ts --> n_apps_web_src_truco_sounds_ts
+  n_assets_bar_map_BarBoteco_export_moto_v2_scripts_54_moto_trip["assets-bar/map/BarBoteco/export/moto_v2/scripts/54_moto_tripo.py"]
+  n_assets_bar_map_BarBoteco_scripts_moto_textura_py["assets-bar/map/BarBoteco/scripts/moto_textura.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v2_scripts_54_moto_trip --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v2_scripts_moto_textura["assets-bar/map/BarBoteco/export/moto_v2/scripts/moto_textura.py"]
+  n_assets_bar_map_BarBoteco_scripts_carro_textura_py["assets-bar/map/BarBoteco/scripts/carro_textura.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v2_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_54_moto_trip["assets-bar/map/BarBoteco/export/moto_v3/scripts/54_moto_tripo.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_54_moto_trip --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_55_moto_v3_p["assets-bar/map/BarBoteco/export/moto_v3/scripts/55_moto_v3.py"]
+  n_assets_bar_map_BarBoteco_scripts_moto_ref_py["assets-bar/map/BarBoteco/scripts/moto_ref.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_ref_py
+  n_assets_bar_map_BarBoteco_scripts_moto_textura3_py["assets-bar/map/BarBoteco/scripts/moto_textura3.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_textura3_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_56_moto_bag_["assets-bar/map/BarBoteco/export/moto_v3/scripts/56_moto_bag.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_56_moto_bag_ --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_56_moto_bag_ --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_moto_textura["assets-bar/map/BarBoteco/export/moto_v3/scripts/moto_textura.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v3_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_54_moto_trip["assets-bar/map/BarBoteco/export/moto_v4/scripts/54_moto_tripo.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_54_moto_trip --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_55_moto_v3_p["assets-bar/map/BarBoteco/export/moto_v4/scripts/55_moto_v3.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_ref_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_textura3_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_55_moto_v3_p --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_57_moto_v4_p["assets-bar/map/BarBoteco/export/moto_v4/scripts/57_moto_v4.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura["assets-bar/map/BarBoteco/export/moto_v4/scripts/moto_textura4.py"]
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_57_moto_v4_p --> n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_57_moto_v4_p --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_moto_textura3_py
+  n_assets_bar_map_BarBoteco_export_moto_v4_scripts_moto_textura --> n_assets_bar_map_BarBoteco_scripts_moto_textura3_py
+  n_assets_bar_map_BarBoteco_scripts_01_texturas_py["assets-bar/map/BarBoteco/scripts/01_texturas.py"]
+  n_assets_bar_map_BarBoteco_scripts_barlib_py["assets-bar/map/BarBoteco/scripts/barlib.py"]
+  n_assets_bar_map_BarBoteco_scripts_01_texturas_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_02_materiais_py["assets-bar/map/BarBoteco/scripts/02_materiais.py"]
+  n_assets_bar_map_BarBoteco_scripts_02_materiais_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_03_rua_py["assets-bar/map/BarBoteco/scripts/03_rua.py"]
+  n_assets_bar_map_BarBoteco_scripts_03_rua_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_04_predio_py["assets-bar/map/BarBoteco/scripts/04_predio.py"]
+  n_assets_bar_map_BarBoteco_scripts_04_predio_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_05_props_py["assets-bar/map/BarBoteco/scripts/05_props.py"]
+  n_assets_bar_map_BarBoteco_scripts_05_props_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_06_interior_py["assets-bar/map/BarBoteco/scripts/06_interior.py"]
+  n_assets_bar_map_BarBoteco_scripts_06_interior_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_07_exterior_py["assets-bar/map/BarBoteco/scripts/07_exterior.py"]
+  n_assets_bar_map_BarBoteco_scripts_07_exterior_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_08_export_py["assets-bar/map/BarBoteco/scripts/08_export.py"]
+  n_assets_bar_map_BarBoteco_scripts_08_export_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_09_assets_py["assets-bar/map/BarBoteco/scripts/09_assets.py"]
+  n_assets_bar_map_BarBoteco_scripts_09_assets_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_10_validar_py["assets-bar/map/BarBoteco/scripts/10_validar.py"]
+  n_assets_bar_map_BarBoteco_scripts_10_validar_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_12_jukebox_py["assets-bar/map/BarBoteco/scripts/12_jukebox.py"]
+  n_assets_bar_map_BarBoteco_scripts_12_jukebox_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_13_fachada_py["assets-bar/map/BarBoteco/scripts/13_fachada.py"]
+  n_assets_bar_map_BarBoteco_scripts_13_fachada_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_14_mesas_py["assets-bar/map/BarBoteco/scripts/14_mesas.py"]
+  n_assets_bar_map_BarBoteco_scripts_14_mesas_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_15_palco_py["assets-bar/map/BarBoteco/scripts/15_palco.py"]
+  n_assets_bar_map_BarBoteco_scripts_15_palco_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_17_lugares_animacao_py["assets-bar/map/BarBoteco/scripts/17_lugares_animacao.py"]
+  n_assets_bar_map_BarBoteco_scripts_17_lugares_animacao_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_pollib_py["assets-bar/map/BarBoteco/scripts/pollib.py"]
+  n_assets_bar_map_BarBoteco_scripts_17_lugares_animacao_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_21_carro_hatch_py["assets-bar/map/BarBoteco/scripts/21_carro_hatch.py"]
+  n_assets_bar_map_BarBoteco_scripts_21_carro_hatch_py --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_scripts_21_cidade_texturas_py["assets-bar/map/BarBoteco/scripts/21_cidade_texturas.py"]
+  n_assets_bar_map_BarBoteco_scripts_21_cidade_texturas_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_22_cidade_base_py["assets-bar/map/BarBoteco/scripts/22_cidade_base.py"]
+  n_assets_bar_map_BarBoteco_scripts_22_cidade_base_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_cidadelib_py["assets-bar/map/BarBoteco/scripts/cidadelib.py"]
+  n_assets_bar_map_BarBoteco_scripts_22_cidade_base_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_23_cidade_edificios_py["assets-bar/map/BarBoteco/scripts/23_cidade_edificios.py"]
+  n_assets_bar_map_BarBoteco_scripts_23_cidade_edificios_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_23_cidade_edificios_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_24_cidade_props_py["assets-bar/map/BarBoteco/scripts/24_cidade_props.py"]
+  n_assets_bar_map_BarBoteco_scripts_24_cidade_props_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_24_cidade_props_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_25_cidade_anel_py["assets-bar/map/BarBoteco/scripts/25_cidade_anel.py"]
+  n_assets_bar_map_BarBoteco_scripts_25_cidade_anel_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_25_cidade_anel_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_26_cidade_lod_py["assets-bar/map/BarBoteco/scripts/26_cidade_lod.py"]
+  n_assets_bar_map_BarBoteco_scripts_26_cidade_lod_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_26_cidade_lod_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_27_cidade_validar_py["assets-bar/map/BarBoteco/scripts/27_cidade_validar.py"]
+  n_assets_bar_map_BarBoteco_scripts_27_cidade_validar_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_27_cidade_validar_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_28_cidade_export_py["assets-bar/map/BarBoteco/scripts/28_cidade_export.py"]
+  n_assets_bar_map_BarBoteco_scripts_28_cidade_export_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_28_cidade_export_py --> n_assets_bar_map_BarBoteco_scripts_cidadelib_py
+  n_assets_bar_map_BarBoteco_scripts_31_ponto_ifood_py["assets-bar/map/BarBoteco/scripts/31_ponto_ifood.py"]
+  n_assets_bar_map_BarBoteco_scripts_31_ponto_ifood_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_34_arvores_py["assets-bar/map/BarBoteco/scripts/34_arvores.py"]
+  n_assets_bar_map_BarBoteco_scripts_34_arvores_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_35_churrasqueira_py["assets-bar/map/BarBoteco/scripts/35_churrasqueira.py"]
+  n_assets_bar_map_BarBoteco_scripts_35_churrasqueira_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_35_churrasqueira_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_36_bar_polimento_py["assets-bar/map/BarBoteco/scripts/36_bar_polimento.py"]
+  n_assets_bar_map_BarBoteco_scripts_36_bar_polimento_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_36_bar_polimento_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_38_materiais_poliigon_py["assets-bar/map/BarBoteco/scripts/38_materiais_poliigon.py"]
+  n_assets_bar_map_BarBoteco_scripts_38_materiais_poliigon_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_39_carrinho_espeto_py["assets-bar/map/BarBoteco/scripts/39_carrinho_espeto.py"]
+  n_assets_bar_map_BarBoteco_scripts_39_carrinho_espeto_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_39_carrinho_espeto_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_40_guardacorpo_py["assets-bar/map/BarBoteco/scripts/40_guardacorpo.py"]
+  n_assets_bar_map_BarBoteco_scripts_40_guardacorpo_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_40_guardacorpo_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_42_geladeira_expositor_py["assets-bar/map/BarBoteco/scripts/42_geladeira_expositor.py"]
+  n_assets_bar_map_BarBoteco_scripts_42_geladeira_expositor_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_42_geladeira_expositor_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_44_bar_paredes_escada_py["assets-bar/map/BarBoteco/scripts/44_bar_paredes_escada.py"]
+  n_assets_bar_map_BarBoteco_scripts_44_bar_paredes_escada_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_44_bar_paredes_escada_py --> n_assets_bar_map_BarBoteco_scripts_pollib_py
+  n_assets_bar_map_BarBoteco_scripts_46_mesa_blackjack_py["assets-bar/map/BarBoteco/scripts/46_mesa_blackjack.py"]
+  n_assets_bar_map_BarBoteco_scripts_46_mesa_blackjack_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_48_mesa_truco_py["assets-bar/map/BarBoteco/scripts/48_mesa_truco.py"]
+  n_assets_bar_map_BarBoteco_scripts_48_mesa_truco_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_54_moto_tripo_py["assets-bar/map/BarBoteco/scripts/54_moto_tripo.py"]
+  n_assets_bar_map_BarBoteco_scripts_54_moto_tripo_py --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_scripts_55_moto_v3_py["assets-bar/map/BarBoteco/scripts/55_moto_v3.py"]
+  n_assets_bar_map_BarBoteco_scripts_55_moto_v3_py --> n_assets_bar_map_BarBoteco_scripts_moto_ref_py
+  n_assets_bar_map_BarBoteco_scripts_55_moto_v3_py --> n_assets_bar_map_BarBoteco_scripts_moto_textura3_py
+  n_assets_bar_map_BarBoteco_scripts_55_moto_v3_py --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_scripts_56_moto_bag_py["assets-bar/map/BarBoteco/scripts/56_moto_bag.py"]
+  n_assets_bar_map_BarBoteco_scripts_56_moto_bag_py --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_scripts_56_moto_bag_py --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_scripts_cidadelib_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_map_BarBoteco_scripts_moto_textura_py --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_scripts_moto_textura3_py --> n_assets_bar_map_BarBoteco_scripts_carro_textura_py
+  n_assets_bar_map_BarBoteco_scripts_moto_textura3_py --> n_assets_bar_map_BarBoteco_scripts_moto_textura_py
+  n_assets_bar_map_BarBoteco_scripts_pollib_py --> n_assets_bar_map_BarBoteco_scripts_barlib_py
+  n_assets_bar_ui_midnight_neon_menu_main_vitest_config_ts["assets-bar/ui/midnight-neon-menu-main/vitest.config.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_vitest_config_ts --> n_apps_server_src_config_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_router_tsx["assets-bar/ui/midnight-neon-menu-main/src/router.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_routeTree_gen_ts["assets-bar/ui/midnight-neon-menu-main/src/routeTree.gen.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_router_tsx --> n_assets_bar_ui_midnight_neon_menu_main_src_routeTree_gen_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_routes___root_tsx["assets-bar/ui/midnight-neon-menu-main/src/routes/__root.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_routeTree_gen_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_routes___root_tsx
+  n_assets_bar_ui_midnight_neon_menu_main_src_routes_index_tsx["assets-bar/ui/midnight-neon-menu-main/src/routes/index.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_routeTree_gen_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_routes_index_tsx
+  n_assets_bar_ui_midnight_neon_menu_main_src_server_ts["assets-bar/ui/midnight-neon-menu-main/src/server.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_capture_["assets-bar/ui/midnight-neon-menu-main/src/lib/error-capture.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_server_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_capture_
+  n_assets_bar_ui_midnight_neon_menu_main_src_server_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_capture_
+  n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_page_ts["assets-bar/ui/midnight-neon-menu-main/src/lib/error-page.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_server_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_page_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_start_ts["assets-bar/ui/midnight-neon-menu-main/src/start.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_start_ts --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_error_page_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_acco["assets-bar/ui/midnight-neon-menu-main/src/components/ui/accordion.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts["assets-bar/ui/midnight-neon-menu-main/src/lib/utils.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_acco --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_aler["assets-bar/ui/midnight-neon-menu-main/src/components/ui/alert-dialog.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_aler --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt["assets-bar/ui/midnight-neon-menu-main/src/components/ui/button.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_aler --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_aler --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_avat["assets-bar/ui/midnight-neon-menu-main/src/components/ui/avatar.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_avat --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_badg["assets-bar/ui/midnight-neon-menu-main/src/components/ui/badge.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_badg --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_brea["assets-bar/ui/midnight-neon-menu-main/src/components/ui/breadcrumb.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_brea --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_cale["assets-bar/ui/midnight-neon-menu-main/src/components/ui/calendar.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_cale --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_cale --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_card["assets-bar/ui/midnight-neon-menu-main/src/components/ui/card.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_card --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_caro["assets-bar/ui/midnight-neon-menu-main/src/components/ui/carousel.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_caro --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_caro --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_char["assets-bar/ui/midnight-neon-menu-main/src/components/ui/chart.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_char --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_chec["assets-bar/ui/midnight-neon-menu-main/src/components/ui/checkbox.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_chec --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_comm["assets-bar/ui/midnight-neon-menu-main/src/components/ui/command.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_comm --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_dial["assets-bar/ui/midnight-neon-menu-main/src/components/ui/dialog.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_comm --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_dial
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_cont["assets-bar/ui/midnight-neon-menu-main/src/components/ui/context-menu.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_cont --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_dial --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_draw["assets-bar/ui/midnight-neon-menu-main/src/components/ui/drawer.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_draw --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_drop["assets-bar/ui/midnight-neon-menu-main/src/components/ui/dropdown-menu.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_drop --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_form["assets-bar/ui/midnight-neon-menu-main/src/components/ui/form.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_form --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_labe["assets-bar/ui/midnight-neon-menu-main/src/components/ui/label.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_form --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_labe
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_hove["assets-bar/ui/midnight-neon-menu-main/src/components/ui/hover-card.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_hove --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_inpu["assets-bar/ui/midnight-neon-menu-main/src/components/ui/input-otp.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_inpu --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_inpu --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_labe --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_menu["assets-bar/ui/midnight-neon-menu-main/src/components/ui/menubar.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_menu --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_navi["assets-bar/ui/midnight-neon-menu-main/src/components/ui/navigation-menu.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_navi --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_pagi["assets-bar/ui/midnight-neon-menu-main/src/components/ui/pagination.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_pagi --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_pagi --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_popo["assets-bar/ui/midnight-neon-menu-main/src/components/ui/popover.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_popo --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_prog["assets-bar/ui/midnight-neon-menu-main/src/components/ui/progress.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_prog --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_radi["assets-bar/ui/midnight-neon-menu-main/src/components/ui/radio-group.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_radi --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_resi["assets-bar/ui/midnight-neon-menu-main/src/components/ui/resizable.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_resi --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_scro["assets-bar/ui/midnight-neon-menu-main/src/components/ui/scroll-area.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_scro --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_sele["assets-bar/ui/midnight-neon-menu-main/src/components/ui/select.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_sele --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_sepa["assets-bar/ui/midnight-neon-menu-main/src/components/ui/separator.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_sepa --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_shee["assets-bar/ui/midnight-neon-menu-main/src/components/ui/sheet.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_shee --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side["assets-bar/ui/midnight-neon-menu-main/src/components/ui/sidebar.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_hooks_use_mobile_t["assets-bar/ui/midnight-neon-menu-main/src/hooks/use-mobile.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_hooks_use_mobile_t
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_butt
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_inpu
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_sepa
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_skel["assets-bar/ui/midnight-neon-menu-main/src/components/ui/skeleton.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_skel
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tool["assets-bar/ui/midnight-neon-menu-main/src/components/ui/tooltip.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_side --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tool
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_skel --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_slid["assets-bar/ui/midnight-neon-menu-main/src/components/ui/slider.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_slid --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_swit["assets-bar/ui/midnight-neon-menu-main/src/components/ui/switch.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_swit --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tabl["assets-bar/ui/midnight-neon-menu-main/src/components/ui/table.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tabl --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tabs["assets-bar/ui/midnight-neon-menu-main/src/components/ui/tabs.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tabs --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_text["assets-bar/ui/midnight-neon-menu-main/src/components/ui/textarea.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_text --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_togg["assets-bar/ui/midnight-neon-menu-main/src/components/ui/toggle-group.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_togg --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_togg --> n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_togg
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_togg --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_components_ui_tool --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_utils_ts
+  n_assets_bar_ui_midnight_neon_menu_main_src_lib_lovable_error_["assets-bar/ui/midnight-neon-menu-main/src/lib/lovable-error-reporting.ts"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_routes___root_tsx --> n_assets_bar_ui_midnight_neon_menu_main_src_lib_lovable_error_
+  n_assets_bar_ui_midnight_neon_menu_main_src_test_app_routing_t["assets-bar/ui/midnight-neon-menu-main/src/test/app-routing.test.tsx"]
+  n_assets_bar_ui_midnight_neon_menu_main_src_test_app_routing_t --> n_assets_bar_ui_midnight_neon_menu_main_src_routeTree_gen_ts
+  n_tests_e2e_achievements_spec_ts["tests/e2e/achievements.spec.ts"]
+  n_tests_e2e_achievements_spec_ts --> n_packages_shared_src_tickets_ts
+  n_packages_shared_src_achievements_ts["packages/shared/src/achievements.ts"]
+  n_tests_e2e_achievements_spec_ts --> n_packages_shared_src_achievements_ts
+  n_tests_e2e_moto_helpers_ts["tests/e2e/moto-helpers.ts"]
+  n_tests_e2e_achievements_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_admin_spec_ts["tests/e2e/admin.spec.ts"]
+  n_tests_e2e_collection_helpers_ts["tests/e2e/collection-helpers.ts"]
+  n_tests_e2e_admin_spec_ts --> n_tests_e2e_collection_helpers_ts
+  n_tests_e2e_bar_animations_spec_ts["tests/e2e/bar-animations.spec.ts"]
+  n_tests_e2e_preview_path_ts["tests/e2e/preview-path.ts"]
+  n_tests_e2e_bar_animations_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_walk_ts["tests/e2e/walk.ts"]
+  n_tests_e2e_bar_animations_spec_ts --> n_tests_e2e_walk_ts
+  n_tests_e2e_bar_spec_ts["tests/e2e/bar.spec.ts"]
+  n_tests_e2e_bar_spec_ts --> n_tests_e2e_collection_helpers_ts
+  n_tests_e2e_camera_spec_ts["tests/e2e/camera.spec.ts"]
+  n_tests_e2e_camera_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_camera_spec_ts --> n_tests_e2e_collection_helpers_ts
+  n_tests_e2e_camera_helpers_ts["tests/e2e/camera-helpers.ts"]
+  n_tests_e2e_camera_spec_ts --> n_tests_e2e_camera_helpers_ts
+  n_tests_e2e_car_spec_ts["tests/e2e/car.spec.ts"]
+  n_tests_e2e_car_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_city_spec_ts["tests/e2e/city.spec.ts"]
+  n_tests_e2e_city_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_collection_spec_ts["tests/e2e/collection.spec.ts"]
+  n_tests_e2e_collection_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_collection_spec_ts --> n_tests_e2e_collection_helpers_ts
+  n_tests_e2e_doors_spec_ts["tests/e2e/doors.spec.ts"]
+  n_tests_e2e_doors_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_economy_spec_ts["tests/e2e/economy.spec.ts"]
+  n_tests_e2e_economy_spec_ts --> n_tests_e2e_walk_ts
+  n_tests_e2e_environment_spec_ts["tests/e2e/environment.spec.ts"]
+  n_tests_e2e_environment_spec_ts --> n_apps_web_src_engine_day_night_ts
+  n_tests_e2e_environment_spec_ts --> n_apps_web_src_engine_environment_lighting_ts
+  n_tests_e2e_environment_spec_ts --> n_tests_e2e_preview_path_ts
+  n_packages_shared_src_stage_show_ts["packages/shared/src/stage-show.ts"]
+  n_tests_e2e_environment_spec_ts --> n_packages_shared_src_stage_show_ts
+  n_tests_e2e_garage_trade_spec_ts["tests/e2e/garage-trade.spec.ts"]
+  n_tests_e2e_garage_trade_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_highfood_spec_ts["tests/e2e/highfood.spec.ts"]
+  n_tests_e2e_highfood_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_highmotors_spec_ts["tests/e2e/highmotors.spec.ts"]
+  n_packages_shared_src_moto_parts_ts["packages/shared/src/moto-parts.ts"]
+  n_tests_e2e_highmotors_spec_ts --> n_packages_shared_src_moto_parts_ts
+  n_tests_e2e_horse_spec_ts["tests/e2e/horse.spec.ts"]
+  n_tests_e2e_horse_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_horse_spec_ts --> n_tests_e2e_camera_helpers_ts
+  n_tests_e2e_horse_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_jukebox_spec_ts["tests/e2e/jukebox.spec.ts"]
+  n_tests_e2e_jukebox_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_kick_spec_ts["tests/e2e/kick.spec.ts"]
+  n_tests_e2e_kick_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_media_platforms_spec_ts["tests/e2e/media-platforms.spec.ts"]
+  n_tests_e2e_media_fixture_ts["tests/e2e/media-fixture.ts"]
+  n_tests_e2e_media_platforms_spec_ts --> n_tests_e2e_media_fixture_ts
+  n_tests_e2e_media_platforms_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_media_platforms_spec_ts --> n_tests_e2e_walk_ts
+  n_tests_e2e_moto_actions_spec_ts["tests/e2e/moto-actions.spec.ts"]
+  n_tests_e2e_moto_actions_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_moto_crash_spec_ts["tests/e2e/moto-crash.spec.ts"]
+  n_tests_e2e_moto_crash_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_moto_parts_spec_ts["tests/e2e/moto-parts.spec.ts"]
+  n_tests_e2e_moto_parts_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_moto_v4_spec_ts["tests/e2e/moto-v4.spec.ts"]
+  n_tests_e2e_moto_v4_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_moto_spec_ts["tests/e2e/moto.spec.ts"]
+  n_tests_e2e_moto_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_nova_ui_spec_ts["tests/e2e/nova-ui.spec.ts"]
+  n_tests_e2e_nova_ui_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_old_cane_spec_ts["tests/e2e/old-cane.spec.ts"]
+  n_tests_e2e_old_cane_spec_ts --> n_tests_e2e_collection_helpers_ts
+  n_tests_e2e_old_cane_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_profile_spec_ts["tests/e2e/profile.spec.ts"]
+  n_tests_e2e_profile_spec_ts --> n_packages_shared_src_achievements_ts
+  n_tests_e2e_profile_spec_ts --> n_tests_e2e_moto_helpers_ts
+  n_tests_e2e_stage_spec_ts["tests/e2e/stage.spec.ts"]
+  n_tests_e2e_stage_spec_ts --> n_tests_e2e_walk_ts
+  n_tests_e2e_stage_spec_ts --> n_tests_e2e_preview_path_ts
+  n_tests_e2e_weather_spec_ts["tests/e2e/weather.spec.ts"]
+  n_tests_e2e_weather_spec_ts --> n_packages_shared_src_environment_ts
+  n_tests_e2e_zz_hud_preview_ts["tests/e2e/zz-hud-preview.ts"]
+  n_tests_e2e_zz_hud_preview_ts --> n_tests_e2e_walk_ts
+  n_tests_fixtures_collection_js["tests/fixtures/collection.js"]
+  n_tests_fixtures_collection_js --> n_apps_web_src_collection_collection_ts
+  n_tests_fixtures_skin_card_render_js["tests/fixtures/skin-card-render.js"]
+  n_tests_fixtures_skin_card_render_js --> n_apps_web_src_engine_animation_tracks_ts
+  n_tests_integration_ambient_test_ts["tests/integration/ambient.test.ts"]
+  n_tests_integration_ambient_test_ts --> n_apps_web_src_ambient_mix_ts
+  n_tests_integration_camera_test_ts["tests/integration/camera.test.ts"]
+  n_tests_integration_camera_test_ts --> n_apps_web_src_engine_camera_rig_ts
+  n_tests_integration_city_streaming_test_ts["tests/integration/city-streaming.test.ts"]
+  n_tests_integration_city_streaming_test_ts --> n_apps_web_src_engine_city_plan_ts
+  n_tests_integration_city_test_ts["tests/integration/city.test.ts"]
+  n_packages_shared_src_city_roads_ts["packages/shared/src/city-roads.ts"]
+  n_tests_integration_city_test_ts --> n_packages_shared_src_city_roads_ts
+  n_tests_integration_day_night_test_ts["tests/integration/day-night.test.ts"]
+  n_tests_integration_day_night_test_ts --> n_apps_web_src_engine_day_night_ts
+  n_tests_integration_gps_follow_test_ts["tests/integration/gps-follow.test.ts"]
+  n_tests_integration_gps_follow_test_ts --> n_apps_web_src_gps_ts
+  n_tests_integration_head_look_test_ts["tests/integration/head-look.test.ts"]
+  n_tests_integration_head_look_test_ts --> n_apps_web_src_engine_head_look_ts
+  n_tests_integration_head_look_test_ts --> n_apps_web_src_networking_ts
+  n_tests_integration_horse_network_test_ts["tests/integration/horse-network.test.ts"]
+  n_tests_integration_horse_network_test_ts --> n_apps_web_src_networking_ts
+  n_tests_integration_mixamo_retarget_test_ts["tests/integration/mixamo-retarget.test.ts"]
+  n_tests_integration_mixamo_retarget_test_ts --> n_apps_web_src_engine_mixamo_retarget_ts
+  n_tests_integration_moto_motion_test_ts["tests/integration/moto-motion.test.ts"]
+  n_tests_integration_moto_motion_test_ts --> n_apps_web_src_engine_moto_motion_ts
+  n_tests_integration_moto_parts_test_ts["tests/integration/moto-parts.test.ts"]
+  n_tests_integration_moto_parts_test_ts --> n_apps_web_src_engine_moto_sound_ts
+  n_tests_integration_performance_test_ts["tests/integration/performance.test.ts"]
+  n_tests_integration_performance_test_ts --> n_apps_web_src_performance_frames_ts
+  n_tests_integration_performance_test_ts --> n_apps_web_src_performance_monitor_ts
+  n_tests_integration_performance_test_ts --> n_apps_web_src_performance_recording_ts
+  n_tests_integration_performance_test_ts --> n_apps_web_src_performance_browser_ts
+  n_tests_integration_phone_filters_test_ts["tests/integration/phone-filters.test.ts"]
+  n_tests_integration_phone_filters_test_ts --> n_apps_web_src_phone_filters_ts
+  n_tests_integration_shared_test_ts["tests/integration/shared.test.ts"]
+  n_tests_integration_shared_test_ts --> n_packages_shared_src_tickets_ts
+  n_tests_integration_stage_show_test_ts["tests/integration/stage-show.test.ts"]
+  n_tests_integration_stage_show_test_ts --> n_apps_web_src_engine_laser_font_ts
+  n_tests_integration_street_names_test_ts["tests/integration/street-names.test.ts"]
+  n_tools_assets_street_names_ts["tools/assets/street-names.ts"]
+  n_tests_integration_street_names_test_ts --> n_tools_assets_street_names_ts
+  n_tests_integration_vehicle_handling_test_ts["tests/integration/vehicle-handling.test.ts"]
+  n_tests_integration_vehicle_handling_test_ts --> n_apps_web_src_engine_moto_motion_ts
+  n_tests_integration_vehicle_network_test_ts["tests/integration/vehicle-network.test.ts"]
+  n_tests_integration_vehicle_network_test_ts --> n_apps_web_src_networking_ts
+  n_tests_load_bots_ts["tests/load/bots.ts"]
+  n_tests_load_bots_ts --> n_packages_shared_src_tickets_ts
+  n_tests_load_room_ts["tests/load/room.ts"]
+  n_tests_load_room_ts --> n_apps_web_src_phone_core_ts
+  n_tests_load_room_ts --> n_packages_shared_src_tickets_ts
+  n_tools_assets_build_gps_ts["tools/assets/build-gps.ts"]
+  n_tools_assets_build_gps_ts --> n_packages_shared_src_city_roads_ts
+  n_tools_assets_build_gps_ts --> n_tools_assets_street_names_ts

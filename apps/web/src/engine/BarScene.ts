@@ -47,6 +47,7 @@ import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent
 import {FoosballBalls} from './foosball-balls';
 import {PoolBalls} from './pool-balls';
 import {completeBasePose} from './animation-tracks';
+import {walkPlaybackRate,walkTransitionSeconds} from './walk-playback';
 import {shootPortrait} from './skin-portrait';
 import {KICKS,skillById} from '@bar/shared';
 
@@ -78,6 +79,7 @@ interface SkinnedRig {
   bones: Record<SkinBone, pc.Entity>;
   clip: string;
   playbackKey?: string;
+  walkRate?:number;
   cane?: pc.Entity;
   oldCaneRate?:number;
   tracks: Set<string>;
@@ -191,7 +193,7 @@ const DEFAULT_MODEL='nathan';
 const MOUSE_JUMP = 500;
 const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? (id==='tiao'?'mixamo-actions-20261103-v2':'mixamo-actions-20261101') : SKIN_VERSIONS[id];
+  const version = folder === 'animations' ? 'walk-smooth-20261104' : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -209,7 +211,8 @@ const OFFSTAGE_MARGIN = 2;
 const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble']);
 // Approximate ground pace at 1×, measured from the Mixamo feet's backward travel while planted (metres/second).
 // Run is Standard Run's own root motion, which the converter prints: 4 m/s on Nathan (3.4–4.4 across the skins).
-// The cadence follows actual movement, capped at 2.2× so fast players do not spin their legs.
+// Walk's exported cycle is stretched by 20% for a more relaxed gait; its cadence eases with ground speed.
+// Rates remain capped at 2.2× so fast players do not spin their legs.
 const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Run: 4, DrunkWalk: .74 };
 // Positions arrive in steps: local predictions every input tick, everyone else with each server patch.
 // Gliding a little longer than the interval keeps a constant speed despite timer jitter.
@@ -1985,9 +1988,10 @@ export class BarScene {
       // leave as leaveBarAction decided.
       // Mixamo's seated/idle poses differ from the authored endpoints and need a short cross-fade.
       const fromAction = skin.clip.startsWith('Bar ') || skin.clip === 'Sit';
+      const walkingBlend=!bar&&!show?walkTransitionSeconds(skin.clip,clip):undefined;
       const blend = bar?.body ? .3 : bar ? (fromAction ? bar.step.blend : bar.step.blend || .3) : show ? show.blend
         : fromAction ? (avatar.barRelease === 0 ? 0 : avatar.barRelease ?? .3) : skin.clip.startsWith('Palco ') ? MUSICIANS.releaseSeconds : clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25;
-      anim.baseLayer?.transition(clip, skin.clip ? blend : 0);
+      anim.baseLayer?.transition(clip, skin.clip ? walkingBlend??blend : 0);
       skin.clip = clip; skin.playbackKey = playbackKey;
       if (bar && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = bar.body
         ? Math.max(0, (Date.now() + this.serverClockOffset - bar.step.startedAt) / 1000) % anim.baseLayer.activeStateDuration : bar.step.time;
@@ -1999,7 +2003,9 @@ export class BarScene {
       }
     }
     const pace = MIXAMO_PACE[clip];
-    anim.speed = pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
+    if(clip==='Walk')skin.walkRate=walkPlaybackRate(skin.walkRate,avatar.speed??0,pose.dt);
+    else skin.walkRate=undefined;
+    anim.speed = clip==='Walk'?skin.walkRate!:pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
     // A drink in hand: the hand layer fades in over a free body and keeps to the room's clock (sips line up for everyone,
     // whatever pace the walk sets for the clips).
     const now = Date.now() + this.serverClockOffset;

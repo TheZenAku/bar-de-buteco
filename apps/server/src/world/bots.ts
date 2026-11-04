@@ -57,6 +57,8 @@ export class BotRunner {
       env: { ...process.env, API_INTERNAL_URL: this.options.apiUrl, BOTS_WORLD_URL: this.options.worldUrl, TSX_TSCONFIG_PATH: join(root, 'tsconfig.base.json') },
     });
     this.child = child; this.status = undefined; this.stopping = false;
+    // Without this listener a failed spawn or kill is an unhandled 'error' event and takes the world down.
+    child.on('error', error => this.options.log('bots_unreachable', { error: error instanceof Error ? error.message : String(error) }));
     child.on('message', message => {
       const update = message as { type?: string; status?: BotsStatus };
       if (update?.type !== 'status' || !update.status) return;

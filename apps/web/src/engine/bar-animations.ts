@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import {BAR_ANIMATIONS,CLEANABLE_TABLES,INTERACTABLES,URINALS,seatChair,type BarClip,type BarFrame,type BarGroup,type BarStep} from '@bar/shared';
 import {alignedRest,boneName,convert,readClip,readSource,readTarget,sample,type Clip,type Source,type Target} from './mixamo-retarget';
+import {isSmoking,polishSmoking} from './smoking-pose';
 
 /**
  * The bar's character animations in PlayCanvas: a port of animacoes_bar.js (assets-bar/map/BarBoteco/export/animacoes),
@@ -64,8 +65,8 @@ export interface BarPlay {
 // authored (1.0–1.2 cm): that thin, it hardly showed from the game's camera.
 interface FxType {taxa:number;vel:number;sobe:number;abre:number;vida:[number,number];tam:[number,number];cor:[number,number,number];cor2:[number,number,number];alfa:number;grav:number;arrasto?:number;chao?:boolean;solido?:boolean}
 const FX_TYPES:Record<string,FxType>={
-  fumaca:{taxa:20,vel:.04,sobe:.16,abre:.03,vida:[2.2,3.2],tam:[.02,.16],cor:[.8,.8,.82],cor2:[.7,.7,.74],alfa:.32,grav:0,arrasto:.5},
-  fumaca_boca:{taxa:90,vel:.65,sobe:.06,abre:.22,vida:[1.6,2.4],tam:[.04,.26],cor:[.84,.84,.86],cor2:[.74,.74,.78],alfa:.34,grav:0,arrasto:1.8},
+  fumaca:{taxa:12,vel:.025,sobe:.11,abre:.02,vida:[1.8,2.8],tam:[.012,.095],cor:[.8,.8,.82],cor2:[.7,.7,.74],alfa:.19,grav:0,arrasto:.5},
+  fumaca_boca:{taxa:70,vel:.55,sobe:.06,abre:.18,vida:[1.6,2.4],tam:[.025,.21],cor:[.84,.84,.86],cor2:[.74,.74,.78],alfa:.26,grav:0,arrasto:1.8},
   vomito:{taxa:170,vel:1.4,sobe:0,abre:.32,vida:[.6,.9],tam:[.022,.032],cor:[.45,.62,.12],cor2:[.62,.58,.18],alfa:.95,grav:9.8,chao:true,solido:true},
   urina:{taxa:240,vel:1.65,sobe:0,abre:.035,vida:[.32,.45],tam:[.014,.018],cor:[.97,.86,.32],cor2:[.93,.8,.26],alfa:.7,grav:9.8,chao:true,solido:true},
 };
@@ -244,12 +245,15 @@ export class BarAnimations {
         // A clip that reaches a place moves the hips by its metres; one in the body's own space, by the body's height, or
         // by the hips' height when its skeleton has other proportions than the 1.90 m one (hipHeight: Mixamo's Smoking).
         const hipScale=group.anchor?1:group.hipHeight?target.hipHeight/group.hipHeight:target.height/group.height;
-        this.converted.set(key,convert(view.clips.get(clip)!,source,target,barState(clip),hipScale));
+        this.converted.set(key,convert(view.clips.get(clip)!,source,target,barState(clip),hipScale,isSmoking(clip)));
         // A posed bone is `delta × aligned` and the authoring one `delta × rest`: between them, a constant local turn.
         const axesKey=`${skinId}|${info.group}`;
         if(!this.axes.has(axesKey)){
-          const aligned=alignedRest(source,target),turns=new Map<string,pc.Quat>();
-          for(const [bone,own] of aligned){const rest=source.restW.get(bone);if(rest)turns.set(bone,nearestAxisTurn(own.clone().invert().mul(rest)));}
+          const aligned=alignedRest(source,target,isSmoking(clip)),turns=new Map<string,pc.Quat>();
+          for(const [bone,own] of aligned){const rest=source.restW.get(bone);if(rest){
+            const turn=own.clone().invert().mul(rest);
+            turns.set(bone,isSmoking(clip)?turn:nearestAxisTurn(turn));
+          }}
           this.axes.set(axesKey,turns);
         }
       }catch(error){console.warn(`animacoes_bar: não foi possível adaptar ${clip} para ${skinId}.`,error);this.converted.set(key,null);}
@@ -281,6 +285,8 @@ export class BarAnimations {
     // The food served at the table stands in for the clip's plate and fries.
     if(servedFood)for(const name of ['Prop_Prato','Prop_Batatas'])kit.props.get(name)?.setLocalScale(0,0,0);
     this.followHands(actor,info,view.source,clip,kit,spaceMatrix,t*groupInfo(info.group).fps,this.axes.get(`${skin}|${info.group}`));
+    const target=this.targets.get(skin);
+    if(isSmoking(step.clip)&&target&&actor.bones)polishSmoking(step.clip,t*groupInfo(info.group).fps,skin,actor.bones,target,kit.props);
     this.aimProps(info,kit,t*groupInfo(info.group).fps);
     for(const name of Object.keys(info.substitui??{}))this.hiding.add(name);
     // The map's chair goes where Prop_Cadeira is.
@@ -384,18 +390,28 @@ export class BarAnimations {
     inverse.copy(space).invert();
     for(const [name,ranges] of Object.entries(info.segue)){
       const prop=kit.props.get(name);if(!prop)continue;
-      let weight=0,bone='';
-      for(const [from,to,held] of ranges)if(frame>=from-4&&frame<=to+4){const w=Math.min(1,(frame-(from-4))/4,((to+4)-frame)/4);if(w>weight){weight=w;bone=held;}}
-      const canonical=boneName(bone),real=actor.bones.get(canonical);
-      if(weight<=0||!real||!source.parent.has(canonical))continue;
-      // S: the authoring bone, T: the skin's, both in the clip's space and without scale.
-      const authored=this.authoredBone(canonical,source,clip,t,world);
-      authored.getTranslation(p);q.setFromMat4(authored);a.setTRS(p,q,pc.Vec3.ONE).invert();
-      b.mul2(inverse,real.getWorldTransform());b.getTranslation(p);q.setFromMat4(b);
-      const turn=axes?.get(canonical);if(turn)q.mul(turn);
-      b.setTRS(p,q,pc.Vec3.ONE);
-      c.mul2(b,a);
-      if(weight<1){c.getTranslation(p).mulScalar(weight);q.setFromMat4(c);q.slerp(pc.Quat.IDENTITY,q,weight);c.setTRS(p,q,pc.Vec3.ONE);}
+      const smoking=info.group==='fumar'||info.group==='fumar_mixamo';
+      const candidates=ranges.flatMap(([from,to,bone])=>{
+        const linear=Math.max(0,Math.min(1,(frame-(from-4))/4,((to+4)-frame)/4));
+        const weight=smoking?linear*linear*(3-2*linear):linear,canonical=boneName(bone),real=actor.bones!.get(canonical);
+        return weight>0&&real&&source.parent.has(canonical)?[{weight,canonical,real}]:[];
+      });
+      const held=smoking?candidates:candidates.sort((a,b)=>b.weight-a.weight).slice(0,1);
+      if(!held.length)continue;
+      // Blend both attachments through a handoff. Choosing the largest weight jumps between two
+      // different transforms exactly halfway through a hand-to-mouth transfer.
+      const total=held.reduce((sum,h)=>sum+h.weight,0),position=new pc.Vec3(),rotation=new pc.Quat();
+      let accumulated=Math.max(0,1-total);
+      for(const {weight,canonical,real} of held){
+        const authored=this.authoredBone(canonical,source,clip,t,world);
+        authored.getTranslation(p);q.setFromMat4(authored);a.setTRS(p,q,pc.Vec3.ONE).invert();
+        b.mul2(inverse,real.getWorldTransform());b.getTranslation(p);q.setFromMat4(b);
+        const turn=axes?.get(canonical);if(turn)q.mul(turn);
+        b.setTRS(p,q,pc.Vec3.ONE);c.mul2(b,a);
+        position.add(c.getTranslation(p).mulScalar(weight/Math.max(1,total)));
+        rotation.slerp(rotation,q.setFromMat4(c),weight/(accumulated+weight));accumulated+=weight;
+      }
+      c.setTRS(position,rotation,pc.Vec3.ONE);
       a.setTRS(prop.getLocalPosition(),prop.getLocalRotation(),prop.getLocalScale());
       b.mul2(c,a);
       prop.setLocalPosition(b.getTranslation(p));prop.setLocalRotation(q.setFromMat4(b));prop.setLocalScale(b.getScale(s));

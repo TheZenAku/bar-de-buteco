@@ -1,0 +1,3 @@
+apps/web/http-redirect.ts
+apps/web/rigs.js
+apps/web/vite.config.ts

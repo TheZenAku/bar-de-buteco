@@ -7,7 +7,7 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Ação no jogo | Fonte | Comportamento |
 | --- | --- | --- |
 | Parado | `misc/Idle (1).fbx` | `Idle` do banco Mixamo: primeiros 4 s, com os últimos 0,5 s misturados à pose inicial para fechar o loop. |
-| Caminhar | `misc/Standard Walk.fbx` | Loop de caminhada, separado da corrida. |
+| Caminhar | `misc/Standard Walk.fbx` | Ciclo de 1,4 s (20% mais longo), com 85 poses a 60 Hz. Interpolação cúbica esférica das rotações e Hermite monotônica do quadril suavizam o movimento e a emenda do loop. A cadência acompanha a velocidade com aceleração de 0,18 s e desaceleração de 0,24 s; entrar e sair da caminhada mistura as poses por 0,32 s e 0,28 s. |
 | Correr | `Standard Run.fbx` | Loop de corrida de todas as skins. O arquivo avança cerca de 3 m por ciclo (root motion); o conversor (`inPlace`) remove esse avanço constante e mantém o balanço do quadril, porque quem move o avatar é o servidor. O avanço medido dá o ritmo do clipe a 1× (`MIXAMO_PACE.Run`, 4 m/s no Nathan): a 6 m/s a cadência fica em 1,5×. |
 | Embriagado parado / andando | `misc/Drunk Idle Variation.fbx` / `misc/Drunk Walk.fbx` | Entra nos estágios altos de embriaguez; substitui a inclinação procedural nos modelos completos. |
 | Tropeçar | `misc/Drunk Idle Variation.fbx` | Cambaleio temporário; não reutiliza mais a queda de desmaio. |

@@ -1,0 +1,2440 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Synthetic OpenAPI from cartographer",
+    "version": "synth",
+    "description": "Built from statically detected endpoints. Run the server and use --live-url for richer schemas."
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 136,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 137,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/metrics": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 141,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/config": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 142,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/prices": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 144,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 145,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/verify": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 168,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/resend": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 179,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 193,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 206,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 207,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/forgot": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 214,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/reset": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 227,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/game-ticket": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 242,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/wardrobe": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 248,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/wardrobe/equip": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 249,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/wardrobe/buy": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 254,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/wardrobe/skill": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 255,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/wardrobe/daily": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 256,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 257,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/buy": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 258,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 262,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/blocks": {
+      "get": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 266,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 267,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/blocks/:id": {
+      "delete": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 274,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "post": {
+        "operationId": "phoneUser",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "apps/api/src/app.ts::phoneUser",
+          "file": "apps/api/src/app.ts",
+          "line": 279,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone": {
+      "get": {
+        "operationId": "get_api_phone",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 301,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/card/:id": {
+      "get": {
+        "operationId": "get_api_phone_card_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 302,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/profile/achievements": {
+      "get": {
+        "operationId": "get_api_profile_achievements",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 304,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/profile/:id": {
+      "get": {
+        "operationId": "get_api_profile_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 305,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/profile/status": {
+      "post": {
+        "operationId": "post_api_profile_status",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 306,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/profile/badges": {
+      "post": {
+        "operationId": "post_api_profile_badges",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 307,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/profile/skill": {
+      "post": {
+        "operationId": "post_api_profile_skill",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 308,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/highfood": {
+      "get": {
+        "operationId": "get_api_highfood",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 310,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vehicles": {
+      "get": {
+        "operationId": "get_api_vehicles",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 311,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vehicles/buy": {
+      "post": {
+        "operationId": "post_api_vehicles_buy",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 312,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vehicles/paint": {
+      "post": {
+        "operationId": "post_api_vehicles_paint",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 316,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/badges/images/:id": {
+      "get": {
+        "operationId": "get_api_badges_images_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 322,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/lookup": {
+      "get": {
+        "operationId": "get_api_phone_lookup",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 326,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/contacts": {
+      "post": {
+        "operationId": "post_api_phone_contacts",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 327,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/contacts/:id": {
+      "delete": {
+        "operationId": "delete_api_phone_contacts_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 328,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/zap": {
+      "get": {
+        "operationId": "get_api_phone_zap",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 329,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/zap/:id": {
+      "get": {
+        "operationId": "get_api_phone_zap_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 330,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_phone_zap_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 331,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram": {
+      "get": {
+        "operationId": "get_api_phone_gram",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 335,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/me": {
+      "patch": {
+        "operationId": "patch_api_phone_gram_me",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 336,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/avatars/:id": {
+      "get": {
+        "operationId": "get_api_phone_gram_avatars_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 342,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/search": {
+      "get": {
+        "operationId": "get_api_phone_gram_search",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 346,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/suggestions": {
+      "get": {
+        "operationId": "get_api_phone_gram_suggestions",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 348,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/users/:id/follow": {
+      "post": {
+        "operationId": "post_api_phone_gram_users_:id_follow",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 352,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/users/:id/:list": {
+      "get": {
+        "operationId": "get_api_phone_gram_users_:id_:list",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 354,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/zap/:id/media": {
+      "post": {
+        "operationId": "post_api_phone_zap_:id_media",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 358,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/zap/media/:id": {
+      "get": {
+        "operationId": "get_api_phone_zap_media_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 364,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/users/:id": {
+      "get": {
+        "operationId": "get_api_phone_gram_users_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 368,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/posts": {
+      "post": {
+        "operationId": "post_api_phone_gram_posts",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 370,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/photos/:id": {
+      "get": {
+        "operationId": "get_api_phone_gram_photos_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 375,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/posts/:id": {
+      "delete": {
+        "operationId": "delete_api_phone_gram_posts_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 379,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/posts/:id/like": {
+      "post": {
+        "operationId": "post_api_phone_gram_posts_:id_like",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 384,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/posts/:id/comments": {
+      "get": {
+        "operationId": "get_api_phone_gram_posts_:id_comments",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 386,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_phone_gram_posts_:id_comments",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 387,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/gram/comments/:id": {
+      "delete": {
+        "operationId": "delete_api_phone_gram_comments_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 391,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/bank": {
+      "get": {
+        "operationId": "get_api_phone_bank",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 392,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/phone/bank/pix": {
+      "post": {
+        "operationId": "post_api_phone_bank_pix",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 393,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/overview": {
+      "get": {
+        "operationId": "get_api_admin_overview",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 398,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/summary": {
+      "get": {
+        "operationId": "get_api_admin_summary",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 403,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/players/:id": {
+      "get": {
+        "operationId": "get_api_admin_players_:id",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 404,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/player": {
+      "post": {
+        "operationId": "post_api_admin_player",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 405,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/reports": {
+      "get": {
+        "operationId": "get_api_admin_reports",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 420,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/reports/resolve": {
+      "post": {
+        "operationId": "post_api_admin_reports_resolve",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 421,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/logs": {
+      "get": {
+        "operationId": "get_api_admin_logs",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 425,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/economy": {
+      "get": {
+        "operationId": "get_api_admin_economy",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 431,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/prices": {
+      "get": {
+        "operationId": "get_api_admin_prices",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 432,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_admin_prices",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 435,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/collection": {
+      "get": {
+        "operationId": "get_api_admin_collection",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 433,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_admin_collection",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 434,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/server": {
+      "get": {
+        "operationId": "get_api_admin_server",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 439,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/wallet": {
+      "post": {
+        "operationId": "post_api_admin_wallet",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 440,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/role": {
+      "post": {
+        "operationId": "post_api_admin_role",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 447,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/action": {
+      "post": {
+        "operationId": "post_api_admin_action",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 451,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges": {
+      "get": {
+        "operationId": "get_api_admin_badges",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 458,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_admin_badges",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 470,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges/images": {
+      "post": {
+        "operationId": "post_api_admin_badges_images",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 459,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges/images/delete": {
+      "post": {
+        "operationId": "post_api_admin_badges_images_delete",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 463,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges/:id/holders": {
+      "get": {
+        "operationId": "get_api_admin_badges_:id_holders",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 469,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges/delete": {
+      "post": {
+        "operationId": "post_api_admin_badges_delete",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 474,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/badges/grant": {
+      "post": {
+        "operationId": "post_api_admin_badges_grant",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 478,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/highfood": {
+      "get": {
+        "operationId": "get_api_admin_highfood",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 482,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/highfood/customers": {
+      "post": {
+        "operationId": "post_api_admin_highfood_customers",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 483,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/highfood/vehicle": {
+      "post": {
+        "operationId": "post_api_admin_highfood_vehicle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 487,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/revert": {
+      "post": {
+        "operationId": "post_api_admin_revert",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 492,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/validate": {
+      "post": {
+        "operationId": "post_api_internal_validate",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 496,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/inventory": {
+      "post": {
+        "operationId": "post_api_internal_inventory",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 503,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/wallet": {
+      "post": {
+        "operationId": "post_api_internal_wallet",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 511,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/fuel/reserve": {
+      "post": {
+        "operationId": "post_api_internal_fuel_reserve",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 518,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/fuel/settle": {
+      "post": {
+        "operationId": "post_api_internal_fuel_settle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 525,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/blackjack/settle": {
+      "post": {
+        "operationId": "post_api_internal_blackjack_settle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 530,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/foosball/settle": {
+      "post": {
+        "operationId": "post_api_internal_foosball_settle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 536,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/truco/settle": {
+      "post": {
+        "operationId": "post_api_internal_truco_settle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 542,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/pool/settle": {
+      "post": {
+        "operationId": "post_api_internal_pool_settle",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 548,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/equip": {
+      "post": {
+        "operationId": "post_api_internal_equip",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 553,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/highfood/rating": {
+      "post": {
+        "operationId": "post_api_internal_highfood_rating",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 562,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/highfood/customers": {
+      "get": {
+        "operationId": "get_api_internal_highfood_customers",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 563,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/highfood/complete": {
+      "post": {
+        "operationId": "post_api_internal_highfood_complete",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 564,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/highfood/lost": {
+      "post": {
+        "operationId": "post_api_internal_highfood_lost",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 565,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/vehicles": {
+      "post": {
+        "operationId": "post_api_internal_vehicles",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 566,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/vehicles/ownership-audit": {
+      "get": {
+        "operationId": "get_api_internal_vehicles_ownership-audit",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 571,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/trades/commit": {
+      "post": {
+        "operationId": "post_api_internal_trades_commit",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 573,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/prices": {
+      "get": {
+        "operationId": "get_api_internal_prices",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 574,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/logs": {
+      "post": {
+        "operationId": "post_api_internal_logs",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 576,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/achievements": {
+      "post": {
+        "operationId": "post_api_internal_achievements",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 582,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/controls": {
+      "get": {
+        "operationId": "get_api_internal_controls",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 588,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/controls/lease": {
+      "post": {
+        "operationId": "post_api_internal_controls_lease",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 591,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/controls/ack": {
+      "post": {
+        "operationId": "post_api_internal_controls_ack",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 595,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/stats": {
+      "post": {
+        "operationId": "post_api_internal_stats",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 600,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/internal/dev/bot": {
+      "post": {
+        "operationId": "post_api_internal_dev_bot",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 620,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dev/mail": {
+      "get": {
+        "operationId": "get_api_dev_mail",
+        "summary": "",
+        "tags": [
+          "src"
+        ],
+        "x-cartographer": {
+          "handler_id": "",
+          "file": "apps/api/src/app.ts",
+          "line": 626,
+          "framework": "express"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "x-cartographer": {
+    "synthetic": true,
+    "endpoint_count": 116,
+    "handler_index": {
+      "GET /api/health": "apps/api/src/app.ts::phoneUser",
+      "GET /api/ready": "apps/api/src/app.ts::phoneUser",
+      "GET /api/internal/metrics": "apps/api/src/app.ts::phoneUser",
+      "GET /api/auth/config": "apps/api/src/app.ts::phoneUser",
+      "GET /api/prices": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/register": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/verify": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/resend": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/login": "apps/api/src/app.ts::phoneUser",
+      "GET /api/auth/me": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/logout": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/forgot": "apps/api/src/app.ts::phoneUser",
+      "POST /api/auth/reset": "apps/api/src/app.ts::phoneUser",
+      "POST /api/game-ticket": "apps/api/src/app.ts::phoneUser",
+      "GET /api/wardrobe": "apps/api/src/app.ts::phoneUser",
+      "POST /api/wardrobe/equip": "apps/api/src/app.ts::phoneUser",
+      "POST /api/wardrobe/buy": "apps/api/src/app.ts::phoneUser",
+      "POST /api/wardrobe/skill": "apps/api/src/app.ts::phoneUser",
+      "POST /api/wardrobe/daily": "apps/api/src/app.ts::phoneUser",
+      "GET /api/inventory": "apps/api/src/app.ts::phoneUser",
+      "POST /api/inventory/buy": "apps/api/src/app.ts::phoneUser",
+      "GET /api/stats": "apps/api/src/app.ts::phoneUser",
+      "GET /api/blocks": "apps/api/src/app.ts::phoneUser",
+      "POST /api/blocks": "apps/api/src/app.ts::phoneUser",
+      "DELETE /api/blocks/:id": "apps/api/src/app.ts::phoneUser",
+      "POST /api/reports": "apps/api/src/app.ts::phoneUser",
+      "GET /api/phone": "",
+      "GET /api/phone/card/:id": "",
+      "GET /api/profile/achievements": "",
+      "GET /api/profile/:id": "",
+      "POST /api/profile/status": "",
+      "POST /api/profile/badges": "",
+      "POST /api/profile/skill": "",
+      "GET /api/highfood": "",
+      "GET /api/vehicles": "",
+      "POST /api/vehicles/buy": "",
+      "POST /api/vehicles/paint": "",
+      "GET /api/badges/images/:id": "",
+      "GET /api/phone/lookup": "",
+      "POST /api/phone/contacts": "",
+      "DELETE /api/phone/contacts/:id": "",
+      "GET /api/phone/zap": "",
+      "GET /api/phone/zap/:id": "",
+      "POST /api/phone/zap/:id": "",
+      "GET /api/phone/gram": "",
+      "PATCH /api/phone/gram/me": "",
+      "GET /api/phone/gram/avatars/:id": "",
+      "GET /api/phone/gram/search": "",
+      "GET /api/phone/gram/suggestions": "",
+      "POST /api/phone/gram/users/:id/follow": "",
+      "GET /api/phone/gram/users/:id/:list": "",
+      "POST /api/phone/zap/:id/media": "",
+      "GET /api/phone/zap/media/:id": "",
+      "GET /api/phone/gram/users/:id": "",
+      "POST /api/phone/gram/posts": "",
+      "GET /api/phone/gram/photos/:id": "",
+      "DELETE /api/phone/gram/posts/:id": "",
+      "POST /api/phone/gram/posts/:id/like": "",
+      "GET /api/phone/gram/posts/:id/comments": "",
+      "POST /api/phone/gram/posts/:id/comments": "",
+      "DELETE /api/phone/gram/comments/:id": "",
+      "GET /api/phone/bank": "",
+      "POST /api/phone/bank/pix": "",
+      "GET /api/admin/overview": "",
+      "GET /api/admin/summary": "",
+      "GET /api/admin/players/:id": "",
+      "POST /api/admin/player": "",
+      "GET /api/admin/reports": "",
+      "POST /api/admin/reports/resolve": "",
+      "GET /api/admin/logs": "",
+      "GET /api/admin/economy": "",
+      "GET /api/admin/prices": "",
+      "GET /api/admin/collection": "",
+      "POST /api/admin/collection": "",
+      "POST /api/admin/prices": "",
+      "GET /api/admin/server": "",
+      "POST /api/admin/wallet": "",
+      "POST /api/admin/role": "",
+      "POST /api/admin/action": "",
+      "GET /api/admin/badges": "",
+      "POST /api/admin/badges/images": "",
+      "POST /api/admin/badges/images/delete": "",
+      "GET /api/admin/badges/:id/holders": "",
+      "POST /api/admin/badges": "",
+      "POST /api/admin/badges/delete": "",
+      "POST /api/admin/badges/grant": "",
+      "GET /api/admin/highfood": "",
+      "POST /api/admin/highfood/customers": "",
+      "POST /api/admin/highfood/vehicle": "",
+      "POST /api/admin/revert": "",
+      "POST /api/internal/validate": "",
+      "POST /api/internal/inventory": "",
+      "POST /api/internal/wallet": "",
+      "POST /api/internal/fuel/reserve": "",
+      "POST /api/internal/fuel/settle": "",
+      "POST /api/internal/blackjack/settle": "",
+      "POST /api/internal/foosball/settle": "",
+      "POST /api/internal/truco/settle": "",
+      "POST /api/internal/pool/settle": "",
+      "POST /api/internal/equip": "",
+      "POST /api/internal/highfood/rating": "",
+      "GET /api/internal/highfood/customers": "",
+      "POST /api/internal/highfood/complete": "",
+      "POST /api/internal/highfood/lost": "",
+      "POST /api/internal/vehicles": "",
+      "GET /api/internal/vehicles/ownership-audit": "",
+      "POST /api/internal/trades/commit": "",
+      "GET /api/internal/prices": "",
+      "POST /api/internal/logs": "",
+      "POST /api/internal/achievements": "",
+      "GET /api/internal/controls": "",
+      "POST /api/internal/controls/lease": "",
+      "POST /api/internal/controls/ack": "",
+      "POST /api/internal/stats": "",
+      "POST /api/internal/dev/bot": "",
+      "GET /api/dev/mail": ""
+    }
+  }
+}

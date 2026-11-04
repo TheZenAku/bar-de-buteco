@@ -64,6 +64,14 @@ O jogo é PlayCanvas, não three.js. Por isso, `animacoes_bar.js` não é carreg
 - **Partículas:** fumaça, vômito e urina são pontos de um único buffer, com os parâmetros de `FX_TIPOS`. A escala dos nós `FX_*` é a intensidade. O jato de urina é um pouco mais grosso que o de autoria (1,4 a 1,8 cm em vez de 1,0 a 1,2 cm), que quase não aparecia na câmera do jogo. Elas não mexem no alfa do canvas.
 - **Restos:** a bituca (dos dois jeitos de fumar), a poça (60 s) e a bebida no balcão (2,5 s) ficam como cópias soltas no mapa. Na mesa, o prato servido é o do jogo.
 
+### Contatos das animações de fumar
+
+`smoking-pose.ts` corrige os contatos depois da pose animada, nos dois grupos de fumar. `SMOKING_LIPS` guarda o centro dos lábios em relação à cabeça de cada skin; a altura total do personagem não serve para localizar a boca. Braços usam IK com o comprimento original dos ossos, cotovelo para baixo e para fora e aproximação suave nos quadros de cada tragada. O pulso mantém os dedos ao lado da boca. Isqueiro e chama chegam à ponta do cigarro; antes de a chama aparecer, a referência é o bico do isqueiro, pois props ocultos podem estar na origem do mundo.
+
+Nesses grupos, o retarget calibra também a palma pelo triângulo pulso–indicador–polegar e usa a rotação exata dos eixos para os props. Os bancos originais só têm polegar e indicador: médio, anelar e mínimo recebem a flexão do indicador nos próprios referenciais de repouso. Cigarro, brasa e emissor da ponta recebem a mesma transformação; a baforada nasce nos lábios. As trocas entre mão e cabeça misturam os dois vínculos, com curvas suaves, para evitar saltos. As correções dependem do tempo do clipe e funcionam também para quem chega no meio da animação.
+
+O teste de navegador `smoking contacts` verifica as quatro fases nos 11 personagens, em duas orientações: filtro nos lábios, fumaça na ponta e na boca, chama na brasa e comprimento dos braços preservado.
+
 ## Modo de debug (só em desenvolvimento)
 
 **F8** abre um painel que dispara cada ação no próprio jogador sem passar pelo servidor:

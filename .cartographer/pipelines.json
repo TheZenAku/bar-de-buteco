@@ -1,0 +1,8 @@
+{
+  "pipelines": [],
+  "stats": {
+    "total_pipelines": 0,
+    "max_depth": 6,
+    "max_nodes_per_pipeline": 60
+  }
+}

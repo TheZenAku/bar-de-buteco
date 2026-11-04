@@ -1,0 +1,1382 @@
+{
+ "segments": [
+  {
+   "name": "api@apps/api",
+   "files": [
+    "apps/api/src/admin-console.ts",
+    "apps/api/src/app.ts",
+    "apps/api/src/config.ts",
+    "apps/api/src/database/index.ts",
+    "apps/api/src/database/schema.ts",
+    "apps/api/src/observability.ts",
+    "apps/api/test/achievements.test.ts",
+    "apps/api/test/admin-console.test.ts",
+    "apps/api/test/auth.test.ts",
+    "apps/api/test/dev-bots.test.ts",
+    "apps/api/test/fuel.test.ts",
+    "apps/api/test/highfood.test.ts",
+    "apps/api/test/inventory.test.ts",
+    "apps/api/test/trade.test.ts",
+    "apps/api/test/wallet.test.ts",
+    "apps/api/test/wardrobe.test.ts"
+   ],
+   "file_count": 16,
+   "loc": 2754,
+   "symbol_count": 133,
+   "integrations": [
+    "jest",
+    "filesystem",
+    "postgres"
+   ],
+   "endpoints": [
+    {
+     "method": "GET",
+     "path": "/api/health",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/ready",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/internal/metrics",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/auth/config",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/prices",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/register",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/verify",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/resend",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/login",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/auth/me",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/logout",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/forgot",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/auth/reset",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/game-ticket",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/wardrobe",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/wardrobe/equip",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/wardrobe/buy",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/wardrobe/skill",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/wardrobe/daily",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/inventory",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/inventory/buy",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/stats",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/blocks",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/blocks",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/blocks/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/reports",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/card/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/profile/achievements",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/profile/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/status",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/badges",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/skill",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/highfood",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/vehicles",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/vehicles/buy",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/vehicles/paint",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/badges/images/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/lookup",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/contacts",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/phone/contacts/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/zap",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/zap/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/zap/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/phone/gram/me",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/avatars/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/search",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/suggestions",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/gram/users/:id/follow",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/users/:id/:list",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/zap/:id/media",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/zap/media/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/users/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/gram/posts",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/photos/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/phone/gram/posts/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/gram/posts/:id/like",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/gram/posts/:id/comments",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/gram/posts/:id/comments",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/phone/gram/comments/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/phone/bank",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/phone/bank/pix",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/overview",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/summary",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/players/:id",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/player",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/reports",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/reports/resolve",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/logs",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/economy",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/prices",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/collection",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/collection",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/prices",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/server",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/wallet",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/role",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/action",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/badges",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/badges/images",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/badges/images/delete",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/badges/:id/holders",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/badges",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/badges/delete",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/badges/grant",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/admin/highfood",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/highfood/customers",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/highfood/vehicle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/admin/revert",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/validate",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/inventory",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/wallet",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/fuel/reserve",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/fuel/settle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/blackjack/settle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/foosball/settle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/truco/settle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/pool/settle",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/equip",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/highfood/rating",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/internal/highfood/customers",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/highfood/complete",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/highfood/lost",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/vehicles",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/internal/vehicles/ownership-audit",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/trades/commit",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/internal/prices",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/logs",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/achievements",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/internal/controls",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/controls/lease",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/controls/ack",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/stats",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "POST",
+     "path": "/api/internal/dev/bot",
+     "file": "apps/api/src/app.ts"
+    },
+    {
+     "method": "GET",
+     "path": "/api/dev/mail",
+     "file": "apps/api/src/app.ts"
+    }
+   ],
+   "directory_prefix": "apps/api",
+   "complexity_score": 167
+  },
+  {
+   "name": "packages/shared/src/truco",
+   "files": [
+    "packages/shared/src/admin.ts",
+    "packages/shared/src/blackjack.ts",
+    "packages/shared/src/car-dynamics.ts",
+    "packages/shared/src/car-parts.ts",
+    "packages/shared/src/city.ts",
+    "packages/shared/src/doors.ts",
+    "packages/shared/src/economy.ts",
+    "packages/shared/src/foosball.ts",
+    "packages/shared/src/garage.ts",
+    "packages/shared/src/gps.ts",
+    "packages/shared/src/head-look.ts",
+    "packages/shared/src/highfood.ts",
+    "packages/shared/src/horse.ts",
+    "packages/shared/src/index.ts",
+    "packages/shared/src/inventory.ts",
+    "packages/shared/src/jukebox.ts",
+    "packages/shared/src/kick-paths.ts",
+    "packages/shared/src/kick.ts",
+    "packages/shared/src/media-links.ts",
+    "packages/shared/src/moto-crash.ts",
+    "packages/shared/src/moto-parts.ts",
+    "packages/shared/src/moto.ts",
+    "packages/shared/src/musicians.ts",
+    "packages/shared/src/needs.ts",
+    "packages/shared/src/performance.ts",
+    "packages/shared/src/phone.ts",
+    "packages/shared/src/prices.ts",
+    "packages/shared/src/profile.ts",
+    "packages/shared/src/ragdoll.ts",
+    "packages/shared/src/rarity.ts",
+    "packages/shared/src/refueling.ts",
+    "packages/shared/src/skins.ts",
+    "packages/shared/src/trade.ts",
+    "packages/shared/src/truco/ai.ts",
+    "packages/shared/src/truco/betting.ts",
+    "packages/shared/src/truco/cards.ts",
+    "packages/shared/src/truco/game.ts",
+    "packages/shared/src/truco/index.ts",
+    "packages/shared/src/truco/scoring.ts",
+    "packages/shared/src/truco/stakes.ts",
+    "packages/shared/src/vehicle-actions.ts",
+    "packages/shared/src/vehicle-controls.ts",
+    "packages/shared/src/vehicle-models.ts",
+    "packages/shared/src/vehicle-parts.ts",
+    "packages/shared/src/voice.ts",
+    "packages/shared/src/world.ts",
+    "tests/e2e/highmotors.spec.ts"
+   ],
+   "file_count": 47,
+   "loc": 5478,
+   "symbol_count": 409,
+   "integrations": [
+    "websocket",
+    "jest",
+    "playwright"
+   ],
+   "endpoints": [],
+   "directory_prefix": "",
+   "complexity_score": 137
+  },
+  {
+   "name": "stripe@apps/web",
+   "files": [
+    "apps/web/src/foosball/render.ts",
+    "apps/web/src/foosball/sounds.ts",
+    "apps/web/src/fuel-hud.ts",
+    "apps/web/src/fullscreen.ts",
+    "apps/web/src/game-ui.ts",
+    "apps/web/src/garage-panel.ts",
+    "apps/web/src/gps.ts",
+    "apps/web/src/graphics.ts",
+    "apps/web/src/highfood/courier.ts",
+    "apps/web/src/highfood/locker.ts",
+    "apps/web/src/highfood/npc-avatar.ts",
+    "apps/web/src/hud-panels.ts",
+    "apps/web/src/jukebox.ts",
+    "apps/web/src/light-desk.ts",
+    "apps/web/src/lobby-hero.ts",
+    "apps/web/src/lobby-menu.ts",
+    "apps/web/src/main.ts",
+    "apps/web/src/media/file.ts",
+    "apps/web/src/media/platforms.ts",
+    "apps/web/src/media/player.ts",
+    "apps/web/src/minimap.ts",
+    "apps/web/src/moto-panel.ts",
+    "apps/web/src/mouse-capture.ts",
+    "apps/web/src/needs-hud.ts",
+    "apps/web/src/networking.ts",
+    "apps/web/src/notifications.ts",
+    "apps/web/src/objective-blip.ts",
+    "apps/web/src/performance/browser.ts",
+    "apps/web/src/performance/frames.ts",
+    "apps/web/src/performance/hud.ts",
+    "apps/web/src/performance/inventory.ts",
+    "apps/web/src/performance/monitor.ts",
+    "apps/web/src/performance/recording.ts",
+    "apps/web/src/performance/report.ts",
+    "apps/web/src/performance/view.ts",
+    "apps/web/src/phone/apps/bank.ts",
+    "apps/web/src/phone/apps/camera.ts",
+    "apps/web/src/phone/apps/gram.ts",
+    "apps/web/src/phone/apps/highfood.ts",
+    "apps/web/src/phone/apps/maps.ts"
+   ],
+   "file_count": 40,
+   "loc": 6402,
+   "symbol_count": 422,
+   "integrations": [
+    "stripe"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/web",
+   "complexity_score": 127
+  },
+  {
+   "name": "apps/web",
+   "files": [
+    "apps/web/src/admin/badges.ts",
+    "apps/web/src/admin/charts.ts",
+    "apps/web/src/admin/collection.ts",
+    "apps/web/src/admin/console.ts",
+    "apps/web/src/admin/economy.ts",
+    "apps/web/src/admin/environment.ts",
+    "apps/web/src/admin/highfood.ts",
+    "apps/web/src/admin/kit.ts",
+    "apps/web/src/admin/logs.ts",
+    "apps/web/src/admin/overview.ts",
+    "apps/web/src/admin/performance.ts",
+    "apps/web/src/admin/players.ts",
+    "apps/web/src/admin/prices.ts",
+    "apps/web/src/admin/reports.ts",
+    "apps/web/src/admin/server.ts",
+    "apps/web/src/admin/vehicles.ts",
+    "apps/web/src/admin/world.ts",
+    "apps/web/src/admission-lifecycle.ts",
+    "apps/web/src/ambient-mix.ts",
+    "apps/web/src/api.ts",
+    "apps/web/src/audio.ts",
+    "apps/web/src/bar-animations-debug.ts",
+    "apps/web/src/blackjack/sounds.ts",
+    "apps/web/src/blackjack/table.ts",
+    "apps/web/src/car-panel.ts",
+    "apps/web/src/collection/card-sounds.ts",
+    "apps/web/src/collection/collection.ts",
+    "apps/web/src/collection/skin-card.ts",
+    "apps/web/src/consuming-hud.ts",
+    "apps/web/src/consumption.ts",
+    "apps/web/src/economy-ui.ts",
+    "apps/web/src/engine/BarScene.ts",
+    "apps/web/src/engine/animation-tracks.ts",
+    "apps/web/src/engine/bar-animations.ts",
+    "apps/web/src/engine/bar-dressing.ts",
+    "apps/web/src/engine/bar-surfaces.ts",
+    "apps/web/src/engine/blow-fx.ts",
+    "apps/web/src/engine/blow-sound.ts",
+    "apps/web/src/engine/camera-rig.ts",
+    "apps/web/src/engine/camera-xray.ts"
+   ],
+   "file_count": 40,
+   "loc": 7365,
+   "symbol_count": 385,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/web",
+   "complexity_score": 117
+  },
+  {
+   "name": "playwright@tests/e2e",
+   "files": [
+    "tests/e2e/achievements.spec.ts",
+    "tests/e2e/admin.spec.ts",
+    "tests/e2e/bar-animations.spec.ts",
+    "tests/e2e/bar.spec.ts",
+    "tests/e2e/camera-helpers.ts",
+    "tests/e2e/camera.spec.ts",
+    "tests/e2e/car.spec.ts",
+    "tests/e2e/city.spec.ts",
+    "tests/e2e/collection-helpers.ts",
+    "tests/e2e/collection.spec.ts",
+    "tests/e2e/doors.spec.ts",
+    "tests/e2e/economy.spec.ts",
+    "tests/e2e/environment.spec.ts",
+    "tests/e2e/garage-trade.spec.ts",
+    "tests/e2e/highfood.spec.ts",
+    "tests/e2e/horse.spec.ts",
+    "tests/e2e/jukebox.spec.ts",
+    "tests/e2e/kick.spec.ts",
+    "tests/e2e/media-fixture.ts",
+    "tests/e2e/media-platforms.spec.ts",
+    "tests/e2e/moto-actions.spec.ts",
+    "tests/e2e/moto-crash.spec.ts",
+    "tests/e2e/moto-helpers.ts",
+    "tests/e2e/moto-parts.spec.ts",
+    "tests/e2e/moto-v4.spec.ts",
+    "tests/e2e/moto.spec.ts",
+    "tests/e2e/nova-ui.spec.ts",
+    "tests/e2e/old-cane.spec.ts",
+    "tests/e2e/preview-path.ts",
+    "tests/e2e/profile.spec.ts",
+    "tests/e2e/stage.spec.ts",
+    "tests/e2e/walk.ts",
+    "tests/e2e/weather.spec.ts",
+    "tests/e2e/zz-hud-preview.ts"
+   ],
+   "file_count": 34,
+   "loc": 5697,
+   "symbol_count": 323,
+   "integrations": [
+    "playwright",
+    "jest",
+    "filesystem",
+    "websocket"
+   ],
+   "endpoints": [],
+   "directory_prefix": "tests/e2e",
+   "complexity_score": 110
+  },
+  {
+   "name": "stripe@apps/web",
+   "files": [
+    "apps/web/src/phone/apps/motors.ts",
+    "apps/web/src/phone/apps/telefone.ts",
+    "apps/web/src/phone/apps/tools.ts",
+    "apps/web/src/phone/apps/zap.ts",
+    "apps/web/src/phone/core.ts",
+    "apps/web/src/phone/filters.ts",
+    "apps/web/src/phone/media.ts",
+    "apps/web/src/phone/phone.ts",
+    "apps/web/src/phone/wallpapers.ts",
+    "apps/web/src/pool/panel.ts",
+    "apps/web/src/pool/render.ts",
+    "apps/web/src/pool/sounds.ts",
+    "apps/web/src/prices.ts",
+    "apps/web/src/profile/badge-card.ts",
+    "apps/web/src/profile/floating-window.ts",
+    "apps/web/src/profile/profile-window.ts",
+    "apps/web/src/settings.ts",
+    "apps/web/src/trade/trade.ts",
+    "apps/web/src/truco/card.ts",
+    "apps/web/src/truco/sounds.ts",
+    "apps/web/src/truco/table.ts",
+    "apps/web/src/ui-icons.ts",
+    "apps/web/src/vehicle-hud.ts",
+    "apps/web/src/voice.ts",
+    "apps/web/src/world-menu.ts",
+    "apps/web/src/youtube-player.ts"
+   ],
+   "file_count": 26,
+   "loc": 4606,
+   "symbol_count": 401,
+   "integrations": [
+    "stripe"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/web",
+   "complexity_score": 109
+  },
+  {
+   "name": "apps/web",
+   "files": [
+    "apps/web/src/engine/car-rig.ts",
+    "apps/web/src/engine/car-sound.ts",
+    "apps/web/src/engine/city-plan.ts",
+    "apps/web/src/engine/city-streaming.ts",
+    "apps/web/src/engine/day-night.ts",
+    "apps/web/src/engine/drink-props.ts",
+    "apps/web/src/engine/environment-lighting.ts",
+    "apps/web/src/engine/foosball-balls.ts",
+    "apps/web/src/engine/fuel-props.ts",
+    "apps/web/src/engine/gltf-textures.ts",
+    "apps/web/src/engine/head-look.ts",
+    "apps/web/src/engine/highfood-props.ts",
+    "apps/web/src/engine/horse-mount.ts",
+    "apps/web/src/engine/horse-sound.ts",
+    "apps/web/src/engine/jukebox-lights.ts",
+    "apps/web/src/engine/laser-font.ts",
+    "apps/web/src/engine/map-effects.ts",
+    "apps/web/src/engine/mixamo-retarget.ts",
+    "apps/web/src/engine/moto-bag.ts",
+    "apps/web/src/engine/moto-delivery.ts",
+    "apps/web/src/engine/moto-lights.ts",
+    "apps/web/src/engine/moto-motion.ts",
+    "apps/web/src/engine/moto-ragdoll.ts",
+    "apps/web/src/engine/moto-sound.ts",
+    "apps/web/src/engine/pool-balls.ts",
+    "apps/web/src/engine/scene-types.ts",
+    "apps/web/src/engine/serving-props.ts",
+    "apps/web/src/engine/skin-portrait.ts",
+    "apps/web/src/engine/speed-blur.ts",
+    "apps/web/src/engine/stage-lights.ts",
+    "apps/web/src/engine/stage-musicians.ts",
+    "apps/web/src/engine/stage-show.ts",
+    "apps/web/src/engine/television-surface.ts",
+    "apps/web/src/engine/vehicle-horn.ts",
+    "apps/web/src/engine/video-colours.ts",
+    "apps/web/src/engine/video-palette.ts",
+    "apps/web/src/engine/weather-effects.ts",
+    "apps/web/src/engine/weather-sound.ts",
+    "apps/web/src/foosball/panel.ts"
+   ],
+   "file_count": 40,
+   "loc": 5922,
+   "symbol_count": 224,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/web",
+   "complexity_score": 84
+  },
+  {
+   "name": "jest@apps/server/test",
+   "files": [
+    "apps/server/test/achievements.integration.test.ts",
+    "apps/server/test/admin-console.integration.test.ts",
+    "apps/server/test/bar-animations.integration.test.ts",
+    "apps/server/test/car.integration.test.ts",
+    "apps/server/test/doors.integration.test.ts",
+    "apps/server/test/economy.integration.test.ts",
+    "apps/server/test/environment.integration.test.ts",
+    "apps/server/test/foosball.room.test.ts",
+    "apps/server/test/garage-trade.integration.test.ts",
+    "apps/server/test/highfood-horse.integration.test.ts",
+    "apps/server/test/highfood.integration.test.ts",
+    "apps/server/test/horse.integration.test.ts",
+    "apps/server/test/inventory.integration.test.ts",
+    "apps/server/test/jukebox.integration.test.ts",
+    "apps/server/test/kick.integration.test.ts",
+    "apps/server/test/media-platforms.integration.test.ts",
+    "apps/server/test/minigame-achievements.integration.test.ts",
+    "apps/server/test/moderation.integration.test.ts",
+    "apps/server/test/moto-parts.integration.test.ts",
+    "apps/server/test/moto.integration.test.ts",
+    "apps/server/test/musicians.integration.test.ts",
+    "apps/server/test/musicians.test.ts",
+    "apps/server/test/needs.integration.test.ts",
+    "apps/server/test/observability.integration.test.ts",
+    "apps/server/test/outbox.test.ts",
+    "apps/server/test/performance.test.ts",
+    "apps/server/test/phone.integration.test.ts",
+    "apps/server/test/pool.room.test.ts",
+    "apps/server/test/refueling.integration.test.ts",
+    "apps/server/test/room.integration.test.ts",
+    "apps/server/test/served.test.ts",
+    "apps/server/test/stage-show.integration.test.ts",
+    "apps/server/test/stage.integration.test.ts",
+    "apps/server/test/vehicle-actions.integration.test.ts",
+    "apps/server/test/voice.integration.test.ts",
+    "apps/server/test/waiter.test.ts"
+   ],
+   "file_count": 36,
+   "loc": 4162,
+   "symbol_count": 154,
+   "integrations": [
+    "jest",
+    "websocket"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/server/test",
+   "complexity_score": 72
+  },
+  {
+   "name": "jest@tests/integration",
+   "files": [
+    "tests/integration/admission-lifecycle.test.ts",
+    "tests/integration/ambient.test.ts",
+    "tests/integration/animations.test.ts",
+    "tests/integration/bar-animations.test.ts",
+    "tests/integration/camera-settings.test.ts",
+    "tests/integration/camera.test.ts",
+    "tests/integration/car.test.ts",
+    "tests/integration/city-streaming.test.ts",
+    "tests/integration/consumption.test.ts",
+    "tests/integration/day-night.test.ts",
+    "tests/integration/doors.test.ts",
+    "tests/integration/drinks.test.ts",
+    "tests/integration/environment.test.ts",
+    "tests/integration/gps-follow.test.ts",
+    "tests/integration/head-look.test.ts",
+    "tests/integration/highfood.test.ts",
+    "tests/integration/horse-network.test.ts",
+    "tests/integration/horse.test.ts",
+    "tests/integration/jukebox.test.ts",
+    "tests/integration/kick.test.ts",
+    "tests/integration/map.test.ts",
+    "tests/integration/media-links.test.ts",
+    "tests/integration/mixamo-retarget.test.ts",
+    "tests/integration/moto-crash.test.ts",
+    "tests/integration/moto-model.test.ts",
+    "tests/integration/moto-motion.test.ts",
+    "tests/integration/moto-parts.test.ts",
+    "tests/integration/moto.test.ts",
+    "tests/integration/needs.test.ts",
+    "tests/integration/performance.test.ts",
+    "tests/integration/phone-filters.test.ts",
+    "tests/integration/preview-path.test.ts",
+    "tests/integration/shared.test.ts",
+    "tests/integration/shop.test.ts",
+    "tests/integration/stage-show.test.ts",
+    "tests/integration/vehicle-actions.test.ts",
+    "tests/integration/vehicle-handling.test.ts",
+    "tests/integration/vehicle-network.test.ts",
+    "tests/integration/voice.test.ts"
+   ],
+   "file_count": 39,
+   "loc": 3999,
+   "symbol_count": 98,
+   "integrations": [
+    "jest",
+    "filesystem"
+   ],
+   "endpoints": [],
+   "directory_prefix": "tests/integration",
+   "complexity_score": 64
+  },
+  {
+   "name": "jest@apps/server/test",
+   "files": [
+    "apps/server/test/bartender.test.ts",
+    "apps/server/test/blackjack.test.ts",
+    "apps/server/test/bots.test.ts",
+    "apps/server/test/events.test.ts",
+    "apps/server/test/foosball.test.ts",
+    "apps/server/test/jobs.test.ts",
+    "apps/server/test/media-check.test.ts",
+    "apps/server/test/navigation.test.ts",
+    "apps/server/test/npcs.test.ts",
+    "apps/server/test/pool.test.ts",
+    "apps/server/test/refueling.test.ts",
+    "apps/server/test/session-registry.test.ts",
+    "apps/server/test/truco-rules.test.ts",
+    "apps/server/test/truco-table.test.ts"
+   ],
+   "file_count": 28,
+   "loc": 4746,
+   "symbol_count": 120,
+   "integrations": [
+    "jest",
+    "stripe",
+    "filesystem"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/server/test",
+   "complexity_score": 61
+  },
+  {
+   "name": "jest@apps/api/test",
+   "files": [
+    "apps/api/test/admin.test.ts",
+    "apps/api/test/car.test.ts",
+    "apps/api/test/control-outbox.test.ts",
+    "apps/api/test/migrations.test.ts",
+    "apps/api/test/observability.test.ts",
+    "apps/api/test/phone.test.ts",
+    "apps/api/test/postgres-smoke.test.ts",
+    "apps/api/test/profile.test.ts",
+    "apps/api/test/vehicle-migration.test.ts"
+   ],
+   "file_count": 18,
+   "loc": 2174,
+   "symbol_count": 162,
+   "integrations": [
+    "jest",
+    "filesystem",
+    "postgres"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/api/test",
+   "complexity_score": 59
+  },
+  {
+   "name": "jest@tests/e2e",
+   "files": [
+    "tests/e2e/admin-badges.spec.ts",
+    "tests/e2e/ambient.spec.ts",
+    "tests/e2e/badge-card.spec.ts",
+    "tests/e2e/foosball.spec.ts",
+    "tests/e2e/horse-sound.spec.ts",
+    "tests/e2e/inventory.spec.ts",
+    "tests/e2e/media-firefox.spec.ts",
+    "tests/e2e/mouse-capture.spec.ts",
+    "tests/e2e/phone.spec.ts",
+    "tests/e2e/refueling.spec.ts",
+    "tests/e2e/rigs.spec.ts",
+    "tests/e2e/server.mjs",
+    "tests/e2e/truco.spec.ts",
+    "tests/e2e/voice.spec.ts"
+   ],
+   "file_count": 28,
+   "loc": 2368,
+   "symbol_count": 100,
+   "integrations": [
+    "jest",
+    "playwright"
+   ],
+   "endpoints": [],
+   "directory_prefix": "tests/e2e",
+   "complexity_score": 54
+  },
+  {
+   "name": "postgres@apps/api/src",
+   "files": [
+    "apps/api/src/achievement-service.ts",
+    "apps/api/src/admin-policy.ts",
+    "apps/api/src/admin-service.ts",
+    "apps/api/src/admin.ts",
+    "apps/api/src/auth/service.ts",
+    "apps/api/src/control-outbox.ts",
+    "apps/api/src/dev-bots.ts",
+    "apps/api/src/fuel-service.ts",
+    "apps/api/src/highfood-service.ts",
+    "apps/api/src/index.ts",
+    "apps/api/src/inventory-service.ts",
+    "apps/api/src/mail.ts",
+    "apps/api/src/phone-service.ts",
+    "apps/api/src/pricing-service.ts",
+    "apps/api/src/profile-service.ts",
+    "apps/api/src/seed.ts",
+    "apps/api/src/trade-service.ts",
+    "apps/api/src/wallet-service.ts",
+    "apps/api/src/wardrobe.ts"
+   ],
+   "file_count": 19,
+   "loc": 1982,
+   "symbol_count": 59,
+   "integrations": [
+    "postgres"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/api/src",
+   "complexity_score": 33
+  },
+  {
+   "name": "jest@tests/tools",
+   "files": [
+    "tests/tools/animation-transitions.test.mjs",
+    "tests/tools/horse.test.mjs",
+    "tests/tools/import-city.test.mjs",
+    "tests/tools/infra.test.mjs",
+    "tests/tools/old-cane.test.mjs",
+    "tests/tools/postgres-backup.test.mjs",
+    "tests/tools/retarget.test.mjs"
+   ],
+   "file_count": 14,
+   "loc": 1000,
+   "symbol_count": 36,
+   "integrations": [
+    "jest",
+    "filesystem",
+    "postgres"
+   ],
+   "endpoints": [],
+   "directory_prefix": "tests/tools",
+   "complexity_score": 30
+  },
+  {
+   "name": "apps/server/src/world",
+   "files": [
+    "apps/server/src/performance.ts",
+    "apps/server/src/room/session-registry.ts",
+    "apps/server/src/world/achievements.ts",
+    "apps/server/src/world/bartender.ts",
+    "apps/server/src/world/bots.ts",
+    "apps/server/src/world/events.ts",
+    "apps/server/src/world/highfood.ts",
+    "apps/server/src/world/jobs.ts",
+    "apps/server/src/world/media-check.ts",
+    "apps/server/src/world/navigation.ts",
+    "apps/server/src/world/needs.ts",
+    "apps/server/src/world/npcs.ts",
+    "apps/server/src/world/outbox.ts",
+    "apps/server/src/world/phone-calls.ts",
+    "apps/server/src/world/refueling.ts",
+    "apps/server/src/world/relays.ts",
+    "apps/server/src/world/trades.ts",
+    "apps/server/src/world/waiter.ts",
+    "apps/server/src/world/wallet.ts"
+   ],
+   "file_count": 19,
+   "loc": 1783,
+   "symbol_count": 52,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/server/src",
+   "complexity_score": 29
+  },
+  {
+   "name": "stripe@packages/shared/src/pool",
+   "files": [
+    "packages/shared/src/bar-animations.ts",
+    "packages/shared/src/pool/ai.ts",
+    "packages/shared/src/pool/aim.ts",
+    "packages/shared/src/pool/index.ts",
+    "packages/shared/src/pool/physics.ts",
+    "packages/shared/src/pool/rules.ts",
+    "packages/shared/src/pool/table.ts"
+   ],
+   "file_count": 7,
+   "loc": 1193,
+   "symbol_count": 79,
+   "integrations": [
+    "stripe"
+   ],
+   "endpoints": [],
+   "directory_prefix": "packages/shared/src",
+   "complexity_score": 25
+  },
+  {
+   "name": "apps/server/src/minigames",
+   "files": [
+    "apps/server/src/minigames/blackjack-bank.ts",
+    "apps/server/src/minigames/blackjack.ts",
+    "apps/server/src/minigames/foosball-cpu.ts",
+    "apps/server/src/minigames/foosball.ts",
+    "apps/server/src/minigames/pool.ts",
+    "apps/server/src/minigames/truco.ts"
+   ],
+   "file_count": 12,
+   "loc": 3988,
+   "symbol_count": 36,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/server/src/minigames",
+   "complexity_score": 19
+  },
+  {
+   "name": "apps/server/src",
+   "files": [
+    "apps/server/src/BarRoom.ts",
+    "apps/server/src/config.ts",
+    "apps/server/src/http.ts",
+    "apps/server/src/index.ts",
+    "apps/server/src/internal.ts",
+    "apps/server/src/observability.ts",
+    "apps/server/src/state.ts",
+    "apps/server/src/world/musicians.ts",
+    "apps/server/src/world/served.ts"
+   ],
+   "file_count": 9,
+   "loc": 4181,
+   "symbol_count": 42,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/server/src",
+   "complexity_score": 17
+  },
+  {
+   "name": "jest",
+   "files": [
+    "packages/shared/src/city-roads.ts",
+    "tests/integration/city.test.ts",
+    "tests/integration/street-names.test.ts"
+   ],
+   "file_count": 5,
+   "loc": 777,
+   "symbol_count": 31,
+   "integrations": [
+    "jest",
+    "filesystem"
+   ],
+   "endpoints": [],
+   "directory_prefix": "",
+   "complexity_score": 17
+  },
+  {
+   "name": "tools/ops",
+   "files": [
+    "tools/ops/postgres-backup-lib.mjs",
+    "tools/ops/postgres-backup.mjs",
+    "tools/ops/postgres-restore-check.mjs",
+    "tools/ops/pseudonym.mjs"
+   ],
+   "file_count": 8,
+   "loc": 370,
+   "symbol_count": 36,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "tools/ops",
+   "complexity_score": 15
+  },
+  {
+   "name": "tests/load/bots-planner.ts",
+   "files": [
+    "tests/load/bots-planner.ts",
+    "tests/load/bots.ts",
+    "tests/load/room.ts"
+   ],
+   "file_count": 3,
+   "loc": 666,
+   "symbol_count": 26,
+   "integrations": [
+    "websocket",
+    "filesystem"
+   ],
+   "endpoints": [],
+   "directory_prefix": "tests/load",
+   "complexity_score": 14
+  },
+  {
+   "name": "apps/api/src/database",
+   "files": [
+    "apps/api/src/database/migrate.ts",
+    "apps/api/src/database/migrations.ts",
+    "apps/api/src/database/schema-contract.ts"
+   ],
+   "file_count": 6,
+   "loc": 540,
+   "symbol_count": 24,
+   "integrations": [
+    "filesystem"
+   ],
+   "endpoints": [],
+   "directory_prefix": "apps/api/src/database",
+   "complexity_score": 13
+  },
+  {
+   "name": "packages",
+   "files": [
+    "packages/shared/src/achievements.ts",
+    "packages/shared/src/environment.ts",
+    "packages/shared/src/metrics.ts",
+    "packages/shared/src/stage-show.ts",
+    "packages/shared/src/tickets.ts"
+   ],
+   "file_count": 5,
+   "loc": 496,
+   "symbol_count": 37,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "packages",
+   "complexity_score": 12
+  },
+  {
+   "name": "apps/web",
+   "files": [
+    "apps/web/http-redirect.ts",
+    "apps/web/rigs.js",
+    "apps/web/vite.config.ts"
+   ],
+   "file_count": 6,
+   "loc": 266,
+   "symbol_count": 22,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "apps/web",
+   "complexity_score": 10
+  },
+  {
+   "name": "tests/fixtures",
+   "files": [
+    "tests/fixtures/collection.js",
+    "tests/fixtures/moto-card-render.js",
+    "tests/fixtures/skin-card-render.js",
+    "tests/fixtures/truco-scenes.js",
+    "tests/fixtures/youtube-api-mock.js"
+   ],
+   "file_count": 5,
+   "loc": 240,
+   "symbol_count": 22,
+   "integrations": [],
+   "endpoints": [],
+   "directory_prefix": "tests/fixtures",
+   "complexity_score": 9
+  }
+ ]
+}

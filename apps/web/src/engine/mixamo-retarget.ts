@@ -141,7 +141,7 @@ export function readTarget(model:pc.Entity,tracks:readonly pc.AnimTrack[]):Targe
  * Each joint's bind pose (model space) turned so its limb points as the authoring rest pose's does, as the offline
  * converter aligns them: the clips' world deltas are applied to this, and a joint posed by a clip is `delta × aligned`.
  */
-export function alignedRest(source:Source,target:Target):Map<string,pc.Quat> {
+export function alignedRest(source:Source,target:Target,matchHands=false):Map<string,pc.Quat> {
   // A world rotation delta alone preserves the target's A/T pose difference. Align each limb's real
   // rest direction first, as the offline converter does, without changing the skin or its bind matrices.
   const ends:Record<string,string>={hip:'spine_01',spine_01:'spine_02',spine_02:'spine_03',spine_03:'neck',neck:'head'};
@@ -151,8 +151,24 @@ export function alignedRest(source:Source,target:Target):Map<string,pc.Quat> {
   for(const bone of target.order){
     const up=target.parent.get(bone),end=ends[bone],targetEnd=end&&target.rest.get(end),sourceEnd=end&&source.restP.get(end),sourceStart=source.restP.get(bone);
     let swing:pc.Quat|undefined;
-    // Faces and soles keep their native orientation; hands and fingers inherit the forearm's alignment.
+    // Faces and soles keep their native orientation.
     if(bone==='head'||/^(foot|toe)_[lr]$/.test(bone))swing=new pc.Quat();
+    else if(matchHands&&/^hand_[lr]$/.test(bone)){
+      // Smoking needs the palm's roll as well as the forearm's direction. Bone axes and A/T poses
+      // differ between skins; measure the same wrist/index/thumb triangle on both skeletons.
+      const side=bone.at(-1)!,frame=(get:(name:string)=>pc.Vec3|undefined)=>{
+        const wrist=get(bone),index=get(`index_01_${side}`),thumb=get(`thumb_01_${side}`);
+        if(!wrist||!index||!thumb)return;
+        const x=new pc.Vec3().sub2(index,wrist).normalize(),z=new pc.Vec3().sub2(thumb,index);
+        z.sub(x.clone().mulScalar(z.dot(x))).normalize();
+        if(x.lengthSq()<.5||z.lengthSq()<.5)return;
+        const y=new pc.Vec3().cross(z,x),m=new pc.Mat4(),d=m.data;
+        d[0]=x.x;d[1]=x.y;d[2]=x.z;d[4]=y.x;d[5]=y.y;d[6]=y.z;d[8]=z.x;d[9]=z.y;d[10]=z.z;
+        return new pc.Quat().setFromMat4(m);
+      };
+      const own=frame(name=>target.rest.get(name)?.p),authored=frame(name=>source.restP.get(name));
+      if(own&&authored)swing=authored.mul(own.invert());
+    }
     else if(targetEnd&&sourceEnd&&sourceStart){
       const from=new pc.Vec3().sub2(targetEnd.p,target.rest.get(bone)!.p).normalize(),to=new pc.Vec3().sub2(sourceEnd,sourceStart).normalize();
       if(from.lengthSq()>.5&&to.lengthSq()>.5)swing=new pc.Quat().setFromDirections(from,to);
@@ -168,14 +184,14 @@ export function alignedRest(source:Source,target:Target):Map<string,pc.Quat> {
  * does not have keep their bind pose under their parent. The hips move by the clip's metres from its rest (times
  * `hipScale`: 1 where the clip must reach a place, the body's height ratio where it moves in its own space).
  */
-export function convert(clip:Clip,source:Source,target:Target,name:string,hipScale=1):pc.AnimTrack {
+export function convert(clip:Clip,source:Source,target:Target,name:string,hipScale=1,matchHands=false):pc.AnimTrack {
   const hipTurn=clip.bones.get('hip.localRotation'),hipMove=clip.bones.get('hip.localPosition');
   if(!hipTurn)throw new Error(`${clip.name} não move o quadril`);
   const times=hipTurn.times,frames=times.length;
   const aboveTurn=new Map([...target.above].map(([bone,matrix])=>[bone,new pc.Quat().setFromMat4(matrix)]));
   const restLocal=new Map(target.order.map(bone=>{const up=target.parent.get(bone);
     return [bone,(up?target.rest.get(up)!.q:aboveTurn.get(bone)!).clone().invert().mul(target.rest.get(bone)!.q)];}));
-  const aligned=alignedRest(source,target);
+  const aligned=alignedRest(source,target,matchHands);
   const turns=new Map(target.order.map(bone=>[bone,new Float32Array(frames*4)])),hips=new Float32Array(frames*3);
   const world=new Map<string,pc.Quat>(),delta=new Map<string,pc.Quat>(),posed=new Map<string,pc.Quat>();
   const value:number[]=[],local=new pc.Quat(),inverse=new pc.Quat(),hip=new pc.Vec3();
@@ -190,7 +206,10 @@ export function convert(clip:Clip,source:Source,target:Target,name:string,hipSca
     }
     for(const bone of target.order){
       const up=target.parent.get(bone),above=up?posed.get(up)!:aboveTurn.get(bone)!,turn=posed.get(bone)??new pc.Quat();
-      if(delta.has(bone))turn.mul2(delta.get(bone)!,aligned.get(bone)!);else turn.mul2(above,restLocal.get(bone)!);
+      // These smoking banks have only index/thumb chains. Let the remaining fingers share the index's
+      // flexion in their own bind frames instead of leaving three rigid fingers sticking through the face.
+      const motion=delta.get(bone)??(matchHands&&/^(middle|ring|pinky)_0[123]_[lr]$/.test(bone)?delta.get(bone.replace(/^(middle|ring|pinky)/,'index')):undefined);
+      if(motion)turn.mul2(motion,aligned.get(bone)!);else turn.mul2(above,restLocal.get(bone)!);
       posed.set(bone,turn);
       const out=inverse.copy(above).invert().mul(turn).normalize(),data=turns.get(bone)!,k=frame*4;
       // Neighbouring keys on the same side of the sphere, so the engine's blend between them never spins.
