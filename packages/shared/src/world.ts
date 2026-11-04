@@ -280,9 +280,9 @@ function obstructed(x:number,z:number,y:number,ignored?:Set<string>,obstacles:re
   return false;
 }
 
-export function isWalkable(x:number,z:number,y?:number):boolean {
+export function isWalkable(x:number,z:number,y?:number,obstacles:readonly Collider[]=[]):boolean {
   const supported=floorHeight(x,z,y??.3);
-  return supported!==undefined&&(y===undefined||Math.abs(supported-y)<.08)&&!obstructed(x,z,supported);
+  return supported!==undefined&&(y===undefined||Math.abs(supported-y)<.08)&&!obstructed(x,z,supported,undefined,obstacles);
 }
 
 /**
@@ -397,14 +397,14 @@ export function nearestInteraction(position:Position,available:(object:Interacta
 }
 
 /** The authored spawn marker is on the pavement; choose the closest clear position to it. */
-export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Position>=map.markers.Spawn_Jogador):Position {
+export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Position>=map.markers.Spawn_Jogador,obstacles:readonly Collider[]=[]):Position {
   const offsets:Array<{x:number;z:number}>=[];
   for(let x=-12;x<=12;x++)for(let z=-12;z<=12;z++)offsets.push({x:x*.8,z:z*.8});
   offsets.sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
   for(const o of offsets){
     const x=anchor.x+o.x,z=anchor.z+o.z,y=floorHeight(x,z,anchor.y);
     const p={x,y:y??anchor.y,z};
-    if(y!==undefined&&isWalkable(x,z,y)&&occupied.every(other=>distance(other,p)>.74))return p;
+    if(y!==undefined&&isWalkable(x,z,y,obstacles)&&occupied.every(other=>distance(other,p)>.74))return p;
   }
   throw new Error('Não há uma posição livre para entrar no mapa.');
 }

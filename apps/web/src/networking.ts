@@ -1,5 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
-import {isRidingHorse,moveHorse} from '@bar/shared';
+import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import type {Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
@@ -223,7 +223,8 @@ export class BarNetwork {
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
     if(!moving&&!this.wasMoving&&!looking)return;
     this.wasMoving=moving;
-    const input={...intention,seq:++this.seq};
+    // A drawn vehicle can have many complete turns. Never let that heading poison the unacknowledged walking queue.
+    const input={...intention,rotation:normalizeHeading(intention.rotation),seq:++this.seq};
     this.pending.push(input);
     if(!locked){this.position=this.predict(input,self);this.hooks.position(this.position);}
     this.send('player.input',input);

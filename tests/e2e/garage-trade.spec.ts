@@ -11,7 +11,7 @@ const shot=async(page:Page,name:string)=>{fs.mkdirSync(SHOTS,{recursive:true});a
 const errorsOf=(page:Page)=>{
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
-  page.on('console',message=>{if(message.type()==='error'&&!/Failed to load resource|favicon|Comando inválido/.test(message.text()))errors.push(message.text());});
+  page.on('console',message=>{if(message.type()==='error'&&!/Failed to load resource|favicon/.test(message.text()))errors.push(message.text());});
   return errors;
 };
 const place=async(page:Page,x:number,y:number,z:number)=>{

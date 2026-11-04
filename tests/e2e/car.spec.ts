@@ -84,6 +84,25 @@ test('car purchase from HighMotors, garage, personal colour and the full parts p
   }finally{await page.context().addCookies(adminCookies);await page.request.post('/api/admin/prices',{data:{changes:[{key:'vehicle:carro',value:null}],reason:'Restaurar preço depois do teste'}});}
 });
 
+test('curbside exit after accumulated car turns keeps camera, walking and stop inputs valid in the renderer',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.set({x:13.6,y:0,z:3.85,yaw:12*Math.PI+.4});f.view('inside');});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.actors.get('driver').riding)).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.inputValid())).toBe(true);
+  await page.evaluate(()=>(window as any).fixture.exit());
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.actors.get('driver').riding)).toBe(false);
+  for(let i=0;i<16;i++){
+    expect(await page.evaluate(()=>{const f=(window as any).fixture;f.scene.rig.yaw+=.3;return f.inputValid();})).toBe(true);
+  }
+  await page.keyboard.down('w');
+  const walking=await page.evaluate(()=>{const f=(window as any).fixture;return {input:f.scene.getInput(),valid:f.inputValid()};});
+  expect(walking.valid).toBe(true);expect(Math.hypot(walking.input.dx,walking.input.dz)).toBeGreaterThan(.9);
+  await page.keyboard.up('w');
+  expect(await page.evaluate(()=>(window as any).fixture.inputValid())).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('vehicle dashboard adapts to car, passenger, motorcycle and horse, restores actions and fits a phone',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   const url='/@fs/'+fileURLToPath(new URL('../fixtures/vehicle-hud.html',import.meta.url)).replaceAll('\\','/');

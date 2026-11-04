@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {eq} from 'drizzle-orm';import {CAR_MODEL,GARAGES,MOTO_ENGINE,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
+import {eq} from 'drizzle-orm';import {CAR_MODEL,GARAGES,MOTO_ENGINE,PLAYER_RADIUS,boxContains,inputSchema,motoObstacle,readCarParts,writeCarParts,vehicleOccupants} from '@bar/shared';
 import {createApi} from '../../api/src/app.js';import {readConfig} from '../../api/src/config.js';import {itemInventory,playerVehicles,wallets} from '../../api/src/database/schema.js';
 import {BarRoom} from '../src/BarRoom.js';
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -55,8 +55,24 @@ test('four people share one car; only the driver moves it, a fifth is refused, a
     fifth.state().assign({x:car.x-4,y:car.y,z:car.z});
     for(let i=0;i<30;i++){fifth.room.send('player.input',{seq:i+1,dx:1,dz:0,running:true,rotation:Math.PI/2});await pause(55);}
     assert.ok(fifth.state().x<car.x-2,'authoritative pedestrian movement cannot cross the car');
+    // The curbside stop follows many complete turns, for every seat, then head-only inputs and walking.
+    car.assign({x:13.6,y:0,z:3.85,yaw:12*Math.PI-Math.PI/2});
+    await pause(150);
     for(const p of people.slice(0,3))p.room.send('player.interact',{objectId:'stand'});await until(()=>car.passengers.every(id=>!id));
     owner.room.send('player.interact',{objectId:'stand'});await until(()=>!car.riderId);assert.equal(owner.state().interactionState,'');
+    for(const p of [owner,...people.slice(0,3)]){
+      assert.ok(!boxContains(motoObstacle(car),p.state().x,p.state().z,PLAYER_RADIUS),'exit clears the actual car hull');
+      assert.ok(Math.abs(p.state().rotation)<=Math.PI,'the vehicle does not leak accumulated turns to a pedestrian');
+      const next=p.state().lastProcessedInput+1;
+      const look={seq:next,dx:0,dz:0,running:false,rotation:p.state().rotation,headYaw:.5,headPitch:.2};
+      assert.ok(inputSchema.safeParse(look).success);p.room.send('player.input',look);
+      await until(()=>p.state().lastProcessedInput===next);
+      const before={x:p.state().x,z:p.state().z};
+      p.room.send('player.input',{...look,seq:next+1,dx:1,dz:0,rotation:Math.PI/2,running:true});
+      await until(()=>p.state().lastProcessedInput===next+1);
+      assert.ok(Math.hypot(p.state().x-before.x,p.state().z-before.z)>.05,'walking along the curb works immediately after exiting and looking around');
+      assert.ok(!p.errors.includes('Comando inválido.'));
+    }
     car.parts=writeCarParts({...readCarParts(car.parts),pneu_de:0,farol:12});await api.db.insert(itemInventory).values({userId:owner.id,itemId:'peca_carro',quantity:2});owner.room.send('inventory.sync',{});await pause(300);
     owner.state().assign({x:car.x+1.2,y:car.y,z:car.z});await pause(120);
     owner.room.send('moto.repair',{motoId:car.id,part:'bau'});await until(()=>owner.errors.some(e=>e.includes('modelo')));

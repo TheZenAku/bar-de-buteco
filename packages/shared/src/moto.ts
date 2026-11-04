@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {findSpawn,floorHeight,isWalkable,roadHeight,solidsBetween,WORLD} from './world.js';
+import {findSpawn,floorHeight,isWalkable,PLAYER_RADIUS,roadHeight,solidsBetween,WORLD} from './world.js';
 import type {Collider,Position} from './index.js';
 import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
@@ -265,20 +265,22 @@ export function motoStrikes(moto:Pick<MotoBody,'x'|'y'|'z'|'yaw'|'model'>,positi
 export function nearestFreeMoto(position:Position,motos:readonly MotoState[],who?:string):MotoState|undefined {
   return motos.filter(moto=>canMountMoto(moto,position,0,who)).sort((a,b)=>hullGap(a,position)-hullGap(b,position))[0];
 }
-/** Where the rider stands getting off: on the left (+X of the bike), or else whichever side has room. */
-export function motoDismountSpot(moto:MotoBody,seat=0):Required<Position> {
-  const s=Math.sin(moto.yaw),c=Math.cos(moto.yaw);
+/** Prefer the seat's side; every candidate and fallback must clear the model's hull and nearby vehicles. */
+export function motoDismountSpot(moto:MotoBody,seat=0,obstacles:readonly Collider[]=[]):Required<Position> {
+  const s=Math.sin(moto.yaw),c=Math.cos(moto.yaw),spec=vehiclePhysics(moto.model);
+  const hulls=[motoObstacle({...moto,id:'dismount'}),...obstacles];
+  const offsets:Array<readonly [number,number]>=[];
   if(moto.model===CAR_MODEL){
-    const side=seat===1||seat===3?-1:1;
-    for(const sign of [side,-side])for(const back of [seat>=2?-.8:.15,-1.3,1.3]){
-      const lx=sign*1.25,x=moto.x+c*lx+s*back,z=moto.z-s*lx+c*back,y=floorHeight(x,z,moto.y);
-      if(y!==undefined&&isWalkable(x,z,y)&&hullGap(moto,{x,z})>.3)return {x,y,z};
-    }
+    const side=seat===1||seat===3?-1:1,width=spec.HALF_WIDTH+PLAYER_RADIUS+.15;
+    for(const sign of [side,-side])for(const back of [seat>=2?-.8:.15,-1.3,1.3])offsets.push([sign*width,back]);
+    offsets.push([0,spec.CENTRE_Z-spec.HALF_LENGTH-PLAYER_RADIUS-.15],[0,spec.CENTRE_Z+spec.HALF_LENGTH+PLAYER_RADIUS+.15]);
+  }else{
+    offsets.push([1,0],[-1,0],[1,.8],[1,-.8],[-1,.8],[-1,-.8],[0,-1.5],[0,1.4]);
   }
-  for(const [lx,lz] of [[1,0],[-1,0],[1,.8],[1,-.8],[-1,.8],[-1,-.8],[0,-1.5],[0,1.4]] as const){
+  for(const [lx,lz] of offsets){
     const x=moto.x+c*lx+s*lz,z=moto.z-s*lx+c*lz,y=floorHeight(x,z,moto.y);
-    if(y!==undefined&&isWalkable(x,z,y))return {x,y,z};
+    if(y!==undefined&&isWalkable(x,z,y,hulls))return {x,y,z};
   }
-  const spot=findSpawn([],{x:moto.x,y:moto.y,z:moto.z});
+  const spot=findSpawn([],{x:moto.x,y:moto.y,z:moto.z},hulls);
   return {x:spot.x,y:spot.y??moto.y,z:spot.z};
 }

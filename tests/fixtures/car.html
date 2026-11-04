@@ -2,7 +2,7 @@
 <style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="world"></canvas><script type="module">
 import {BarScene} from '/src/engine/BarScene.ts';
 import {MotoLights,MotoLampMaterials,lampState} from '../../apps/web/src/engine/moto-lights.ts';
-import {CAR_MODEL,DEFAULT_ENVIRONMENT,NEW_CAR_PARTS,parkedMoto,stepMoto} from '../../packages/shared/src/index.ts';
+import {CAR_MODEL,DEFAULT_ENVIRONMENT,NEW_CAR_PARTS,inputSchema,motoDismountSpot,parkedMoto,stepMoto} from '../../packages/shared/src/index.ts';
 const start={x:18,y:0,z:7,yaw:Math.PI/2},state={...parkedMoto({id:'hatch',...start}),model:CAR_MODEL,color:'#b51f38',plate:'BAR1C80',parts:NEW_CAR_PARTS,engine:2,headlights:1,riderId:'driver',passengers:['front','backl','backr'],doors:0,wipers:false,hood:false,trunk:false};
 const other={...parkedMoto({id:'other',x:24,y:0,z:7,yaw:0}),model:CAR_MODEL,color:'#245db7',plate:'BAR2C80',parts:NEW_CAR_PARTS,headlights:0,passengers:['','','']};
 const world={players:{},npcs:{},tables:{},motos:{hatch:state,other},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:4,capacity:32,serverTime:Date.now(),environment:{...DEFAULT_ENVIRONMENT,hour:12,paused:true,weather:'clear'}};
@@ -16,6 +16,8 @@ const scene=new BarScene(document.querySelector('canvas'),{onMediaFrame:()=>{
 scene.setWorld(world,'driver');scene.setEnabled(false);
 scene.app.on('update',dt=>{if(moving){const next=stepMoto(state,{throttle:reverse?-1:1,steer,brake:false},Math.min(dt,.05));Object.assign(state,next);state.ticks++;world.serverTime=Date.now();scene.setWorld(world,'driver');}});
 window.fixture={scene,ready:scene.ready,status:()=>scene.getMotos(),set:patch=>{Object.assign(state,patch);scene.setWorld(world,'driver');},other:()=>other,
+exit(){const player=world.players.driver,exit=motoDismountSpot(state);state.riderId='';Object.assign(player,exit,{rotation:state.yaw,animationState:'idle',interactionState:''});scene.setWorld(world,'driver');scene.setLocal(exit);return exit;},
+inputValid:()=>inputSchema.safeParse({...scene.getInput(),seq:1}).success,
 checkBikeLamps(){const root=new scene.camera.constructor('lamp check');scene.app.root.addChild(root);root.setPosition(scene.camera.getPosition());const lights=new MotoLights({ponto:()=>root},new MotoLampMaterials());lights.update({lit:false,brake:true,left:false,right:false,high:false},Date.now(),scene.camera,1);const braking=lights.telemetry();lights.update(lampState(false,15),Date.now(),scene.camera,1);const off=lights.telemetry();root.destroy();return {braking,off};},
 hour:hour=>{world.environment.hour=hour;scene.setWorld(world,'driver');},view:next=>{view=next;scene.setEnabled(next==='inside');scene.app.once('update',()=>scene.setCameraMode(next==='inside'?'first':'third'));},drive:(on,turn=0,back=false)=>{moving=on;steer=turn;reverse=back;},stop:()=>{moving=false;state.speed=0;state.steer=0;scene.setWorld(world,'driver');}};
 </script></html>

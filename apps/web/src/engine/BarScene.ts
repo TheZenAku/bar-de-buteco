@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {HORSE,isRidingHorse} from '@bar/shared';
+import {HORSE,isRidingHorse,normalizeHeading} from '@bar/shared';
 import {HorseMount} from './horse-mount';
 import {HorseSounds} from './horse-sound';
 import type {RenderPerformance} from '../performance/monitor';
@@ -1014,6 +1014,7 @@ export class BarScene {
   }
 
   getInput(): SceneInput {
+    this.lastRotation=normalizeHeading(this.lastRotation);
     // A debug run of a bar animation holds the player, as the room would.
     if (!this.enabled || this.inputHasFocus() || document.hidden || this.barOverrides.has(this.localId)) {
       return { dx: 0, dz: 0, running: false, rotation: this.lastRotation };
@@ -2329,7 +2330,7 @@ export class BarScene {
       if (!bike || !avatar.skin) continue;
       this.seat(avatar, avatar.skin, bike);
       avatar.yaw = bike.drawn.yaw * RAD_TO_DEG;
-      if (id === this.localId) this.lastRotation = bike.drawn.yaw;
+      if (id === this.localId) this.lastRotation = normalizeHeading(bike.drawn.yaw);
     }
   }
   /**

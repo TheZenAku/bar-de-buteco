@@ -48,6 +48,8 @@ Desligar o motor, ficar sem combustível ou sair do lugar do motorista apaga far
 
 Carros e motos bloqueiam a caminhada e a corrida dos jogadores com suas caixas orientadas e altura real. Servidor e previsão usam a mesma regra em cada passo do movimento; é possível deslizar pelas laterais e contornar o veículo. Quem for sobreposto por um veículo ainda consegue sair do casco.
 
+A saída considera o tamanho real do modelo, o espaço do personagem, o chão da calçada e os outros veículos próximos. Se o lado da porta estiver ocupado, procura outro lado e depois o chão livre mais próximo, sempre fora dos cascos. Motorista e passageiros usam o mesmo fluxo de liberação de assento e limpeza dos comandos pendentes. As voltas acumuladas ao dirigir ou interpolar o veículo são normalizadas antes de virar rotação do personagem e antes de enviar movimento pela rede; sair, parar ou girar a câmera não pode encher a fila de comandos inválidos e travar a caminhada.
+
 O tanque do carro tem 42 L e o da moto, 5,5 L. O nível tem consumo por distância e marcha lenta, é decidido no servidor e acompanha o veículo na garagem, reconexões e negociações. Tanque vazio interrompe o motor. Com o veículo parado e desligado a até 16 m de uma garagem, o painel oferece **Abastecer**, que completa o tanque sem cobrança. O combustível é persistido pela fila existente e pela migração aditiva `018_vehicle_fuel.sql`, com tanque cheio para veículos antigos.
 
 ## Estado e manutenção
@@ -71,6 +73,7 @@ Arquivos principais: `vehicle-models.ts`, `car-parts.ts`, `vehicle-parts.ts` e `
 ## Validação
 
 - `tests/integration/car.test.ts`: dimensões, direção, determinismo, quatro lugares, garagem, saída e peças.
+- `tests/integration/vehicle-network.test.ts`: saída de carro e moto após várias voltas, câmera, parada e continuidade da caminhada sem comandos inválidos.
 - `apps/api/test/car.test.ts`: compra concorrente sem duplicação, permissões de pintura, persistência e transferência por negociação.
 - `apps/server/test/car.integration.test.ts`: cinco clientes reais, autoridade do motorista, quatro assentos, manutenção e estado salvo na garagem.
 - `tests/e2e/car.spec.ts`: importação e animação do rig, quatro ocupantes, pintura independente, noite, curvas, ré, portas, câmera interna e compra/garagem/painel no jogo real.

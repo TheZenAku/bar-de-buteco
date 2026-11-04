@@ -23,6 +23,32 @@ test('four seats are real capacity; moving, locked or full cars reject boarding'
   car.passengers[2]='';car.speed=2;assert.ok(!canMountMoto(car,near));car.speed=0;car.locked=true;car.ownerId='owner';assert.ok(!canMountMoto(car,near,0,'other'));assert.ok(canMountMoto(car,near,0,'owner'));
   assert.ok(isRidingMoto(passengerInteraction('hatch',2)));
 });
+
+test('every vehicle exit clears its own hull and neighboring vehicles, including curbside and fallback exits',()=>{
+  for(const model of [CAR_MODEL,'moto-delivery'])for(const yaw of [0,Math.PI/2,Math.PI/4,Math.PI*12+.4]){
+    const vehicle={...body(13.6,3.85,yaw),model},hull=motoObstacle({id:'exiting',...vehicle});
+    for(let seat=0;seat<(model===CAR_MODEL?4:1);seat++){
+      const first=motoDismountSpot(vehicle,seat);
+      const neighbor=motoObstacle({id:'neighbor',...body(first.x,first.z,yaw),model:CAR_MODEL,y:first.y});
+      const exit=motoDismountSpot(vehicle,seat,[neighbor]);
+      assert.ok(!boxContains(hull,exit.x,exit.z,PLAYER_RADIUS),`${model} seat ${seat}: outside own hull`);
+      assert.ok(!boxContains(neighbor,exit.x,exit.z,PLAYER_RADIUS),`${model} seat ${seat}: outside neighbor`);
+      const step=movePlayer(exit,{dx:0,dz:0,running:false},.05,false,false,[hull,neighbor]);
+      assert.deepEqual(step,exit,'exit is supported on the same walkable floor as normal movement');
+    }
+  }
+});
+
+test('a crowded vehicle exit searches nearby walkable ground and never falls back inside a hull',()=>{
+  for(const model of [CAR_MODEL,'moto-delivery']){
+    const vehicle={...body(50,7,0),model};
+    const blocked={id:'blocked-exits',x:50,z:7,hx:3,hz:3,minY:0,maxY:2};
+    const exit=motoDismountSpot(vehicle,0,[blocked]);
+    assert.ok(!boxContains(blocked,exit.x,exit.z,PLAYER_RADIUS),'fallback clears the occupied area');
+    assert.ok(!boxContains(motoObstacle({id:'own',...vehicle}),exit.x,exit.z,PLAYER_RADIUS));
+    assert.throws(()=>motoDismountSpot(vehicle,0,[{...blocked,hx:30,hz:30}]),/posição livre/,'no overlapping fallback when every nearby point is blocked');
+  }
+});
 test('each of 18 car parts survives serialization and four tyres affect the drivetrain independently',()=>{
   assert.equal(CAR_PARTS.length,18);const parts=readCarParts(NEW_CAR_PARTS);assert.equal(writeCarParts(parts),NEW_CAR_PARTS);
   const healthy=motoHandling({id:'car',model:CAR_MODEL,parts:NEW_CAR_PARTS});

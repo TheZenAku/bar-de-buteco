@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {CAR_MODEL,CAR_SEATS,NEW_CAR_PARTS,NEW_MOTO_PARTS,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts} from '@bar/shared';
 import {applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt} from '@bar/shared';
-import {HORSE,horseFits,isRidingHorse,moveHorse} from '@bar/shared';
+import {HORSE,horseFits,isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {ServerPerformanceSampler} from './performance.js';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
@@ -1062,13 +1062,13 @@ export class BarRoom extends Room<{ state: BarState }> {
           if (crashed) break;
         }
         if (moto.phase) continue;
-        if (stepped) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; this.strikeWalkers(moto, rider); continue; }
+        if (stepped) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = normalizeHeading(moto.yaw); this.strikeWalkers(moto, rider); continue; }
         if (now - presence.motoInputAt < 250) continue;
         moto.gas = false;
       }
       if (!moto.speed && !moto.steer && !intent.throttle && !intent.steer) continue;
       if (this.stepRidden(moto, intent, obstacles, riding ? rider : undefined)) continue;
-      if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = moto.yaw; this.strikeWalkers(moto, rider); }
+      if (riding) { rider.x = moto.x; rider.y = moto.y; rider.z = moto.z; rider.rotation = normalizeHeading(moto.yaw); this.strikeWalkers(moto, rider); }
     }
   }
 
@@ -1356,7 +1356,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(!canMountMoto(moto,player,INTERACTION_SLACK,player.id))throw new Error('Chegue mais perto da porta do carro.');
       if(chosen===0){moto.riderId=player.id;moto.ignition=true;}else moto.passengers[chosen-1]=player.id;
       this.dropParcel(player);const order=this.highfood.orderOf(player.id);if(order){order.transport='moto';this.sendFood(player.id);}
-      Object.assign(player,seatPosition(moto,chosen));player.rotation=moto.yaw;
+      Object.assign(player,seatPosition(moto,chosen));player.rotation=normalizeHeading(moto.yaw);
       player.interactionState=chosen===0?motoInteraction(moto.id):passengerInteraction(moto.id,chosen);
       player.animationState='ride';player.animationStartedAt=Date.now();player.drinkItem='';
       presence.queue.length=0;presence.motoQueue.length=0;presence.motoBudget=1;presence.motoBudgetAt=Date.now();player.lastProcessedInput=presence.lastReceived;
@@ -1379,7 +1379,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.dropParcel(player);
     const order=this.highfood.orderOf(player.id);
     if(order){order.transport='moto';this.sendFood(player.id);}
-    player.x = moto.x; player.y = moto.y; player.z = moto.z; player.rotation = moto.yaw;
+    player.x = moto.x; player.y = moto.y; player.z = moto.z; player.rotation = normalizeHeading(moto.yaw);
     player.interactionState = motoInteraction(moto.id); player.animationState = 'ride'; player.animationStartedAt = Date.now(); player.drinkItem = '';
     presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoInputAt = 0; presence.motoBudget = 1; presence.motoBudgetAt = Date.now(); player.lastProcessedInput = presence.lastReceived;
     this.crankEngine(moto, Date.now());
@@ -1399,11 +1399,11 @@ export class BarRoom extends Room<{ state: BarState }> {
         const id=car.passengers[seat-1];if(!id)continue;
         const player=this.state.players.get(id),presence=this.sessions.getByUser(id);
         if(!player?.connected||!presence||presence.revoked||player.interactionState!==passengerInteraction(car.id,seat)){
-          car.passengers[seat-1]='';
-          if(player&&isPassenger(player.interactionState)){Object.assign(player,motoDismountSpot(car,seat));player.interactionState='';player.animationState='idle';}
+          if(player?.interactionState===passengerInteraction(car.id,seat))this.freeMoto(car,player);
+          else car.passengers[seat-1]='';
           continue;
         }
-        Object.assign(player,seatPosition(car,seat));player.rotation=car.yaw;
+        Object.assign(player,seatPosition(car,seat));player.rotation=normalizeHeading(car.yaw);
         presence.motoQueue.length=0;presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;
       }
     }
@@ -2036,21 +2036,23 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!moto) { player.interactionState = ''; player.animationState = 'idle'; return; }
     if (Math.abs(moto.speed) > vehiclePhysics(moto.model).DISMOUNT_SPEED) throw new Error('Diminua a velocidade para sair do veículo.');
     if(isPassenger(player.interactionState)){this.freeMoto(moto,player);return;}
-    moto.speed = 0; moto.steer = 0; moto.lights = 0;
     this.freeMoto(moto, player);
+    moto.speed = 0; moto.steer = 0; moto.lights = 0;
     const order = this.highfood.orderOf(player.id);
     if (order?.stage === 'going' && moto.ownerId === player.id && Math.hypot(order.x - player.x, order.z - player.z) <= HIGHFOOD.UNLOAD_REACH) this.startUnload(player, order, moto);
   }
 
   private freeMoto(moto: Moto, rider?: Player): void {
     const seat=rider?vehicleSeat(moto,rider.id):-1;
-    if(seat>0&&rider){moto.passengers[seat-1]='';Object.assign(rider,motoDismountSpot(moto,seat));rider.interactionState='';rider.animationState='idle';rider.animationStartedAt=Date.now();this.openCarDoor(moto,seat);return;}
-    moto.riderId = '';
-    this.setEngine(moto, MOTO_ENGINE.OFF, Date.now());
-    if (!rider) return;
-    if (rider.interactionState === motoInteraction(moto.id)) {
-      Object.assign(rider, motoDismountSpot(moto));if(isCar(moto))this.openCarDoor(moto,0);
-      rider.rotation = moto.yaw; rider.interactionState = ''; rider.animationState = 'idle'; rider.animationStartedAt = Date.now();
+    const riding=!!rider&&(rider.interactionState===motoInteraction(moto.id)||(seat>0&&rider.interactionState===passengerInteraction(moto.id,seat)));
+    // Resolve the exit before releasing the seat, so a failed search leaves the current ride intact.
+    const exit=riding?motoDismountSpot(moto,Math.max(0,seat),this.motoObstacles(moto)):undefined;
+    if(seat>0)moto.passengers[seat-1]='';
+    else {moto.riderId='';this.setEngine(moto,MOTO_ENGINE.OFF,Date.now());}
+    if(!rider)return;
+    if(exit){
+      Object.assign(rider,exit);if(isCar(moto))this.openCarDoor(moto,Math.max(0,seat));
+      rider.rotation=normalizeHeading(moto.yaw);rider.interactionState='';rider.animationState='idle';rider.animationStartedAt=Date.now();
     }
     const presence = this.sessions.getByUser(rider.id);
     if (presence) { presence.queue.length = 0; presence.motoQueue.length = 0; rider.lastProcessedInput = presence.lastReceived; }
