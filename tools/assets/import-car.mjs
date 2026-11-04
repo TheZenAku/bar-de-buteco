@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../../',import.meta.url)),source=path.join(root,'assets-bar/map/BarBoteco/export/carro'),target=path.join(root,'apps/web/public/carro');
+const bytes=fs.readFileSync(path.join(source,'carro_hatch.glb'));
+if(bytes.toString('ascii',0,4)!=='glTF')throw new Error('O carro precisa ser um GLB.');
+const json=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12))),nodes=new Set(json.nodes.map(n=>n.name));
+for(const name of ['Carro_Rig','raiz','chassi','porta_E','porta_D','capo','tampa_traseira','direcao_E','direcao_D','roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D','ponto_motorista','ponto_passageiro','ponto_tras_E','ponto_tras_D','ponto_mao_E','ponto_mao_D','ponto_olhos'])if(!nodes.has(name))throw new Error(`Falta o nó ${name}.`);
+for(const name of ['Carro_Pintura','Carro_Placa','Luz_Farol','Luz_Lanterna','Luz_Re','Luz_Seta_E','Luz_Seta_D'])if(!json.materials.some(m=>m.name===name))throw new Error(`Falta o material ${name}.`);
+if(json.images.some(image=>image.uri))throw new Error('O GLB deve incorporar suas texturas.');
+fs.mkdirSync(target,{recursive:true});
+for(const [from,to] of [['carro_hatch.glb','carro_hatch.glb'],['carro_hatch_colisao.glb','carro_hatch_colisao.glb'],['previa_playcanvas.png','foto.png']])fs.copyFileSync(path.join(source,from),path.join(target,to));
+console.log(`Carro importado sem alterar o GLB: ${bytes.length} bytes, sha256 ${crypto.createHash('sha256').update(bytes).digest('hex').slice(0,12)}.`);

@@ -105,4 +105,5 @@ export interface SceneCallbacks {
   onWorldMenu?: (x: number, y: number, hit: { player?: string; moto?: string }) => void;
   /** The player's overall volume, for the bikes' engines (0–1). */
   motoVolume?: () => number;
+  onVehicleControl?:(id:string,action:string)=>void;
 }

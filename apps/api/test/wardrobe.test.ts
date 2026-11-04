@@ -15,7 +15,7 @@ test('Nathan is free for new accounts; purchases persist and duplicate/racing re
   let view=(await get('/api/wardrobe')).json();assert.equal(view.balance,0);
   assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['rafael-rose',false,2500],['read',false,850],['gilmar-gordo',false,900],['gabriel',false,900],['flavio-hipotetico',false,900],['tiao',false,900]]);
   assert.deepEqual(view.catalog.filter((s:any)=>s.base==='rafael').map((s:any)=>[s.id,s.variant,s.rarity]),[['rafael','Original','epic'],['rafael-rose','Rosé','legendary']]);
-  assert.deepEqual(view.skills.map((s:any)=>[s.id,s.skin,s.owned,s.price,s.available]),[['karate','rafael',false,500,true],['air-kick','rafael',false,800,true]]);
+  assert.deepEqual(view.skills.map((s:any)=>[s.id,s.skin,s.owned,s.price,s.available]),[['horse','tiao',false,800,true],['karate','rafael',false,500,true],['air-kick','rafael',false,800,true]]);
   assert.equal((await post('/api/wardrobe/daily',{})).statusCode,409,'No income is enabled by default');
   assert.equal((await post('/api/wardrobe/buy',{skin:'nathan'})).statusCode,200,'Buying the free skin is a no-op');
   assert.equal((await post('/api/wardrobe/equip',{skin:'rafael'})).statusCode,403);

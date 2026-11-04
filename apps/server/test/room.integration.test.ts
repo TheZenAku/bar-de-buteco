@@ -92,6 +92,12 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     await eventually(()=>bob.lastProcessedInput===0);
     assert.ok(Math.abs(bob.x-slowX-OLD_CANE_SPEED*TICK_MS/1000)<1e-5);
     assert.equal(bob.animationState,'walk','Shift must not select running during the cane gait');
+    const stopped={x:bob.x,y:bob.y,z:bob.z,rotation:bob.rotation};
+    second.send('player.input',{seq:1,dx:0,dz:0,running:false,rotation:stopped.rotation,headYaw:.6,headPitch:.3});
+    await eventually(()=>Math.abs(first.state.players.get('bob').headYaw-.6)<1e-5&&Math.abs(first.state.players.get('bob').headPitch-.3)<1e-5);
+    assert.deepEqual({x:bob.x,y:bob.y,z:bob.z,rotation:bob.rotation},stopped,'Only the head turns at rest; position and body heading stay unchanged');
+    assert.equal(first.state.players.get('bob').rotation,stopped.rotation,'Other clients keep the same body heading');
+    assert.equal(bob.animationState,'idle');
     assert.ok(!received.includes('/velho'),'Slash commands are interpreted by the server, not broadcast as chat text');
     second.send('chat.send',{text:'/velho'});await eventually(()=>first.state.players.get('bob').oldWalk===false);
     second.send('player.emote',{emote:'wave'});

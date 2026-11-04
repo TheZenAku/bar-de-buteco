@@ -7,6 +7,7 @@ export default defineConfig({
   // API's per-address limit, including observer contexts. Limits stay enabled;
   // the trusted local Vite proxy forwards these test-only headers.
   projects:[
+    {name:'horse',testMatch:['**/horse.spec.ts','**/horse-sound.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.16'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'game',testMatch:'**/bar.spec.ts',grep:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'::1'}}},
     {name:'world',testMatch:['**/bar.spec.ts','**/admin.spec.ts','**/inventory.spec.ts','**/economy.spec.ts'],grepInvert:/new skeletal|new accounts|two independent/,use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.1'}}},
     {name:'interface',testMatch:['**/nova-ui.spec.ts','**/old-cane.spec.ts','**/mouse-capture.spec.ts','**/admin-badges.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'::ffff:127.0.0.1'}}},
@@ -15,7 +16,7 @@ export default defineConfig({
     {name:'media-firefox',testMatch:'**/media-firefox.spec.ts',use:{browserName:'firefox',channel:'',launchOptions:{args:[]}}},
     {name:'doors',testMatch:'**/doors.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'ambient',testMatch:'**/ambient.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
-    {name:'environment',testMatch:'**/environment.spec.ts'},
+    {name:'environment',testMatch:['**/environment.spec.ts','**/weather.spec.ts']},
     {name:'rigs',testMatch:'**/rigs.spec.ts'},
     // Two players' worlds at once: drawn on the GPU where the host has one (software rendering starves their input loops).
     // The bar animations: many skinned bodies, props and particles; drawn on the GPU like the stage.

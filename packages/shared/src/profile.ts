@@ -25,6 +25,7 @@ export const AIR_KICK_DURATION_MS = 2900;
 /** What a character can do besides what every skin does, in all its variants, once bought. `clip` is only in the animation banks of that character's skins. */
 export interface Skill {id:string;skin:string;name:string;description:string;clip:string;durationMs:number;icon:string;rarity:Rarity;price:number}
 export const SKILLS:readonly Skill[]=[
+  {id:'horse',skin:'tiao',name:'Cavalo do Tião',description:'Chama seu cavalo e monta na sela. WASD para andar, Shift para acelerar. Repita a skill ou E para desmontar. Só ao ar livre.',clip:'Sit',durationMs:0,icon:'horse',rarity:'epic',price:800},
   {id:'karate',skin:'rafael',name:'Golpe de karatê',description:'Um golpe rápido, com os pés no chão. Quem leva voa longe e perde 6 de vida.',clip:'Kick',durationMs:KICK_DURATION_MS,icon:'kick',rarity:'rare',price:500},
   {id:'air-kick',skin:'rafael',name:'Chute voador',description:'Salta, acerta com os dois pés e cai de costas no chão. Quem leva voa mais longe ainda e perde 10 de vida.',clip:'AirKick',durationMs:AIR_KICK_DURATION_MS,icon:'bolt',rarity:'epic',price:800},
 ];

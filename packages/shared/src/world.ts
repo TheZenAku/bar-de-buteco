@@ -106,6 +106,14 @@ export function solidsBetween(ax:number,az:number,bx:number,bz:number):readonly 
 }
 /** Every solid volume right now, including each door leaf where its door state puts it. */
 export function solidColliders():readonly Collider[] {return solids;}
+/** Highest solid or ceiling under an outdoor rain column; includes the veranda and rotated city buildings. */
+export function rainSurfaceHeight(x:number,z:number):number {
+  let height=groundBelow(x,z,200)??0;
+  for(const c of [...solidsBetween(x,z,x,z),...map.cameraCeilings] as Collider[]){
+    if(!c.ramp&&boxContains(c,x,z)&&Number.isFinite(c.maxY))height=Math.max(height,c.maxY!);
+  }
+  return height;
+}
 export function isDoorOpen(id:string):boolean {return openDoors.get(id)??true;}
 /** Applies door states (id → open); unknown ids are ignored. Returns whether anything changed. */
 export function setDoorStates(states:Iterable<readonly [string,boolean]>):boolean {

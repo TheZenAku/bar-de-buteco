@@ -1,4 +1,7 @@
 import * as pc from 'playcanvas';
+import {HORSE,isRidingHorse} from '@bar/shared';
+import {HorseMount} from './horse-mount';
+import {HorseSounds} from './horse-sound';
 import type {RenderPerformance} from '../performance/monitor';
 import {UpdateProfiler} from '../performance/recording';
 import {collectSceneInventory} from '../performance/inventory';
@@ -10,6 +13,8 @@ import type { MapView, SceneActor, SceneCallbacks, SceneInput, SceneLabel, Scene
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
+import {CarRig,seatCar} from './car-rig';
+import {isCar,vehicleSeat,vehiclePhysics} from '@bar/shared';
 import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
@@ -85,6 +90,7 @@ interface SkinnedRig {
   hip?: pc.Entity;
 }
 interface Avatar {
+  horse?:HorseMount;
   headLook?:HeadLookPose;
   root: pc.Entity;
   body: pc.Entity;
@@ -290,6 +296,7 @@ export class BarScene {
   /** The thrown bodies the room is running. */
   private ragdollStarts:Record<string,RagdollStart&{startedAt:number}>={};
   private readonly blowSounds:BlowSounds;
+  private readonly horseSounds:HorseSounds;
   private readonly blowEffects:BlowEffects;
   /** The rider's switches (Z, X, C, H), and how far the bike has turned with the blinker on. */
   private motoSwitches=0;
@@ -332,6 +339,36 @@ export class BarScene {
   /** The dance clips' names, sorted: the same in every skin's bank, so `dance` picks the same one on every client. */
   private dances: string[] = [];
   private readonly animationRequests = new Set<string>();
+  private horseModel?:pc.ContainerResource;
+  private horseRequested=false;
+
+  private loadHorse():void {
+    if(this.horseRequested)return;this.horseRequested=true;
+    this.app.assets.loadFromUrl(`${import.meta.env.BASE_URL}mounts/tiao-horse.glb?v=20261103-3`,'container',(error,asset)=>{
+      if(this.destroyed)return;
+      if(error||!asset){this.horseRequested=false;console.warn('Cavalo do Tião indisponível.',error);return;}
+      this.horseModel=asset.resource as pc.ContainerResource;
+    });
+  }
+
+  private placeHorseRiders():void {
+    for(const avatar of this.actors.values()){
+      if(!isRidingHorse(avatar.actor.interactionState)){
+        if(avatar.horse){avatar.horse.entity.destroy();avatar.horse=undefined;avatar.contact.setLocalScale(.9,1,.9);}
+        continue;
+      }
+      this.loadHorse();
+      if(!this.horseModel||!avatar.skin)continue;
+      const horse=avatar.horse??=new HorseMount(this.horseModel,avatar.root);
+      horse.update(avatar.speed??0,avatar.actor.animation,avatar.resting);
+      const skin=avatar.skin,hip=skin.hip??=(skin.model.findByName('hip') as pc.Entity|null)??undefined;
+      avatar.spine??=(skin.model.findByName('spine_02') as pc.Entity|null)??null;
+      if(hip&&!avatar.resting)horse.seat({root:avatar.body,hip,spine:avatar.spine,...skin.bones,handRigL:skin.drinkHand,handRigR:skin.rightHand});
+      // The backpack follows the seated spine, after the horse has positioned the rider.
+      this.dressCourier(avatar,skin,!!avatar.resting);
+      avatar.contact.setLocalScale(1.1,1,2.3);
+    }
+  }
   private readonly caneModels=new Map<string,pc.ContainerResource>();
   private readonly caneRequests=new Set<string>();
   private serverClockOffset = 0;
@@ -428,7 +465,7 @@ export class BarScene {
     this.camera.lookAt(14, 1.8, -6);
     // Before any material is drawn: the x-ray goes into every shader.
     this.rig = new CameraRig(this.camera, this.app.graphicsDevice);
-    this.environment=new EnvironmentLighting(this.app,this.camera);
+    this.environment=new EnvironmentLighting(this.app,this.camera,()=>this.callbacks.motoVolume?.()??1);
     this.environment.setDynamicCasters(()=>this.dynamicCasters());
     this.environment.update(Date.now(),0,'');
 
@@ -441,6 +478,7 @@ export class BarScene {
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
     this.poolBalls=new PoolBalls(this.app);
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
+    this.horseSounds=new HorseSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
       const ear=this.camera.getPosition();
       return {x:ear.x,y:ear.y,z:ear.z,forward:this.camera.forward,up:this.camera.up};
@@ -897,7 +935,7 @@ export class BarScene {
       const q = avatar.root.getPosition();
       others.push({ id, x: q.x, y: q.y, z: q.z, npc: avatar.npc });
     }
-    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others, riding: !!self.actor.interactionState?.startsWith('moto:') };
+    return { x: p.x, y: p.y, z: p.z, yaw: this.rig.yaw, facing: self.yaw / RAD_TO_DEG, others, riding: !!self.actor.interactionState?.startsWith('moto:') || isRidingHorse(self.actor.interactionState) };
   }
 
   /** The bike the local player rides, as predicted (networking.ts). */
@@ -969,12 +1007,13 @@ export class BarScene {
     const dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * vertical) / length;
     // The body keeps following travel; looking around at rest only turns the head.
     const actor=this.actors.get(this.localId)?.actor;
-    if((dx||dz)&&!actor?.interactionState&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
+    if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
     return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'), rotation: this.lastRotation,
       ...headLookAt(yaw,this.rig.pitch,this.lastRotation) };
   }
 
   setWorld(world: WorldState, localId: string): void {
+    this.environment.setState(world.environment);
     // The empty snapshot used when leaving the bar has serverTime=0; keep the clock running.
     if(Number.isFinite(world.serverTime)&&world.serverTime>0)this.serverClockOffset = world.serverTime - Date.now();
     this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
@@ -1144,6 +1183,7 @@ export class BarScene {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    this.environment.setActive(enabled);
     this.app.autoRender = enabled;
     this.app.renderNextFrame = true;
     if (!enabled) {
@@ -1163,9 +1203,10 @@ export class BarScene {
       // In first person, your own name would float just over your eyes.
       if (id === this.localId && this.hiddenHead) continue;
       const p = avatar.root.getPosition();
-      this.tempPosition.set(p.x-eye.x,p.y+LABEL_HEIGHT-eye.y,p.z-eye.z);
+      const labelY=isRidingHorse(avatar.actor.interactionState)&&avatar.skin?avatar.skin.bones.head.getPosition().y+.35:p.y+LABEL_HEIGHT;
+      this.tempPosition.set(p.x-eye.x,labelY-eye.y,p.z-eye.z);
       if (this.tempPosition.dot(forward) <= 0 || this.tempPosition.lengthSq() > 400) continue;
-      this.tempPosition.set(p.x,p.y+LABEL_HEIGHT,p.z);
+      this.tempPosition.set(p.x,labelY,p.z);
       this.camera.camera.worldToScreen(this.tempPosition, this.tempScreen);
       const x = this.tempScreen.x;
       const y = this.tempScreen.y;
@@ -1219,7 +1260,7 @@ export class BarScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
-    this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();
+    this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -1321,6 +1362,7 @@ export class BarScene {
   }
 
   private loadAnimations(id: string): void {
+    if(id==='tiao')this.loadHorse();
     if (this.animationRequests.has(id)) return;
     this.animationRequests.add(id);
     // The dances (several MB) follow the actions, so they never hold up the avatar's walk and idle.
@@ -1511,7 +1553,7 @@ export class BarScene {
     const progress = clamp((this.elapsed - avatar.glideAt) / avatar.glide, 0, 1);
     root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
     const drawn = root.getPosition(), last = avatar.lastDrawn ??= drawn.clone();
-    avatar.speed = lerp(avatar.speed ?? 0, Math.min(8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
+    avatar.speed = lerp(avatar.speed ?? 0, Math.min(isRidingHorse(actor.interactionState)?HORSE.fastSpeed:8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
     last.copy(drawn);
     // A bar animation (sitting at a table, the urinal, a cigarette, Magrão at the counter...): undefined while its clip loads.
     const bar = avatar.skin ? this.barAction(avatar, Date.now() + this.serverClockOffset) : undefined;
@@ -1860,7 +1902,7 @@ export class BarScene {
     const anim = skin.model.anim!;
     // Gestures are built on the static Pose; plain standing uses the animated Idle.
     const gesture = seated > 0.01 || dancing || drinking || waving;
-    const action = actor.animation;
+    const action = isRidingHorse(actor.interactionState) ? 'ride' : actor.animation;
     const stage=drunkStage(actor.drunk??0);
     // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
     const show=bar?undefined:this.musicianClip(avatar,skin);
@@ -2096,6 +2138,7 @@ export class BarScene {
     if (graphics) this.city?.setQuality(graphics.city, CITY_FOG.end * FOG_SCALE[graphics.fog], graphics.shadows !== 'off');
   }
   getGraphics() { return { ...this.graphics, currentScale: this.scale, fps: this.fps, pixelRatio: this.app.graphicsDevice.maxPixelRatio }; }
+  getHorses(){return [...this.actors.values()].filter(a=>a.horse).map(a=>({id:a.actor.id,...a.horse!.telemetry(),sound:this.horseSounds.telemetry(a.actor.id),hip:a.skin?.hip?.getPosition().clone().toArray(),feet:[a.skin?.bones.foot_l.getPosition().clone().toArray(),a.skin?.bones.foot_r.getPosition().clone().toArray()]}));}
   private applyResolution(): void {
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, this.graphics?.pixelRatioCap ?? 1.5) * this.scale;
     this.resize();
@@ -2141,8 +2184,13 @@ export class BarScene {
     this.updateProfiler.mark('avatars');
     this.callbacks.onFrame?.(realDt);
     this.updateProfiler.mark('client');
-    this.motos.update(dt, this.camera, this.app.scene.exposure);
+    this.motos.update(dt, this.camera, this.app.scene.exposure,this.environment.rainStrength>.15);
     this.placeRiders();
+    this.placeHorseRiders();
+    this.horseSounds.update([...this.actors.values()].filter(a=>a.horse).map(a=>{
+      const position=a.root.getPosition();
+      return {id:a.actor.id,speed:a.speed??0,animation:a.actor.animation,x:position.x,y:position.y+.2,z:position.z};
+    }),this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.placeThrown(dt);
     this.blowEffects.update(dt, this.camera);
     this.updateProfiler.mark('vehicles');
@@ -2185,13 +2233,13 @@ export class BarScene {
     } else if (player && this.enabled) {
       const bike = this.motos.ridden(this.localId);
       // Thrown off, the view stays behind the body until it is up: never inside it.
-      const riding = !!bike || player.actor.interactionState === 'thrown';
+      const riding = !!bike || isRidingHorse(player.actor.interactionState) || player.actor.interactionState === 'thrown';
       if (riding !== this.chasing) { this.chasing = riding; this.rig.ride(this.chasing); this.motoSwitches = 0; }
       // In real time: the body moved for all of a stalled frame, and a view told a shorter one reads it as a sprint and falls metres behind.
       if (bike) { this.rig.chase(bike.drawn.yaw, realDt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
       this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: player.skin?.bones.head.getPosition(), facing: player.yaw / RAD_TO_DEG,
-        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? MOTO_XRAY : {}) });
+        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? {...MOTO_XRAY,clearance:vehiclePhysics(bike.state.model).HALF_LENGTH} : {}) });
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
       this.camera.setPosition(18+Math.sin(this.elapsed*.035)*2,9,16);
@@ -2328,7 +2376,8 @@ export class BarScene {
     const hip = skin.hip ??= (skin.model.findByName('hip') as pc.Entity | null) ?? undefined;
     if (!hip) return;
     avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
-    seatRider(bike.rig, { root: avatar.root, hip, spine: avatar.spine, ...skin.bones, handRigL: skin.drinkHand, handRigR: skin.rightHand });
+    const rider={ root: avatar.root, hip, spine: avatar.spine, ...skin.bones, handRigL: skin.drinkHand, handRigR: skin.rightHand };
+    if(bike.rig instanceof CarRig)seatCar(bike.rig,rider,vehicleSeat(bike.state,avatar.actor.id));else seatRider(bike.rig,rider);
   }
 
   /** Something plays on the stage: a video on the telão, or a musician at a spot. */
@@ -2361,7 +2410,12 @@ export class BarScene {
       }
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
       // On a bike, the switches on the bars take these keys over.
-      if (this.chasing && this.motos.ridden(this.localId) && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
+      const vehicle=this.motos.ridden(this.localId);
+      if(vehicle&&isCar(vehicle.state)&&vehicle.state.riderId===this.localId){
+        const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'};
+        if(action[event.code]){event.preventDefault();if(!event.repeat)this.callbacks.onVehicleControl?.(vehicle.state.id,action[event.code]!);return;}
+      }
+      if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
       // F lights one and keeps smoking until F again; Shift+F smokes a whole cigarette and steps on the butt.

@@ -12,8 +12,11 @@ const ahead=(metres:number,side=0)=>({x:OPEN.x+side,y:0,z:OPEN.z+metres,rotation
 const whole=(skill:string)=>{const span=kickWindow(skill)!;return [span.from,span.to] as const;};
 const landed=(skill:string,target:{x:number;y:number;z:number},kicker=facing(0))=>kickTouches(skill,...whole(skill),kicker,target);
 
-test('every skill of the skins is a kick with a foot table the clip agrees with',()=>{
-  for(const skill of SKILLS){assert.ok(KICKS[skill.id],`${skill.id} has its blow`);assert.ok(KICK_PATHS[skill.clip],`${skill.clip} has its table`);}
+test('every registered kick is a catalog skill with a foot table the clip agrees with',()=>{
+  for(const id of Object.keys(KICKS)){
+    const skill=SKILLS.find(candidate=>candidate.id===id);
+    assert.ok(skill,`${id} has its catalog skill`);assert.ok(KICK_PATHS[skill.clip],`${skill.clip} has its table`);
+  }
   // Run npm run assets:kicks when this fails: the clip changed and the table with it.
   const table=measureKicks(fs.readFileSync(new URL('../../apps/web/public/animations/rafael.glb',import.meta.url)));
   assert.deepEqual(table,JSON.parse(JSON.stringify(KICK_PATHS)));

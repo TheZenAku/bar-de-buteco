@@ -5,6 +5,9 @@ import {palmUp,reach} from './serving-props';
 import {RoomTrack,SNAP_DISTANCE} from './moto-motion';
 import {lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-lights';
 import {MotoSounds} from './moto-sound';
+import {CarRig,CarLights} from './car-rig';
+import {CarSounds} from './car-sound';
+import {CAR_MODEL,isCar,readDriveParts,vehiclePhysics,vehicleSeat} from '@bar/shared';
 
 const RAD_TO_DEG=180/Math.PI;
 const BONES=['chassi','direcao','roda_dianteira','roda_traseira'] as const;
@@ -77,7 +80,7 @@ const CLOCK_RESTART_MS=250,CLOCK_PULL=.01;
 /** How far a right click reaches a bike (metres), and how much bigger than its box the target is. */
 const PICK_REACH=40,PICK_MARGIN=.12;
 export interface Bike {
-  entity:pc.Entity;rig:MotoRig;state:MotoState;lights:MotoLights;
+  entity:pc.Entity;rig:MotoRig|CarRig;state:MotoState;lights:MotoLights|CarLights;
   /** The local rider's own bike as it should be drawn this frame (moto-motion.ts); everybody else's follows `track`. */
   plate?:{material:pc.StandardMaterial;texture:pc.Texture}|undefined;
   predicted?:MotoBody;track:RoomTrack;riddenHere:boolean;gap:{x:number;z:number;yaw:number};
@@ -88,6 +91,8 @@ export interface Bike {
 /** Under the plate lamp (moto-lights.ts), in the tail node's space. */
 const PLATE_AT=[.016,-.295,.03] as const,PLATE_SIZE=[.21,.08,.006] as const;
 export class Motos {
+  private carModel?:pc.ContainerResource;
+  private readonly carSounds:CarSounds;
   private model?:pc.ContainerResource;
   private states:readonly MotoState[]=[];
   private readonly bikes=new Map<string,Bike>();
@@ -113,6 +118,11 @@ export class Motos {
   constructor(private readonly app:pc.AppBase,private readonly shadow:(root:pc.Entity)=>pc.Entity,volume:()=>number=()=>1) {
     this.lampMaterials=new MotoLampMaterials();
     this.sounds=new MotoSounds(volume,import.meta.env.BASE_URL);
+    this.carSounds=new CarSounds(volume);
+    app.assets.loadFromUrl(`${import.meta.env.BASE_URL}carro/carro_hatch.glb`,'container',(error,asset)=>{
+      if(error||!asset){console.warn('Carro hatch indisponível.',error);return;}
+      this.carModel=asset.resource as pc.ContainerResource;this.place();
+    });
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_delivery.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Moto de entrega indisponível.',error);return;}
       this.model=asset.resource as pc.ContainerResource;this.place();
@@ -145,19 +155,19 @@ export class Motos {
     for(const state of this.states)this.bikes.get(state.id)?.track.push(state,now);
   }
   private place():void {
-    if(!this.model)return;
     for(const state of this.states){
       const known=this.bikes.get(state.id);
       if(known){known.state=state;continue;}
-      const entity=new pc.Entity(`Moto ${state.id}`),body=this.model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
-      body.setLocalScale(MOTO.SCALE,MOTO.SCALE,MOTO.SCALE);
+      const car=isCar(state),model=car?this.carModel:this.model;if(!model)continue;
+      const entity=new pc.Entity(`${car?'Carro':'Moto'} ${state.id}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
+      const spec=vehiclePhysics(state.model);body.setLocalScale(spec.SCALE,spec.SCALE,spec.SCALE);
       entity.addChild(body);this.app.root.addChild(entity);
-      const contact=this.shadow(entity);contact.setLocalScale(1.1*MOTO.SCALE,1,2.3*MOTO.SCALE);
-      const rig=new MotoRig(body);
-      const plate=state.plate?this.plate(rig,state.plate):undefined;
-      this.bikes.set(state.id,{entity,rig,plate,lights:new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
+      const contact=this.shadow(entity);contact.setLocalScale(spec.HALF_WIDTH*4,1,spec.HALF_LENGTH*2.8);
+      const rig=car?new CarRig(body,this.app.graphicsDevice):new MotoRig(body);
+      const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate):undefined;
+      this.bikes.set(state.id,{entity,rig,plate,lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
-    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
+    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){if(bike.rig instanceof CarRig)bike.rig.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
   }
   /** The local rider's own bike as it should be drawn this frame (undefined off the bike). */
   predict(id:string,body:MotoBody|undefined):void {const bike=this.bikes.get(id);if(bike)bike.predicted=body;}
@@ -165,7 +175,7 @@ export class Motos {
   lamps(id:string,bits:number):void {this.localLamps={id,bits};}
   /** The throttle the local rider holds this frame. */
   gas(id:string,open:boolean):void {this.localGas={id,open};}
-  update(dt:number,camera:pc.Entity,exposure:number):void {
+  update(dt:number,camera:pc.Entity,exposure:number,raining=false):void {
     const wall=performance.now(),now=Date.now();
     this.clock+=dt*1000;
     this.clock=Math.abs(wall-this.clock)>CLOCK_RESTART_MS?wall:this.clock+(wall-this.clock)*CLOCK_PULL;
@@ -193,30 +203,33 @@ export class Motos {
         bike.entity.setRotation(this.turn.mul(this.tilt));
       }
       const {rig}=bike;
+      if(rig instanceof CarRig)rig.setState(bike.state,raining);
       rig.velocidade=target.speed;rig.direcao=target.steer;rig.inclinacaoMax=lying?0:10;
       // The handlebar turns as far as the wheel really does at this speed; the lean follows the whole intent.
-      rig.anguloDirecao=motoSteerAngle(target.speed)*RAD_TO_DEG;
+      rig.anguloDirecao=motoSteerAngle(target.speed,bike.state.model)*RAD_TO_DEG;
       rig.update(dt);
       // On while someone rides it, and until it comes to rest after a crash.
       const {phase,riderId}=bike.state,lit=!!riderId||phase==='loose'||phase==='tumble';
       const lamps:LampState=lampState(lit,bike.predicted&&this.localLamps?.id===bike.state.id?this.localLamps.bits:bike.state.lights);
-      const parts=readMotoParts(bike.state.parts),seed=bike.state.id.charCodeAt(bike.state.id.length-1)||0;
+      const parts=readDriveParts(bike.state),seed=bike.state.id.charCodeAt(bike.state.id.length-1)||0;
       bike.lights.update(lamps,now,camera,exposure,motoLampLevel(parts.farol,parts.bateria,now,seed),motoLampLevel(parts.lanterna,parts.bateria,now,seed+1));
     }
     const ear=camera.getPosition();
-    this.sounds.update(dt,[...this.bikes.values()].map(bike=>({id:bike.state.id,x:bike.drawn.x,y:bike.drawn.y,z:bike.drawn.z,
+    this.sounds.update(dt,[...this.bikes.values()].filter(bike=>!isCar(bike.state)).map(bike=>({id:bike.state.id,x:bike.drawn.x,y:bike.drawn.y,z:bike.drawn.z,
       view:{engine:bike.state.engine??MOTO_ENGINE.OFF,engineAt:bike.state.engineAt??0,crank:bike.state.crank??0,gas:!!bike.state.gas,speed:bike.predicted?.speed??bike.state.speed,parts:bike.state.parts??''},
       ...(bike.predicted&&this.localGas?.id===bike.state.id?{gasNow:this.localGas.open}:{})})),ear,camera.forward,camera.up);
+    this.carSounds.update([...this.bikes.values()].filter(b=>isCar(b.state)).map(b=>({state:b.state,...b.drawn,speed:b.predicted?.speed??b.state.speed})),ear,camera.forward,camera.up);
   }
   /** The bike under a point of the view (CSS pixels of the canvas), the nearest first: a ray against its box, however it lies. */
   pick(camera:pc.CameraComponent,x:number,y:number):string|undefined {
     const near=camera.screenToWorld(x,y,camera.nearClip,this.rayA),far=camera.screenToWorld(x,y,PICK_REACH,this.rayB);
     let best:string|undefined,bestAt=Infinity;
     for(const bike of this.bikes.values()){
+      const spec=vehiclePhysics(bike.state.model);
       this.toLocal.copy(bike.entity.getWorldTransform()).invert();
       this.toLocal.transformPoint(near,this.localA);this.toLocal.transformPoint(far,this.localB);
       let enter=0,leave=1;
-      for(const [axis,low,high] of [['x',-MOTO.HALF_WIDTH-PICK_MARGIN,MOTO.HALF_WIDTH+PICK_MARGIN],['y',-PICK_MARGIN,MOTO.HEIGHT+PICK_MARGIN],['z',MOTO.CENTRE_Z-MOTO.HALF_LENGTH-PICK_MARGIN,MOTO.CENTRE_Z+MOTO.HALF_LENGTH+PICK_MARGIN]] as const){
+      for(const [axis,low,high] of [['x',-spec.HALF_WIDTH-PICK_MARGIN,spec.HALF_WIDTH+PICK_MARGIN],['y',-PICK_MARGIN,spec.HEIGHT+PICK_MARGIN],['z',spec.CENTRE_Z-spec.HALF_LENGTH-PICK_MARGIN,spec.CENTRE_Z+spec.HALF_LENGTH+PICK_MARGIN]] as const){
         const from=this.localA[axis],span=this.localB[axis]-from;
         if(Math.abs(span)<1e-6){if(from<low||from>high){enter=2;break;}continue;}
         const a=(low-from)/span,b=(high-from)/span;
@@ -226,9 +239,9 @@ export class Motos {
     }
     return best;
   }
-  soundTelemetry(id?:string) {return this.sounds.telemetry(id);}
-  destroy():void {this.sounds.destroy();}
-  ridden(playerId:string):Bike|undefined {for(const bike of this.bikes.values())if(bike.state.riderId===playerId)return bike;}
+  soundTelemetry(id?:string) {return id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);}
+  destroy():void {this.sounds.destroy();this.carSounds.destroy();for(const bike of this.bikes.values())if(bike.rig instanceof CarRig)bike.rig.destroy();}
+  ridden(playerId:string):Bike|undefined {for(const bike of this.bikes.values())if(vehicleSeat(bike.state,playerId)>=0)return bike;}
   /** The bike nearest to a point, not far off. */
   nearest(point:{x:number;z:number}):Bike|undefined {
     let found:Bike|undefined,best=6;

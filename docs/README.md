@@ -28,6 +28,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 ## Sistemas do jogo
 
+- [Cavalo do Tião: habilidade, controles e animações](sistemas/cavalo.md)
 - [Administração](sistemas/admin.md)
 - [Análise de desempenho e HUD](sistemas/desempenho.md)
 - [Blackjack: regras de cassino, apostas e o painel da mesa](sistemas/blackjack.md)
@@ -38,9 +39,10 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Celular: ligações, Highzap, Highgram, câmera e HighBank](sistemas/celular.md)
 - [Perfil do jogador: janela, emblemas e skills](sistemas/perfil.md)
 - [Sons dos golpes: origem, licença e como tocam](assets/sons-golpes.md)
+- [Som de galope: origem, licença e reprodução](assets/sons-cavalo.md)
 - [Conquistas: emblemas ganhos jogando, em séries de quatro níveis](sistemas/conquistas.md)
 - [Som ambiente](sistemas/ambient.md)
-- [Ciclo de dia e noite](sistemas/day-night.md)
+- [Tempo e clima: dia e noite, chuva, tempestades e controles de administrador](sistemas/day-night.md)
 - [Economia: moedas, balcão, mesa, empregos e mídia](sistemas/economia.md)
 - [Configurações gráficas](sistemas/graficos.md)
 - [Portas](sistemas/doors.md)

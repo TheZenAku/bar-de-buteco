@@ -92,6 +92,20 @@ test('head-only turns reach the room without moving or rotating the body, with n
   intention.headPitch=-.4;tick();assert.equal(sent.length,2,'Vertical look is sent too');
 });
 
+test('camera turns cannot rotate a seated player or interrupt an interaction',()=>{
+  for(const lock of ['seat-1','kick','moto-repair','stage']){
+    const {self,intention,sent,tick}=fixture();
+    self.interactionState=lock;intention.rotation=-2;tick();
+    assert.equal(sent.length,0,`${lock} retains the server heading`);
+    intention.headPitch=.3;tick();
+    assert.equal(sent[0]!.rotation,self.rotation);
+    assert.equal(sent[0]!.dx,0);assert.equal(sent[0]!.dz,0);
+  }
+  const {self,intention,sent,tick}=fixture();
+  self.currentTableId='blackjack-1';intention.rotation=-2;tick();
+  assert.equal(sent.length,0,'The table also keeps the heading locked');
+});
+
 test('looking while seated keeps position and body rotation locked; walking and stopping still work',()=>{
   const {self,intention,sent,tick}=fixture();
   self.interactionState='seat-1';intention.headYaw=.5;intention.dx=1;intention.rotation=2;

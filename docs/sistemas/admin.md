@@ -78,6 +78,12 @@ Na aba **Histórico**, use a opção junto ao registro original. O formulário i
 
 Reversões de moedas usam transação, bloqueio da carteira e identificador derivado da ação original; são recusadas se o saldo final ficar negativo ou passar do limite. Liberações, reversões, mudanças de nome, itens, skins, preços e a habilitação da conta principal não têm reversão automática: faça a mudança contrária pela ficha ou por Preços.
 
+## Tempo e clima
+
+Abra **Tempo e clima** no menu lateral. Defina a hora do jogo, pause/retome o relógio, ajuste a duração do dia (5–240 minutos reais) ou use os atalhos de horário. O celular e a iluminação acompanham o novo horário. Partidas, entregas e empregos continuam com seus prazos normais quando o relógio está pausado.
+
+Escolha **Automático**, **Céu limpo**, **Nublado**, **Chuva** ou **Tempestade**. O automático alterna condições a cada seis minutos; alterações de clima transitam em 12 segundos. O estado é compartilhado por todos nesta sala, inclusive novas entradas, e dura até o servidor reiniciar. **Restaurar tempo e clima** volta ao ciclo global de 40 minutos e clima automático. Cada comando exige administração e fica registrado nos logs. Implementação e efeitos em [tempo e clima](day-night.md).
+
 ## Denúncias
 
 Filtros **Abertas**, **Resolvidas** e **Todas**. Cada denúncia mostra quem denunciou, contra quem, quando e o motivo, com atalhos para as duas fichas. **Resolver** pede a decisão (por exemplo: advertência, banimento, sem irregularidade), que fica gravada com quem resolveu e quando; **Reabrir** volta a denúncia para a fila. Punir é feito na aba Moderação da ficha. As colunas `resolved_at`, `resolved_by` e `resolution` vêm da migração `008_admin_console.sql`; resolver e reabrir também entram no histórico (`report-resolve`, `report-reopen`).

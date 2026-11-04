@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {PICKUP_POINTS,atPickup,nearestPickup,GARAGES,motoSpawnSpot,DELIVERY_SPOTS,GPS_CELL,HIGHFOOD,HIGHFOOD_CUSTOMERS,MOTO_PARTS,NEW_MOTO_PARTS,STREET_LABELS,customerLookSchema,defaultPrices,deliveryPay,deliveryStars,floorHeight,gpsClass,gpsRoute,isWalkable,mileageWear,motoFits,priceOf,ratingWait,readMotoParts,routeLength,routeProgress,roadHeight,SKINS,courierLevel,fillLine} from '@bar/shared';
+import {PICKUP_POINTS,atPickup,nearestPickup,GARAGES,motoSpawnSpot,DELIVERY_SPOTS,GPS_CELL,HIGHFOOD,HIGHFOOD_CUSTOMERS,MOTO_PARTS,NEW_MOTO_PARTS,STREET_LABELS,customerLookSchema,defaultPrices,deliveryPay,deliveryStars,floorHeight,gpsClass,gpsRoute,horseFits,isWalkable,mileageWear,motoFits,priceOf,ratingWait,readMotoParts,routeLength,routeProgress,roadHeight,SKINS,courierLevel,fillLine} from '@bar/shared';
 
 const prices=defaultPrices({});
 const sample=<T>(list:readonly T[],count:number)=>Array.from({length:count},(_,i)=>list[Math.floor(i*list.length/count)]!);
+
+test('delivery GPS routes also leave room for Tião and his whole horse',()=>{
+  const sampled=sample(DELIVERY_SPOTS,120);let clear=0;
+  for(const spot of sampled){
+    const route=gpsRoute(HIGHFOOD.BASE,{x:spot.parkX,z:spot.parkZ});assert.ok(route);
+    let fits=true;
+    for(let i=1;i<route.points.length-2&&fits;i++){
+      const [ax,az]=route.points[i]!,[bx,bz]=route.points[i+1]!,yaw=Math.atan2(bx-ax,bz-az),length=Math.hypot(bx-ax,bz-az);
+      for(let d=0;d<=length&&fits;d+=.5){
+        const x=ax+(bx-ax)*d/length,z=az+(bz-az)*d/length;
+        fits=horseFits({x,y:0,z},yaw)||horseFits({x,y:.15,z},yaw);
+      }
+    }
+    if(fits)clear++;
+  }
+  assert.ok(clear/sampled.length>=.97,`${clear} of ${sampled.length} routes clear for the horse`);
+});
 
 test('the GPS finds its way from the base to every corner of the city, over ground the bike can take',()=>{
   const start=HIGHFOOD.BASE;

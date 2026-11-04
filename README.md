@@ -40,7 +40,7 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | --- | --- |
 | WASD | Caminhar, em relação à câmera |
 | Shift | Correr |
-| Arrastar o mouse / roda | Girar a câmera / ajustar distância |
+| Arrastar o mouse / roda | Girar a câmera e o olhar da cabeça / ajustar distância |
 | E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto; levantar a moto caída |
 | W/S, A/D, Espaço (na moto) | Acelerar, frear e dar ré; virar; freio de mão ([moto de entrega](docs/sistemas/moto.md)) |
 | Z, C, X, H (na moto) | Seta esquerda, seta direita, pisca-alerta, farol alto |

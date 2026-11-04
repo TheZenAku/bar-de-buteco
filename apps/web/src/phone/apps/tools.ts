@@ -68,7 +68,7 @@ export const relogio:PhoneApp={id:'relogio',name:'Relógio',icon:'clock',tint:'l
   const watch=()=>elapsed+(started?Date.now()-started:0);
   const stopwatchText=(ms:number)=>`${duration(ms/1000)},${String(Math.floor(ms%1000/10)).padStart(2,'0')}`;
   function render():void {
-    const hour=gameHour(ctx.host.serverNow()),h=Math.floor(hour),m=Math.floor((hour-h)*60);
+    const hour=gameHour(ctx.host.serverNow(),ctx.host.world()?.environment),h=Math.floor(hour),m=Math.floor((hour-h)*60);
     const body=tab==='world'?`<div class="ph-large"><h1>Relógio</h1></div><div class="ph-list">
         <div class="ph-row clock-row bar"><span class="fl"><small>Aqui no bar</small><b>Highland</b></span><time>${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}</time></div>
         ${ZONES.map(([name,zone])=>`<div class="ph-row clock-row"><span class="fl"><small>${e(new Date().toLocaleDateString('pt-BR',{timeZone:zone,weekday:'long'}))}</small><b>${name}</b></span><time>${new Date().toLocaleTimeString('pt-BR',{timeZone:zone,hour:'2-digit',minute:'2-digit'})}</time></div>`).join('')}</div>

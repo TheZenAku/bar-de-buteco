@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {HEAD_LOOK_YAW,HEAD_LOOK_PITCH,type HeadLook} from './head-look.js';
 export * from './head-look.js';
 export * from './admin.js';
+export * from './environment.js';
+export {rainSurfaceHeight} from './world.js';
 export * from './jukebox.js';
 export * from './media-links.js';
 export * from './voice.js';
@@ -15,6 +17,7 @@ export * from './phone.js';
 export * from './rarity.js';
 export * from './skins.js';
 export * from './profile.js';
+export * from './horse.js';
 export * from './achievements.js';
 export * from './stage-show.js';
 export * from './prices.js';
@@ -23,6 +26,9 @@ export * from './foosball.js';
 export * from './pool/index.js';
 export * from './truco/index.js';
 export * from './moto.js';
+export * from './vehicle-models.js';
+export * from './car-parts.js';
+export * from './vehicle-parts.js';
 export * from './moto-parts.js';
 export * from './moto-crash.js';
 export * from './ragdoll.js';
@@ -40,6 +46,7 @@ import type {BlackjackPhase} from './blackjack.js';
 import type {FoosballTableView} from './foosball.js';
 import type {MotoState} from './moto.js';
 import type {RagdollStart} from './ragdoll.js';
+import type {EnvironmentState} from './environment.js';
 
 export const TICK_MS = 50;
 export const PATCH_MS = 100;
@@ -47,6 +54,7 @@ export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
 export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,isWalkable,movePlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
+  | 'horse-idle' | 'horse-walk' | 'horse-gallop'
   /** Highfood: a customer waiting with the phone, thanking for the delivery, and the courier taking the bag from the box. */
   | 'text' | 'thank' | 'pick'
   | 'drink' | 'kick' | 'stumble' | 'fallen' | 'recover' | 'deal' | 'shuffle' | 'bartend'
@@ -115,6 +123,7 @@ export interface BlackjackTable { id: string; phase: BlackjackPhase; round: numb
   dealerCards: BlackjackCard[]; dealerTotal: number; dealerSoft: boolean; turnPlayerId: string; turnHand: number; deadline: number; minBet: number; maxBet: number }
 export interface ActiveEvent { id: string; type: EventType | ''; startedAt: number; durationMs: number }
 export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; jobs?:Record<string,JobSlotsView>; served?:Record<string,ServedItemState>;
+  environment?:EnvironmentState;
   /** The stage's musicians' spots, by spot id (musicians.ts). */
   musicians?:Record<string,MusicianState>;
   /** The stage show's settings from the light desk (stage-show.ts). */

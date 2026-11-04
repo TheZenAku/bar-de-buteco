@@ -33,7 +33,7 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   user_badges:{user_id:['text'],badge_id:['text'],shown_at:['smallint',true],granted_at:['timestamp with time zone',false,'now()'],notified_at:['timestamp with time zone',true]},
   user_achievements:{user_id:['text'],series:['text'],value:['integer',false,'0'],updated_at:['timestamp with time zone',false,'now()']},
   trades:{id:['text'],user_a:['text'],user_b:['text'],offer_a:['jsonb'],offer_b:['jsonb'],fingerprint:['text'],created_at:['timestamp with time zone',false,'now()']},
-  player_vehicles:{id:['text'],plate:['text'],user_id:['text'],model:['text'],parts:['text'],mileage:['integer',false,'0'],bought_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
+  player_vehicles:{id:['text'],plate:['text'],user_id:['text'],model:['text'],parts:['text'],mileage:['integer',false,'0'],color:['text',false,"'#ccc9c2'"],bought_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_customers:{id:['text'],name:['text'],skin:['text'],look:['jsonb'],image_id:['text',true],lines:['jsonb'],active:['boolean',false,'true'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_deliveries:{id:['text'],user_id:['text'],customer_id:['text'],customer:['text'],restaurant:['text'],items:['jsonb'],address:['text'],length_m:['integer'],duration_ms:['integer'],paid:['integer',false,'0'],stars:['smallint',true],on_time:['boolean',false,'false'],crashes:['smallint',false,'0'],status:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_follows:{follower_id:['text'],followed_id:['text'],created_at:['timestamp with time zone',false,'now()']},

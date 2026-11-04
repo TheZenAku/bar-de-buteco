@@ -1,5 +1,7 @@
 import {z} from 'zod';
 import type {ItemId} from './inventory.js';
+import {CAR_PART_IDS,carDriveParts} from './car-parts.js';
+import {CAR_MODEL} from './vehicle-models.js';
 
 /** The bike's parts, in the order the panel lists them; `MotoState.parts` carries their condition in this same order. */
 export const MOTO_PARTS=[
@@ -28,6 +30,7 @@ export function readMotoParts(text:string|undefined):MotoParts {
   return Object.fromEntries(MOTO_PARTS.map((part,i)=>{const value=Number(values[i]);return [part.id,values[i]!==undefined&&values[i]!==''&&Number.isFinite(value)?Math.max(0,Math.min(100,value)):100];})) as MotoParts;
 }
 export const writeMotoParts=(parts:MotoParts):string=>MOTO_PARTS.map(part=>Math.round(parts[part.id])).join(',');
+export const readDriveParts=(vehicle:{model?:string;parts?:string}):MotoParts=>vehicle.model===CAR_MODEL?carDriveParts(vehicle.parts):readMotoParts(vehicle.parts);
 
 /** What a condition means, for the panel. Every part crosses these at the same marks; what happens at each is in MOTO_PARTS. */
 export type MotoPartStatus='good'|'worn'|'bad'|'dead';
@@ -70,8 +73,8 @@ export interface MotoHandling {power:number;brake:number;turn:number;rolling:num
 export const FULL_HANDLING:MotoHandling={power:1,brake:1,turn:1,rolling:1,pull:0};
 /** From `mark` up nothing changes; at 0 the value is `least`. */
 const fade=(condition:number,mark:number,least:number)=>condition>=mark?1:least+(1-least)*condition/mark;
-export function motoHandling(moto:{id:string;parts?:string;engine?:number}):MotoHandling {
-  const parts=readMotoParts(moto.parts),running=moto.engine===undefined||moto.engine===MOTO_ENGINE.ON;
+export function motoHandling(moto:{id:string;model?:string;parts?:string;engine?:number}):MotoHandling {
+  const parts=readDriveParts(moto),running=moto.engine===undefined||moto.engine===MOTO_ENGINE.ON;
   const flat=(tyre:number)=>tyre>=25?1:1+(1-tyre/25)*5;
   // Which way a bent fork pulls is the bike's own: the last character of its id.
   const side=(moto.id.charCodeAt(moto.id.length-1)||0)%2?1:-1;
@@ -142,12 +145,12 @@ export function mileageWear(parts:MotoParts,random:()=>number=Math.random):MotoP
   return parts;
 }
 export const MOTO_REPAIR={item:'peca_moto' as ItemId,pieces:1,amount:40,ms:3500} as const;
-export const motoRepairSchema=z.object({motoId:z.string().max(32),part:z.enum(MOTO_PART_IDS)}).strict();
+export const motoRepairSchema=z.object({motoId:z.string().max(32),part:z.enum([...MOTO_PART_IDS,...CAR_PART_IDS])}).strict();
 /** The state of someone working on a bike, in Player.interactionState. */
-export const motoRepairInteraction=(motoId:string,part:MotoPartId)=>`moto-repair:${motoId}:${part}`;
+export const motoRepairInteraction=(motoId:string,part:string)=>`moto-repair:${motoId}:${part}`;
 export const isRepairingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto-repair:');
-export function repairOf(interaction:string|undefined):{motoId:string;part:MotoPartId}|undefined {
+export function repairOf(interaction:string|undefined):{motoId:string;part:string}|undefined {
   if(!isRepairingMoto(interaction))return;
   const [,motoId,part]=interaction!.split(':');
-  return motoId&&motoPartById(part??'')?{motoId,part:part as MotoPartId}:undefined;
+  return motoId&&(motoPartById(part??'')||CAR_PART_IDS.includes(part??''))?{motoId,part:part!}:undefined;
 }

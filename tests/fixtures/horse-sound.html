@@ -1,0 +1,7 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Horse audio</title>
+<button>Ativar áudio</button><script type="module">
+import {HorseSounds} from '/src/engine/horse-sound.ts';
+const fixture=window.fixture={volume:1,horses:[],ear:{x:0,y:1,z:0}};
+fixture.sounds=new HorseSounds(()=>fixture.volume,'/');
+setInterval(()=>fixture.sounds.update(fixture.horses,fixture.ear,{x:0,y:0,z:-1},{x:0,y:1,z:0}),16);
+</script></html>

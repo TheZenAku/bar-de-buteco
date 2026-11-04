@@ -20,6 +20,28 @@ async function ready(page:Page){
 const section=(page:Page,id:string)=>page.locator(`[data-admin-nav="${id}"]`).click();
 const fileTab=(page:Page,name:RegExp|string)=>page.getByRole('tab',{name}).click();
 
+test('tempo e clima: administração altera hora, pausa, velocidade e tempestade para a sala',async({page})=>{
+  test.setTimeout(150000);
+  await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
+  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'environment');
+  await expect(page.getByLabel('Horário',{exact:true})).toBeVisible();
+  await page.getByLabel('Horário',{exact:true}).fill('18:30');
+  await page.getByLabel('Duração do dia (minutos reais)',{exact:true}).fill('60');
+  await page.getByLabel('Pausar passagem do tempo',{exact:true}).check();
+  await page.getByRole('button',{name:'Aplicar horário',exact:true}).click();
+  await expect(page.locator('[data-environment-clock]')).toHaveText('18:30');
+  await expect(page.getByRole('button',{name:'Retomar relógio',exact:true})).toBeVisible();
+  await page.getByLabel('Condição do tempo',{exact:true}).selectOption('storm');
+  await page.getByRole('button',{name:'Aplicar clima',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.snapshot().world.environment.weather)).toBe('storm');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.environment().weather.rain),{timeout:25000}).toBe(1);
+  await page.screenshot({path:'test-results/previews/admin-environment.png'});
+  await page.getByRole('button',{name:'Meio-dia',exact:true}).click();
+  await expect(page.locator('[data-environment-clock]')).toHaveText('12:00');
+  await page.getByRole('button',{name:'Restaurar tempo e clima',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.snapshot().world.environment)).toMatchObject({weather:'auto',paused:false,dayDurationMs:2400000});
+});
+
 test('desempenho: coleta real, HUD fora da administração, pausas, preferências e relatório',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));

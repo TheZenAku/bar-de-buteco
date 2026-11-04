@@ -1,6 +1,6 @@
 import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
 import type { MotoPhase } from '@bar/shared';
-import { DEFAULT_SHOW, DEFAULT_SKIN, NEW_MOTO_PARTS } from '@bar/shared';
+import { DEFAULT_ENVIRONMENT, DEFAULT_SHOW, DEFAULT_SKIN, NEW_MOTO_PARTS, type EnvironmentState } from '@bar/shared';
 
 export class Player extends Schema {
   @type('string') id = '';
@@ -251,6 +251,15 @@ export class MusicianSpot extends Schema {
 }
 /** A delivery bike (MotoState in packages/shared/src/moto.ts). */
 export class Moto extends Schema {
+  @type('string') model = 'moto-delivery';
+  @type('string') color = '#ccc9c2';
+  @type(['string']) passengers = new ArraySchema<string>('','','');
+  /** Open left/right doors (bits 1/2), hood, hatch and wipers. */
+  @type('uint8') doors = 0;
+  @type('boolean') hood = false;
+  @type('boolean') trunk = false;
+  @type('boolean') wipers = false;
+  @type('uint8') headlights = 0;
   @type('string') id = '';
   /** Whoever holds its key ('' for the administration's), their name, the plate on its back and its row in the API. */
   @type('string') ownerId = '';
@@ -339,7 +348,20 @@ export class JobSlotState extends Schema {
   @type('uint16') pay = 0;
   @type('boolean') enabled = true;
 }
+export class Environment extends Schema {
+  @type('number') anchorMs = DEFAULT_ENVIRONMENT.anchorMs;
+  @type('number') hour = DEFAULT_ENVIRONMENT.hour;
+  @type('number') dayDurationMs = DEFAULT_ENVIRONMENT.dayDurationMs;
+  @type('boolean') paused = DEFAULT_ENVIRONMENT.paused;
+  @type('string') weather:EnvironmentState['weather'] = DEFAULT_ENVIRONMENT.weather;
+  @type('number') weatherChangedAt = 0;
+  @type('number') fromCloud = DEFAULT_ENVIRONMENT.fromCloud;
+  @type('number') fromRain = DEFAULT_ENVIRONMENT.fromRain;
+  @type('number') fromStorm = DEFAULT_ENVIRONMENT.fromStorm;
+  @type('number') fromWind = DEFAULT_ENVIRONMENT.fromWind;
+}
 export class BarState extends Schema {
+  @type(Environment) environment = new Environment();
   @view() @type({ map: Player }) players = new MapSchema<Player>();
   @view() @type({ map: Npc }) npcs = new MapSchema<Npc>();
   @type({ map: TableState }) tables = new MapSchema<TableState>();

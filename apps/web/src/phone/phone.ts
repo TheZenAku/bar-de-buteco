@@ -127,7 +127,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
   addEventListener('resize',layout);
 
   function gameClock():{text:string;phase:string;night:boolean} {
-    const hour=gameHour(host.serverNow()),h=Math.floor(hour),m=Math.floor((hour-h)*60);
+    const hour=gameHour(host.serverNow(),host.world()?.environment),h=Math.floor(hour),m=Math.floor((hour-h)*60);
     return {text:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,phase:GAME_PHASES.find(([until])=>hour<until)![1],night:hour<6||hour>=18.5};
   }
   function renderStatus():void {

@@ -304,7 +304,14 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   // Highfood and HighMotors (docs/sistemas/highfood.md): what the phone's apps show; the shift itself is the room's.
   app.get('/api/highfood', { preHandler: phoneUser }, request => highfood.view(me(request)));
   app.get('/api/vehicles', { preHandler: phoneUser }, request => highfood.vehicle(me(request)));
-  app.post('/api/vehicles/buy', { preHandler: phoneUser, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, request => highfood.buy(request.auth!.user, z.object({ requestId: uuidSchema.toLowerCase() }).strict().parse(request.body).requestId));
+  app.post('/api/vehicles/buy', { preHandler: phoneUser, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, request => {
+    const body=z.object({requestId:uuidSchema.toLowerCase(),model:z.enum(['moto-delivery','carro-hatch']).optional(),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional()}).strict().parse(request.body);
+    return highfood.buy(request.auth!.user,body.requestId,body.model,body.color);
+  });
+  app.post('/api/vehicles/paint',{preHandler:phoneUser,config:{rateLimit:{max:20,timeWindow:'1 minute'}}},request=>{
+    const body=z.object({vehicleId:uuidSchema,color:z.string().regex(/^#[0-9a-fA-F]{6}$/)}).strict().parse(request.body);
+    return highfood.paint(request.auth!.user.id,body.vehicleId,body.color);
+  });
   const badgeImageId = z.object({ id: z.string().regex(BADGE_IMAGE_ID, 'Imagem inválida.') }).strict();
   // Named by its contents, so the browser keeps it.
   app.get('/api/badges/images/:id', { preHandler: authenticated, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {

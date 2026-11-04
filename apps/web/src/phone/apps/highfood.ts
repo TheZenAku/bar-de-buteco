@@ -25,11 +25,14 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
   const me=()=>ctx.host.user()?.id;
   /** Their bike is out on the street, or else it is in the garage. */
   const bikeOut=()=>Object.values(ctx.host.world()?.motos??{}).some(moto=>moto.ownerId===me());
+  const horseAvailable=()=>!!food().horseAvailable;
+  const transportKey=()=>`${bikeOut()}|${horseAvailable()}`;
+  let drawnTransport='';
   function toGarage():void {
     const self=ctx.host.world()?.players?.[me()??''],garage=nearestGarage(self??{x:HIGHFOOD.BASE.x,z:HIGHFOOD.BASE.z});
     ctx.host.gps.setWaypoint({x:garage.x,y:garage.y,z:garage.z,source:'waypoint',label:garage.name});ctx.open('mapas');
   }
-  const garageCard=()=>`<section class="hf-card"><header><small>Sua moto está guardada</small></header><p class="hf-note">Os pedidos só chegam com a moto na rua. Vá até uma garagem e retire ela.</p><div class="hf-actions"><button type="button" class="ph-pill-btn wide hf-go" data-hf="to-garage">${uiIcon('mapPin')}Traçar rota até a garagem</button></div></section>`;
+  const garageCard=()=>`<section class="hf-card"><header><small>Sua moto está guardada</small></header><p class="hf-note">Retire a moto da garagem ou equipe Tião com a habilidade Cavalo para receber pedidos.</p><div class="hf-actions"><button type="button" class="ph-pill-btn wide hf-go" data-hf="to-garage">${uiIcon('mapPin')}Traçar rota até a garagem</button></div></section>`;
   async function load():Promise<void> {
     try{
       const [view,vehicle]=await Promise.all([api<HighfoodView>('/highfood'),api<VehicleView>('/vehicles')]);
@@ -43,10 +46,10 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
     <div class="hf-line">${uiIcon('mapPin')}<span><b>${e(order.address)}</b><small>${metres(order.length)} pelas ruas, a partir do ponto</small></span></div>`;
   function homeHtml(state:HighfoodState):string {
     if(state.status==='off'){
-      const owned=ctx.host.food.owned();
-      return `<div class="hf-off"><i class="hf-radar off">${uiIcon('bike')}</i><h3>Você está offline</h3>
-        <p>${owned?(bikeOut()?'Fique online daqui mesmo. O celular vibra quando aparecer um pedido.':'Fique online daqui mesmo. Para os pedidos chegarem, sua moto precisa estar na rua: ela está na garagem.'):'Para entregar você precisa de uma moto. Ela está à venda no HighMotors.'}</p>
-        ${owned?`<button type="button" class="ph-pill-btn wide hf-go" data-hf="online">${uiIcon('bike')}Ficar online</button>${bikeOut()?'':`<button type="button" class="ph-pill-btn wide soft" data-hf="to-garage">${uiIcon('mapPin')}Traçar rota até a garagem</button>`}`:'<button type="button" class="ph-pill-btn wide hf-go" data-hf="motors">Abrir o HighMotors</button>'}</div>`;
+      const owned=ctx.host.food.owned(),horse=horseAvailable();
+      return `<div class="hf-off"><i class="hf-radar off">${uiIcon(horse?'horse':'bike')}</i><h3>Você está offline</h3>
+        <p>${horse?'Entregue com o cavalo do Tião, sem precisar de moto. Fique online e use a tecla da habilidade para montar. O pedido vai na mochila.':owned?(bikeOut()?'Fique online daqui mesmo. O celular vibra quando aparecer um pedido.':'Fique online daqui mesmo. Para os pedidos chegarem, sua moto precisa estar na rua: ela está na garagem.'):'Entregue com uma moto do HighMotors ou equipe Tião e compre a habilidade Cavalo na coleção (C).'}</p>
+        ${owned||horse?`<button type="button" class="ph-pill-btn wide hf-go" data-hf="online">${uiIcon(horse?'horse':'bike')}Ficar online</button>${bikeOut()||horse?'':`<button type="button" class="ph-pill-btn wide soft" data-hf="to-garage">${uiIcon('mapPin')}Traçar rota até a garagem</button>`}`:'<button type="button" class="ph-pill-btn wide hf-go" data-hf="motors">Abrir o HighMotors</button>'}</div>`;
     }
     if(state.status==='offer'&&state.offer){
       const offer=state.offer;
@@ -56,16 +59,17 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
     }
     if(state.status==='order'&&state.order){
       const order=state.order,left=order.promiseAt-serverNow(),index=order.stage==='collect'?0:STEPS.findIndex(([id])=>id===order.stage);
-      const hint=order.stage==='pickup'?'Siga o GPS até o ponto de retirada. Desça da moto, vá até a tela, aperte E e digite este código.':order.stage==='collect'?'Retirando o pedido…':order.stage==='going'?'Siga o GPS e desça da moto perto do cliente. O pedido sai do baú na hora.':order.stage==='unload'?'Tirando o pedido do baú…':`Leve até ${order.customer.name} e aperte E. Subindo na moto, o pedido vai no baú.`;
+      const horse=order.transport==='horse',storage=horse?'na mochila':'no baú';
+      const hint=order.stage==='pickup'?`Siga o GPS até o ponto de retirada. ${horse?'Desmonte do cavalo':'Desça da moto'}, vá até a tela, aperte E e digite este código.`:order.stage==='collect'?'Retirando o pedido…':order.stage==='going'?horse?'Siga o GPS e desmonte perto do cliente para pegar o pedido na mochila. Se já estiver a pé, aperte E para pegá-lo.':'Siga o GPS e desça da moto perto do cliente para pegar o pedido no baú.':order.stage==='unload'?`Pegando o pedido ${storage}…`:`Leve até ${order.customer.name} e aperte E. ${horseAvailable()?'Montando no cavalo, o pedido vai na mochila.':'Subindo na moto, o pedido vai no baú.'}`;
       return `<section class="hf-card"><header><small>Entrega em andamento</small><b class="hf-pay">${coins(order.pay)} <small>moedas</small></b></header>
-        <ol class="hf-steps">${STEPS.map(([,label],i)=>`<li class="${i<index?'done':i===index?'now':''}"><i></i>${label}</li>`).join('')}</ol>${order.stage==='pickup'?`<div class="hf-code" role="group" aria-label="Código de retirada ${e(order.code)}"><small>Código de retirada</small><div>${[...order.code].map(digit=>`<b>${e(digit)}</b>`).join('')}</div></div>`:''}${orderHead(order)}
+        <ol class="hf-steps">${STEPS.map(([id,label],i)=>`<li class="${i<index?'done':i===index?'now':''}"><i></i>${horse&&id==='unload'?'Na mochila':label}</li>`).join('')}</ol>${order.stage==='pickup'?`<div class="hf-code" role="group" aria-label="Código de retirada ${e(order.code)}"><small>Código de retirada</small><div>${[...order.code].map(digit=>`<b>${e(digit)}</b>`).join('')}</div></div>`:''}${orderHead(order)}
         <p class="hf-note ${left<0?'late':''}" data-hf-promise>${left>=0?`Prazo: ${clock(left)}`:'Atrasado: sem bônus e com menos estrelas'}</p>${order.crashes?`<p class="hf-note late">Pedido amassado em ${order.crashes} ${order.crashes===1?'queda':'quedas'}: vale menos.</p>`:''}
         <p class="ph-hint">${e(hint)}</p>
         <div class="hf-actions"><button type="button" class="ph-pill-btn soft" data-hf="map">${uiIcon('map')}Mapa</button><button type="button" class="ph-pill-btn soft danger-text" data-hf="cancel">Cancelar</button></div></section>`;
     }
     const next=state.nextAt?state.nextAt-serverNow():0;
-    if(!bikeOut())return `${garageCard()}<div class="hf-actions center"><button type="button" class="ph-pill-btn soft danger-text" data-hf="offline">Ficar offline</button></div>`;
-    return `<div class="hf-off"><i class="hf-radar">${uiIcon('bike')}</i><h3>Procurando pedidos…</h3><p>${next>20_000?'Os pedidos vêm aos poucos. Fique por perto: o celular vibra quando aparecer um.':'Quase lá: fique de olho.'}</p><button type="button" class="ph-pill-btn soft danger-text" data-hf="offline">Ficar offline</button></div>`;
+    if(!bikeOut()&&!horseAvailable())return `${garageCard()}<div class="hf-actions center"><button type="button" class="ph-pill-btn soft danger-text" data-hf="offline">Ficar offline</button></div>`;
+    return `<div class="hf-off"><i class="hf-radar">${uiIcon(horseAvailable()?'horse':'bike')}</i><h3>Procurando pedidos…</h3><p>${next>20_000?'Os pedidos vêm aos poucos. Fique por perto: o celular vibra quando aparecer um.':'Quase lá: fique de olho.'}</p><button type="button" class="ph-pill-btn soft danger-text" data-hf="offline">Ficar offline</button></div>`;
   }
   function todayHtml():string {
     const today=data?.today,state=food();
@@ -95,11 +99,13 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
     return `<div class="hf-profile">${avatar({name:user?.displayName??'?',color:user?.color,id:user?.id,...(ctx.profile()?.photo?{photo:ctx.profile()!.photo!}:{})},84)}<h3>${e(user?.displayName??'')}</h3><p class="hf-level">${e(level.name)}</p>${data?.rating?`<p>${stars(data.rating)} <b>${data.rating.toFixed(1).replace('.',',')}</b> <small>(últimas ${Math.min(50,data.ratings)})</small></p>`:'<p class="ph-hint">Sem avaliações ainda.</p>'}</div>
       ${level.next?`<div class="ph-card hf-progress"><small>Faltam ${level.next-(data?.deliveries??0)} entregas para ${e(level.nextName??'')}</small><div class="hf-meter"><i style="width:${Math.min(100,done/span*100)}%"></i></div></div>`:''}
       <h3 class="ph-section">Seus números</h3><div class="ph-card"><div class="ph-row"><span class="fl">Entregas</span><b>${coins(data?.deliveries??0)}</b></div><div class="ph-row"><span class="fl">No prazo</span><b>${data?.onTimeShare===null||data?.onTimeShare===undefined?'—':`${Math.round(data.onTimeShare*100)}%`}</b></div><div class="ph-row"><span class="fl">Moedas ganhas</span><b>${coins(data?.earnedTotal??0)}</b></div></div>
+      ${horseAvailable()?`<h3 class="ph-section">Seu cavalo</h3><div class="ph-card"><p class="ph-hint">${uiIcon('horse')}Cavalo do Tião disponível. Monte com a tecla da habilidade e leve os pedidos na mochila. Desmonte para retirar e entregar.</p></div>`:''}
       <h3 class="ph-section">Sua moto</h3><div class="ph-list"><button type="button" class="ph-row" data-hf="motors">${uiIcon('bike')}<span class="fl"><b>Ver no HighMotors</b><small>Estado das peças, placa e guincho</small></span>${uiIcon('chevronRight')}</button></div>
       <p class="ph-hint">Nota acima de 4,5 traz pedidos um pouco mais rápido; abaixo de 3,5 eles demoram mais. A nota nunca muda o valor de um pedido.</p>
       ${food().status!=='off'?'<div class="hf-actions center"><button type="button" class="ph-pill-btn soft danger-text" data-hf="offline">Ficar offline</button></div>':''}`;
   }
   function render():void {
+    drawnTransport=transportKey();
     const state=food(),scroll=view.querySelector('.ph-body')?.scrollTop??0;
     const online=state.status!=='off';
     view.innerHTML=`<header class="hf-top"><span class="hf-logo"><img class="hf-logo-img" src="${LOGO}" alt="Highfood, Highland Bar Delivery" draggable="false"></span><span class="hf-status ${online?'on':''}"><i></i>${online?'Online':'Offline'}</span></header>
@@ -125,6 +131,7 @@ export const highfood:PhoneApp={id:'highfood',name:'Highfood',icon:'food',image:
   const stopFood=ctx.host.food.listen(()=>{ctx.foodSeen();render();if(tab==='home'&&food().status!=='offer')void load();}),stopReceipt=ctx.host.food.receipts(()=>void load());
   // Offers and the promise run by the clock, between the room's messages; only those numbers change.
   const tick=setInterval(()=>{
+    if(drawnTransport!==transportKey())render();
     const state=food();
     const count=view.querySelector('[data-hf-count]');if(count&&state.offer)count.textContent=clock(state.offer.expiresAt-serverNow());
     const promise=view.querySelector<HTMLElement>('[data-hf-promise]');

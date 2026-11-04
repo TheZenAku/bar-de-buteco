@@ -1,8 +1,22 @@
-# Ciclo de dia e noite
+# Tempo, clima e ciclo de dia e noite
 
 Um dia completo do jogo dura **40 minutos reais**. Amanhecer, dia, entardecer, noite e madrugada transitam continuamente; não existe troca instantânea de presets. O ciclo usa uma época fixa e o relógio já transmitido pelo servidor, então entrar, reconectar ou reiniciar o mundo não reinicia o horário. No lobby, o ciclo continua.
 
-Os parâmetros estão em `apps/web/src/engine/day-night.ts`: `DAY_NIGHT.durationMs`, `epochMs` e `offsetHours`. Alterar a duração muda a fase global calculada; distribua o mesmo build para todos os jogadores. O horário é acelerado e não corresponde à hora civil nem a uma simulação astronômica da cidade.
+Os parâmetros padrão estão em `packages/shared/src/environment.ts`: `DAY_NIGHT.durationMs`, `epochMs` e `offsetHours`. O horário é acelerado e não corresponde à hora civil nem a uma simulação astronômica da cidade. O servidor transmite `WorldState.environment`, com a referência do relógio e o clima; o cenário e o relógio do celular usam essa mesma referência.
+
+## Controles de administrador
+
+Em **Administração → Tempo e clima**, é possível definir o horário, usar os atalhos de amanhecer/meio-dia/entardecer/meia-noite, pausar e retomar o relógio e escolher a duração de um dia entre **5 e 240 minutos reais**. Pausar congela apenas a hora do jogo: entregas, partidas, empregos, ingressos e clima seguem o relógio real do servidor. Mudar a velocidade ou retomar preserva a hora atual.
+
+O clima pode ser **Automático**, **Céu limpo**, **Nublado**, **Chuva** ou **Tempestade**. Um clima fixo permanece até outra alteração. No automático, um ciclo determinístico de oito períodos de seis minutos alterna céu limpo, nuvens, chuva e tempestade. A passagem entre condições leva **12 segundos**, inclusive quando um administrador interrompe uma transição. Alterar a hora do jogo não altera a fase do clima.
+
+O comando `admin.environment` valida tipos e limites, exige o papel de administrador e registra `admin_environment` no log. As configurações são replicadas a todos os jogadores, incluindo reconexões e novas entradas. Valem por sala até o servidor reiniciar. **Restaurar tempo e clima** retoma o relógio global, o dia de 40 minutos e o clima automático.
+
+## Chuva e tempestades
+
+Nuvens procedurais se movem com o vento e reduzem a luz do sol, da lua e das estrelas. Chuva fecha a névoa e tempestades intensificam vento, precipitação e escurecimento. Relâmpagos amplos e breves seguem o relógio compartilhado; o trovão vem depois, sem reproduzir trovões antigos ao entrar na sala.
+
+A chuva é uma malha com uma chamada de desenho e movimento na GPU, em torno da câmera. A quantidade máxima varia de 650 a 2.400 gotas conforme a qualidade de sombras. Os pisos, sólidos, telhados e os tetos da varanda limitam a altura das gotas; elas não atravessam os interiores. O som procedural fica abafado sob cobertura, respeita o volume geral e silencia ao sair ou esconder a aba. Não há download de gravações para esses efeitos.
 
 ## Luz natural e luminárias
 
@@ -26,10 +40,16 @@ A névoa linear vem dos extras da cena da cidade: de **90 a 650 m** de dia, fech
 
 ## Arquivos e validação
 
-- `apps/web/src/engine/day-night.ts`: relógio, paleta, trajetória e parâmetros de névoa.
+- `packages/shared/src/environment.ts`: relógio, comandos, clima automático, transições e relâmpagos determinísticos.
+- `apps/web/src/admin/environment.ts`: controles em Tempo e clima.
+- `apps/web/src/engine/day-night.ts`: paleta e trajetória solar/lunar.
+- `apps/web/src/engine/weather-effects.ts` e `weather-sound.ts`: precipitação e áudio procedural.
 - `apps/web/src/engine/environment-lighting.ts`: aplicação de luzes, sombras, céu, brilho e névoa ao cenário.
 - `BarScene.ts`: sincronização com o horário do servidor e integração com eventos, câmera e descarte de recursos.
 - `tests/integration/day-night.test.ts`: periodicidade, continuidade, direções e névoa.
+- `tests/integration/environment.test.ts`: relógio controlado, transições, comandos, relâmpagos e coberturas.
+- `apps/server/test/environment.integration.test.ts`: permissões e replicação para observadores e novas entradas.
+- `tests/e2e/weather.spec.ts` e cenário de tempo e clima em `admin.spec.ts`: renderização e controles no navegador.
 - `tests/e2e/environment.spec.ts`: renderização do mapa em horários diferentes, direção real das luzes, sombras, eventos, transparência da TV e relógio no jogo/lobby.
 
 Em desenvolvimento, `barDebug.environment()` expõe o estado somente para leitura. O teste visual usa um relógio controlado na sua própria página de teste, sem oferecer comandos de alteração do horário a jogadores.

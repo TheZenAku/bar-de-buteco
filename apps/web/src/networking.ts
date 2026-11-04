@@ -1,4 +1,5 @@
 import {Client,type Room} from '@colyseus/sdk';
+import {isRidingHorse,moveHorse} from '@bar/shared';
 import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import type {Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
@@ -142,7 +143,7 @@ export class BarNetwork {
         this.seq=Math.max(this.seq,self.lastProcessedInput);
         this.pending=this.pending.filter(input=>input.seq>self.lastProcessedInput);
         this.position={x:self.x,y:self.y,z:self.z};
-        if(!self.interactionState&&!self.currentTableId) for(const input of this.pending)this.position=this.predict(input,self);
+        if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending)this.position=this.predict(input,self);
         this.hooks.position(this.position);
         this.reconcileMoto(world,self);
       }
@@ -213,7 +214,7 @@ export class BarNetwork {
     if(!self)return;
     // On a bike the frames keep the time (rideFrame).
     if(isRidingMoto(self.interactionState)){this.wasMoving=false;return;}
-    const locked=!!(self.interactionState||self.currentTableId);
+    const locked=!!((self.interactionState&&!isRidingHorse(self.interactionState))||self.currentTableId);
     const requested=this.hooks.input();
     const intention=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
     const moving=!!(intention.dx||intention.dz);
@@ -278,7 +279,10 @@ export class BarNetwork {
    * The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts), the stage only with
    * a pass. The raw input is what is sent.
    */
-  private predict(input:PlayerInput,self:PlayerState):Position {return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self));}
+  private predict(input:PlayerInput,self:PlayerState):Position {
+    if(isRidingHorse(self.interactionState))return moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
+    return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self));
+  }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   sendBytes(type:string,bytes:Uint8Array):void {if(this.room&&!this.stopped&&this.transportReady)this.room.sendBytes(type,bytes);}
   telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length+this.pendingMoto.length};}

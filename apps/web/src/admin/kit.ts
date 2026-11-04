@@ -1,4 +1,4 @@
-import type {PublicUser} from '@bar/shared';
+import type {PublicUser,EnvironmentState,WeatherSample} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
 import type {PerformanceMonitor} from '../performance/monitor';
@@ -12,7 +12,7 @@ export interface AdminContext {
   /** The world's last admin.world snapshot (null until it arrives), and how to ask for a new one. */
   world:()=>WorldSnapshot|null;
   requestWorld:()=>void;
-  /** A command to the world (admin.job, admin.table, admin.media, admin.bots, admin.moto.spawn, admin.moto.despawn). */
+  /** A command to the world (jobs, devices, bots, vehicles and admin.environment). */
   send:(type:string,payload?:unknown)=>void;
   /** Opens another section, e.g. a player's file from the log. */
   go:(section:SectionId,params?:Record<string,string>)=>void;
@@ -23,13 +23,14 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'logs'|'world'|'environment'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 
 /** admin.world (apps/server/src/BarRoom.ts adminSnapshot). */
 export interface WorldOrder {id?:string;playerId:string;items:string[];total:number}
 export interface WorldSnapshot {
+  environment?:EnvironmentState&{currentHour:number;currentWeather:WeatherSample};
   at:number;occupancy:number;capacity:number;event:string;walletRetries:number;resultOutbox:number;prices:Record<string,number>;pricesLoaded?:boolean;logQueue?:number;
   players:Array<{id:string;name:string;connected:boolean;x:number;y:number;z:number;animation:string;interaction:string;job:string;condition:string;balance?:number;stageMinutes?:number}>;
   npcs:Array<{id:string;name:string;behavior:string;animation:string;x:number;z:number}>;

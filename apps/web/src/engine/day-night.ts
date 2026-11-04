@@ -1,5 +1,5 @@
-/** One game day per 40 real minutes. Fixed epoch survives reloads and world restarts. */
-export const DAY_NIGHT={durationMs:40*60_000,epochMs:Date.UTC(2026,0,1),offsetHours:8} as const;
+import {gameHour,type EnvironmentState} from '@bar/shared/environment';
+export {DAY_NIGHT,gameHour} from '@bar/shared/environment';
 export type Rgb=[number,number,number];
 const rgb=(hex:string):Rgb=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255) as Rgb;
 const clamp=(x:number)=>Math.max(0,Math.min(1,x));
@@ -17,12 +17,8 @@ const keys=[
   [24,'#080f23','#172337','#354460','#ffc18b'],
 ].map(([hour,top,horizon,ambient,sun])=>({hour:hour as number,top:rgb(top as string),horizon:rgb(horizon as string),ambient:rgb(ambient as string),sun:rgb(sun as string)}));
 
-export function gameHour(serverTime:number):number {
-  const time=Number.isFinite(serverTime)?serverTime:DAY_NIGHT.epochMs;
-  return (((time-DAY_NIGHT.epochMs)/DAY_NIGHT.durationMs*24+DAY_NIGHT.offsetHours)%24+24)%24;
-}
-export function daylightAt(serverTime:number){
-  const hour=gameHour(serverTime),angle=(hour-6)/24*Math.PI*2;
+export function daylightAt(serverTime:number,environment?:EnvironmentState){
+  const hour=gameHour(serverTime,environment),angle=(hour-6)/24*Math.PI*2;
   // East = +X; the noon arc crosses the south (+Z), lighting the main facade.
   const x=Math.cos(angle),y=Math.sin(angle)*.92,z=Math.sin(angle)*.39;
   const length=Math.hypot(x,y,z),sunDirection:[number,number,number]=[x/length,y/length,z/length];

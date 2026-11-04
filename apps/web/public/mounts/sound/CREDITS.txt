@@ -1,0 +1,17 @@
+Horse gallop on different surfaces - ground.mp3
+Adapted/curated by congusbongus; original recording by D4XX.
+https://opengameart.org/content/horse-gallop-on-different-surfaces
+Download: https://opengameart.org/sites/default/files/archive_2.zip
+
+The pack is published under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+The included credits.txt identifies ground.mp3 as derived from:
+Single Horse Galopp by D4XX
+https://freesound.org/people/D4XX/sounds/564628/
+Original recording: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Only ground.mp3 is used. credits.txt is preserved from the original archive.
+Game adaptation: decoded to mono 32 kHz PCM WAV, peak normalized, 1 ms edge fades.
+The same pack attribution and CC BY 4.0 license apply to the adapted gallop.wav.
+Retrieved on 2026-11-03. No endorsement by the authors is implied.

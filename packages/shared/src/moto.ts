@@ -3,6 +3,7 @@ import {findSpawn,floorHeight,isWalkable,roadHeight,solidsBetween,WORLD} from '.
 import type {Collider,Position} from './index.js';
 import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
+import {CAR,CAR_MODEL,isPassenger,vehicleOccupants} from './vehicle-models.js';
 
 /** How much smaller than moto_delivery.glb the bike is drawn: its measurements below all follow. */
 const SCALE=.8;
@@ -35,7 +36,10 @@ export const MOTO={
   LIMIT:12,
 } as const;
 
-export interface MotoBody {x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number}
+type VehiclePhysics={[K in keyof typeof MOTO]:number};
+const CAR_PHYSICS:VehiclePhysics={...MOTO,...CAR};
+export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===CAR_MODEL?CAR_PHYSICS:MOTO;
+export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number}
 /** Which lamps are lit beyond the ones always on (MotoState.lights). */
 export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
 /**
@@ -46,86 +50,94 @@ export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
  * starting, `gas` whether the throttle is open, and `parts` the condition of each part in MOTO_PARTS's order.
  */
 export interface MotoState extends MotoBody {id:string;/** Who holds its key (docs/sistemas/garagem.md). '' for the administration's, which anyone may ride. */ownerId?:string;/** The key holder's name, the plate on its back, and the row it is in the API. */ownerName?:string;plate?:string;vehicleId?:string;/** Only the key holder gets on it. */locked?:boolean;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
+export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number}
 export interface MotoIntent {throttle:number;steer:number;brake:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
 /** W/S (forward, brake and reverse), A/D (+1 is right), the handbrake and the switches. */
 export interface MotoInput extends MotoIntent {seq:number}
 export const motoInputSchema=z.object({seq:z.number().int().min(0).max(2147483647),throttle:z.number().finite().min(-1).max(1),steer:z.number().finite().min(-1).max(1),brake:z.boolean(),lights:z.number().int().min(0).max(15).optional()}).strict();
-export const motoMountSchema=z.object({motoId:z.string().max(32)}).strict();
+export const motoMountSchema=z.object({motoId:z.string().max(32),seat:z.number().int().min(0).max(3).optional()}).strict();
 export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 
 /** The rider's Player.interactionState. */
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
-export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:');
+export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:')||isPassenger(interaction);
 export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
 export const motoSpawnSchema=z.object({}).strict();
 /** How far a body is from the hull, seen from above. */
-export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'>,position:Position)=>hullGap(moto,position);
+export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position)=>hullGap(moto,position);
 /** One bike, or every bike when there is no id. */
 export const motoDespawnSchema=z.object({id:z.string().max(32).optional()}).strict();
 
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
 /** The most the front wheel may turn at this speed (radians): full lock while slow, less as the tyres would let go. */
-export function motoSteerAngle(speed:number):number {
-  return Math.min(MOTO.MAX_STEER,Math.atan(MOTO.WHEELBASE*MOTO.GRIP/Math.max(speed*speed,.01)));
+export function motoSteerAngle(speed:number,model?:string):number {
+  const spec=vehiclePhysics(model);
+  return Math.min(spec.MAX_STEER,Math.atan(spec.WHEELBASE*spec.GRIP/Math.max(speed*speed,.01)));
 }
 
 /** The street under both wheels and the hull's corners: its height, and the slope between the axles. */
-function ground(x:number,z:number,yaw:number,reference:number):{y:number;pitch:number}|undefined {
-  const s=Math.sin(yaw),c=Math.cos(yaw),axle=MOTO.WHEELBASE/2;
-  const front=roadHeight(x+s*axle,z+c*axle,reference),rear=roadHeight(x-s*axle,z-c*axle,reference);
+function ground(x:number,z:number,yaw:number,reference:number,spec:VehiclePhysics=MOTO):{y:number;pitch:number}|undefined {
+  const s=Math.sin(yaw),c=Math.cos(yaw),axle=spec.WHEELBASE/2;
+  let front=roadHeight(x+s*axle,z+c*axle,reference),rear=roadHeight(x-s*axle,z-c*axle,reference);
+  if(spec===CAR_PHYSICS){
+    const wheel=(side:number,along:number)=>roadHeight(x+c*side+s*along,z-s*side+c*along,reference);
+    const fl=wheel(CAR.WHEEL_TRACK/2,axle),fr=wheel(-CAR.WHEEL_TRACK/2,axle),rl=wheel(CAR.WHEEL_TRACK/2,-axle),rr=wheel(-CAR.WHEEL_TRACK/2,-axle);
+    if(fl===undefined||fr===undefined||rl===undefined||rr===undefined)return;
+    front=(fl+fr)/2;rear=(rl+rr)/2;
+  }
   if(front===undefined||rear===undefined)return;
-  const nose=MOTO.CENTRE_Z+MOTO.HALF_LENGTH,tail=MOTO.CENTRE_Z-MOTO.HALF_LENGTH;
-  for(const [lx,lz] of [[MOTO.HALF_WIDTH,nose],[-MOTO.HALF_WIDTH,nose],[MOTO.HALF_WIDTH,tail],[-MOTO.HALF_WIDTH,tail]] as const)
+  const nose=spec.CENTRE_Z+spec.HALF_LENGTH,tail=spec.CENTRE_Z-spec.HALF_LENGTH;
+  for(const [lx,lz] of [[spec.HALF_WIDTH,nose],[-spec.HALF_WIDTH,nose],[spec.HALF_WIDTH,tail],[-spec.HALF_WIDTH,tail]] as const)
     if(roadHeight(x+c*lx+s*lz,z-s*lx+c*lz,reference)===undefined)return;
-  return {y:(front+rear)/2,pitch:Math.atan2(front-rear,MOTO.WHEELBASE)};
+  return {y:(front+rear)/2,pitch:Math.atan2(front-rear,spec.WHEELBASE)};
 }
 /** The hull (a box turned by `yaw`) against the solids: separating axes, the world's first and then the hull's. */
-const overlaps=(x:number,z:number,yaw:number,y:number,solids:readonly Collider[]):boolean=>!!overlapping(x,z,yaw,y,solids);
+const overlaps=(x:number,z:number,yaw:number,y:number,solids:readonly Collider[],spec:VehiclePhysics=MOTO):boolean=>!!overlapping(x,z,yaw,y,solids,spec);
 const WORLD_EDGE:Collider={id:'world',x:0,z:0,hx:0,hz:0};
 /** What the hull is inside of: the first solid found, or the edge of the world. */
-function overlapping(x:number,z:number,yaw:number,y:number,solids:readonly Collider[]):Collider|undefined {
-  const s=Math.sin(yaw),c=Math.cos(yaw),cx=x+s*MOTO.CENTRE_Z,cz=z+c*MOTO.CENTRE_Z;
-  const ex=Math.abs(c)*MOTO.HALF_WIDTH+Math.abs(s)*MOTO.HALF_LENGTH,ez=Math.abs(s)*MOTO.HALF_WIDTH+Math.abs(c)*MOTO.HALF_LENGTH;
+function overlapping(x:number,z:number,yaw:number,y:number,solids:readonly Collider[],spec:VehiclePhysics=MOTO):Collider|undefined {
+  const s=Math.sin(yaw),c=Math.cos(yaw),cx=x+s*spec.CENTRE_Z,cz=z+c*spec.CENTRE_Z;
+  const ex=Math.abs(c)*spec.HALF_WIDTH+Math.abs(s)*spec.HALF_LENGTH,ez=Math.abs(s)*spec.HALF_WIDTH+Math.abs(c)*spec.HALF_LENGTH;
   if(cx-ex<WORLD.minX||cx+ex>WORLD.maxX||cz-ez<WORLD.minZ||cz+ez>WORLD.maxZ)return WORLD_EDGE;
   for(const solid of solids){
-    if(solid.ramp||(solid.maxY??Infinity)<=y+.26||(solid.minY??-Infinity)>=y+MOTO.HEIGHT)continue;
+    if(solid.ramp||(solid.maxY??Infinity)<=y+.26||(solid.minY??-Infinity)>=y+spec.HEIGHT)continue;
     const dx=solid.x-cx,dz=solid.z-cz;
     if(Math.abs(dx)>=solid.hx+ex||Math.abs(dz)>=solid.hz+ez)continue;
     const turn=solid.turn;
     if(!turn){
-      if(Math.abs(dx*c-dz*s)>=MOTO.HALF_WIDTH+solid.hx*Math.abs(c)+solid.hz*Math.abs(s))continue;
-      if(Math.abs(dx*s+dz*c)>=MOTO.HALF_LENGTH+solid.hx*Math.abs(s)+solid.hz*Math.abs(c))continue;
+      if(Math.abs(dx*c-dz*s)>=spec.HALF_WIDTH+solid.hx*Math.abs(c)+solid.hz*Math.abs(s))continue;
+      if(Math.abs(dx*s+dz*c)>=spec.HALF_LENGTH+solid.hx*Math.abs(s)+solid.hz*Math.abs(c))continue;
       return solid;
     }
     // A turned box (the city's): its two axes and the hull's. u is its X on the ground and v its Z; a is the hull's X and b its Z.
     const {ux,uz,lx,lz}=turn,ua=ux*c-uz*s,ub=ux*s+uz*c,va=-uz*c-ux*s,vb=-uz*s+ux*c;
-    if(Math.abs(dx*ux+dz*uz)>=lx+MOTO.HALF_WIDTH*Math.abs(ua)+MOTO.HALF_LENGTH*Math.abs(ub))continue;
-    if(Math.abs(dz*ux-dx*uz)>=lz+MOTO.HALF_WIDTH*Math.abs(va)+MOTO.HALF_LENGTH*Math.abs(vb))continue;
-    if(Math.abs(dx*c-dz*s)>=MOTO.HALF_WIDTH+lx*Math.abs(ua)+lz*Math.abs(va))continue;
-    if(Math.abs(dx*s+dz*c)>=MOTO.HALF_LENGTH+lx*Math.abs(ub)+lz*Math.abs(vb))continue;
+    if(Math.abs(dx*ux+dz*uz)>=lx+spec.HALF_WIDTH*Math.abs(ua)+spec.HALF_LENGTH*Math.abs(ub))continue;
+    if(Math.abs(dz*ux-dx*uz)>=lz+spec.HALF_WIDTH*Math.abs(va)+spec.HALF_LENGTH*Math.abs(vb))continue;
+    if(Math.abs(dx*c-dz*s)>=spec.HALF_WIDTH+lx*Math.abs(ua)+lz*Math.abs(va))continue;
+    if(Math.abs(dx*s+dz*c)>=spec.HALF_LENGTH+lx*Math.abs(ub)+lz*Math.abs(vb))continue;
     return solid;
   }
 }
 /** The face of a solid a hull has just gone into: the axis with the least overlap, pointing back at the hull. */
-function faceOf(solid:Collider,x:number,z:number,yaw:number):{nx:number;nz:number} {
-  const s=Math.sin(yaw),c=Math.cos(yaw),dx=x+s*MOTO.CENTRE_Z-solid.x,dz=z+c*MOTO.CENTRE_Z-solid.z,turn=solid.turn;
+function faceOf(solid:Collider,x:number,z:number,yaw:number,spec:VehiclePhysics=MOTO):{nx:number;nz:number} {
+  const s=Math.sin(yaw),c=Math.cos(yaw),dx=x+s*spec.CENTRE_Z-solid.x,dz=z+c*spec.CENTRE_Z-solid.z,turn=solid.turn;
   const ux=turn?turn.ux:1,uz=turn?turn.uz:0,hx=turn?turn.lx:solid.hx,hz=turn?turn.lz:solid.hz;
   const along=dx*ux+dz*uz,across=dz*ux-dx*uz;
-  const reachX=MOTO.HALF_WIDTH*Math.abs(c*ux-s*uz)+MOTO.HALF_LENGTH*Math.abs(s*ux+c*uz),reachZ=MOTO.HALF_WIDTH*Math.abs(-s*ux-c*uz)+MOTO.HALF_LENGTH*Math.abs(c*ux-s*uz);
+  const reachX=spec.HALF_WIDTH*Math.abs(c*ux-s*uz)+spec.HALF_LENGTH*Math.abs(s*ux+c*uz),reachZ=spec.HALF_WIDTH*Math.abs(-s*ux-c*uz)+spec.HALF_LENGTH*Math.abs(c*ux-s*uz);
   if(hx+reachX-Math.abs(along)<hz+reachZ-Math.abs(across)){const sign=along<0?-1:1;return {nx:ux*sign,nz:uz*sign};}
   const sign=across<0?-1:1;
   return {nx:-uz*sign,nz:ux*sign};
 }
 /** A bike as something another bike runs into. */
-export function motoObstacle(other:{id:string;x:number;y:number;z:number;yaw:number}):Collider {
-  const s=Math.sin(other.yaw),c=Math.cos(other.yaw);
-  return {id:`moto:${other.id}`,x:other.x+s*MOTO.CENTRE_Z,y:other.y,z:other.z+c*MOTO.CENTRE_Z,hx:Math.abs(c)*MOTO.HALF_WIDTH+Math.abs(s)*MOTO.HALF_LENGTH,hz:Math.abs(s)*MOTO.HALF_WIDTH+Math.abs(c)*MOTO.HALF_LENGTH,
-    minY:other.y,maxY:other.y+MOTO.HEIGHT,turn:{ux:c,uz:-s,lx:MOTO.HALF_WIDTH,lz:MOTO.HALF_LENGTH}};
+export function motoObstacle(other:{id:string;x:number;y:number;z:number;yaw:number;model?:string}):Collider {
+  const s=Math.sin(other.yaw),c=Math.cos(other.yaw),spec=vehiclePhysics(other.model);
+  return {id:`moto:${other.id}`,x:other.x+s*spec.CENTRE_Z,y:other.y,z:other.z+c*spec.CENTRE_Z,hx:Math.abs(c)*spec.HALF_WIDTH+Math.abs(s)*spec.HALF_LENGTH,hz:Math.abs(s)*spec.HALF_WIDTH+Math.abs(c)*spec.HALF_LENGTH,
+    minY:other.y,maxY:other.y+spec.HEIGHT,turn:{ux:c,uz:-s,lx:spec.HALF_WIDTH,lz:spec.HALF_LENGTH}};
 }
 /** The street can take the hull upright there: its height and slope. */
-export function motoFits(x:number,z:number,yaw:number,reference:number):{y:number;pitch:number}|undefined {
-  const reach=MOTO.HALF_LENGTH+Math.abs(MOTO.CENTRE_Z)+.1,floor=ground(x,z,yaw,reference);
-  if(!floor||!clearStreet(x,z,yaw,floor.y)||overlaps(x,z,yaw,floor.y,solidsBetween(x-reach,z-reach,x+reach,z+reach)))return;
+export function motoFits(x:number,z:number,yaw:number,reference:number,model?:string):{y:number;pitch:number}|undefined {
+  const spec=vehiclePhysics(model),reach=spec.HALF_LENGTH+Math.abs(spec.CENTRE_Z)+.1,floor=ground(x,z,yaw,reference,spec);
+  if(!floor||!clearStreet(x,z,yaw,floor.y,spec)||overlaps(x,z,yaw,floor.y,solidsBetween(x-reach,z-reach,x+reach,z+reach),spec))return;
   return floor;
 }
 /** A blow: how fast it was going, and how much of that went straight into what stopped it (m/s), the way back out of it, and what it was. */
@@ -140,38 +152,39 @@ export interface MotoHit {speed:number;closing:number;nx:number;nz:number;solid?
 export function stepMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):MotoBody {return advanceMoto(body,input,dt,obstacles,handling).body;}
 /** The same step, also telling what it ran into (the room throws the rider off by that: moto-crash.ts). */
 export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):{body:MotoBody;hit?:MotoHit} {
+  const spec=vehiclePhysics(body.model);
   const throttle=clamp(input.throttle,-1,1),wanted=clamp(input.steer,-1,1);
-  const rate=(wanted===0||wanted*body.steer<0?MOTO.STEER_RETURN:MOTO.STEER_RATE)*dt;
+  const rate=(wanted===0||wanted*body.steer<0?spec.STEER_RETURN:spec.STEER_RATE)*dt;
   const steer=body.steer+clamp(wanted-body.steer,-rate,rate);
-  let drive=0,stop=MOTO.ROLLING*handling.rolling+MOTO.DRAG*body.speed*body.speed;
-  if(input.brake)stop+=MOTO.HANDBRAKE*handling.brake;
-  else if(throttle>0){if(body.speed<-.1)stop+=MOTO.BRAKE*handling.brake*throttle;else drive=MOTO.ENGINE*handling.power*throttle;}
-  else if(throttle<0){if(body.speed>.1)stop-=MOTO.BRAKE*handling.brake*throttle;else if(body.speed>-MOTO.REVERSE_SPEED)drive=MOTO.REVERSE*handling.power*throttle;}
-  let speed=body.speed+drive/MOTO.MASS*dt;
-  const loss=stop/MOTO.MASS*dt;
+  let drive=0,stop=spec.ROLLING*handling.rolling+spec.DRAG*body.speed*body.speed;
+  if(input.brake)stop+=spec.HANDBRAKE*handling.brake;
+  else if(throttle>0){if(body.speed<-.1)stop+=spec.BRAKE*handling.brake*throttle;else drive=spec.ENGINE*handling.power*throttle;}
+  else if(throttle<0){if(body.speed>.1)stop-=spec.BRAKE*handling.brake*throttle;else if(body.speed>-spec.REVERSE_SPEED)drive=spec.REVERSE*handling.power*throttle;}
+  let speed=body.speed+drive/spec.MASS*dt;
+  const loss=stop/spec.MASS*dt;
   speed=Math.abs(speed)<=loss?0:speed-Math.sign(speed)*loss;
   if(!speed)return {body:{...body,speed,steer}};
-  const turn=speed*Math.tan(clamp(steer+handling.pull,-1,1)*handling.turn*motoSteerAngle(speed))/MOTO.WHEELBASE;
-  const steps=Math.max(1,Math.ceil(Math.abs(speed*dt)/MOTO.SUBSTEP)),reach=MOTO.HALF_LENGTH+Math.abs(MOTO.CENTRE_Z)+Math.abs(speed*dt)+.1;
+  const turn=speed*Math.tan(clamp(steer+handling.pull,-1,1)*handling.turn*motoSteerAngle(speed,body.model))/spec.WHEELBASE;
+  const steps=Math.max(1,Math.ceil(Math.abs(speed*dt)/spec.SUBSTEP)),reach=spec.HALF_LENGTH+Math.abs(spec.CENTRE_Z)+Math.abs(speed*dt)+.1;
   const near=solidsBetween(body.x-reach,body.z-reach,body.x+reach,body.z+reach),solids=obstacles.length?[...near,...obstacles]:near;
   let {x,y,z,yaw,pitch}=body,kept=1,hit=false,blow:MotoHit|undefined;
   // Already inside a solid (a door closed on it): free to ride out.
-  const free=!overlaps(x,z,yaw,y,solids);
+  const free=!overlaps(x,z,yaw,y,solids,spec);
   const place=(px:number,pz:number,pyaw:number)=>{
-    const floor=ground(px,pz,pyaw,y);
-    if(!floor||(free&&overlaps(px,pz,pyaw,floor.y,solids)))return false;
+    const floor=ground(px,pz,pyaw,y,spec);
+    if(!floor||(free&&overlaps(px,pz,pyaw,floor.y,solids,spec)))return false;
     x=px;z=pz;yaw=pyaw;y=floor.y;pitch=floor.pitch;return true;
   };
   for(let step=0;step<steps&&!hit;step++){
-    const distance=speed*dt/steps,next=yaw-turn*dt/steps,middle=(yaw+next)/2,axle=MOTO.WHEELBASE/2;
+    const distance=speed*dt/steps,next=yaw-turn*dt/steps,middle=(yaw+next)/2,axle=spec.WHEELBASE/2;
     const rearX=x-Math.sin(yaw)*axle+Math.sin(middle)*distance,rearZ=z-Math.cos(yaw)*axle+Math.cos(middle)*distance;
     const wantX=rearX+Math.sin(next)*axle,wantZ=rearZ+Math.cos(next)*axle;
     if(place(wantX,wantZ,next))continue;
     // The first thing it ran into, and how much of the speed went straight against it.
     if(!blow&&free){
-      const floor=ground(wantX,wantZ,next,y),solid=floor?overlapping(wantX,wantZ,next,floor.y,solids):undefined;
+      const floor=ground(wantX,wantZ,next,y,spec),solid=floor?overlapping(wantX,wantZ,next,floor.y,solids,spec):undefined;
       if(solid&&solid!==WORLD_EDGE){
-        const {nx,nz}=faceOf(solid,wantX,wantZ,next);
+        const {nx,nz}=faceOf(solid,wantX,wantZ,next,spec);
         blow={speed,closing:Math.max(0,-(Math.sin(yaw)*nx+Math.cos(yaw)*nz)*speed),nx,nz,solid:solid.id};
       }
     }
@@ -188,54 +201,55 @@ export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:read
   }
   // A hard knock throws it back a little.
   speed=hit?(Math.abs(speed)>3?-speed*.18:0):speed*kept;
-  return {body:{x,y,z,yaw,pitch,speed,steer},hit:blow};
+  return {body:{...(body.model?{model:body.model}:{}),x,y,z,yaw,pitch,speed,steer},hit:blow};
 }
 
 /**
  * Nothing but street under the whole hull, seen from above it: the pavement's surface runs on under the bar's floor, where a
  * bike already riding never gets (the walls stop it) but one being placed could.
  */
-function clearStreet(x:number,z:number,yaw:number,y:number):boolean {
-  const s=Math.sin(yaw),c=Math.cos(yaw),nose=MOTO.CENTRE_Z+MOTO.HALF_LENGTH,tail=MOTO.CENTRE_Z-MOTO.HALF_LENGTH;
-  for(const [lx,lz] of [[0,0],[0,nose],[0,tail],[MOTO.HALF_WIDTH,nose],[-MOTO.HALF_WIDTH,nose],[MOTO.HALF_WIDTH,tail],[-MOTO.HALF_WIDTH,tail]] as const)
+function clearStreet(x:number,z:number,yaw:number,y:number,spec:VehiclePhysics=MOTO):boolean {
+  const s=Math.sin(yaw),c=Math.cos(yaw),nose=spec.CENTRE_Z+spec.HALF_LENGTH,tail=spec.CENTRE_Z-spec.HALF_LENGTH;
+  for(const [lx,lz] of [[0,0],[0,nose],[0,tail],[spec.HALF_WIDTH,nose],[-spec.HALF_WIDTH,nose],[spec.HALF_WIDTH,tail],[-spec.HALF_WIDTH,tail]] as const)
     if(roadHeight(x+c*lx+s*lz,z-s*lx+c*lz,y+.2)===undefined)return false;
   return true;
 }
 /** Rings around whoever spawns a bike: the first clears the hull and the body, the last is as far as a street may be. */
-const SPAWN_FIRST_RING=MOTO.HALF_LENGTH+.8,SPAWN_RING_STEP=1,SPAWN_LAST_RING=30,SPAWN_ANGLES=24,SPAWN_GAP=MOTO.HALF_LENGTH*2+.4;
+const SPAWN_RING_STEP=1,SPAWN_LAST_RING=30,SPAWN_ANGLES=24;
 /**
  * The free stretch of street nearest to a point, starting straight ahead of `yaw` and pointing that way if it fits. From inside the
  * bar or the terrace this is the street outside. Undefined when no street is near.
  */
-export function motoSpawnSpot(near:Position,yaw:number,others:readonly Pick<MotoBody,'x'|'z'>[],avoid:ReadonlyArray<{x:number;z:number;radius:number}>=[]):{x:number;y:number;z:number;yaw:number;pitch:number}|undefined {
-  const reach=MOTO.HALF_LENGTH+Math.abs(MOTO.CENTRE_Z)+.1;
-  for(let ring=SPAWN_FIRST_RING;ring<=SPAWN_LAST_RING;ring+=SPAWN_RING_STEP){
+export function motoSpawnSpot(near:Position,yaw:number,others:readonly Pick<MotoBody,'x'|'z'|'model'>[],avoid:ReadonlyArray<{x:number;z:number;radius:number}>=[],model?:string):{x:number;y:number;z:number;yaw:number;pitch:number}|undefined {
+  const spec=vehiclePhysics(model),reach=spec.HALF_LENGTH+Math.abs(spec.CENTRE_Z)+.1;
+  for(let ring=spec.HALF_LENGTH+.8;ring<=SPAWN_LAST_RING;ring+=SPAWN_RING_STEP){
     for(let i=0;i<SPAWN_ANGLES;i++){
       // 0, +1, −1, +2, −2…: the nearest to straight ahead first.
       const angle=yaw+Math.ceil(i/2)*(i%2?1:-1)*Math.PI*2/SPAWN_ANGLES,x=near.x+Math.sin(angle)*ring,z=near.z+Math.cos(angle)*ring;
-      if(others.some(other=>Math.hypot(other.x-x,other.z-z)<SPAWN_GAP)||avoid.some(zone=>Math.hypot(zone.x-x,zone.z-z)<zone.radius))continue;
+      if(others.some(other=>Math.hypot(other.x-x,other.z-z)<spec.HALF_LENGTH+vehiclePhysics(other.model).HALF_LENGTH+.4)||avoid.some(zone=>Math.hypot(zone.x-x,zone.z-z)<zone.radius))continue;
       const solids=solidsBetween(x-reach,z-reach,x+reach,z+reach);
       for(const heading of [yaw,yaw+Math.PI/2,yaw-Math.PI/2,yaw+Math.PI])for(const reference of [near.y??0,0]){
-        const floor=ground(x,z,heading,reference);
-        if(floor&&clearStreet(x,z,heading,floor.y)&&!overlaps(x,z,heading,floor.y,solids))return {x,y:floor.y,z,yaw:heading,pitch:floor.pitch};
+        const floor=ground(x,z,heading,reference,spec);
+        if(floor&&clearStreet(x,z,heading,floor.y,spec)&&!overlaps(x,z,heading,floor.y,solids,spec))return {x,y:floor.y,z,yaw:heading,pitch:floor.pitch};
       }
     }
   }
 }
 
 /** Metres from a point to the hull, seen from above (0 inside it). */
-function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'>,position:Position):number {
+function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position):number {
+  const spec=vehiclePhysics(moto.model);
   const s=Math.sin(moto.yaw),c=Math.cos(moto.yaw),dx=position.x-moto.x,dz=position.z-moto.z;
-  const side=Math.abs(dx*c-dz*s)-MOTO.HALF_WIDTH,along=Math.abs(dx*s+dz*c-MOTO.CENTRE_Z)-MOTO.HALF_LENGTH;
+  const side=Math.abs(dx*c-dz*s)-spec.HALF_WIDTH,along=Math.abs(dx*s+dz*c-spec.CENTRE_Z)-spec.HALF_LENGTH;
   return Math.hypot(Math.max(0,side),Math.max(0,along));
 }
 /** Close enough to get on (the server allows `slack` more for latency), on its floor, on its wheels, nobody riding it. */
 export function canMountMoto(moto:MotoState,position:Position,slack=0,who?:string):boolean {
-  return !moto.riderId&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=MOTO.REACH+slack;
+  return (moto.model===CAR_MODEL?vehicleOccupants(moto).filter(Boolean).length<CAR.SEATS&&Math.abs(moto.speed)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
 }
 /** Close enough to work on it, standing or lying, and nobody on it, nobody lifting it, and it is not moving. */
 export function canRepairMoto(moto:MotoState,position:Position,slack=0):boolean {
-  return !moto.riderId&&!moto.lifterId&&(moto.phase===''||moto.phase==='down')&&!moto.speed&&Math.abs((position.y??moto.y)-moto.y)<.7&&hullGap(moto,position)<=MOTO.REACH+.6+slack;
+  return !vehicleOccupants(moto).some(Boolean)&&!moto.lifterId&&(moto.phase===''||moto.phase==='down')&&!moto.speed&&Math.abs((position.y??moto.y)-moto.y)<.7&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+.6+slack;
 }
 /** Close enough to lift it (a bit more than to get on: it is lying down, and only just landed there). */
 export function canLiftMoto(moto:MotoState,position:Position,slack=0):boolean {
@@ -245,15 +259,22 @@ export function nearestFallenMoto(position:Position,motos:readonly MotoState[]):
   return motos.filter(moto=>canLiftMoto(moto,position)).sort((a,b)=>hullGap(a,position)-hullGap(b,position))[0];
 }
 /** A body on foot in the bike's way: the hull and the body's own width, on its floor. */
-export function motoStrikes(moto:Pick<MotoBody,'x'|'y'|'z'|'yaw'>,position:Position):boolean {
+export function motoStrikes(moto:Pick<MotoBody,'x'|'y'|'z'|'yaw'|'model'>,position:Position):boolean {
   return Math.abs((position.y??moto.y)-moto.y)<.6&&hullGap(moto,position)<=.22;
 }
 export function nearestFreeMoto(position:Position,motos:readonly MotoState[],who?:string):MotoState|undefined {
   return motos.filter(moto=>canMountMoto(moto,position,0,who)).sort((a,b)=>hullGap(a,position)-hullGap(b,position))[0];
 }
 /** Where the rider stands getting off: on the left (+X of the bike), or else whichever side has room. */
-export function motoDismountSpot(moto:MotoBody):Required<Position> {
+export function motoDismountSpot(moto:MotoBody,seat=0):Required<Position> {
   const s=Math.sin(moto.yaw),c=Math.cos(moto.yaw);
+  if(moto.model===CAR_MODEL){
+    const side=seat===1||seat===3?-1:1;
+    for(const sign of [side,-side])for(const back of [seat>=2?-.8:.15,-1.3,1.3]){
+      const lx=sign*1.25,x=moto.x+c*lx+s*back,z=moto.z-s*lx+c*back,y=floorHeight(x,z,moto.y);
+      if(y!==undefined&&isWalkable(x,z,y)&&hullGap(moto,{x,z})>.3)return {x,y,z};
+    }
+  }
   for(const [lx,lz] of [[1,0],[-1,0],[1,.8],[1,-.8],[-1,.8],[-1,-.8],[0,-1.5],[0,1.4]] as const){
     const x=moto.x+c*lx+s*lz,z=moto.z-s*lx+c*lz,y=floorHeight(x,z,moto.y);
     if(y!==undefined&&isWalkable(x,z,y))return {x,y,z};

@@ -1,6 +1,16 @@
 # Highfood e HighMotors
 
-O emprego de entregador. O jogador compra a moto no celular, tira ela da [garagem](garagem.md), fica online pelo app ou na base ao lado do bar, recebe pedidos no app, retira o pedido no ponto de retirada mais perto com um código de 4 dígitos, pilota seguindo o GPS e entrega na mão de um cliente que espera na calçada. Cada entrega paga moedas.
+O emprego de entregador. O jogador usa uma moto própria ou o [cavalo do Tião](cavalo.md), fica online pelo app ou na base ao lado do bar, recebe pedidos no app, retira o pedido no ponto de retirada mais perto com um código de 4 dígitos, segue o GPS e entrega na mão de um cliente que espera na calçada. Cada entrega paga moedas.
+
+## Entregas a cavalo
+
+Equipe **Tião** e compre a habilidade **Cavalo** na coleção (C). O Highfood libera **Ficar online** no app e na base sem exigir moto ou garagem. Os pedidos chegam também enquanto Tião está a pé, permitindo desmontar para usar o armário e falar com o cliente.
+
+Use a tecla da habilidade (padrão **X**) para montar. Retire o pedido a pé, com o código no armário. Ao montar com a sacola, ela vai para a mochila do Highfood, que acompanha Tião na sela e aparece para os outros jogadores. **Shift + WASD** galopa a 9 m/s; o minimapa se afasta para mostrar a rota.
+
+Ao desmontar com **E** ou com a tecla da habilidade a até 35 m do cliente, Tião pega a sacola da mochila em 2 s. Se desmontar mais longe, ela continua guardada: ao chegar perto do endereço a pé, **E** pega a sacola. Montar de novo a guarda novamente. Com a sacola na mão, aproxime-se do cliente e use **E** para entregar.
+
+Prazo, pagamento, avaliação, cancelamento e limite diário seguem as mesmas regras. O estado do baú de uma moto guardada ou estacionada não penaliza pedidos transportados no cavalo. É possível trocar entre cavalo e moto durante a entrega; a sacola acompanha o transporte usado. Sem moto própria, trocar de personagem ou perder a habilidade Cavalo encerra o turno e registra um pedido em andamento como perdido.
 
 ## Do começo ao fim
 
@@ -153,6 +163,8 @@ Se a API estiver fora do ar, o saco já mudou de mão e o pagamento fica guardad
 | `tests/integration/highfood.test.ts` | Os 23 pontos de retirada conferidos com `pontos_ifood.json` (lugar em pé na tela, moto na rua, caminho a pé livre), a escolha do mais perto, rotas de qualquer ponto, a moto cabendo ao longo de 97% ou mais das rotas, grade conferida com o mapa, pontos de entrega válidos, cálculo do pagamento, a conta do dia e da moto, desgaste, clientes |
 | `apps/api/test/highfood.test.ts` | A mesma compra uma vez, sem moedas, pagamento uma vez, histórico, meio preço depois de 20, teto exato, clientes, foto em uso, dar a moto |
 | `apps/server/test/highfood.integration.test.ts` | Tempos do turno, ofertas ignoradas, desistência e, por WebSockets reais, o turno inteiro: online pelo app, longe da base e sem pedidos com a moto guardada, garagem, moto trancada, oferta, tela do ponto (longe, atrás do armário, código errado, sair, código certo), baú, diálogo, pagamento, cliente indo embora, cancelar, guincho |
+| `apps/server/test/highfood-horse.integration.test.ts` | Turno sem moto, compra da habilidade em jogo, app/base, sincronização de inventário, retirada, mochila ao montar, retirada manual e automática ao desmontar, remontar, entrega paga uma vez, cancelamento e perda de acesso |
+| `tests/e2e/horse.spec.ts` | App Highfood sem moto, turno replicado e mochila acompanhando Tião na sela em diferentes direções |
 | `tests/e2e/highfood.spec.ts` | Navegador e teclado de verdade: comprar, marcar destino no mapa, retirar da garagem, ficar online pelo app, vibração sem aviso na tela, aceitar, GPS até o ponto, tela com código errado e certo, celular por cima da tela, pilotar pela linha, baú, diálogo, receber, abas do app, foto do cliente na administração. As imagens vão para `test-results/highfood` |
 
 ## Limitações

@@ -1,6 +1,8 @@
 import * as pc from 'playcanvas';
-import {CITY_FAR_CLIP,cityFog} from '@bar/shared';
+import {CITY_FAR_CLIP,cityFog,lightningAt,weatherAt,type EnvironmentState} from '@bar/shared';
 import {daylightAt,type Rgb} from './day-night';
+import {WeatherEffects} from './weather-effects';
+import {WeatherSounds} from './weather-sound';
 
 interface Lamp {entity:pc.Entity;base:number;outside:boolean;street:boolean;enabled:boolean;shadow:boolean;reach:number;}
 interface Glow {material:pc.StandardMaterial;base:number;outside:boolean;}
@@ -56,7 +58,9 @@ varying vec3 skyDirection;void main(){skyDirection=aPosition;gl_Position=matrix_
 const skyFragment=`precision highp float;
 varying vec3 skyDirection;uniform vec3 skyTop;uniform vec3 skyHorizon;uniform vec3 sunDirection;uniform vec3 moonDirection;
 uniform vec3 sunColor;uniform float sunVisible;uniform float moonVisible;uniform float night;uniform float barSkyExposure;
+uniform float cloudCover;uniform float cloudTime;uniform float stormStrength;uniform float lightning;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 void main(){
  vec3 direction=normalize(skyDirection);
  vec3 result=mix(skyHorizon,skyTop,smoothstep(0.0,.75,max(0.0,direction.y)));
@@ -65,7 +69,15 @@ void main(){
  result+=vec3(.63,.70,.82)*smoothstep(.99965,.99985,moonDot)*moonVisible;
  vec2 starGrid=vec2(atan(direction.z,direction.x)*100.0,asin(direction.y)*100.0);
  float star=step(.994,hash(floor(starGrid)))*(1.0-smoothstep(.02,.18,length(fract(starGrid)-.5)));
- result+=vec3(star*night*.38*smoothstep(.08,.45,direction.y));
+ result+=vec3(star*night*.38*smoothstep(.08,.45,direction.y))*(1.-cloudCover);
+ if(cloudCover>.001&&direction.y>0.){
+   vec2 p=direction.xz/(direction.y+.25)*3.+vec2(cloudTime,cloudTime*.31);
+   float n=noise(p)*.6+noise(p*2.3)*.28+noise(p*5.1)*.12;
+   float cloud=smoothstep(.75-cloudCover*.55,1.-cloudCover*.45,n)*smoothstep(0.,.15,direction.y);
+   vec3 shade=mix(vec3(.67,.7,.73),vec3(.16,.2,.26),stormStrength)*mix(1.,.16,night);
+   result=mix(result,shade*(.7+n*.3),cloud*cloudCover);
+ }
+ result+=vec3(.52,.6,.78)*lightning*.7;
  gl_FragColor=vec4(pow(pow(max(result,vec3(0.0)),vec3(2.2))*barSkyExposure,vec3(1.0/2.2)),1.0);
 }`;
 /** The engine's local shadow renderer: its culling decides who is drawn into each lamp's map (see watchShadowCulling). */
@@ -74,6 +86,11 @@ interface EngineCuller {processingMeshInstances:Set<pc.MeshInstance>}
 
 /** Natural lighting stays separate from the electrical circuit affected by events. */
 export class EnvironmentLighting {
+  private settings?:EnvironmentState;
+  private weather=weatherAt(Date.now());
+  private flash=0;
+  private readonly rain:WeatherEffects;
+  private readonly sounds:WeatherSounds;
   private lamps:Lamp[]=[];
   private glows:Glow[]=[];
   private signs:Sign[]=[];
@@ -111,7 +128,8 @@ export class EnvironmentLighting {
   private localRenderer?:LocalShadowRenderer;
   private localCull?:LocalShadowRenderer['cull'];
   private onCullEnd=()=>this.updateShadowSkins();
-  constructor(private app:pc.Application,private camera:pc.Entity){
+  constructor(private app:pc.Application,private camera:pc.Entity,volume:()=>number=()=>0){
+    this.rain=new WeatherEffects(app,camera);this.sounds=new WeatherSounds(volume);
     app.scene.fog.type=pc.FOG_LINEAR;
     const lighting=app.scene.lighting;
     lighting.atlasSplit=[ATLAS_SPLIT];lighting.cells=new pc.Vec3(14,4,14);
@@ -249,7 +267,16 @@ export class EnvironmentLighting {
     this.update(Date.now(),0,'');
   }
   update(serverTime:number,dt:number,event:string):void {
-    const state=this.sampled=daylightAt(serverTime),nowNight=state.night;
+    const state=this.sampled=daylightAt(serverTime,this.settings),weather=this.weather=weatherAt(serverTime,this.settings);
+    const flash=this.flash=lightningAt(serverTime,weather).flash;
+    const nowNight=state.night+(1-state.night)*weather.cloud*.35;
+    const tint=(color:Rgb,shade:Rgb,strength:number):Rgb=>color.map((v,i)=>v+(shade[i]!-v)*strength) as Rgb;
+    const skyShade=1-state.night*.82;
+    state.top=tint(state.top,[.13*skyShade,.17*skyShade,.23*skyShade],weather.cloud*.8);
+    state.horizon=tint(state.horizon,[.25*skyShade,.29*skyShade,.34*skyShade],weather.cloud*.75);
+    state.sunIntensity*=1-weather.cloud*.88;
+    state.moonIntensity*=1-weather.cloud*.7;
+    state.ambient=state.ambient.map(v=>v*(1-weather.cloud*.28-weather.storm*.12)+flash*.14) as Rgb;
     const blend=dt===0?1:1-Math.exp(-Math.min(dt,.1)*4);
     this.electrical+=((event==='BLACKOUT'?0:event==='PARTY'?.75:1)-this.electrical)*blend;
     this.party+=((event==='PARTY'?1:0)-this.party)*blend;
@@ -262,19 +289,23 @@ export class EnvironmentLighting {
       this.direction.set(-direction[0],-direction[1],-direction[2]);
       entity.setRotation(this.rotation.setFromDirections(pc.Vec3.DOWN,this.direction));
     };
-    orient(this.sun,state.sunDirection,state.sunIntensity);orient(this.moon,state.moonDirection,state.moonIntensity);
+    orient(this.sun,state.sunDirection,state.sunIntensity+flash*(1-state.night)*.55);orient(this.moon,state.moonDirection,state.moonIntensity+flash*state.night*.55);
     if(this.sun?.light)this.sun.light.color.set(...state.sunColor);
     const ambient=this.app.scene.ambientLight;
     ambient.set(state.ambient[0]*(1-this.party*.08),state.ambient[1]*(1-this.party*.16),state.ambient[2]);
     this.app.scene.exposure=state.exposure;
     const fog=cityFog(state.night);
-    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=fog.start*this.fogScale;this.app.scene.fog.end=fog.end*this.fogScale;
+    const visibility=1-weather.rain*.28-weather.storm*.25;
+    this.app.scene.fog.color.set(...state.horizon);this.app.scene.fog.start=fog.start*this.fogScale*visibility;this.app.scene.fog.end=fog.end*this.fogScale*visibility;
     this.camera.camera!.clearColor.set(...state.horizon,1);
     this.skirtMaterial.emissive.set(...state.horizon);this.skirtMaterial.update();
     const eye=this.camera.getPosition();
     this.sky.setPosition(eye);
     for(const [name,value] of Object.entries({skyTop:state.top,skyHorizon:state.horizon,sunDirection:state.sunDirection,moonDirection:state.moonDirection,sunColor:state.sunColor,
-      sunVisible:state.sunIntensity/1.15,moonVisible:state.moonIntensity/.18,night:nowNight,barSkyExposure:state.exposure}))this.skyMaterial.setParameter(name,value);
+      sunVisible:state.sunIntensity/1.15,moonVisible:state.moonIntensity/.18,night:state.night,barSkyExposure:state.exposure,
+      cloudCover:weather.cloud,cloudTime:(serverTime%3_600_000)/1000*.012*(.2+weather.wind),stormStrength:weather.storm,lightning:flash}))this.skyMaterial.setParameter(name,value);
+    const sheltered=this.rain.update(serverTime,weather,this.daylight);
+    this.sounds.update(serverTime,weather,sheltered);
     for(const lamp of this.lamps){
       const intensity=lamp.base*(lamp.outside?nowNight:.68+nowNight*.32)*this.electrical;
       const enabled=intensity>.015,light=lamp.entity.light!;
@@ -300,7 +331,8 @@ export class EnvironmentLighting {
     }
     // The panorama is painted in daylight and draws over the sky near the horizon: it takes the colour of the hour.
     if(this.panorama){
-      const day=1-nowNight,tint=state.horizon.map(channel=>Math.min(1,channel*1.15)*nowNight+day) as Rgb,key=tint.map(channel=>channel.toFixed(2)).join();
+      const day=1-state.night,weatherShade=1-weather.cloud*.42-weather.storm*.18;
+      const tint=state.horizon.map(channel=>(Math.min(1,channel*1.15)*state.night+day)*weatherShade+flash*.25) as Rgb,key=tint.map(channel=>channel.toFixed(2)).join();
       if(key!==this.panoramaTint){this.panoramaTint=key;this.panorama.emissive.set(...tint);this.panorama.update();}
     }
     if(this.signLight){
@@ -406,6 +438,7 @@ export class EnvironmentLighting {
    * the lamps keep a small cached map, without which the upper floor would light the ground floor through the slab.
    */
   setQuality(shadows:'off'|'low'|'medium'|'high'|'ultra',fogScale:number):void {
+    this.rain.setQuality(shadows);
     this.fogScale=fogScale;
     // Resolution, cascades and reach of the sun's map: a shorter reach draws fewer things into it and sharpens what it keeps.
     const sky=({off:[0,1,55],low:[1024,1,30],medium:[2048,2,45],high:[2048,2,55],ultra:[4096,3,55]} as const)[shadows];
@@ -423,15 +456,18 @@ export class EnvironmentLighting {
   }
   private fogScale=1;
   private quality:'off'|'low'|'medium'|'high'|'ultra'='high';
+  setState(state?:EnvironmentState):void {this.settings=state;}
+  setActive(active:boolean):void {this.sounds.setActive(active);}
   addPartyShadows(lights:pc.Entity[]):void {for(const entity of lights)if(entity.light){entity.light.shadowUpdateMode=pc.SHADOWUPDATE_THISFRAME;this.shadowLights.push(entity.light);}}
   get partyStrength():number{return this.party;}
   /** The bar's power: 1 normally, 0 in a blackout (the lamps, the signs, what glows). */
   get power():number{return this.electrical;}
+  get rainStrength():number{return this.weather.rain;}
   /** How much the sun lights the open air now: 0 at night, 1 in full daylight. */
   get daylight():number{return Math.min(1,Math.max(0,this.sampled.sunIntensity/.6));}
   telemetry(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled&&entity.light.intensity>.001,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;
-    return {...this.sampled,electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
+    return {...this.sampled,weather:{...this.weather,mode:this.settings?.weather??'clear',flash:this.flash,...this.rain.telemetry(),sound:this.sounds.telemetry()},electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
       lamps:this.lamps.map(lamp=>({name:lamp.entity.name,position:lamp.entity.getPosition().toArray(),outside:lamp.outside,street:lamp.street,enabled:lamp.entity.light!.enabled,intensity:lamp.entity.light!.intensity,shadows:lamp.entity.light!.castShadows,live:this.live.has(lamp.entity.light!),direction:lamp.entity.up.clone().mulScalar(-1).toArray()})),
       cityLights:[...this.cityLights].map(light=>({name:light.entity.parent?.name??'',enabled:light.enabled,intensity:+light.intensity.toFixed(3),shadows:light.castShadows})),
       facade:{materials:this.signs.map(sign=>({name:sign.material.name,emissive:sign.material.emissive.toString(false),intensity:+sign.material.emissiveIntensity.toFixed(3)})),
@@ -440,6 +476,7 @@ export class EnvironmentLighting {
       realtimeLocalShadows:this.shadowLights.filter(light=>light.enabled&&light.shadowUpdateMode===pc.SHADOWUPDATE_REALTIME).length};
   }
   destroy():void {
+    this.rain.destroy();this.sounds.destroy();
     if(this.localRenderer&&this.localCull)this.localRenderer.cull=this.localCull;
     this.app.scene.off('cull:end',this.onCullEnd);
     for(const lamp of this.lamps)if(lamp.street)lamp.entity.destroy();

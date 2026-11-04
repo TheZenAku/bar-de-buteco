@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {previewPath} from './preview-path';
 import {wearCard} from './collection-helpers';
+import {aimCamera} from './camera-helpers';
 
 interface CameraState {mode:'first'|'third';distance:number;reach:number;boom:number;yaw:number;pitch:number;position:number[]}
 const camera=(page:Page):Promise<CameraState>=>page.evaluate(()=>(window as any).barDebug.camera());
@@ -28,24 +29,19 @@ test('only the head follows the camera, the body still follows travel, and the u
     const drawn=debug.animations().find((actor:{id:string})=>actor.id===localId);
     return {x:self.x,z:self.z,body:self.rotation,headYaw:self.headYaw,headPitch:self.headPitch,drawn};
   });
-  const aim=async(yaw:number,pitch:number)=>{
-    const point=await page.evaluate(()=>{
-      for(const x of [.5,.65,.8])for(const y of [.45,.6,.75])if(document.elementFromPoint(innerWidth*x,innerHeight*y)?.id==='world')return {x:innerWidth*x,y:innerHeight*y};
-      throw new Error('No unobscured canvas point for the camera drag');
-    });
-    const before=await camera(page);
-    await page.mouse.move(point.x,point.y);await page.mouse.down();
-    await page.locator('#world').dispatchEvent('pointermove',{movementX:(before.yaw-yaw)/.006,movementY:(pitch-before.pitch)/.004,buttons:1,pointerId:1,pointerType:'mouse'});
-    await page.mouse.up();
-    await expect.poll(async()=>Math.abs((await camera(page)).yaw-yaw)).toBeLessThan(.01);
-    await expect.poll(async()=>Math.abs((await camera(page)).pitch-pitch)).toBeLessThan(.01);
-  };
+  const aim=(yaw:number,pitch:number)=>aimCamera(page,yaw,pitch);
+  // Walking inputs can still be awaiting the room after a released key. Check stationary poses only after its stop.
+  const stopped=()=>expect.poll(()=>page.evaluate(()=>{
+    const debug=(window as any).barDebug,{world,localId}=debug.snapshot();
+    return world.players[localId].animationState==='idle'&&debug.network().pending===0;
+  })).toBe(true);
   try{
     for(const skin of ['nathan','tiao']){
       if(skin==='tiao')await wearCard(page,skin);
       await expect.poll(async()=>(await state()).drawn?.skin).toBe(skin);
       for(const mode of ['third','first'] as const){
         if((await camera(page)).mode!==mode)await page.keyboard.press('q');
+        await stopped();
         const start=await state(),yaw=start.body-Math.PI;
         await aim(yaw+.5,.3);
         await expect.poll(async()=>{const s=await state();return Math.max(Math.abs(s.headYaw-.5),Math.abs(s.headPitch-.3),Math.abs(s.drawn.look.yaw-.5),Math.abs(s.drawn.look.pitch-.3));}).toBeLessThan(.03);
@@ -54,12 +50,23 @@ test('only the head follows the camera, the body still follows travel, and the u
         expect(Math.abs(looked.drawn.facing-start.body)).toBeLessThan(.01);
         await aim(yaw-.5,-.3);
         await expect.poll(async()=>{const s=await state();return Math.max(Math.abs(s.headYaw+.5),Math.abs(s.headPitch+.3),Math.abs(s.drawn.look.yaw+.5),Math.abs(s.drawn.look.pitch+.3));}).toBeLessThan(.03);
-        const other=await state();expect(other.body).toBe(start.body);
+        const other=await state();
+        expect(other.body).toBe(start.body);expect(other.x).toBe(start.x);expect(other.z).toBe(start.z);
+        expect(Math.abs(other.drawn.facing-start.body)).toBeLessThan(.01);
         const dot=other.drawn.look.bone.reduce((sum:number,value:number,i:number)=>sum+value*looked.drawn.look.bone[i],0);
         expect(Math.abs(dot),'The actual head bone changed, rather than only telemetry').toBeLessThan(.98);
+        // Multiple complete camera turns must never rotate or move the body, in either view.
+        for(const turns of [-1,2]){
+          await aim(yaw+.5+turns*2*Math.PI,.3);
+          await expect.poll(async()=>{const s=await state();return Math.max(Math.abs(s.headYaw-.5),Math.abs(s.drawn.look.yaw-.5));}).toBeLessThan(.03);
+          const turned=await state();
+          expect(turned.body).toBe(start.body);expect(turned.x).toBe(start.x);expect(turned.z).toBe(start.z);
+          expect(Math.abs(turned.drawn.facing-start.body)).toBeLessThan(.01);
+        }
       }
       const yaw=(await camera(page)).yaw;
       await page.keyboard.press('d',{delay:250});
+      await stopped();
       await expect.poll(async()=>{const body=(await state()).body;return Math.abs(Math.atan2(Math.sin(body-(Math.PI/2+yaw)),Math.cos(body-(Math.PI/2+yaw))));}).toBeLessThan(.03);
       if((await camera(page)).mode!=='third')await page.keyboard.press('q');
     }

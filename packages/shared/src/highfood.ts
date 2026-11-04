@@ -4,7 +4,7 @@ import type {PriceTable} from './prices.js';
 import {priceOf} from './prices.js';
 
 /**
- * Highfood (docs/sistemas/highfood.md): deliveries on a bike the player bought. The room runs the shift and the order
+ * Highfood (docs/sistemas/highfood.md): deliveries on an owned bike or Tião's purchased horse. The room runs the shift and the order
  * (apps/server/src/world/highfood.ts), the API keeps the money, the history and the customers' profiles (apps/api/src/highfood-service.ts).
  */
 export const HIGHFOOD={
@@ -151,12 +151,14 @@ export interface HighfoodOrderView {
   expiresAt:number;promiseAt:number;
   /** The rider crashed this many times carrying it. */
   crashes:number;
-  /** pickup: on the way to the locker; collect: the bag is coming out of it; going: on the way, the bag in the box; unload: it is coming out of the box; carrying: in hand. */
+  /** Where the bag travels. Older orders without this field use the bike's box. */
+  transport?:'moto'|'horse';
+  /** pickup: heading to the locker; collect: collecting; going: stored in the box or backpack; unload: taking it out; carrying: in hand. */
   stage:'pickup'|'collect'|'going'|'unload'|'carrying';
 }
 export type HighfoodStatus='off'|'waiting'|'offer'|'order';
 /** What the room tells its courier, whenever it changes. */
-export interface HighfoodState {status:HighfoodStatus;since:number;offer?:HighfoodOrderView;order?:HighfoodOrderView;done:number;earned:number;nextAt?:number}
+export interface HighfoodState {status:HighfoodStatus;since:number;offer?:HighfoodOrderView;order?:HighfoodOrderView;done:number;earned:number;nextAt?:number;horseAvailable?:boolean}
 /** The pickup point's screen is open for this order. */
 export interface HighfoodLockerView {orderId:string}
 /** The dialog when handing over. */
@@ -186,6 +188,7 @@ export interface HighfoodView {
 }
 /** What HighMotors shows: the model for sale and the vehicles whose key this player holds. */
 export interface VehicleView {
+  models?:import('./vehicle-models.js').VehicleOffer[];
   model:string;name:string;price:number;tow:number;owned:boolean;limit:number;vehicles:OwnedVehicle[];
 }
 

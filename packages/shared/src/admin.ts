@@ -189,6 +189,9 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_media_off:d=>({title:'Administração: aparelho desligado',detail:text(d.id)}),
   media_refused:d=>({title:'Vídeo pulado: a plataforma não deixou tocar',detail:`${text(d.id)} · ${text(d.videoId)}${d.refunded?' · moedas devolvidas':''}`}),
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
+  admin_environment:d=>({title:'Administração: tempo e clima',detail:d.reset?'Ciclo padrão restaurado':[
+    d.hour!==undefined?`hora ${text(d.hour)}`:'',d.dayMinutes!==undefined?`dia de ${text(d.dayMinutes)} min`:'',
+    d.paused!==undefined?(d.paused?'relógio pausado':'relógio em andamento'):'',d.weather?`clima ${text(d.weather)}`:''].filter(Boolean).join(' · ')}),
   admin_moto_spawn:d=>({title:'Administração: moto spawnada',detail:`${text(d.id)} em ${text(d.x)}, ${text(d.z)}`}),
   admin_moto_despawn:d=>({title:'Administração: moto despawnada',detail:text(d.ids)}),
   highfood_online:()=>({title:'Ficou online no Highfood',detail:''}),
