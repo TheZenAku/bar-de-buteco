@@ -11,9 +11,9 @@ import {BarRoom} from '../src/BarRoom.js';
 
 async function until(check:()=>boolean,ms=5000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(resolve=>setTimeout(resolve,20));}}
 
-test('room keeps inventory private, removes through the API and applies an item only after its action', {timeout:20000},async()=>{
+test('room keeps inventory private and applies full effects at the start, never again on completion or interruption', {timeout:20000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
-  let stacks:InventoryStack[]=[{itemId:'coxinha',quantity:1},{itemId:'agua',quantity:2}],inventoryCalls=0;
+  let stacks:InventoryStack[]=[{itemId:'coxinha',quantity:1},{itemId:'agua',quantity:2},{itemId:'curativo',quantity:1}],inventoryCalls=0;
   const api=createServer(async(req,res)=>{
     let raw='';for await(const chunk of req)raw+=chunk;
     const body=raw?JSON.parse(raw):{};
@@ -42,21 +42,39 @@ test('room keeps inventory private, removes through the API and applies an item 
     assert.deepEqual(states.at(-1).stacks,stacks);assert.equal(states.at(-1).capacity,INVENTORY_CAPACITY);
     assert.equal('inventory' in room.state,false,'private inventory must not be exposed in the room schema');
 
-    const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=100;needs.hungerCore=10;
+    const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=100;needs.hungerCore=10;needs.hpCore=10;needs.staminaCore=10;
     // A snack goes into the hand: had over the same time as at a table, the player free to move meanwhile.
     room.send('inventory.use',{itemId:'coxinha'});
     await until(()=>inventoryCalls===1&&player.holding==='coxinha');
     assert.equal(player.interactionState,'');assert.equal(player.holdingUntil-player.holdingSince,consumeMs('coxinha'));
     await until(()=>results.some(result=>result.action==='use'),4000);
-    assert.ok(needs.hungerCore<12,'its effects come in as it goes');
+    assert.ok(needs.hungerCore>44&&needs.hungerCore<=45,'all hunger points apply at the start');
+    assert.equal(needs.hpCore,15,'the heart reserve fills immediately');assert.equal(needs.staminaCore,30);
+    await until(()=>room!.state.players.get(player.id)?.hpCore===15);
     player.holdingUntil=Date.now();await until(()=>player.holding==='');
-    await until(()=>needs.intake.hunger===0,8000);assert.ok(needs.hungerCore>=44&&needs.hungerCore<=46,`all of it once finished, into the core: ${needs.hungerCore}`);
+    assert.ok(needs.hungerCore>44&&needs.hungerCore<=45,'finishing must not apply it twice');assert.equal(needs.hpCore,15);
     assert.equal(states.at(-1).stacks.some((stack:any)=>stack.itemId==='coxinha'),false);
 
     room.send('inventory.use',{itemId:'coxinha'});await until(()=>errors.some(error=>error.toLowerCase().includes('mochila')));
     assert.equal(inventoryCalls,1,'an absent item is rejected before reaching the API');
     room.send('inventory.discard',{itemId:'agua',quantity:1});await until(()=>results.some(result=>result.action==='discard'));
-    assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1}]);
+    assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1},{itemId:'curativo',quantity:1}]);
+
+    needs.thirstCore=10;needs.bladder=0;
+    room.send('inventory.use',{itemId:'agua'});await until(()=>player.holding==='agua');
+    assert.ok(needs.thirstCore>41&&needs.thirstCore<=42,'the whole drink applies immediately');assert.equal(needs.bladder,14);
+    (authoritative as any).dropHolding(player);
+    assert.equal(needs.bladder,14,'dropping the drink does not apply or reverse its effects');
+    // Respect the room's three inventory-use commands per second, including the rejected snack request.
+    await new Promise(resolve=>setTimeout(resolve,1000));
+    needs.hpCore=10;
+    room.send('inventory.use',{itemId:'curativo'});await until(()=>player.animationState==='use');
+    assert.equal(needs.hpCore,38,'a bandage also fills the heart before its animation ends');
+    const presence=(authoritative as any).sessions.getByUser(player.id);
+    (authoritative as any).consumePart(player,presence,Date.now());
+    assert.equal(needs.hpCore,38,'interruption does not grant another dose');
+    presence.interactionEndsAt=Date.now();await until(()=>player.interactionState==='');
+    assert.equal(needs.hpCore,38,'completion does not grant another dose');assert.equal(inventoryCalls,4);
 
     // The house's shop opens only for someone standing on its blip: the room checks the reach.
     const opened:unknown[]=[];room.onMessage('shop.open',message=>opened.push(message));

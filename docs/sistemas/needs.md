@@ -59,7 +59,7 @@ Todos os efeitos passam por uma única função, `applyConsumable(state, effects
 
 O catálogo `CONSUMABLES` é derivado do catálogo real do inventário e inclui água, refrigerante, café, long neck, copo de chopp, coxinha, pastel, torresmo e curativo. A cerveja hidrata pouco e de forma explícita: álcool não é tratado como água. Nomes, efeitos, preços e limites ficam em `packages/shared/src/inventory.ts`.
 
-A bebida conta ao terminar o gole. Se a pessoa levanta no meio, conta a fração já bebida. Desmaiado ou cambaleando, não é possível consumir.
+Comida, bebida e curativo aplicam todos os ganhos e perdas de uma vez no início do consumo. Isso vale para a mochila, para a bebida recebida no balcão e para cada item que chega à mesa enquanto a pessoa está sentada. Terminar ou interromper a animação não reaplica nem reduz o efeito. Desmaiado ou cambaleando, não é possível consumir.
 
 ## Como ajustar
 
@@ -72,7 +72,7 @@ Todos os valores ficam no objeto `NEEDS`, em `packages/shared/src/needs.ts`, que
 
 ## Inventário
 
-O inventário principal é persistido pela API e integrado em `BarRoom`. Uso, descarte e perda removem a unidade em transação antes de atualizar a cópia privada da sala. Ao terminar a animação, `room.needs.consume(player, itemId, Date.now())` aplica o efeito. Veja [inventário](inventory.md).
+O inventário principal é persistido pela API e integrado em `BarRoom`. Uso, descarte e perda removem a unidade em transação antes de atualizar a cópia privada da sala. Após a remoção confirmada pela API, `room.needs.consume(player, itemId, Date.now())` aplica o efeito completo ao iniciar o uso. Veja [inventário](inventory.md).
 
 `InventoryPort`, em `apps/server/src/world/needs.ts`, permanece como um adaptador síncrono pequeno para simulações e modos alternativos:
 
@@ -98,7 +98,7 @@ interface InventoryPort {
 - `tests/integration/needs.test.ts`: regras puras dos itens 1 a 11 do pedido, além de limites, NaN e valores absurdos.
 - `apps/server/test/needs.integration.test.ts`: sala Colyseus real com dois clientes. Cobre:
   - corrida e exaustão;
-  - cerveja pela metade;
+  - cerveja com efeitos completos no início e sem duplicação no fim;
   - banheiro ocupado e esvaziado;
   - desmaio por vida bloqueando ações e entradas;
   - porta de inventário com perda de item;
@@ -110,7 +110,7 @@ interface InventoryPort {
 Vida, fôlego, fome e sede têm **dois valores**: o **anel** (o nível: `hp`, `stamina`, `hunger`, `thirst`) e o **coração** (a reserva por trás: `hpCore`, `staminaCore`, `hungerCore`, `thirstCore`). Bexiga e embriaguez continuam como eram. Tudo em `NEEDS.cores` (packages/shared/src/needs.ts).
 
 - **O anel se enche gastando o coração.** Fome e sede caem com o tempo (o coração dura 40 min e 25 min; correndo, a sede gasta o dobro) e o anel puxa do coração a 3 pontos por segundo. O fôlego cai ao correr e volta gastando 0,05 de coração por ponto (uma barra cheia custa 5). A vida cura do coração a 1,5 por segundo.
-- **Comer enche o coração aos poucos** (8 pontos por segundo): a comida e a bebida entram em `intake` e chegam ao coração ao longo de alguns segundos. O que tira (torresmo dá sede) sai do coração na hora. O café, a coxinha, o pastel, o torresmo e o refrigerante agora também dão fôlego; o curativo e a comida dão vida ao coração, não ao anel.
+- **Comer ou beber altera as reservas imediatamente:** todos os pontos positivos e negativos do item entram de uma vez no início do consumo, sem fila de absorção nem espera pelo fim da animação. O que tira (torresmo dá sede) também sai do coração na hora. O café, a coxinha, o pastel, o torresmo e o refrigerante agora também dão fôlego; o curativo e a comida dão vida ao coração, não ao anel.
 - **Anel zerado não mata:** o dano passa para o coração (primeiro o anel, depois o coração). Fome ou sede com anel e coração em zero tiram vida aos poucos (0,25 e 0,35 por segundo, depois de 1 min de carência ao acordar). Fôlego com o coração vazio ainda volta, a 20% do ritmo, para ninguém ficar parado para sempre.
 - **Só a vida mata:** anel e coração de vida em zero = a Morte ([morte.md](morte.md)), não mais um desmaio. Ao voltar, o anel fica em 35 e o coração vazio. Só a embriaguez desmaia agora.
 - **Matar pela administração** (painel e menu de contexto) zera os dois (`NeedsDirector.kill`) e chama a Morte.

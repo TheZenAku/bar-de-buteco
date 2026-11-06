@@ -69,7 +69,7 @@ test('a full table makes room from what is finished first, never from what a sea
   assert.ok(state.has('ana-5:0'));
 });
 
-test('a seated customer has each item over its time, and what is finished or left behind waits to be collected', () => {
+test('table items apply their full effects at arrival once, while props remain until finished or left behind', () => {
   const state = new MapSchema<ServedItem>(), served = new ServedItems(state);
   const seatedNow = new Set([`ana:${seat!.id}`, `bia:${neighbour!.id}`]);
   const seated = (playerId: string, seatId: string) => seatedNow.has(`${playerId}:${seatId}`);
@@ -80,17 +80,24 @@ test('a seated customer has each item over its time, and what is finished or lef
     served.place(o, served.plan(o, seated)!, 0);
   }
   const down = SERVE_LEAD_MS + 3 * SERVE_ITEM_MS;
-  for (let now = 0; now <= down + consumeMs('coxinha'); now += 1000) served.update(now, seated, consume);
-  assert.ok(Math.abs(had.get('ana:coxinha')! - 1) < 1e-9, 'The whole coxinha, a little at a time');
-  assert.ok(had.get('ana:garrafa')! > .3 && had.get('ana:garrafa')! < 1, 'The beer lasts longer');
+  served.update(SERVE_LEAD_MS+SERVE_ITEM_MS-1,seated,consume);
+  assert.equal(had.size,0,'nothing is consumed before it reaches the table');
+  served.update(SERVE_LEAD_MS+SERVE_ITEM_MS,seated,consume);
+  assert.equal(had.get('ana:coxinha'),1,'the whole snack applies when it reaches the customer');
+  assert.equal(had.get('bia:torresmo'),1,'including the whole salty-food penalty');
+  assert.equal(had.has('ana:garrafa'),false,'the second item has not arrived yet');
+  assert.equal(state.get('ana-1:0')!.doneAt,0,'the snack remains on the table during its animation');
+  for (let now = SERVE_LEAD_MS+SERVE_ITEM_MS; now <= down + consumeMs('coxinha'); now += 1000) served.update(now, seated, consume);
+  assert.equal(had.get('ana:coxinha'),1,'the snack is not applied again');
+  assert.equal(had.get('ana:garrafa'),1,'the beer also applied in full, although it lasts longer');
   assert.ok(state.get('ana-1:0')!.doneAt > 0, 'The finished coxinha waits on the table');
   assert.equal(state.get('ana-1:1')!.doneAt, 0, 'The beer is still being had');
   assert.deepEqual(served.dirtyTables(), [7]);
 
-  // Bia gets up halfway through her torresmo: the rest is left behind, and it waits to be collected too.
+  // Bia gets up halfway through her torresmo: its effects were already applied and must not repeat.
   seatedNow.delete(`bia:${neighbour!.id}`);
   served.update(down + consumeMs('coxinha') + 1, seated, consume);
-  assert.ok(had.get('bia:torresmo')! < 1);
+  assert.equal(had.get('bia:torresmo'),1);
   assert.ok(state.get('bia-1:0')!.doneAt > 0);
 
   // Clearing the table takes everything finished; the beer Ana is still having stays.
@@ -108,6 +115,7 @@ test('a seated customer has each item over its time, and what is finished or lef
   served.update(2_000_000 + down, seated, consume);
   served.update(2_000_000 + down + LEFTOVER_MS, seated, consume);
   assert.equal(state.size, 0, 'Leftovers expire');
+  assert.equal(had.has('caio:agua'),false,'a customer who left before delivery receives no effects');
 });
 
 test('an order refunded while being put down leaves nothing behind', () => {

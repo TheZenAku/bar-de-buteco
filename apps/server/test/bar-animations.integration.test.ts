@@ -112,8 +112,8 @@ test('bar animations over real WebSockets: urinal, chair in and out, a cigarette
     b.player().holdingUntil=Date.now();
     await until(()=>b.player().animationState==='vomit');
     assert.equal(b.player().holding,'','the finished drink leaves the hand');
-    // The chopp's alcohol went in (+7), and more than that came back up.
-    assert.ok(needs.drunk<75&&needs.drunk>75-NEEDS.drunk.vomit.drunkRelief,`drunk ${needs.drunk}`);
+    // Alcohol applied when the drink entered the hand; finishing only applies sickness relief.
+    assert.ok(Math.abs(needs.drunk-(75-NEEDS.drunk.vomit.drunkRelief))<1,`drunk ${needs.drunk}`);
     assert.ok(needs.nextVomitAt>Date.now(),'Not again before the cooldown');
     await until(()=>a.chat.some(t=>t.includes('passou mal')));
     await until(()=>b.player().animationState==='idle',barClipMs('vomitar')+2000);

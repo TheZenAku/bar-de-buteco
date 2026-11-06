@@ -100,13 +100,35 @@ test('7b. hunger empty (ring and core) costs HP too; grace after waking',()=>{
   run(s,clock,10);assert.ok(Math.abs(s.hp-(100-NEEDS.hunger.damagePerSecond*10))<.05,`${s.hp}`);
 });
 
-test('7c. eating fills the core gradually, and the ring draws on it',()=>{
+test('7c. eating fills the reserves immediately, and only the ring refills over time',()=>{
   const s=createNeeds(0),clock={now:0};s.hungerCore=10;s.hunger=60;
   assert.ok(applyConsumable(s,CONSUMABLES.coxinha!,0));
-  assert.equal(s.hungerCore,10,'not at once');assert.equal(s.intake.hunger,CONSUMABLES.coxinha!.hunger);
-  run(s,clock,1);assert.ok(s.hungerCore>10+NEEDS.cores.absorbPerSecond*.5,`gradually: ${s.hungerCore}`);
-  run(s,clock,25);assert.equal(s.intake.hunger,0);assert.ok(s.hunger>=99.9,'the ring filled from it');
+  assert.equal(s.hungerCore,10+CONSUMABLES.coxinha!.hunger!,'the whole item reaches the reserve at once');
+  assert.equal(s.hunger,60,'the ring still draws on the reserve over time');
+  run(s,clock,1);assert.ok(s.hungerCore<45&&s.hunger>60,'the reserve pays for refilling the ring');
+  run(s,clock,25);assert.ok(s.hunger>=99.9,'the ring filled from it');
   const salty=createNeeds(0);applyConsumable(salty,CONSUMABLES.torresmo!,0);assert.equal(salty.thirstCore,100+CONSUMABLES.torresmo!.thirst!,'what takes away is taken from the core at once');
+});
+
+test('every consumable applies all reserve gains and losses in one operation, with no delayed refill',()=>{
+  for(const effects of Object.values(CONSUMABLES)){
+    const s=createNeeds(0);s.hpCore=s.staminaCore=s.hungerCore=s.thirstCore=40;
+    s.bladder=20;s.drunk=10;
+    assert.equal(applyConsumable(s,effects,0),true);
+    for(const key of ['hp','stamina','hunger','thirst'] as const){
+      const expected=Math.max(0,Math.min(100,40+(effects[key]??0)));
+      assert.equal(s[`${key}Core`],expected,`${effects.name}: ${key}`);
+    }
+    assert.equal(s.bladder,20+(effects.bladder??0));assert.equal(s.drunk,10+(effects.drunk??0));
+    const reserves=[s.hpCore,s.staminaCore,s.hungerCore,s.thirstCore];
+    tickNeeds(s,.5,500,{running:false,moving:false},()=>.99);
+    [s.hpCore,s.staminaCore,s.hungerCore,s.thirstCore].forEach((value,i)=>assert.ok(value<=reserves[i]!,`${effects.name}: no queued effects`));
+  }
+  const full=createNeeds(0),clock={now:0};
+  applyConsumable(full,CONSUMABLES.coxinha!,0);damage(full,10,0);run(full,clock,1);
+  assert.ok(full.hpCore<100,'food consumed at full reserve does not bank an extra refill');
+  applyConsumable(full,{name:'Strong effects',hp:1e6,stamina:-1e6,hunger:1e6,thirst:-1e6},clock.now);
+  assert.deepEqual([full.hpCore,full.staminaCore,full.hungerCore,full.thirstCore],[100,0,100,0]);
 });
 
 test('7d. the stamina core is the price of resting: with it empty the bar still comes back, slowly',()=>{
@@ -124,11 +146,10 @@ test('7e. the administration kills: ring and heart to zero, one death',()=>{
 });
 
 test('8. alcohol changes drunkenness and bladder separately; it is not water',()=>{
-  const s=createNeeds(0);s.thirst=50;
+  const s=createNeeds(0);s.thirst=50;s.thirstCore=40;
   assert.ok(applyConsumable(s,CONSUMABLES.garrafa!,0));
   assert.equal(s.drunk,CONSUMABLES.garrafa!.drunk);assert.equal(s.bladder,CONSUMABLES.garrafa!.bladder);
-  assert.equal(s.intake.thirst,CONSUMABLES.garrafa!.thirst!,'Only the thirst declared for the drink');
-  assert.ok(s.intake.thirst<20);
+  assert.equal(s.thirstCore,40+CONSUMABLES.garrafa!.thirst!,'Only the thirst declared for the drink, immediately');
   relieve(s);assert.equal(s.bladder,0);assert.equal(s.drunk,CONSUMABLES.garrafa!.drunk,'The toilet does not sober');
   // Half a drink counts half.
   const h=createNeeds(0);applyConsumable(h,CONSUMABLES.copo!,0,.5);assert.equal(h.bladder,CONSUMABLES.copo!.bladder!/2);
@@ -170,10 +191,11 @@ test('9–10. stage 4 faints once from alcohol and wakes sober enough not to fai
   assert.equal(s.hp,100,'Alcohol faint does not cost HP');
 });
 
-test('11. foods fill the cores gradually and raise the ring ceiling for a while, without corrupting HP',()=>{
+test('11. foods fill the cores immediately and raise the ring ceiling for a while, without corrupting HP',()=>{
   const s=createNeeds(0),clock={now:0};s.hungerCore=20;s.hpCore=50;
   const stew={name:'Caldo de mocotó',hunger:40,hp:10,maxHp:{amount:20,seconds:30}};
   assert.ok(applyConsumable(s,stew,0));
+  assert.equal(s.hpCore,60);assert.equal(s.hungerCore,60);assert.equal(maxHp(s,0),120);
   run(s,clock,10);assert.ok(Math.abs(s.hungerCore-60)<1,`${s.hungerCore}`);assert.ok(s.hpCore>=30,'the heart took the stew (and paid for the raised ceiling)');assert.equal(maxHp(s,clock.now),120);
   run(s,clock,31);assert.equal(maxHp(s,clock.now),100);assert.ok(s.hp<=100,'Bonus ends, HP brought down to the maximum');
   applyConsumable(s,{name:'Inválido',hp:Number.NaN,hunger:Infinity,maxHp:{amount:-5,seconds:10}},clock.now);

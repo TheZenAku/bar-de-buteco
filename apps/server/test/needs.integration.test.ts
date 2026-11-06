@@ -35,12 +35,14 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     assert.ok(tired.has('walk'));
     await until(()=>seen()?.exhausted===true);
 
-    // Beer: drunkenness and bladder change separately; half a drink in hand counts half (then it is dropped).
-    const since=Date.now()-consumeMs('garrafa')/2;
-    player.assign({holding:'garrafa',holdingSince:since,holdingUntil:since+consumeMs('garrafa')});
-    await until(()=>(seen()?.drunk??0)>0);player.assign({holding:'',holdingSince:0,holdingUntil:0});
-    assert.ok(Math.abs(needs.drunk-6)<1.5,`half a long neck: ${needs.drunk}`);
-    assert.ok(Math.abs(needs.bladder-9)<1.5,`bladder ${needs.bladder}`);
+    // Beer: the full dose reaches the synced state at the start, while the prop stays in hand.
+    (authoritative as any).startHolding(player,'garrafa',Date.now());
+    assert.equal(player.holdingUntil-player.holdingSince,consumeMs('garrafa'));
+    assert.ok(Math.abs(needs.drunk-12)<.1);assert.equal(needs.bladder,18);
+    await until(()=>(seen()?.drunk??0)>=11&&seen()?.bladder===18);
+    player.holdingUntil=Date.now();await until(()=>player.holding==='');
+    assert.ok(Math.abs(needs.drunk-12)<1,`not applied again at the end: ${needs.drunk}`);
+    assert.equal(needs.bladder,18);
     assert.equal(seen()?.bladder,Math.round(needs.bladder));
 
     // The toilet empties the bladder after its time; only one person at a time.
