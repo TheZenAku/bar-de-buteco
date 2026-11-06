@@ -392,6 +392,7 @@ test('death ragdolls settle, follow the cloud and clear on respawn on every play
     (window as any).deathWorld={players,npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:skins.length,capacity:32,serverTime:now,ragdolls};
     f.scene.setWorld((window as any).deathWorld,'');
   },skins);
+  await expect.poll(()=>page.evaluate(()=>[...(window as any).fixture.scene.actors].filter(([id,a]:any)=>a.skinId===id&&a.skin?.tracks.has('Sit')).length),{timeout:90000}).toBe(skins.length);
   const ragdolls=()=>page.evaluate(()=>(window as any).fixture.scene.getRagdolls());
   await expect.poll(async()=>(await ragdolls()).filter((r:any)=>r.asleep).length,{timeout:90000}).toBe(skins.length);
   for(const body of await ragdolls()){
