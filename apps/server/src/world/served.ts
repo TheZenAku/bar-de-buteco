@@ -7,11 +7,10 @@ export interface Spot { x: number; y: number; z: number; rotation: number }
 /** Where an order goes, and what has to be cleared from the table when it arrives. */
 export interface TablePlan { table: number; spots: Spot[]; clear: string[] }
 interface Footprint { x: number; z: number; radius: number }
-/** `consumed`: the part (0–1) of it the customer has already had. */
-interface Placed { state: ServedItem; ownerId: string; seatId: string; consumed: number }
+interface Placed { state: ServedItem; ownerId: string; seatId: string; effectsApplied: boolean }
 /** Whether a customer still sits where they ordered from. */
 export type Seated = (playerId: string, seatId: string) => boolean;
-/** Gives a customer the effects of `portion` (0–1) of something they are having at the table. */
+/** Gives a customer the full effects (portion 1) once they start having an item at the table. */
 export type Consume = (playerId: string, item: string, portion: number) => void;
 
 // The customer tables' top is a 0.83 m square (INST_A_mesa-vermelha) with the number holder in its centre.
@@ -21,8 +20,6 @@ const TABLE_HALF = .39, HOLDER_RADIUS = .1, GAP = .012, STEP = .02;
 const PICNIC_HALF = { along: .38, across: .88 }, PICNIC_REACH = .3;
 // Never more than this on all tables together: the oldest go first.
 const MAX_ITEMS = 96;
-// Effects are taken in steps of at least this part of an item (and the rest when it is finished).
-const SIP = .05;
 
 /**
  * Spots for `items` ordered from a seat: on the customer's quarter of the table top (`anywhere` also allows the
@@ -60,7 +57,7 @@ export function layoutSpots(seat: { x: number; z: number; table?: number; rotati
 
 /**
  * What was served on the tables, synced to every browser through the room state. A customer has each item over
- * consumeMs while seated (its effects come in as it goes); finished, or left behind when they get up, it waits on the
+ * consumeMs while seated (its effects apply in full at the start); finished, or left behind when they get up, it waits on the
  * table (`doneAt`) until someone collects it: the bar's helper (clearTable) or, with nobody working, Tonico (takeOne).
  * Uncollected, it goes on its own LEFTOVER_MS later.
  */
@@ -99,7 +96,7 @@ export class ServedItems {
     order.items.forEach((item, slot) => {
       const spot = plan.spots[slot]!, id = `${order.id}:${slot}`;
       const state = new ServedItem().assign({ id, item, table: plan.table, ...spot, placedAt: now + SERVE_LEAD_MS + (slot + 1) * SERVE_ITEM_MS, orderId: order.id, slot, seat: order.seatId });
-      this.items.set(id, { state, ownerId: order.playerId, seatId: order.seatId, consumed: 0 });
+      this.items.set(id, { state, ownerId: order.playerId, seatId: order.seatId, effectsApplied: false });
       this.state.set(id, state);
     });
     for (const oldest of [...this.items.values()].sort((a, b) => a.state.placedAt - b.state.placedAt).slice(0, Math.max(0, this.items.size - MAX_ITEMS))) this.remove(oldest.state.id);
@@ -133,7 +130,7 @@ export class ServedItems {
   }
 
   /**
-   * Seated customers have what is in front of them (`consume` gives them its effects as they go); whatever is
+   * Seated customers get each item's full effects when it arrives; whatever is
    * finished, or left behind by someone who got up, waits to be collected and goes on its own LEFTOVER_MS later.
    */
   update(now: number, seated: Seated, consume?: Consume): void {
@@ -143,8 +140,8 @@ export class ServedItems {
       // Still on its way to the table.
       if (now < state.placedAt) continue;
       if (!seated(placed.ownerId, placed.seatId)) { state.doneAt = now; continue; }
-      const progress = Math.min(1, (now - state.placedAt) / consumeMs(state.item)), portion = progress - placed.consumed;
-      if (portion >= SIP || progress >= 1) { placed.consumed = progress; consume?.(placed.ownerId, state.item, portion); }
+      if (!placed.effectsApplied && consume) { placed.effectsApplied = true; consume(placed.ownerId, state.item, 1); }
+      const progress = Math.min(1, (now - state.placedAt) / consumeMs(state.item));
       if (progress >= 1) state.doneAt = now;
     }
   }

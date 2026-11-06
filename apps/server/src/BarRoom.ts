@@ -133,7 +133,6 @@ interface Presence {
   /** Private persistent item state. It is sent only to this player, never through the room schema. */
   inventory:Map<ItemId,number>;
   inventoryBusy?:boolean;
-  inventoryItem?:ItemId;
   fireworkAt?:number;
   /** Coins as last confirmed by the API (the API decides every change; this only feeds the HUD and messages). */
   balance:number;
@@ -151,8 +150,6 @@ interface Presence {
   dialogUntil?:number;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
-/** What is in hand is had 5% at a time, like what is served at a table (served.ts). */
-const HOLDING_SIP = .05;
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
 const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'truco.join', 'truco.seat', 'truco.config', 'truco.ready', 'truco.again', 'truco.play', 'truco.call', 'truco.answer', 'truco.eleven', 'truco.signal', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'pool.join', 'pool.seat', 'pool.config', 'pool.cpu', 'pool.ready', 'pool.shot', 'pool.choice', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
@@ -214,7 +211,6 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** HP, stamina, hunger, thirst, bladder and drunkenness of every avatar (packages/shared/src/needs.ts). */
   readonly needs = new NeedsDirector();
   /** How much of what each player holds (Player.holding) they have had so far, 0–1: its effects come in 5% at a time. */
-  private readonly holdingConsumed = new Map<string, number>();
   /** Administrative controls: leased from the API's outbox, applied once, then confirmed. */
   private controls = new ControlRelay(this.config.instanceId, internal);
   /** Finished rounds wait on disk until the API confirms them (survives crashes and API outages). */
@@ -552,7 +548,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.currentTableId = '';
     // The microphone belongs to a session; a new one switches it on again itself.
     player.voice = false;
-    const presence=this.sessions.getByUser(player.id);if(presence)presence.inventoryItem=undefined;
     // Halfway out of a chair: the avatar is left standing beside it.
     if (player.animationState === 'stand-up') this.finishStandUp(player);
     // A musician puts the instrument back (the stop clip plays) and the spot frees itself when it ends.
@@ -2432,7 +2427,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     },now,this.jobs.working===0);
     if(events.picked)this.sessions.getByUser(events.picked.playerId)?.client.send('table.state',{status:'ordered',order:{...publicOrder(events.picked),waiter:'Tonico',stage:'carrying'}});
     if(events.placing)this.served.place(events.placing.order,events.placing.plan,now);
-    // Seated customers have what is in front of them, a little at a time.
+    // Each item applies its full effects when it reaches its seated customer.
     this.served.update(now,this.seated,(playerId,item,portion)=>{const player=this.state.players.get(playerId);if(player)this.consume(player,item,now,portion);});
     if(events.delivered)this.tableDelivered(events.delivered,'O Tonico',now);
     if(events.dropped){
@@ -2574,8 +2569,10 @@ export class BarRoom extends Room<{ state: BarState }> {
       // In hand, like Magrão's drinks: had over the same time as at a table, walking around meanwhile.
       this.startHolding(player,itemId,Date.now());presence.client.send('inventory.result',{action:'use',itemId,quantity:1});
     }else{
-      presence.inventoryItem=itemId;player.interactionState='inventory';player.animationStartedAt=Date.now();
+      player.interactionState='inventory';player.animationStartedAt=Date.now();
       player.animationState='use';player.drinkItem='';presence.interactionEndsAt=player.animationStartedAt+USE_DURATION_MS;
+      this.consume(player,itemId,player.animationStartedAt);
+      presence.client.send('inventory.result',{action:'use',itemId,quantity:1});
     }
     this.sendInventory(presence,view);
   }
@@ -2613,7 +2610,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.achieved(player.id, 'mecanico');
       this.log('moto_repair', { playerId: player.id, moto: repaired.id, part: repair.part, condition: Math.round(parts[repair.part]) });
     }
-    if(presence.inventoryItem){const used=presence.inventoryItem;this.consume(player,used,now);presence.client.send('inventory.result',{action:'use',itemId:used,quantity:1});presence.inventoryItem=undefined;}
     if (player.interactionState.startsWith('toilet-') || player.interactionState.startsWith('mictorio-')) {
       if (player.bladder >= ACHIEVEMENT_BLADDER_MIN) this.achieved(player.id, 'bexiga-solta');
       this.needs.relieve(player, now);
@@ -2622,32 +2618,28 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   /**
    * What is in hand goes into the hand: drinks Magrão served and anything from the backpack that is had over time. It
-   * lasts consumeMs, whatever the player does meanwhile (walking, sitting, dancing).
+   * lasts consumeMs, whatever the player does meanwhile (walking, sitting, dancing). Effects apply once at the start.
    */
   private startHolding(player: Player, item: string, now: number): void {
     player.holding = item; player.holdingSince = now; player.holdingUntil = now + consumeMs(item);
-    this.holdingConsumed.set(player.id, 0);
+    this.consume(player,item,now);
   }
-  /** Empty hands: finished, spilled in a fall, or the player gone. What was had so far already counted. */
+  /** Empty hands: finished, spilled in a fall, or the player gone. Its effects were already applied at the start. */
   private dropHolding(player: Player): void {
     player.holding = ''; player.holdingSince = 0; player.holdingUntil = 0;
-    this.holdingConsumed.delete(player.id);
   }
   /**
-   * Its effects come in as it goes, in 5% portions like at a table. Finished, it leaves the hand; a drink too many
+   * Finished, it leaves the hand without applying its effects again; a drink too many
    * comes back up (NEEDS.drunk.vomit), unless the body is busy with something else (seated, on the stage...).
    */
   private updateHolding(player: Player, presence: Presence, now: number): void {
-    const item = player.holding, progress = Math.min(1, (now - player.holdingSince) / Math.max(1, player.holdingUntil - player.holdingSince));
-    const portion = progress - (this.holdingConsumed.get(player.id) ?? 0);
-    if (portion >= HOLDING_SIP || (progress >= 1 && portion > 0)) { this.holdingConsumed.set(player.id, progress); this.consume(player, item, now, portion); }
-    if (progress < 1) return;
+    const item = player.holding;
+    if (now < player.holdingUntil) return;
     this.dropHolding(player);
     if (!player.interactionState && !player.currentTableId && isConscious(player) && this.needs.sick(player, item, now)) this.startVomiting(player, presence, now);
   }
-  /** Ending a toilet visit, or a backpack item used at once, early counts the part already done. */
+  /** Ending a toilet visit early counts the part already done. Consumables already applied their full effects. */
   private consumePart(player: Player, presence: Presence, now: number): void {
-    if(presence.inventoryItem){this.consume(player,presence.inventoryItem,now,(now-player.animationStartedAt)/Math.max(1,(presence.interactionEndsAt??now)-player.animationStartedAt));presence.inventoryItem=undefined;}
     if (player.interactionState.startsWith('toilet-') && presence.interactionEndsAt)
       this.needs.relieve(player, now, 1 - (presence.interactionEndsAt - now) / (NEEDS.bladder.toiletSeconds * 1000));
     if (player.interactionState.startsWith('mictorio-') && presence.interactionEndsAt)
@@ -2696,7 +2688,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelTable(player.id);
     // A worker who falls while putting an order down takes it back on the tray (and starts over at the table).
     if (player.interactionState === 'job') { const task = this.jobs.interrupt(player.id); if (task?.kind === 'deliver' && task.order) this.served.removeOrder(task.order.order.id); }
-    presence.inventoryItem=undefined;
     player.drinkItem = ''; presence.interactionEndsAt = undefined; presence.queue.length = 0;
     player.lastProcessedInput = presence.lastReceived;
   }

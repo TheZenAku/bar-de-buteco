@@ -6,7 +6,7 @@ import {ITEM_CATALOG} from './inventory.js';
  *
  * HP, stamina, hunger and thirst are each two things: the ring (the level, `hp`, `stamina`...) and the core behind it
  * (`hpCore`...). The ring is what is felt and it is refilled from the core, which is spent as it does; eating fills the core
- * gradually. Damage past an empty ring takes the core. Only the heart (HP) kills: its ring and core both at zero is death.
+ * immediately when consumption starts. Damage past an empty ring takes the core. Only the heart (HP) kills: its ring and core both at zero is death.
  * Every tunable number lives in NEEDS; nothing below hard-codes balance.
  */
 export const NEEDS = {
@@ -20,8 +20,6 @@ export const NEEDS = {
   /** The cores: where they start, how fast each ring is refilled from its core, and how many core points a ring point costs. */
   cores: {
     start: 100,
-    /** Eaten points reach a core at this pace (points per second): a meal is felt for a few seconds. */
-    absorbPerSecond: 8,
     hp: { refillPerSecond: 1.5, cost: 1 },
     /** Rested stamina is cheap: a full bar costs 5 core points. With an empty core it comes back at this share of the pace. */
     stamina: { refillPerSecond: 12, cost: .05, emptyShare: .2 },
@@ -115,9 +113,8 @@ export type FaintCause = 'hp' | 'alcohol';
 export interface MaxHpBonus { source: string; amount: number; until: number }
 export interface NeedsState {
   hp: number; stamina: number; hunger: number; thirst: number; bladder: number; drunk: number;
-  /** The cores behind hp, stamina, hunger and thirst, and what was eaten and is still reaching them. */
+  /** The reserves behind hp, stamina, hunger and thirst. Consumables change them immediately. */
   hpCore: number; staminaCore: number; hungerCore: number; thirstCore: number;
-  intake: Record<CoreKey, number>;
   /** HP and its core ran out: the death was reported once (the room clears it with `revive`). */
   dead: boolean;
   bonuses: MaxHpBonus[];
@@ -155,7 +152,7 @@ export interface ConsumableEffects {
   thirst?: number;
   /** Stamina for the stamina core. */
   stamina?: number;
-  /** HP for the heart's core: it reaches it gradually, and the core refills the ring. */
+  /** HP for the heart's core immediately; the core then refills the ring. */
   hp?: number;
   /** Temporary raise of maximum HP, and for how long. */
   maxHp?: { amount: number; seconds: number };
@@ -173,7 +170,7 @@ const clamp = (value: number, min: number, max: number) => Number.isFinite(value
 export function createNeeds(now = 0): NeedsState {
   const core = NEEDS.cores.start;
   return { hp: NEEDS.hp.max, stamina: NEEDS.stamina.max, hunger: NEEDS.hunger.max, thirst: NEEDS.thirst.max, bladder: 0, drunk: 0,
-    hpCore: core, staminaCore: core, hungerCore: core, thirstCore: core, intake: { hp: 0, stamina: 0, hunger: 0, thirst: 0 }, dead: false,
+    hpCore: core, staminaCore: core, hungerCore: core, thirstCore: core, dead: false,
     bonuses: [], exhausted: false, restAt: now, condition: 'normal', conditionUntil: 0, faints: 0, nextStumbleAt: 0, nextVomitAt: 0, dehydrationGraceUntil: 0 };
 }
 /** Maximum HP right now: the base plus active temporary bonuses. */
@@ -232,25 +229,24 @@ export function damage(state: NeedsState, amount: number, now: number): void {
 }
 /** HP, ring and heart, to zero: the death the administration sends. The next tick reports it (unless `dead` is already set). */
 export function killNeeds(state: NeedsState): void {
-  state.hp = 0; state.hpCore = 0; state.intake.hp = 0;
+  state.hp = 0; state.hpCore = 0;
 }
-/** Back from a death: the ring at `NEEDS.hp.recoverTo`, an empty heart, nothing left to absorb. */
+/** Back from a death: the ring at `NEEDS.hp.recoverTo` and an empty heart. */
 export function reviveNeeds(state: NeedsState): void {
-  state.dead = false; state.hp = NEEDS.hp.recoverTo; state.hpCore = 0; state.intake.hp = 0;
+  state.dead = false; state.hp = NEEDS.hp.recoverTo; state.hpCore = 0;
   state.condition = 'normal'; state.conditionUntil = 0;
 }
 
 /**
- * Applies a food or drink. `portion` (0–1) covers a drink interrupted halfway. Returns false when the
+ * Applies food or drink effects immediately. `portion` (0–1) scales the dose. Returns false when the
  * character cannot consume now (fainted or stumbling). The only place consumables change needs.
  */
 export function applyConsumable(state: NeedsState, effects: ConsumableEffects, now: number, portion = 1): boolean {
   if (!isConscious(state)) return false;
   const part = clamp(portion, 0, 1), amount = (value?: number) => Number.isFinite(value) ? value! : 0;
-  // Food and drink reach the cores gradually (tickNeeds); what takes away (salty food) is taken from the core at once.
+  // All gains and losses reach the reserves together, without waiting for the animation or a later tick.
   const feed = (key: CoreKey, value: number) => {
-    if (value > 0) state.intake[key] = clamp(state.intake[key] + value * part, 0, NEEDS.cores.start);
-    else if (value < 0) state[`${key}Core` as const] = clamp(state[`${key}Core` as const] + value * part, 0, NEEDS.cores.start);
+    state[`${key}Core` as const] = clamp(state[`${key}Core` as const] + value * part, 0, NEEDS.cores.start);
   };
   feed('hunger', amount(effects.hunger)); feed('thirst', amount(effects.thirst)); feed('stamina', amount(effects.stamina)); feed('hp', amount(effects.hp));
   state.bladder = clamp(state.bladder + amount(effects.bladder) * part, 0, NEEDS.bladder.max);
@@ -291,11 +287,6 @@ export function tickNeeds(state: NeedsState, seconds: number, now: number, activ
   const ceiling = maxHp(state, now);
   state.hp = clamp(state.hp, 0, ceiling);
 
-  // What was eaten reaches the cores a little at a time.
-  for (const key of CORE_KEYS) {
-    const core = `${key}Core` as const, take = Math.min(state.intake[key], NEEDS.cores.absorbPerSecond * dt, NEEDS.cores.start - state[core]);
-    if (take > 0) { state[core] += take; state.intake[key] -= take; }
-  }
   // Each ring is refilled from its core, spending it. `room` is how much the ring can take at most this tick.
   const refill = (key: CoreKey, ring: number, max: number, pace: number): number => {
     const rule = NEEDS.cores[key], core = `${key}Core` as const, got = Math.min(Math.max(0, max - ring), pace * dt, state[core] / rule.cost);
