@@ -47,6 +47,7 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
 | I | Abrir ou fechar a mochila, usar e descartar itens |
+| Clique esquerdo / R (com rojão equipado) | Soltar na direção da mira / guardar; compre na Loja da casa e equipe pela mochila ([fogos](docs/sistemas/fogos.md)) |
 | T | Sentado à mesa: pedir comida e bebida ao Tonico |
 | J | Trabalhar no bar (Ajudante do Magrão) e ganhar moedas |
 | K | Celular: ligar para outros jogadores, Highzap, Highgram, câmera, HighBank e mais ([celular](docs/sistemas/celular.md)) |

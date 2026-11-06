@@ -16,7 +16,7 @@ const DANCES = ['Dancing', 'Dancing Twerk', 'Hip Hop Dancing', 'Hip Hop Dancing 
   'Hip Hop Dancing (8)', 'Salsa Dancing', 'Salsa Dancing (2)', 'Samba Dancing', 'Swing Dancing', 'Twist Dance', 'Wave Hip Hop Dance'].map(name => `Dance ${name}`);
 
 test('generated animations bind to existing skins and contain valid skeletal rotations', () => {
-  for (const skin of ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico', 'tiao']) for (const file of [skin, `${skin}-dances`]) {
+  for (const skin of ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico', 'tiao', 'primo']) for (const file of [skin, `${skin}-dances`]) {
     const { json, bin } = glb(`animations/${file}.glb`);
     const model = glb(`models/${skin}.glb`).json;
     assert.deepEqual(json.nodes.map((node: any) => node.name), model.nodes.map((node: any) => node.name));
@@ -86,6 +86,7 @@ const MIXAMO_SKINS = [
   {id:'gabriel',name:'Gabriel',joints:34,weights:'mixamo'},
   {id:'flavio-hipotetico',name:'Flavio Hipotético',joints:65,weights:'mixamo'},
   {id:'tiao',name:'Tião',joints:65,weights:'mixamo'},
+  {id:'primo',name:'Primo',joints:65,weights:'mixamo'},
 ] as const;
 for (const {id,name,joints,weights:source} of MIXAMO_SKINS) test(`${name} has its own Mixamo skeleton, normalized ${source} weights and embedded materials`, () => {
   const {json,bin}=glb(`models/${id}.glb`);

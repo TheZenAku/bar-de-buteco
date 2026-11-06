@@ -18,6 +18,7 @@ function fixture(budget=500,model=CAR_MODEL){
 }
 test('first physical pump: exact sequence, gradual fuel, actual walking and only one debit after docking',async()=>{
   const f=fixture();await f.request();assert.equal(f.service.busy(f.vehicle.id),true);
+  assert.ok([...f.service.npcs.values()].every(npc=>npc.skin==='frentista'));
   await assert.rejects(f.request(),/atendimento/);
   await f.until('fueling');assert.equal(f.vehicle.fuel,90);assert.deepEqual(f.paid,[]);
   const before=f.vehicle.fuel;await f.tick();assert.ok(f.vehicle.fuel>before&&f.vehicle.fuel<100);

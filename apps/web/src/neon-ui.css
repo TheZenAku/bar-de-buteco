@@ -200,6 +200,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 .hud-track i{display:block;height:100%;background:var(--vw-pink);transition:width .4s}
 /* Ações: a hotbar along the bottom. Icon tiles of the list's language (white when on, quiet hover) with the key in the
    corner; the name shows above a tile on hover or keyboard focus. The heading is a thin strip at the left: grip and collapse. */
+/* The hotbar is never drawn: the keys (E, P, G, V, F, T, K, I, C, J) still work through its buttons, which stay in the DOM,
+   and what is near shows as a key prompt (.prompts) instead. */
+.game>[data-panel=actions]{display:none!important}
 .game>[data-panel=actions]{flex-direction:row}
 /* Clear of the minimap and its cores (bottom left), whatever the width. */
 @media(min-width:761px){.game>[data-panel=actions]{width:max-content!important;max-width:calc(100vw - 380px)}}
@@ -258,7 +261,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 
 /* Over the scene: the key prompts (E near something, P seated) side by side above the hotbar, with what is being
    consumed above them (needs.css), event, connection and the waiting screen */
-.prompts{position:absolute;left:50%;bottom:76px;translate:-50% 0;z-index:79;display:flex;flex-direction:column;align-items:center;gap:6px;width:max-content;max-width:calc(100vw - 20px);pointer-events:none}
+.prompts{position:absolute;left:50%;bottom:32px;translate:-50% 0;z-index:79;display:flex;flex-direction:column;align-items:center;gap:6px;width:max-content;max-width:calc(100vw - 20px);pointer-events:none}
 .prompt-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
 .context{display:flex;gap:12px;align-items:center;pointer-events:auto;background:var(--panel);padding:10px 16px 10px 10px;max-width:90vw;text-align:left;transition:background-color .15s}
 .context:hover{background:var(--secondary)}
@@ -366,6 +369,12 @@ button.inventory-slot:hover{background:var(--secondary)}
 .item-actions{display:flex;gap:1px}
 .item-actions button{flex:1}
 .inventory-layout+.fine-print{margin:14px 0 18px}
+.firework-hud{position:absolute;inset:0;pointer-events:none;z-index:12}
+.firework-reticle{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);border:1px solid #ffda78;border-radius:50%;box-shadow:0 0 0 1px #0009,0 0 14px #fac41655}
+.firework-reticle:after{content:'';position:absolute;left:9px;top:9px;width:2px;height:2px;background:#fff;box-shadow:0 0 4px #fac416}
+.firework-controls{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 16px;background:#111015ed;border:1px solid #fac41670;pointer-events:auto}
+.firework-controls span{white-space:nowrap}.firework-controls b,.firework-controls small{display:block}.firework-controls b{color:#ffda78;font:600 13px var(--font-mono)}.firework-controls small{margin-top:4px;color:var(--muted-foreground);font-size:11px}.firework-controls b span{display:inline}.firework-controls .button{white-space:nowrap}
+@media(max-width:680px){.firework-controls{bottom:110px;flex-wrap:wrap;justify-content:center;width:max-content}.firework-controls>span{width:100%;text-align:center}.firework-controls .button{min-height:40px}}
 .shop-grid{display:grid;margin:10px 0 20px}
 .shop-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
 .shop-item .item-icon{width:42px;height:42px}
@@ -415,7 +424,7 @@ button.inventory-slot:hover{background:var(--secondary)}
   .panel-foot{margin:10px -12px -10px;padding:8px 12px}
 }
 @media(max-width:1100px) and (min-width:761px){.game-tools .tool-label{display:none}}
-@media(max-width:959px) and (min-width:761px){.prompts{bottom:121px}}
+@media(max-width:959px) and (min-width:761px){.prompts{bottom:32px}}
 @media(max-width:760px){
   .menu-header{padding:20px 16px;flex-wrap:wrap;gap:14px}
   .menu-title{font-size:28px}

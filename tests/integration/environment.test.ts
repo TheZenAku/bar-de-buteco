@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_ENVIRONMENT,WEATHER,applyEnvironmentPatch,environmentPatchSchema,formatGameHour,gameHour,lightningAt,rainSurfaceHeight,weatherAt} from '@bar/shared';
+import {DEFAULT_ENVIRONMENT,WEATHER,WEATHER_CITY,applyCityWeather,applyEnvironmentPatch,environmentPatchSchema,formatGameHour,gameHour,lightningAt,rainSurfaceHeight,weatherAt} from '@bar/shared';
 
 test('setting, pausing, changing speed and resuming the world clock preserves its phase',()=>{
   const now=Date.UTC(2026,10,4,12),state=applyEnvironmentPatch({...DEFAULT_ENVIRONMENT},{hour:23.5,dayMinutes:24},now);
@@ -27,18 +27,29 @@ test('weather transitions stay continuous when interrupted and are identical for
   const paused=applyEnvironmentPatch(storm,{paused:true},now+20_000);
   assert.equal(weatherAt(now+40_000,paused).rain,1);
 });
-test('automatic weather includes clear skies, overcast, rain and storms and crosses cycle boundaries smoothly',()=>{
-  const kinds=new Set<string>();
-  for(let i=-8;i<16;i++){
-    const boundary=DEFAULT_ENVIRONMENT.anchorMs+i*WEATHER.periodMs;
-    const a=weatherAt(boundary-1,DEFAULT_ENVIRONMENT),b=weatherAt(boundary+1,DEFAULT_ENVIRONMENT);
-    assert.ok(Math.abs(a.rain-b.rain)<.001);assert.ok(Math.abs(a.cloud-b.cloud)<.001);
-    kinds.add(weatherAt(boundary+20_000,DEFAULT_ENVIRONMENT).kind);
-  }
-  assert.deepEqual([...kinds].sort(),['clear','cloudy','rain','storm']);
-  const now=Date.UTC(2026,10,4),fixed=applyEnvironmentPatch({...DEFAULT_ENVIRONMENT},{weather:'storm',hour:12,paused:true},now);
-  const reset=applyEnvironmentPatch(fixed,{reset:true},now+30_000);
+test('automatic weather follows city readings, preserves transitions and never invents rain',()=>{
+  const now=Date.UTC(2026,10,4);
+  for(let i=0;i<60;i++)assert.equal(weatherAt(now+i*60_000,DEFAULT_ENVIRONMENT).rain,0);
+  const reading={observedAt:now,precipitationMmH:2,cloud:.9,rain:.3,storm:0,wind:.2,kind:'rain' as const};
+  const wet=applyCityWeather({...DEFAULT_ENVIRONMENT},reading,now);
+  assert.equal(weatherAt(now,wet).rain,0);
+  assert.equal(weatherAt(now+WEATHER.transitionMs,wet).rain,.3);
+  assert.equal(weatherAt(now+WEATHER.transitionMs,wet).kind,'rain');
+  const middle=now+6000,strong=applyCityWeather(wet,{...reading,observedAt:middle,rain:.8,precipitationMmH:10},middle);
+  assert.equal(weatherAt(middle,strong).rain,weatherAt(middle,wet).rain);
+  assert.equal(weatherAt(middle+WEATHER.transitionMs,strong).rain,.8);
+  assert.deepEqual(weatherAt(middle+8000,strong),weatherAt(middle+8000,JSON.parse(JSON.stringify(strong))));
+  assert.equal(applyCityWeather(strong,reading,middle).realRain,.8,'older responses cannot replace new weather');
+  const dryAt=now+60_000,dry=applyCityWeather(strong,{...reading,observedAt:dryAt,rain:0,precipitationMmH:0},dryAt);
+  assert.equal(weatherAt(dryAt+WEATHER.transitionMs,dry).rain,0);
+  assert.equal(weatherAt(dryAt+WEATHER.transitionMs,dry).kind,'cloudy');
+  assert.equal(weatherAt(now+WEATHER_CITY.maxAgeMs+WEATHER.transitionMs,wet).rain,0,'stale rain fades out');
+  const fixed=applyEnvironmentPatch(wet,{weather:'storm',hour:12,paused:true},now+20_000);
+  const cached=applyCityWeather(fixed,{...reading,observedAt:now+30_000,rain:.15},now+30_000);
+  assert.equal(weatherAt(now+40_000,cached).rain,1,'manual override survives new city data');
+  const reset=applyEnvironmentPatch(cached,{reset:true},now+30_000);
   assert.equal(reset.paused,false);assert.equal(reset.dayDurationMs,40*60_000);assert.equal(reset.weather,'auto');
+  assert.equal(reset.realRain,.15);assert.equal(weatherAt(now+42_000,reset).rain,.15);
   assert.equal(gameHour(now+30_000,reset),gameHour(now+30_000));
 });
 test('lightning is deterministic, thunder follows it, and dry or overcast weather never flashes',()=>{

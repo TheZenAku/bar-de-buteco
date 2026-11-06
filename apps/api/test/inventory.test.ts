@@ -7,6 +7,22 @@ import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 import {currencyLedger,inventoryLedger,itemInventory,wallets} from '../src/database/schema.js';
 
+test('fireworks purchases persist, respect the stack limit and charge only once on retry',async t=>{
+  const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
+  const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{email:'fireworks@example.com',username:'fireworks',displayName:'Festeiro',password:'InventarioSeguro2026!'}});
+  assert.equal(register.statusCode,201);
+  const cookie=`${register.cookies[0].name}=${register.cookies[0].value}`,userId=register.json().user.id as string;
+  const get=()=>api.app.inject({method:'GET',url:'/api/inventory',headers:{cookie}});
+  await get();await api.db.update(wallets).set({balance:500}).where(eq(wallets.userId,userId));
+  const requestId=randomUUID(),buy=()=>api.app.inject({method:'POST',url:'/api/inventory/buy',headers:{cookie},payload:{itemId:'rojao',quantity:10,requestId}});
+  const bought=await Promise.all([buy(),buy()]);assert.ok(bought.every(response=>response.statusCode===200));
+  const view=(await get()).json();assert.equal(view.balance,150);assert.equal(view.stacks.find((s:any)=>s.itemId==='rojao').quantity,10);
+  assert.equal(view.history.filter((entry:any)=>entry.itemId==='rojao'&&entry.reason==='purchase').length,1);
+  const full=await api.app.inject({method:'POST',url:'/api/inventory/buy',headers:{cookie},payload:{itemId:'rojao',quantity:1,requestId:randomUUID()}});
+  assert.equal(full.statusCode,409);assert.equal((await get()).json().balance,150);
+});
+
 test('inventory persists starters and makes purchases and removals atomic and idempotent',async t=>{
   const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
   const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());

@@ -2,10 +2,10 @@ import {WEATHER_NAMES,formatGameHour,gameHour,weatherAt} from '@bar/shared';
 import {card,e,n,stat,type SectionFactory,type WorldSnapshot} from './kit';
 
 export const environmentSection:SectionFactory=(root,ctx)=>{
-  let snapshot:WorldSnapshot|null=ctx.world(),receivedAt=Date.now();
+  let snapshot:WorldSnapshot|null=ctx.world(),receivedAt=performance.now();
   function status():void {
     const s=snapshot?.environment;if(!s)return;
-    const now=snapshot!.at+Date.now()-receivedAt,w=weatherAt(now,s);
+    const now=snapshot!.at+performance.now()-receivedAt,w=weatherAt(now,s);
     const clock=root.querySelector('[data-environment-clock]'),climate=root.querySelector('[data-environment-weather]');
     if(clock)clock.textContent=formatGameHour(gameHour(now,s));
     if(climate)climate.textContent=WEATHER_NAMES[w.kind];
@@ -15,7 +15,7 @@ export const environmentSection:SectionFactory=(root,ctx)=>{
     if(!s){root.innerHTML='<p class="admin-loading">Carregando tempo e clima…</p>';return;}
     root.innerHTML=`<div class="admin-stats">
       ${stat('Hora no jogo',`<span data-environment-clock>${formatGameHour(s.currentHour)}</span>`,s.paused?'Relógio pausado':'Ciclo em andamento')}
-      ${stat('Clima atual',`<span data-environment-weather>${e(WEATHER_NAMES[s.currentWeather.kind])}</span>`,s.weather==='auto'?'Ciclo automático':'Clima fixo')}
+      ${stat('Clima atual',`<span data-environment-weather>${e(WEATHER_NAMES[s.currentWeather.kind])}</span>`,s.weather==='auto'?'Santa Bárbara d’Oeste · clima real':'Clima fixo')}
       ${stat('Duração de um dia',`${n(s.dayDurationMs/60_000)} min`,'Minutos reais para 24 horas no jogo')}
     </div><div class="admin-grid">
     ${card('Relógio do mundo',`<form class="admin-inline-form" data-environment-form="clock">
@@ -29,7 +29,7 @@ export const environmentSection:SectionFactory=(root,ctx)=>{
     ${card('Clima da cidade',`<form class="admin-inline-form" data-environment-form="weather"><label for="admin-environment-weather">Condição do tempo</label><select id="admin-environment-weather" name="weather">${Object.entries(WEATHER_NAMES).map(([id,label])=>`<option value="${id}" ${s.weather===id?'selected':''}>${label}</option>`).join('')}</select>
       <button class="mini-button" type="submit">Aplicar clima</button></form>
       <p class="admin-note">Chuva com vento e céu fechado; tempestades acrescentam relâmpagos e trovões. Telhados protegem os interiores.</p>
-      <p class="fine-print">No automático, o clima muda a cada 6 minutos. As transições levam 12 segundos. Um clima fixo permanece até outra alteração.</p>`,{icon:'cloud'})}
+      <p class="fine-print">No automático, a chuva acompanha Santa Bárbara d’Oeste, com intensidade proporcional à precipitação local. O clima é consultado a cada 5 minutos; as transições levam 12 segundos. Dados meteorológicos podem ter atraso. Um clima fixo permanece até outra alteração.</p>`,{icon:'cloud'})}
     </div>${card('Restaurar padrão',`<p class="admin-note">Volta ao horário global, ao dia de 40 minutos e ao clima automático.</p><button class="mini-button" type="button" data-environment-reset>Restaurar tempo e clima</button>`)}
     <p class="fine-print">Alterações valem para todos nesta sala e ficam no log. Os controles voltam ao padrão quando o servidor reinicia.</p>`;
     status();
@@ -50,6 +50,6 @@ export const environmentSection:SectionFactory=(root,ctx)=>{
   };
   root.addEventListener('click',click);root.addEventListener('submit',submit);render();ctx.requestWorld();
   const timer=setInterval(status,500);
-  return {world(next){snapshot=next;receivedAt=Date.now();const active=document.activeElement;if(root.contains(active)&&(active instanceof HTMLInputElement||active instanceof HTMLSelectElement)){status();return;}render();},
+  return {world(next){snapshot=next;receivedAt=performance.now();const active=document.activeElement;if(root.contains(active)&&(active instanceof HTMLInputElement||active instanceof HTMLSelectElement)){status();return;}render();},
     destroy(){clearInterval(timer);root.removeEventListener('click',click);root.removeEventListener('submit',submit);}};
 };

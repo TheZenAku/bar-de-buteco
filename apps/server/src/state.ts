@@ -4,16 +4,21 @@ import { DEFAULT_ENVIRONMENT, DEFAULT_SHOW, DEFAULT_SKIN, NEW_MOTO_PARTS, type E
 
 export class Player extends Schema {
   @type('string') id = '';
+  /** A short number for this avatar in the crowd records (shared/crowd.ts), so a sprite and its model are known to be one player. */
+  @type('uint16') slot = 0;
   @type('string') displayName = '';
   @type('string') color = '#e6a23b';
   @type('string') skin: string = DEFAULT_SKIN;
   @type('boolean') oldWalk = false;
+  @type('boolean') fireworkEquipped = false;
   @type('float32') x = 0;
   @type('float32') y = 0;
   @type('float32') z = 8;
   @type('float32') rotation = 0;
   @type('float32') headYaw = 0;
   @type('float32') headPitch = 0;
+  /** VR hands (packages/shared/src/vr-arms.ts): '' unless the player is in a headset. */
+  @type('string') vrArms = '';
   @type('string') animationState = 'idle';
   @type('number') animationStartedAt = 0;
   /** Drawn at random each time the player starts dancing; every client plays the same clip of its dance bank with it. */
@@ -40,6 +45,11 @@ export class Player extends Schema {
   @type('uint8') hp = 100;
   @type('uint8') hpMax = 100;
   @type('uint8') stamina = 100;
+  /** The cores behind hp, stamina, hunger and thirst (shared/needs.ts). */
+  @type('uint8') hpCore = 100;
+  @type('uint8') staminaCore = 100;
+  @type('uint8') hungerCore = 100;
+  @type('uint8') thirstCore = 100;
   @type('uint8') hunger = 100;
   @type('uint8') thirst = 100;
   @type('uint8') bladder = 0;
@@ -381,6 +391,12 @@ export class Environment extends Schema {
   @type('number') fromRain = DEFAULT_ENVIRONMENT.fromRain;
   @type('number') fromStorm = DEFAULT_ENVIRONMENT.fromStorm;
   @type('number') fromWind = DEFAULT_ENVIRONMENT.fromWind;
+  @type('number') realWeatherAt = DEFAULT_ENVIRONMENT.realWeatherAt;
+  @type('number') realCloud = DEFAULT_ENVIRONMENT.realCloud;
+  @type('number') realRain = DEFAULT_ENVIRONMENT.realRain;
+  @type('number') realStorm = DEFAULT_ENVIRONMENT.realStorm;
+  @type('number') realWind = DEFAULT_ENVIRONMENT.realWind;
+  @type('number') realPrecipitationMmH = DEFAULT_ENVIRONMENT.realPrecipitationMmH;
 }
 export class BarState extends Schema {
   @type(Environment) environment = new Environment();

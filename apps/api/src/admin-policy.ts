@@ -3,7 +3,8 @@ import {eq,sql} from 'drizzle-orm';
 import type {Database} from './database/index.js';
 import {users,moderationActions} from './database/schema.js';
 
-export const OWNER_EMAIL='rafaelrodrigues-2017@hotmail.com';
+// OWNER_EMAIL in the environment replaces the default; the account still needs a verified e-mail to be promoted.
+export const OWNER_EMAIL=(process.env.OWNER_EMAIL||'rafaelrodrigues-2017@hotmail.com').trim().toLowerCase();
 export const isOwnerEmail=(email:string)=>email.trim().toLowerCase()===OWNER_EMAIL;
 
 // Do not create an account, change a password or bypass the configured e-mail verification policy.

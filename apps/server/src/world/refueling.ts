@@ -55,7 +55,7 @@ export class Refueling {
   constructor(private hooks:Hooks,private journal?:FileOutbox<FuelJournal>){
     for(const pump of FUEL_PUMPS){
       this.states.set(pump.id,new FuelService().assign({id:pump.id,npcId:pump.npcId,price:pump.price}));
-      this.npcs.set(pump.npcId,new Npc().assign({id:pump.npcId,displayName:'Frentista',skin:'nathan',color:'#e6a12f',...pumpHome(pump),behavior:'fuel-service',rotation:Math.atan2(-pump.uz,pump.ux)}));
+      this.npcs.set(pump.npcId,new Npc().assign({id:pump.npcId,displayName:'Frentista',skin:'frentista',color:'#e6a12f',...pumpHome(pump),behavior:'fuel-service',rotation:Math.atan2(-pump.uz,pump.ux)}));
     }
   }
   busy(vehicleId:string):boolean{return [...this.active.values()].some(s=>s.vehicle.id===vehicleId);}

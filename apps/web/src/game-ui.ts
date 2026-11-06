@@ -1,7 +1,7 @@
 import {CHAT_RADIUS} from '@bar/shared';
 import {uiIcon as icon} from './ui-icons';
 import {needsMarkup,faintMarkup} from './needs-hud';
-import {lobbyPanels} from './lobby-menu';
+import {lobbyMore} from './lobby-menu';
 import {lobbyBubbles,lobbyHero} from './lobby-hero';
 // The player's own state is not a panel: its cores sit on the rim of the minimap (.status-hud), in the bottom-left corner. The actions are a hotbar panel, one row of icons along the bottom (wrapped in two on narrow screens).
 export const HUD_PANELS=[
@@ -24,24 +24,25 @@ const neonBackdrop='<div class="horizon" aria-hidden="true"></div><div class="su
 const keyHints=(hints:Array<[string,string]>)=>`<footer class="key-hints">${hints.map(([key,label])=>`<span><kbd>${key}</kbd>${label}</span>`).join('')}</footer>`;
 export function gameUi():string{return `
   <canvas id="world" aria-label="Cenário tridimensional do B.A.R."></canvas><div id="labels" aria-hidden="true"></div><div class="vignette"></div>
-  <main id="lobby" class="lobby neon-stage">${neonBackdrop}${lobbyBubbles()}
-    <div class="lobby-layout"><div class="lobby-main">
-    <header class="menu-header"><div><p class="eyebrow">O seu bar · A sua galera</p><h1 class="menu-title">Highland Bar</h1></div>
-      <div class="money-panel"><p class="cash">${icon('signal')} Aberto pra resenha</p><p>${icon('users')} Sem instalação · só chegar</p></div></header>
-    <section class="menu-section" aria-label="Entrada">
-      <nav class="menu-tabs" role="tablist" aria-label="Seções da entrada"><button role="tab" id="lobby-tab-account" data-lobby-tab="account" aria-selected="true" aria-controls="lobby-account">Conta</button><button role="tab" id="lobby-tab-bar" data-lobby-tab="bar" aria-selected="false" aria-controls="lobby-bar" tabindex="-1">O Bar</button><button role="tab" id="lobby-tab-controls" data-lobby-tab="controls" aria-selected="false" aria-controls="lobby-controls" tabindex="-1">Controles</button></nav>
-      <div class="menu-line" aria-hidden="true"></div>
-      <div class="menu-columns" id="lobby-account" role="tabpanel" aria-labelledby="lobby-tab-account"><nav class="menu-list" id="auth-list" aria-label="Acesso"></nav><section class="menu-detail entry-card" aria-label="Acesso à conta"><div id="auth-content"></div></section></div>
-      ${lobbyPanels()}
-    </section></div>
-    ${lobbyHero()}</div>
+  <main id="lobby" class="lobby neon-stage" data-stage="intro">${neonBackdrop}${lobbyBubbles()}
+    <div class="lobby-cut" aria-hidden="true"></div><div class="lobby-fade" aria-hidden="true"></div>
+    <h1 class="sr-only">Highland Bar</h1>
+    <div class="lobby-center">
+      <p class="lobby-status" id="lobby-status">${icon('signal')}<span>Aberto pra resenha</span></p>
+      <section class="access-card" id="lobby-account" aria-label="Acesso à conta"><div id="auth-content"></div></section>
+      ${lobbyMore()}
+    </div>
+    ${lobbyHero()}
+    <section class="clicker" aria-label="Brinde da galera"><div class="clicker-score"><span>Brindes</span><b id="clicker-count">0</b><small id="clicker-rank"></small></div>
+      <p class="clicker-combo" id="clicker-combo" aria-live="polite"></p>
+      <button type="button" class="clicker-exit" data-clicker-exit>${icon('close')} Voltar à entrada <kbd>Esc</kbd></button></section>
     ${keyHints([['Tab','Navegar'],['Enter','Selecionar']])}${icon('crosshair').replace('class="ui-icon"','class="ui-icon crosshair"')}
   </main>
   <main id="game" class="game hidden" aria-label="Interface do bar">
     <header class="game-header"><h1 class="boteco-logo"><img src="/ui/logo-highland-hud.webp" alt="Highland Bar" width="128" height="128"></h1>
-    <nav class="game-tools" aria-label="Ferramentas"><button class="hud-btn job-toggle hidden" data-hud-visible="job" title="Mostrar ou esconder o painel do turno" aria-label="Painel do turno" aria-pressed="true">${icon('briefcase')}<span class="tool-label">Turno</span></button><button class="hud-btn" data-hud-menu aria-label="Painéis" aria-expanded="false" aria-controls="panel-menu">${icon('panels')}<span class="tool-label">Painéis</span></button><button class="hud-btn" data-action="people" title="Pessoas no bar" aria-label="Pessoas no bar">${icon('users')}</button><button class="hud-btn" data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música" aria-pressed="false">${icon('volume')}<i class="muted-mark"></i></button><span class="voice-tools" role="group" aria-label="Chat de voz"><button class="hud-btn voice-btn" data-action="voice-mic" id="voice-mic" title="Ligar microfone (M)" aria-label="Ligar microfone" aria-pressed="false"><span class="voice-icon">${icon('micOff')}</span><i class="voice-level" aria-hidden="true"></i></button><button class="hud-btn voice-btn" data-action="voice-listen" id="voice-listen" title="Silenciar vozes" aria-label="Silenciar vozes" aria-pressed="true"><span class="voice-icon">${icon('headphones')}</span></button></span><button class="hud-btn" data-action="settings" title="Configurações" aria-label="Configurações">${icon('sliders')}</button><button class="hud-btn" data-action="help" title="Como jogar" aria-label="Como jogar">${icon('help')}</button><button class="hud-btn hidden" data-action="admin" id="admin-button" title="Administração" aria-label="Administração">${icon('shield')}</button></nav>
+    <nav class="game-tools" aria-label="Ferramentas"><button class="hud-btn job-toggle hidden" data-hud-visible="job" title="Mostrar ou esconder o painel do turno" aria-label="Painel do turno" aria-pressed="true">${icon('briefcase')}<span class="tool-label">Turno</span></button><button class="hud-btn" data-hud-menu aria-label="Painéis" aria-expanded="false" aria-controls="panel-menu">${icon('panels')}<span class="tool-label">Painéis</span></button><button class="hud-btn" data-action="people" title="Pessoas no bar" aria-label="Pessoas no bar">${icon('users')}</button><button class="hud-btn" data-action="audio" id="audio-button" title="Ativar música" aria-label="Ativar música" aria-pressed="false">${icon('volume')}<i class="muted-mark"></i></button><span class="voice-tools" role="group" aria-label="Chat de voz"><button class="hud-btn voice-btn" data-action="voice-mic" id="voice-mic" title="Ligar microfone (M)" aria-label="Ligar microfone" aria-pressed="false"><span class="voice-icon">${icon('micOff')}</span><i class="voice-level" aria-hidden="true"></i></button><button class="hud-btn voice-btn" data-action="voice-listen" id="voice-listen" title="Silenciar vozes" aria-label="Silenciar vozes" aria-pressed="true"><span class="voice-icon">${icon('headphones')}</span></button></span><button class="hud-btn hidden" data-action="vr" id="vr-button" title="Jogar com óculos VR (Meta Quest 2)" aria-label="Entrar no VR" aria-pressed="false">${icon('glasses')}</button><button class="hud-btn" data-action="settings" title="Configurações" aria-label="Configurações">${icon('sliders')}</button><button class="hud-btn" data-action="help" title="Como jogar" aria-label="Como jogar">${icon('help')}</button><button class="hud-btn hidden" data-action="admin" id="admin-button" title="Administração" aria-label="Administração">${icon('shield')}</button></nav>
     <div class="money-panel hud-wallet" role="group" aria-label="Carteira"><p class="cash">${icon('wallet')}<b id="hud-balance">…</b></p></div>
-    <div id="panel-menu" class="hud-panel panel-menu hidden" aria-label="Organizar painéis"><p class="eyebrow">Seu bar, do seu jeito</p><button data-fullscreen aria-pressed="false">${icon('maximize')}<span>Tela cheia</span></button><button data-hud-lock aria-label="Travar painéis" aria-pressed="false">${icon('unlock')}<span>Travar painéis</span></button>${HUD_PANELS.map(p=>`<button data-hud-visible="${p.id}" aria-pressed="true">${icon(p.icon)}<span>${p.title}</span>${icon('eye')}</button>`).join('')}<button class="hud-btn" data-hud-reset>${icon('reset')} Restaurar layout</button></div></header>
+    <div id="panel-menu" class="hud-panel panel-menu hidden" aria-label="Organizar painéis"><p class="eyebrow">Seu bar, do seu jeito</p><button data-fullscreen aria-pressed="false">${icon('maximize')}<span>Tela cheia</span></button><button data-hud-lock aria-label="Travar painéis" aria-pressed="false">${icon('unlock')}<span>Travar painéis</span></button>${HUD_PANELS.filter(p=>p.id!=='actions').map(p=>`<button data-hud-visible="${p.id}" aria-pressed="true">${icon(p.icon)}<span>${p.title}</span>${icon('eye')}</button>`).join('')}<button class="hud-btn" data-hud-reset>${icon('reset')} Restaurar layout</button></div></header>
     <p id="panel-instructions" class="sr-only">Arraste o cabeçalho para mover. Com ele em foco, use as setas. As posições são salvas neste navegador.</p>
     <section class="minimap" aria-label="Mapa"><div class="minimap-dial"><div class="minimap-bezel"><canvas id="minimap" aria-hidden="true"></canvas></div></div><p class="minimap-zone" id="minimap-zone"></p>
       <section class="status-hud" aria-label="Seu estado">${needsMarkup()}</section></section>
@@ -51,6 +52,7 @@ export function gameUi():string{return `
     ${faintMarkup()}<div id="event-banner" class="event-banner hidden" role="status"></div><div id="connection" class="connection hidden" role="status"></div>
     <canvas id="job-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="food-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="garage-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="stage-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="telao-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="shop-blip" class="job-blip" hidden aria-hidden="true"></canvas><canvas id="desk-blip" class="job-blip" hidden aria-hidden="true"></canvas>
     <div class="prompts"><section id="consuming" class="consuming hidden" aria-label="Consumindo"></section><div class="prompt-row"><button id="table-cta" data-action="table-menu" class="context table-cta hidden"><kbd>P</kbd><span><small>Na mesa</small><b id="table-cta-label">Pedir ao Tonico</b></span></button><button id="context" data-action="interact" class="context hidden"><kbd>E</kbd><span><small>Chega mais</small><b id="context-label"></b></span></button></div></div>
+    <section id="firework-hud" class="firework-hud hidden" aria-label="Rojão equipado"><div class="firework-reticle" aria-hidden="true"></div><div class="firework-controls"><span><b>Rojão de festa · <span id="firework-count">0</span></b><small>Aponte a câmera · clique ou toque para soltar</small></span><button class="button primary" data-action="firework-fire">Soltar</button><button class="button secondary" data-action="firework-stow">Guardar <kbd>R</kbd></button></div></section>
     <section id="vehicle-hud" class="vehicle-hud hidden" aria-label="Painel do veículo"></section>
     <section id="blackjack" class="blackjack hud-panel hidden" aria-label="Mesa de blackjack"></section>
     <section id="truco" class="truco hud-panel hidden" aria-label="Mesa de truco"></section>

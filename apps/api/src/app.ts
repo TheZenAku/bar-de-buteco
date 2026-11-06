@@ -7,11 +7,12 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
+import {passwordProblem,VEHICLE_MODELS,PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {WalletService} from './wallet-service.js';
 import {PhoneService} from './phone-service.js';
+import {zapLocationSchema} from '@bar/shared';
 import {ProfileService} from './profile-service.js';
 import {AchievementService} from './achievement-service.js';
 import {AdminService} from './admin-service.js';
@@ -31,7 +32,7 @@ import { Mailer } from './mail.js';
 import { blockedIds, createSession, getUser, hashPassword, hashToken, isBanned, newToken, readSession, SESSION_DAYS } from './auth/service.js';
 
 const emailSchema = z.string().trim().toLowerCase().email().max(254);
-const passwordSchema = z.string().min(10, 'A senha precisa ter pelo menos 10 caracteres.').max(128);
+const passwordSchema = z.string().superRefine((value, ctx) => { const problem = passwordProblem(value); if (problem) ctx.addIssue({ code: 'custom', message: problem }); });
 const tokenSchema = z.string().min(20).max(256);
 const uuidSchema = z.string().uuid();
 const reasonSchema = z.string().trim().min(3).max(500);
@@ -310,7 +311,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.get('/api/highfood', { preHandler: phoneUser }, request => highfood.view(me(request)));
   app.get('/api/vehicles', { preHandler: phoneUser }, request => highfood.vehicle(me(request)));
   app.post('/api/vehicles/buy', { preHandler: phoneUser, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, request => {
-    const body=z.object({requestId:uuidSchema.toLowerCase(),model:z.enum(['moto-delivery','carro-hatch']).optional(),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional()}).strict().parse(request.body);
+    const body=z.object({requestId:uuidSchema.toLowerCase(),model:z.enum(VEHICLE_MODELS).optional(),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional()}).strict().parse(request.body);
     return highfood.buy(request.auth!.user,body.requestId,body.model,body.color);
   });
   app.post('/api/vehicles/paint',{preHandler:phoneUser,config:{rateLimit:{max:20,timeWindow:'1 minute'}}},request=>{
@@ -329,8 +330,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.get('/api/phone/zap', { preHandler: phoneUser }, async request => ({ threads: await phone.threads(me(request)) }));
   app.get('/api/phone/zap/:id', { preHandler: phoneUser }, request => phone.thread(me(request), idParams.parse(request.params).id, beforeQuery.parse(request.query).before));
   app.post('/api/phone/zap/:id', { preHandler: phoneUser, config: { rateLimit: { max: 40, timeWindow: '1 minute' } } }, request => {
-    const body = z.object({ text: z.string().max(PHONE.messageMax * 2), requestId: uuidSchema.toLowerCase() }).strict().parse(request.body);
-    return phone.send(me(request), idParams.parse(request.params).id, body.text, body.requestId);
+    const body = z.object({ text: z.string().max(PHONE.messageMax * 2).default(''), location: zapLocationSchema.optional(), requestId: uuidSchema.toLowerCase() }).strict().parse(request.body);
+    return phone.send(me(request), idParams.parse(request.params).id, body.text, body.requestId, body.location);
   });
   app.get('/api/phone/gram', { preHandler: phoneUser }, async request => { const query = feedQuery.parse(request.query); return { posts: await phone.feed(me(request), query.before, query.scope) }; });
   app.patch('/api/phone/gram/me', { preHandler: phoneUser, bodyLimit: Math.ceil(PHONE.avatarMaxBytes * 1.4) + 4096, config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, request => {
@@ -408,6 +409,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({...base,op:z.literal('rename'),displayName:z.string().max(64)}).strict(),
       z.object({...base,op:z.literal('verify')}).strict(),
       z.object({...base,op:z.literal('logout')}).strict(),
+      z.object({...base,op:z.literal('kill')}).strict(),
       z.object({...base,op:z.literal('item'),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(-100).max(100)}).strict(),
       z.object({...base,op:z.literal('skin'),skinId:z.string().max(32),grant:z.boolean()}).strict(),
       z.object({...base,op:z.literal('skill'),skillId:z.string().max(32),grant:z.boolean()}).strict(),

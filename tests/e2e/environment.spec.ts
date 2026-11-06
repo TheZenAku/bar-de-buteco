@@ -346,6 +346,7 @@ test('the stage musicians: every spot takes, starts, loops and stops on any skin
 
 test('the live game follows the server clock and keeps the cycle when returning to the lobby',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await expect.poll(async()=>(await page.request.get('/api/ready').catch(()=>undefined))?.ok()??false,{timeout:60000}).toBe(true);
   expect((await page.request.post('/api/auth/login',{data:{email:'jogador2@bar.local',password:process.env.DEMO_PASSWORD||'ButecoDemo2026!'}})).ok()).toBe(true);
   await page.goto('/');await page.getByRole('button',{name:'Entrar no bar'}).click();
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});

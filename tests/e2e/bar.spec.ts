@@ -147,7 +147,7 @@ test('new skeletal clips load on every skin and the keyboard plays the authored 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`anim_${Date.now().toString(36)}`);
   const id=await page.evaluate(()=>(window as any).barDebug.snapshot().localId);
-  for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','tiao','read']){
+  for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo','read']){
     await showCard(page,skin);
     // Magrão is Seu Zé's; players choose among the others, one card per character in the hand.
     await expect(page.locator('.cl-hand-card')).toHaveCount(8);

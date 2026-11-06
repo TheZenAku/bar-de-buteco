@@ -1,14 +1,19 @@
 import {vehicleMoving} from '@bar/shared';
+import type {FireworkShot} from '@bar/shared';
 import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
-import {setDoorStates,movePlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
-import type {Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
+import {setDoorStates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import type {DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
+import {ServerClock} from './server-clock';
+import type {EnvironmentState,EnvironmentSnapshot} from '@bar/shared';
 import {PredictedRide} from './engine/moto-motion';
 import type {ServerPerformance} from '@bar/shared';
 
 export interface NetworkHooks {
+  firework?:(shot:FireworkShot)=>void;
+  environment?:(environment:EnvironmentState)=>void;
   fuelReceipt?:(receipt:FuelReceipt)=>void;
   serverPerformance?:(snapshot:ServerPerformance)=>void;
   /** The player just got a badge (docs/sistemas/conquistas.md). */
@@ -59,6 +64,9 @@ export interface NetworkHooks {
   itemLost?:(item:string)=>void;
   /** A bike ran this player over: the life it took, and who was riding ('' with nobody on it). */
   motoStruck?:(hit:{hp:number;by:string})=>void;
+  /** The Morte's scene near this player (docs/sistemas/morte.md), and the victim's own screen: the dark, the phrase, the buttons. */
+  deathScene?:(plan:DeathPlan)=>void;
+  deathScreen?:(screen:DeathScreen)=>void;
   /** Rafael's kick landed on this player: the life it took, and who it was. */
   kicked?:(hit:{hp:number;by:string})=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
@@ -68,6 +76,7 @@ export interface NetworkHooks {
   table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
   adminWorld?:(snapshot:unknown)=>void;
+  crowd?:(bytes:ArrayBuffer|Uint8Array)=>void;
   /** The price table (packages/shared/src/prices.ts), on entering and when the administration changes it. */
   prices?:(table:unknown)=>void;
   /** The phone: a call changed (rings, answered, ended), or another player sent something new (Highzap, Highgram, Pix). */
@@ -93,9 +102,26 @@ export class BarNetwork {
   room?:Room;
   // By default the game is reached through the site's own address (Vite proxies /game), which also works
   // over https://, where the browser blocks a plain ws:// connection to another port.
-  private client=new Client((import.meta.env.VITE_GAME_URL||'/game').startsWith('/')
+  private readonly serverUrl=(import.meta.env.VITE_GAME_URL||'/game').startsWith('/')
     ? `${location.protocol==='https:'?'wss':'ws'}://${location.host}${import.meta.env.VITE_GAME_URL||'/game'}`
-    : import.meta.env.VITE_GAME_URL);
+    : import.meta.env.VITE_GAME_URL;
+  private client=new Client(this.serverUrl);
+  private readonly clock=new ServerClock();
+  environment?:EnvironmentState;
+  /** The renderer, phone, weather and game UI all read this same clock. */
+  serverNow=():number=>this.clock.now();
+  async syncEnvironment():Promise<void> {
+    if(this.transportReady)return;
+    const sent=performance.now();
+    try{
+      const response=await fetch(`${this.serverUrl.replace(/^ws/,'http').replace(/\/$/,'')}/environment`,{cache:'no-store',signal:AbortSignal.timeout(5000)});
+      if(!response.ok)return;
+      const snapshot:EnvironmentSnapshot=await response.json();
+      if(this.transportReady)return;
+      this.clock.sync(snapshot.at,(performance.now()-sent)/2);
+      this.environment=snapshot.environment;this.hooks.environment?.(snapshot.environment);
+    }catch{/* Offline entry: retain the last server reference until the next sample. */}
+  }
   private pending:PlayerInput[]=[];
   private pendingMoto:MotoInput[]=[];
   /** The bike being ridden, as predicted, and its id. */
@@ -138,6 +164,8 @@ export class BarNetwork {
     this.hooks.status('Você está no bar',true);
     room.onStateChange((state:any)=>{
       const world=(typeof state.toJSON==='function'?state.toJSON():state) as WorldState;
+      this.clock.sync(world.serverTime);
+      if(world.environment)this.environment=world.environment;
       this.world=world;
       // Prediction must collide with doors exactly where the server has them.
       if(world.doors)setDoorStates(Object.values(world.doors).map(door=>[door.id,door.open] as const));
@@ -162,6 +190,7 @@ export class BarNetwork {
     room.onMessage('tv.result',()=>{});
     room.onMessage('stage.open',(message:{until:number;price:number})=>this.hooks.stage?.({...message,open:true}));
     room.onMessage('shop.open',()=>this.hooks.shop?.());
+    room.onMessage('firework.shot',(shot:FireworkShot)=>this.hooks.firework?.(shot));
     room.onMessage('food.state',(state:HighfoodState)=>this.hooks.food?.(state));
     room.onMessage('food.base',(message:{owned:boolean;out:boolean;state:HighfoodState})=>this.hooks.foodBase?.(message));
     room.onMessage('food.owned',(message:{owned:boolean})=>this.hooks.foodOwned?.(message.owned));
@@ -186,6 +215,8 @@ export class BarNetwork {
     room.onMessage('stage.state',(message:{until:number;price?:number;message?:string})=>this.hooks.stage?.(message));
     room.onMessage('needs.itemLost',(message:{item:string})=>this.hooks.itemLost?.(message.item));
     room.onMessage('moto.struck',(hit:{hp:number;by:string})=>this.hooks.motoStruck?.(hit));
+    room.onMessage('death.scene',(plan:DeathPlan)=>this.hooks.deathScene?.(plan));
+    room.onMessage('death.screen',(screen:DeathScreen)=>this.hooks.deathScreen?.(screen));
     room.onMessage('player.kicked',(hit:{hp:number;by:string})=>this.hooks.kicked?.(hit));
     room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
@@ -195,6 +226,8 @@ export class BarNetwork {
     room.onMessage('table.state',(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>this.hooks.table?.(update));
     room.onMessage('job.state',(update:{task?:JobTaskView|null;message?:string})=>this.hooks.job?.(update));
     room.onMessage('admin.world',(snapshot:unknown)=>this.hooks.adminWorld?.(snapshot));
+    // The people beyond the avatars, a few times a second, as bytes (packages/shared/src/crowd.ts).
+    room.onMessage('crowd',(bytes:ArrayBuffer|Uint8Array)=>this.hooks.crowd?.(bytes));
     room.onMessage('prices',(message:{prices:unknown})=>this.hooks.prices?.(message.prices));
     room.onMessage('phone.call',(call:PhoneCallView)=>this.hooks.phoneCall?.(call));
     room.onMessage('phone.ping',(ping:PhonePing)=>this.hooks.phonePing?.(ping));
@@ -209,7 +242,11 @@ export class BarNetwork {
     room.onMessage('moderation.removed',(message:{kind:'kick'|'ban';reason:string})=>{if(message.kind==='kick'||message.kind==='ban')removal=message;});
     room.onMessage('error',(payload:{message?:string})=>this.hooks.error(payload.message||'Ação indisponível.'));
     room.onMessage('admin.performance',(snapshot:ServerPerformance)=>this.hooks.serverPerformance?.(snapshot));
-    room.onMessage('pong',(payload:{at:number})=>this.hooks.ping(Math.max(0,Date.now()-payload.at)));
+    room.onMessage('pong',(payload:{at:number;serverTime?:number})=>{
+      const elapsed=Math.max(0,performance.now()-payload.at);
+      if(payload.serverTime)this.clock.sync(payload.serverTime,elapsed/2);
+      this.hooks.ping(elapsed);
+    });
     room.onError((_code:number,message?:string)=>this.hooks.error(message||'A conexão encontrou um problema.'));
     room.onDrop(()=>{this.transportReady=false;this.stopTimers();this.pending=[];this.pendingMoto=[];this.hooks.status('Conexão interrompida. Tentando reconectar…',false);});
     room.onReconnect(()=>{if(this.stopped)return;this.transportReady=true;this.pending=[];this.pendingMoto=[];this.startTimers();this.hooks.status('Você está no bar',true);});
@@ -225,7 +262,7 @@ export class BarNetwork {
     const locked=!!((self.interactionState&&!isRidingHorse(self.interactionState))||self.currentTableId);
     const requested=this.hooks.input();
     const intention=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
-    const moving=!!(intention.dx||intention.dz);
+    const moving=!!(intention.dx||intention.dz||intention.dy);
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
@@ -292,13 +329,17 @@ export class BarNetwork {
    * a pass. The raw input is what is sent.
    */
   private predict(input:PlayerInput,self:PlayerState):Position {
+    if(self.animationState==='fly-fall')return this.position;
+    if(self.animationState?.startsWith("fly"))return flyPlayer(this.position,input,TICK_MS/1000);
     if(isRidingHorse(self.interactionState))return self.animationState==='horse-rear'?this.position:moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
     return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle));
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
+  /** Bytes still waiting in the socket (0 if unknown). */
+  backlog():number {try{return (this.room as unknown as {connection?:{transport?:{ws?:{bufferedAmount?:number}}}}|undefined)?.connection?.transport?.ws?.bufferedAmount??0;}catch{return 0;}}
   sendBytes(type:string,bytes:Uint8Array):void {if(this.room&&!this.stopped&&this.transportReady)this.room.sendBytes(type,bytes);}
   telemetry():{sequence:number;pending:number}{return {sequence:this.seq,pending:this.pending.length+this.pendingMoto.length};}
-  private startTimers():void {this.stopTimers();this.tick=setInterval(()=>this.sendInput(),TICK_MS);this.heartbeat=setInterval(()=>this.send('ping',{at:Date.now()}),3000);}
+  private startTimers():void {this.stopTimers();this.tick=setInterval(()=>this.sendInput(),TICK_MS);const ping=()=>this.send('ping',{at:performance.now()});ping();this.heartbeat=setInterval(ping,3000);}
   private stopTimers():void {clearInterval(this.tick);clearInterval(this.heartbeat);}
   async disconnect():Promise<void>{this.stopped=true;this.transportReady=false;this.generation++;this.stopTimers();const room=this.room;this.room=undefined;this.world=undefined;this.pending=[];this.pendingMoto=[];this.ride=undefined;if(room){room.reconnection.enabled=false;if(room.connection?.isOpen)await room.leave();}}
 }

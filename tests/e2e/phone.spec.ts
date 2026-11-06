@@ -4,12 +4,14 @@ const password='ButecoTeste2026!';
 async function enter(browser:Browser,name:string):Promise<{page:Page;id:string;username:string}>{
   const context=await browser.newContext({permissions:['microphone']});const page=await context.newPage();
   const id=`${name}_${Date.now().toString(36)}`,username=id.slice(0,24).toLowerCase();
+  await expect.poll(async()=>(await page.request.get('/api/ready').catch(()=>undefined))?.ok()??false,{timeout:90000,intervals:[500]}).toBe(true);
   await page.goto('/');
   await page.getByRole('button',{name:'Criar conta',exact:true}).click();
   await page.getByLabel('Seu nome',{exact:true}).fill(name);
   await page.getByLabel('Usuário',{exact:true}).fill(username);
   await page.getByLabel('E-mail',{exact:true}).fill(`${id.toLowerCase()}@example.com`);
   await page.getByLabel('Senha',{exact:true}).fill(password);
+  await page.locator('[name="confirmPassword"]').fill(password);
   await page.getByRole('button',{name:'Criar minha conta'}).click();
   await expect(page.locator('#game')).toBeVisible({timeout:60000});await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
   return {page,username,id:await page.evaluate(()=>(window as any).barDebug.snapshot().localId)};
@@ -69,6 +71,29 @@ test('the phone: numbers from the player\'s profile, Highzap with photos, voice 
   await expect(a.page.locator('#phone .zap-bubble:not(.me)')).toContainText('Já vou!',{timeout:20000});
   await expect(a.page.locator('#phone .zap-bubble.me .zap-tick').first()).toHaveClass(/read/,{timeout:20000});
 
+  // Share the player's game position, reopen the conversation and open the saved point on the map.
+  const sharedAt=await a.page.evaluate(()=>{
+    const snapshot=(window as any).barDebug.snapshot(),self=snapshot.world.players[snapshot.localId];
+    return {x:self.x,y:self.y??0,z:self.z};
+  });
+  await a.page.locator('#phone [data-zap="attach"]').click();
+  await a.page.getByRole('button',{name:'Enviar localização atual',exact:true}).click();
+  await expect(b.page.locator('#phone .zap-location')).toBeVisible({timeout:20000});
+  const shared=(await (await b.page.request.get(`/api/phone/zap/${a.id}`)).json()).messages.find((message:any)=>message.location);
+  expect(shared.location.x).toBeCloseTo(sharedAt.x,1);expect(shared.location.z).toBeCloseTo(sharedAt.z,1);
+  await openApp(b.page,'highzap');
+  await b.page.locator(`#phone [data-zap="open"][data-id="${a.id}"]`).click();
+  await b.page.getByRole('button',{name:'Abrir localização no mapa'}).click();
+  await expect(b.page.locator('#phone .map-card')).toContainText('Localização de Ligadora');
+  // Read the target in the click's task: the GPS can immediately mark a nearby point as already reached.
+  const destination=await b.page.evaluate(()=>{
+    document.querySelector<HTMLButtonElement>('#phone [data-map="route"]')!.click();
+    return (window as any).barDebug.gps().target;
+  });
+  expect(destination.x).toBeCloseTo(shared.location.x,3);expect(destination.z).toBeCloseTo(shared.location.z,3);
+  await openApp(b.page,'highzap');
+  await b.page.locator(`#phone [data-zap="open"][data-id="${a.id}"]`).click();
+
   // A photo from the camera, through the preview, lands as a picture in the other phone.
   await a.page.locator('#phone [data-zap="attach"]').click();
   await a.page.locator('#phone [data-zap="camera"]').click();
@@ -109,6 +134,34 @@ test('the phone: numbers from the player\'s profile, Highzap with photos, voice 
   await b.page.locator('#phone [data-call="answer"]').click();
   await expect(b.page.locator('#phone .ph-call.video.remote')).toBeVisible({timeout:30000});
   await expect(a.page.locator('#phone .ph-call.video.remote')).toBeVisible({timeout:30000});
+  for(const page of [a.page,b.page])await page.evaluate(()=>{
+    const original=window.createImageBitmap,timings={capture:[] as number[],decode:[] as number[]};
+    (window as any).phoneVideoProbe={timings,restore:()=>window.createImageBitmap=original};
+    window.createImageBitmap=function(...args:Parameters<typeof original>){
+      const start=performance.now(),kind=args[0] instanceof HTMLCanvasElement?'capture':'decode';
+      return original.apply(window,args).then(bitmap=>{timings[kind].push(performance.now()-start);return bitmap;});
+    } as typeof original;
+  });
+  // Count paints on the receiving canvas: the call must keep moving past the former 8 fps ceiling.
+  const paints=await a.page.evaluate(async()=>{
+    let frames=0;
+    const original=CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage=function(this:CanvasRenderingContext2D,...args:Parameters<typeof original>){
+      if(this.canvas.classList.contains('ph-call-remote'))frames++;
+      return original.apply(this,args);
+    } as typeof original;
+    try{await new Promise(resolve=>setTimeout(resolve,3000));return frames;}
+    finally{CanvasRenderingContext2D.prototype.drawImage=original;}
+  });
+  await test.info().attach('video-call-frames',{body:JSON.stringify({durationMs:3000,frames:paints,fps:paints/3}),contentType:'application/json'});
+  const telemetry=await Promise.all([a.page,b.page].map(page=>page.evaluate(()=>{
+    const probe=(window as any).phoneVideoProbe;probe.restore();
+    const summary=(values:number[])=>({frames:values.length,averageMs:values.reduce((sum,value)=>sum+value,0)/Math.max(1,values.length),maxMs:Math.max(0,...values)});
+    return {capture:summary(probe.timings.capture),decode:summary(probe.timings.decode),performance:(window as any).barDebug.performance(),graphics:(window as any).barDebug.graphics(),hidden:document.hidden};
+  })));
+  await test.info().attach('video-call-performance',{body:JSON.stringify(telemetry),contentType:'application/json'});
+  console.log('Video call performance',JSON.stringify({paints,telemetry}));
+  expect(paints).toBeGreaterThan(24);
   // The far camera switched off shows as such.
   await b.page.locator('#phone [data-call="camera"]').click();
   await expect(a.page.locator('#phone .ph-call.video')).not.toHaveClass(/remote/,{timeout:10000});

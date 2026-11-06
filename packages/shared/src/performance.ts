@@ -6,5 +6,9 @@ export interface ServerPerformance {
   process:{rss:number;heapUsed:number;heapTotal:number;external:number;cpuPercent:number};
   host:{totalMem:number;freeMem:number;cores:number};
   loop:{p95Ms:number;maxMs:number};
+  /** Colyseus state patch (encode and send to every client), run on its own timer outside the tick. */
+  patch?:{samples:number;p50Ms:number|null;p95Ms:number|null;maxMs:number|null};
+  /** Mean (per tick) and max ms of each step() phase over the last 30 s. */
+  phases?:Record<string,{meanMs:number;maxMs:number}>;
   world:{players:number;capacity:number;npcs:number;motos:number;walletRetries:number;resultOutbox:number;logQueue:number;apiAgeMs:number|null};
 }

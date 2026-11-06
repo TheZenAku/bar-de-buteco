@@ -10,7 +10,7 @@ const window=(f:number,a:number,b:number,c:number,d:number)=>smooth((f-a)/(b-a))
 export const SMOKING_LIPS:Readonly<Record<string,readonly [number,number,number]>>={
   nathan:[0,-.028,.108],leandro:[0,-.018,.155],rafael:[0,-.019,.129],read:[0,-.033,.137],
   magrao:[0,.017,.151],'gilmar-gordo':[0,.014,.149],gabriel:[0,-.015,.131],
-  'flavio-hipotetico':[0,-.022,.155],tiao:[0,-.025,.131],tonico:[0,-.023,.139],'rafael-rose':[0,-.024,.122],
+  'flavio-hipotetico':[0,-.022,.155],tiao:[0,-.025,.131],primo:[0,-.025,.131],tonico:[0,-.023,.139],'rafael-rose':[0,-.024,.122],
 };
 export const isSmoking=(clip:string)=>clip.startsWith('fumar_');
 

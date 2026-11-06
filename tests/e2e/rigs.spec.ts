@@ -7,7 +7,8 @@ test('all rendered rigs return to the same pose after actions without resetting 
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.goto('/rigs.html');
   await page.evaluate(()=>(window as any).rigFixture.ready);
-  await expect(page.locator('#skin option')).toHaveCount(12);
+  const rigs=await page.evaluate(()=>(window as any).rigFixture.actors.size);
+  await expect(page.locator('#skin option')).toHaveCount(rigs+1);
 
   // Use the actual loaded render entities and AnimComponent. The inspector normally resets
   // between selections for visual comparison; these transitions deliberately keep the graph.
@@ -51,8 +52,71 @@ test('all rendered rigs return to the same pose after actions without resetting 
     }
     return results;
   });
-  expect(comparisons).toHaveLength(55);
+  expect(comparisons).toHaveLength(rigs*5);
   for(const {from,to,skin,maxError,bone} of comparisons)
     expect(maxError,`${skin}: ${bone} retained a pose from ${from} when entering ${to}`).toBeLessThan(.0001);
+  expect(errors).toEqual([]);
+});
+
+
+test('drinking overlays an already playing gait on every rig and releases it cleanly',async({page})=>{
+  test.setTimeout(120000);
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/rigs.html');
+  await page.evaluate(()=>(window as any).rigFixture.ready);
+  const comparisons=await page.evaluate(async()=>{
+    // Exercise the game's layer creation after the base clips have already bound their joints,
+    // as happens when the animation bank arrives after the avatar starts walking.
+    const sceneModule='/src/engine/BarScene.ts';
+    const {BarScene}=await import(sceneModule);
+    const fixture=(window as any).rigFixture;
+    const frame=()=>new Promise<void>(resolve=>fixture.app.once('postrender',resolve));
+    const masked=['shoulder_l','upperarm_l','lowerarm_l','hand_l','neck','head'];
+    const body=['hip','spine_01','spine_02','spine_03','upperarm_r','lowerarm_r','hand_r','upperleg_l','lowerleg_l','foot_l','upperleg_r','lowerleg_r','foot_r'];
+    const rotations=(actor:any,names:string[])=>Object.fromEntries(names.map(name=>{
+      const q=actor.model.findByName(name).getLocalRotation();return [name,[q.x,q.y,q.z,q.w]];
+    }));
+    await fixture.select('bank:Drink');fixture.pose(3);
+    await frame();
+    const drink=new Map<string,Record<string,number[]>>([...fixture.actors].map(([id,actor]:any)=>[id,rotations(actor,masked)]));
+    await fixture.select('bank:Walk');fixture.pose(.4);
+    await frame();
+    for(const actor of fixture.actors.values()){
+      const bones=Object.fromEntries(['upperarm_l','head'].map(name=>[name,actor.model.findByName(name)]));
+      for(const clip of ['Idle','Walk','Run','DrunkIdle','DrunkWalk','OldCaneWalk','OldCaneHold'])
+        actor.model.anim.assignAnimation(clip,actor.tracks.get(clip));
+      actor.handSkin={model:actor.model,bones};
+      (BarScene.prototype as any).addHandLayer.call({},actor.handSkin,actor.tracks.get('Drink'));
+      actor.handSkin.handLayer.transition('Drink',0);
+      actor.model.anim.baseLayer.playing=true;
+    }
+    const results:Array<{skin:string;clip:string;phase:string;bone:string;error:number}>=[];
+    const compare=(skin:string,clip:string,phase:string,actual:Record<string,number[]>,expected:Record<string,number[]>)=>{
+      for(const [bone,q] of Object.entries(expected)){
+        const a=actual[bone]!;
+        const dot=Math.abs(a.reduce((sum,value,index)=>sum+value*q[index]!,0));
+        results.push({skin,clip,phase,bone,error:1-Math.min(1,dot)});
+      }
+    };
+    for(const clip of ['Idle','Walk','Run','DrunkIdle','DrunkWalk','OldCaneWalk','OldCaneHold']){
+      for(const [id,actor] of fixture.actors){
+        const anim=actor.model.anim,layer=actor.handSkin.handLayer;
+        anim.baseLayer.transition(clip,0);anim.baseLayer.activeStateCurrentTime=.4;
+        layer.weight=0;anim.update(0);
+        const clean=rotations(actor,[...masked,...body]);
+        layer.weight=1;layer.activeStateCurrentTime=3;anim.update(0);
+        compare(id,clip,'sip',rotations(actor,masked),drink.get(id)!);
+        compare(id,clip,'body',rotations(actor,body),Object.fromEntries(body.map(name=>[name,clean[name]!])));
+        layer.weight=0;anim.update(0);
+        compare(id,clip,'released',rotations(actor,[...masked,...body]),clean);
+      }
+    }
+    return {rigs:fixture.actors.size,results};
+  });
+  expect(comparisons.rigs).toBe(12);
+  expect(comparisons.results).toHaveLength(12*7*(6+13+19));
+  for(const {skin,clip,phase,bone,error} of comparisons.results)
+    expect(error,`${skin}/${clip}/${phase}: ${bone}`).toBeLessThan(.000001);
   expect(errors).toEqual([]);
 });

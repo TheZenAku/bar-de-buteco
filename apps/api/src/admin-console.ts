@@ -3,7 +3,7 @@ import {statfs} from 'node:fs/promises';
 import os from 'node:os';
 import {and,desc,eq,gte,ilike,inArray,isNotNull,isNull,lt,or,sql,type Column,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {ACCESS_LOG_EVENTS,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
+import {ACCESS_LOG_EVENTS,barDayKey,startOfBarDay,DEATH,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
   type AdminEconomy,type AdminLedgerEntry,type AdminLogCategory,type AdminLogEntry,type AdminLogPage,type AdminPlayerDetail,type AdminPlayerOperation,type AdminReport,
   type AdminServerInfo,type AdminSummary,type LedgerSource,type PublicUser} from '@bar/shared';
 import type {MetricsRegistry} from '@bar/shared/metrics';
@@ -14,10 +14,11 @@ import {ensureOwnerAdministrator} from './admin-policy.js';
 import type {PricingService} from './pricing-service.js';
 
 const DAY=86_400_000;
+/** A second kill order inside this window is the same click twice: the first death's log may not have reached the API yet. */
+const DEATH_ORDER_GRACE_MS=5000;
 const iso=(value:Date|string|null|undefined)=>value?new Date(value).toISOString():null;
-/** Local calendar day (the API's time zone), as the daily bonus and the work cap count them. */
-const dayKey=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-const startOfDay=(date:Date)=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
+/** The bar's calendar day (Brasília), as the daily bonus and the work cap count them. */
+const dayKey=barDayKey,startOfDay=startOfBarDay;
 const likeTerm=(term:string)=>`%${term.replace(/[\\%_]/g,'\\$&')}%`;
 /** Coin movements that create or destroy coins (a Pix only moves them between wallets). */
 const notTransfer=sql`${t.currencyLedger.reason} not like 'pix:%' and ${t.currencyLedger.reason} not like 'trade:%'`;
@@ -147,6 +148,22 @@ export class AdminConsole {
           const ended=await tx.delete(t.sessions).where(eq(t.sessions.userId,target.id)).returning({id:t.sessions.id});
           await record('player-logout',`${ended.length} sessão(ões) encerrada(s).`);
           return {message:ended.length?'Sessões encerradas. Se estiver no bar, o jogador sai em alguns segundos.':'Esta conta não tinha sessões abertas.'};
+        }
+        case 'kill':{
+          // The only cause of death the game has so far (needs.ts has fainting, not dying): this button, to test the whole sequence.
+          // The main account is protected from everybody else, but may test the sequence on itself.
+          if(permissions.owner&&!self)throw new AdminError(403,'A conta principal só pode ser morta por ela mesma.');
+          if(!self&&!permissions.canModerate)throw new AdminError(403,'Esta conta está protegida contra essa alteração.');
+          // Dead already: the world logged the start of a death and not its end, or a kill was ordered a moment ago (its log may not have arrived yet).
+          const [last]=await tx.select({event:t.gameLogs.event,at:t.gameLogs.createdAt}).from(t.gameLogs)
+            .where(and(eq(t.gameLogs.userId,target.id),eq(t.gameLogs.source,'world'),inArray(t.gameLogs.event,['death_start','death_end']))).orderBy(desc(t.gameLogs.createdAt)).limit(1);
+          const [ordered]=await tx.select({at:t.moderationActions.createdAt}).from(t.moderationActions)
+            .where(and(eq(t.moderationActions.userId,target.id),eq(t.moderationActions.action,'player-kill'))).orderBy(desc(t.moderationActions.createdAt)).limit(1);
+          const now=Date.now();
+          if((last?.event==='death_start'&&now-new Date(last.at).getTime()<DEATH.maxMs)||(ordered&&now-new Date(ordered.at).getTime()<DEATH_ORDER_GRACE_MS))throw new AdminError(409,'Este jogador já está morto.');
+          await record('player-kill','Morte de teste.');
+          await tx.insert(t.controls).values({id:randomUUID(),payload:{action:'kill',playerId:target.id,issuedAt:now,reason}});
+          return {message:'Comando enviado: se o jogador estiver no bar, a Morte já está a caminho.'};
         }
         case 'item':{
           requireWallet();
@@ -306,7 +323,7 @@ export class AdminConsole {
     const topCount=Math.max(1,Math.ceil(holders.length*.1)),top10=holders.slice(-topCount).reduce((s,b)=>s+b,0);
     // Gini over every wallet (0: everyone has the same; 1: one wallet has everything).
     const gini=total>0&&sorted.length>1?sorted.reduce((sum,b,i)=>sum+(2*(i+1)-sorted.length-1)*b,0)/(sorted.length*total):0;
-    const keys:string[]=[];for(let d=new Date(since);d<=now;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1))keys.push(dayKey(d));
+    const keys:string[]=[];for(let d=new Date(since);d<=now;d=new Date(d.getTime()+DAY))keys.push(dayKey(d));
     const perDay=new Map(keys.map(k=>[k,{net:0,created:0,destroyed:0}])),perSource=new Map<LedgerSource,{created:number;destroyed:number;count:number}>();
     for(const row of hourly){
       const bucket=perDay.get(dayKey(new Date(row.hour)));if(!bucket)continue;

@@ -37,7 +37,7 @@ test('chat toggles only the cane and gait, replicates to other players and works
       await page.screenshot({path:previewPath('old-cane.png')});
     }finally{await page.keyboard.up('d');await page.keyboard.up('Shift');}
     await expect.poll(async()=>(await animation(page))?.clip).toBe('OldCaneHold');
-    for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','tiao','read']){
+    for(const skin of ['nathan','leandro','rafael','rafael-rose','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo','read']){
       // Nathan is free and already worn; the others are bought first.
       await wearCard(page,skin);
       await expect.poll(async()=>(await animation(other))?.skin).toBe(skin);

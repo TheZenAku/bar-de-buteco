@@ -1,0 +1,46 @@
+/* The victim's side of a death (death-ui.ts): the vignette, the dark with a phrase, the four buttons, the red mistake. */
+.death{position:fixed;inset:0;z-index:9000;pointer-events:none;color:#cfd2da;font-family:inherit;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.death[hidden]{display:none}
+.death-vignette{position:absolute;inset:0;opacity:0;transition:opacity 2.2s ease-out;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,0) 38%,rgba(6,0,10,.72) 100%);backdrop-filter:saturate(.62) brightness(.9);-webkit-backdrop-filter:saturate(.62) brightness(.9)}
+.death.scene .death-vignette{opacity:1}
+/* Low graphics: a flat, light vignette, no filter on the picture. */
+.death.lite .death-vignette{backdrop-filter:none;-webkit-backdrop-filter:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(6,0,10,.5) 100%)}
+.death-red{position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse at center,rgba(120,0,10,0) 25%,rgba(190,10,25,.82) 100%)}
+.death.failed .death-red{opacity:1;animation:death-pulse .6s ease-in-out infinite}
+.death.still.failed .death-red{animation:none}
+.death-dark{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .6s ease-in;display:grid;place-items:center;padding:8vmin;pointer-events:auto}
+.death.dark .death-dark{opacity:1}
+.death.closing .death-dark{transition:opacity .6s ease-out}
+.death-phrase{max-width:34ch;margin:0;font-size:clamp(18px,3.2vmin,30px);line-height:1.45;text-align:center;color:#9a9ca4;letter-spacing:.01em;text-wrap:balance}
+.death-game{position:absolute;inset:0;pointer-events:none}
+.death-game[hidden]{display:none}
+.death-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(60vw,360px);display:grid;gap:14px;justify-items:center;text-align:center}
+.death-status{margin:0;font-size:clamp(16px,2.6vmin,24px);color:#d8dae0}
+.death-hint{margin:0;font-size:13px;color:#6f717a}
+@media (pointer:coarse){.death-hint{display:none}}
+.death-progress{display:flex;gap:8px}
+.death-progress i{width:12px;height:12px;border-radius:50%;border:2px solid #595b66}
+.death-progress i.on{background:#e8e9ee;border-color:#e8e9ee}
+.death-timer{width:100%;height:6px;background:#1b1c22;border-radius:3px;overflow:hidden}
+.death-timer i{display:block;height:100%;background:linear-gradient(90deg,#8a0f1f,#e8e9ee);transform-origin:left center;will-change:transform}
+/* Four big buttons in the corners of the screen; at least 56 px. */
+.death-button{position:absolute;display:grid;place-items:center;pointer-events:auto;touch-action:none;cursor:pointer;
+  width:clamp(72px,24vmin,150px);height:clamp(72px,24vmin,150px);border-radius:22%;border:3px solid color-mix(in srgb,var(--c) 70%,#000);
+  background:color-mix(in srgb,var(--c) 14%,#0b0b10);color:var(--c);padding:0;margin:max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));
+  transition:transform .06s,background .06s,box-shadow .06s}
+.death-button svg{width:56%;height:56%;fill:currentColor}
+.death-button b{position:absolute;right:9%;bottom:6%;font-size:clamp(12px,2.4vmin,18px);color:#cfd2da;opacity:.75}
+@media (pointer:coarse){.death-button b{display:none}}
+.death-button[data-button="0"]{left:0;top:0}
+.death-button[data-button="1"]{right:0;top:0}
+.death-button[data-button="2"]{left:0;bottom:0}
+.death-button[data-button="3"]{right:0;bottom:0}
+.death-button.lit{background:var(--c);color:#0b0b10;box-shadow:0 0 38px 8px color-mix(in srgb,var(--c) 70%,transparent);transform:scale(1.06)}
+.death-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.death-error{position:absolute;left:50%;top:50%;margin:0;width:min(86vw,760px);transform:translate(-50%,-50%);text-align:center;font-size:clamp(26px,6vmin,56px);font-weight:800;line-height:1.2;color:#ff2a3b;
+  text-shadow:0 0 22px rgba(255,20,40,.55),0 2px 0 #300;animation:death-shake .45s linear infinite;text-wrap:balance}
+.death-error[hidden]{display:none}
+.death.still .death-error{animation:none}
+@keyframes death-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes death-shake{0%,100%{transform:translate(-50%,-50%)}20%{transform:translate(calc(-50% - 4px),calc(-50% + 2px))}40%{transform:translate(calc(-50% + 5px),calc(-50% - 3px))}60%{transform:translate(calc(-50% - 3px),calc(-50% - 2px))}80%{transform:translate(calc(-50% + 4px),calc(-50% + 3px))}}

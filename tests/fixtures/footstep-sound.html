@@ -1,0 +1,11 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Footstep audio</title>
+<button>Ativar áudio</button><script type="module">
+import {FootstepSounds} from '/src/engine/footstep-sound.ts';
+const fixture=window.fixture={volume:1,moving:false,speed:3.5,walker:{id:'player',animation:'walk',x:8,y:.3,z:-4}};
+fixture.sounds=new FootstepSounds(()=>fixture.volume,'/');fixture.sounds.setActive(true);
+setInterval(()=>{
+  if(fixture.manual)return;
+  if(fixture.moving)fixture.walker.x+=fixture.speed*.016;
+  fixture.sounds.update(.016,[fixture.walker],{x:fixture.walker.x,y:1.5,z:fixture.walker.z+1},{x:0,y:0,z:-1},{x:0,y:1,z:0});
+},16);
+</script></html>

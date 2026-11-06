@@ -1,4 +1,4 @@
-import {PHONE,formatPhoneNumber,type PhoneContact,type PhoneMediaKind,type ZapMessage,type ZapThread} from '@bar/shared';
+import {PHONE,cityZone,formatPhoneNumber,type PhoneContact,type PhoneMediaKind,type ZapLocation,type ZapMessage,type ZapThread} from '@bar/shared';
 import {api,escape as e} from '../../api';
 import {uiIcon} from '../../ui-icons';
 import {avatar,duration,header,hourMinute,timeAgo,type CameraRequest,type Person,type Photo,type PhoneApp} from '../core';
@@ -8,7 +8,7 @@ interface Shown extends ZapMessage {pending?:boolean;failed?:boolean}
 const day=(at:number)=>new Date(at).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
 const MEDIA:Record<PhoneMediaKind,{icon:string;label:string}>={photo:{icon:'camera',label:'Foto'},audio:{icon:'mic',label:'Mensagem de voz'},video:{icon:'video',label:'Vídeo'}};
 /** What a conversation's last message says in the list. */
-const preview=(message:ZapMessage)=>message.media?`${uiIcon(MEDIA[message.media.kind].icon)}${MEDIA[message.media.kind].label}${message.media.ms?` (${duration(message.media.ms/1000)})`:''}`:e(message.text);
+const preview=(message:ZapMessage)=>message.location?`${uiIcon('mapPin')}Localização`:message.media?`${uiIcon(MEDIA[message.media.kind].icon)}${MEDIA[message.media.kind].label}${message.media.ms?` (${duration(message.media.ms/1000)})`:''}`:e(message.text);
 /** Someone outside your contacts shows as their number, as a messenger does, with the name they use beside it. */
 const title=(person:Person,saved:boolean)=>saved||!person.number?e(person.name):`${e(formatPhoneNumber(person.number))} <i class="zap-push">~${e(person.name)}</i>`;
 
@@ -67,7 +67,9 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
       const mine=message.from===me,today=day(message.sentAt);
       if(today!==lastDay){list.push({key:`day:${today}`,body:`<p class="zap-day">${e(today)}</p>`});lastDay=today;}
       // Pending media show a clock until the upload finishes; the bubble itself is the same before and after.
-      const body=`<div class="zap-bubble ${mine?'me':''} ${message.media?`media ${message.media.kind}`:''}">${message.media?mediaHtml(message):`<span>${e(message.text)}</span>`}<small>${hourMinute(message.sentAt)}<span class="zap-status"></span></small></div>`;
+      const location=message.location;
+      const content=location?`<button type="button" class="zap-location" data-zap="open-location" data-id="${e(message.id)}" aria-label="Abrir localização no mapa"><span class="zap-location-map" aria-hidden="true">${uiIcon('mapPin')}</span><b>Localização</b><span>${e(cityZone(location.x,location.z))}</span><small>Ver no mapa e traçar rota</small></button>`:message.media?mediaHtml(message):`<span>${e(message.text)}</span>`;
+      const body=`<div class="zap-bubble ${mine?'me':''} ${message.media?`media ${message.media.kind}`:''}">${content}<small>${hourMinute(message.sentAt)}<span class="zap-status"></span></small></div>`;
       const meta=mine?message.failed?`<i class="zap-tick failed" title="Não enviada">!</i>`:message.pending?`<i class="zap-tick">${uiIcon('clock')}</i>`:`<i class="zap-tick ${message.readAt?'read':''}" title="${message.readAt?'Lida':'Enviada'}">${uiIcon(message.readAt?'checkCheck':'check')}</i>`:'';
       list.push({key:message.id,body,meta});
     }
@@ -99,7 +101,7 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
   }
   function composeHtml():string {
     if(recording)return `<div class="zap-recording" role="status"><button type="button" class="ph-mini" data-zap="rec-cancel" aria-label="Descartar o áudio">${uiIcon('trash')}</button><i class="zap-rec-dot" aria-hidden="true"></i><b data-rec-time>${duration(recording.run.ms/1000)}</b><span>Gravando…</span><button type="button" class="zap-send" data-zap="rec-send" aria-label="Enviar o áudio">${uiIcon('send')}</button></div>`;
-    return `<form class="zap-compose" data-zap-form="send"><button type="button" class="zap-attach" data-zap="attach" aria-label="Enviar foto ou vídeo">${uiIcon('plus')}</button><input class="ph-input" name="text" maxlength="${PHONE.messageMax}" autocomplete="off" placeholder="Mensagem" aria-label="Mensagem para ${e(peer?.name??'')}"><button type="submit" class="zap-send" aria-label="Enviar">${uiIcon('send')}</button><button type="button" class="zap-mic" data-zap="record" aria-label="Gravar mensagem de voz">${uiIcon('mic')}</button></form>`;
+    return `<form class="zap-compose" data-zap-form="send"><button type="button" class="zap-attach" data-zap="attach" aria-label="Anexar foto, vídeo ou localização">${uiIcon('plus')}</button><input class="ph-input" name="text" maxlength="${PHONE.messageMax}" autocomplete="off" placeholder="Mensagem" aria-label="Mensagem para ${e(peer?.name??'')}"><button type="submit" class="zap-send" aria-label="Enviar">${uiIcon('send')}</button><button type="button" class="zap-mic" data-zap="record" aria-label="Gravar mensagem de voz">${uiIcon('mic')}</button></form>`;
   }
   function renderCompose():void {const node=view.querySelector('.zap-bottom');if(node)node.innerHTML=composeHtml();}
   function sheetHtml():string {
@@ -109,7 +111,7 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
       return `<div class="ph-sheet tall" role="dialog" aria-label="Enviar"><div class="ph-sheet-panel zap-stage"><header><h3>Enviar para ${e(peer?.name??'')}</h3><button type="button" class="ph-mini" data-zap="sheet-close" aria-label="Cancelar">${uiIcon('close')}</button></header>
         ${staged.kind==='video'?`<video src="${url}" controls playsinline></video>`:`<img src="${url}" alt="Foto a enviar">`}<button type="button" class="ph-pill-btn wide" data-zap="send-staged">${uiIcon('send')} Enviar</button></div></div>`;
     }
-    if(sheet==='attach')return `<div class="ph-sheet" role="dialog" aria-label="Anexar"><div class="ph-sheet-list"><button type="button" data-zap="camera">${uiIcon('camera')} Câmera</button><button type="button" data-zap="gallery">${uiIcon('image')} Fotos e vídeos</button><button type="button" data-zap="sheet-close">Cancelar</button></div></div>`;
+    if(sheet==='attach')return `<div class="ph-sheet" role="dialog" aria-label="Anexar"><div class="ph-sheet-list"><button type="button" data-zap="camera">${uiIcon('camera')} Câmera</button><button type="button" data-zap="gallery">${uiIcon('image')} Fotos e vídeos</button><button type="button" data-zap="location">${uiIcon('mapPin')} Enviar localização atual</button><button type="button" data-zap="sheet-close">Cancelar</button></div></div>`;
     if(sheet==='gallery')return `<div class="ph-sheet tall" role="dialog" aria-label="Fotos e vídeos"><div class="ph-sheet-panel"><header><h3>Fotos e vídeos</h3><button type="button" class="ph-mini" data-zap="sheet-close" aria-label="Fechar">${uiIcon('close')}</button></header>
       ${roll.length?`<div class="ph-grid3 zap-roll">${roll.map(item=>`<button type="button" data-zap="stage" data-id="${item.id}" aria-label="${item.kind==='video'?'Vídeo':'Foto'}">${item.kind==='video'?`<video src="${ctx.gallery.url(item)}#t=0.1" muted preload="metadata" playsinline></video><small>${uiIcon('play')}${duration((item.ms??0)/1000)}</small>`:`<img src="${ctx.gallery.url(item)}" alt="">`}</button>`).join('')}</div>`:'<p class="ph-empty small">A galeria está vazia. Use a câmera do celular.</p>'}</div></div>`;
     return '';
@@ -147,12 +149,12 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
     }catch(error){ctx.host.error(error instanceof Error?error.message:'A conversa não carregou.');mode='list';renderList();}
   }
   function openThread(person:Person):void {mode='thread';peer=person;messages=[];query='';sheet=undefined;viewing=undefined;renderThread();void loadThread();}
-  async function send(text:string):Promise<void> {
+  async function send(text:string,location?:ZapLocation):Promise<void> {
     if(!peer)return;
-    const to=peer.id,shown:Shown={id:crypto.randomUUID(),from:me,to,text,sentAt:Date.now(),pending:true};
+    const to=peer.id,shown:Shown={id:crypto.randomUUID(),from:me,to,text,sentAt:Date.now(),pending:true,...(location?{location}:{})};
     messages.push(shown);renderMessages(true);
     try{
-      const sent=await api<ZapMessage>(`/phone/zap/${encodeURIComponent(to)}`,{text,requestId:shown.id});
+      const sent=await api<ZapMessage>(`/phone/zap/${encodeURIComponent(to)}`,{text,requestId:shown.id,...(location?{location}:{})});
       Object.assign(shown,sent,{pending:false});
       ctx.host.send('phone.ping',{to,kind:'zap'});
     }catch(error){shown.pending=false;shown.failed=true;ctx.host.error(error instanceof Error?error.message:'Mensagem não enviada.');}
@@ -217,6 +219,17 @@ export const highzap:PhoneApp={id:'highzap',name:'Highzap',icon:'messageCircle',
       case 'video':if(peer)ctx.call(peer,true);break;
       case 'save':if(peer){const current=peer;void api('/phone/contacts',{userId:current.id}).then(()=>ctx.refreshProfile()).then(()=>{if(peer?.id===current.id)renderThread();}).catch(error=>ctx.host.error(error instanceof Error?error.message:'Não foi possível salvar.'));}break;
       case 'attach':sheet='attach';renderSheet();break;
+      case 'location':{
+        const self=ctx.host.world()?.players[me];
+        if(!self){ctx.host.error('Sua localização ainda não está disponível.');break;}
+        const location={x:self.x,y:self.y??0,z:self.z};
+        sheet=undefined;renderSheet();void send(`Localização · ${cityZone(location.x,location.z)}`,location);break;
+      }
+      case 'open-location':{
+        const message=messages.find(item=>item.id===button.dataset.id);
+        if(message?.location)ctx.open('mapas',{location:message.location,label:`Localização de ${message.from===me?'você':peer?.name??'contato'}`});
+        break;
+      }
       case 'camera':if(peer)ctx.open('camera',{then:'highzap',back:{peer:{id:peer.id,name:peer.name,color:peer.color,number:peer.number,photo:peer.photo}}} satisfies CameraRequest);break;
       case 'gallery':void ctx.gallery.list().then(list=>{roll=list;sheet='gallery';renderSheet();});break;
       case 'stage':void stage(button.dataset.id!);break;

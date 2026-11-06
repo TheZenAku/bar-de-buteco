@@ -32,7 +32,19 @@ void main(){
   float soft=1.-smoothstep(.1,1.,r);
   gl_FragColor=vec4(.62,.57,.5,soft*soft*.38*(1.-fxAge)*min(1.,fxAge*9.));
 }`;
-const STAR_SECONDS=.2,DUST_SECONDS=.55;
+// The sound barrier: a thin white vapour ring racing outwards, a second fainter one behind it, and a haze that thins out.
+const RING=`
+precision highp float;
+uniform float fxAge;uniform float fxSeed;
+varying vec2 vUv;
+void main(){
+  float r=length(vUv),front=.18+.8*sqrt(fxAge),second=front*.72;
+  float edge=(1.-smoothstep(0.,.035+.05*fxAge,abs(r-front)))+.45*(1.-smoothstep(0.,.05,abs(r-second)));
+  float haze=smoothstep(second*.55,front,r)*(1.-smoothstep(front,front+.1,r))*.28;
+  float fade=(1.-fxAge)*(1.-fxAge)*min(1.,fxAge*14.);
+  gl_FragColor=vec4(.92,.97,1.,clamp(edge*.9+haze,0.,1.)*fade);
+}`;
+const STAR_SECONDS=.2,DUST_SECONDS=.55,RING_SECONDS=1;
 const POOL=6,DUST_PUFFS=3;
 
 interface Quad {entity:pc.Entity;instance:pc.MeshInstance;age:number;seconds:number;from:number;to:number}
@@ -40,6 +52,8 @@ interface Quad {entity:pc.Entity;instance:pc.MeshInstance;age:number;seconds:num
 export class BlowEffects {
   private readonly stars:Quad[]=[];
   private readonly dust:Quad[]=[];
+  private readonly rings:Quad[]=[];
+  private readonly ringMaterial:pc.ShaderMaterial;
   private readonly starMaterial:pc.ShaderMaterial;
   private readonly dustMaterial:pc.ShaderMaterial;
 
@@ -52,6 +66,7 @@ export class BlowEffects {
     this.starMaterial=material('Kick star',STAR,new pc.BlendState(true,pc.BLENDEQUATION_ADD,pc.BLENDMODE_SRC_ALPHA,pc.BLENDMODE_ONE,pc.BLENDEQUATION_ADD,pc.BLENDMODE_ZERO,pc.BLENDMODE_ONE));
     // Over the body it comes from: a foot sits inside the one it hits.
     this.starMaterial.depthTest=false;this.starMaterial.update();
+    this.ringMaterial=material('Sonic ring',RING,new pc.BlendState(true,pc.BLENDEQUATION_ADD,pc.BLENDMODE_SRC_ALPHA,pc.BLENDMODE_ONE,pc.BLENDEQUATION_ADD,pc.BLENDMODE_ZERO,pc.BLENDMODE_ONE));
     this.dustMaterial=material('Fall dust',DUST,new pc.BlendState(true,pc.BLENDEQUATION_ADD,pc.BLENDMODE_SRC_ALPHA,pc.BLENDMODE_ONE_MINUS_SRC_ALPHA,pc.BLENDEQUATION_ADD,pc.BLENDMODE_ZERO,pc.BLENDMODE_ONE));
   }
   private quad(list:Quad[],material:pc.Material):Quad {
@@ -82,9 +97,13 @@ export class BlowEffects {
       this.start(this.quad(this.dust,this.dustMaterial),x+Math.cos(a)*off,y+.1+Math.random()*.12,z+Math.sin(a)*off,DUST_SECONDS*(.8+Math.random()*.4),.25,.75+.55*hard);
     }
   }
+  /** The sound barrier broken here: a vapour ring spreading from the body, `size` metres across at its widest. */
+  shock(at:{x:number;y:number;z:number},size:number):void {
+    this.start(this.quad(this.rings,this.ringMaterial),at.x,at.y,at.z,RING_SECONDS,size*.2,size);
+  }
   /** One frame: they grow, fade and keep facing the camera. */
   update(dt:number,camera:pc.Entity):void {
-    for(const item of [...this.stars,...this.dust]){
+    for(const item of [...this.stars,...this.dust,...this.rings]){
       if(!item.entity.enabled)continue;
       item.age+=dt;
       const age=item.age/item.seconds;
@@ -98,9 +117,9 @@ export class BlowEffects {
     }
   }
   /** How many are showing (tests). */
-  get showing():number {return [...this.stars,...this.dust].filter(item=>item.entity.enabled).length;}
+  get showing():number {return [...this.stars,...this.dust,...this.rings].filter(item=>item.entity.enabled).length;}
   destroy():void {
-    for(const item of [...this.stars,...this.dust])item.entity.destroy();
-    this.starMaterial.destroy();this.dustMaterial.destroy();
+    for(const item of [...this.stars,...this.dust,...this.rings])item.entity.destroy();
+    this.starMaterial.destroy();this.ringMaterial.destroy();this.dustMaterial.destroy();
   }
 }

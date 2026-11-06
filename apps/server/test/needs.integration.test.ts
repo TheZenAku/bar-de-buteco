@@ -55,29 +55,13 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     assert.equal(player.interactionState,'');
     other.assign({x:12,y:.3,z:-4});
 
-    // HP faint: fallen, actions refused, inputs ignored; wakes recovered. Without an inventory nothing is lost.
+    // Life gone (ring and heart): the Morte comes for them; coming back, the ring is at the configured value and the heart empty.
     player.assign({x:12,y:.3,z:-6});
     authoritative.needs.damage(player,1000,Date.now());
-    await until(()=>seen()?.condition==='fainted'&&seen()?.animationState==='fallen'&&seen()?.faintCause==='hp');
-    assert.ok(chat.some(t=>t.includes('desmaiou')));
-    a.send('player.emote',{emote:'dance'});await until(()=>errors.includes('Você está desacordado.'));
-    const at={x:player.x,z:player.z};await walk(a,6,false);
-    assert.deepEqual({x:player.x,z:player.z},at,'A fainted body does not move');
-    assert.deepEqual(lost,[],'NO_INVENTORY: nothing to lose and nothing breaks');
-    needs.conditionUntil=Date.now()+200;
-    await until(()=>seen()?.condition==='recovering'&&seen()?.animationState==='recover');
-    assert.equal(seen()?.hp,NEEDS.hp.recoverTo);
-    needs.conditionUntil=Date.now();await until(()=>seen()?.condition==='normal');
-
-    // The inventory hook: with a (fake) inventory, the 80% roll removes an eligible item and tells the player.
-    const removed:string[]=[];
-    authoritative.needs.inventory={eligibleItems:()=>['isqueiro'],remove:(_id,item)=>{removed.push(item);return true;}};
-    Object.assign(authoritative.needs,{random:()=>0});
-    authoritative.needs.damage(player,1000,Date.now());
-    await until(()=>lost.length===1);
-    assert.deepEqual(lost,['isqueiro']);assert.deepEqual(removed,['isqueiro']);
-    needs.conditionUntil=Date.now();await until(()=>seen()?.condition==='recovering');
-    needs.conditionUntil=Date.now();await until(()=>seen()?.condition==='normal');
+    await until(()=>(authoritative as any).deaths.isDead(player.id)&&seen()?.hp===0&&seen()?.hpCore===0);
+    assert.equal(seen()?.condition,'normal','a death is not a faint');
+    (authoritative as any).deaths.disconnected(player.id);
+    await until(()=>seen()?.hp===NEEDS.hp.recoverTo&&seen()?.hpCore===0&&seen()?.interactionState==='');
 
     // Alcohol faint: taken once to the recovery point, wakes soberer.
     player.assign({x:12,y:.3,z:-6});needs.drunk=95;

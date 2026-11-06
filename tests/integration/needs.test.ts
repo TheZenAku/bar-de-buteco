@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEEDS,CONSUMABLES,applyConsumable,canRun,createNeeds,damage,drunkStage,isConscious,maxHp,relieve,staminaCost,staminaRecovery,swayAngle,swayInput,tickNeeds,type NeedsEvent,type NeedsState} from '@bar/shared';
+import {NEEDS,CONSUMABLES,applyConsumable,canRun,createNeeds,damage,killNeeds,reviveNeeds,drunkStage,isConscious,maxHp,relieve,staminaCost,staminaRecovery,swayAngle,swayInput,tickNeeds,type NeedsEvent,type NeedsState} from '@bar/shared';
 
 const STEP=.05;
 /** Runs the 20 Hz needs tick for `seconds` from `clock.now`; returns every event. */
@@ -18,29 +18,38 @@ function sane(state:NeedsState):void{
 test('every attribute starts full (bladder and drunkenness empty) on 0–100 scales, all tunable in NEEDS',()=>{
   const s=createNeeds(0);
   assert.deepEqual([s.hp,s.stamina,s.hunger,s.thirst,s.bladder,s.drunk],[100,100,100,100,0,0]);
+  assert.deepEqual([s.hpCore,s.staminaCore,s.hungerCore,s.thirstCore],[100,100,100,100],'and so do their cores');
   assert.deepEqual([NEEDS.hp.max,NEEDS.stamina.max,NEEDS.hunger.max,NEEDS.thirst.max,NEEDS.bladder.max,NEEDS.drunk.max],[100,100,100,100,100,100]);
   assert.equal(NEEDS.faint.itemLossChance,.8);
 });
 
-test('1. HP goes down with damage and the character faints only at zero, once',()=>{
+test('1. damage takes the ring first, then the heart; both at zero is death, reported once',()=>{
   const s=createNeeds(0),clock={now:0};
-  damage(s,60,0);assert.equal(s.hp,40);
-  assert.deepEqual(run(s,clock,1),[]);assert.equal(s.condition,'normal');
-  damage(s,1000,clock.now);assert.equal(s.hp,0,'HP never goes negative');
-  damage(s,Number.NaN,clock.now);damage(s,-50,clock.now);assert.equal(s.hp,0,'Invalid damage changes nothing');
-  const events=run(s,clock,NEEDS.faint.seconds-1);
-  assert.deepEqual(events,[{type:'faint',cause:'hp'}],'One faint, not one per tick');
-  assert.equal(s.condition,'fainted');assert.equal(s.faints,1);
+  damage(s,30,0);assert.equal(s.hp,70);assert.equal(s.hpCore,100,'the ring takes it first');
+  damage(s,100,0);assert.equal(s.hp,0);assert.equal(s.hpCore,70,'what is left past an empty ring takes the heart');
+  damage(s,Number.NaN,0);damage(s,-50,0);assert.equal(s.hpCore,70,'invalid damage changes nothing');
+  assert.equal(s.dead,false);
+  damage(s,1000,0);assert.equal(s.hp,0);assert.equal(s.hpCore,0,'never negative');
+  assert.deepEqual(run(s,clock,.5),[{type:'died'}]);assert.equal(s.dead,true);
+  assert.deepEqual(run(s,clock,5),[],'once, not once per tick');assert.equal(s.condition,'normal','death is not a faint');
+  reviveNeeds(s);assert.equal(s.dead,false);assert.equal(s.hp,NEEDS.hp.recoverTo);assert.equal(s.hpCore,0);
 });
 
-test('2. a faint blocks consuming and ends: HP recovers to the configured value, then normal again',()=>{
-  const s=createNeeds(0),clock={now:0};damage(s,100,0);run(s,clock,.05);
+test('1b. the ring refills from the heart, spending it; an empty heart refills nothing',()=>{
+  const s=createNeeds(0),clock={now:0};damage(s,30,0);
+  run(s,clock,10);
+  assert.ok(Math.abs(s.hp-85)<.2,`${NEEDS.cores.hp.refillPerSecond}/s for ten seconds: ${s.hp}`);
+  assert.ok(Math.abs(s.hpCore-85)<.2,'every point the ring got came out of the heart');
+  const empty=createNeeds(0);empty.hpCore=0;damage(empty,30,0);run(empty,clock,10);assert.equal(empty.hp,70);
+});
+
+test('2. a faint blocks consuming and ends: back to normal after recovering',()=>{
+  const s=createNeeds(0),clock={now:0};s.drunk=95;run(s,clock,.05);
   assert.equal(isConscious(s),false);assert.equal(canRun(s),false);
   assert.equal(applyConsumable(s,CONSUMABLES.garrafa!,clock.now),false,'Cannot drink while unconscious');
-  assert.equal(s.drunk,0);
-  const woke=run(s,clock,NEEDS.faint.seconds);
+  const woke=run(s,clock,NEEDS.faint.alcoholSeconds);
   assert.deepEqual(woke,[{type:'woke'}]);
-  assert.equal(s.condition,'recovering');assert.equal(s.hp,NEEDS.hp.recoverTo);assert.ok(isConscious(s));
+  assert.equal(s.condition,'recovering');assert.ok(isConscious(s));
   assert.deepEqual(run(s,clock,NEEDS.faint.recoveringSeconds+.1),[{type:'recovered'}]);
   assert.equal(s.condition,'normal');assert.equal(s.faints,1);
 });
@@ -73,26 +82,53 @@ test('6. hunger and thirst slow stamina gradually (no cliff) and hunger makes ru
   assert.ok(staminaCost({hunger:0})>staminaCost({hunger:100}));
 });
 
-test('7. empty thirst takes HP gradually and leads to the same faint, without a loop after waking',()=>{
-  const s=createNeeds(0),clock={now:0};s.thirst=0;
-  run(s,clock,10);
-  assert.ok(Math.abs(s.hp-(100-NEEDS.thirst.damagePerSecond*10))<.01,`gradual: ${s.hp}`);
-  s.hp=.2;const events=run(s,clock,3);
-  assert.deepEqual(events,[{type:'faint',cause:'hp'}]);
-  run(s,clock,NEEDS.faint.seconds+.1);
-  assert.equal(s.hp,NEEDS.hp.recoverTo);
-  run(s,clock,NEEDS.thirst.graceAfterWakingSeconds-3);
-  assert.equal(s.hp,NEEDS.hp.recoverTo,'Grace after waking: no immediate new damage');
-  run(s,clock,10);assert.ok(s.hp<NEEDS.hp.recoverTo&&s.hp>NEEDS.hp.recoverTo-1,'Then gradual damage again while still thirsty');
+test('7. thirst: the ring drains and is refilled from its core; with both empty HP is lost gradually, then death',()=>{
+  const s=createNeeds(0),clock={now:0};
+  run(s,clock,60);
+  assert.ok(s.thirst>99,'the ring is held up by the core');
+  assert.ok(Math.abs((100-s.thirstCore)-NEEDS.thirst.drainPerMinute)<.2,`the core paid a minute of thirst: ${s.thirstCore}`);
+  s.thirst=0;s.thirstCore=0;s.hpCore=0;
+  run(s,clock,10);assert.ok(Math.abs(s.hp-(100-NEEDS.thirst.damagePerSecond*10))<.01,`gradual: ${s.hp}`);
+  const events=run(s,clock,400);
+  assert.deepEqual(events.filter(e=>e.type==='died'),[{type:'died'}]);assert.equal(s.hp,0);assert.equal(s.hpCore,0);
   sane(s);
+});
+
+test('7b. hunger empty (ring and core) costs HP too; grace after waking',()=>{
+  const s=createNeeds(0),clock={now:0};s.hunger=0;s.hungerCore=0;s.hpCore=0;s.dehydrationGraceUntil=5000;
+  run(s,clock,4.9);assert.equal(s.hp,100,'grace');
+  run(s,clock,10);assert.ok(Math.abs(s.hp-(100-NEEDS.hunger.damagePerSecond*10))<.05,`${s.hp}`);
+});
+
+test('7c. eating fills the core gradually, and the ring draws on it',()=>{
+  const s=createNeeds(0),clock={now:0};s.hungerCore=10;s.hunger=60;
+  assert.ok(applyConsumable(s,CONSUMABLES.coxinha!,0));
+  assert.equal(s.hungerCore,10,'not at once');assert.equal(s.intake.hunger,CONSUMABLES.coxinha!.hunger);
+  run(s,clock,1);assert.ok(s.hungerCore>10+NEEDS.cores.absorbPerSecond*.5,`gradually: ${s.hungerCore}`);
+  run(s,clock,25);assert.equal(s.intake.hunger,0);assert.ok(s.hunger>=99.9,'the ring filled from it');
+  const salty=createNeeds(0);applyConsumable(salty,CONSUMABLES.torresmo!,0);assert.equal(salty.thirstCore,100+CONSUMABLES.torresmo!.thirst!,'what takes away is taken from the core at once');
+});
+
+test('7d. the stamina core is the price of resting: with it empty the bar still comes back, slowly',()=>{
+  const s=createNeeds(0),clock={now:0};s.stamina=0;s.exhausted=true;
+  run(s,clock,2);const rested=s.stamina,spent=100-s.staminaCore;
+  assert.ok(rested>20&&Math.abs(spent-rested*NEEDS.cores.stamina.cost)<.01,`${rested} for ${spent}`);
+  const dry=createNeeds(0);dry.stamina=0;dry.staminaCore=0;run(dry,clock,2);
+  assert.ok(dry.stamina>0&&dry.stamina<rested/3,`a trickle: ${dry.stamina}`);
+});
+
+test('7e. the administration kills: ring and heart to zero, one death',()=>{
+  const s=createNeeds(0),clock={now:0};killNeeds(s);
+  assert.equal(s.hp,0);assert.equal(s.hpCore,0);
+  assert.deepEqual(run(s,clock,.5),[{type:'died'}]);
 });
 
 test('8. alcohol changes drunkenness and bladder separately; it is not water',()=>{
   const s=createNeeds(0);s.thirst=50;
   assert.ok(applyConsumable(s,CONSUMABLES.garrafa!,0));
   assert.equal(s.drunk,CONSUMABLES.garrafa!.drunk);assert.equal(s.bladder,CONSUMABLES.garrafa!.bladder);
-  assert.equal(s.thirst,50+CONSUMABLES.garrafa!.thirst!,'Only the thirst declared for the drink');
-  assert.ok(s.thirst<70);
+  assert.equal(s.intake.thirst,CONSUMABLES.garrafa!.thirst!,'Only the thirst declared for the drink');
+  assert.ok(s.intake.thirst<20);
   relieve(s);assert.equal(s.bladder,0);assert.equal(s.drunk,CONSUMABLES.garrafa!.drunk,'The toilet does not sober');
   // Half a drink counts half.
   const h=createNeeds(0);applyConsumable(h,CONSUMABLES.copo!,0,.5);assert.equal(h.bladder,CONSUMABLES.copo!.bladder!/2);
@@ -134,15 +170,14 @@ test('9–10. stage 4 faints once from alcohol and wakes sober enough not to fai
   assert.equal(s.hp,100,'Alcohol faint does not cost HP');
 });
 
-test('11. foods apply immediate and temporary effects without corrupting HP',()=>{
-  const s=createNeeds(0),clock={now:0};s.hunger=20;s.hp=50;
+test('11. foods fill the cores gradually and raise the ring ceiling for a while, without corrupting HP',()=>{
+  const s=createNeeds(0),clock={now:0};s.hungerCore=20;s.hpCore=50;
   const stew={name:'Caldo de mocotó',hunger:40,hp:10,maxHp:{amount:20,seconds:30}};
   assert.ok(applyConsumable(s,stew,0));
-  assert.equal(s.hunger,60);assert.equal(s.hp,60);assert.equal(maxHp(s,0),120);
-  applyConsumable(s,{name:'Torresmo',hp:100},0);assert.equal(s.hp,120,'Up to the raised maximum');
-  run(s,clock,31);assert.equal(maxHp(s,clock.now),100);assert.equal(s.hp,100,'Bonus ends, HP brought down to the maximum');
+  run(s,clock,10);assert.ok(Math.abs(s.hungerCore-60)<1,`${s.hungerCore}`);assert.ok(s.hpCore>=30,'the heart took the stew (and paid for the raised ceiling)');assert.equal(maxHp(s,clock.now),120);
+  run(s,clock,31);assert.equal(maxHp(s,clock.now),100);assert.ok(s.hp<=100,'Bonus ends, HP brought down to the maximum');
   applyConsumable(s,{name:'Inválido',hp:Number.NaN,hunger:Infinity,maxHp:{amount:-5,seconds:10}},clock.now);
-  sane(s);assert.equal(maxHp(s,clock.now),100);
+  run(s,clock,10);sane(s);assert.equal(maxHp(s,clock.now),100);
 });
 
 test('values stay finite and in range with absurd inputs and long sessions',()=>{

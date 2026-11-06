@@ -196,6 +196,14 @@ export class CameraRig {
   }
   /** Height, sensitivity and smoothing, as Configurações has them. */
   setFeel(feel:CameraFeel):void {this.feel=readCameraFeel(feel);}
+  /** VR: the head decides where to look. The view takes the headset's heading and elevation as they are, with no easing. */
+  slave(yaw:number,pitch:number):void {
+    this.yaw=this.yawGoal=this.yawGoalBefore=yaw;
+    this.pitch=this.pitchGoal=pitch;
+    this.sinceDrag=0;
+  }
+  /** VR: in the eyes at once, with no walk in from behind. */
+  enterFirst():void {this.mode='first';this.inside=1;this.holdPitch();}
   /** Q: the next view round CAMERA_MODES. */
   cycle():CameraMode {this.setMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.mode)+1)%CAMERA_MODES.length]!);return this.mode;}
   /** One step of the wheel: towards longe or towards perto, stopping at both. Out of first person it goes back to the last distance. */
@@ -220,6 +228,10 @@ export class CameraRig {
     this.yawGoal-=dx*TURN_PER_PIXEL*this.feel.sensitivity;
     this.pitchGoal+=dy*LOOK_PER_PIXEL*this.feel.sensitivity;
     this.holdPitch();
+  }
+  /** Turns the view to look along `heading` (the camera goes to the opposite side), by the short way round; the chase does not undo it at once. */
+  face(heading:number):void {
+    this.yawGoal+=wrapped(heading+Math.PI-this.yawGoal);this.sinceDrag=0;
   }
   /** Third person keeps the horizon: back from first person's free turns on the nearest turn, without unwinding them on screen. */
   private holdPitch():void {

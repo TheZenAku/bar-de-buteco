@@ -9,10 +9,12 @@ Cada bomba tem um frentista e uma máquina de estados independente: autorizaçã
 - `packages/shared/src/refueling.ts`: bombas derivadas dos colliders reais `COL_Cid_Bomba`, orientação, pontos do tanque por modelo, preço por bomba (6 moedas/L), velocidade de 1,2 L/s e contratos públicos.
 - `apps/server/src/world/refueling.ts`: sequência autoritativa, caminhos que reutilizam a navegação do mapa e contornam veículos, cancelamento e retomada de pagamentos. Posições e animações são replicadas pelo Colyseus, com os NPCs na mesma área de interesse dos demais personagens.
 - Combustível continua em `Moto.fuel`, em percentual, e na persistência de veículos existente. Capacidades: 42 L no hatch, 5,5 L na moto. Nenhuma equação de direção ou física foi modificada.
-- `apps/web/src/engine/fuel-props.ts`: bico separado e mangueira segmentada ligados à bomba. O bico segue o punho real depois da solução de braços. Nathan reutiliza Idle/Walk; retirada, inserção e devolução usam o sistema de dois ossos já usado para servir pedidos. Tronco e joelhos se inclinam para alcançar a tampa. Não há clips dedicados de frentista nos assets disponíveis. Sem clips específicos, a pose procedural continua executando as ações.
+- `apps/web/src/engine/fuel-props.ts`: bico separado e mangueira segmentada ligados à bomba. O bico segue o punho real depois da solução de braços. O modelo próprio `frentista` usa Idle/Walk adaptados ao seu esqueleto; retirada, inserção e devolução usam o sistema de dois ossos já usado para servir pedidos. Tronco e joelhos se inclinam para alcançar a tampa. Sem clips específicos, a pose procedural continua executando as ações.
 - `apps/web/src/fuel-hud.ts`: progresso, percentual, litros, moedas e interrupção. A notificação final confirma litros e pagamento. E tem prioridade sobre a saída quando há uma bomba disponível, e não executa saída durante atendimento.
 
-## Carteira e falhas
+## Modelo do atendente
+
+O visual do atendente vem de `assets-bar/skins/Frentista/frentista.glb`. Para reconstruir o modelo publicado, execute `node tools/assets/import-mixamo.mjs frentista`: ele gera `apps/web/public/models/frentista.glb`, com textura incorporada, 65 ossos Mixamo com nomes canônicos e altura de 1,80 m. Idle, Walk e Pose ficam no próprio modelo; o cliente não solicita bancos de ações, danças ou bengala para esse NPC. Todos os atendentes das bombas usam essa skin, exclusiva do serviço de abastecimento.
 
 Aplicar a migração **019_fuel_services.sql** pelo procedimento normal de migração da API antes de iniciar esta versão. Ela acrescenta reservas e protege o saldo reservado contra débitos simultâneos de outros sistemas. A reserva não desconta moedas: o saldo só muda após o bico ser devolvido. A reserva limita o volume à quantidade pagável; ao atingir esse limite, o NPC finaliza normalmente. Tanque cheio e saldo zero são recusados antes de retirar o bico.
 

@@ -109,7 +109,7 @@ const knownClips=new Set([...Object.keys(clips),...dances.map(dance=>dance.name)
 const manifest=Object.fromEntries(Object.entries(previousManifest).filter(([name])=>knownClips.has(name)));
 const requested=process.argv.slice(2);
 // Gilmar enters once his Mixamo skin has been imported (tools/assets/import-mixamo.mjs).
-const skins = ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico', 'tiao'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
+const skins = ['nathan', 'leandro', 'rafael', 'rafael-rose', 'read', 'magrao', 'tonico', 'gilmar-gordo', 'gabriel', 'flavio-hipotetico', 'tiao', 'primo'].filter(id => fs.existsSync(path.join(models, `${id}.glb`)));
 for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   const model = readModel(id);
   const retargeted = id !== 'nathan';

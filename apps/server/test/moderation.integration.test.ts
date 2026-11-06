@@ -11,6 +11,8 @@ import type {Control} from '../src/internal.js';
 
 const eventually=async(check:()=>boolean)=>{const until=Date.now()+4000;while(!check()){if(Date.now()>until)throw new Error('Timed out');await new Promise(resolve=>setTimeout(resolve,20));}};
 test('moderation over real WebSockets: old kicks cannot remove a new join; event undo cannot stop a newer event',async()=>{
+  // Every maintenance round confirms every session here (the world spreads the checks out otherwise).
+  process.env.ACCESS_RECHECK_MS='0';
   const previous=process.env.API_INTERNAL_URL,queued:Control[]=[],rooms:Room[]=[],acknowledged:{owner:string;applied:string[];failed:{id:string}[]}[]=[];
   let banned=false,authority:BarRoom|undefined;
   const api=createServer(async(req,res)=>{
@@ -52,6 +54,6 @@ test('moderation over real WebSockets: old kicks cannot remove a new join; event
     banned=false;const third=await join();assert.ok(third.connection.isOpen);
   }finally{
     await Promise.allSettled(rooms.filter(room=>room.connection?.isOpen).map(room=>room.leave()));await server.gracefullyShutdown(false);
-    await new Promise<void>(resolve=>api.close(()=>resolve()));if(previous===undefined)delete process.env.API_INTERNAL_URL;else process.env.API_INTERNAL_URL=previous;
+    await new Promise<void>(resolve=>api.close(()=>resolve()));delete process.env.ACCESS_RECHECK_MS;if(previous===undefined)delete process.env.API_INTERNAL_URL;else process.env.API_INTERNAL_URL=previous;
   }
 });

@@ -29,11 +29,13 @@ export function lobbyHero():string{
           <span class="hero-shine" aria-hidden="true"></span>
         </div></div>
       </div>
-      <span class="hero-flash" aria-hidden="true"></span>
+      <span class="hero-flash" aria-hidden="true"></span><span class="hero-shock a" aria-hidden="true"></span><span class="hero-shock b" aria-hidden="true"></span>
       <span class="hero-burst" aria-hidden="true"></span>
+      <div class="hero-eq" aria-hidden="true">${repeat(EQ_BARS,i=>`<i style="--i:${i};--d:${(.42+((i*37)%11)/22).toFixed(2)}s"></i>`)}</div>
+      <p class="hero-hint" aria-hidden="true">Clique na logo e <b>brinde</b></p>
+      <p class="hero-tag" aria-hidden="true">O seu bar · A sua galera</p>
     </div>
-    <div class="hero-eq" aria-hidden="true">${repeat(EQ_BARS,i=>`<i style="--i:${i};--d:${(.42+((i*37)%11)/22).toFixed(2)}s"></i>`)}</div>
-    <p class="hero-hint" aria-hidden="true">Clique na logo e <b>brinde</b></p>
+    <p class="corner-tip" aria-hidden="true">Clique na logo e <b>brinde</b></p>
   </aside>`;
 }
 /** Beer bubbles rising behind the entry: spread across the width, each its own size, speed and sway. */

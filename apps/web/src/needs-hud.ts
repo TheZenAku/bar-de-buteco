@@ -33,16 +33,18 @@ const DRUNK_LINE='<defs><linearGradient id="need-drunk-line" x1="0" y1="0" x2="1
  * The only meter worth a notice: low life ends in fainting. The others turn critical in the cores around the minimap.
  * It alerts once until life gets back to a comfortable level (no spam).
  */
-const LOW_HP={title:'Você não está bem',text:'Sua vida está baixa. Se chegar a zero, você desmaia.'};
+const LOW_HP={title:'Você não está bem',text:'Sua reserva de vida está acabando. Coma algo: se ela e a vida chegarem a zero, você morre.'};
+/** The meters with a core behind their ring (the bladder and drunkenness have none). */
+const CORED=new Set(['hp','stamina','hunger','thirst']);
 
 /**
- * A core per meter, as Red Dead Online's: the ring around it is the meter, and the symbol inside fills up and drains with
- * it (`--level`, 0–1). `slot` is its place along the minimap's rim (`--i`). The name and value show over it on hover,
+ * A core per meter, as Red Dead Online's: the ring around it is the level (`--level`, 0–1) and the symbol inside is the core
+ * behind it (`--heart`, 0–1): the ring refills from the core, and eating fills the core. Bladder and drunkenness have no core. `slot` is its place along the minimap's rim (`--i`). The name and value show over it on hover,
  * and it is a meter with that name and value.
  */
 function core(id:string,label:string,value:string,now:number,slot:number,hidden=false):string {
   const glyph=GLYPHS[id]!,svg=(extra='')=>`<svg class="need-glyph${extra}" viewBox="2 2 20 20" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${glyph}</svg>`;
-  return `<div class="need" data-need="${id}" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${now}" aria-valuetext="${value}" style="--level:${now/100};--i:${slot}"${hidden?' hidden':''}>`
+  return `<div class="need" data-need="${id}" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${now}" aria-valuetext="${value}" style="--level:${now/100};--heart:${now/100};--i:${slot}"${hidden?' hidden':''}>`
     +`<svg class="need-ring" viewBox="0 0 48 48" aria-hidden="true">${id==='drunk'?DRUNK_LINE:''}<circle class="need-ring-track" cx="24" cy="24" r="21"/><circle class="need-arc" cx="24" cy="24" r="21" pathLength="100"/><circle class="need-ticks" cx="24" cy="24" r="21" pathLength="100"/></svg>`
     +`<span class="need-core" aria-hidden="true">${svg()}${svg(' need-fill')}</span><span class="need-tip" aria-hidden="true">${label}<b>${value}</b></span></div>`;
 }
@@ -83,23 +85,28 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
     last=self;
     if(!self){countdown();return;}
     const values:Record<string,number>={hp:self.hp??100,stamina:self.stamina??100,hunger:self.hunger??100,thirst:self.thirst??100,bladder:self.bladder??0,drunk:self.drunk??0};
+    const cores:Record<string,number>={hp:self.hpCore??100,stamina:self.staminaCore??100,hunger:self.hungerCore??100,thirst:self.thirstCore??100};
     const hpMax=Math.max(1,self.hpMax??100),stage=drunkStage(values.drunk!);
-    const key=JSON.stringify([values,hpMax,self.exhausted,self.condition,self.faintCause]);
+    const key=JSON.stringify([values,cores,hpMax,self.exhausted,self.condition,self.faintCause]);
     if(key!==shownKey){shownKey=key;
       for(const meter of [...METERS,DRUNK]){
         const node=root.querySelector<HTMLElement>(`[data-need="${meter.id}"]`)!,value=values[meter.id]!,max=meter.id==='hp'?hpMax:100;
-        const critical=meter.low?value<=meter.alertAt:value>=meter.alertAt,text=meter.id==='drunk'?STAGES[stage]!:String(value);
+        // With a core behind it the ring stays full while the core lasts: what is critical is the weaker of the two.
+        const core=CORED.has(meter.id)?cores[meter.id]!:undefined,weakest=core===undefined?value:Math.min(value,core);
+        const critical=meter.low?weakest<=meter.alertAt:value>=meter.alertAt,text=meter.id==='drunk'?STAGES[stage]!:core===undefined?String(value):`${value} · reserva ${core}`;
         node.classList.toggle('critical',critical||(meter.id==='stamina'&&!!self.exhausted));
         node.style.setProperty('--level',String(Math.max(0,Math.min(1,value/max))));
+        node.style.setProperty('--heart',String(core===undefined?Math.max(0,Math.min(1,value/max)):Math.max(0,Math.min(1,core/100))));
         node.querySelector('.need-tip b')!.textContent=text;
         node.setAttribute('aria-valuenow',String(value));node.setAttribute('aria-valuemax',String(max));node.setAttribute('aria-valuetext',text);
-        const before=shown.get(meter.id);shown.set(meter.id,value);
-        if(before!==undefined&&meter.id!=='drunk'&&(meter.low?value-before:before-value)>=2)flash(node,meter.id);
+        // The core is what eating changes: that is what flashes (the bladder and the ring of the others as before).
+        const level=core??value,before=shown.get(meter.id);shown.set(meter.id,level);
+        if(before!==undefined&&meter.id!=='drunk'&&(meter.low?level-before:before-level)>=2)flash(node,meter.id);
       }
       root.querySelector<HTMLElement>('[data-need="drunk"]')!.hidden=values.drunk!<=0;
       for(let s=1;s<=4;s++)document.body.classList.toggle(`drunk-${s}`,stage===s);
     }
-    alert(values.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',values.hp!>NEEDS.hp.alertAt+15);
+    alert(cores.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',cores.hp!>NEEDS.hp.alertAt+15);
     countdown();
   }
   function reset():void{warned=false;shownKey='';last=undefined;shown.clear();countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}

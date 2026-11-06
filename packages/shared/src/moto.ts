@@ -4,7 +4,7 @@ import {findSpawn,floorHeight,isWalkable,PLAYER_RADIUS,roadHeight,solidsBetween,
 import type {Collider,Position} from './index.js';
 import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
-import {CAR,CAR_MODEL,isPassenger,vehicleOccupants} from './vehicle-models.js';
+import {CAR,CAR_MODEL,MOTO_FOGO_MODEL,VEHICLE_MODELS,isPassenger,vehicleOccupants} from './vehicle-models.js';
 
 /** v4 is authored in metres (30 cm tyres and an 80 cm seat). No scooter scale correction. */
 const SCALE=1;
@@ -39,7 +39,13 @@ export const MOTO={
 
 type VehiclePhysics={[K in keyof typeof MOTO]:number};
 const CAR_PHYSICS:VehiclePhysics={...MOTO,...CAR};
-export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===CAR_MODEL?CAR_PHYSICS:MOTO;
+/**
+ * The Caveira em Chamas (moto_fogo.glb, scripts/58_moto_fogo.py): the delivery bike's engine and handling on its own measurements,
+ * taken from the model: round 29,7 cm wheels (rebuilt on their axles), axles 1,5128 m apart, 2,16 m long. The hull is the body and the grips; the spiked bar
+ * ends (±0,63 m, above 1 m) are left out so it does not stick on doorways.
+ */
+export const MOTO_FOGO:VehiclePhysics={...MOTO,WHEELBASE:1.5128,WHEEL_RADIUS:.297,HALF_WIDTH:.46,HALF_LENGTH:1.08,CENTRE_Z:-.0225,HEIGHT:1.18};
+export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===CAR_MODEL?CAR_PHYSICS:model===MOTO_FOGO_MODEL?MOTO_FOGO:MOTO;
 export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number;/** Local +X velocity (m/s), and yaw velocity (rad/s). Absent legacy fields read as zero. */lateralSpeed?:number;yawRate?:number}
 /** Which lamps are lit beyond the ones always on (MotoState.lights). */
 export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
@@ -63,7 +69,7 @@ export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
 export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:')||isPassenger(interaction);
 export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,lateralSpeed:0,yawRate:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
-export const motoSpawnSchema=z.object({model:z.enum(['moto-delivery','carro-hatch']).optional()}).strict();
+export const motoSpawnSchema=z.object({model:z.enum(VEHICLE_MODELS).optional()}).strict();
 /** How far a body is from the hull, seen from above. */
 export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position)=>hullGap(moto,position);
 /** One bike, or every bike when there is no id. */

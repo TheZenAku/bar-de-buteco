@@ -1,0 +1,164 @@
+/* Touch play (touch-mode.ts, touch-controls.ts). Every rule hangs from html.touch-ui, so a keyboard-and-mouse player never sees any
+   of it. The controls sit in the lower corners, the thumbs' places: the stick (left) and the buttons (right). Sizes follow --s,
+   smaller on short landscape screens. Plain translucent fills, no backdrop blur: software compositing (and old phones) pays for each. */
+
+/* ---- The page itself: no zoom, no pull-to-refresh, no selection or callout from a long press. */
+html.touch-ui,html.touch-ui body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;touch-action:manipulation}
+html.touch-ui .game,html.touch-ui #labels,html.touch-ui .vignette{-webkit-user-select:none;user-select:none}
+html.touch-ui .game .messages,html.touch-ui .game input{-webkit-user-select:text;user-select:text}
+html.touch-ui #world{touch-action:none}
+
+.tp{--s:1;--pad:max(14px,env(safe-area-inset-right));--padl:max(14px,env(safe-area-inset-left));--padb:max(14px,env(safe-area-inset-bottom));
+  --m:calc(78px * var(--s));--b:calc(54px * var(--s));--r:calc(96px * var(--s));--st:calc(138px * var(--s));
+  --fill:oklch(.13 .05 300 / 62%);--edge:oklch(.75 .2 330 / 55%);--lit:oklch(.62 .28 330 / 85%);
+  position:absolute;inset:0;pointer-events:none;z-index:60;font-family:var(--font-display,inherit)}
+.tp-hidden{display:none}
+.tp *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+
+/* The stick: the whole lower left takes the thumb (the base appears under it); at rest a faint base shows where it is. */
+.tp-zone{position:absolute;left:0;bottom:0;width:38%;height:62%;pointer-events:auto}
+.tp-stick{position:absolute;width:var(--st);height:var(--st);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,oklch(.16 .06 300 / 40%) 0 58%,oklch(.12 .05 300 / 62%) 59%);
+  border:2px solid var(--edge);box-shadow:0 0 18px oklch(.62 .28 330 / 30%),inset 0 0 18px oklch(0 0 0 / 40%);
+  display:grid;place-items:center}
+.tp-stick.tp-rest{left:calc(var(--padl) + 112px * var(--s));bottom:var(--padb);opacity:.55}
+.tp-stick.tp-live{opacity:1}
+.tp-knob{width:46%;height:46%;border-radius:50%;background:radial-gradient(circle at 36% 28%,oklch(.78 .22 330),oklch(.5 .26 320));
+  border:2px solid oklch(.92 .1 330 / 70%);box-shadow:0 4px 12px oklch(0 0 0 / 55%),0 0 14px oklch(.62 .28 330 / 55%)}
+
+/* The buttons are placed on arcs around the big one (its centre is --m/2 + --pad from the right and the bottom corner). */
+.tp-cluster{position:absolute;inset:0;pointer-events:none}
+.tp-btn{--w:var(--b);--dx:0px;--dy:0px;position:absolute;width:var(--w);height:var(--w);border-radius:50%;pointer-events:auto;cursor:pointer;
+  right:calc(var(--pad) + var(--m) / 2 + var(--dx) - var(--w) / 2);bottom:calc(var(--padb) + var(--m) / 2 + var(--dy) - var(--w) / 2);
+  display:grid;place-items:center;align-content:center;gap:0;padding:0;color:var(--foreground,#fff);
+  background:var(--fill);border:2px solid var(--edge);box-shadow:0 4px 14px oklch(0 0 0 / 45%);
+  transition:background-color .08s,transform .08s,border-color .08s}
+.tp-btn .ui-icon{width:calc(22px * var(--s));height:calc(22px * var(--s));grid-area:1/1;align-self:end}
+.tp-btn b{grid-area:2/1;font:600 calc(8.5px * var(--s))/1 var(--font-mono,monospace);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;color:oklch(1 0 0 / 78%);align-self:start}
+.tp-btn.tp-down,.tp-btn.tp-on{background:var(--lit);border-color:oklch(.92 .1 330 / 80%);transform:scale(.93)}
+.tp-main{--w:var(--m);--dx:0px;--dy:0px;border-color:oklch(.85 .16 200 / 70%);background:oklch(.2 .1 290 / 70%)}
+.tp-main .ui-icon{width:calc(28px * var(--s));height:calc(28px * var(--s))}
+.tp-main b{font-size:calc(9.5px * var(--s))}
+.tp-chat{--dx:0px;--dy:var(--r)}
+.tp-more{--w:calc(var(--b) * .9);--dx:calc(var(--r) * .74);--dy:calc(var(--r) * .74)}
+.tp-run{--dx:var(--r);--dy:0px}
+/* In a vehicle the stick steers and gives gas; the brake and the horn stack above the chat button. */
+.tp-brake,.tp-horn{display:none;--w:calc(var(--b) * .92)}
+.tp-horn{--dx:0px;--dy:calc(var(--r) + var(--b) * 1.04)}
+.tp-brake{--dx:0px;--dy:calc(var(--r) + var(--b) * 2.04)}
+.tp[data-kind=bike] :is(.tp-brake,.tp-horn),.tp[data-kind=car] :is(.tp-brake,.tp-horn){display:grid}
+.tp[data-kind=car] .tp-run{display:none}
+/* On the horse the bike's Shift (rearing) is the only extra. */
+
+/* The sheet with everything else. */
+.tp-sheet{position:absolute;left:50%;bottom:calc(var(--padb) - 4px);translate:-50% 0;width:min(560px,calc(100% - 28px));max-height:calc(100dvh - 90px);overflow:auto;pointer-events:auto;z-index:5;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;padding:10px;background:oklch(.12 .045 300 / 96%);border:1px solid var(--edge);box-shadow:0 10px 36px oklch(0 0 0 / 65%)}
+.tp-sheet::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.tp-sheet.hidden{display:none}
+.tp-sheet button{display:grid;justify-items:center;align-content:center;gap:4px;min-height:54px;padding:6px 4px;background:oklch(.2 .06 300 / 70%);border:1px solid oklch(1 0 0 / 10%);color:var(--foreground,#fff);cursor:pointer}
+.tp-sheet button.tp-down{background:var(--lit)}
+.tp-sheet .ui-icon{width:22px;height:22px;color:var(--vw-pink,#ff5ac8)}
+.tp-sheet span{font:600 10px/1.15 var(--font-mono,monospace);letter-spacing:.05em;text-transform:uppercase;text-align:center}
+
+/* ---- The rest of the HUD, made for fingers. */
+html.touch-ui .game>[data-panel=actions],html.touch-ui .key-hints,html.touch-ui .crosshair{display:none!important}
+html.touch-ui .context kbd{display:none}
+html.touch-ui .context{padding:10px 16px;min-height:44px}
+html.touch-ui .game-tools .hud-btn,html.touch-ui .voice-tools .hud-btn{min-width:42px;height:42px}
+html.touch-ui .game-header .panel-menu button,html.touch-ui .panel-menu .hud-btn{min-height:44px}
+html.touch-ui .hud-btn,html.touch-ui .mini-button,html.touch-ui .button{min-height:40px}
+
+/* Landscape (the way to play): the minimap keeps its corner, smaller, and the stick rests beside it; the chat moves to the top left. */
+html.touch-ui .minimap{--map:92px;--core:23px;--arc-step:25deg;left:max(12px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom))}
+html.touch-ui .minimap-zone{font-size:8px;padding:2px 7px}
+html.touch-ui .prompts{bottom:max(14px,env(safe-area-inset-bottom))}
+html.touch-ui .vehicle-hud{width:min(340px,calc(100% - 520px));bottom:8px}
+html.touch-ui .event-banner,html.touch-ui .toasts{top:60px}
+html.touch-ui .game>[data-panel=chat]{left:max(12px,env(safe-area-inset-left))!important;right:auto!important;top:68px!important;width:min(330px,46vw)!important;max-height:calc(100dvh - 250px)!important}
+html.touch-ui .game>[data-panel=chat].chat-open{top:calc(var(--vv-top,0px) + 8px)!important;width:min(520px,calc(100vw - 24px))!important;z-index:200!important}
+html.touch-ui .game>[data-panel=chat].chat-open{max-height:calc(100dvh - 16px)!important}
+html.touch-ui [data-panel=chat].chat-open .panel-foot{display:none}
+html.touch-ui [data-panel=chat] .messages{height:auto;min-height:0;max-height:76px}
+html.touch-ui [data-panel=chat].chat-open .messages{max-height:60px}
+html.touch-ui #chat-input{min-height:44px;font-size:16px}
+html.touch-ui .game>[data-panel=job]{left:auto!important;right:max(12px,env(safe-area-inset-right))!important;top:64px!important}
+
+@media(max-height:430px){.tp{--s:.86}html.touch-ui .minimap{--map:80px;--core:21px;--arc-step:26deg}}
+@media(max-height:360px){.tp{--s:.76}}
+
+/* Portrait: plenty of height, little width. The minimap climbs above the stick, the buttons keep their arcs. */
+@media(orientation:portrait){
+  .tp{--s:.9}
+  .tp-zone{width:50%;height:48%}
+  .tp-stick.tp-rest{left:max(18px,env(safe-area-inset-left))}
+  html.touch-ui .minimap{bottom:calc(max(16px,env(safe-area-inset-bottom)) + var(--st-pad,160px))}
+  html.touch-ui .prompts{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 150px)}
+  html.touch-ui .vehicle-hud{width:calc(100% - 24px);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 150px)}
+  html.touch-ui .game>[data-panel=chat]{top:96px!important;width:calc(100vw - 24px)!important;max-height:calc(100dvh - 380px)!important}
+  html.touch-ui .game>[data-panel=job]{top:150px!important}
+}
+
+/* Windows: a finger-sized close button, and less chrome on a short screen so the content gets the room. */
+html.touch-ui .modal-header button{width:44px;height:44px}
+@media(max-height:560px){
+  html.touch-ui .modal-backdrop{padding:6px}
+  html.touch-ui .modal{max-height:calc(100dvh - 12px)}
+  html.touch-ui .modal-header{padding:4px 6px 4px 16px;gap:8px}
+  html.touch-ui .modal-header h2{font-size:15px}
+  html.touch-ui #modal-content{padding:12px 16px}
+}
+html.touch-ui .world-menu button{min-height:46px;padding:10px 16px;font-size:14px}
+
+/* The toolbar and logo clear a notch or a rounded corner. */
+html.touch-ui .game-header{inset:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) auto max(10px,env(safe-area-inset-left))}
+
+/* The entry on a short (landscape) screen: the sign steps aside so the menu is in sight without scrolling. */
+@media(max-height:560px){
+  html.touch-ui .lobby-hero,html.touch-ui .hero-stage{display:none}
+  html.touch-ui .menu-header{padding:10px 16px;flex-wrap:nowrap}
+  html.touch-ui .menu-title{font-size:24px}
+  html.touch-ui .lobby .money-panel{padding:6px 10px;font-size:11px}
+  html.touch-ui .menu-section{margin:0 16px}
+}
+
+/* Collection (C) on a phone on its side: the desktop layout has no room for the buy and wear buttons at 390 px tall.
+   Same idea as its portrait layout (one column that scrolls, the hand first), with the card beside its details. */
+@media (max-height:560px) and (min-width:781px){
+  html.touch-ui .cl{--hand-card:56px;display:flex;flex-direction:column;overflow:auto;overscroll-behavior:contain}
+  html.touch-ui .cl>*{flex:none}
+  html.touch-ui .cl-head{padding:8px 64px 4px 18px;gap:14px}
+  html.touch-ui .cl-title h2{font-size:17px}
+  html.touch-ui .cl-progress{width:150px}
+  html.touch-ui .cl-hand-wrap{order:1;overflow-x:auto;justify-content:flex-start;padding:2px 12px 8px}
+  html.touch-ui .cl-hand{justify-content:flex-start;align-items:flex-start;padding-top:6px}
+  html.touch-ui .cl-hand-card,html.touch-ui .cl-hand-card:hover,html.touch-ui .cl-hand-card[aria-selected="true"]{margin-inline:3px;transform:none}
+  html.touch-ui .cl-stage{order:2;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:8px 22px;align-items:start;justify-content:center;max-width:none;padding:4px 20px 18px}
+  html.touch-ui .cl-focus{grid-column:1;grid-row:1/3;height:auto;width:min(34vh,150px);max-height:none}
+  html.touch-ui .cl-variants{grid-column:2;grid-row:1;justify-self:start;width:100%;max-height:none}
+  html.touch-ui .cl-variants.alone{display:none}
+  html.touch-ui .cl-variant-list{grid-template-columns:repeat(auto-fill,minmax(70px,84px));overflow:visible}
+  html.touch-ui .cl-variant,html.touch-ui .cl-variant:hover,html.touch-ui .cl-variant[aria-pressed="true"]{transform:none}
+  html.touch-ui .cl-info{grid-column:2;grid-row:2;width:100%;max-width:none;max-height:none;overflow:visible}
+  html.touch-ui .cl-keys{display:none}
+}
+
+/* ---- Vehicle dashboard on touch: a small speed chip by default (it hid the road); a tap on it opens the full dashboard. */
+html.touch-ui .vehicle-hud:not(.vh-open){left:50%;right:auto;transform:translateX(-50%);width:92px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 6px)}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-dashboard{aspect-ratio:auto;filter:none}
+html.touch-ui .vehicle-hud:not(.vh-open) :is(.vh-frame,.vh-heading,.vh-metrics,.vh-functions,.vh-signals,.vh-utility,.vh-refuel,.vh-passenger,.vh-dial>svg){display:none}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-dial{position:relative;width:100%;height:auto;display:grid;justify-items:center;gap:1px;padding:5px 4px 4px;pointer-events:auto;cursor:pointer;
+  background:oklch(.13 .05 300 / 62%);border:1px solid oklch(.75 .2 330 / 55%);border-radius:12px}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-dial>strong{position:static;font-size:30px;line-height:1;letter-spacing:-.04em;text-shadow:none}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-unit{position:static;font-size:10px}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-gears{position:static;width:auto;height:auto;padding:0;border:0;background:none;font-size:11px;gap:0}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-gears>[data-vh-position]:not(.is-selected){display:none}
+html.touch-ui .vehicle-hud:not(.vh-open) .vh-gears>[data-vh-position]{width:18px;height:16px}
+html.touch-ui .vehicle-hud.vh-open .vh-dial{pointer-events:auto;cursor:pointer}
+@media(orientation:portrait){
+  html.touch-ui .vehicle-hud.vh-open{left:10px;right:max(122px,env(safe-area-inset-right));width:auto;transform:none}
+}
+
+/* ---- Minigames on a phone: the foosball and blackjack panels take the whole screen like pool and truco (they were sized for a desktop window). */
+html.touch-ui .game>.foosball{left:6px;top:6px;translate:none;width:calc(100vw - 12px);height:calc(100dvh - 12px);z-index:110}
+html.touch-ui .game>.blackjack{bottom:6px;width:calc(100vw - 12px);max-height:calc(100dvh - 12px);z-index:110;overflow:auto}
+html.touch-ui .bj{max-height:none}

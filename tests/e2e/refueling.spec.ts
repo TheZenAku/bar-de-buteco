@@ -6,6 +6,7 @@ test('physical pump: animated walk, hand-bound nozzle, tank insertion, return an
   const status=()=>page.evaluate(()=>(window as any).fixture.status()[0]);
   await expect.poll(status).toBeTruthy();
   await expect.poll(()=>page.evaluate(()=>!!(window as any).fixture.scene.actors.get((window as any).fixture.pump.npcId)?.skin)).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.actors.get((window as any).fixture.pump.npcId)?.skinId)).toBe('frentista');
   await page.evaluate(()=>(window as any).fixture.walk());
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.actors.get((window as any).fixture.pump.npcId).skin.clip)).toBe('Walk');
   await page.screenshot({path:'test-results/previews/fuel-walking.png'});

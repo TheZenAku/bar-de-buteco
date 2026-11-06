@@ -20,8 +20,8 @@ export const PHONE={
   audioMaxMs:60_000,audioMaxBytes:900_000,videoMaxMs:30_000,videoMaxBytes:6_000_000,
   /** What one account keeps sent in Highzap; past it, its oldest media are deleted (the messages stay, marked). */
   mediaQuotaBytes:150_000_000,
-  /** Video calls: JPEG frames relayed by the room, each under the WebSocket message limit (8 kB). */
-  videoFrameWidth:168,videoFrameHeight:224,videoFps:8,videoFrameMaxBytes:7_600,
+  /** Video calls: JPEG frames relayed by the room, each under the WebSocket message limit (24 kB). */
+  videoFrameWidth:240,videoFrameHeight:320,videoFps:12,videoFrameMaxBytes:22_000,videoFrameTargetBytes:16_000,
 } as const;
 
 /** Highgram handles: lower-case letters, digits, dot and underscore. */
@@ -62,7 +62,10 @@ export interface PhoneContact {id:string;name:string;color:string;number:string;
 export interface PhoneProfile {number:string;contacts:PhoneContact[];unread:number;photo?:number}
 /** A Highzap attachment; `id` is missing once the sender's quota deleted the file (the message stays). */
 export interface ZapMedia {id?:string;kind:PhoneMediaKind;ms?:number}
-export interface ZapMessage {id:string;from:string;to:string;text:string;sentAt:number;readAt?:number;media?:ZapMedia}
+/** A fixed position in the game, captured when the player taps Send location. */
+export const zapLocationSchema=z.object({x:z.number().min(-400).max(400),y:z.number().min(-100).max(200),z:z.number().min(-400).max(400)}).strict();
+export type ZapLocation=z.infer<typeof zapLocationSchema>;
+export interface ZapMessage {id:string;from:string;to:string;text:string;sentAt:number;readAt?:number;media?:ZapMedia;location?:ZapLocation}
 /** `saved`: the peer is in your contacts (otherwise the phone shows the number, as a messenger does for strangers). */
 export interface ZapThread {peer:PhoneContact;last:ZapMessage;unread:number;saved:boolean}
 export interface GramAuthor {id:string;name:string;handle:string;color:string;photo?:number}

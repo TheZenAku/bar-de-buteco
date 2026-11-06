@@ -75,24 +75,29 @@ export class GameBank implements TableBank {
   }
 
   private async deliver(): Promise<void> {
-    for (const record of this.outbox.pending()) {
-      if (record.kind !== `${this.game}-settle`) continue;
-      const settlement = record.payload as SettleEntry;
-      try {
-        const answer = walletChangeSchema.safeParse(await this.send<unknown>(`${this.game}/settle`, settlement));
-        this.outbox.complete([record.id]);
-        if (answer.success) this.hooks.wallet?.(settlement.userId, answer.data);
-      } catch (error) {
-        if (error instanceof InternalApiError && error.status >= 400 && error.status < 500) {
-          this.outbox.fail([record.id], error.message);
-          this.hooks.log(`${this.game}_settle_refused`, { playerId: settlement.userId, roundId: settlement.roundId, reason: error.message });
-          continue;
+    // The outbox file is rewritten whole on every change, so delivered records leave in one batch, not one rewrite each.
+    // A crash before that only repeats a settlement, which the API pays once.
+    const done: string[] = [];
+    try {
+      for (const record of this.outbox.pending()) {
+        if (record.kind !== `${this.game}-settle`) continue;
+        const settlement = record.payload as SettleEntry;
+        try {
+          const answer = walletChangeSchema.safeParse(await this.send<unknown>(`${this.game}/settle`, settlement));
+          done.push(record.id);
+          if (answer.success) this.hooks.wallet?.(settlement.userId, answer.data);
+        } catch (error) {
+          if (error instanceof InternalApiError && error.status >= 400 && error.status < 500) {
+            this.outbox.fail([record.id], error.message);
+            this.hooks.log(`${this.game}_settle_refused`, { playerId: settlement.userId, roundId: settlement.roundId, reason: error.message });
+            continue;
+          }
+          // The API is away: the rest waits for the next maintenance round.
+          this.hooks.log(`${this.game}_settle_retry`, { playerId: settlement.userId, roundId: settlement.roundId });
+          return;
         }
-        // The API is away: the rest waits for the next maintenance round.
-        this.hooks.log(`${this.game}_settle_retry`, { playerId: settlement.userId, roundId: settlement.roundId });
-        return;
       }
-    }
+    } finally { this.outbox.complete(done); }
   }
 
   private recover(): void {

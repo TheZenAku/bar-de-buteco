@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import {BAR_ANIMATIONS,CLEANABLE_TABLES,INTERACTABLES,URINALS,seatChair,type BarClip,type BarFrame,type BarGroup,type BarStep} from '@bar/shared';
+import {unflipForearms} from './forearm-roll';
 import {alignedRest,boneName,convert,readClip,readSource,readTarget,sample,type Clip,type Source,type Target} from './mixamo-retarget';
 import {isSmoking,polishSmoking} from './smoking-pose';
 
@@ -498,6 +499,7 @@ export class BarAnimations {
           // Instantiated, before any clip runs: the authoring skeleton and the props at rest.
           const entity=container.instantiateRenderEntity();
           const clips=tracks.map(track=>readClip(track,node=>/^(Prop_|FX_)/.test(node)));
+          for(const clip of clips)unflipForearms(clip);
           target.source=readSource(entity,clips);
           for(const clip of clips)target.clips.set(clip.name,clip);
           for(const child of entity.children)if(/^(Prop_|FX_)/.test(child.name))target.rest.set(child.name,{p:child.getLocalPosition().clone(),q:child.getLocalRotation().clone(),s:child.getLocalScale().clone()});

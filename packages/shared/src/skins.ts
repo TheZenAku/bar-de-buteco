@@ -6,7 +6,7 @@ import {RARITIES,type Rarity} from './rarity.js';
  * own model (apps/web/public/models/<id>.glb) sold on its own. What stands here are the defaults; the administration overrides the rarity,
  * the text and whether a card is sold (skin_catalog), and the price (the price table).
  */
-export const SKIN_IDS=['nathan','leandro','rafael','rafael-rose','read','gilmar-gordo','gabriel','flavio-hipotetico','tiao'] as const;
+export const SKIN_IDS=['nathan','leandro','rafael','rafael-rose','read','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo','morte'] as const;
 export type SkinId=typeof SKIN_IDS[number];
 export interface Skin {
   id:SkinId;
@@ -20,6 +20,8 @@ export interface Skin {
   /** The light behind the character on its card; the frame has the colour of the rarity. */
   accent:string;
   description:string;
+  /** Never sold: it comes only from the administration (hidden in the catalog by default, and the purchase refuses it). */
+  adminOnly?:boolean;
 }
 // Player models, each with its own skeleton and animation bank.
 export const SKINS:readonly Skin[]=[
@@ -32,6 +34,8 @@ export const SKINS:readonly Skin[]=[
   {id:'gabriel',name:'Gabriel',base:'gabriel',variant:'Original',rarity:'rare',price:900,accent:'#3cc7f0',description:'Veio direto da pelada, de chuteira e tudo. Sempre de saída e nunca vai embora.'},
   {id:'flavio-hipotetico',name:'Flavio Hipotético',base:'flavio-hipotetico',variant:'Original',rarity:'rare',price:900,accent:'#b46cff',description:'Terno, faixa no peito e discurso pronto. Em tese, está no bar. Na prática, também.'},
   {id:'tiao',name:'Tião',base:'tiao',variant:'Original',rarity:'rare',price:900,accent:'#c68c4f',description:'Chapéu, casaco de couro e bota empoeirada. Veio de longe e só vai embora depois da última rodada.'},
+  {id:'primo',name:'Primo',base:'primo',variant:'Original',rarity:'rare',price:1000,accent:'#4fd18b',description:'Chegou sem avisar, como todo primo. Pede só uma cerveja e fica até o fim da noite.'},
+  {id:'morte',name:'Morte',base:'morte',variant:'Original',rarity:'legendary',price:0,accent:'#8a0f1f',description:'Capuz, foice e nenhuma pressa. Só aparece para quem ela escolhe.',adminOnly:true},
 ];
 /** Free for every account: new players wear it, and anything not owned falls back to it. The others are sold. */
 export const DEFAULT_SKIN:SkinId='nathan';

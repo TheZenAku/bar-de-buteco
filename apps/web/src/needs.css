@@ -1,6 +1,6 @@
 /* Needs: the player's state as small round cores along the minimap's rim, as in Red Dead Online. The ring around each one
-   is its meter, in ten segments and the meter's colour, and the symbol inside fills up and drains with it (--level, set
-   by needs-hud.ts). From the left: life, breath, hunger, thirst, the bladder and, while there is alcohol, drunkenness.
+   is its level (--level) and the symbol inside is the core behind it (--heart): the ring refills from it, and eating fills
+   it (both set by needs-hud.ts). From the left: life, breath, hunger, thirst, the bladder and, while there is alcohol, drunkenness.
    Each core sits on an arc over the map (minimap.css sets --core, --orbit, --arc-start and --arc-step for each screen
    size; --i is its place). No panel and no numbers: the name and value show over a core on hover. */
 .status-hud{position:absolute;inset:0;pointer-events:none}
@@ -26,7 +26,7 @@
 .need-glyph{grid-area:1/1;width:60%;height:60%;overflow:visible;color:oklch(1 0 0 / 16%)}
 .need-glyph .need-cut{fill:none;stroke:oklch(.15 .05 300)}
 /* The full symbol, cut from the top down to the level: it drains as the meter goes down. */
-.need-fill{color:var(--need);clip-path:inset(calc((1 - var(--level)) * 100%) 0 0 0);transition:clip-path .6s cubic-bezier(.3,.7,.3,1),color .3s}
+.need-fill{color:var(--need);clip-path:inset(calc((1 - var(--heart,var(--level))) * 100%) 0 0 0);transition:clip-path .6s cubic-bezier(.3,.7,.3,1),color .3s}
 .need[data-need=stamina]{--need:var(--vw-mint)}
 .need[data-need=hunger]{--need:var(--hl-orange)}
 .need[data-need=thirst]{--need:var(--hl-cyan)}

@@ -1,4 +1,4 @@
-import {CALL_END_TEXT,HIGHFOOD,PHONE,type HighfoodState,type PhoneCallView,type PhonePing,type PhoneProfile} from '@bar/shared';
+import {CALL_END_TEXT,HIGHFOOD,PHONE,formatWorldDate,type HighfoodState,type PhoneCallView,type PhonePing,type PhoneProfile} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {gameHour} from '../engine/day-night';
 import {uiIcon} from '../ui-icons';
@@ -13,6 +13,8 @@ import {highfood} from './apps/highfood';
 import {highmotors} from './apps/motors';
 import {notas,calendario,relogio,calculadora,ajustes} from './apps/tools';
 import {WALLPAPERS} from './wallpapers';
+import {createFrameEncoder} from './frame-encoder';
+import {createFrameReceiver} from './frame-receiver';
 import './phone.css';
 
 /** Dock first (Telefone, Highzap, Highgram, Câmera), then the home screen's grid. */
@@ -48,10 +50,10 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
   const sounds=new PhoneSounds(()=>host.volume());
   const shell=document.createElement('div');shell.id='phone';shell.className='phone-shell';shell.hidden=true;
   shell.setAttribute('role','dialog');shell.setAttribute('aria-label','Celular');
-  shell.innerHTML=`<div class="phone-device"><span class="ph-btn ph-action" aria-hidden="true"></span><span class="ph-btn ph-vol-up" aria-hidden="true"></span><span class="ph-btn ph-vol-down" aria-hidden="true"></span><span class="ph-btn ph-power" aria-hidden="true"></span>
+  shell.innerHTML=`<div class="phone-device"><span class="ph-btn ph-action" aria-hidden="true"></span><span class="ph-btn ph-vol-up" aria-hidden="true"></span><span class="ph-btn ph-vol-down" aria-hidden="true"></span><button type="button" class="ph-btn ph-power" data-phone-close aria-label="Fechar o celular"></button>
     <div class="phone-screen"><div class="ph-wall"></div><div class="ph-home"></div><div class="ph-app-host"></div><div class="ph-call-host"></div><div class="ph-banners"></div>
     <div class="ph-status"><b class="ph-time"></b><span class="ph-status-right">${statusIcons}</span></div>
-    <button class="ph-island" type="button" aria-label="Dynamic Island"></button><button class="ph-home-bar" type="button" data-phone-home aria-label="Voltar à tela inicial"></button></div></div>`;
+    <button class="ph-island" type="button" aria-label="Dynamic Island"></button><button class="ph-home-bar" type="button" data-phone-home aria-label="Voltar à tela inicial"></button></div></div><button type="button" class="ph-x" data-phone-close aria-label="Fechar o celular">${uiIcon('close')}</button>`;
   const pill=document.createElement('div');pill.id='phone-pill';pill.className='phone-pill';pill.hidden=true;
   root.append(shell,pill);
   const $=<T extends HTMLElement>(selector:string)=>shell.querySelector<T>(selector)!;
@@ -63,7 +65,16 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
   // Video calls: your camera (front = the game camera on your face, as the selfie; back = your own view of the bar),
   // sent as small JPEGs while the call screen is in front of you; the other end's last frame, and when it came.
   const camera={on:false,front:true};
-  let capturing=false,quality=.6,selfieForCall=false,preview:MediaStream|undefined,remote:ImageBitmap|undefined,remoteAt=0,remoteLive=false;
+  let quality=.6,tier=1,growStreak=0,holdTier=0,slowStreak=0,videoGeneration=0,selfieForCall=false,remoteAt=0,remoteLive=false;
+  // What fits one frame is a size and a JPEG quality together: the sender walks this ladder (the other end draws whatever size arrives).
+  const LADDER:ReadonlyArray<readonly [number,number]>=[[192,256],[240,320],[288,384],[336,448]];
+  const encoder=createFrameEncoder();
+  type VideoFrame={bitmap:ImageBitmap;at:number;id:string;epoch:number;front:boolean};
+  let pendingVideo:VideoFrame|undefined,encodingVideo=false;
+  const receiver=createFrameReceiver(bytes=>createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/jpeg'})),()=>{
+    remoteAt=performance.now();
+    if(!remoteLive){remoteLive=true;renderCall();}else paintRemote();
+  });
 
   const ctx:PhoneContext={host,store,gallery,sounds,
     settings:()=>settings,
@@ -120,9 +131,16 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     layout();
   }
   function layout():void {
-    const fit=Math.min((innerHeight-24)/864,(innerWidth-24)/410),mobile=innerWidth<=760;
-    shell.style.setProperty('--phone-scale',String(mobile?Math.min(1,fit):Math.min(fit,SCALE[settings.size]??SCALE.m)));
-    shell.classList.toggle('mobile',mobile);
+    // A short screen with a finger (a phone on its side): a shorter device, so the apps are big enough to read and touch.
+    const touch=document.documentElement.classList.contains('touch-ui'),compact=touch&&innerHeight<=560,deviceHeight=compact?Math.max(560,Math.min(660,innerWidth<innerHeight?864:Math.round(innerHeight*1.55))):864;
+    const fit=Math.min((innerHeight-(compact?12:24))/deviceHeight,(innerWidth-24)/410),mobile=innerWidth<=760;
+    const scale=compact?fit:mobile?Math.min(1,fit):Math.min(fit,SCALE[settings.size]??SCALE.m);
+    shell.style.setProperty('--ph-h',deviceHeight+'px');
+    shell.style.setProperty('--phone-scale',String(scale));
+    shell.classList.toggle('mobile',mobile);shell.classList.toggle('compact',compact);
+    // Where the X fits: beside the device, above it, or (no room) over its corner.
+    const wide=410*scale,tall=deviceHeight*scale,side=(mobile?(innerWidth-wide)/2:innerWidth-22-wide)>=58,top=innerHeight-8-tall>=54;
+    shell.classList.toggle('x-side',side);shell.classList.toggle('x-top',!side&&top);shell.classList.toggle('x-in',!side&&!top);
   }
   addEventListener('resize',layout);
 
@@ -131,14 +149,19 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     return {text:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,phase:GAME_PHASES.find(([until])=>hour<until)![1],night:hour<6||hour>=18.5};
   }
   function renderStatus():void {
-    const time=gameClock().text,node=$('.ph-time');if(node.textContent!==time)node.textContent=time;
-    const clock=home.querySelector('[data-widget="clock"] b');if(clock&&clock.textContent!==time)clock.textContent=time;
+    const sample=gameClock(),time=sample.text,node=$('.ph-time');if(node.textContent!==time)node.textContent=time;
+    const widget=home.querySelector('[data-widget="clock"]'),clock=widget?.querySelector('b');if(clock&&clock.textContent!==time)clock.textContent=time;
+    const label=widget?.querySelector('span'),text=`${sample.phase} · ${formatWorldDate(host.serverNow(),{weekday:'short',day:'numeric',month:'short'})}`;
+    if(label&&label.textContent!==text)label.textContent=text;
+    if(widget&&widget.getAttribute('data-night')!==String(sample.night)){
+      widget.setAttribute('data-night',String(sample.night));widget.querySelector('small')!.innerHTML=`${uiIcon(sample.night?'moon':'sun')} Hora no bar`;
+    }
   }
   const icon=(app:PhoneApp,label=true)=>`<button class="ph-icon" type="button" data-app="${app.id}" aria-label="${e(app.name)}${badges.get(app.id)?` · ${badges.get(app.id)} novidades`:''}"><span class="ph-glyph ${app.image?'has-image':''}" style="--tint:${app.tint}">${app.image?`<img src="${import.meta.env.BASE_URL}${app.image}" alt="" draggable="false">`:uiIcon(app.icon)}${badges.get(app.id)?`<i class="ph-badge">${Math.min(99,badges.get(app.id)!)}</i>`:''}</span>${label?`<span class="ph-label">${e(app.name)}</span>`:''}</button>`;
   function renderHome():void {
-    const clock=gameClock(),balance=host.wallet(),unread=profile?.unread??0,today=new Date();
+    const clock=gameClock(),balance=host.wallet(),unread=profile?.unread??0;
     home.innerHTML=`<div class="ph-widgets">
-      <button class="ph-widget ph-w-clock" type="button" data-app="relogio" data-widget="clock"><small>${uiIcon(clock.night?'moon':'sun')} Hora no bar</small><b>${clock.text}</b><span>${clock.phase} · ${today.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'})}</span></button>
+      <button class="ph-widget ph-w-clock" type="button" data-app="relogio" data-widget="clock"><small>${uiIcon(clock.night?'moon':'sun')} Hora no bar</small><b>${clock.text}</b><span>${clock.phase} · ${formatWorldDate(host.serverNow(),{weekday:'short',day:'numeric',month:'short'})}</span></button>
       <div class="ph-widget-stack"><button class="ph-widget ph-w-bank" type="button" data-app="highbank"><small>${uiIcon('landmark')} HighBank</small><b>${balance===undefined?'—':balance.toLocaleString('pt-BR')}</b><span>moedas</span></button>
       <button class="ph-widget ph-w-zap" type="button" data-app="highzap"><small>${uiIcon('messageCircle')} Highzap</small><b>${unread}</b><span>${unread===1?'mensagem nova':'mensagens novas'}</span></button></div></div>
       <div class="ph-grid">${APPS.filter(app=>!app.dock).map(app=>icon(app)).join('')}</div>
@@ -260,9 +283,9 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
         :call.state==='ended'?'':`<button class="ph-round soft ${muted?'on':''}" type="button" data-call="mute" aria-pressed="${muted}">${uiIcon(muted?'micOff':'mic')}<small>${muted?'Mudo':'Microfone'}</small></button><button class="ph-round soft ${camera.on?'on':''}" type="button" data-call="camera" aria-pressed="${camera.on}">${uiIcon(camera.on?'video':'videoOff')}<small>Câmera</small></button>${camera.on?`<button class="ph-round soft" type="button" data-call="flip" aria-label="Virar a câmera">${uiIcon('switchCamera')}<small>Virar</small></button>`:''}<button class="ph-round soft" type="button" data-call="hide">${uiIcon('home')}<small>Início</small></button><button class="ph-round decline" type="button" data-call="hangup" aria-label="Encerrar">${uiIcon('phoneOff')}<small>Encerrar</small></button>`;
       // A video call: the other end fills the screen once its frames arrive; your camera sits in the corner.
       const video=call.state==='active'&&(camera.on||remoteLive);
-      callHost.innerHTML=`<div class="ph-call ${call.state}${video?' video':''}${remoteLive?' remote':''}" style="--av:${e(peer!.color)}">${video?`<canvas class="ph-call-remote" width="${PHONE.videoFrameWidth}" height="${PHONE.videoFrameHeight}" aria-label="Câmera de ${e(peer!.name)}"></canvas>${camera.on?`<video class="ph-call-self${camera.front?' front':''}" muted playsinline autoplay aria-label="Sua câmera"></video>`:''}`:''}
+      callHost.innerHTML=`<div class="ph-call ${call.state}${video?' video':''}${remoteLive?' remote':''}" style="--av:${e(peer!.color)}">${video?`<canvas class="ph-call-remote" width="${PHONE.videoFrameWidth}" height="${PHONE.videoFrameHeight}" aria-label="Câmera de ${e(peer!.name)}"></canvas>${camera.on?`<canvas class="ph-call-self${camera.front?' front':''}" width="96" height="128" aria-label="Sua câmera"></canvas>`:''}`:''}
         <div class="ph-call-top">${avatar(peer!,96)}<h2>${e(peer!.name)}</h2><p data-call-status>${e(callStatus())}</p>${video&&!remoteLive?'<p class="ph-call-note">A câmera do outro lado está desligada.</p>':''}${callNote?`<p class="ph-call-note">${e(callNote)}</p>`:''}</div><div class="ph-call-actions">${actions}</div></div>`;
-      if(video){paintRemote();attachPreview();}
+      if(video)paintRemote();
     }
     renderPill(peer);
   }
@@ -274,35 +297,81 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
   }
   function answer():void {if(call?.state!=='incoming')return;sounds.stop();void readyMicrophone();host.send('phone.answer',{id:call.id});}
   function paintRemote():void {
+    const remote=receiver.current;
     const canvas=callHost.querySelector<HTMLCanvasElement>('.ph-call-remote');
-    if(canvas&&remote)canvas.getContext('2d')?.drawImage(remote,0,0,canvas.width,canvas.height);
+    if(!canvas||!remote)return;
+    if(canvas.width!==remote.width||canvas.height!==remote.height){canvas.width=remote.width;canvas.height=remote.height;}
+    canvas.getContext('2d')?.drawImage(remote,0,0);
   }
-  /** Your camera in the corner: the game view itself, as the Câmera app's viewfinder. */
-  function attachPreview():void {
-    const node=callHost.querySelector<HTMLVideoElement>('.ph-call-self');if(!node)return;
-    try{preview??=host.canvas.captureStream(15);}catch{return;}
-    if(node.srcObject!==preview){node.srcObject=preview;void node.play().catch(()=>{});}
+  /** Your camera in the corner: the frame about to be sent, so it costs nothing more than the call already does. */
+  function paintSelf(bitmap:ImageBitmap):void {
+    const node=callHost.querySelector<HTMLCanvasElement>('.ph-call-self');
+    if(node)node.getContext('2d')?.drawImage(bitmap,0,0,node.width,node.height);
   }
   function setCallSelfie(on:boolean):void {if(on!==selfieForCall){selfieForCall=on;host.setSelfie(on);}}
-  /** Eight frames a second while the call screen is in front of you; the JPEG quality follows the frame limit. */
-  function videoTick():void {
-    const live=call?.state==='active'&&camera.on&&open&&callShown;
+  /**
+   * Capture independently of encoding: the next render can be captured while the worker finishes the previous JPEG.
+   * At most one encode and one waiting bitmap exist; a newer capture replaces the waiting one.
+   */
+  const videoLive=()=>call?.state==='active'&&camera.on&&open&&callShown&&!document.hidden;
+  const currentVideo=(frame:VideoFrame)=>videoLive()&&call?.id===frame.id&&videoGeneration===frame.epoch&&camera.front===frame.front;
+  function reduceVideo():void {growStreak=0;holdTier=PHONE.videoFps*10;if(tier>0)tier--;quality=.55;}
+  async function videoTick():Promise<void> {
+    const started=performance.now(),interval=1000/PHONE.videoFps;
+    const live=videoLive();
     setCallSelfie(!!live&&camera.front);
-    if(!live||capturing)return;
-    capturing=true;
-    void host.capture(PHONE.videoFrameWidth,PHONE.videoFrameHeight,quality).then(async blob=>{
-      if(!blob||call?.state!=='active'||!camera.on)return;
-      const bytes=new Uint8Array(await blob.arrayBuffer());
-      if(bytes.length>PHONE.videoFrameMaxBytes){quality=Math.max(.2,quality-.1);return;}
-      if(bytes.length<PHONE.videoFrameMaxBytes*.55&&quality<.75)quality=Math.min(.75,quality+.03);
-      host.sendBytes('phone.video',bytes);
-    }).catch(()=>{}).finally(()=>{capturing=false;});
+    const id=call?.id,epoch=videoGeneration,front=camera.front;
+    try{
+      if(!live||!id)return;
+      // Limit the queued video to about two frames on both ends of the connection.
+      if(host.backlog()>PHONE.videoFrameTargetBytes*2){if(++slowStreak>=3){reduceVideo();slowStreak=0;}return;}
+      const [width,height]=LADDER[tier]!;
+      const bitmap=await host.captureBitmap(width,height);
+      if(!bitmap)return;
+      const frame:VideoFrame={bitmap,at:started,id,epoch,front};
+      if(!currentVideo(frame)){bitmap.close();return;}
+      paintSelf(bitmap);
+      pendingVideo?.bitmap.close();pendingVideo=frame;void encodeVideo();
+    }catch{/* A failed capture can recover on the next tick. */}
+    finally{setTimeout(()=>void videoTick(),live?Math.max(0,interval-(performance.now()-started)):100);}
   }
-  setInterval(videoTick,1000/PHONE.videoFps);
-  function stopPreview():void {for(const track of preview?.getTracks()??[])track.stop();preview=undefined;}
+  async function encodeVideo():Promise<void> {
+    if(encodingVideo)return;
+    encodingVideo=true;
+    try{
+      while(pendingVideo){
+        const frame=pendingVideo;pendingVideo=undefined;
+        if(!currentVideo(frame)){frame.bitmap.close();continue;}
+        const bytes=await encoder.encode(frame.bitmap,quality);
+        if(!bytes||!currentVideo(frame))continue;
+        const elapsed=performance.now()-frame.at,interval=1000/PHONE.videoFps;
+        if(elapsed>interval*2){if(++slowStreak>=4){reduceVideo();slowStreak=0;}}else slowStreak=0;
+        // The encode may outlive a network slowdown; do not enqueue a frame that is already stale.
+        if(elapsed>250||host.backlog()>PHONE.videoFrameTargetBytes*2)continue;
+        if(bytes.length>PHONE.videoFrameMaxBytes){
+          growStreak=0;
+          if(quality>.46)quality=Math.max(.42,quality-.08);else reduceVideo();
+          continue;
+        }
+        holdTier--;
+        if(bytes.length>PHONE.videoFrameTargetBytes){
+          growStreak=0;
+          if(quality>.46)quality=Math.max(.42,quality-.04);else if(tier>0)reduceVideo();
+        }else if(bytes.length<PHONE.videoFrameTargetBytes*.75&&elapsed<=interval*1.5){
+          if(quality<.72)quality=Math.min(.72,quality+.02);
+          else if(tier<LADDER.length-1&&holdTier<=0&&++growStreak>=PHONE.videoFps*2){tier++;quality=.55;growStreak=0;holdTier=PHONE.videoFps*5;}
+        }else growStreak=0;
+        host.sendBytes('phone.video',bytes);
+      }
+    }catch{/* A failed encode can recover with the next capture. */}
+    finally{encodingVideo=false;}
+  }
+  void videoTick();
   function stopVideo():void {
-    setCallSelfie(false);camera.on=false;stopPreview();
-    remote?.close();remote=undefined;remoteLive=false;remoteAt=0;
+    videoGeneration++;quality=.6;tier=1;growStreak=0;holdTier=0;slowStreak=0;
+    pendingVideo?.bitmap.close();pendingVideo=undefined;
+    setCallSelfie(false);camera.on=false;
+    receiver.clear();remoteLive=false;remoteAt=0;
   }
   function hangup():void {
     if(!call||call.state==='ended')return;
@@ -329,12 +398,13 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
       else if(action==='hangup')hangup();
       else if(action==='hide'){callShown=false;renderCall();}
       else if(action==='mute'){muted=!muted;void setMic(!muted);renderCall();}
-      else if(action==='camera'){camera.on=!camera.on;if(!camera.on){setCallSelfie(false);stopPreview();}renderCall();}
-      else if(action==='flip'){camera.front=!camera.front;renderCall();}
+      else if(action==='camera'){videoGeneration++;camera.on=!camera.on;if(!camera.on)setCallSelfie(false);renderCall();}
+      else if(action==='flip'){videoGeneration++;camera.front=!camera.front;setCallSelfie(camera.front);renderCall();}
       return;
     }
     if(target.closest('.ph-island')&&call&&call.state!=='ended'){callShown=true;renderCall();return;}
-    if(target.closest('[data-phone-home]')){if(callShown&&call?.state==='active'){callShown=false;renderCall();}else goHome();return;}
+    if(target.closest('[data-phone-close]')){hide();return;}
+    if(target.closest('[data-phone-home]')){if(callShown&&call?.state==='active'){callShown=false;renderCall();}else if(!current&&!callShown&&document.documentElement.classList.contains('touch-ui'))hide();else goHome();return;}
     const launcher=target.closest<HTMLElement>('[data-app]');
     if(launcher&&(launcher.closest('.ph-home')||launcher.closest('.ph-banners'))){banners.replaceChildren();openApp(launcher.dataset.app!);}
   });
@@ -345,7 +415,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
 
   function show():void {
     if(open)return;
-    open=true;shell.hidden=false;sounds.unlock();
+    open=true;shell.hidden=false;layout();sounds.unlock();
     requestAnimationFrame(()=>shell.classList.add('open'));
     if(!current)renderHome();
     renderCall();
@@ -394,12 +464,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     ping:onPing,
     videoFrame(bytes){
       if(call?.state!=='active')return;
-      remoteAt=performance.now();
-      void createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/jpeg'})).then(bitmap=>{
-        if(call?.state!=='active'){bitmap.close();return;}
-        remote?.close();remote=bitmap;
-        if(!remoteLive){remoteLive=true;renderCall();}else paintRemote();
-      }).catch(()=>{});
+      receiver.receive(bytes);
     },
     disconnected(){if(call&&call.state!=='ended')onCall({...call,state:'ended',reason:'dropped'});},
     enter(){
@@ -409,7 +474,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     },
     leave(){
       if(call&&call.state!=='ended')hangup();
-      sounds.stop();host.setCallPeer(undefined);stopVideo();call=undefined;callShown=false;micForCall=false;
+      sounds.stop();host.setCallPeer(undefined);stopVideo();encoder.close();call=undefined;callShown=false;micForCall=false;
       hide();profile=undefined;profileAt=0;renderCall();stopBuzz();
     },
   };

@@ -12,4 +12,6 @@ A postura do cavaleiro usa o clipe `Sit` do banco de Tião, convertido de `asset
 
 O galope tem [som de cascos de um banco gratuito](../assets/sons-cavalo.md), com cadência conforme a velocidade e áudio espacial para os jogadores próximos. O volume segue a configuração Geral; parar ou desmontar interrompe o som.
 
+Ao aparecer, o cavalo surge numa **explosão de fumaça** (`apps/web/src/engine/smoke-burst.ts`): 48 nuvens que se espalham em anel e sobem em colunas, com cor sorteada a cada aparição. Não usa arquivos de textura: o formato das nuvens (borda irregular, partes finas que se desfazem, sombreado) é desenhado por shader de ruído e tingido pela cor sorteada. É reutilizável: `smokeBurst.burst(x,y,z,raio,cor?)`. A cor é sorteada em cada cliente, então quem assiste pode ver outra cor.
+
 Validação: testes de movimento/colisão, testes do GLB e dos ciclos e testes no navegador com a montaria real e dois jogadores. Imagens de teste ficam em `test-results/previews/`.

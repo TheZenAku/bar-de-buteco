@@ -1,6 +1,54 @@
 import {test,expect} from '@playwright/test';
+const SHOP_SPOT={x:18.79,y:.3,z:-15.45};
 
 const password='InventarioBrowser2026!';
+
+test('rojão da loja equipa na mão, dispara com a mira e guarda sem gastar',async({page})=>{
+  test.setTimeout(150000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error'&&/shader|firework/i.test(message.text()))errors.push(message.text());});
+  const suffix=`firework_${Date.now().toString(36)}`;
+  const registered=await page.request.post('/api/auth/register',{data:{email:`${suffix}@example.com`,username:suffix,displayName:'Festeiro',password}});expect(registered.ok()).toBe(true);
+  await page.goto('/');await page.getByRole('button',{name:'Entrar no bar'}).click();
+  await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
+  await expect.poll(()=>page.evaluate(()=>{const s=(window as any).barDebug?.snapshot();return !!s?.world?.players?.[s.localId]?.connected;}),{timeout:30000}).toBe(true);
+  await page.evaluate(at=>(window as any).barDebug.send('test.player.place',at),SHOP_SPOT);
+  await expect.poll(()=>page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId].x;})).toBeCloseTo(SHOP_SPOT.x,1);
+  await page.keyboard.press('e');await expect(page.getByRole('heading',{name:'Loja da casa',exact:true})).toBeVisible();
+  const card=page.locator('.shop-item').filter({hasText:'Rojão de festa'});
+  await expect.poll(()=>card.locator('img').evaluate((img:HTMLImageElement)=>img.naturalWidth)).toBeGreaterThan(0);
+  const purchase=()=>page.waitForResponse(r=>r.url().endsWith('/inventory/buy')&&r.request().method()==='POST');
+  let bought=purchase();await card.getByRole('button',{name:'Comprar',exact:true}).click();expect((await bought).ok()).toBe(true);
+  await expect(card.getByRole('button',{name:'Comprar',exact:true})).toBeEnabled();
+  bought=purchase();await card.getByRole('button',{name:'Comprar',exact:true}).click();expect((await bought).ok()).toBe(true);
+  await page.keyboard.press('Escape');await page.keyboard.press('i');
+  const slot=page.locator('.inventory-slot[data-item="rojao"]');await slot.click();await expect(page.locator('.item-detail')).toContainText('×2');
+  await page.getByRole('button',{name:'Equipar na mão',exact:true}).click();
+  const hud=page.getByRole('region',{name:'Rojão equipado'});
+  await expect(hud).toBeVisible();await expect(page.locator('#firework-count')).toHaveText('2');
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.fireworks()?.equipped)).toBe(true);
+  await page.keyboard.press('r');await expect(hud).toBeHidden();
+  let view=await (await page.request.get('/api/inventory')).json();expect(view.stacks.find((s:any)=>s.itemId==='rojao').quantity).toBe(2);
+  await page.keyboard.press('i');await slot.click();await page.getByRole('button',{name:'Equipar na mão',exact:true}).click();await expect(hud).toBeVisible();
+  // Aim from the open yard, away from the shop's canopy, and lift the view towards the sky.
+  await page.evaluate(()=>(window as any).barDebug.send('test.player.place',{x:22,y:.3,z:-16}));
+  await page.locator('#world').hover({position:{x:500,y:250}});
+  await page.mouse.down({button:'right'});await page.mouse.move(500,50,{steps:12});await page.mouse.up({button:'right'});
+  await page.waitForTimeout(800);
+  await page.screenshot({path:'test-results/fireworks-equipped.png'});
+  await hud.getByRole('button',{name:'Soltar',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.fireworks()?.showing)).toBe(1);
+  await expect(page.locator('#firework-count')).toHaveText('1');
+  await page.waitForTimeout(2500);await page.screenshot({path:'test-results/fireworks.png'});
+  await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.fireworks()?.showing),{timeout:10000}).toBe(0);
+  // A simple left click on the view fires; dragging it to aim must not fire.
+  const canvas=page.locator('#world'),box=(await canvas.boundingBox())!;
+  await page.mouse.move(box.x+box.width*.6,box.y+box.height*.4);await page.mouse.down();await page.mouse.move(box.x+box.width*.6+60,box.y+box.height*.4,{steps:5});await page.mouse.up();
+  view=await (await page.request.get('/api/inventory')).json();expect(view.stacks.find((s:any)=>s.itemId==='rojao').quantity).toBe(1);
+  await canvas.click({position:{x:box.width*.6,y:box.height*.4}});await expect(hud).toBeHidden();
+  await expect.poll(async()=>{const v=await (await page.request.get('/api/inventory')).json();return v.stacks.some((s:any)=>s.itemId==='rojao');}).toBe(false);
+  expect(errors).toEqual([]);
+});
 
 test.beforeEach(async({request})=>{
   await expect.poll(async()=>{

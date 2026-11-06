@@ -119,6 +119,7 @@ test('the engine, the wear, being run over and fixing a part, over real WebSocke
     assert.ok(motoStrikeHp(5)<struck.hp);
     // A blow that would kill: the body flies first and faints where it lands.
     const needs=(room as unknown as {needs:{damage:(p:unknown,n:number,now:number)=>void}}).needs;
+    (room as unknown as {needs:{state:(id:string)=>{hpCore:number}}}).needs.state('walker').hpCore=0;
     needs.damage(walker.player(),walker.player().hp-3,Date.now());
     staff.room.send('admin.moto.despawn',{});await until(()=>room.state.motos.size===0);
     await pause(250);
@@ -134,9 +135,9 @@ test('the engine, the wear, being run over and fixing a part, over real WebSocke
     await pause(100);
     assert.equal(walker.player().hp,1,'Alive in the air');
     assert.equal(walker.player().condition,'normal');
-    await until(()=>walker.player().condition==='fainted',15000);
+    await until(()=>(room as unknown as {deaths:{isDead:(id:string)=>boolean}}).deaths.isDead('walker'),15000);
     assert.equal(walker.player().hp,0);
-    assert.equal(room.state.ragdolls.has('walker'),false,'The faint took over from the body');
+    assert.equal(room.state.ragdolls.has('walker'),false,'The death took over from the body');
     await until(()=>rider.player().interactionState==='',20000);await until(()=>next.phase==='down',20000);
     // The wear of a head-on crash: the front goes first.
     await pause(1200);

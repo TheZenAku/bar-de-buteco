@@ -204,6 +204,8 @@
 #phone .hm-sale-photo img,#phone .hm-detail-photo img,#phone .hm-confirm-photo img{width:100%;height:100%;object-fit:cover}
 #phone .hm-thumb img.hm-photo-moto,#phone .hm-sale-photo img.hm-photo-moto,#phone .hm-detail-photo img.hm-photo-moto,#phone .hm-confirm-photo img.hm-photo-moto{object-fit:contain;background:#e8ecea}
 #phone .hm-sale-photo img.hm-photo-moto,#phone .hm-detail-photo img.hm-photo-moto,#phone .hm-confirm-photo img.hm-photo-moto{position:absolute;inset:0}
+/* the Caveira's photo is a scene, not a studio cut-out: it fills the frame */
+#phone .hm-thumb img.hm-photo-fogo,#phone .hm-sale-photo img.hm-photo-fogo,#phone .hm-detail-photo img.hm-photo-fogo,#phone .hm-confirm-photo img.hm-photo-fogo{object-fit:cover;object-position:50% 62%}
 #phone .hm-sale-photo>.ui-icon,#phone .hm-detail-photo>.ui-icon,#phone .hm-confirm-photo>.ui-icon{width:64px;height:64px}
 #phone .hm-sale-badge,#phone .hm-detail-badge{position:absolute;left:14px;bottom:14px;display:flex;align-items:center;gap:5px;padding:6px 9px;border-radius:7px;background:var(--hm-accent);color:var(--hm-ink);font-size:10px;font-weight:750}
 #phone .hm-detail-badge{background:#161d19e6;color:#d5edb9;border:1px solid #ffffff30}

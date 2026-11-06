@@ -1,12 +1,20 @@
 export const CAR_MODEL='carro-hatch';
 export const CAR_NAME='Hatch 80';
 export const DEFAULT_CAR_COLOR='#ccc9c2';
-export const VEHICLE_MODELS=['moto-delivery',CAR_MODEL] as const;
+export const MOTO_FOGO_MODEL='moto-fogo';
+export const MOTO_FOGO_NAME='Caveira em Chamas';
+/** The red the bike's texture was painted with: the colour that leaves it as it came (engine/moto-paint.ts repaints the reds to the owner's). */
+export const FOGO_DEFAULT_COLOR='#6b1d1d';
+export const defaultVehicleColor=(model:string)=>model===MOTO_FOGO_MODEL?FOGO_DEFAULT_COLOR:DEFAULT_CAR_COLOR;
+export const VEHICLE_MODELS=['moto-delivery',MOTO_FOGO_MODEL,CAR_MODEL] as const;
 export type VehicleModel=typeof VEHICLE_MODELS[number];
 export interface VehicleOffer {model:string;name:string;price:number;seats:number;photo:string}
 export const isCar=(vehicle:{model?:string}|undefined)=>vehicle?.model===CAR_MODEL;
-export const vehicleName=(model:string)=>model===CAR_MODEL?CAR_NAME:'Highland Bar Delivery';
-export const vehiclePhoto=(model:string)=>model===CAR_MODEL?'carro/foto.png':'moto/foto-v4.webp';
+export const isFogo=(vehicle:{model?:string}|undefined)=>vehicle?.model===MOTO_FOGO_MODEL;
+export const vehicleName=(model:string)=>model===CAR_MODEL?CAR_NAME:model===MOTO_FOGO_MODEL?MOTO_FOGO_NAME:'Highland Bar Delivery';
+/** The price table's key for a model (prices.ts). */
+export const vehiclePriceKey=(model:string)=>model===CAR_MODEL?'vehicle:carro':model===MOTO_FOGO_MODEL?'vehicle:moto-fogo':'vehicle:moto';
+export const vehiclePhoto=(model:string)=>model===CAR_MODEL?'carro/foto.png':model===MOTO_FOGO_MODEL?'moto/foto-fogo.webp':'moto/foto-v4.webp';
 /** Measured from the supplied rig, at its authored metre scale. */
 export const CAR={SCALE:1,WHEELBASE:2.314,WHEEL_TRACK:1.33,WHEEL_RADIUS:.285,HALF_WIDTH:.76,HALF_LENGTH:1.80,CENTRE_Z:0,HEIGHT:1.39,
   MASS:850,ENGINE:3800,REVERSE:1800,BRAKE:8000,HANDBRAKE:7000,ROLLING:120,DRAG:2.45,TOP_SPEED:38.9,REVERSE_SPEED:4.5,

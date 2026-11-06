@@ -1,6 +1,7 @@
-import { createEndpoint, createRouter } from '@colyseus/core';
+import { createEndpoint, createRouter, matchMaker } from '@colyseus/core';
 import { BarRoom } from './BarRoom.js';
 import { internalSecretMatches, readiness, worldMetrics } from './observability.js';
+import {DEFAULT_ENVIRONMENT,type EnvironmentSnapshot} from '@bar/shared';
 
 /**
  * The world's HTTP endpoints, on Colyseus's own router (so a check never sends a second response).
@@ -9,7 +10,10 @@ import { internalSecretMatches, readiness, worldMetrics } from './observability.
  */
 export function worldRouter() {
   return createRouter({
-    health: createEndpoint('/health', { method: 'GET' }, async () => Response.json({ ok: true, service: 'game', roomId: BarRoom.activeId || null })),
+    environment: createEndpoint('/environment', { method: 'GET' }, async () => Response.json({at:Date.now(),
+      environment:BarRoom.active?.state.environment.toJSON()??DEFAULT_ENVIRONMENT} satisfies EnvironmentSnapshot,
+      {headers:{'cache-control':'no-store'}})),
+    health: createEndpoint('/health', { method: 'GET' }, async () => Response.json({ ok: true, service: 'game', roomId: BarRoom.activeId || null, processId: matchMaker.processId, players: BarRoom.active?.state.occupancy ?? 0, capacity: BarRoom.active?.state.capacity ?? 0 })),
     ready: createEndpoint('/ready', { method: 'GET' }, async () => { const state = readiness(); return Response.json({ ...state, service: 'game' }, { status: state.ready ? 200 : 503 }); }),
     metrics: createEndpoint('/metrics', { method: 'GET' }, async (context) => internalSecretMatches(context.request?.headers.get('x-internal-secret') ?? null)
       ? new Response(worldMetrics.render(), { headers: { 'content-type': 'text/plain; version=0.0.4' } }) : new Response('Not found', { status: 404 })),

@@ -230,6 +230,16 @@ export function floorHeight(x:number,z:number,reference=.3):number|undefined {
   return highest;
 }
 
+/** The same support as movement, including its authored id; keeps stacked floors distinct for footsteps. */
+export function floorSurface(x:number,z:number,reference=.3):{id:string;y:number}|undefined {
+  let highest:{id:string;y:number}|undefined;
+  for(const surface of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
+    const y=triangleHeight(surface.points,x,z);
+    if(y!==undefined&&y<=reference+.26&&y>=reference-.36&&(highest===undefined||y>highest.y))highest={id:surface.id,y};
+  }
+  return highest;
+}
+
 /** The highest floor at or under a height, however far below (a step of `rise` still counts as under): what a falling body lands on. */
 export function groundBelow(x:number,z:number,y:number,rise=.2):number|undefined {
   let highest:number|undefined;
@@ -328,6 +338,21 @@ export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'r
   return {x,y,z};
 }
 
+/** Admin flight: no collisions (a noclip), only the ground below and a ceiling. `running` boosts; `dy` climbs (+1) or sinks (-1). */
+export const FLY={speed:9,boost:24,climb:6,ceiling:60,fall:12};
+export function flyPlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>&{dy?:number},dt=.05):Required<Position> {
+  const step=Math.min(Math.max(dt,0),.1),boost=input.running?1:0,scale=(boost?FLY.boost:FLY.speed)*step/Math.max(1,Math.hypot(input.dx,input.dz));
+  const x=position.x+input.dx*scale,z=position.z+input.dz*scale,y0=position.y??0;
+  const floor=groundBelow(x,z,y0)??0;
+  return {x,z,y:Math.min(FLY.ceiling,Math.max(floor,y0+(input.dy??0)*FLY.climb*(1+boost)*step))};
+}
+
+/** Letting go of the flight: straight down, gathering speed up to `FLY.fall` over its first second (`age`: seconds since it began), onto whatever is below (a floor, a roof, a table top). `landed` when it arrived. */
+export function fallPlayer(position:Position,dt=.05,age=0):Required<Position>&{landed:boolean} {
+  const y0=position.y??0,floor=groundBelow(position.x,position.z,y0)??0,y=Math.max(floor,y0-Math.min(FLY.fall,3+16*Math.max(age,0))*Math.min(Math.max(dt,0),.1));
+  return {x:position.x,z:position.z,y,landed:y<=floor+1e-6};
+}
+
 export function distance(a:Position,b:Position):number {return Math.hypot(a.x-b.x,(a.y??0)-(b.y??0),a.z-b.z);}
 
 // Objects are used by touching them: the body may be this far from the collision box (players stop at it).
@@ -397,11 +422,14 @@ export function nearestInteraction(position:Position,available:(object:Interacta
 }
 
 /** The authored spawn marker is on the pavement; choose the closest clear position to it. */
-export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Position>=map.markers.Spawn_Jogador,obstacles:readonly Collider[]=[]):Position {
+// Candidate places round the marker, nearest first, computed once: 40 m out (a bar of a thousand people spawns in a crowd that wide).
+const SPAWN_OFFSETS=(()=>{
   const offsets:Array<{x:number;z:number}>=[];
-  for(let x=-12;x<=12;x++)for(let z=-12;z<=12;z++)offsets.push({x:x*.8,z:z*.8});
-  offsets.sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
-  for(const o of offsets){
+  for(let x=-50;x<=50;x++)for(let z=-50;z<=50;z++)offsets.push({x:x*.8,z:z*.8});
+  return offsets.sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
+})();
+export function findSpawn(occupied:readonly Position[]=[],anchor:Required<Position>=map.markers.Spawn_Jogador,obstacles:readonly Collider[]=[]):Position {
+  for(const o of SPAWN_OFFSETS){
     const x=anchor.x+o.x,z=anchor.z+o.z,y=floorHeight(x,z,anchor.y);
     const p={x,y:y??anchor.y,z};
     if(y!==undefined&&isWalkable(x,z,y,obstacles)&&occupied.every(other=>distance(other,p)>.74))return p;
@@ -468,6 +496,10 @@ function firstHit(start:Required<Position>,end:Required<Position>,pad:number,see
 export function cameraFraction(start:Required<Position>,end:Required<Position>,seeThrough=false):number {
   const hit=firstHit(start,end,.14,seeThrough);
   return hit<1?Math.max(.03,hit-.02):1;
+}
+/** Solid map ray for small projectiles; unlike a camera boom it must stop even right against a wall. */
+export function solidRayFraction(start:Required<Position>,end:Required<Position>,radius=.03):number {
+  return firstHit(start,end,radius,false);
 }
 /** Whether something solid hides `to` from `from` (the camera and a point of the body), the last `spare` metres aside. */
 export function sightBlocked(from:Required<Position>,to:Required<Position>,spare=.3):boolean {

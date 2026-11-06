@@ -20,7 +20,7 @@ try {
   ]) {
     const [existing] = await connection.db.select().from(users).where(eq(users.email, account.email));
     if (existing) {
-      for(const skin of SKINS)await connection.db.insert(skinInventory).values({userId:existing.id,skinId:skin.id}).onConflictDoNothing();
+      for(const skin of SKINS.filter(s=>!s.adminOnly))await connection.db.insert(skinInventory).values({userId:existing.id,skinId:skin.id}).onConflictDoNothing();
       for(const skill of SKILLS)await connection.db.insert(skillInventory).values({userId:existing.id,skillId:skill.id}).onConflictDoNothing();
       console.log(`Conta de demonstração existente: ${account.email} (coleção de teste preparada)`);continue;
     }
@@ -28,7 +28,7 @@ try {
       const id = randomUUID();
       await tx.insert(users).values({ id, email: account.email, username: account.username, role: account.role, verified: true, passwordHash });
       await tx.insert(profiles).values({ userId: id, displayName: account.displayName, avatarConfig: { color: account.color } });
-      for(const skin of SKINS)await tx.insert(skinInventory).values({userId:id,skinId:skin.id});
+      for(const skin of SKINS.filter(s=>!s.adminOnly))await tx.insert(skinInventory).values({userId:id,skinId:skin.id});
       for(const skill of SKILLS)await tx.insert(skillInventory).values({userId:id,skillId:skill.id});
       await tx.insert(statistics).values({ userId: id });
     });

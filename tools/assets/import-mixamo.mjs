@@ -38,6 +38,8 @@ const skins={
   magrao:{name:'Magrao',fbx:'outros/magrao-mixamo.fbx',rig:'accurig/magrao.glb',height:1.86},
   tonico:{name:'Tonico',glb:'../../skins/Tonico/Tonico.glb',height:1.86},
   tiao:{name:'Tião',glb:'../../skins/Tiao/tiao.glb',height:1.8},
+  primo:{name:'Primo',glb:'../../skins/Primo/primo.glb',height:1.8},
+  frentista:{name:'Frentista',glb:'../../skins/Frentista/frentista.glb',height:1.8},
 };
 // About the heaviest AccuRig skin (Read, 98k); several players share the screen.
 const TRIANGLES=100000;

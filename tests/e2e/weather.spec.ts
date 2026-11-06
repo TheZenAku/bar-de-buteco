@@ -36,5 +36,17 @@ test('rain and storms render outdoors, roofs shelter the camera and lightning fo
   await page.screenshot({path:'test-results/previews/weather-sheltered.png'});
   await page.evaluate(state=>(window as any).fixture.weather(state),{...DEFAULT_ENVIRONMENT,weather:'clear'});
   await expect.poll(async()=>(await status()).weather.enabled).toBe(false);
+  // The city reading controls density directly; auto no longer runs an invented weather cycle.
+  const cityTime=await page.evaluate(()=>(window as any).fixture.now());
+  await page.evaluate(state=>(window as any).fixture.weather(state),{...DEFAULT_ENVIRONMENT,
+    realWeatherAt:cityTime,realRain:.15,realCloud:.8,realWind:.2,realPrecipitationMmH:.5});
+  await expect.poll(async()=>(await status()).weather.rain).toBe(.15);
+  const drizzleDrops=(await status()).weather.drops;
+  await page.evaluate(state=>(window as any).fixture.weather(state),{...DEFAULT_ENVIRONMENT,
+    realWeatherAt:cityTime,realRain:.8,realCloud:1,realWind:.6,realPrecipitationMmH:10});
+  await expect.poll(async()=>(await status()).weather.rain).toBe(.8);
+  expect((await status()).weather.drops).toBeGreaterThan(drizzleDrops*4);
+  await page.evaluate(state=>(window as any).fixture.weather(state),{...DEFAULT_ENVIRONMENT,realWeatherAt:cityTime,realCloud:.8});
+  await expect.poll(async()=>(await status()).weather.enabled).toBe(false);
   expect(errors).toEqual([]);
 });

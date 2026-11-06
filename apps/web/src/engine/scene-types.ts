@@ -4,6 +4,8 @@ import type {MusicianState} from '@bar/shared';
 /** Small presentation-only contracts. All game rules belong to the server. */
 export interface SceneActor {
   id: string;
+  /** The avatar's number in the crowd records (shared/crowd.ts). */
+  slot?: number;
   name?: string;
   displayName?: string;
   x: number;
@@ -12,6 +14,8 @@ export interface SceneActor {
   rotation?: number;
   headYaw?:number;
   headPitch?:number;
+  /** A VR player's hands (packages/shared/src/vr-arms.ts), '' or absent otherwise. */
+  vrArms?:string;
   animation?: string;
   animationStartedAt?: number;
   interactionState?: string;
@@ -30,6 +34,7 @@ export interface SceneActor {
   drinkItem?: string;
   /** What a player has in hand and is having, since/until when (server clock): a drink is raised and sipped over the body. */
   holding?: string;
+  fireworkEquipped?:boolean;
   holdingSince?: number;
   holdingUntil?: number;
   /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
@@ -61,6 +66,8 @@ export interface SceneWorld {
 
 export interface SceneInput {
   rear?:boolean;
+  /** Flying only: climb (+1, Space) or sink (-1, Ctrl). */
+  dy?:number;
   headYaw?:number;
   headPitch?:number;
   dx: number;
@@ -92,20 +99,38 @@ export interface SceneLabel {
 }
 
 export interface SceneCallbacks {
+  onFirework?:(direction:{x:number;y:number;z:number})=>void;
+  onFireworkStow?:()=>void;
+  /** One authoritative clock shared with the network and interface. */
+  serverNow?:()=>number;
+  /** The entry's backdrop (engine/showcase.ts): how covered the screen is by the fade between two angles, 0 to 1. */
+  onShowcaseCut?: (cut: number) => void;
+  /** The backdrop could not keep a steady frame rate and switched itself off. */
+  onShowcaseSlow?: () => void;
   onInteract?: () => void;
   onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette') => void;
   onChat?: () => void;
   onSkins?: () => void;
+  /** B: an administrator takes off or lands (the room refuses anyone else). */
+  onFly?: () => void;
   /** A key the game has no use for on foot, pressed in the world: true when it was the active skill's. */
   onSkillKey?: (code: string) => boolean;
   onMediaFrame?: () => void;
+  /** VR: a window, the phone, a table or a menu is open, so the headset shows the screen and the sticks leave the world alone. */
+  vrWindowOpen?: () => boolean;
+  /** VR: the session ended (the headset came off, the system menu closed it, or the player left). */
+  onVrEnd?: (reason: string) => void;
+  /** VR: something to tell the player (shown on the screen's notices). */
+  onVrNotice?: (text: string) => void;
+  /** VR: the local player's hands, to send to the room (player.arms) so others see the arms move. */
+  onVrArms?: (arms: import('@bar/shared').VrArmsMessage) => void;
   /** Each frame, before the bikes are drawn: seconds since the last one. */
   onFrame?: (dt: number) => void;
   /** The player changed the view or zoom; distance is the last positive third-person distance. */
   onCameraChange?: (mode: CameraMode, distance: number) => void;
   /** A right click (no drag) on a player (the local one too) or a bike, at this point of the window. */
   onWorldMenu?: (x: number, y: number, hit: { player?: string; moto?: string }) => void;
-  /** The player's overall volume, for the bikes' engines (0–1). */
+  /** The player's overall volume, for world effects including engines and footsteps (0–1). */
   motoVolume?: () => number;
   onVehicleControl?:(id:string,action:string)=>void;
 }

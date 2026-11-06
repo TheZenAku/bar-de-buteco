@@ -11,8 +11,8 @@ interface Job { order?: TableOrder; table?: number; phase: Phase; route?: Route;
 // Where Tonico goes back to after a delivery, before his usual round (apps/server/src/world/npcs.ts).
 const REST_POINT: Point = { x: 15.3, y: .3, z: -6 };
 export const TABLE_QUEUE_MAX = 8;
-// Search nodes expanded per tick: a route to the terrace is found in about a second without holding the room's tick.
-const SEARCH_SLICE = 400;
+// Milliseconds of search per tick (not a node count: 400 nodes took 35–80 ms and were the tick's worst spikes in a 27-player capture).
+const SEARCH_MS = 3;
 // What fits on the tray in one trip when clearing tables; the rest waits for the next one.
 const TRAY_MAX = 6;
 // A table Tonico could not reach is left alone for this long.
@@ -48,13 +48,13 @@ class Route {
   constructor(private readonly candidates: Array<() => PathSearch | undefined>) {}
   /** The path, null when no candidate has one, undefined while still searching. */
   step(): Point[] | null | undefined {
-    for (let budget = SEARCH_SLICE; ;) {
+    for (let ms = SEARCH_MS; ;) {
       this.search ??= this.candidates[this.index]?.();
       if (!this.search) { if (this.index >= this.candidates.length) return null; this.index++; continue; }
-      const result = this.search.run(budget);
+      const result = this.search.runFor(ms);
       if (result) return result;
       if (result === undefined) return;
-      this.search = undefined; this.index++; budget = SEARCH_SLICE / 4;
+      this.search = undefined; this.index++; ms = SEARCH_MS / 4;
     }
   }
 }

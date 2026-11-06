@@ -25,13 +25,22 @@ Os marcadores do mundo mantêm a cor do seu anel na cena: verde no objetivo do t
 
 ## Entrada
 
-Três abas, como na referência:
+Uma tela centralizada, em quatro tempos (`data-stage` em `#lobby`, escrito por `lobby-stage.ts`; estilos em `lobby-entry.css` e `lobby-hero.css`):
 
-- **Conta**: Entrar, Criar conta e Recuperar senha (ou Nova senha, pelo link do e-mail). Com a sessão ativa, Continuar e Usar outra conta.
-- **O Bar**: galera, blackjack, truco, pebolim, sinuca, jukebox e TVs, palco, mesa e balcão e trabalho, com preços e limites lidos de `@bar/shared`. Nada é inventado.
-- **Controles**: as teclas por grupo. A ajuda do jogo (`?`) lê a mesma lista (`CONTROLS` em `lobby-menu.ts`).
+1. **intro** (cerca de 4 s): a tela começa escura, uma linha de neon abre no meio, a logo explode dela girando, com dois anéis de choque, um tremor e a frase "O seu bar · A sua galera". Um clique ou uma tecla pula.
+2. **corner**: a logo voa para o canto superior esquerdo (pequena, ainda brilhando, com a dica "Clique na logo e brinde") e o cartão de acesso sobe no meio da tela.
+3. **game**: clicar na logo esconde o cartão, traz a logo para o meio e abre o brinde: cada clique é um brinde (o letreiro e o som de `lobby-hero.ts`), contado em "Brindes" (guardado em `localStorage`, chave `bar.brindes`), com a rodada (cliques seguidos) e um título de brincadeira por faixa. "Voltar à entrada" ou Esc saem.
+4. **login**: depois de sair, a logo some até a página ser recarregada e o cartão volta.
 
-Apontar ou focar um item de O Bar e de Controles mostra o seu detalhe. As setas esquerda e direita trocam de aba; para cima e para baixo percorrem a lista.
+Robôs de teste (`navigator.webdriver`) e quem pede menos movimento pulam o show: a entrada abre já em `corner` (ou com uma intro de 0,7 s). `?intro=1` força a intro num navegador automatizado.
+
+**O cartão de acesso** (`renderAuth` em `main.ts`): um seletor Entrar / Criar conta sobre o formulário; Esqueci minha senha troca para Recuperar senha (ou Nova senha, pelo link do e-mail) com Voltar ao login. Com a sessão ativa, vira Continuar, com o avatar, Entrar no bar e Usar outra conta. Embaixo, **O que rola no bar** (chips de galera, blackjack, truco, pebolim, sinuca, jukebox e TVs, palco, mesa e balcão e trabalho; o chip apontado, focado ou clicado se explica numa linha, com preços e limites de `@bar/shared`, nada inventado) e as seis teclas de uma primeira visita, com o botão Todos os controles, que abre a ajuda do jogo (`CONTROLS`, a mesma lista).
+
+**Pessoas no bar agora** (no alto do cartão): `lobby-presence.ts` lê o `/game/health` público do mundo (contagem e capacidade, mais nada) a cada 15 s, só com a entrada na tela e a aba visível.
+
+### O bar ao fundo
+
+Com o 3D pronto, o fundo da entrada é o bar vazio visto de cima (`engine/showcase.ts`, `BarScene.setShowcase`): quatro ângulos em três quartos que deslizam devagar e passam de um para outro por um fade (rua sudoeste, palco, terraço sudeste, quintal nordeste), sob uma película vaporwave (`.lobby.has-3d`). Os ângulos giram em volta do prédio porque o telhado esconde o salão. Não liga em celular/toque, com movimento reduzido, economia de dados ou robô de teste (`?showcase=1` força), e se desliga sozinho se ficar abaixo de uns 15 FPS por 5 s. Em dev, `barDebug.showcase({position,target,fov})` fixa uma pose para escolher ângulos (`barDebug.showcase()` volta aos planos).
 
 ### A logo na entrada
 

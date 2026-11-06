@@ -12,9 +12,10 @@ import {readConfig} from '../../apps/api/src/config.js';
 import * as schema from '../../apps/api/src/database/schema.js';
 import {createSession,hashPassword} from '../../apps/api/src/auth/service.js';
 import {BarRoom} from '../../apps/server/src/BarRoom.js';
+import {worldMetrics} from '../../apps/server/src/observability.js';
 import {signTicket} from '@bar/shared/tickets';
 
-const count=Math.max(2,Math.min(64,Number(process.env.LOAD_CLIENTS)||32));
+const count=Math.max(2,Math.min(1024,Number(process.env.LOAD_CLIENTS)||32));
 const durationMs=Math.max(5000,Number(process.env.LOAD_DURATION_MS)||30000);
 process.env.ROOM_CAPACITY=String(count);
 const config={...readConfig(),production:false,dataPath:'memory://',databaseUrl:undefined,mailEnabled:true,smtpHost:undefined};
@@ -40,7 +41,7 @@ try{
     const session=await createSession(db,id);
     const ticket=signTicket({userId:id,sessionId:session.session.id,displayName:`Teste ${i+1}`,color:'#ae884e',role:'user'},config.authSecret);
     const room=await client.joinOrCreate('bar',{ticket});
-    room.onMessage('error',message=>failures.push(message.message));room.onMessage('chat.message',()=>{});
+    room.onMessage('error',message=>failures.push(message.message));room.onMessage('chat.message',()=>{});room.onMessage('crowd',()=>{});
     room.onMessage('pong',message=>rtts.push(Date.now()-message.at));room.onStateChange(()=>patches++);
     room.onError((_code,message)=>failures.push(message||'room error'));
     rooms.push({room,id,seq:0});
@@ -56,7 +57,10 @@ try{
   if(new Set(rooms.map(({room})=>room.roomId)).size!==1)failures.push('Clients split across rooms');
   rtts.sort((a,b)=>a-b);
   const percentile=(p:number)=>rtts[Math.min(rtts.length-1,Math.floor(rtts.length*p))]??null;
-  const report={timestamp:new Date().toISOString(),scenario:'API + PostgreSQL embutido + Colyseus + SDK no mesmo processo, loopback; sem renderização 3D',clients:count,durationMs,joinedMs,patches,rttSamples:rtts.length,rttMedianMs:percentile(.5),rttP95Ms:percentile(.95),rttMaxMs:rtts.at(-1),eventLoopP95Ms:Number((loop.percentile(95)/1e6).toFixed(2)),rssMiB:Math.round(process.memoryUsage().rss/1024/1024),hardware:{platform:platform(),cpu:cpus()[0]?.model,logicalCpus:cpus().length,ramGiB:Math.round(totalmem()/1024**3)},failures};
+  const report={timestamp:new Date().toISOString(),scenario:'API + PostgreSQL embutido + Colyseus + SDK no mesmo processo, loopback; sem renderização 3D',clients:count,durationMs,joinedMs,patches,rttSamples:rtts.length,rttMedianMs:percentile(.5),rttP95Ms:percentile(.95),rttMaxMs:rtts.at(-1),eventLoopP95Ms:Number((loop.percentile(95)/1e6).toFixed(2)),rssMiB:Math.round(process.memoryUsage().rss/1024/1024),hardware:{platform:platform(),cpu:cpus()[0]?.model,logicalCpus:cpus().length,ramGiB:Math.round(totalmem()/1024**3)},failures,
+    // The world alone (the numbers above include this process's own thousand SDK clients): its tick, and each phase of it, in ms.
+    phases:(BarRoom.active as any)?.performanceSampler.snapshot({players:count,capacity:count,npcs:0,motos:0,walletRetries:0,resultOutbox:0,logQueue:0,apiAgeMs:0}).phases,
+    server:Object.fromEntries(['bar_world_tick_ms','bar_world_phase_players_ms','bar_world_phase_motos_ms','bar_world_phase_minigames_a_ms','bar_world_phase_minigames_b_ms','bar_world_phase_service_ms','bar_world_phase_npcs_ms','bar_world_phase_views_ms','bar_world_patch_ms'].map(name=>{const w=worldMetrics.window(name);return [name.replace(/^bar_world_|_ms$/g,''),w?{p50:w.percentile(50),p95:w.percentile(95),p99:w.percentile(99)}:null];}))};
   await mkdir('test-results',{recursive:true});await writeFile('test-results/load-report.json',JSON.stringify(report,null,2));
   console.log(JSON.stringify(report,null,2));if(failures.length)process.exitCode=1;
 }finally{clearInterval(timer);clearInterval(pingTimer);loop.disable();await Promise.allSettled(rooms.map(({room})=>room.leave()));await server.gracefullyShutdown(false);await app.close();}

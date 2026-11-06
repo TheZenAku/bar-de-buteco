@@ -3,7 +3,7 @@
 import {BarScene} from '/src/engine/BarScene.ts';
 import {FUEL_PUMPS,FUEL,pumpHome,pumpStand,vehicleFiller,fillerStand,CAR_MODEL,DEFAULT_ENVIRONMENT,NEW_CAR_PARTS,parkedMoto} from '../../packages/shared/src/index.ts';
 const pump=FUEL_PUMPS[0],car={...parkedMoto({id:'hatch',x:pump.x-3.3,y:pump.y,z:pump.z-1,yaw:Math.PI}),model:CAR_MODEL,color:'#9d3439',plate:'BAR1C80',parts:NEW_CAR_PARTS,engine:0,riderId:'driver',passengers:['','',''],fuel:90};
-const npc={id:pump.npcId,displayName:'Frentista',skin:'nathan',color:'#e6a12f',...pumpHome(pump),rotation:0,animationState:'idle',animationStartedAt:Date.now(),behavior:'fuel-service'};
+const npc={id:pump.npcId,displayName:'Frentista',skin:'frentista',color:'#e6a12f',...pumpHome(pump),rotation:0,animationState:'idle',animationStartedAt:Date.now(),behavior:'fuel-service'};
 const service={id:pump.id,npcId:pump.npcId,phase:'idle',startedAt:Date.now(),playerId:'driver',vehicleId:car.id,litres:0,total:0,price:6,message:'',tankX:0,tankY:0,tankZ:0};
 const world={players:{driver:{id:'driver',displayName:'Motorista',skin:'nathan',...car,rotation:car.yaw,animationState:'ride',interactionState:'moto:hatch',currentTableId:'',connected:true}},npcs:{[npc.id]:npc},tables:{},motos:{hatch:car},fuelServices:{[pump.id]:service},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:1,capacity:32,serverTime:Date.now(),environment:{...DEFAULT_ENVIRONMENT,hour:12,paused:true,weather:'clear'}};
 const tank=vehicleFiller(car);Object.assign(service,{tankX:tank.x,tankY:tank.y,tankZ:tank.z});

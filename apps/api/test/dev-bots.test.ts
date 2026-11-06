@@ -13,7 +13,7 @@ test('development bots: a ticket marked as a bot for an account made on first us
   assert.equal(claims.bot,true);assert.equal(claims.userId,first.userId);assert.equal(first.displayName,'Bot Tião');
   const validation=(await api.app.inject({method:'POST',url:'/api/internal/validate',headers:{'x-internal-secret':config.internalSecret},payload:{sessionId:claims.sessionId,userId:claims.userId}})).json();
   assert.equal(validation.valid,true);assert.equal(validation.balance,5000);
-  assert.deepEqual(validation.ownedSkins,SKINS.map(s=>s.id));assert.equal(validation.equippedSkin,SKINS[1].id,'Each bot wears the next skin');
+  const sellable=SKINS.filter(s=>!s.adminOnly);assert.deepEqual(validation.ownedSkins,sellable.map(s=>s.id),'The Morte is only granted by the administration');assert.equal(validation.equippedSkin,sellable[1].id,'Each bot wears the next skin');
   const again=(await bot(2)).json();
   assert.equal(again.userId,first.userId);assert.equal(verifyTicket(again.ticket,config.authSecret).sessionId,claims.sessionId,'The session is reused');
   assert.equal((await api.db.select().from(sessions)).length,1);

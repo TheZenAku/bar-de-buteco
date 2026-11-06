@@ -1,24 +1,31 @@
 import {vehicleSpeed as groundVehicleSpeed} from '@bar/shared';
 import * as pc from 'playcanvas';
+import {FIREWORK,fireworkOrigin,solidRayFraction,type FireworkShot} from '@bar/shared';
+import {Fireworks} from './fireworks';
 import {FuelProps} from './fuel-props';
-import {HORSE,isRidingHorse,normalizeHeading} from '@bar/shared';
+import {FLY,HORSE,isRidingHorse,normalizeHeading} from '@bar/shared';
 import {HorseMount} from './horse-mount';
 import {HorseSounds} from './horse-sound';
+import {FootstepSounds} from './footstep-sound';
 import type {RenderPerformance} from '../performance/monitor';
 import {UpdateProfiler} from '../performance/recording';
 import {collectSceneInventory} from '../performance/inventory';
 import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
-import {DRINK_PROPS,RIG_GRIP,findHand,holdDrink,type HandRig} from './drink-props';
-import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,openHand,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
+import {DRINK_PROPS,RIG_GRIP,findHand,handFrame,holdDrink,closeHand,type HandRig} from './drink-props';
+import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,aim,openHand,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
+import {decodeVrArms,vrArmsMessage,type VrArms,type VrHand} from '@bar/shared';
 import type { MapView, SceneActor, SceneCallbacks, SceneInput, SceneLabel, SceneWorld } from './scene-types';
 import {TelevisionSurface} from './television-surface';
 import {TELEVISIONS,TV_SYSTEMS} from '@bar/shared';
 import {EnvironmentLighting} from './environment-lighting';
+import {ServerClock} from '../server-clock';
+import type {EnvironmentState} from '@bar/shared';
 import {CarRig,seatCar} from './car-rig';
 import {isCar,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
 import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
+import {Showcase,type ShowcasePose} from './showcase';
 import {MapEffects,type MapEffectsStatus} from './map-effects';
 import {JukeboxLights,type JukeboxLightsStatus} from './jukebox-lights';
 import {StageLights,type StageLightsStatus} from './stage-lights';
@@ -30,10 +37,14 @@ import {StageMusicians,musicianState,musicianTime} from './stage-musicians';
 import {BarDressing} from './bar-dressing';
 import {BAR_ANIMATIONS,CLEANABLE_TABLES,ITEM_CATALOG,URINALS,barClipMs,seatChair,barFrame,barTimeline,cornerSpot,inFrame,nearestCorner,type BarClip,type BarFrame,type BarStep,type Meal} from '@bar/shared';
 import {BarAnimations,barEndOffset,barState} from './bar-animations';
-import {FOG_SCALE,textureLimit,type GraphicsSettings} from '../graphics';
+import {FOG_SCALE,GRAPHICS_PRESETS,textureLimit,type GraphicsSettings} from '../graphics';
 import {limitTextures,loadSharedContainer} from './gltf-textures';
 import {CameraRig,type CameraFeel,type CameraMode} from './camera-rig';
+import {VrSession,type VrAnchor} from '../vr/vr-session';
+import {vrLog,type VrSettings} from '../vr/vr-mode';
 import {HeadLookPose} from './head-look';
+import {FlyPose} from './fly-pose';
+import {FlySounds} from './fly-sound';
 import {headLookAt,type HeadLook} from '@bar/shared';
 import {Motos,MotoRig,seatRider,type Bike} from './moto-delivery';
 import {MotoBag} from './moto-bag';
@@ -43,6 +54,8 @@ import {SpeedBlur} from './speed-blur';
 import {LATE_MS,lifterPose,RagdollPuppet,type RagdollRig} from './moto-ragdoll';
 import {BlowSounds} from './blow-sound';
 import {BlowEffects} from './blow-fx';
+import {SmokeBurst} from './smoke-burst';
+import {CrowdSprites} from './crowd';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
 import {PoolBalls} from './pool-balls';
@@ -50,6 +63,9 @@ import {completeBasePose} from './animation-tracks';
 import {walkPlaybackRate,walkTransitionSeconds} from './walk-playback';
 import {shootPortrait} from './skin-portrait';
 import {KICKS,skillById} from '@bar/shared';
+import {MorteScene} from './morte-scene';
+import type {DeathAudio} from '../death/death-audio';
+import {DEATH_GONE_STATE,type DeathPlan} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -74,6 +90,7 @@ const DRUNK_CAMERA_ROLL = [0, 0.6, 1.5, 3, 3];
 const HIDDEN_HEAD = 1e-3;
 // NPCs with their own skin, not offered in the selector: the bartender is Magrão, the waiter is Tonico.
 const NPC_SKINS: Record<string, string> = { bartender: 'magrao', tonico: 'tonico' };
+const NPC_MODEL_IDS=new Set([...Object.values(NPC_SKINS),'frentista']);
 interface SkinnedRig {
   model: pc.Entity;
   bones: Record<SkinBone, pc.Entity>;
@@ -95,8 +112,17 @@ interface SkinnedRig {
   hip?: pc.Entity;
 }
 interface Avatar {
+  firework?:pc.Entity;
+  /** A VR player's hands as the room sent them (vrArms), and as drawn now (eased towards them). */
+  vrArmsRaw?: string;
+  vrArmsGoal?: VrArms | null;
+  vrArmsShown?: VrArms | null;
+  /** The room says this body was taken by the Morte: it is not drawn until it comes back. */
+  deathHidden?: boolean;
   horse?:HorseMount;
   headLook?:HeadLookPose;
+  /** An administrator in flight: lean, hover and limbs (fly-pose.ts). */
+  fly?:FlyPose;
   root: pc.Entity;
   body: pc.Entity;
   /** Procedural pivots: NPCs, and players while the player model loads. */
@@ -132,6 +158,9 @@ interface Avatar {
   yaw: number;
   /** Seconds of the next glide, instead of the usual: a musician sliding onto a stage spot or stepping off it. */
   glideNext?: number;
+  /** In flight: the velocity (m/s) measured from the room's positions, and when the last one came (scene seconds). */
+  flyV?: pc.Vec3;
+  flyAt?: number;
   /** Seated on a delivery bike this frame: its own shadow takes the place of the one at the feet. */
   riding?: boolean;
   carScale?:pc.Vec3;
@@ -191,7 +220,9 @@ interface Pose {
 const DEFAULT_MODEL='nathan';
 // Models and canes follow their rig version; regenerated animation banks have a separate cache version.
 const MOUSE_JUMP = 500;
-const SKIN_VERSIONS: Record<string, string> = { nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2' };
+// Touch on the view: pixels of finger travel before it counts as a look (not a tap), a tap's limits, and a pinch's wheel steps per pixel.
+const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
+const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
   const version = folder === 'animations' ? 'walk-smooth-20261104' : SKIN_VERSIONS[id];
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
@@ -206,6 +237,9 @@ const BOX_AVATAR_SCALE: V3 = [0.75, 0.9, 0.75];
 // Name labels float just above head height.
 const LABEL_HEIGHT = 2.15;
 // Keep nearby bodies and actions with moving props or physics animated even outside the view.
+/** Avatars beyond this distance from the camera (metres) cast no shadow; back on inside the margin (updateAvatarShadows). */
+const AVATAR_SHADOW_RANGE = 12;
+const AVATAR_SHADOW_MARGIN = 1.5;
 const OFFSTAGE_NEAR = 8;
 const OFFSTAGE_MARGIN = 2;
 const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble']);
@@ -301,11 +335,30 @@ export class BarScene {
   /** How much of the feeling of speed applies now, 0 to 1, and the lens it adds to (the phone's zoom sets that). */
   private rush = 0;
   private lensFov = 57;
+  /** The Morte's scene (docs/sistemas/morte.md), made when a death first needs it or the bar preloads it; and the lens punch of her laugh. */
+  private morte?: MorteScene;
+  private deathAudio?: DeathAudio;
+  private deathPull?: { victim: string; k: number; x: number; z: number };
+  private deathPulled = false;
+  private fovPunch = 0;
+  private fovPunchGoal = 0;
   /** The thrown bodies the room is running. */
   private ragdollStarts:Record<string,RagdollStart&{startedAt:number}>={};
   private readonly blowSounds:BlowSounds;
   private readonly horseSounds:HorseSounds;
+  private readonly footstepSounds:FootstepSounds;
   private readonly blowEffects:BlowEffects;
+  private readonly flySounds:FlySounds;
+  /** The local flier: how far into the dash (0 to 1), whether the barrier may break again, and when it last did (scene seconds). */
+  private flyShare = 0; private boomArmed = true; private boomAt = -99;
+  /** The local flier's velocity from the keys, as of the last input the room was sent (getInput), and when. */
+  private readonly localFlyV = new pc.Vec3(); private localFlyAt = -99;
+  private readonly smokeBurst:SmokeBurst;
+  private readonly fireworks:Fireworks;
+  private fireworkPressedAt=-Infinity;
+  /** The people beyond the avatars, as sprites (crowd.ts); the slots of the avatars drawn now keep theirs hidden. */
+  private readonly crowd:CrowdSprites;
+  private modelSlots=new Set<number>();
   /** The rider's switches (Z, X, C, H), and how far the bike has turned with the blinker on. */
   private motoSwitches=0;
   private signalYaw?:number;
@@ -336,6 +389,14 @@ export class BarScene {
   private readonly resizeObserver: ResizeObserver;
   private readonly tempScreen = new pc.Vec3();
   private readonly tempPosition = new pc.Vec3();
+  private readonly tempPoint = new pc.Vec3();
+  private readonly tempPole = new pc.Vec3();
+  private readonly vrHandPose = { wrist: new pc.Vec3(), fingers: new pc.Vec3(), palm: new pc.Vec3() };
+  /** The local body moved under the headset this frame (vrBody), and by how much. */
+  private vrShifted?: Avatar;
+  private readonly vrShift = new pc.Vec3();
+  private vrArmsSentAt = 0;
+  private vrArmsSent = '';
   private readonly tempTurn = new pc.Quat();
   private readonly axisRight = new pc.Vec3();
   private readonly axisUp = new pc.Vec3();
@@ -367,8 +428,13 @@ export class BarScene {
       }
       this.loadHorse();
       if(!this.horseModel||!avatar.skin)continue;
+      if(!avatar.horse){
+        // The horse appears in a puff of smoke, a new random colour every time.
+        const ground=avatar.root.getPosition();
+        this.smokeBurst.burst(ground.x,ground.y,ground.z,1.8);
+      }
       const horse=avatar.horse??=new HorseMount(this.horseModel,avatar.root);
-      horse.update(avatar.speed??0,avatar.actor.animation,avatar.resting,avatar.actor.horseRearAt??0,Date.now()+this.serverClockOffset);
+      horse.update(avatar.speed??0,avatar.actor.animation,avatar.resting,avatar.actor.horseRearAt??0,this.serverNow());
       const skin=avatar.skin,hip=skin.hip??=(skin.model.findByName('hip') as pc.Entity|null)??undefined;
       avatar.spine??=(skin.model.findByName('spine_02') as pc.Entity|null)??null;
       if(hip&&!avatar.resting)horse.seat({root:avatar.body,hip,spine:avatar.spine,...skin.bones,handRigL:skin.drinkHand,handRigR:skin.rightHand});
@@ -379,7 +445,8 @@ export class BarScene {
   }
   private readonly caneModels=new Map<string,pc.ContainerResource>();
   private readonly caneRequests=new Set<string>();
-  private serverClockOffset = 0;
+  private readonly clock=new ServerClock();
+  private readonly serverNow=()=>this.callbacks.serverNow?.()??this.clock.now();
   /** Skins already requested, including failed ones, so a missing file is not fetched again. */
   private readonly skinRequests = new Set<string>();
   private readonly discoBall: pc.Entity;
@@ -401,17 +468,36 @@ export class BarScene {
     DOOR_LEAVES.map(leaf=>({leaf,openness:1,from:1,target:1,changedAt:0}));
   private localId = '';
   private enabled = false;
+  /** The entry's backdrop: the empty bar from fixed angles while no one is in the room (setShowcase). */
+  private showcaseOn = false;
+  private readonly showcase = new Showcase();
+  private showcaseSlow = 0;
+  private showcaseCut = 0;
+  private debugPose?: ShowcasePose;
   private destroyed = false;
   private elapsed = 0;
   /** The local player's camera: its views, smoothing and x-ray (camera-rig.ts). */
   private readonly rig: CameraRig;
+  /** Playing in a headset (vr/vr-session.ts), the view the player had before it, and where the eyes were last placed. */
+  private readonly vr: VrSession;
+  private beforeVr?: { mode: CameraMode };
+  private graphicsBeforeVr?: GraphicsSettings;
+  private vrLogTimer = 0;
+  private readonly vrAnchor: VrAnchor = { x: 0, y: 0, z: 0, special: false };
+  private vrAnchored = false;
   /** The local avatar's head joint first person hid, and its own scale to give back. */
   private hiddenHead?: pc.Entity;
   private readonly hiddenCarFace=new Map<pc.GraphNode,pc.Vec3>();
   private readonly headScale = new pc.Vec3(1, 1, 1);
   private dragging = false;
+  /** The touch stick (touch-controls.ts): x right and y down, -1 to 1, and whether it runs. Added to what the keys say. */
+  private touchAxis = { x: 0, y: 0 };
+  private touchSprint = false;
+  /** Fingers on the view: one looks around, two pinch to zoom. */
+  private fingers = new Map<number, { x: number; y: number; x0: number; y0: number; at: number; moved: number }>();
+  private pinch = 0;
   /** Where a press began: the right button released close by and quickly is a click on whoever is under it (onWorldMenu). */
-  private press?: { x: number; y: number; at: number; button: number };
+  private press?: { x: number; y: number; at: number; button: number; travel:number };
   private lastRotation = Math.PI;
   private eventType = '';
   private frameSeconds = 0;
@@ -433,7 +519,7 @@ export class BarScene {
   private shadowsPending = false;
   /** The phone's front camera (setSelfie): the view turns to the player's face. */
   private selfie = false;
-  /** Canvases the phone's camera draws into, one per size (a video call takes eight frames a second). */
+  /** Canvases the phone's camera draws into, one per size (a video call targets up to 24 frames a second). */
   private captureCanvases = new Map<string, HTMLCanvasElement>();
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks = {}) {
@@ -474,9 +560,21 @@ export class BarScene {
     this.camera.lookAt(14, 1.8, -6);
     // Before any material is drawn: the x-ray goes into every shader.
     this.rig = new CameraRig(this.camera, this.app.graphicsDevice);
+    this.vr = new VrSession(this.app, this.camera, {
+      windowOpen: () => !!this.callbacks.vrWindowOpen?.(),
+      context: () => this.touchContext(),
+      key: (code, down) => document.body.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code.startsWith('Key') ? code.slice(3).toLowerCase() : code === 'Space' ? ' ' : code.startsWith('Shift') ? 'Shift' : code, shiftKey: code.startsWith('Shift'), bubbles: true, cancelable: true })),
+      move: (x, y) => this.setTouchAxis(x, y),
+      sprint: on => this.setTouchSprint(on),
+      pick: (origin, direction, reach) => this.pickRay(origin, direction, reach),
+      menu: (id, x, y, vehicle) => this.callbacks.onWorldMenu?.(x, y, vehicle ? { moto: id } : { player: id }),
+      notice: text => this.callbacks.onVrNotice?.(text),
+      names: max => this.vrNames(max),
+    });
+    this.vr.onEnd = reason => this.leftVr(reason);
     this.environment=new EnvironmentLighting(this.app,this.camera,()=>this.callbacks.motoVolume?.()??1);
     this.environment.setDynamicCasters(()=>this.dynamicCasters());
-    this.environment.update(Date.now(),0,'');
+    this.environment.update(this.serverNow(),0,'');
 
     this.staticBatchId = this.app.batcher.addGroup('Static bar furnishings', false, 24).id;
     // The blackjack and truco tables and their chairs are the map's (46_mesa_blackjack.py: BJ_* at BLACKJACK_TABLE and BLACKJACK_SEATS;
@@ -489,11 +587,16 @@ export class BarScene {
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
     this.fuelProps=new FuelProps(this.app);
     this.horseSounds=new HorseSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
+    this.footstepSounds=new FootstepSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
       const ear=this.camera.getPosition();
       return {x:ear.x,y:ear.y,z:ear.z,forward:this.camera.forward,up:this.camera.up};
     });
     this.blowEffects=new BlowEffects(this.app);
+    this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
+    this.smokeBurst=new SmokeBurst(this.app);
+    this.fireworks=new Fireworks(this.app,()=>this.callbacks.motoVolume?.()??1);
+    this.crowd=new CrowdSprites(this.app);
     this.speedBlur=new SpeedBlur(this.app);
     this.app.batcher.generate([this.staticBatchId]);
     this.staticBatchId = -1;
@@ -750,6 +853,7 @@ export class BarScene {
     blip.ring.setLocalScale(breath,1,breath);
   }
   getEnvironmentStatus(){return this.environment.telemetry();}
+  setEnvironment(state?:EnvironmentState):void {if(state)this.environment.setState(state);}
 
   /** The bar animations' debug actions (debugBarAnimation). */
   static readonly BAR_DEBUG_ACTIONS = ['fumar','parar-fumar','cigarro','vomitar','cair','levantar-chao','sentar','comer','parar-comer','levantar','limpar-mesa','urinar','chopp','chopp-escuro','longneck','parar'] as const;
@@ -759,7 +863,7 @@ export class BarScene {
    * The player is held still meanwhile. Returns what happened.
    */
   debugBarAnimation(action:typeof BarScene.BAR_DEBUG_ACTIONS[number]):string {
-    const now=Date.now()+this.serverClockOffset,player=this.actors.get(this.localId),id=this.localId,current=this.barOverrides.get(id);
+    const now=this.serverNow(),player=this.actors.get(this.localId),id=this.localId,current=this.barOverrides.get(id);
     const serve=({chopp:'serve-chopp','chopp-escuro':'serve-chopp-dark',longneck:'serve-longneck'} as Record<string,string>)[action];
     if(serve){
       if(!this.actors.has('bartender'))return 'O Magrão não está à vista: chegue perto do balcão.';
@@ -808,16 +912,208 @@ export class BarScene {
   /** Height, sensitivity and smoothing of the view, from Configurações. */
   setCameraFeel(feel: CameraFeel): void { this.rig.setFeel(feel); }
 
+  /** Whether the player is in a headset right now. */
+  get vrActive(): boolean { return this.vr.active; }
+  /**
+   * Puts the player in the headset (WebXR needs this to run from a click). The view becomes first person, the 3D resolution is
+   * the headset's own to choose (settings.resolution), and the browser's pixel cap and the dynamic resolution step aside.
+   */
+  async enterVr(settings: VrSettings): Promise<void> {
+    if (this.vr.active) return;
+    this.beforeVr = { mode: this.rig.mode };
+    this.app.graphicsDevice.maxPixelRatio = window.devicePixelRatio || 1;
+    try {
+      await this.vr.start(settings);
+    } catch (error) {
+      this.beforeVr = undefined;
+      this.applyResolution();
+      throw error;
+    }
+    this.rig.enterFirst();
+    this.vrAnchored = false;
+    vrLog(`VR ligado; gráficos leves=${settings.lightGraphics}; resolução ${settings.resolution}`);
+    window.clearInterval(this.vrLogTimer);
+    this.vrLogTimer = window.setInterval(() => vrLog(JSON.stringify(this.getVr())), 2000);
+    // Light graphics for the headset (given back on leaving): shadows off, the near city only.
+    if (settings.lightGraphics && this.graphics) { this.graphicsBeforeVr = this.graphics; this.setGraphics({ preset: 'low', ...GRAPHICS_PRESETS.low, renderScale: 1, dynamicResolution: false, fpsCap: 0 }); }
+    this.app.autoRender = true;
+    this.app.renderNextFrame = true;
+  }
+  /** Fixtures and tests: the VR session without a headset; `pose` (the vr session's) is the head. */
+  simulateVr(settings: VrSettings): { pose: { x: number; y: number; z: number; yaw: number; pitch: number } } {
+    this.beforeVr = { mode: this.rig.mode };
+    this.vr.simulate(settings);
+    this.rig.enterFirst();
+    this.vrAnchored = false;
+    return this.vr;
+  }
+  exitVr(): void { this.vr.stop(); }
+  /** An avatar's own frame: its feet, its right and where it faces (zero yaw faces +Z). */
+  private bodyFrame(avatar: Avatar): { feet: pc.Vec3; rx: number; rz: number; fx: number; fz: number } {
+    const a = avatar.yaw / RAD_TO_DEG;
+    return { feet: avatar.root.getPosition(), fx: Math.sin(a), fz: Math.cos(a), rx: -Math.cos(a), rz: Math.sin(a) };
+  }
+  /**
+   * In a headset the body stands under the head: on foot, the drawn body (not the room's position, which the eyes follow) slides
+   * under the eyes as the player leans or steps in the room, with the eyes a little in front of the face, so looking down
+   * never shows the inside of the chest. Standing still, the body turns to where the head looks once it is turned well away.
+   * Only drawn here: the room is told nothing but the turn (the heading the player walks by).
+   */
+  private vrBody(player: Avatar | undefined, viewYaw: number, onFoot: boolean): void {
+    if (!player?.skin || !onFoot || player.ragdoll || player.deathHidden) return;
+    const facing = normalizeHeading(viewYaw + Math.PI);
+    if ((player.speed ?? 0) < .3 && Math.abs(Math.atan2(Math.sin(facing - this.lastRotation), Math.cos(facing - this.lastRotation))) > .75) this.lastRotation = facing;
+    const { feet, fx, fz } = this.bodyFrame(player), eye = this.camera.getPosition();
+    let x = eye.x - fx * .14 - feet.x, z = eye.z - fz * .14 - feet.z;
+    const length = Math.hypot(x, z);
+    if (length > .7) { x *= .7 / length; z *= .7 / length; }
+    this.vrShift.set(x, 0, z);
+    player.root.setPosition(feet.x + x, feet.y, feet.z + z);
+    this.vrShifted = player;
+  }
+  /**
+   * Arms over the clip's pose: the wrist reaches the hand's target (two-bone IK, the elbow down, out and back), then the hand
+   * turns so its fingers point and its palm faces as the controller does (measured from the hand's own joints, so any rig works).
+   */
+  private poseArm(avatar: Avatar, skin: SkinnedRig, side: 'l' | 'r', wrist: pc.Vec3, fingers: pc.Vec3, palm: pc.Vec3): void {
+    const { rx, rz, fx, fz } = this.bodyFrame(avatar), out = side === 'l' ? -1 : 1, b = skin.bones;
+    this.tempPole.set(rx * .55 * out - fx * .35, -.8, rz * .55 * out - fz * .35);
+    if (side === 'l') reach(b.upperarm_l, b.lowerarm_l, b.hand_l, wrist, this.tempPole);
+    else reach(b.upperarm_r, b.lowerarm_r, b.hand_r, wrist, this.tempPole);
+    const rig = side === 'l' ? skin.drinkHand : skin.rightHand;
+    if (!rig || fingers.lengthSq() < 1e-6) return;
+    aim(rig.hand, handFrame(rig).fingers, fingers.clone().normalize());
+    const axis = fingers.clone().normalize(), flat = (v: pc.Vec3) => v.clone().sub(axis.clone().mulScalar(v.dot(axis)));
+    const from = flat(handFrame(rig).palm), to = flat(palm);
+    if (from.lengthSq() > 1e-6 && to.lengthSq() > 1e-6) aim(rig.hand, from, to);
+  }
+  /** A world pose of a hand in an avatar's frame, and back. */
+  private toBody(avatar: Avatar, wrist: pc.Vec3, fingers: pc.Vec3, palm: pc.Vec3): VrHand {
+    const { feet, rx, rz, fx, fz } = this.bodyFrame(avatar), r = (n: number) => Math.round(n * 1000) / 1000;
+    const local = (x: number, y: number, z: number): [number, number, number] => [r(x * rx + z * rz), r(y), r(x * fx + z * fz)];
+    return { wrist: local(wrist.x - feet.x, wrist.y - feet.y, wrist.z - feet.z), fingers: local(fingers.x, fingers.y, fingers.z), palm: local(palm.x, palm.y, palm.z) };
+  }
+  private fromBody(avatar: Avatar, hand: VrHand, wrist: pc.Vec3, fingers: pc.Vec3, palm: pc.Vec3): void {
+    const { feet, rx, rz, fx, fz } = this.bodyFrame(avatar);
+    const world = (v: readonly number[], out: pc.Vec3, origin?: pc.Vec3) => out.set(v[0]! * rx + v[2]! * fx + (origin?.x ?? 0), v[1]! + (origin?.y ?? 0), v[0]! * rz + v[2]! * fz + (origin?.z ?? 0));
+    world(hand.wrist, wrist, feet); world(hand.fingers, fingers); world(hand.palm, palm);
+  }
+  /**
+   * VR arms. The local player's follow the controllers, and are sent to the room (about 12 times a second, when they move) so
+   * everyone else draws them; other VR players' arms are drawn from what the room relays, eased between updates.
+   */
+  private vrArms(player: Avatar | undefined, dt: number): void {
+    const pose = this.vrHandPose;
+    if (this.vr.active && player?.skin && !player.ragdoll && !player.deathHidden) {
+      const arms: VrArms = { l: null, r: null };
+      for (const side of ['l', 'r'] as const) {
+        if (!this.vr.handPose(side === 'l' ? 'left' : 'right', pose.wrist, pose.fingers, pose.palm)) continue;
+        this.poseArm(player, player.skin, side, pose.wrist, pose.fingers, pose.palm);
+        arms[side] = this.toBody(player, pose.wrist, pose.fingers, pose.palm);
+      }
+      this.sendVrArms(arms);
+    } else if (this.vrArmsSent) this.sendVrArms({ l: null, r: null });
+    const k = 1 - Math.exp(-14 * dt);
+    for (const [id, avatar] of this.actors) {
+      if (id === this.localId || !avatar.skin || avatar.ragdoll || avatar.deathHidden) continue;
+      const raw = avatar.actor.vrArms ?? '';
+      if (raw !== avatar.vrArmsRaw) { avatar.vrArmsRaw = raw; avatar.vrArmsGoal = decodeVrArms(raw); if (!avatar.vrArmsGoal) avatar.vrArmsShown = null; }
+      const goal = avatar.vrArmsGoal;
+      if (!goal) continue;
+      const shown = avatar.vrArmsShown ??= { l: goal.l && structuredClone(goal.l), r: goal.r && structuredClone(goal.r) };
+      for (const side of ['l', 'r'] as const) {
+        const want = goal[side];
+        if (!want) { shown[side] = null; continue; }
+        const have = shown[side] ??= structuredClone(want);
+        for (const key of ['wrist', 'fingers', 'palm'] as const) for (let i = 0; i < 3; i++) have[key][i] = have[key][i]! + (want[key][i]! - have[key][i]!) * k;
+        this.fromBody(avatar, have, pose.wrist, pose.fingers, pose.palm);
+        this.poseArm(avatar, avatar.skin, side, pose.wrist, pose.fingers, pose.palm);
+      }
+    }
+  }
+  private sendVrArms(arms: VrArms): void {
+    const message = vrArmsMessage(arms), text = JSON.stringify(message), now = performance.now();
+    if (text === this.vrArmsSent || now - this.vrArmsSentAt < 80) return;
+    // Below about a centimetre of change there is nothing for anyone to see.
+    if (this.vrArmsSent && message.l && message.r) {
+      const before = JSON.parse(this.vrArmsSent) as typeof message;
+      if (before.l && before.r && [...before.l, ...before.r].every((v, i) => Math.abs(v - [...message.l!, ...message.r!][i]!) < .012)) return;
+    }
+    this.vrArmsSent = message.l || message.r ? text : '';
+    this.vrArmsSentAt = now;
+    this.callbacks.onVrArms?.(message);
+  }
+  /** An error inside the headset's frame would leave it on a frozen loading screen: say what it was, and leave VR. */
+  private vrFailed(error: unknown): void {
+    console.error('[vr]', error);
+    vrLog(`ERRO no quadro: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+    this.callbacks.onVrNotice?.(`Erro no VR: ${error instanceof Error ? error.message : String(error)}`);
+    this.vr.stop();
+  }
+  recentreVr(): void { if (this.vr.active) this.vr.recentre(); }
+  getVr() {
+    const feet = this.actors.get(this.localId)?.root.getPosition(), a = this.vrAnchor, eye = this.camera.getPosition();
+    const r = (n: number) => +n.toFixed(2);
+    return { ...this.vr.telemetry(), enabled: this.enabled, anchored: this.vrAnchored, anchor: [r(a.x), r(a.y), r(a.z)], special: a.special, feet: feet && [r(feet.x), r(feet.y), r(feet.z)], eye: [r(eye.x), r(eye.y), r(eye.z)], windowOpen: !!this.callbacks.vrWindowOpen?.(), fps: this.fps };
+  }
+  private leftVr(reason: string): void {
+    this.touchAxis = { x: 0, y: 0 }; this.touchSprint = false;
+    if (this.beforeVr) { this.rig.setMode(this.beforeVr.mode); this.beforeVr = undefined; }
+    window.clearInterval(this.vrLogTimer);
+    vrLog(`saiu do VR: ${reason}`);
+    if (this.graphicsBeforeVr) { this.setGraphics(this.graphicsBeforeVr); this.graphicsBeforeVr = undefined; }
+    this.fovPunch = 0; this.fovPunchGoal = 0;
+    if (this.camera.camera) this.camera.camera.fov = this.lensFov;
+    this.applyResolution();
+    this.app.autoRender = this.enabled || this.showcaseOn;
+    this.app.renderNextFrame = true;
+    this.callbacks.onVrEnd?.(reason);
+  }
+  /** The people near the eyes, with where their names go (a little over the head), nearest first. */
+  private vrNames(max: number): { id: string; name: string; x: number; y: number; z: number; npc: boolean }[] {
+    const eye = this.camera.getPosition(), found: { id: string; name: string; x: number; y: number; z: number; npc: boolean; d: number }[] = [];
+    for (const [id, avatar] of this.actors) {
+      if (id === this.localId || avatar.deathHidden) continue;
+      const name = avatar.actor.displayName ?? avatar.actor.name;
+      if (!name) continue;
+      const at = avatar.root.getPosition(), d = Math.hypot(at.x - eye.x, at.z - eye.z);
+      if (d < 18) found.push({ id, name, x: at.x, y: at.y + 1.98, z: at.z, npc: !!avatar.npc, d });
+    }
+    return found.sort((a, b) => a.d - b.d).slice(0, max).map(({ d: _d, ...tag }) => tag);
+  }
+  /** The nearest other player a ray from a controller passes close to, within `reach` metres. */
+  /** What a controller's ray points at, within `reach` metres: a person or a vehicle, whichever is nearer (the menu is the same as a right click on it). */
+  private pickRay(origin: pc.Vec3, direction: pc.Vec3, reach: number): { id: string; distance: number; vehicle?: true } | undefined {
+    const person = this.pickPlayerRay(origin, direction, reach);
+    const hit = this.motos.pickRay(origin, this.tempPoint.copy(direction).mulScalar(reach).add(origin));
+    if (!hit || (person && person.distance <= hit.at * reach)) return person;
+    return { id: hit.id, distance: hit.at * reach, vehicle: true };
+  }
+  private pickPlayerRay(origin: pc.Vec3, direction: pc.Vec3, reach: number): { id: string; distance: number } | undefined {
+    let best: { id: string; distance: number } | undefined;
+    for (const [id, avatar] of this.actors) {
+      if (avatar.npc || id === this.localId) continue;
+      const feet = avatar.root.getPosition();
+      this.tempPosition.set(feet.x - origin.x, feet.y + 1 - origin.y, feet.z - origin.z);
+      const along = this.tempPosition.dot(direction);
+      if (along < .2 || along > reach) continue;
+      const off = this.tempPosition.sub(this.tempPoint.copy(direction).mulScalar(along)).length();
+      if (off < .6 && (!best || along < best.distance)) best = { id, distance: along };
+    }
+    return best;
+  }
+
   /** Before PlayCanvas evaluates any clip, remove last frame's additive head rotation. */
   private restoreHeadLooks():void {
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
-    for(const avatar of this.actors.values())avatar.headLook?.restore();
+    for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();}
   }
 
   /** The animation has already posed the skeleton; only the head joint receives the camera offset. */
   private applyHeadLooks(dt:number):void {
     for(const [id,avatar] of this.actors){
       if(avatar.npc||avatar.resting)continue;
+      if(avatar.skin)avatar.fly?.apply(avatar.skin.bones,avatar.body,this.elapsed+avatar.phase);
       const head=avatar.skin?.bones.head??avatar.limbs?.head;
       if(!head)continue;
       const actor=avatar.actor,local=id===this.localId,bodyYaw=avatar.yaw/RAD_TO_DEG;
@@ -837,7 +1133,8 @@ export class BarScene {
    * fill the view; the body, the hands and what they hold stay. Any other avatar, or a later view, gets it back.
    */
   private showOwnHead(player: Avatar | undefined): void {
-    const head = this.rig.headHidden && this.enabled && !this.watchingTv && !this.selfie ? player?.skin?.bones.head : undefined;
+    // In a headset the eyes are always inside the head, also with a window open (when the scene is not enabled).
+    const head = (this.vr.active && !this.vrAnchor.special || this.rig.headHidden && this.enabled && !this.watchingTv) && !this.selfie ? player?.skin?.bones.head : undefined;
     const carHead=!!head&&!!player&&this.motos.ridden(player.actor.id)?.rig instanceof CarRig;
     if(!carHead||head!==this.hiddenHead){for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();}
     if(carHead&&head){
@@ -852,26 +1149,59 @@ export class BarScene {
     if (head && head !== this.hiddenHead) this.headScale.copy(head.getLocalScale());
     this.hiddenHead = head;
     head?.setLocalScale(HIDDEN_HEAD, HIDDEN_HEAD, HIDDEN_HEAD);
-    // The ring at the feet is for finding yourself from behind.
-    if (player) player.ring.enabled = !head && !player.riding;
+    if (player) player.ring.enabled = false;
   }
 
+  private morteScene(): MorteScene {
+    if (!this.morte) {
+      this.morte = new MorteScene({
+        app: this.app, camera: this.camera, serverNow: () => this.serverNow(), localId: () => this.localId,
+        shake: metres => this.rig.shake(metres), faceCamera: heading => this.rig.face(heading), punchFov: degrees => { this.fovPunchGoal = degrees; },
+        dust: (x, y, z, radius, colour) => { this.smokeBurst.burst(x, y, z, radius, colour); },
+        lowQuality: () => this.graphics?.preset === 'low' || (this.graphics?.renderScale ?? 1) < .7,
+      });
+      this.morte.audio = this.deathAudio;
+      this.morte.onPull = (victim, k, towards) => { this.deathPull = { victim, k, x: towards.x, z: towards.z }; };
+    }
+    return this.morte;
+  }
+  /** On entering the bar, once idle: the five GLBs of the Morte, so the first death does not stall. */
+  preloadDeath(): void { this.morteScene().preload(); }
+  playDeath(plan: DeathPlan): void { this.morteScene().start(plan); }
+  stopDeath(): void { this.morte?.stop(); this.deathPull = undefined; }
+  setDeathAudio(audio: DeathAudio): void { this.deathAudio = audio; if (this.morte) this.morte.audio = audio; }
+  getDeath() { return { playing: !!this.morte?.current, loaded: this.morte?.ready ?? false, victim: this.morte?.current?.victim ?? '', pull: this.deathPull?.k ?? 0 }; }
+  /** The victim's body is drawn into the cloud as the Morte leaves: it moves to where she stood and sinks, smaller, until the room hides it. */
+  private applyDeathPull(): void {
+    const pull = this.deathPull, avatar = pull && this.actors.get(pull.victim);
+    if (!pull || !avatar) return;
+    const body = avatar.body;
+    if (pull.k <= 0) { if (this.deathPulled) { body.setLocalPosition(0, 0, 0); body.setLocalScale(1, 1, 1); this.deathPulled = false; } return; }
+    const here = avatar.root.getPosition(), k = pull.k, target = new pc.Vec3(here.x + (pull.x - here.x) * .85 * k, here.y - 1.15 * k, here.z + (pull.z - here.z) * .85 * k);
+    const local = new pc.Mat4().copy(avatar.root.getWorldTransform()).invert().transformPoint(target);
+    body.setLocalPosition(local); body.setLocalScale(1 - .35 * k, 1 - .35 * k, 1 - .35 * k); this.deathPulled = true;
+  }
   /** The phone's front camera: at arm's length in front of the face, looking back at it, until switched off. */
   setSelfie(on: boolean): void { this.selfie = on; }
   /** The phone camera's zoom: the lens narrows (1× is the game's own 57° view). */
   setZoom(factor: number): void {
     const zoom = Math.max(1, Math.min(8, factor || 1));
     this.lensFov = zoom === 1 ? 57 : 2 * Math.atan(Math.tan(57 / 2 / RAD_TO_DEG) / zoom) * RAD_TO_DEG;
-    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV;
+    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV - this.fovPunch;
   }
   /** Going fast on the local rider's own bike: the view and the edges of the screen, eased on the frames' time. */
   private feelSpeed(bike: Bike | undefined, dt: number): void {
     const share = bike?.predicted ? groundVehicleSpeed(bike.predicted) / vehiclePhysics(bike.state.model).TOP_SPEED : 0;
-    const wanted = clamp((share - RUSH_FROM) / (RUSH_FULL - RUSH_FROM), 0, 1), goal = wanted * wanted * (3 - 2 * wanted);
+    const wanted = Math.max(clamp((share - RUSH_FROM) / (RUSH_FULL - RUSH_FROM), 0, 1), this.flyShare), goal = wanted * wanted * (3 - 2 * wanted);
+    // The barrier breaking: the view stretches and the edges streak at once, then settle.
+    const boom = Math.exp(-(this.elapsed - this.boomAt) * 3.2);
     this.rush += (goal - this.rush) * (1 - Math.exp(-(goal > this.rush ? RUSH_IN : RUSH_OUT) * dt));
+    if (boom > .02) this.rush = Math.max(this.rush, boom);
     if (this.rush < .002) this.rush = goal ? this.rush : 0;
     this.rig.rush(this.rush);
-    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV;
+    // A headset's field of view is its own, and a screen blur would be drawn on one eye's glass only.
+    if (this.vr.active) { this.speedBlur.set(0); return; }
+    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV + (boom > .02 ? boom * 12 : 0) - this.fovPunch;
     this.speedBlur.set(this.rush);
   }
   /** A skin standing still, as an image (the profile window); undefined when it could not be drawn. */
@@ -934,6 +1264,25 @@ export class BarScene {
     });
   }
 
+  /**
+   * The same cut as capture(), for a video call: a bitmap of `width`×`height` made in the frame it is drawn (the GPU does the
+   * scaling; no page-thread readback, no JPEG here: the phone encodes it in a worker). Null if nothing is drawn for two seconds.
+   */
+  captureBitmap(width: number, height: number): Promise<ImageBitmap | null> {
+    return new Promise(resolve => {
+      let done = false;
+      const grab = () => {
+        if (done) return; done = true;
+        const source = this.canvas, aspect = width / height, sw = Math.min(source.width, source.height * aspect), sh = sw / aspect;
+        createImageBitmap(source, Math.round((source.width - sw) / 2), Math.round((source.height - sh) / 2), Math.round(sw), Math.round(sh),
+          { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }).then(resolve, () => resolve(null));
+      };
+      this.app.once('frameend', grab);
+      this.app.renderNextFrame = true;
+      setTimeout(() => { if (!done) { done = true; this.app.off('frameend', grab); resolve(null); } }, 2000);
+    });
+  }
+
   /** Where the local player hears from: the avatar's position and the camera's heading (radians). */
   getListener(): (Position & { yaw: number }) | undefined {
     const avatar = this.actors.get(this.localId);
@@ -960,6 +1309,15 @@ export class BarScene {
 
   /** The bike the local player rides, as predicted (networking.ts). */
   predictMoto(id: string, body: MotoBody | undefined): void { this.motos.predict(id, body); }
+  /** The touch stick: x right, y down (-1 to 1). It walks, or steers and gives gas on a vehicle, like the keys it adds to. */
+  setTouchAxis(x: number, y: number): void { this.touchAxis = { x: clamp(x, -1, 1), y: clamp(y, -1, 1) }; }
+  setTouchSprint(on: boolean): void { this.touchSprint = on; }
+  /** What the player's hands are doing, which decides the touch buttons: on foot, driving a bike or a car, or on the horse. */
+  touchContext(): 'walk' | 'bike' | 'car' | 'horse' {
+    const vehicle = this.motos.ridden(this.localId);
+    if (vehicle && vehicle.state.riderId === this.localId) return isCar(vehicle.state) ? 'car' : 'bike';
+    return isRidingHorse(this.actors.get(this.localId)?.actor.interactionState) ? 'horse' : 'walk';
+  }
   /** W/S: throttle, brake and reverse; A/D: +1 is right; Space: the handbrake. */
   getMotoInput(): MotoIntent {
     const vehicle=this.motos.ridden(this.localId);
@@ -972,7 +1330,7 @@ export class BarScene {
       return { ...NO_MOTO_INTENT, lights: this.motoSwitches };
     }
     const held = (...codes: string[]) => Number(codes.some(code => this.keys.has(code)));
-    const input = { throttle: held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown'), steer: held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft'), brake: this.keys.has('Space'), lights: this.motoSwitches,horn:this.keys.has('KeyF'),wheelie:!isCar(vehicle?.state)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')) };
+    const input = { throttle: clamp(held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown') - this.touchAxis.y, -1, 1), steer: clamp(held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft') + this.touchAxis.x, -1, 1), brake: this.keys.has('Space'), lights: this.motoSwitches,horn:this.keys.has('KeyF'),wheelie:!isCar(vehicle?.state)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')) };
     const bike = this.motos.ridden(this.localId), speed = bike?.predicted?.speed ?? 0;
     const braking = input.brake || (input.throttle < 0 && speed > .1) || (input.throttle > 0 && speed < -.1);
     if (bike) { this.motos.lamps(bike.state.id, this.motoSwitches | (braking ? MOTO_LIGHT.BRAKE : 0)); this.motos.gas(bike.state.id, input.throttle > 0 && bike.state.engine === MOTO_ENGINE.ON); }
@@ -1032,6 +1390,26 @@ export class BarScene {
   /** The thrown bodies as drawn (tests and telemetry). */
   /** Kicks and falls: what was heard and what is showing (tests). */
   getBlows() { return { ...this.blowSounds.telemetry(), effects: this.blowEffects.showing }; }
+  getSmokeBurst() { return { showing: this.smokeBurst.showing, color: this.smokeBurst.lastColor }; }
+  getFireworks() {return {showing:this.fireworks.showing,equipped:!!this.actors.get(this.localId)?.firework?.enabled};}
+  fireworkShot(shot:FireworkShot):void {this.fireworks.shot(shot,this.serverNow());}
+  fireworkFire():void {this.shootFirework();}
+  private fireworkDirection():pc.Vec3 {
+    const actor=this.actors.get(this.localId)?.actor;
+    if(!actor)return this.camera.forward.clone();
+    const eye=this.camera.getPosition(),forward=this.camera.forward;
+    const end=eye.clone().add(forward.clone().mulScalar(80));
+    const fraction=solidRayFraction(eye,end);
+    const target=eye.clone().lerp(eye,end,fraction),origin=fireworkOrigin(actor,this.lastRotation);
+    return target.sub(new pc.Vec3(origin.x,origin.y,origin.z)).normalize();
+  }
+  private shootFirework():boolean {
+    if(!this.enabled||this.inputHasFocus()||!this.actors.get(this.localId)?.actor.fireworkEquipped)return false;
+    if(performance.now()-this.fireworkPressedAt<FIREWORK.cooldownMs)return true;
+    this.fireworkPressedAt=performance.now();
+    const direction=this.fireworkDirection();
+    this.callbacks.onFirework?.({x:direction.x,y:direction.y,z:direction.z});return true;
+  }
   getRagdolls() {
     return [...this.actors].filter(([, avatar]) => avatar.ragdoll).map(([id, avatar]) => {
       const [x, y, z] = avatar.ragdoll!.pelvis(), head = avatar.skin?.bones.head.getPosition(), foot = avatar.skin?.bones.foot_l.getPosition(), hip = avatar.skin?.hip?.getPosition();
@@ -1039,16 +1417,18 @@ export class BarScene {
     });
   }
 
+  private flying(): boolean { return !!this.actors.get(this.localId)?.actor.animation?.startsWith('fly'); }
+
   getInput(): SceneInput {
     this.lastRotation=normalizeHeading(this.lastRotation);
     // A debug run of a bar animation holds the player, as the room would.
     if (!this.enabled || this.inputHasFocus() || document.hidden || this.barOverrides.has(this.localId)) {
       return { dx: 0, dz: 0, running: false, rotation: this.lastRotation };
     }
-    const horizontal = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
-      Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
-    const vertical = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
-      Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
+    const horizontal = clamp(Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
+      Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) + this.touchAxis.x, -1, 1);
+    const vertical = clamp(Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
+      Number(this.keys.has('KeyS') || this.keys.has('ArrowDown')) - this.touchAxis.y, -1, 1);
     const length = Math.hypot(horizontal, vertical) || 1;
     const yaw = this.rig.yaw;
     const dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * vertical) / length;
@@ -1056,14 +1436,20 @@ export class BarScene {
     // The body keeps following travel; looking around at rest only turns the head.
     const actor=this.actors.get(this.localId)?.actor;
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
-    return { dx, dz, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),rear:isRidingHorse(actor?.interactionState)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')), rotation: this.lastRotation,
+    if(actor?.fireworkEquipped)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
+    const dy = this.flying() ? Number(this.keys.has('Space')) - Number(this.keys.has('ControlLeft')) : 0;
+    if (this.flying()) {
+      const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint, pace = (boost ? FLY.boost : FLY.speed) / Math.max(1, Math.hypot(dx, dz));
+      this.localFlyV.set(dx * pace, dy * FLY.climb * (boost ? 2 : 1), dz * pace); this.localFlyAt = this.elapsed;
+    }
+    return { dx, dz, dy: dy || undefined, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint,rear:isRidingHorse(actor?.interactionState)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||this.touchSprint), rotation: this.lastRotation,
       ...headLookAt(yaw,this.rig.pitch,this.lastRotation) };
   }
 
   setWorld(world: WorldState, localId: string): void {
-    this.environment.setState(world.environment);
-    // The empty snapshot used when leaving the bar has serverTime=0; keep the clock running.
-    if(Number.isFinite(world.serverTime)&&world.serverTime>0)this.serverClockOffset = world.serverTime - Date.now();
+    if(world.environment)this.environment.setState(world.environment);
+    // Empty departure snapshots preserve the shared clock and climate in the entry.
+    if(!this.callbacks.serverNow)this.clock.sync(world.serverTime);
     this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
     this.stageState=world.televisions?.telao;
     this.stageSpots=Object.values(world.musicians??{});
@@ -1125,7 +1511,7 @@ export class BarScene {
 
   /** Smooth swing toward each door's state; a late arrival sees doors already where they are. */
   private swingDoors():void {
-    const now=Date.now()+this.serverClockOffset;
+    const now=this.serverNow();
     for(const door of this.doorLeaves){
       if(door.openness===door.target||!door.entity)continue;
       const t=door.changedAt?Math.min(1,Math.max(0,(now-door.changedAt)/(DOOR_SWING_SECONDS*1000))):1,eased=t*t*(3-2*t);
@@ -1175,8 +1561,13 @@ export class BarScene {
 
   dispose(): void { this.destroy(); }
 
+  /** A message of the crowd's records (packages/shared/src/crowd.ts): who is out there beyond the avatars. */
+  setCrowd(bytes: ArrayBuffer | Uint8Array): void { this.crowd.setRecords(bytes); }
+
   updateState(world: SceneWorld, localId: string): void {
     this.localId = localId;
+    this.modelSlots = new Set((world.players ?? []).map(player => player.slot ?? 0).filter(Boolean));
+    if (!world.players?.length) {this.crowd.clear();this.fireworks.clear();}
     this.eventType = world.event?.type ?? '';
     const seen = new Set<string>();
     for (const [list, npc] of [[world.players, false], [world.npcs, true]] as const) {
@@ -1189,10 +1580,11 @@ export class BarScene {
           const moved = actor.x !== existing.actor.x || actor.y !== existing.actor.y || actor.z !== existing.actor.z;
           // Onto a stage spot in the time the body blends into the take clip; off the drums' spot at a walk.
           if (!!existing.actor.musician !== !!actor.musician) existing.glideNext = actor.musician ? MUSICIANS.blendSeconds : .6;
+          const previous = existing.actor;
           // The local position comes from prediction (updateLocal), not from the server snapshot.
           existing.actor = local ? { ...actor, x: existing.actor.x, y: existing.actor.y, z: existing.actor.z } : { ...actor };
-          if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
-          existing.ring.enabled = local;
+          if (moved && !local) { if ((actor.animation ?? '').startsWith('fly')) this.trackFlight(existing, actor, previous); else this.glideTo(existing, PATCH_GLIDE); }
+          existing.ring.enabled = false;
           if (this.usesSkin(existing.actor, npc) && this.skinFor(existing.actor, npc) !== existing.skinId) this.replaceAvatar(actor.id, existing);
         } else {
           const avatar=this.makeAvatar(actor,npc);this.actors.set(actor.id,avatar);
@@ -1213,9 +1605,19 @@ export class BarScene {
     const avatar = this.actors.get(this.localId);
     if (!avatar || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return;
     const moved = position.x !== avatar.actor.x || position.y !== avatar.actor.y || position.z !== avatar.actor.z;
+    const before = avatar.actor;
     avatar.actor = { ...avatar.actor, ...position };
-    if (moved) this.glideTo(avatar, INPUT_GLIDE);
+    // In flight the drawn body is moved every frame (animateAvatar), not glided from tick to tick.
+    if ((avatar.actor.animation ?? '').startsWith('fly')) { if (moved && avatar.actor.animation === 'fly-fall') this.trackFlight(avatar, avatar.actor, before); }
+    else if (moved) this.glideTo(avatar, INPUT_GLIDE);
     if (position.rotation !== undefined) this.lastRotation = position.rotation;
+  }
+
+  /** A flier's velocity from the position that just arrived against the last one (`from`: the avatar's own, unless given). */
+  private trackFlight(avatar: Avatar, to: Position, from: Position = avatar.actor): void {
+    const dt = clamp(this.elapsed - (avatar.flyAt ?? this.elapsed - .1), .03, .3);
+    (avatar.flyV ??= new pc.Vec3()).set((to.x - from.x) / dt, ((to.y ?? 0) - (from.y ?? 0)) / dt, (to.z - from.z) / dt);
+    avatar.flyAt = this.elapsed;
   }
 
   /** Glides at constant speed from where the avatar is drawn to its new position; long jumps snap. */
@@ -1231,10 +1633,38 @@ export class BarScene {
     avatar.glideNext = undefined;
   }
 
+  /** The entry's backdrop on or off: the bar drawn from the showcase angles (engine/showcase.ts) while the room is empty. */
+  setShowcase(on: boolean): void {
+    this.showcaseOn = on;
+    this.showcaseSlow = 0;
+    this.app.autoRender = this.enabled || on;
+    this.app.renderNextFrame = true;
+    if (!on && this.showcaseCut) { this.showcaseCut = 0; this.callbacks.onShowcaseCut?.(0); }
+  }
+
+  /** Dev only: holds the backdrop on a pose (for choosing the angles); undefined goes back to the shots. */
+  debugShowcase(pose?: { position: [number, number, number]; target: [number, number, number]; fov: number }): void {
+    this.debugPose = pose && { ...pose, cut: 0 };
+  }
+
+  private showcaseCamera(dt: number, realDt: number): void {
+    const pose = this.debugPose ?? this.showcase.advance(dt);
+    this.camera.setPosition(pose.position[0], pose.position[1], pose.position[2]);
+    this.camera.lookAt(pose.target[0], pose.target[1], pose.target[2]);
+    if (this.camera.camera) this.camera.camera.fov = pose.fov;
+    const cut = Math.round(pose.cut * 50) / 50;
+    if (cut !== this.showcaseCut) { this.showcaseCut = cut; this.callbacks.onShowcaseCut?.(cut); }
+    // A backdrop is not worth a stutter: below about 15 FPS for five seconds it switches itself off.
+    this.showcaseSlow = realDt > .067 ? this.showcaseSlow + realDt : Math.max(0, this.showcaseSlow - realDt);
+    if (this.showcaseSlow > 5) { this.setShowcase(false); this.callbacks.onShowcaseSlow?.(); }
+  }
+
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    this.footstepSounds.setActive(enabled);
     this.environment.setActive(enabled);
-    this.app.autoRender = enabled;
+    // A headset needs a frame every time it asks, windows open or not.
+    this.app.autoRender = enabled || this.showcaseOn || this.vr.active;
     this.app.renderNextFrame = true;
     if (!enabled) {
       this.keys.clear();
@@ -1295,7 +1725,7 @@ export class BarScene {
   }
 
   getAnimations(): Array<{ id: string; facing:number; look?:{yaw:number;pitch:number;bone:number[]}; skin?: string; clip?: string; time?: number; height?: number; speed?:number; bar?:{clip:string;time:number;placed:boolean;root:number[]}; drink?:{item:string;sip:number}; cards?:number; tray?:{items:number;onTray:number}; cane?:{enabled:boolean;parent?:string;renders:number}; musician?:{spot:string;phase?:string;root:number[];hip?:number[]}; tracks: string[] }> {
-    const now=Date.now()+this.serverClockOffset,point=(p:pc.Vec3)=>[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];
+    const now=this.serverNow(),point=(p:pc.Vec3)=>[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];
     return [...this.actors].map(([id, avatar]) => ({ id, facing:avatar.yaw/RAD_TO_DEG, skin: avatar.skinId, clip: avatar.skin?.clip,
       look:avatar.headLook?{yaw:avatar.headLook.yaw,pitch:avatar.headLook.pitch,bone:(()=>{const q=(avatar.skin?.bones.head??avatar.limbs!.head).getLocalRotation();return [q.x,q.y,q.z,q.w];})()}:undefined,
       bar:avatar.bar?{clip:avatar.bar.clip,time:+avatar.bar.time.toFixed(3),placed:!!avatar.bar.frame,root:point(avatar.root.getPosition())}:undefined,
@@ -1307,10 +1737,13 @@ export class BarScene {
   }
 
   destroy(): void {
+    this.fireworks.destroy();
+    this.footstepSounds.destroy();
     if (this.destroyed) return;
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
-    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.blowEffects.destroy();this.horseSounds.destroy();
+    this.morte?.destroy();this.morte=undefined;
+    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -1392,8 +1825,8 @@ export class BarScene {
   }
 
   private loadSkin(id: string): void {
-    this.loadAnimations(id);
-    this.loadCane(id);
+    // The attendant uses its embedded Idle/Walk/Pose; FuelProps poses the nozzle and both arms.
+    if(id!=='frentista'){this.loadAnimations(id);this.loadCane(id);}
     if (this.skinRequests.has(id)) return;
     this.skinRequests.add(id);
     this.app.assets.loadFromUrl(skinUrl(id), 'container', (error, asset) => {
@@ -1460,6 +1893,9 @@ export class BarScene {
     // The typings declare an array; the binder reads an object keyed by path.
     skin.handLayer = anim.addLayer(HAND_LAYER, 0, mask as unknown as object[], pc.ANIM_LAYER_OVERWRITE);
     anim.assignAnimation('Drink', track, HAND_LAYER, 1, true);
+    // Idle/Walk may already have bound these joints before the bank arrived. Their blend targets
+    // still have room for only the base layer; rebuild them so the hand layer can drive them too.
+    anim.rebind();
   }
 
   private loadCane(id:string):void{
@@ -1483,7 +1919,7 @@ export class BarScene {
    * Asks for missing skins.
    */
   private skinFor(actor: SceneActor, npc: boolean): string | undefined {
-    const wanted=npc ? NPC_SKINS[actor.id]??(actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_MODEL) : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
+    const wanted=npc ? NPC_SKINS[actor.id]??(actor.skin && (SKIN_IDS.has(actor.skin)||NPC_MODEL_IDS.has(actor.skin)) ? actor.skin : DEFAULT_MODEL) : actor.skin && SKIN_IDS.has(actor.skin) ? actor.skin : DEFAULT_SKIN;
     if (!this.skinModels.has(wanted)) this.loadSkin(wanted);
     return this.skinModels.has(wanted)?wanted:undefined;
   }
@@ -1602,16 +2038,30 @@ export class BarScene {
 
   private animateAvatar(avatar: Avatar, dt: number): void {
     const { actor, root, glideFrom } = avatar;
+    // Taken by the Morte: not drawn while the room says so, and it comes back without gliding across the map.
+    if (actor.interactionState === DEATH_GONE_STATE) {
+      if (!avatar.deathHidden) { avatar.deathHidden = true; root.enabled = false; }
+      root.setPosition(actor.x, actor.y ?? 0, actor.z); glideFrom.set(actor.x, actor.y ?? 0, actor.z); avatar.glideAt = this.elapsed; return;
+    }
+    if (avatar.deathHidden) { avatar.deathHidden = false; root.enabled = true; glideFrom.set(actor.x, actor.y ?? 0, actor.z); avatar.glideAt = this.elapsed; }
     const local = actor.id === this.localId;
     const current = root.getPosition();
     const moving = Math.hypot(actor.x - current.x, actor.z - current.z) > 0.025;
     const progress = clamp((this.elapsed - avatar.glideAt) / avatar.glide, 0, 1);
-    root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
+    if ((actor.animation ?? '').startsWith('fly')) {
+      // A flier moves at speeds the ticks and patches (20 and 10 a second) would draw in jumps: from the last position it
+      // carries on at its velocity, for at most a tick or a patch, and the body eases towards that point on the frame's time.
+      const ownKeys = local && actor.animation !== 'fly-fall', v = ownKeys ? this.localFlyV : avatar.flyV, age = clamp(this.elapsed - (ownKeys ? this.localFlyAt : avatar.flyAt ?? -99), 0, ownKeys ? .06 : .12);
+      const tx = actor.x + (v ? v.x * age : 0), tz = actor.z + (v ? v.z * age : 0), ty = (actor.y ?? 0) + (v ? (v.y > 0 ? v.y * age : Math.max(v.y * age, -.15)) : 0);
+      if (Math.hypot(tx - current.x, ty - current.y, tz - current.z) > 12) root.setPosition(tx, ty, tz);
+      else { const k = 1 - Math.exp(-dt / .05); root.setPosition(current.x + (tx - current.x) * k, current.y + (ty - current.y) * k, current.z + (tz - current.z) * k); }
+      glideFrom.copy(root.getPosition()); avatar.glideAt = this.elapsed;
+    } else root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
     const drawn = root.getPosition(), last = avatar.lastDrawn ??= drawn.clone();
-    avatar.speed = lerp(avatar.speed ?? 0, Math.min(isRidingHorse(actor.interactionState)?HORSE.fastSpeed:8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
+    avatar.speed = lerp(avatar.speed ?? 0, Math.min(isRidingHorse(actor.interactionState)?HORSE.fastSpeed:(actor.animation??'').startsWith('fly')?FLY.boost+4:8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
     last.copy(drawn);
     // A bar animation (sitting at a table, the urinal, a cigarette, Magrão at the counter...): undefined while its clip loads.
-    const bar = avatar.skin ? this.barAction(avatar, Date.now() + this.serverClockOffset) : undefined;
+    const bar = avatar.skin ? this.barAction(avatar, this.serverNow()) : undefined;
     if (avatar.bar && !bar) this.leaveBarAction(avatar);
     let animation = (actor.animation ?? actor.state ?? 'idle').toLowerCase();
     if (moving && animation === 'idle') animation = 'walk';
@@ -1633,6 +2083,7 @@ export class BarScene {
     const anim = avatar.skin?.model.anim;
     if (anim && anim.playing === resting) anim.playing = !resting;
     avatar.resting = resting;
+    if(avatar.firework&&!actor.fireworkEquipped)avatar.firework.enabled=false;
     if (resting) return;
     const pose: Pose = {
       t: this.elapsed + avatar.phase, dt,
@@ -1648,6 +2099,26 @@ export class BarScene {
     if(avatar.cards)avatar.cards.enabled=false;
     if (avatar.skin) this.poseSkin(avatar, avatar.skin, pose, bar);
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
+    // Flight: the whole body leans about the hips and floats; the limbs follow after the clip (applyHeadLooks).
+    const fly = avatar.fly ??= new FlyPose();
+    fly.update(animation.startsWith('fly'), avatar.speed ?? 0, dt);
+    if (local) {
+      this.flyShare = fly.dash; this.flySounds.update(fly.air, fly.dash);
+      // The barrier: once per dash, when the speed passes what walking in the air reaches; it re-arms when the flier slows down.
+      const pace = avatar.speed ?? 0;
+      if (pace < FLY.speed + 1) this.boomArmed = true;
+      else if (this.boomArmed && pace > FLY.speed + 6 && fly.air > .9) {
+        this.boomArmed = false; this.boomAt = this.elapsed; this.flySounds.boom();
+        const at = root.getPosition(); this.blowEffects.shock({ x: at.x, y: at.y + 1, z: at.z }, 11);
+      }
+    }
+    if (fly.air > 0) {
+      const lean = fly.lean * Math.PI / 180, hips = .95, bob = Math.sin((this.elapsed + avatar.phase) * 2.2) * .05 * fly.air * (1 - fly.dash);
+      // A slow roll and nod, bigger the faster it goes: the body rides the air instead of being carried.
+      const sway = (this.elapsed + avatar.phase) * 1.3, roll = Math.sin(sway) * (1.2 + 2.6 * fly.dash) * fly.air, nod = Math.sin(sway * .73 + 1) * (.8 + 1.4 * fly.dash) * fly.air;
+      avatar.body.setLocalEulerAngles(fly.lean + nod, 0, roll);
+      avatar.body.setLocalPosition(0, hips * (1 - Math.cos(lean)) + bob, -hips * Math.sin(lean));
+    }
     if (bar && avatar.skin && avatar.bar) {
       this.barAnimations!.play(actor.id, bar.step, { space: avatar.bar.space, model: avatar.skin.model, skin: avatar.skinId!, servedFood: bar.servedFood, seat: bar.seat }, dt);
       this.barPlayed.add(actor.id);
@@ -1656,16 +2127,17 @@ export class BarScene {
       if (p) avatar.contact.setPosition(p.x, root.getPosition().y + .012, p.z);
     } else avatar.contact.setLocalPosition(0, .012, 0);
     // Tonico serving or clearing, and a player working the bar with an order on the tray (Magrão's hands are in his clips).
-    if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, Date.now() + this.serverClockOffset);
+    if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, this.serverNow());
     else if (avatar.tray) avatar.tray.entity.enabled = false;
     if (avatar.skin) this.dressCourier(avatar, avatar.skin, !!bar); else if (avatar.parcelProp || avatar.packProp) this.dressCourier(avatar, undefined, true);
+    this.dressFirework(avatar);
     if(actor.id.startsWith('attendant-')){
       const bones=avatar.skin?.bones,hand=bones?.hand_r??avatar.limbs?.rightArm.findByName('Hand') as pc.Entity|undefined;
       const upper=bones?.upperarm_r??avatar.limbs?.rightArm;
       const lower=bones?.lowerarm_r??avatar.limbs?.rightArm.findByName('Fuel elbow') as pc.Entity|undefined;
       const torso=avatar.skin?.model.findByName('spine_01') as pc.Entity|undefined;
       const legs=bones?[{upper:bones.upperleg_l,lower:bones.lowerleg_l,foot:bones.foot_l},{upper:bones.upperleg_r,lower:bones.lowerleg_r,foot:bones.foot_r}]:undefined;
-      if(hand&&upper)this.fuelProps.pose(actor.id,{upper,lower,hand,grip:avatar.skin?.rightHand,root,body:avatar.body,torso,legs},Date.now()+this.serverClockOffset);
+      if(hand&&upper)this.fuelProps.pose(actor.id,{upper,lower,hand,grip:avatar.skin?.rightHand,root,body:avatar.body,torso,legs},this.serverNow());
     }
   }
 
@@ -1699,6 +2171,29 @@ export class BarScene {
       const at = (avatar.spine ?? skin!.bones.upperarm_r).getPosition().clone().sub(front.clone().mulScalar(.12)).add(up.clone().mulScalar(.08));
       pack.setPosition(at); pack.setEulerAngles(0, avatar.yaw, 0); pack.enabled = true;
     }
+  }
+
+  private dressFirework(avatar:Avatar):void {
+    const actor=avatar.actor,bones=avatar.skin?.bones;
+    const visible=!!actor.fireworkEquipped&&!actor.interactionState&&!actor.currentTableId&&!avatar.ragdoll&&!avatar.bar;
+    if(!visible){if(avatar.firework)avatar.firework.enabled=false;return;}
+    const prop=avatar.firework??=this.fireworks.makeProp(avatar.root);prop.enabled=true;
+    if(avatar.skin?.cane)avatar.skin.cane.enabled=false;
+    const yaw=(actor.rotation??0)+(actor.headYaw??0),pitch=actor.headPitch??0;
+    const direction=actor.id===this.localId?this.fireworkDirection():new pc.Vec3(Math.sin(yaw)*Math.cos(pitch),-Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
+    const origin=fireworkOrigin(avatar.root.getPosition(),actor.id===this.localId?this.lastRotation:actor.rotation??0);
+    const target=new pc.Vec3(origin.x,origin.y,origin.z);
+    if(bones){
+      reach(bones.upperarm_r,bones.lowerarm_r,bones.hand_r,target,new pc.Vec3(0,-1,0));
+      const hand=avatar.skin?.rightHand;
+      if(hand){
+        aim(hand.hand,handFrame(hand).across,direction);
+        closeHand(hand,[42,55,28]);
+        const frame=handFrame(hand),grip=frame.origin.clone().add(frame.fingers.clone().mulScalar(frame.length*.55)).add(frame.palm.clone().mulScalar(.04));
+        prop.setPosition(grip.sub(direction.clone().mulScalar(.06)));
+      }else prop.setPosition(bones.hand_r.getPosition());
+    }else prop.setPosition(target);
+    prop.setRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,direction));
   }
 
   /**
@@ -1791,6 +2286,30 @@ export class BarScene {
     const motos = this.motos as Motos | undefined;
     if (motos) yield* motos.casters();
   }
+
+  /**
+   * People far from the camera cast no shadow. Past about 12 m a person's shadow is a few pixels, while every caster is
+   * drawn again by each lamp map and sun cascade that reaches it. The change is checked every fourth frame, with a margin
+   * so a person on the edge does not flicker in and out; only the meshes this turned off are turned back on.
+   */
+  private updateAvatarShadows(): void {
+    const eye = this.camera.getPosition();
+    for (const avatar of this.actors.values()) {
+      const p = avatar.root.getPosition();
+      const distance = Math.hypot(p.x - eye.x, p.z - eye.z);
+      const off = this.shadowlessAvatars.get(avatar);
+      if (!off && distance > AVATAR_SHADOW_RANGE) {
+        const turned: pc.MeshInstance[] = [];
+        for (const render of avatar.root.findComponents('render') as pc.RenderComponent[])
+          for (const instance of render.meshInstances) if (instance.castShadow) { instance.castShadow = false; turned.push(instance); }
+        this.shadowlessAvatars.set(avatar, turned);
+      } else if (off && distance < AVATAR_SHADOW_RANGE - AVATAR_SHADOW_MARGIN) {
+        for (const instance of off) instance.castShadow = true;
+        this.shadowlessAvatars.delete(avatar);
+      }
+    }
+  }
+  private readonly shadowlessAvatars = new WeakMap<Avatar, pc.MeshInstance[]>();
 
   /** A soft dark disc on the floor under an avatar (the lamps' shadow maps leave people out). */
   private contactShadow(root: pc.Entity): pc.Entity {
@@ -1994,10 +2513,10 @@ export class BarScene {
       anim.baseLayer?.transition(clip, skin.clip ? walkingBlend??blend : 0);
       skin.clip = clip; skin.playbackKey = playbackKey;
       if (bar && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = bar.body
-        ? Math.max(0, (Date.now() + this.serverClockOffset - bar.step.startedAt) / 1000) % anim.baseLayer.activeStateDuration : bar.step.time;
+        ? Math.max(0, (this.serverNow() - bar.step.startedAt) / 1000) % anim.baseLayer.activeStateDuration : bar.step.time;
       else if (show && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = musicianTime(show.spot,show.phase,show.startedAt,show.now);
       else if (actionImported && !locomotion && actor.animationStartedAt && anim.baseLayer) {
-        const age = Math.max(0, (Date.now() + this.serverClockOffset - actor.animationStartedAt) / 1000);
+        const age = Math.max(0, (this.serverNow() - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
         anim.baseLayer.activeStateCurrentTime = ['Deal', 'Wait', 'Text', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) || clip.startsWith('Dance ') ? age % duration : Math.min(age, duration);
       }
@@ -2008,7 +2527,7 @@ export class BarScene {
     anim.speed = clip==='Walk'?skin.walkRate!:pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
     // A drink in hand: the hand layer fades in over a free body and keeps to the room's clock (sips line up for everyone,
     // whatever pace the walk sets for the clips).
-    const now = Date.now() + this.serverClockOffset;
+    const now = this.serverNow();
     const held = actor.holding && (actor.holdingUntil ?? 0) > now ? HELD_DRINKS.find(id => id === actor.holding) : undefined;
     const handOn = !!held && !bar && !show && HAND_FREE_CLIPS.has(clip) && !!skin.handLayer;
     if (skin.handLayer) {
@@ -2020,7 +2539,7 @@ export class BarScene {
     // The body keeps to the room's clock (a hidden tab, a slow frame): props and chair are drawn at that time too.
     else if (bar && anim.baseLayer?.activeState === clip) {
       const duration = bar.body ? anim.baseLayer.activeStateDuration : BAR_ANIMATIONS.clips[bar.step.clip].duration;
-      const time = bar.body ? Math.max(0, (Date.now() + this.serverClockOffset - bar.step.startedAt) / 1000) % duration : bar.step.time;
+      const time = bar.body ? Math.max(0, (this.serverNow() - bar.step.startedAt) / 1000) % duration : bar.step.time;
       const looping = BAR_ANIMATIONS.clips[bar.step.clip].loop, current = anim.baseLayer.activeStateCurrentTime;
       // PlayCanvas accumulates loop time across laps. Compare phases so an old/suspended tab can still catch up.
       const drift = Math.abs((looping ? (current % duration + duration) % duration : current) - time);
@@ -2116,7 +2635,7 @@ export class BarScene {
   private musicianClip(avatar:Avatar,skin:SkinnedRig):{state:string;spot:StageSpot;phase:StagePhase;startedAt:number;now:number;blend:number}|undefined {
     const playing=avatar.actor.musician,spot=playing?stageSpot(playing.id):undefined,model=avatar.skinId?this.skinModels.get(avatar.skinId):undefined;
     if(!playing||!spot||!model||!this.musicians)return;
-    const now=Date.now()+this.serverClockOffset,current=musicianPhase(playing,now);
+    const now=this.serverNow(),current=musicianPhase(playing,now);
     if(!current||current.phase==='fim')return;
     const tracks=this.musicians.bodyTracks(spot.id,avatar.skinId!,skin.model,model.animations.map(asset=>asset.resource as pc.AnimTrack));
     if(!tracks)return;
@@ -2206,6 +2725,8 @@ export class BarScene {
   getGraphics() { return { ...this.graphics, currentScale: this.scale, fps: this.fps, pixelRatio: this.app.graphicsDevice.maxPixelRatio }; }
   getHorses(){return [...this.actors.values()].filter(a=>a.horse).map(a=>({id:a.actor.id,...a.horse!.telemetry(),sound:this.horseSounds.telemetry(a.actor.id),hip:a.skin?.hip?.getPosition().clone().toArray(),feet:[a.skin?.bones.foot_l.getPosition().clone().toArray(),a.skin?.bones.foot_r.getPosition().clone().toArray()]}));}
   private applyResolution(): void {
+    // In a headset the session's own scale decides (VrSettings.resolution), not the window's.
+    if (this.vr?.active) return;
     this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, this.graphics?.pixelRatioCap ?? 1.5) * this.scale;
     this.resize();
   }
@@ -2216,7 +2737,7 @@ export class BarScene {
    */
   private adaptResolution(): void {
     const graphics = this.graphics;
-    if (!graphics?.dynamicResolution || !this.enabled) return;
+    if (!graphics?.dynamicResolution || !this.enabled || this.vr.active) return;
     const target = graphics.fpsCap || 60;
     if (this.fps < target * 0.8) {
       this.goodSeconds = 0;
@@ -2247,7 +2768,13 @@ export class BarScene {
     this.barPlayed.clear();
     this.updateProfiler.mark('setup');
     this.fuelProps.begin(this.camera.getPosition());
+    if (this.frameId % 4 === 0) this.updateAvatarShadows();
+    // The body put under the headset last frame goes back where the room has it before it is moved again (vrBody).
+    if (this.vrShifted) { const p = this.vrShifted.root.getPosition(); this.vrShifted.root.setPosition(p.x - this.vrShift.x, p.y, p.z - this.vrShift.z); this.vrShifted = undefined; }
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
+    this.morte?.update(dt);
+    this.applyDeathPull();
+    if (!this.vr.active && this.fovPunch !== this.fovPunchGoal) { this.fovPunch += (this.fovPunchGoal - this.fovPunch) * (1 - Math.exp(-(this.fovPunchGoal > this.fovPunch ? 18 : 5) * dt)); if (Math.abs(this.fovPunch - this.fovPunchGoal) < .01) this.fovPunch = this.fovPunchGoal; if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV - this.fovPunch; }
     this.updateProfiler.mark('avatars');
     this.callbacks.onFrame?.(realDt);
     this.updateProfiler.mark('client');
@@ -2260,17 +2787,24 @@ export class BarScene {
     }),this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.placeThrown(dt);
     this.blowEffects.update(dt, this.camera);
+    this.smokeBurst.update(dt, this.camera);
+    this.fireworks.update(this.serverNow(),this.camera);
+    this.crowd.update(dt, this.camera, this.modelSlots, .55 + .45 * this.environment.daylight);
     this.updateProfiler.mark('vehicles');
     // Instruments nobody was drawn playing this frame go back on their stands.
     this.musicians?.frame();
     // Props nobody plays go away, pulled chairs go back, the cup and the freezer lid show again; particles and leftovers.
     this.barAnimations?.frame(dt,this.camera.camera,this.app.graphicsDevice.height,this.barPlayed);
-    this.placeServed(Date.now()+this.serverClockOffset);
+    this.placeServed(this.serverNow());
     const bartender=this.actors.get('bartender');
     // The tap runs while the chopp pours (Prop_Jato in Magrão's clip).
     this.mapEffects?.update(this.elapsed,!!this.barAnimations?.pouring()||bartender?.skin?.clip==='Bartend');
     this.updateProfiler.mark('barEffects');
     const player = this.actors.get(this.localId);
+    // In a headset the head decides the heading; the camera code below only finds out where the eyes belong.
+    let vrView: { yaw: number; pitch: number } | null = null;
+    try { vrView = this.vr.beginFrame(realDt); } catch (error) { this.vrFailed(error); }
+    let vrFresh = false, vrSpecial = false, vrFoot = false;
     this.feelSpeed(this.enabled ? this.motos.ridden(this.localId) : undefined, dt);
     const television=TELEVISIONS.find(t=>t.id===this.watchingTv);
     if(television){
@@ -2279,6 +2813,7 @@ export class BarScene {
       this.camera.setPosition(television.x+Math.sin(angle+this.tvYaw)*back*Math.cos(this.tvPitch),television.y+Math.sin(this.tvPitch)*back,television.z+Math.cos(angle+this.tvYaw)*back*Math.cos(this.tvPitch));
       this.camera.lookAt(television.x,television.y,television.z,-Math.sin(angle+this.tvYaw)*Math.sin(this.tvPitch),Math.cos(this.tvPitch),-Math.cos(angle+this.tvYaw)*Math.sin(this.tvPitch));
       this.rig.idle();
+      vrFresh = vrSpecial = true;
     } else if(this.watchingStage){
       // From the back of the backyard, under the terrace, a little above the crowd's heads; turned so the stage sits in the
       // middle of the part of the screen the panel leaves.
@@ -2288,8 +2823,9 @@ export class BarScene {
       this.camera.lookAt(target);
       const covered=clamp(this.watchingStage(),0,.45),aspect=this.canvas.clientWidth/Math.max(1,this.canvas.clientHeight);
       const half=Math.tan((this.camera.camera?.fov??57)*Math.PI/360)*aspect;
-      if(covered)this.camera.rotateLocal(0,-Math.atan(covered*half)*RAD_TO_DEG,0);
+      if(covered&&!this.vr.active)this.camera.rotateLocal(0,-Math.atan(covered*half)*RAD_TO_DEG,0);
       this.rig.idle();
+      vrFresh = vrSpecial = true;
     } else if (player && this.enabled && this.selfie && player.skin) {
       // Arm's length in front of the face, a little to the side and above the eyes, as a phone held up.
       const head = player.skin.bones.head.getPosition(), facing = player.yaw / RAD_TO_DEG;
@@ -2297,36 +2833,66 @@ export class BarScene {
       this.camera.setPosition(head.x + ahead.x * .85 + side.x * .2, head.y + .12, head.z + ahead.z * .85 + side.z * .2);
       this.camera.lookAt(head.x, head.y + .02, head.z);
       this.rig.idle();
+      vrFresh = vrSpecial = true;
     } else if (player && this.enabled) {
       const bike = this.motos.ridden(this.localId);
       // Thrown off, the view stays behind the body until it is up: never inside it.
       const riding = !!bike || isRidingHorse(player.actor.interactionState) || player.actor.interactionState === 'thrown';
       if (riding !== this.chasing) { this.chasing = riding; this.rig.ride(this.chasing); this.motoSwitches = 0; }
+      // Always through the eyes in a headset: the chase view behind a bike is for a screen.
+      if (this.vr.active && this.rig.mode !== 'first') this.rig.enterFirst();
       // In real time: the body moved for all of a stalled frame, and a view told a shorter one reads it as a sprint and falls metres behind.
       if (bike) { this.rig.chase(bike.drawn.yaw, realDt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
       const eyes=bike?.rig instanceof CarRig&&vehicleSeat(bike.state,this.localId)===0?bike.rig.ponto('ponto_olhos').getPosition():player.skin?.bones.head.getPosition();
       this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: eyes, facing: player.yaw / RAD_TO_DEG,
-        roll: DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? {...MOTO_XRAY,clearance:vehiclePhysics(bike.state.model).HALF_LENGTH} : {}) });
+        roll: this.vr.active ? 0 : DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? {...MOTO_XRAY,clearance:vehiclePhysics(bike.state.model).HALF_LENGTH} : {}) });
+      vrFresh = true;
+      vrFoot = !bike && !riding && !player.actor.interactionState && !player.actor.currentTableId;
+    } else if (!player && this.showcaseOn && !this.enabled) {
+      this.showcaseCamera(dt, realDt);
+      this.rig.idle();
     } else if (!player) {
       // Waiting at the door: a slow drift in front of the facade.
       this.camera.setPosition(18+Math.sin(this.elapsed*.035)*2,9,16);
       this.camera.lookAt(14,1.8,-6);
       this.rig.idle();
     }
+    if (this.vr.active) {
+      if (vrFresh) {
+        // The eyes belong where the camera code put the camera; on foot, over the feet, which move smoothly (the head joint bobs).
+        const eye = this.camera.getPosition(), forward = this.camera.forward, anchor = this.vrAnchor;
+        anchor.x = eye.x; anchor.y = eye.y; anchor.z = eye.z; anchor.special = vrSpecial;
+        if (vrFoot && player) { const feet = player.root.getPosition(); anchor.x = feet.x; anchor.z = feet.z; }
+        anchor.faceYaw = Math.atan2(-forward.x, -forward.z);
+        this.vrAnchored = true;
+      }
+      // The camera code did not run (a window is open, or the room has not admitted the player yet): the eyes stay with the avatar,
+      // never where the lobby camera was left.
+      if (!vrFresh && player) { const feet = player.root.getPosition(), anchor = this.vrAnchor; anchor.x = feet.x; anchor.z = feet.z; if (!this.vrAnchored) { anchor.y = feet.y + 1.62; anchor.special = false; anchor.faceYaw = this.rig.yaw + Math.PI * 0; } else anchor.y = Math.max(anchor.y, feet.y + 1.2); this.vrAnchored = true; }
+      try { if (this.vrAnchored) this.vr.endFrame(realDt, this.vrAnchor); } catch (error) { this.vrFailed(error); }
+      if (vrView) this.rig.slave(vrView.yaw, vrView.pitch);
+    }
     this.applyHeadLooks(dt);
+    if (this.vr.active && vrView) this.vrBody(player, vrView.yaw, vrFoot && !vrSpecial);
+    this.vrArms(player, realDt);
     this.showOwnHead(player);
+    this.footstepSounds.update(realDt,this.enabled?[...this.actors.values()].map(avatar=>{
+      const position=avatar.root.getPosition(),actor=avatar.actor;
+      return {id:actor.id,x:position.x,y:position.y,z:position.z,animation:actor.animation??actor.state,
+        oldWalk:actor.oldWalk,blocked:!!avatar.riding||!!avatar.horse||!!avatar.ragdoll||!!avatar.bar||!!actor.musician||!!avatar.deathHidden};
+    }):[],this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.updateProfiler.mark('camera');
     const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();
     this.city?.update(dt, focus.x, focus.z);
     this.updateProfiler.mark('streaming');
     this.environment.setFocus(player?.root.getPosition());
-    this.environment.update(Date.now()+this.serverClockOffset,dt,this.eventType);
+    this.environment.update(this.serverNow(),dt,this.eventType);
     this.surfaces?.update(this.environment.power);
-    this.jukeboxLights?.update(dt,this.jukeboxState,Date.now()+this.serverClockOffset,this.jukeboxDuration,this.app.scene.exposure);
-    this.stageLights?.update(dt,this.stageState,Date.now()+this.serverClockOffset,this.stageDuration,this.app.scene.exposure);
+    this.jukeboxLights?.update(dt,this.jukeboxState,this.serverNow(),this.jukeboxDuration,this.app.scene.exposure);
+    this.stageLights?.update(dt,this.stageState,this.serverNow(),this.stageDuration,this.app.scene.exposure);
     this.updateProfiler.mark('lighting');
-    const serverNow=Date.now()+this.serverClockOffset;
+    const serverNow=this.serverNow();
     this.foosballBalls.update(serverNow);
     this.poolBalls.update();
     this.stageShow.update(dt,{stage:this.stageLive(serverNow),desk:this.showDesk,serverNow,camera:this.camera,height:this.app.graphicsDevice.height,daylight:this.environment.daylight});
@@ -2383,7 +2949,7 @@ export class BarScene {
    * someone lifting a fallen bike. After motos.update, since the bike's grips are where the hands go.
    */
   private placeThrown(dt: number): void {
-    const now = Date.now() + this.serverClockOffset;
+    const now = this.serverNow();
     for (const [id, avatar] of this.actors) {
       const { skin, actor } = avatar;
       if (!skin) continue;
@@ -2471,11 +3037,13 @@ export class BarScene {
     };
     listen(window, 'keydown', event => {
       if (!this.enabled || this.inputHasFocus()) return;
+      if(!event.repeat&&event.code==='KeyR'&&this.actors.get(this.localId)?.actor.fireworkEquipped){event.preventDefault();this.callbacks.onFireworkStow?.();return;}
       // On a bike Space is the brake, even with the toolbar button last clicked still focused.
       if (event.code === 'Space' && this.chasing && document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
       // Let a focused interface button receive its native keyboard activation.
       if ((event.code === 'Enter' || event.code === 'Space') && document.activeElement?.tagName === 'BUTTON') return;
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code) || (event.code === 'Space' && this.chasing)) {
+      if (!event.repeat && event.code === 'KeyB') { this.callbacks.onFly?.(); }
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code) || (event.code === 'Space' && (this.chasing || this.flying())) || (event.code === 'ControlLeft' && this.flying())) {
         event.preventDefault(); this.keys.add(event.code);
       }
       if (!event.repeat && event.code === 'KeyE') { event.preventDefault(); this.callbacks.onInteract?.(); }
@@ -2499,22 +3067,27 @@ export class BarScene {
     listen(window, 'keyup', event => this.keys.delete(event.code));
     listen(window, 'blur', () => { this.keys.clear(); this.dragging = false; });
     listen(this.canvas, 'pointerdown', event => {
+      if (event.pointerType === 'touch') { this.touchDown(event); return; }
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (event.button !== 0 && event.button !== 2)) return;
-      this.press = { x: event.clientX, y: event.clientY, at: performance.now(), button: event.button };
+      this.press = { x: event.clientX, y: event.clientY, at: performance.now(), button: event.button,travel:0 };
       // A locked pointer cannot be captured, and it looks around anyway.
       if (this.mouseCaptured) return;
       this.dragging = true;
       this.canvas.setPointerCapture(event.pointerId);
     });
     listen(this.canvas, 'pointermove', event => {
+      if (event.pointerType === 'touch') { this.touchMove(event); return; }
+      if(this.press)this.press.travel+=Math.hypot(event.movementX,event.movementY);
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (!this.dragging&&!this.mouseCaptured)) return;
       if(this.watchingTv||this.watchingStage){this.tvYaw-=event.movementX*.006;this.tvPitch+=event.movementY*.004;return;}
       // A captured pointer now and then reports a jump of thousands of pixels (a browser quirk): no hand moves that far in one event.
       this.rig.drag(clamp(event.movementX, -MOUSE_JUMP, MOUSE_JUMP), clamp(event.movementY, -MOUSE_JUMP, MOUSE_JUMP));
     });
     listen(window, 'pointerup', event => {
+      if (event.pointerType === 'touch') { this.touchUp(event); return; }
       this.dragging = false;
       const press = this.press; this.press = undefined;
+      if(press?.button===0&&event.button===0&&press.travel<=6&&this.enabled&&!this.watchingTv&&Math.hypot(event.clientX-press.x,event.clientY-press.y)<=6&&performance.now()-press.at<450&&this.shootFirework())return;
       if (!press || press.button !== 2 || !this.enabled || this.watchingTv || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6 || performance.now() - press.at > 450) return;
       const rect = this.canvas.getBoundingClientRect();
       // With no cursor on the screen, a click is at the middle of the view.
@@ -2522,7 +3095,7 @@ export class BarScene {
       const player = this.pickPlayer(x, y, true), moto = this.pickMoto(x, y);
       if (player || moto) this.callbacks.onWorldMenu?.(rect.left + x, rect.top + y, { ...(player ? { player } : {}), ...(moto ? { moto } : {}) });
     });
-    listen(this.canvas, 'pointercancel', () => { this.dragging = false; });
+    listen(this.canvas, 'pointercancel', event => { this.dragging = false; if (event.pointerType === 'touch') this.touchUp(event); });
     // The right button is the game's, over the view and over the HUD; a released drag can land on either. Text boxes keep paste and copy.
     listen(window, 'contextmenu', event => { if (!(event.target instanceof Element && event.target.closest('input,textarea,[contenteditable="true"]'))) event.preventDefault(); });
     listen(this.canvas, 'wheel', event => {
@@ -2532,6 +3105,46 @@ export class BarScene {
       if(this.rig.wheel(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1)))
         this.callbacks.onCameraChange?.(this.rig.mode,this.rig.reach);
     }, { passive: false });
+  }
+
+  private fingerSpan(): number { const [a, b] = [...this.fingers.values()]; return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0; }
+  private touchDown(event: PointerEvent): void {
+    if (!this.enabled && !this.watchingTv && !this.watchingStage) return;
+    this.fingers.set(event.pointerId, { x: event.clientX, y: event.clientY, x0: event.clientX, y0: event.clientY, at: performance.now(), moved: 0 });
+    try { this.canvas.setPointerCapture(event.pointerId); } catch { /* Capture only keeps the drag on the view. */ }
+    // A second finger makes it a pinch: neither of the two is a tap or a look any more.
+    if (this.fingers.size >= 2) { for (const finger of this.fingers.values()) finger.moved = Infinity; this.pinch = this.fingerSpan(); }
+  }
+  /** One finger turns the view (the mouse's drag), two zoom it (the wheel's steps); in a TV or stage view they turn the picture. */
+  private touchMove(event: PointerEvent): void {
+    const finger = this.fingers.get(event.pointerId);
+    if (!finger) return;
+    const dx = event.clientX - finger.x, dy = event.clientY - finger.y;
+    finger.x = event.clientX; finger.y = event.clientY;
+    if (finger.moved !== Infinity) finger.moved = Math.max(finger.moved, Math.hypot(finger.x - finger.x0, finger.y - finger.y0));
+    if (!this.enabled && !this.watchingTv && !this.watchingStage) return;
+    if (this.fingers.size >= 2) {
+      const span = this.fingerSpan();
+      // Spreading the fingers brings the view closer: the wheel turned the other way.
+      if (this.pinch && !this.watchingTv && !this.watchingStage && this.rig.wheel(-(span - this.pinch) * TOUCH_PINCH)) this.callbacks.onCameraChange?.(this.rig.mode, this.rig.reach);
+      this.pinch = span;
+      return;
+    }
+    if (finger.moved < TOUCH_SLOP) return;
+    if (this.watchingTv || this.watchingStage) { this.tvYaw -= dx * .006 * TOUCH_LOOK; this.tvPitch += dy * .004 * TOUCH_LOOK; return; }
+    this.rig.drag(dx * TOUCH_LOOK, dy * TOUCH_LOOK);
+  }
+  /** The last finger up after a short tap on a player or a bike opens their menu, as a right click does. */
+  private touchUp(event: PointerEvent): void {
+    const finger = this.fingers.get(event.pointerId);
+    if (!finger) return;
+    this.fingers.delete(event.pointerId);
+    this.pinch = this.fingers.size >= 2 ? this.fingerSpan() : 0;
+    if (event.type !== 'pointerup' || this.fingers.size || !this.enabled || this.watchingTv || finger.moved > TAP_SLOP || performance.now() - finger.at > TAP_MS) return;
+    if(this.shootFirework())return;
+    const rect = this.canvas.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
+    const player = this.pickPlayer(x, y, true), moto = this.pickMoto(x, y);
+    if (player || moto) this.callbacks.onWorldMenu?.(event.clientX, event.clientY, { ...(player ? { player } : {}), ...(moto ? { moto } : {}) });
   }
 
   private resize(): void {

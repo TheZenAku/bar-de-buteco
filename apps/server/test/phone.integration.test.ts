@@ -27,7 +27,7 @@ test('phone calls through the room: busy lines, answering, voice at any distance
     res.end(JSON.stringify(req.url?.endsWith('/validate')?{valid:true,blocked:userId==='phone-d'?['phone-a']:[],role:'user',equippedSkin:'nathan',ownedSkins:['nathan']}:req.url?.endsWith('/controls')?{controls:[]}:{ok:true}));});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   // The production socket limit (apps/server/src/index.ts): a video frame has to fit in one message.
-  const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http,maxPayload:8192}),greet:false,gracefullyShutdown:false});let authoritative:BarRoom;
+  const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http,maxPayload:24_576}),greet:false,gracefullyShutdown:false});let authoritative:BarRoom;
   server.define('bar',BarRoom).on('create',room=>{authoritative=room as BarRoom;});await server.listen(0,'127.0.0.1');
   const client=new Client(`http://127.0.0.1:${(http.address() as AddressInfo).port}`),rooms:Room[]=[];
   const calls=new Map<string,PhoneCallView[]>(),pings=new Map<string,PhonePing[]>(),heard=new Map<string,string[]>(),seen=new Map<string,number[]>();
@@ -86,6 +86,15 @@ test('phone calls through the room: busy lines, answering, voice at any distance
     await settle(400);
     assert.ok(seen.get('phone-a')!.length>=PHONE.videoFps&&seen.get('phone-a')!.length<=PHONE.videoFps+4,`at most ${PHONE.videoFps+4} frames a second, got ${seen.get('phone-a')!.length}`);
     assert.deepEqual([seen.get('phone-c'),seen.get('phone-d')],[[],[]]);
+
+    // Do not add video to a listener whose socket is already backed up with voice/game data.
+    await settle(1100);
+    const socket=authoritative!.clients.find(client=>client.sessionId===a.sessionId)!.ref;
+    const descriptor=Object.getOwnPropertyDescriptor(socket,'bufferedAmount'),beforeVideo=seen.get('phone-a')!.length;
+    Object.defineProperty(socket,'bufferedAmount',{configurable:true,value:PHONE.videoFrameTargetBytes*3});
+    try{b.sendBytes('phone.video',frame());await settle();assert.equal(seen.get('phone-a')!.length,beforeVideo);}
+    finally{if(descriptor)Object.defineProperty(socket,'bufferedAmount',descriptor);else Reflect.deleteProperty(socket,'bufferedAmount');}
+    b.sendBytes('phone.video',frame());await until(()=>seen.get('phone-a')!.length===beforeVideo+1);
 
     // Pings: forwarded with the sender, unless one side blocked the other.
     a.send('phone.ping',{to:'phone-b',kind:'zap'});await until(()=>pings.get('phone-b')!.length===1);

@@ -38,7 +38,7 @@ const envKey=(id:string)=>id.toUpperCase().replace(/-/g,'_');
 let entries:PriceEntry[]|undefined;
 export function priceEntries():readonly PriceEntry[]{
   return entries??=[
-    ...ITEM_CATALOG.map(item=>({key:`item:${item.id}`,group:'itens' as const,label:item.name,hint:item.id==='garrafa'||item.id==='copo'?'Balcão, mesa e mochila':item.category==='saude'?'Mochila':item.category==='peca'?'Loja da casa':'Mesa e mochila',defaultValue:item.price,min:0,max:10_000})),
+    ...ITEM_CATALOG.map(item=>({key:`item:${item.id}`,group:'itens' as const,label:item.name,hint:item.id==='garrafa'||item.id==='copo'?'Balcão, mesa e mochila':item.category==='saude'?'Mochila':item.category==='peca'||item.category==='fogo'?'Loja da casa':'Mesa e mochila',defaultValue:item.price,min:0,max:10_000})),
     ...SKINS.filter(skin=>skin.id!==DEFAULT_SKIN).map(skin=>({key:`skin:${skin.id}`,group:'skins' as const,label:skin.name,hint:'Coleção (C)',defaultValue:skin.price,min:0,max:1_000_000})),
     ...SKILLS.map(skill=>({key:`skill:${skill.id}`,group:'skins' as const,label:skill.name,hint:'Habilidade, na coleção (C)',defaultValue:skill.price,min:0,max:1_000_000})),
     ...(Object.keys(MEDIA_PRICES) as MediaPriceKind[]).map(kind=>({key:`media:${kind}`,group:'midia' as const,label:MEDIA_LABELS[kind],hint:'Por vídeo novo',defaultValue:MEDIA_PRICES[kind],min:0,max:10_000})),
@@ -60,6 +60,7 @@ export function priceEntries():readonly PriceEntry[]{
     ...JOBS.map(job=>({key:`job:${job.id}`,group:'trabalho' as const,label:job.name,hint:'Pagamento por tarefa',defaultValue:job.pay,min:0,max:1000})),
     {key:'cap:job-daily',group:'trabalho',label:'Teto diário do trabalho',hint:'Máximo que um jogador ganha trabalhando por dia',defaultValue:JOB_DAILY_CAP,min:0,max:1_000_000},
     {key:'vehicle:moto',group:'highfood',label:'Moto de entrega',hint:'Venda no app HighMotors do celular',defaultValue:10_000,min:0,max:1_000_000},
+    {key:'vehicle:moto-fogo',group:'highfood',label:'Caveira em Chamas',hint:'Moto esqueleto com fogo nas rodas, no HighMotors (sem bag de entrega)',defaultValue:25_000,min:0,max:1_000_000},
     {key:'vehicle:carro',group:'highfood',label:'Hatch 80',hint:'Carro de quatro lugares no HighMotors',defaultValue:35_000,min:0,max:1_000_000},
     {key:'vehicle:tow',group:'highfood',label:'Guincho',hint:'Trazer a própria moto até a rua mais perto, pelo celular',defaultValue:30,min:0,max:10_000},
     {key:'highfood:base',group:'highfood',label:'Entrega: valor fixo',hint:'Por entrega, qualquer distância',defaultValue:8,min:0,max:1000},

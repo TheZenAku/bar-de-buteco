@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {and,eq,inArray,sql} from 'drizzle-orm';
-import {DEFAULT_SKIN,SKILLS,SKINS,priceEntry,skillById,skinById,type AdminCatalogEntry,type CatalogAvailability,type PublicUser,type Rarity,type Wardrobe} from '@bar/shared';
+import {barDayKey,DEFAULT_SKIN,SKILLS,SKINS,priceEntry,skillById,skinById,type AdminCatalogEntry,type CatalogAvailability,type PublicUser,type Rarity,type Wardrobe} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {currencyLedger,moderationActions,profiles,skillInventory,skinCatalog,skinInventory,wallets} from './database/schema.js';
 import {PricingService} from './pricing-service.js';
@@ -36,7 +36,7 @@ export class WardrobeService {
       this.db.select().from(currencyLedger).where(eq(currencyLedger.id,this.dailyKey(user.id))),
     ]);
     const catalog=SKINS.flatMap(skin=>{
-      const set=overrides.get(`skin:${skin.id}`),owned=owns(inventory,skin.id),availability=set?.availability??'sale';
+      const set=overrides.get(`skin:${skin.id}`),owned=owns(inventory,skin.id),availability=set?.availability??(skin.adminOnly?'hidden':'sale');
       // A hidden card stays with whoever has it, and does not exist for anyone else.
       if(availability==='hidden'&&!owned)return [];
       return [{id:skin.id,name:skin.name,base:skin.base,variant:skin.variant,rarity:set?.rarity??skin.rarity,accent:skin.accent,description:set?.description??skin.description,
@@ -49,7 +49,7 @@ export class WardrobeService {
     });
     return {equippedSkin:profile.equippedSkin,balance:wallet.balance,catalog,skills:shown,dailyReward:prices['reward:daily']??0,dailyClaimed:!!daily};
   }
-  private dailyKey(userId:string){return `daily:${userId}:${new Date().toISOString().slice(0,10)}`;}
+  private dailyKey(userId:string){return `daily:${userId}:${barDayKey()}`;}
   async claimDaily(user:PublicUser){
     if(!user.verified)throw new WardrobeError(403,'Confirme seu e-mail para receber moedas.');
     const dailyReward=await this.pricing.get('reward:daily');
@@ -72,7 +72,8 @@ export class WardrobeService {
       const [owned]=await tx.select().from(skinInventory).where(and(eq(skinInventory.userId,user.id),eq(skinInventory.skinId,skinId)));
       if(owned)return;
       const [set]=await tx.select({availability:skinCatalog.availability}).from(skinCatalog).where(eq(skinCatalog.key,`skin:${skinId}`));
-      if(set&&set.availability!=='sale')throw new WardrobeError(409,'Esta carta não está à venda.');
+      // The Morte (adminOnly) is never sold, whatever the catalog row says; the administration grants it.
+      if(skin.adminOnly||(set&&set.availability!=='sale'))throw new WardrobeError(409,'Esta carta não está à venda.');
       const price=this.skinPrice(await this.pricing.table(),skinId);
       if(wallet.balance<price)throw new WardrobeError(409,'Moedas insuficientes para esta skin.');
       await tx.update(wallets).set({balance:wallet.balance-price}).where(eq(wallets.userId,user.id));
@@ -135,7 +136,7 @@ export class WardrobeService {
     };
     return [
       ...SKINS.map(skin=>{const key=`skin:${skin.id}`,set=overrides.get(key);return {...common(key),id:skin.id,kind:'skin' as const,name:skin.name,base:skin.base,variant:skin.variant,accent:skin.accent,icon:'',
-        rarity:set?.rarity??skin.rarity,description:set?.description??skin.description,availability:set?.availability??'sale',owners:count(skinOwners,skin.id),wearing:count(wearing,skin.id)};}),
+        rarity:set?.rarity??skin.rarity,description:set?.description??skin.description,availability:set?.availability??(skin.adminOnly?'hidden':'sale'),owners:count(skinOwners,skin.id),wearing:count(wearing,skin.id)};}),
       ...SKILLS.map(skill=>{const key=`skill:${skill.id}`,set=overrides.get(key);return {...common(key),id:skill.id,kind:'skill' as const,name:skill.name,base:skill.skin,variant:'',accent:skinById(skill.skin)?.accent??'#ea2fdc',icon:skill.icon,
         rarity:set?.rarity??skill.rarity,description:set?.description??skill.description,availability:set?.availability??'sale',owners:count(skillOwners,skill.id),wearing:0};}),
     ];

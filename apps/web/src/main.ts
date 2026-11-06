@@ -9,11 +9,16 @@ import {itemCost,loadPrices,price as livePrice,setPrices} from './prices';
 import './assets/fonts/neon-ui.css';
 import './neon-ui.css';
 import {gameUi} from './game-ui';
-import {CONTROLS,createLobbyMenu,detailCard,keyGrid} from './lobby-menu';
+import {CONTROLS,createLobbyMenu,keyGrid} from './lobby-menu';
 import {createLobbyHero} from './lobby-hero';
+import {createLobbyPresence} from './lobby-presence';
+import {createLobbyStage} from './lobby-stage';
 import {createFullscreen} from './fullscreen';
+import {DeathAudio} from './death/death-audio';
+import {createDeathUi} from './death/death-ui';
 import {createMouseCapture} from './mouse-capture';
 import './lobby-hero.css';
+import './lobby-entry.css';
 import {createHudPanels} from './hud-panels';
 import {createVehicleHud} from './vehicle-hud';
 import {createFuelHud,fuelContext} from './fuel-hud';
@@ -35,16 +40,21 @@ import './light-desk.css';
 import {createSettings,type GameSettings} from './settings';
 import {VoiceChat} from './voice';
 import {coins,itemImage,uiIcon} from './ui-icons';
-import {VOICE} from '@bar/shared';
+import {VOICE,PASSWORD_MIN,PASSWORD_MAX,passwordProblem} from '@bar/shared';
 import './voice.css';
 import './needs.css';
 import {createNeedsHud} from './needs-hud';
 import './minimap.css';
+import './touch/touch.css';
 import {createMinimap} from './minimap';
 import {AdmissionLifecycle,type AdmissionDeparture} from './admission-lifecycle';
 import {MOTO_ENGINE,MOTO_PARTS,MOTO_REPAIR,NO_MOTO_INTENT,canRepairMoto,isRepairingMoto,isRidingMoto,nearestFallenMoto,nearestFreeMoto,readMotoParts,repairOf,type MotoPartId} from '@bar/shared';
 import {motoPanelHtml} from './moto-panel';
 import {worldMenu,worldMenuOpen} from './world-menu';
+import {createTouchControls,TOUCH_KEYS} from './touch/touch-controls';
+import {setTouchPreference,touchPreference,touchMode,type TouchPreference} from './touch/touch-mode';
+import './vr/vr.css';
+import {vrSettings,updateVr,vrSupported,vrUnavailableReason,watchVr,vrLog,vrLogText,clearVrLog} from './vr/vr-mode';
 import {garagePanelHtml,keyChirp,plateHtml} from './garage-panel';
 import {createTrade} from './trade/trade';
 import './trade/trade.css';
@@ -75,6 +85,8 @@ const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
 createLobbyMenu(document.querySelector<HTMLElement>('#lobby')!);
 createLobbyHero(document.querySelector<HTMLElement>('#lobby')!);
+createLobbyStage(document.querySelector<HTMLElement>('#lobby')!);
+createLobbyPresence(document.querySelector<HTMLElement>('#lobby')!);
 
 const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
 const hud=createHudPanels($('#game'));
@@ -110,7 +122,16 @@ const lockerPad=createLockerPad($('#game'),{submit:(orderId,code)=>network.send(
 // The menu closes on the way in: the mouse is about to be captured, and its row out would be out of reach.
 createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>hud.closeMenu());
 // What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the Painéis menu. The chat is typed.
-const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden'),text=>notices.show({variant:'acao',title:'Tela cheia',text}));
+const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden');
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,text=>notices.show({variant:'acao',title:'Tela cheia',text}));
+// On a phone or tablet: a stick, buttons and a sheet that press the keys (docs/sistemas/toque.md). Shown while the world takes input.
+const touchControls=createTouchControls($('#game'),{
+  visible:()=>touchMode()&&!needsCursor()&&!document.body.classList.contains('watching-tv')&&$('#blackjack').classList.contains('hidden'),
+  context:()=>scene?.touchContext()??'walk',
+  axis:(x,y)=>scene?.setTouchAxis(x,y),
+  sprint:on=>scene?.setTouchSprint(on),
+  skillButton:()=>document.querySelector<HTMLButtonElement>('#skill-button'),
+});
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 const minimap=createMinimap($('#game'));
 const consumingHud=createConsumingHud($('#consuming'));
@@ -143,8 +164,7 @@ let usedItem='';
 let handShown='';
 let user:PublicUser|undefined;
 let world:WorldState|undefined;
-let serverClockOffset=0;
-const serverNow=()=>Date.now()+serverClockOffset;
+const serverNow=()=>network.serverNow();
 let inGame=false,connected=false,authMode:'login'|'register'|'forgot'|'reset'='login';
 let emailVerificationRequired=true;
 let checkingSession=true;
@@ -156,6 +176,9 @@ let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
 const settings=createSettings();
+// The Morte (docs/sistemas/morte.md): her sounds and, for the victim alone, the dark and the sequence game.
+const deathAudio=new DeathAudio(()=>settings.get().master);
+const deathUi=createDeathUi($('#game'),{send:(type,payload)=>network.send(type,payload),now:()=>serverNow(),audio:deathAudio,lite:()=>settings.get().graphics.preset==='low',active:on=>document.body.classList.toggle('dead',on)});
 const voice=new VoiceChat({sendPacket:packet=>network.sendBytes('voice',packet),sendState:state=>network.send('voice.state',state),notice:(text,error)=>toast(text,error),changed:()=>renderVoice()},settings);
 const chatHistory:ChatMessage[]=[];
 let administration:ReturnType<typeof adminConsole>|undefined;
@@ -207,18 +230,20 @@ function setBusy(form:HTMLFormElement,busy:boolean):void {form.querySelectorAll<
 function renderAuth(message=''):void {
   const formField=(label:string,name:string,type:string,placeholder:string,extra='')=>`<label>${label}<input name="${name}" type="${type}" placeholder="${placeholder}" required ${extra}></label>`;
   const go=uiIcon('chevronRight');
-  // [action, label, icon] in a fixed order; the detail card is the current option's.
-  const options:Array<[string,string,string]>=user?[['','Continuar','user'],['logout','Usar outra conta','logOut']]
-    :[['auth-login','Entrar','logIn'],['auth-register','Criar conta','userPlus'],authMode==='reset'?['auth-reset','Nova senha','key']:['auth-forgot','Recuperar senha','key']];
-  const current=user?'':`auth-${authMode}`,[,title,iconName]=options.find(option=>option[0]===current)!;
+  // Password fields share one eye button; the confirmation only exists where a NEW password is chosen.
+  const passwordField=(label:string,name:string,placeholder:string,autocomplete:string,rules=false)=>`<label>${label}<span class="pw-wrap"><input name="${name}" type="password" data-pw placeholder="${placeholder}" required autocomplete="${autocomplete}"${rules?` minlength="${PASSWORD_MIN}" maxlength="${PASSWORD_MAX}"`:''}><button type="button" class="pw-toggle" data-action="toggle-password" aria-label="Mostrar senha" aria-pressed="false">${uiIcon('eye')}</button></span></label>`;
+  const newPassword=(label:string)=>`${passwordField(label,'password',`Mínimo ${PASSWORD_MIN} caracteres, com letra e número`,'new-password',true)}${passwordField('Confirmar senha','confirmPassword','Repita a senha','new-password',true)}`;
+  const titles={login:'Bem-vindo',register:'Nova por aqui?',forgot:'Recuperar senha',reset:'Nova senha'},headIcon=user?'user':authMode==='register'?'userPlus':authMode==='login'?'logIn':'key';
   let intro='',content='';
   if(user){intro=`Olha quem chegou. ${e(user.displayName)}, sua cadeira está esperando.`;content=`<div class="returning-user"><span class="profile-initial" style="--avatar:${e(user.color)}">${e(user.displayName.slice(0,1).toUpperCase())}</span><div><b>${e(user.displayName)}</b><small>${e(user.email)}</small></div></div><button data-action="enter" class="button primary full">Entrar no bar ${go}</button>${!user.verified&&emailVerificationRequired?'<button data-action="resend" class="text-button full">Reenviar confirmação de e-mail</button>':''}`;}
-  else if(authMode==='login'){intro='Boa noite, vizinho. Entre na sua conta: a casa é sua.';content=`<form id="auth-form" data-mode="login">${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Sua senha','autocomplete="current-password"')}<button type="button" data-action="auth-forgot" class="forgot-link">Esqueci minha senha</button><button class="button primary full" type="submit">Entrar no bar ${go}</button></form>`;}
-  else if(authMode==='register'){intro='Chega mais. Uma conta, muitas histórias pra contar.';content=`<form id="auth-form" data-mode="register"><div class="field-row">${formField('Seu nome','displayName','text','Como te chamam?','autocomplete="nickname" minlength="2" maxlength="24"')}${formField('Usuário','username','text','seu_apelido','autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" minlength="3" maxlength="24"')}</div>${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${formField('Senha','password','password','Pelo menos 10 caracteres','autocomplete="new-password" minlength="10" maxlength="128"')}<button class="button primary full" type="submit">Criar minha conta ${go}</button><p class="fine-print">${emailVerificationRequired?'Confirme seu e-mail para entrar no bar.':'Sua conta será ativada automaticamente. Depois, é só entrar.'}</p></form>`;}
+  else if(authMode==='login'){intro='Boa noite, vizinho. Entre na sua conta: a casa é sua.';content=`<form id="auth-form" data-mode="login">${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${passwordField('Senha','password','Sua senha','current-password')}<button type="button" data-action="auth-forgot" class="forgot-link">Esqueci minha senha</button><button class="button primary full" type="submit">Entrar no bar ${go}</button></form>`;}
+  else if(authMode==='register'){intro='Chega mais. Uma conta, muitas histórias pra contar.';content=`<form id="auth-form" data-mode="register"><div class="field-row">${formField('Seu nome','displayName','text','Como te chamam?','autocomplete="nickname" minlength="2" maxlength="24"')}${formField('Usuário','username','text','seu_apelido','autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" minlength="3" maxlength="24"')}</div>${formField('E-mail','email','email','voce@exemplo.com','autocomplete="email" maxlength="254"')}${newPassword('Senha')}<button class="button primary full" type="submit">Criar minha conta ${go}</button><p class="fine-print">${emailVerificationRequired?'Confirme seu e-mail para entrar no bar.':'Sua conta será ativada automaticamente. Depois, é só entrar.'}</p></form>`;}
   else if(authMode==='forgot'){intro='Acontece nas melhores. Vamos mandar um link para você criar uma nova senha.';content=`<form id="auth-form" data-mode="forgot">${formField('E-mail da conta','email','email','voce@exemplo.com','autocomplete="email"')}<button class="button primary full" type="submit">Recuperar acesso ${go}</button></form>`;}
-  else {intro='Um novo começo. Escolha uma nova senha para sua conta.';content=`<form id="auth-form" data-mode="reset">${formField('Nova senha','password','password','Pelo menos 10 caracteres','autocomplete="new-password" minlength="10" maxlength="128"')}<button class="button primary full" type="submit">Salvar nova senha ${go}</button></form>`;}
-  $('#auth-list').innerHTML=options.map(([action,label,name])=>`<button type="button" ${action?`data-action="${action}"`:''} aria-current="${action===current}">${uiIcon(name)}<span>${label}</span>${go}</button>`).join('');
-  $('#auth-content').innerHTML=detailCard(title,iconName,`<p class="detail-info">${intro}</p>${content}<div id="auth-message" class="form-message ${message?'':'hidden'}" role="status">${e(message)}</div>`,`${uiIcon('signal')} Sem instalação. Só chegar.`,`${options.findIndex(option=>option[0]===current)+1} / ${options.length}`);
+  else {intro='Um novo começo. Escolha uma nova senha para sua conta.';content=`<form id="auth-form" data-mode="reset">${newPassword('Nova senha')}<button class="button primary full" type="submit">Salvar nova senha ${go}</button></form>`;}
+  // The access card: logged out, a two-way switch (Entrar / Criar conta) over the form; back in, the way to the chair.
+  const switcher=user?'':`<div class="auth-switch" role="group" aria-label="Acesso"><button type="button" data-action="auth-login" aria-pressed="${authMode==='login'}">Entrar</button><button type="button" data-action="auth-register" aria-pressed="${authMode==='register'}">Criar conta</button></div>`;
+  const aside=user?`<button type="button" data-action="logout" class="text-button full">${uiIcon('logOut')} Usar outra conta</button>`:authMode==='forgot'||authMode==='reset'?`<button type="button" data-action="auth-login" class="text-button full">Voltar ao login</button>`:'';
+  $('#auth-content').innerHTML=`<header class="detail-head"><h2>${user?'Continuar':titles[authMode]}</h2>${uiIcon(headIcon)}</header>${switcher}<div class="detail-body"><p class="detail-info">${intro}</p>${content}<div id="auth-message" class="form-message ${message?'':'hidden'}" role="status">${e(message)}</div>${aside}</div><footer class="detail-foot"><span>${uiIcon('signal')} Sem instalação. Só chegar.</span></footer>`;
   $('#auth-content').setAttribute('aria-busy',String(checkingSession));
   if(checkingSession){$('#lobby-account').querySelectorAll<HTMLInputElement|HTMLButtonElement>('input,button').forEach(control=>control.disabled=true);if(!message)authMessage('Verificando sua conta…');}
 }
@@ -259,12 +284,14 @@ const profile=createProfileWindow({
   toast,
 });
 const network=new BarNetwork({
+  environment:environment=>scene?.setEnvironment(environment),
   input:()=>scene?.getInput()??{dx:0,dz:0,running:false,rotation:0},
   motoInput:()=>scene?.getMotoInput()??NO_MOTO_INTENT,
   moto:(id,body)=>scene?.predictMoto(id,body),
   skin:savedSkin,
   position:position=>scene?.setLocal(position),
-  state:state=>{world=state;serverClockOffset=state.serverTime-Date.now();scene?.setWorld(state,user!.id);media.forEach(m=>m.setWorld(state,user!.id,connected));desk?.update(state.stageShow);renderWorld();},
+  crowd:bytes=>scene?.setCrowd(bytes),
+  state:state=>{world=state;scene?.setWorld(state,user!.id);media.forEach(m=>m.setWorld(state,user!.id,connected));desk?.update(state.stageShow);renderWorld();},
   jukebox:openJukebox,
   television:openTelevision,
   shop:()=>{void openShop().catch(error=>toast(errorMessage(error),true));},
@@ -309,9 +336,12 @@ const network=new BarNetwork({
   },
   itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
   motoStruck:({hp,by})=>notices.show({variant:'aviso',title:'Atropelado',text:`${by||'Uma moto desgovernada'} passou por cima de você: -${hp} de vida.`}),
+  deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
+  deathScreen:screen=>deathUi.screen(screen),
   kicked:({hp,by})=>notices.show({variant:'aviso',title:'Chutado',text:hp?`${by} acertou um chute em você: -${hp} de vida.`:`${by} acertou um chute em você.`}),
   inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();},
   inventoryResult:()=>{},
+  firework:shot=>scene?.fireworkShot(shot),
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
     renderBalance();blackjackUi.refresh();trucoUi.refresh();foosballUi.refresh();poolUi.refresh();trade.refresh();
@@ -392,6 +422,8 @@ const phone=createPhone($('#game'),{
   // A Pix changed the wallet in the API: the HUD shows it now, and the room reads it again (inventory.sync).
   balance:value=>{if(inventory)inventory={...inventory,balance:value};if(wardrobe)wardrobe={...wardrobe,balance:value};renderBalance();network.send('inventory.sync');},
   capture:(width,height,quality)=>scene?scene.capture(width,height,quality):Promise.resolve(null),
+  captureBitmap:(width,height)=>scene?scene.captureBitmap(width,height):Promise.resolve(null),
+  backlog:()=>network.backlog(),
   setSelfie:on=>scene?.setSelfie(on),
   setZoom:factor=>scene?.setZoom(factor),
   canvas:$<HTMLCanvasElement>('#world'),
@@ -401,6 +433,36 @@ const phone=createPhone($('#game'),{
   gps,
   food:courier,
 });
+/** VR (docs/sistemas/vr.md): a window, the phone, a table or a menu is open, so the headset shows the screen with the interface. */
+const vrWindowOpen=()=>inGame&&(!!activeModal||atFoosball()||atTruco()||atPool()||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden')||document.body.classList.contains('watching-tv'));
+/** The VR button on top: only inside the bar, and only for whoever turned the VR on in Configurações. */
+function refreshVrButton():void {
+  const button=document.querySelector<HTMLButtonElement>('#vr-button');if(!button)return;
+  const on=!!scene?.vrActive;
+  button.classList.toggle('hidden',!(inGame&&(vrSettings().enabled||on)));
+  button.setAttribute('aria-pressed',String(on));
+  const label=on?'Sair do VR':'Entrar no VR (Meta Quest 2)';button.title=label;button.setAttribute('aria-label',label);
+}
+async function toggleVr():Promise<void> {
+  if(!scene)return;
+  if(scene.vrActive){scene.exitVr();return;}
+  if(!inGame){toast('Entre no bar para jogar com o VR.',true);return;}
+  if(!await vrSupported()){toast(vrUnavailableReason(),true);return;}
+  try{
+    // The headset takes the whole view: windows of the 2D page close, the screen in VR opens them again as needed.
+    if(activeModal)closeModal();
+    await scene.enterVr(vrSettings());
+    refreshVrButton();
+    toast('VR ligado. Y abre a tela com a interface; aperte o direcional direito para recentralizar.');
+  }catch(error){vrLog(`toggleVr falhou: ${errorMessage(error)}`);toast(errorMessage(error),true);refreshVrButton();}
+}
+watchVr(()=>refreshVrButton());
+/** The first time in the bar with the touch controls on: where the stick is, what dragging does. */
+function touchHint():void {
+  if(!touchMode())return;
+  try{if(localStorage.getItem('bar:touch-hint:v1'))return;localStorage.setItem('bar:touch-hint:v1','1');}catch{/* Shown again next time. */}
+  notices.show({variant:'acao',title:'Controles de toque',text:'Direcional à esquerda para andar, arraste a tela para olhar e use “Mais” para o resto.'});
+}
 async function enterBar():Promise<void> {
   if(inGame)return;
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
@@ -408,10 +470,12 @@ async function enterBar():Promise<void> {
   const attempt=admission.beginEntry();if(!attempt)return;
   // Entering is a click: the browser lets this page play voices from now on.
   voice.unlock();audio.unlock();
-  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
+  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);touchHint();refreshVrButton();$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
   performanceMonitor.forUser(user.id);
   try{
     $('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;
+    // The Morte's five GLBs come once the bar is up and the browser is idle, never in the middle of a scene.
+    if('requestIdleCallback' in window)window.requestIdleCallback(()=>scene?.preloadDeath(),{timeout:8000});else setTimeout(()=>scene?.preloadDeath(),3000);
     if(!admission.isCurrentEntry(attempt))return;
     const [result,owned,items,own]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory'),api<ProfileView>(`/profile/${encodeURIComponent(user.id)}`).catch(()=>undefined)]);
     if(!admission.isCurrentEntry(attempt))return;
@@ -434,7 +498,7 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   vehicleHud.reset();$('#game').classList.remove('vehicle-mounted');hud.setAvailable('actions',true);
   gps.reset();foodDialog.reset();lockerPad.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
-  inGame=false;connected=false;tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  deathUi.reset();scene?.stopDeath();scene?.exitVr();inGame=false;connected=false;refreshVrButton();tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#truco').classList.add('hidden');trucoUi.reset();trucoView=undefined;$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';$('#pool').classList.add('hidden');poolUi.reset();poolWatching='';poolViews.clear();closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
@@ -840,7 +904,7 @@ setInterval(()=>{void refreshAdministration();},5000);
 /** An item's effects on the needs, as "fome +35" (CONSUMABLES come from the same catalogue). */
 const effectList=(item:{effects:object})=>Object.entries(item.effects).filter(([key,value])=>key!=='name'&&typeof value==='number'&&Number(value)!==0)
   .map(([key,value])=>`${({hunger:'fome',thirst:'sede',hp:'vida',drunk:'álcool',bladder:'bexiga'} as Record<string,string>)[key]??key} ${Number(value)>0?'+':''}${value}`);
-const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde',peca:'Peça'};
+const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde',peca:'Peça',fogo:'Fogos de artifício'};
 /** "1:30" for a duration in milliseconds. */
 const clockText=(ms:number)=>`${Math.floor(ms/60_000)}:${String(Math.round(ms%60_000/1000)).padStart(2,'0')}`;
 // The backpack's chosen slot (its card shows beside the slots).
@@ -866,12 +930,13 @@ function renderInventory():void {
   if(item&&stack){
     // Why Usar waits, when it does (the room refuses the same cases).
     const blocked=self?.condition==='fainted'||self?.condition==='stumbling'?'Espere recuperar o equilíbrio.'
+      :self?.fireworkEquipped&&item.id!=='rojao'?'Guarde o rojão com R antes de usar outro item.'
       :self?.interactionState||self?.currentTableId?'Levante-se ou termine o que está fazendo para usar itens.'
-      :held&&consumedOverTime(item.id)?`Ainda na mão: ${itemById(held)?.name??held}. Termine antes de pegar outro.`:'';
+      :held&&(consumedOverTime(item.id)||item.id==='rojao')?`Ainda na mão: ${itemById(held)?.name??held}. Termine antes de pegar outro.`:'';
     const lasts=consumedOverTime(item.id)?`dura ${clockText(consumeMs(item.id))}`:'na hora',forBike=item.category==='peca';
     detail=`<section class="item-detail" aria-label="${e(item.name)}"><header><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><div><small>${e(CATEGORY_NAMES[item.category]??item.category)}</small><h3>${e(item.name)}</h3></div><strong>×${stack.quantity}</strong></header>
-      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${forBike?'':`<span class="item-time">${uiIcon('clock')}${lasts}</span>`}</div>
-      ${blocked&&!forBike?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${forBike?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>Usar</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
+      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${forBike?'':`<span class="item-time">${uiIcon(item.id==='rojao'?'sparkles':'clock')}${item.id==='rojao'?'1 unidade por disparo':lasts}</span>`}</div>
+      ${blocked&&!forBike?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${forBike?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>${item.id==='rojao'?(self?.fireworkEquipped?'Guardar':'Equipar na mão'):'Usar'}</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
   }
   const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar',trade:'Negociação'};
   const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
@@ -938,12 +1003,18 @@ async function skins(focusOn?:string):Promise<void> {
     },focusOn);
   }catch(error){if(activeModal==='skins'&&generation===modalGeneration){closeModal();toast(errorMessage(error),true);}}
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Suba ao salão de jogos, chegue perto da mesa e aperte E. Monte a aposta com as fichas e confirme em Apostar: a primeira aposta abre a rodada para a mesa toda. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Na sua vez: Pedir (1), Parar (2), Dobrar (3), Dividir (4) ou Desistir (5). Blackjack paga 3 para 2; com um ás do dealer à mostra, dá para fazer seguro. O dealer para em 17. As apostas são em moedas da carteira, de ${livePrice('blackjack:min-bet')} a ${livePrice('blackjack:max-bet')} por mão; sair no meio da rodada para as suas mãos onde estão. O ícone de ajuda da mesa mostra todas as regras.</p><h3>Pebolim</h3><p>As duas mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa cheia ou com partida rolando, você assiste. Quem abre a mesa escolhe 1 × 1 ou 2 × 2, quantos gols, um set ou melhor de 3, e pode chamar o Zé do Totó para as vagas (três níveis: tomou todas, na média ou sóbrio) ou marcar a partida valendo moedas (${livePrice('foosball:min-bet')} a ${livePrice('foosball:max-bet')} por jogador; quem vence leva o dobro). Quando todo mundo marca Pronto, a bola rola. Mexa o mouse (ou o dedo) e os bonecos seguem o ponteiro; clique ou Espaço chuta, segurar carrega a bomba; botão direito ou Shift levanta os bonecos para a bola passar. Vale o tempo de posse oficial: 10 s no meio e 15 s nas outras linhas. Sair no meio de uma partida valendo é W.O.; no amistoso, o Zé assume o lugar.</p><h3>Sinuca (bola 8)</h3><p>As três mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa com partida rolando, você assiste. Jogue contra outra pessoa ou chame o Juca da Sinuca (iniciante, na média ou matador). Valem as regras da bola 8 da Noel Snooker: a moeda decide quem escolhe a saída, a branca da saída vai no quadro, e a primeira bola encaçapada define lisas e listradas. Mire com o mouse; segure o botão esquerdo e a força enche, solte e a tacada sai (o botão direito cancela; a roda faz o ajuste fino). O efeito na branca e a inclinação do taco ficam nos controles embaixo da mesa. A linha mostra onde a branca bate e para onde vai a bola. O ícone de ajuda da mesa mostra todas as regras e faltas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez na mão; na mesa, o pedido inteiro ao mesmo tempo. Cada coisa vira um ícone acima dos avisos, com um anel que esvazia e o tempo que falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${touchMode()?`<h3>No toque</h3>${keyGrid(TOUCH_KEYS)}`:''}${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Suba ao salão de jogos, chegue perto da mesa e aperte E. Monte a aposta com as fichas e confirme em Apostar: a primeira aposta abre a rodada para a mesa toda. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Na sua vez: Pedir (1), Parar (2), Dobrar (3), Dividir (4) ou Desistir (5). Blackjack paga 3 para 2; com um ás do dealer à mostra, dá para fazer seguro. O dealer para em 17. As apostas são em moedas da carteira, de ${livePrice('blackjack:min-bet')} a ${livePrice('blackjack:max-bet')} por mão; sair no meio da rodada para as suas mãos onde estão. O ícone de ajuda da mesa mostra todas as regras.</p><h3>Pebolim</h3><p>As duas mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa cheia ou com partida rolando, você assiste. Quem abre a mesa escolhe 1 × 1 ou 2 × 2, quantos gols, um set ou melhor de 3, e pode chamar o Zé do Totó para as vagas (três níveis: tomou todas, na média ou sóbrio) ou marcar a partida valendo moedas (${livePrice('foosball:min-bet')} a ${livePrice('foosball:max-bet')} por jogador; quem vence leva o dobro). Quando todo mundo marca Pronto, a bola rola. Mexa o mouse (ou o dedo) e os bonecos seguem o ponteiro; clique ou Espaço chuta, segurar carrega a bomba; botão direito ou Shift levanta os bonecos para a bola passar. Vale o tempo de posse oficial: 10 s no meio e 15 s nas outras linhas. Sair no meio de uma partida valendo é W.O.; no amistoso, o Zé assume o lugar.</p><h3>Sinuca (bola 8)</h3><p>As três mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa com partida rolando, você assiste. Jogue contra outra pessoa ou chame o Juca da Sinuca (iniciante, na média ou matador). Valem as regras da bola 8 da Noel Snooker: a moeda decide quem escolhe a saída, a branca da saída vai no quadro, e a primeira bola encaçapada define lisas e listradas. Mire com o mouse; segure o botão esquerdo e a força enche, solte e a tacada sai (o botão direito cancela; a roda faz o ajuste fino). O efeito na branca e a inclinação do taco ficam nos controles embaixo da mesa. A linha mostra onde a branca bate e para onde vai a bola. O ícone de ajuda da mesa mostra todas as regras e faltas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez na mão; na mesa, o pedido inteiro ao mesmo tempo. Cada coisa vira um ícone acima dos avisos, com um anel que esvazia e o tempo que falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
   const action=button.dataset.action!;
   void (async()=>{
+    if(action==='toggle-password'){
+      const form=button.closest('form')!,fields=[...form.querySelectorAll<HTMLInputElement>('input[data-pw]')],show=fields[0]?.type==='password';
+      fields.forEach(field=>field.type=show?'text':'password');
+      form.querySelectorAll<HTMLElement>('.pw-toggle').forEach(toggle=>{toggle.innerHTML=uiIcon(show?'eyeOff':'eye');toggle.setAttribute('aria-pressed',String(show));toggle.setAttribute('aria-label',show?'Ocultar senha':'Mostrar senha');});
+      return;
+    }
     if(action.startsWith('auth-')){authMode=action.slice(5) as typeof authMode;renderAuth();return;}
     switch(action){
       case 'enter':await enterBar();break;
@@ -971,6 +1042,8 @@ app.addEventListener('click',event=>{
       case 'phone':phone.toggle();break;
       case 'inventory':await openInventory();break;
       case 'inventory-use':useInventoryItem(button.dataset.item!);break;
+      case 'firework-fire':scene?.fireworkFire();break;
+      case 'firework-stow':network.send('firework.stow',{});break;
       case 'inventory-select':selectedItem=button.dataset.item??'';renderInventory();document.querySelector<HTMLElement>(`.inventory-slot[data-item="${CSS.escape(selectedItem)}"]`)?.focus();break;
       case 'garage-take':network.send('garage.take',{garageId:garageShown,vehicleId:button.dataset.vehicle});break;
       case 'garage-store':network.send('garage.store',{garageId:garageShown,recall:button.dataset.recall==='true'});break;
@@ -1009,6 +1082,10 @@ app.addEventListener('click',event=>{
       case 'voice-listen':{const on=!settings.get().voicesEnabled;voice.unlock();settings.update({voicesEnabled:on});break;}
       case 'voice-mute':{const id=button.dataset.id!;const muted=voice.toggleMute(id);peopleKey='';renderPeopleContent();break;}
       case 'settings':openSettings();break;
+      case 'vr':await toggleVr();break;
+      case 'vr-log-copy':{const text=vrLogText();try{await navigator.clipboard.writeText(text);toast('Log do VR copiado: cole aqui na conversa.');}catch{const box=document.querySelector<HTMLTextAreaElement>('#vr-log');box?.select();toast('Selecionei o log: aperte Ctrl+C para copiar.');}break;}
+      case 'vr-log-save':{const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([vrLogText()],{type:'text/plain'}));link.download='vr-log.txt';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);break;}
+      case 'vr-log-clear':clearVrLog();{const box=document.querySelector<HTMLTextAreaElement>('#vr-log');if(box)box.value=vrLogText();}break;
       case 'dance':if(performing())break;network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':closeModal();break;
       case 'block':{const id=button.dataset.id!;if(blocked.has(id)){await api(`/blocks/${encodeURIComponent(id)}`,undefined,'DELETE');blocked.delete(id);}else{await api('/blocks',{playerId:id});blocked.add(id);}renderPeopleContent();renderChat();break;}
@@ -1028,6 +1105,11 @@ app.addEventListener('submit',event=>{
     setBusy(form,true);
     try{
       if(form.id==='auth-form'){
+        if(authMode==='register'||authMode==='reset'){
+          const problem=passwordProblem(data.password??'')||(data.password!==data.confirmPassword?'As senhas não são iguais.':'');
+          if(problem){authMessage(problem,true);return;}
+        }
+        delete data.confirmPassword;
         if(authMode==='login'){const result=await api<{user:PublicUser}>('/auth/login',data);user=result.user;renderAuth();if(user.verified)await enterBar();else authMessage(emailVerificationRequired?'Confirme seu e-mail antes de entrar. Você pode pedir um novo link abaixo.':'Sua conta ainda precisa ser ativada. Entre novamente após a ativação.');}
         else if(authMode==='register'){const result=await api<{user:PublicUser;message:string;verificationRequired:boolean}>('/auth/register',data);emailVerificationRequired=result.verificationRequired;user=result.user;authMode='login';renderAuth(result.message);if(user.verified)await enterBar();}
         else if(authMode==='forgot'){await api('/auth/forgot',data);authMessage('Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.');}
@@ -1074,6 +1156,7 @@ window.addEventListener('blur',()=>voice.setPushToTalk(false));
 $('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
 $('#modal').addEventListener('input',event=>{
   const input=event.target as HTMLInputElement,key=input.dataset.setting;if(!key||input.type!=='range')return;
+  if(key==='vr.resolution'){updateVr({resolution:Number(input.value)/100});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;return;}
   if(key.startsWith('graphics.')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input.value)});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';return;}
   if(key.startsWith('cameraFeel.')){const name=key.slice(11) as keyof CameraFeel,value=Number(input.value)/100;settings.update({cameraFeel:{...settings.get().cameraFeel,[name]:value}});const output=input.parentElement?.querySelector('output');if(output)output.textContent=cameraFeelLabel(name,value);return;}
   const value=Number(input.value)/100;
@@ -1084,7 +1167,13 @@ $('#modal').addEventListener('change',event=>{
   const target=event.target as HTMLElement;
   if(target instanceof HTMLInputElement&&target.name==='item'&&target.form?.id==='table-order'){tableMenuTotal(target.form);return;}
   const input=event.target as HTMLInputElement|HTMLSelectElement,key=input.dataset.setting;if(!key)return;
+  if(key==='vr.enabled'){updateVr({enabled:(input as HTMLInputElement).checked});return;}
+  if(key==='vr.light'){updateVr({lightGraphics:(input as HTMLInputElement).checked});return;}
+  if(key==='vr.comfort'){updateVr({comfort:(input as HTMLInputElement).checked});return;}
+  if(key==='vr.turn'){updateVr({turn:input.value==='smooth'?'smooth':'snap'});return;}
+  if(key==='vr.snapDegrees'){updateVr({snapDegrees:Number(input.value) as 15|30|45});return;}
   if(key.startsWith('graphics.')&&!(input instanceof HTMLInputElement&&input.type==='range')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input instanceof HTMLInputElement&&input.type==='checkbox'?input.checked:input.value)});if(key==='graphics.preset')openSettings();else{const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';}return;}
+  if(key==='touchUi'){setTouchPreference(input.value==='on'||input.value==='off'?input.value:'auto');return;}
   if(key==='micEnabled'){void voice.setMicrophone((input as HTMLInputElement).checked);return;}
   if(key==='voicesEnabled'){voice.unlock();settings.update({voicesEnabled:(input as HTMLInputElement).checked});return;}
   if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});openSettings();return;}
@@ -1143,6 +1232,23 @@ function openSettings():void {
   // −60 dB (whisper) … −20 dB (loud) maps onto the meter's −60…0 dB scale.
   const threshold=current.sensitivity*40/60*100;
   showModal('Configurações',`<div class="settings-panel" data-capture-input>
+    <section><h3>${uiIcon('smartphone')} Controles de toque</h3>
+      <label class="setting-row device-row"><span>Controles na tela</span><select data-setting="touchUi">${([['auto','Automático (celular e tablet)'],['on','Sempre ligados'],['off','Desligados (teclado e mouse)']] as const).map(([value,label])=>`<option value="${value}" ${touchPreference()===value?'selected':''}>${label}</option>`).join('')}</select></label>
+      <p class="fine-print">Direcional à esquerda para andar (ou dirigir), botões à direita e “Mais” para o resto. Arraste a tela para girar a câmera, use dois dedos para aproximar ou afastar e toque numa pessoa ou veículo para abrir o menu dele.</p>
+    </section>
+    <section><h3>${uiIcon('glasses')} Realidade virtual (Meta Quest 2)</h3>
+      ${toggle('vr.enabled','Jogar com óculos VR','Mostra o botão de VR no topo, dentro do bar. Abra o jogo no Navegador do próprio Quest 2 (endereço https).',vrSettings().enabled)}
+      <p class="fine-print" id="vr-status">Verificando os óculos…</p>
+      <button type="button" class="button secondary" data-action="vr">${scene?.vrActive?'Sair do VR':'Entrar no VR agora'}</button>
+      <label class="setting-row device-row"><span>Girar com o direcional direito</span><select data-setting="vr.turn"><option value="snap" ${vrSettings().turn==='snap'?'selected':''}>Em passos (mais confortável)</option><option value="smooth" ${vrSettings().turn==='smooth'?'selected':''}>Suave</option></select></label>
+      <label class="setting-row device-row"><span>Tamanho do passo</span><select data-setting="vr.snapDegrees">${[15,30,45].map(degrees=>`<option value="${degrees}" ${vrSettings().snapDegrees===degrees?'selected':''}>${degrees}°</option>`).join('')}</select></label>
+      ${toggle('vr.light','Gráficos leves no VR','Usa o preset Baixo (sem sombras, cidade só por perto) enquanto está de óculos: recomendado, o VR desenha tudo duas vezes.',vrSettings().lightGraphics)}
+      ${toggle('vr.comfort','Anel de conforto','Escurece as bordas da visão quando você anda ou gira, o que ajuda contra o enjoo.',vrSettings().comfort)}
+      <label class="setting-row"><span>Resolução do VR</span><input type="range" min="50" max="100" step="5" data-setting="vr.resolution" value="${Math.round(vrSettings().resolution*100)}"><output>${Math.round(vrSettings().resolution*100)}%</output></label>
+      <div class="setting-row" style="flex-wrap:wrap;gap:8px"><button type="button" class="button secondary" data-action="vr-log-copy">Copiar log do VR</button><button type="button" class="button secondary" data-action="vr-log-save">Baixar log</button><button type="button" class="button secondary" data-action="vr-log-clear">Limpar log</button></div>
+      <textarea id="vr-log" readonly rows="6" style="width:100%;font:11px/1.3 monospace">${e(vrLogText())}</textarea>
+      <p class="fine-print">Quanto menor a resolução, mais fluido fica no Quest 2. A interface (janelas, celular, chat) aparece numa tela à sua frente: aponte com o controle e puxe o gatilho.</p>
+    </section>
     ${graphicsSettingsHtml(current.graphics,scene?.getGraphics())}
     <section><h3>${uiIcon('eye')} Câmera</h3>
       <label class="setting-row device-row"><span>Visão</span><select data-setting="camera">${CAMERA_MODES.map(mode=>`<option value="${mode}" ${current.camera===mode?'selected':''}>${CAMERA_LABELS[mode]}</option>`).join('')}</select></label>
@@ -1170,6 +1276,7 @@ function openSettings():void {
       <label class="setting-row device-row"><span>Dispositivo</span><select data-setting="inputDevice" id="voice-device"><option value="">Padrão do sistema</option></select></label>
     </section>
   </div>`,'settings');
+  void vrSupported().then(ok=>{const status=document.querySelector('#vr-status');if(status)status.textContent=ok?'Óculos detectados: é só entrar.':vrUnavailableReason();});
   void voice.devices().then(devices=>{
     const select=document.querySelector<HTMLSelectElement>('#voice-device');if(!select||activeModal!=='settings')return;
     for(const [i,device] of devices.entries())if(device.deviceId&&device.deviceId!=='default'){const option=document.createElement('option');option.value=device.deviceId;option.textContent=device.label||`Microfone ${i+1}`;select.append(option);}
@@ -1178,20 +1285,36 @@ function openSettings():void {
 }
 
 async function start():Promise<void>{
+  void network.syncEnvironment();
+  setInterval(()=>{void network.syncEnvironment();},30_000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void network.syncEnvironment();});
   void loadPrices();
   try{const config=await api<{emailVerificationRequired:boolean}>('/auth/config');emailVerificationRequired=config.emailVerificationRequired;renderAuth();}catch{/* The server still enforces its verification policy. */}
   try{scene=new BarScene($<HTMLCanvasElement>('#world'),{
+    serverNow,
+    onShowcaseCut:cut=>$('#lobby').style.setProperty('--cut',String(cut)),
+    onShowcaseSlow:()=>$('#lobby').classList.remove('has-3d'),
     onInteract:interact,
+    onFirework:direction=>network.send('firework.fire',{direction}),
+    onFireworkStow:()=>network.send('firework.stow',{}),
     onFrame:dt=>network.rideFrame(dt),
     onEmote:emote=>performing()?undefined:emote==='smoke'?smoke():emote==='cigarette'?cigarette():network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
+    vrWindowOpen,
+    onVrEnd:reason=>{refreshVrButton();toast(reason);},
+    onVrNotice:text=>toast(text),
+    onVrArms:arms=>network.send('player.arms',arms),
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins();},
+    // B is also push-to-talk: with that voice mode the key keeps talking.
+    onFly:()=>{if(inGame&&!activeModal&&user?.role==='admin'&&settings.get().voiceMode!=='ptt')network.send('admin.fly',{on:!world?.players[user.id]?.animationState.startsWith('fly')});},
     onSkillKey:code=>{const active=activeSkill();if(active?.key!==code)return false;useSkill();return true;},
     onWorldMenu:(x,y,{player,moto})=>{
       if(!inGame||activeModal)return;
       const bike=moto?world?.motos?.[moto]:undefined,other=player&&player!==user?.id&&world?.players[player]?.connected!==false;
       worldMenu({x,y},[
         ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
+        // Administrators test the Morte on themselves (the same kill as the player file's button, docs/sistemas/morte.md).
+        ...(player&&player===user?.id&&user?.role==='admin'?[{id:'die',icon:'ghost',label:'Morrer (teste)',choose:()=>void api('/admin/player',{playerId:player,op:'kill',reason:'Teste pelo menu do jogo'}).then(()=>toast('A Morte está a caminho.'),error=>toast(errorMessage(error),true))}]:[]),
         ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
         ...(bike&&isCar(bike)?CAR_SEATS.filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${CAR_SEATS.indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:CAR_SEATS.indexOf(seat)})})):[]),
@@ -1202,7 +1325,7 @@ async function start():Promise<void>{
     onVehicleControl:(vehicleId,action)=>sendVehicleControl(vehicleId,action),
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
     onMediaFrame:()=>{
-      mediaProfiler.begin();mouseCapture.sync();mediaProfiler.mark('mouse');
+      mediaProfiler.begin();mouseCapture.sync();touchControls.sync();mediaProfiler.mark('mouse');
       media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));mediaProfiler.mark('video');
       minimap.render(inGame?()=>scene?.mapView():null);mediaProfiler.mark('minimap');
       objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');
@@ -1210,19 +1333,26 @@ async function start():Promise<void>{
       voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
       const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}mediaProfiler.mark('audioButton');
     },
-  });scene.setEnabled(false);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);}
+  });scene.setEnvironment(network.environment);scene.setEnabled(false);scene.setDeathAudio(deathAudio);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
+  if(scene&&backdropAllowed())void scene.ready.then(()=>{if(inGame)return;scene?.setShowcase(true);$('#lobby').classList.add('has-3d');}).catch(()=>{});
   const params=new URLSearchParams(location.search);
   if(params.has('verify')){try{await api('/auth/verify',{token:params.get('verify')});renderAuth('E-mail confirmado! Agora é só entrar.');}catch(error){authMessage(errorMessage(error),true);}history.replaceState({},'',location.pathname);}
   if(params.has('reset')){resetToken=params.get('reset')!;authMode='reset';checkingSession=false;renderAuth();return;}
   try{const result=await api<{user:PublicUser}>('/auth/me');user=result.user;}catch{/* No active session: show login. */}
   checkingSession=false;renderAuth();
 }
+/** The bar behind the entry: not for phones, reduced motion, data saving or automated tests (which want a light page); ?showcase=1 forces it. */
+function backdropAllowed():boolean{
+  if(new URLSearchParams(location.search).has('showcase'))return true;
+  const saving=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection?.saveData;
+  return !navigator.webdriver&&!saving&&!touchMode()&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility
@@ -1230,6 +1360,9 @@ if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{food:()=>
  */
 const worldLabels=new Map<string,{node:HTMLSpanElement;html:string;speaking:boolean;x:string;y:string}>();
 setInterval(()=>{
+  const fireworkVisible=inGame&&connected&&sceneActive()&&!!world?.players[user?.id??'']?.fireworkEquipped;
+  $('#firework-hud').classList.toggle('hidden',!fireworkVisible);
+  if(fireworkVisible)$('#firework-count').textContent=String(inventory?.stacks.find(stack=>stack.itemId==='rojao')?.quantity??0);
   if(!inGame||!scene||!world)return;
   const labels=scene.projectLabels?.()||[],container=$('#labels'),seen=new Set<string>();
   // Leaving the bar empties the container (replaceChildren): its nodes are made again.

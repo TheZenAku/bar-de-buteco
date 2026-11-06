@@ -9,6 +9,7 @@ export const CONTROLS=[
   {label:'Interação',icon:'sparkles',keys:[['E','Sentar, pedir bebida, usar a jukebox ou entrar na mesa'],['Botão direito','Clique em alguém, ou em você, e abra o Perfil'],['I','Abrir a mochila, usar e descartar itens'],['P','Sentado à mesa: pedir comida e bebida ao Tonico ou a quem estiver trabalhando no bar'],['J','Trabalhar no bar e ganhar moedas'],['K','Celular: ligações, Highzap, Highgram, câmera, HighBank e mais (Esc guarda)']]},
   {label:'Gestos',icon:'hand',keys:[['Sua tecla','Usar a skill ativa da skin: compre na coleção (C), escolha a tecla no seu perfil, aba Skill'],['G','Dançar ou parar de dançar'],['V','Acenar para o pessoal'],['F','Acender um cigarro (F de novo, ou E, apaga)'],['Shift F','Fumar um cigarro inteiro: tira o maço, acende, traga e pisa na bituca (cerca de 18 s)'],['C','Trocar de skin']]},
   {label:'Veículos',icon:'bike',keys:[['W S','Acelerar; frear e dar ré'],['A D','Virar'],['Espaço','Freio de mão'],['F','Segure para buzinar na moto ou no carro'],['Shift','Na moto em movimento: fazer grau. No cavalo: empinar e relinchar; com movimento depois da empinada, galopar'],['E','Subir e descer. Moto caída: levantar. Devagar no anel da garagem: guardar'],['L','Trancar e destrancar o seu veículo'],['Z C','Seta esquerda e seta direita (apagam sozinhas depois da curva)'],['X','Pisca-alerta'],['H','Faróis']]},
+  {label:'Óculos VR (Quest 2)',icon:'glasses',keys:[['Direcional esquerdo','Andar (empurrado até o fim, corre); apertar o direcional corre sem segurar. Dirigindo: acelera, freia e vira'],['Direcional direito','Girar a visão aos pulos (ou suave, em Configurações); apertar o direcional recentraliza na sua posição e altura'],['Gatilho direito','Aponte para alguém e puxe para abrir o menu da pessoa; senão, interage. Nas janelas, clica. Nos veículos, buzina'],['A','Interagir (E); nas janelas, clica'],['B','Fecha a janela aberta; fora delas, acena (na moto ou no carro, liga o farol)'],['X','Celular (K); na moto ou no carro, liga o motor'],['Y','Fecha a janela, ou abre e fecha a tela com a interface'],['Gatilho esquerdo','Abre o chat (um teclado aparece na tela); nos veículos, freio de mão'],['Apertar (grip)','Esquerdo corre, direito dança; nos veículos, esquerdo é freio de mão e direito é grau/galope'],['Pulso esquerdo','Levante o controle esquerdo diante dos olhos para ver mapa, estado e carteira']]},
   {label:'Conversa',icon:'chat',keys:[['Enter ou T',`Conversar com quem está a até ${CHAT_RADIUS} metros`],['M',`Ligar ou desligar o microfone (voz por proximidade, até ${VOICE.maxDistance} metros)`],['B','Segure para falar, no modo apertar para falar'],['Esc','Fechar uma janela']]},
 ] as const;
 export const keyGrid=(keys:ReadonlyArray<readonly [string,string]>)=>`<div class="help-grid">${keys.map(([key,text])=>`<kbd>${key}</kbd><span>${text}</span>`).join('')}</div>`;
@@ -26,47 +27,39 @@ const features=()=>[
   {label:'Trabalho',icon:'briefcase',info:'Trabalhe no bar e ganhe moedas: cada tarefa paga na hora.',rows:JOBS.map(job=>[job.name,`${price(`job:${job.id}`)} moedas por tarefa`] as const)},
 ] as const;
 
-const item=(group:string,index:number,label:string,iconName:string)=>`<button type="button" data-lobby-item="${group}:${index}" aria-current="${index===0}">${icon(iconName)}<span>${label}</span>${icon('chevronRight')}</button>`;
-/** The reference's detail card: title and pink icon, content, and a mono footer with the position in the list. */
-export const detailCard=(title:string,iconName:string,body:string,foot:string,position='')=>`<header class="detail-head"><h2>${title}</h2>${icon(iconName)}</header><div class="detail-body">${body}</div><footer class="detail-foot"><span>${foot}</span><span>${position}</span></footer>`;
-function detail(group:'bar'|'controls',index:number):string{
-  if(group==='bar'){const all=features(),f=all[index]!;return detailCard(f.label,f.icon,`<p class="detail-info">${f.info}</p><dl class="detail-rows">${f.rows.map(([name,value])=>`<div><dt>${e(name)}</dt><dd>${e(value)}</dd></div>`).join('')}</dl>`,`${icon('signal')} Sessão pública`,`${index+1} / ${all.length}`);}
-  const c=CONTROLS[index]!;return detailCard(c.label,c.icon,keyGrid(c.keys),`${icon('keyboard')} Teclado e mouse`,`${index+1} / ${CONTROLS.length}`);
+const chip=(index:number,f:ReturnType<typeof features>[number])=>`<button type="button" class="tile" data-lobby-item="bar:${index}" aria-current="${index===0}">${icon(f.icon)}<b>${f.label}</b></button>`;
+/** The line under the chips: what the pointed one is, and its leading limit or price (never an invented number). */
+function detail(index:number):string{
+  const f=features()[index]!;
+  return `<p class="chip-info"><b>${f.label}</b> ${f.info}</p><p class="chip-stat">${e(f.rows[0]?.[0]??'')}: <b>${e(f.rows[0]?.[1]??'')}</b></p>`;
 }
-/** The entry's O Bar and Controles tabs (the Conta tab is the account form of main.ts renderAuth). */
-export function lobbyPanels():string{
-  return `<div class="menu-columns" id="lobby-bar" role="tabpanel" aria-labelledby="lobby-tab-bar" hidden><nav class="menu-list" aria-label="O que tem no bar">${features().map((f,i)=>item('bar',i,f.label,f.icon)).join('')}</nav><section class="menu-detail" data-lobby-detail="bar" aria-live="polite">${detail('bar',0)}</section></div>
-    <div class="menu-columns" id="lobby-controls" role="tabpanel" aria-labelledby="lobby-tab-controls" hidden><nav class="menu-list" aria-label="Grupos de teclas">${CONTROLS.map((c,i)=>item('controls',i,c.label,c.icon)).join('')}</nav><section class="menu-detail" data-lobby-detail="controls" aria-live="polite">${detail('controls',0)}</section></div>`;
+/** The keys a first visit needs; the rest is in the help window (CONTROLS), one click away. */
+const QUICK_KEYS=[['W A S D','Caminhar'],['E','Interagir'],['T','Conversar'],['K','Celular'],['G','Dançar'],['I','Mochila']] as const;
+/** Under the account card: what the bar offers as chips (the pointed one explained below) and the keys that matter. */
+export function lobbyMore():string{
+  const all=features();
+  return `<section class="lobby-more" id="lobby-bar" aria-label="O que rola no bar"><p class="eyebrow">O que rola no bar</p>
+    <div class="tiles" role="group" aria-label="Atividades do bar">${all.map((f,i)=>chip(i,f)).join('')}</div>
+    <div class="chip-detail" data-lobby-detail="bar" aria-live="polite">${detail(0)}</div>
+    <div class="quick-keys" aria-label="Teclas principais"><div class="quick-grid">${QUICK_KEYS.map(([key,label])=>`<span><kbd>${key}</kbd>${label}</span>`).join('')}</div>
+    <button type="button" class="text-button" data-action="help">Todos os controles ${icon('chevronRight')}</button></div></section>`;
 }
 
-/** Tabs (arrows left and right), lists (arrows up and down) and, as in the reference, pointing at an item selects it. */
+/** Pointing at, focusing or clicking a tile selects it (as the reference's list did); the arrows walk the grid. */
 export function createLobbyMenu(root:HTMLElement):void{
-  const tabs=[...root.querySelectorAll<HTMLButtonElement>('[data-lobby-tab]')];
-  function selectTab(tab:HTMLButtonElement,focus=false):void{
-    for(const other of tabs){const on=other===tab;other.setAttribute('aria-selected',String(on));other.tabIndex=on?0:-1;root.querySelector<HTMLElement>(`#${other.getAttribute('aria-controls')}`)!.hidden=!on;}
-    if(focus)tab.focus();
-  }
-  function selectItem(button:HTMLButtonElement):void{
+  const detailBox=root.querySelector<HTMLElement>('[data-lobby-detail="bar"]')!,tiles=[...root.querySelectorAll<HTMLButtonElement>('[data-lobby-item]')];
+  function select(button:HTMLButtonElement):void{
     if(button.getAttribute('aria-current')==='true')return;
-    const [group,index]=button.dataset.lobbyItem!.split(':') as ['bar'|'controls',string];
-    button.parentElement!.querySelectorAll('[data-lobby-item]').forEach(other=>other.setAttribute('aria-current',String(other===button)));
-    root.querySelector(`[data-lobby-detail="${group}"]`)!.innerHTML=detail(group,Number(index));
+    tiles.forEach(other=>other.setAttribute('aria-current',String(other===button)));
+    detailBox.innerHTML=detail(Number(button.dataset.lobbyItem!.split(':')[1]));
   }
-  root.addEventListener('click',event=>{
-    const target=event.target as Element,tab=target.closest<HTMLButtonElement>('[data-lobby-tab]'),entry=target.closest<HTMLButtonElement>('[data-lobby-item]');
-    if(tab)selectTab(tab);if(entry)selectItem(entry);
-  });
-  root.addEventListener('pointerover',event=>{const entry=(event.target as Element).closest<HTMLButtonElement>('[data-lobby-item]');if(entry)selectItem(entry);});
-  root.addEventListener('focusin',event=>{const entry=(event.target as Element).closest<HTMLButtonElement>('[data-lobby-item]');if(entry)selectItem(entry);});
+  const tileOf=(event:Event)=>(event.target as Element).closest<HTMLButtonElement>('[data-lobby-item]');
+  root.addEventListener('click',event=>{const entry=tileOf(event);if(entry)select(entry);});
+  root.addEventListener('pointerover',event=>{const entry=tileOf(event);if(entry)select(entry);});
+  root.addEventListener('focusin',event=>{const entry=tileOf(event);if(entry)select(entry);});
   root.addEventListener('keydown',event=>{
-    const target=event.target as HTMLElement;
-    if(target.matches('[data-lobby-tab]')&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){
-      event.preventDefault();const index=tabs.indexOf(target as HTMLButtonElement),next=tabs[(index+(event.key==='ArrowRight'?1:tabs.length-1))%tabs.length]!;selectTab(next,true);return;
-    }
-    const list=target.closest('.menu-list');
-    if(list&&target.matches('button')&&(event.key==='ArrowDown'||event.key==='ArrowUp')){
-      event.preventDefault();const buttons=[...list.querySelectorAll<HTMLButtonElement>('button:not([disabled])')],index=buttons.indexOf(target as HTMLButtonElement);
-      buttons[(index+(event.key==='ArrowDown'?1:buttons.length-1))%buttons.length]?.focus();
-    }
+    const entry=tileOf(event);if(!entry)return;
+    const step={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[event.key as 'ArrowRight'];if(!step)return;
+    event.preventDefault();tiles[(tiles.indexOf(entry)+step+tiles.length)%tiles.length]!.focus();
   });
 }

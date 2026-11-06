@@ -88,6 +88,7 @@ export function createVehicleHud(host:HTMLElement,onControl:(action:string)=>voi
   const element=(name:string)=>elements.get(name);
   const text=(name:string,value:string)=>{const node=element(name);if(node&&node.textContent!==value)node.textContent=value;};
   host.addEventListener('click',event=>{
+    if(document.documentElement.classList.contains('touch-ui')&&(event.target as Element).closest('.vh-dial')){host.classList.toggle('vh-open');return;}
     const target=(event.target as Element).closest<HTMLButtonElement>('[data-vcontrol]');
     if(!target||target.disabled)return;
     onControl(target.dataset.vcontrol!);

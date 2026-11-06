@@ -4,13 +4,14 @@ import {GRAM_HANDLE,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_TYPES,PHONE_NUMBER,isJpeg
 import type {Database} from './database/index.js';
 import {blocks,currencyLedger,gramComments,gramFollows,gramLikes,gramPosts,gramProfiles,phoneContacts,phoneLines,phoneMedia,phoneMessages,profiles,users,wallets} from './database/schema.js';
 import type {WardrobeService} from './wardrobe.js';
+import {cityZone,zapLocationSchema,type ZapLocation} from '@bar/shared';
 
 export class PhoneError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
-const startOfDay=(now=new Date())=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+import {startOfBarDay as startOfDay} from '@bar/shared';
 const JPEG_PREFIX='data:image/jpeg;base64,';
 /** Highgram keeps at most this many posts per account; older ones must be deleted before posting more. */
 export const GRAM_POSTS_PER_ACCOUNT=60;
-const message=(row:typeof phoneMessages.$inferSelect):ZapMessage=>({id:row.id,from:row.senderId,to:row.recipientId,text:row.body,sentAt:row.createdAt.getTime(),...(row.readAt?{readAt:row.readAt.getTime()}:{}),
+const message=(row:typeof phoneMessages.$inferSelect):ZapMessage=>({id:row.id,from:row.senderId,to:row.recipientId,text:row.body,sentAt:row.createdAt.getTime(),...(row.readAt?{readAt:row.readAt.getTime()}:{}),...(row.location?{location:row.location}:{}),
   ...(row.mediaKind?{media:{kind:row.mediaKind as PhoneMediaKind,...(row.mediaId?{id:row.mediaId}:{}),...(row.mediaMs?{ms:row.mediaMs}:{})}}:{})});
 /** Free text from a player: control characters become spaces. */
 const clean=(text:string)=>text.replace(/[\u0000-\u001f\u007f]/g,' ').trim();
@@ -132,13 +133,14 @@ export class PhoneService {
     return {peer,messages:rows.reverse().map(message),read:read.length};
   }
   /** Sends once per requestId (a retried request returns the same message). */
-  async send(userId:string,peerId:string,text:string,requestId:string):Promise<ZapMessage>{
+  async send(userId:string,peerId:string,text:string,requestId:string,position?:ZapLocation):Promise<ZapMessage>{
     await this.reachable(userId,peerId);
-    const body=text.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g,' ').trim();
+    const location=position===undefined?undefined:zapLocationSchema.parse(position);
+    const body=location?`Localização · ${cityZone(location.x,location.z)}`:text.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g,' ').trim();
     if(!body||body.length>PHONE.messageMax)throw new PhoneError(400,`A mensagem precisa ter de 1 a ${PHONE.messageMax} caracteres.`);
     const sent=await this.sent(userId,requestId);if(sent)return sent;
     await this.canMessage(userId,peerId);
-    const inserted=await this.db.insert(phoneMessages).values({id:requestId,senderId:userId,recipientId:peerId,body}).onConflictDoNothing().returning({id:phoneMessages.id});
+    const inserted=await this.db.insert(phoneMessages).values({id:requestId,senderId:userId,recipientId:peerId,body,location}).onConflictDoNothing().returning({id:phoneMessages.id});
     const row=await this.sent(userId,requestId);
     if(!row)throw new PhoneError(409,'Este identificador já foi usado.');
     if(inserted.length)await this.achieved(userId,'fofoqueiro');

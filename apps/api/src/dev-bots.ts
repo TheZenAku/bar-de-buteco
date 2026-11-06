@@ -28,15 +28,15 @@ export class DevBots {
       await this.db.transaction(async tx=>{
         // The password is the API's unusable dummy hash: nobody logs in as a bot.
         await tx.insert(users).values({id,email,username:`bot_${number}`,verified:true,passwordHash:this.passwordHash});
-        await tx.insert(profiles).values({userId:id,displayName,avatarConfig:{color},equippedSkin:SKINS[(index-1)%SKINS.length]!.id});
-        for(const skin of SKINS)await tx.insert(skinInventory).values({userId:id,skinId:skin.id});
+        await tx.insert(profiles).values({userId:id,displayName,avatarConfig:{color},equippedSkin:SKINS.filter(s=>!s.adminOnly)[(index-1)%SKINS.filter(s=>!s.adminOnly).length]!.id});
+        for(const skin of SKINS.filter(s=>!s.adminOnly))await tx.insert(skinInventory).values({userId:id,skinId:skin.id});
         await tx.insert(statistics).values({userId:id});
       });
       [user]=await this.db.select().from(users).where(eq(users.email,email));
     }
     const userId=user!.id;
     // Also for bots made before skills and variants were sold: a bot that lands on one still has to use it.
-    for(const skin of SKINS)await this.db.insert(skinInventory).values({userId,skinId:skin.id}).onConflictDoNothing();
+    for(const skin of SKINS.filter(s=>!s.adminOnly))await this.db.insert(skinInventory).values({userId,skinId:skin.id}).onConflictDoNothing();
     for(const skill of SKILLS)await this.db.insert(skillInventory).values({userId,skillId:skill.id}).onConflictDoNothing();
     await this.wardrobe.initialize(userId);
     await this.db.transaction(async tx=>{

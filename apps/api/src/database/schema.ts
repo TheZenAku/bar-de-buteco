@@ -110,6 +110,7 @@ export const phoneMessages=pgTable('phone_messages',{
   id:text('id').primaryKey(),senderId:text('sender_id').notNull().references(()=>users.id,{onDelete:'cascade'}),recipientId:text('recipient_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
   body:text('body').notNull(),createdAt:date('created_at').notNull().defaultNow(),readAt:date('read_at'),
   mediaId:text('media_id').references(()=>phoneMedia.id,{onDelete:'set null'}),mediaKind:text('media_kind'),mediaMs:integer('media_ms'),
+  location:jsonb('location').$type<import('@bar/shared').ZapLocation>(),
 });
 /** The photo is the JPEG in base64, served by GET /api/phone/gram/photos/:id. */
 export const gramPosts=pgTable('gram_posts',{

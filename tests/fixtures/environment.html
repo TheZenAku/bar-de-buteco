@@ -6,7 +6,7 @@ import {DAY_NIGHT} from '/src/engine/day-night.ts';
 let timestamp=DAY_NIGHT.epochMs+(12-DAY_NIGHT.offsetHours)/24*DAY_NIGHT.durationMs;
 Date.now=()=>timestamp;
 let eye=[18,9,16],target=[14,1.8,-6],weatherPreview=false;
-const scene=new BarScene(document.querySelector('canvas'),{onMediaFrame:()=>{scene.camera.setPosition(...eye);scene.camera.lookAt(...target);scene.environment.sky.setPosition(...eye);scene.app.autoRender=true;}});
+const scene=new BarScene(document.querySelector('canvas'),{serverNow:()=>timestamp,onMediaFrame:()=>{scene.camera.setPosition(...eye);scene.camera.lookAt(...target);scene.environment.sky.setPosition(...eye);scene.app.autoRender=true;}});
 // Weather follows the rendered camera, rather than the lobby drift used before this fixture overrides it.
 const updateEnvironment=scene.environment.update.bind(scene.environment);
 scene.environment.update=(...args)=>{if(weatherPreview){scene.camera.setPosition(...eye);scene.camera.lookAt(...target);}updateEnvironment(...args);};

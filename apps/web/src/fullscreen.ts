@@ -20,6 +20,8 @@ export function createFullscreen(button:HTMLButtonElement,notice:(text:string)=>
     try{await document.documentElement.requestFullscreen({navigationUI:'hide'});}
     catch{notice('O navegador não abriu a tela cheia daqui. Tente a tecla F11.');return;}
     entered();
+    // A phone plays on its side.
+    if(document.documentElement.classList.contains('touch-ui'))try{await (screen.orientation as ScreenOrientation&{lock?(orientation:string):Promise<void>}).lock?.('landscape');}catch{/* Not every browser lets a page turn the screen. */}
     try{await (navigator as Navigator&KeyboardLock).keyboard?.lock?.(['Escape']);}catch{/* Esc then leaves full screen at once. */}
   })());
   document.addEventListener('fullscreenchange',render);

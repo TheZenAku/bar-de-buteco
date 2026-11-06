@@ -48,6 +48,7 @@ export type AdminPlayerOperation=
   |{op:'rename';displayName:string}
   |{op:'verify'}
   |{op:'logout'}
+  |{op:'kill'}
   |{op:'item';itemId:string;quantity:number}
   |{op:'skin';skinId:string;grant:boolean}
   |{op:'skill';skillId:string;grant:boolean};
@@ -149,7 +150,7 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
 const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão desfeita',ban:'Banimento',unban:'Banimento removido',event:'Evento',
   'admin-grant':'Administrador concedido','admin-revoke':'Administrador removido','owner-bootstrap':'Conta principal habilitada',
   'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados',
-  'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas',
+  'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas','player-kill':'Jogador morto (teste)',
   'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','catalog-edit':'Carta da coleção editada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
   'vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
@@ -175,6 +176,8 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   expel:d=>({title:'Removido do bar',detail:text(d.reason)}),
   faint:d=>({title:'Desmaiou',detail:d.cause==='drunk'?'Bebeu demais.':d.cause?`Causa: ${text(d.cause)}`:''}),
   vomit:()=>({title:'Passou mal',detail:'Bebeu além da conta.'}),
+  death_start:d=>({title:'Morreu',detail:text(d.cause)==='admin'?'Pela administração (teste).':text(d.cause)}),
+  death_end:d=>({title:'Voltou da morte',detail:d.reason==='disconnected'?'Saiu durante a morte; volta vivo no ponto de reaparecimento.':d.errors?`Errou ${text(d.errors)} vez(es) no minigame.`:''}),
   achievement:d=>({title:'Ganhou um emblema',detail:text(d.badge)}),
   job_start:d=>({title:'Começou um turno',detail:`Emprego: ${text(d.jobId)}`}),
   job_end:d=>({title:'Terminou o turno',detail:`${text(d.tasks)||0} tarefa(s) · ${text(d.earned)||0} moedas`}),

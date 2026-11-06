@@ -104,3 +104,16 @@ interface InventoryPort {
   - porta de inventário com perda de item;
   - desmaio por álcool com um único resgate;
   - sincronização com o outro cliente.
+
+## Anel e coração (2026-11-06)
+
+Vida, fôlego, fome e sede têm **dois valores**: o **anel** (o nível: `hp`, `stamina`, `hunger`, `thirst`) e o **coração** (a reserva por trás: `hpCore`, `staminaCore`, `hungerCore`, `thirstCore`). Bexiga e embriaguez continuam como eram. Tudo em `NEEDS.cores` (packages/shared/src/needs.ts).
+
+- **O anel se enche gastando o coração.** Fome e sede caem com o tempo (o coração dura 40 min e 25 min; correndo, a sede gasta o dobro) e o anel puxa do coração a 3 pontos por segundo. O fôlego cai ao correr e volta gastando 0,05 de coração por ponto (uma barra cheia custa 5). A vida cura do coração a 1,5 por segundo.
+- **Comer enche o coração aos poucos** (8 pontos por segundo): a comida e a bebida entram em `intake` e chegam ao coração ao longo de alguns segundos. O que tira (torresmo dá sede) sai do coração na hora. O café, a coxinha, o pastel, o torresmo e o refrigerante agora também dão fôlego; o curativo e a comida dão vida ao coração, não ao anel.
+- **Anel zerado não mata:** o dano passa para o coração (primeiro o anel, depois o coração). Fome ou sede com anel e coração em zero tiram vida aos poucos (0,25 e 0,35 por segundo, depois de 1 min de carência ao acordar). Fôlego com o coração vazio ainda volta, a 20% do ritmo, para ninguém ficar parado para sempre.
+- **Só a vida mata:** anel e coração de vida em zero = a Morte ([morte.md](morte.md)), não mais um desmaio. Ao voltar, o anel fica em 35 e o coração vazio. Só a embriaguez desmaia agora.
+- **Matar pela administração** (painel e menu de contexto) zera os dois (`NeedsDirector.kill`) e chama a Morte.
+- **HUD** (`needs-hud.ts`, `needs.css`): o anel de cada medidor mostra o nível e o símbolo no meio, o coração. A dica mostra "92 · reserva 64". O que fica crítico é o menor dos dois; o aviso de vida baixa vem do coração.
+
+Valores escolhidos à mão, para os medidores se mexerem de verdade: ajustar em `NEEDS` (`drainPerMinute`, `cores.*`). Não testado num jogo de verdade com jogadores.

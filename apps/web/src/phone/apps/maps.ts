@@ -1,4 +1,4 @@
-import {CAFE_TABLES,CITY_MARKERS,GARAGES,HIGHFOOD,JUKEBOX,MAP_MARKERS,SHOP_SPOT,STREET_LABELS,cityZone,distance} from '@bar/shared';
+import {CAFE_TABLES,CITY_MARKERS,GARAGES,HIGHFOOD,JUKEBOX,MAP_MARKERS,SHOP_SPOT,STREET_LABELS,cityZone,distance,zapLocationSchema} from '@bar/shared';
 import {escape as e} from '../../api';
 import {MAP_LAYERS,cityPlaces,type MapLayerBox,type MapLayerName} from '../../minimap';
 import {uiIcon} from '../../ui-icons';
@@ -43,7 +43,7 @@ const metres=(value:number)=>value>=1000?`${(value/1000).toFixed(1).replace('.',
 const BIKE_PACE=9;
 
 /** Mapas: the whole city from the map's own data, you as an arrow, the people the room shows you, places, street names and a GPS: tap anywhere to mark where you want to go. */
-export const mapas:PhoneApp={id:'mapas',name:'Mapas',icon:'map',tint:'linear-gradient(160deg,#7fe0b0,#2c86d8)',open(view,ctx){
+export const mapas:PhoneApp={id:'mapas',name:'Mapas',icon:'map',tint:'linear-gradient(160deg,#7fe0b0,#2c86d8)',open(view,ctx,arg){
   view.innerHTML=`<div class="map-view"><canvas aria-label="Mapa da cidade. Toque para marcar um destino."></canvas>
     <div class="map-search"><input class="ph-search" type="search" placeholder="Buscar lugar ou mesa" aria-label="Buscar no mapa" data-map="search"><div class="map-results" role="listbox"></div></div>
     <div class="map-zoom"><button type="button" data-map="in" aria-label="Aproximar">${uiIcon('plus')}</button><button type="button" data-map="out" aria-label="Afastar">${uiIcon('minus')}</button><button type="button" data-map="me" aria-label="Centralizar em você">${uiIcon('locate')}</button><button type="button" data-map="city" aria-label="Ver a cidade inteira">${uiIcon('map')}</button></div>
@@ -51,17 +51,22 @@ export const mapas:PhoneApp={id:'mapas',name:'Mapas',icon:'map',tint:'linear-gra
   const canvas=view.querySelector('canvas')!,graphics=canvas.getContext('2d')!,results=view.querySelector<HTMLElement>('.map-results')!,card=view.querySelector<HTMLElement>('.map-card')!;
   const me=ctx.host.user()?.id??'',gps=ctx.host.gps;
   let zoom=3,centre={x:0,z:0},follow=true,selected:Place|undefined,drag:{x:number;y:number;id:number;moved:number}|undefined;
+  const shared=arg as {location?:unknown;label?:unknown}|undefined,location=zapLocationSchema.safeParse(shared?.location);
+  if(location.success){
+    selected={...location.data,name:typeof shared?.label==='string'?shared.label:'Localização compartilhada'};
+    centre={x:selected.x,z:selected.z};follow=false;zoom=6;
+  }
   /** Where each player is drawn: eased towards the room's position every frame, so dots glide instead of jumping. */
   const drawn=new Map<string,{x:number;z:number;rotation:number}>();
   let frame=0,lastAt=performance.now(),lastDescribed=0,lastCard='';
   function describe():void {
     const self=ctx.host.world()?.players[me],target=gps.target;
     let html:string;
-    if(target){
+    if(selected)html=`<b>${e(selected.name)}</b><small>${self?`a ${Math.round(distance(self,selected))} m de você · `:''}${e(cityZone(selected.x,selected.z))}</small><button type="button" class="ph-mini route" data-map="route" aria-label="Traçar rota">${uiIcon('compass')}</button><button type="button" class="ph-mini" data-map="clear" aria-label="Fechar">${uiIcon('close')}</button>`;
+    else if(target){
       const left=gps.remaining||Math.hypot(target.x-(self?.x??target.x),target.z-(self?.z??target.z)),name=target.label||'Destino marcado';
       html=`<b>${e(name)}</b><small>${metres(left)} pelas ruas · cerca de ${Math.max(1,Math.round(left/BIKE_PACE/60))} min de moto · ${e(cityZone(target.x,target.z))}</small>${target.source==='delivery'?'':`<button type="button" class="ph-mini" data-map="clear-target" aria-label="Remover destino">${uiIcon('close')}</button>`}`;
-    }else if(selected)html=`<b>${e(selected.name)}</b><small>${self?`a ${Math.round(distance(self,selected))} m de você`:''}</small><button type="button" class="ph-mini route" data-map="route" aria-label="Traçar rota">${uiIcon('compass')}</button><button type="button" class="ph-mini" data-map="clear" aria-label="Fechar">${uiIcon('close')}</button>`;
-    else html=self?`<b>Toque no mapa para marcar um destino</b><small>${e(nearestPlace(self))}</small>`:'<b>Mapa da cidade</b>';
+    }else html=self?`<b>Toque no mapa para marcar um destino</b><small>${e(nearestPlace(self))}</small>`:'<b>Mapa da cidade</b>';
     if(html!==lastCard){lastCard=html;card.innerHTML=html;}
   }
   const nearestPlace=(at:{x:number;z:number})=>{const place=PLACES.filter(p=>!p.table).sort((a,b)=>distance(at,a)-distance(at,b))[0];return place?`Perto de: ${place.name}`:'';};
@@ -130,7 +135,7 @@ export const mapas:PhoneApp={id:'mapas',name:'Mapas',icon:'map',tint:'linear-gra
       }
     }
     graphics.font='600 11px -apple-system,"Segoe UI",sans-serif';
-    const ordered=[...PLACES].sort((a,b)=>Number(b===selected)-Number(a===selected));
+    const ordered=[...(selected&&!PLACES.includes(selected)?[selected]:[]),...PLACES].sort((a,b)=>Number(b===selected)-Number(a===selected));
     for(const place of ordered){
       if(place.bar&&zoom<4&&place!==selected)continue;
       if(place.table&&zoom<9&&place!==selected)continue;

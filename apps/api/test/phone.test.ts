@@ -56,6 +56,23 @@ test('the phone: numbers, contacts, Highzap, Highgram and Pix, with blocks hidin
   assert.equal((await bia.call('GET','/api/phone')).json().unread,0);
   assert.ok((await ana.call('GET',`/api/phone/zap/${bia.id}`)).json().messages.every((m:{readAt?:number})=>m.readAt),'the sender sees them read');
 
+  // A fixed game location survives storage and retries, and follows the same contact/block rules as text.
+  const location={x:14.8,y:.3,z:-12.5},locationId=randomUUID();
+  const located=await ana.call('POST',`/api/phone/zap/${bia.id}`,{location,requestId:locationId});
+  assert.equal(located.statusCode,200,located.body);assert.deepEqual(located.json().location,location);
+  assert.match(located.json().text,/^Localização/);
+  const retry=await ana.call('POST',`/api/phone/zap/${bia.id}`,{location:{x:50,y:0,z:50},requestId:locationId});
+  assert.deepEqual(retry.json(),located.json(),'a retry never moves a previously shared position');
+  assert.equal((await bia.call('GET','/api/phone')).json().unread,1);
+  assert.deepEqual((await bia.call('GET','/api/phone/zap')).json().threads[0].last.location,location);
+  const locations=(await bia.call('GET',`/api/phone/zap/${ana.id}`)).json().messages.filter((m:{id:string})=>m.id===locationId);
+  assert.equal(locations.length,1);assert.deepEqual(locations[0].location,location);
+  assert.deepEqual((await ana.call('GET',`/api/phone/zap/${bia.id}`)).json().messages.at(-1).location,location);
+  for(const invalid of [{x:401,y:0,z:0},{x:0,y:0,z:-401},{x:'14',y:0,z:0},{x:0,z:0},{...location,label:'<script>'}]){
+    assert.equal((await ana.call('POST',`/api/phone/zap/${bia.id}`,{location:invalid,requestId:randomUUID()})).statusCode,400);
+  }
+  assert.equal((await ana.call('POST',`/api/phone/zap/${caio.id}`,{location,requestId:randomUUID()})).statusCode,403,'location needs a saved contact or an existing conversation');
+
   // Highgram: post, photo, like (once), comments, profile.
   const post=await ana.call('POST','/api/phone/gram/posts',{image:jpeg(),caption:'Noite boa no Highland',requestId:randomUUID()});
   assert.equal(post.statusCode,200,post.body);const postId=post.json().id as string;
@@ -79,6 +96,7 @@ test('the phone: numbers, contacts, Highzap, Highgram and Pix, with blocks hidin
 
   // Blocks hide each other's messages, posts and photos, both ways.
   await caio.call('POST','/api/blocks',{playerId:ana.id});
+  assert.equal((await ana.call('POST',`/api/phone/zap/${caio.id}`,{location,requestId:randomUUID()})).statusCode,403,'a block also prevents location sharing');
   assert.equal((await caio.call('GET','/api/phone/gram')).json().posts.length,0);
   assert.equal((await caio.call('GET',`/api/phone/gram/photos/${postId}`)).statusCode,404);
   assert.equal((await ana.call('POST',`/api/phone/zap/${caio.id}`,{text:'oi',requestId:randomUUID()})).statusCode,403);

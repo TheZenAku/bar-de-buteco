@@ -1,0 +1,100 @@
+/* The entry (lobby-stage.ts drives data-stage on #lobby): the account card in the middle of the screen over the bar seen from
+   above (engine/showcase.ts, when the browser can afford it), the sign in the corner, and the brinde game in the middle
+   when the sign is clicked. The logo and its light show are lobby-hero.css. */
+
+/* Over the bar: the vaporwave sky as a tint, so the 3D shows through; the flat gradient stays when there is no 3D */
+.lobby.has-3d{background:
+  radial-gradient(ellipse at 50% 46%,oklch(.1 .05 300 / 0%) 0,oklch(.1 .06 300 / 55%) 100%),
+  linear-gradient(180deg,oklch(.14 .1 300 / 62%) 0%,oklch(.3 .16 305 / 32%) 42%,oklch(.52 .25 335 / 32%) 78%,oklch(.74 .17 55 / 42%) 100%)}
+.lobby.has-3d>.horizon,.lobby.has-3d>.sun{display:none}
+/* The fade between two camera angles (BarScene onShowcaseCut sets --cut) */
+#lobby .lobby-cut{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:var(--cut,0);background:linear-gradient(180deg,oklch(.12 .09 300),oklch(.4 .24 330))}
+
+/* The middle of the screen */
+.lobby{align-items:center}
+.lobby-center{position:relative;z-index:2;display:grid;gap:10px;justify-items:center;width:min(460px,100%);margin:auto;padding:14px 16px;transition:opacity .7s .55s,translate .7s .55s,visibility 0s}
+[data-stage=intro] .lobby-center,[data-stage=game] .lobby-center{opacity:0;translate:0 22px;visibility:hidden;pointer-events:none;transition:opacity .45s,translate .45s,visibility 0s .45s}
+[data-stage=intro] .key-hints,[data-stage=game] .key-hints{opacity:0}
+.key-hints{transition:opacity .4s}
+.lobby-center>*{width:100%}
+.lobby-status{display:flex;align-items:center;justify-content:center;gap:8px;width:auto!important;padding:5px 14px;background:var(--panel);font:400 12px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--money)}
+.lobby-status .ui-icon{width:14px;height:14px}
+.lobby-status.live .ui-icon{color:var(--vw-mint)}
+
+/* Account: the gradient line on top, the switch, the form and the foot */
+.access-card{background:var(--panel);border-top:2px solid;border-image:var(--gradient-line) 1;box-shadow:0 0 44px oklch(.62 .28 330 / 28%),0 20px 60px oklch(0 0 0 / 45%)}
+.access-card .detail-head{padding:14px 20px}
+.access-card .detail-body{padding:16px 20px 14px}
+.access-card .detail-info{margin-bottom:14px}
+.access-card .detail-foot{padding:10px 20px}
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{padding-right:44px!important}
+.pw-toggle{position:absolute;top:6px;right:0;bottom:0;width:42px;display:grid;place-items:center;background:transparent;color:var(--muted-foreground);transition:color .15s}
+.pw-toggle:hover,.pw-toggle[aria-pressed=true]{color:var(--foreground)}
+.pw-toggle svg{width:18px;height:18px}
+.auth-switch{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.auth-switch button{padding:11px 8px;background:var(--secondary);color:var(--muted-foreground);font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.1em;transition:color .15s,background-color .15s}
+.auth-switch button:hover{color:var(--foreground)}
+.auth-switch [aria-pressed=true]{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
+.access-card .returning-user{padding:2px 0 18px}
+.access-card .returning-user .profile-initial{width:52px;height:52px;font-size:24px}
+.access-card .returning-user b{font-size:18px}
+.access-card .button.primary{padding:15px 20px;font-size:14px}
+.access-card #auth-form label:last-of-type{margin-bottom:12px}
+.access-card .text-button{margin-top:6px;text-align:center}
+#auth-form{max-width:none}
+
+/* What the bar offers, as chips, and the keys that matter */
+.lobby-more{display:grid;gap:8px;justify-items:center;padding:12px 16px 10px;background:var(--panel);text-align:center}
+.lobby-more .eyebrow{font-size:11px}
+.tiles{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.tile{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--secondary);color:var(--soft);transition:background-color .15s,color .15s}
+.tile:hover{background:oklch(.3 .1 305)}
+.tile .ui-icon{width:14px;height:14px;color:var(--vw-pink)}
+.tile b{font:600 11px var(--font-display);text-transform:uppercase;letter-spacing:.06em}
+.tile[aria-current=true],.tile[aria-current=true]:hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
+.tile[aria-current=true] .ui-icon{color:var(--active-foreground)}
+.chip-detail{min-height:64px;display:grid;align-content:start;gap:4px}
+.chip-info{font-size:13px;line-height:1.45;color:var(--muted-foreground)}
+.chip-info b{color:var(--foreground);text-transform:uppercase;letter-spacing:.05em}
+.chip-stat{font:400 11px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+.chip-stat b{font-weight:500;color:var(--hl-gold)}
+.quick-keys{display:grid;gap:4px;justify-items:center;width:100%;padding-top:10px;border-top:1px solid var(--border)}
+.quick-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px}
+.quick-grid>span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft)}
+.quick-grid kbd{min-width:26px;padding:1px 5px;border:1px solid var(--key);text-align:center;color:var(--foreground);white-space:nowrap}
+.quick-keys .text-button{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 0 0}
+.quick-keys .text-button .ui-icon{width:12px;height:12px}
+.money-panel>.cash.live .ui-icon{color:var(--vw-mint)}
+
+/* The brinde game: the sign in the middle, the count over it, the way back under it */
+#lobby .clicker{position:fixed;inset:0;z-index:8;display:grid;grid-template-rows:auto 1fr auto;justify-items:center;padding:28px 16px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .4s,visibility 0s .4s}
+#lobby[data-stage=game] .clicker{opacity:1;visibility:visible;transition:opacity .6s .7s,visibility 0s .7s}
+.clicker-score{display:grid;justify-items:center;gap:2px;text-align:center}
+.clicker-score>span{font:400 12px var(--font-mono);letter-spacing:.4em;text-transform:uppercase;color:var(--dim)}
+.clicker-score b{font:700 clamp(40px,9vh,76px)/1 var(--font-display);letter-spacing:.04em;color:#fff;text-shadow:0 0 6px oklch(1 0 0 / 80%),0 0 18px var(--hl-gold),0 0 40px var(--hl-orange);font-variant-numeric:tabular-nums}
+.clicker-score small{font:500 12px var(--font-mono);letter-spacing:.24em;text-transform:uppercase;color:var(--hl-cyan)}
+.clicker-combo{align-self:end;min-height:1.4em;margin-bottom:12px;font:500 13px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--hl-gold);text-shadow:0 0 12px oklch(.7 .2 70 / 60%)}
+.clicker-exit{grid-row:3;display:inline-flex;align-items:center;gap:10px;padding:10px 18px;background:var(--panel);color:var(--soft);font:500 12px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;pointer-events:auto;transition:background-color .15s,color .15s}
+.clicker-exit:hover{background:var(--secondary);color:var(--foreground)}
+.clicker-exit kbd{border:1px solid var(--key);padding:0 6px}
+.clicker-exit .ui-icon{width:14px;height:14px}
+.clicker .clicker-combo{grid-row:2;align-self:end;position:relative}
+
+@media(max-width:760px){
+  .lobby-center{padding-top:calc(var(--cs,90px) + 28px);padding-bottom:20px}
+  .lobby-more{padding:12px}
+  .chip-detail{min-height:104px}
+  .key-hints,.crosshair{display:none}
+}
+@media(max-width:380px){
+  .tile{padding:6px 8px}
+}
+
+/* A tighter card, so the card and what rola fit a 768 px screen without scrolling */
+.access-card .detail-head{padding:10px 20px}
+.access-card .detail-head h2{font-size:18px}
+.access-card label{margin-bottom:12px}
+.access-card input:not([type=checkbox]):not([type=radio]){min-height:38px;padding:8px 12px}
+.access-card .button.primary{padding:13px 20px}
+.access-card .detail-info{margin-bottom:12px}

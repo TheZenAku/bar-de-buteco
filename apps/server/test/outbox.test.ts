@@ -72,7 +72,7 @@ test('controls are applied once even when delivered again, rejections are report
 test('world configuration: invalid values stop the start; empty means unset; the previous limits still apply',()=>{
   const base={NODE_TEST_CONTEXT:undefined};
   const config=readWorldConfig({...base,GAME_PORT:'',ROOM_CAPACITY:'500',BLACKJACK_TURN_MS:'1000',EVENT_MIN_MS:'2000',EVENT_MAX_MS:'1500',API_INTERNAL_URL:'http://api:3001/'});
-  assert.equal(config.port,2567);assert.equal(config.capacity,128);assert.equal(config.blackjackTurnMs,5000);
+  assert.equal(config.port,2567);assert.equal(config.capacity,500);assert.equal(config.blackjackTurnMs,5000);
   assert.equal(config.eventMinMs,2000);assert.equal(config.eventMaxMs,2000);assert.equal(config.apiInternalUrl,'http://api:3001');
   assert.equal(readWorldConfig({BAR_CAPACITY:'12'}).capacity,12,'Old variable name still honoured');
   assert.match(readWorldConfig({}).outboxPath,/[\\/]\.data[\\/]world[\\/]outbox\.jsonl$/);
@@ -89,4 +89,22 @@ test('world production configuration requires separate strong secrets; developme
   assert.throws(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth}),/INTERNAL_SECRET/);
   assert.throws(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth,INTERNAL_SECRET:auth}),/diferente de AUTH_SECRET/);
   assert.doesNotThrow(()=>readWorldConfig({NODE_ENV:'production',AUTH_SECRET:auth,INTERNAL_SECRET:internal}));
+});
+
+test('a rename the system refuses (Windows holding the file open) does not throw: the outbox keeps working and the file catches up', async () => {
+  const fs = await import('node:fs');
+  const path = join(tmpdir(), `outbox-eperm-${process.pid}-${Date.now()}.jsonl`);
+  const events: string[] = [];
+  const box = new FileOutbox<{ n: number }>(path, event => events.push(event));
+  box.add('k', 'a', { n: 1 }); box.add('k', 'b', { n: 2 });
+  // A directory in the way of the temporary file makes every rename (and the first open) fail, as an exclusive handle would.
+  const temporary = `${path}.tmp`; fs.mkdirSync(temporary);
+  assert.doesNotThrow(() => box.complete(['a']));
+  assert.deepEqual(box.pending().map(record => record.id), ['b'], 'the memory is right even if the disk is not');
+  assert.ok(events.includes('outbox_rewrite_retry'));
+  fs.rmdirSync(temporary);
+  // Once the way is clear the next write replaces the file whole, and a reload sees only what is left.
+  box.add('k', 'c', { n: 3 });
+  assert.deepEqual(new FileOutbox<{ n: number }>(path).pending().map(record => record.id), ['b', 'c']);
+  fs.rmSync(path, { force: true });
 });

@@ -48,7 +48,7 @@ export class WeatherSounds {
     if(!ctx||!this.bus||!this.rainGain||!this.filter)return;
     const now=ctx.currentTime;
     this.bus.gain.setTargetAtTime(audible?Math.max(0,Math.min(1,this.volume())):0,now,.1);
-    this.rainGain.gain.setTargetAtTime(weather.rain*(sheltered?.055:.22),now,.4);
+    this.rainGain.gain.setTargetAtTime(weather.rain*(sheltered?.033:.132),now,.4);
     this.filter.frequency.setTargetAtTime(sheltered?750:4000,now,.3);
     if(crossed&&strike.strength>.1&&this.lastThunder!==strike.strikeAt){
       this.lastThunder=strike.strikeAt;
@@ -59,7 +59,7 @@ export class WeatherSounds {
     const ctx=this.context!,source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain(),now=ctx.currentTime;
     source.buffer=this.noise!;source.loop=true;source.playbackRate.value=.55;
     filter.type='lowpass';filter.frequency.value=this.sheltered?180:330;filter.Q.value=.6;
-    gain.gain.setValueAtTime(0,now);gain.gain.linearRampToValueAtTime(strength*(this.sheltered?.22:.5),now+.14);gain.gain.exponentialRampToValueAtTime(.001,now+4.5);
+    gain.gain.setValueAtTime(0,now);gain.gain.linearRampToValueAtTime(strength*(this.sheltered?.132:.3),now+.14);gain.gain.exponentialRampToValueAtTime(.001,now+4.5);
     source.connect(filter).connect(gain).connect(this.bus!);source.start();source.stop(now+4.6);this.thunders.add(source);
     source.onended=()=>{this.thunders.delete(source);source.disconnect();filter.disconnect();gain.disconnect();};
   }

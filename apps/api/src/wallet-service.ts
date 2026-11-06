@@ -7,7 +7,7 @@ import type {WardrobeService} from './wardrobe.js';
 export class WalletError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
 export interface WalletRequest {userId:string;amount:number;reason:string;requestId:string}
 
-const startOfDay=(now=new Date())=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+import {startOfBarDay as startOfDay} from '@bar/shared';
 
 /**
  * Coins the room spends or pays: media, counter and table orders, job tasks and their refunds. Each change
@@ -104,5 +104,3 @@ export class WalletService {
   }
 }
 export interface GameSettlement {userId:string;roundId:string;payout:number;stakes:string[];voids:string[]}
-/** @deprecated The same shape for every game: GameSettlement. */
-export type BlackjackSettlement=GameSettlement;

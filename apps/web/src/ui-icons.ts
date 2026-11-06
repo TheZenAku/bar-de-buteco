@@ -1,5 +1,6 @@
 // Lucide icons (lucide-static 1.64.0, ISC), the set of the Midnight Neon Menu reference. Inlined: no requests or icon font.
 const paths:Record<string,string>={
+  glasses:'<circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M14 15a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M2.5 13 5 7c.7-1.3 1.4-2 3-2"/><path d="M21.5 13 19 7c-.7-1.3-1.5-2-3-2"/>',
   cloud:'<path d="M18 18H6a5 5 0 1 1 .3-10 6 6 0 0 1 11.4 1A4.5 4.5 0 1 1 18 18Z"/>',
   horse:'<path d="m5 3 4 2 3-2 2 4 5 3 2 5-3 2-4-3-3 2-1 5H4l1-8 2-5Z"/><path d="m9 5-3 6M14 10h.01M5 21h7"/>',
   activity:'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',

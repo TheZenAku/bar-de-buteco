@@ -5,20 +5,26 @@ import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';
 import {WebSocketTransport} from '@colyseus/ws-transport';
 import {Client,type Room} from '@colyseus/sdk';
-import {gameHour,type EnvironmentState} from '@bar/shared';
+import {gameHour,weatherAt,type EnvironmentState} from '@bar/shared';
 import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
+import {worldRouter} from '../src/http.js';
 
 const until=async(check:()=>boolean)=>{const end=Date.now()+6000;while(!check()){if(Date.now()>end)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}};
 test('only administrators control the shared clock and weather; observers and late arrivals receive the same state',{timeout:30000},async()=>{
-  const previous=process.env.API_INTERNAL_URL,api=createServer(async(req,res)=>{
+  const previous=process.env.API_INTERNAL_URL,previousWeather=process.env.WEATHER_API_URL;
+  let precipitation=.125;
+  const api=createServer(async(req,res)=>{
     let raw='';for await(const chunk of req)raw+=chunk;const body=raw?JSON.parse(raw):{};
     res.setHeader('content-type','application/json');
-    if(req.url==='/api/internal/validate')res.end(JSON.stringify({valid:true,blocked:[],role:body.userId==='admin'?'admin':'user',ownedSkins:['nathan'],inventory:[],balance:1000}));
+    if(req.url?.startsWith('/weather?'))res.end(JSON.stringify({current:{time:Math.floor(Date.now()/1000),interval:900,precipitation,weather_code:63,cloud_cover:90,wind_speed_10m:18}}));
+    else if(req.url==='/api/internal/validate')res.end(JSON.stringify({valid:true,blocked:[],role:body.userId==='admin'?'admin':'user',ownedSkins:['nathan'],inventory:[],balance:1000}));
     else res.end(JSON.stringify({ok:true,controls:[],prices:{}}));
   });
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
+  process.env.WEATHER_API_URL=process.env.API_INTERNAL_URL+'/weather';
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});
+  server.router=worldRouter();
   let world!:BarRoom;server.define('bar',BarRoom).on('create',r=>{world=r as BarRoom;});await server.listen(0,'127.0.0.1');
   const client=new Client(`http://127.0.0.1:${(http.address() as AddressInfo).port}`),rooms:Room[]=[],errors:string[]=[],snapshots:any[]=[];
   async function join(id:string,admin=false){
@@ -28,22 +34,40 @@ test('only administrators control the shared clock and weather; observers and la
     await until(()=>!!room.state?.environment);return room;
   }
   try{
+    const endpoint=`http://127.0.0.1:${(http.address() as AddressInfo).port}/environment`;
+    const initial=await fetch(endpoint);assert.equal(initial.headers.get('cache-control'),'no-store');
+    const entry=await initial.json() as any;assert.equal(entry.environment.dayDurationMs,40*60_000);assert.ok(Math.abs(entry.at-Date.now())<1000);
     const admin=await join('admin',true),observer=await join('observer');
+    const pong=new Promise<{at:number;serverTime:number}>(resolve=>observer.onMessage('pong',resolve));
+    observer.send('ping',{at:1234});const reply=await pong;
+    assert.equal(reply.at,1234);assert.ok(Math.abs(reply.serverTime-Date.now())<1000);
+    await until(()=>observer.state.environment.realWeatherAt>0);
+    assert.equal(observer.state.environment.realPrecipitationMmH,.5);
+    assert.ok(Math.abs(observer.state.environment.realRain-world.state.environment.realRain)<1e-6);
+    assert.ok(weatherAt(Date.now()+12_000,observer.state.environment as EnvironmentState).rain>0);
     observer.send('admin.environment',{weather:'storm'});await until(()=>errors.length===1);
     assert.match(errors[0]!,/administra/);assert.equal(world.state.environment.weather,'auto');
     admin.send('admin.environment',{hour:18.5,paused:true,dayMinutes:60,weather:'storm'});
     await until(()=>snapshots.length>0&&observer.state.environment.weather==='storm');
     assert.equal(snapshots.at(-1).environment.currentHour,18.5);assert.equal(snapshots.at(-1).environment.paused,true);
     const late=await join('late');assert.equal(late.state.environment.weather,'storm');
+    assert.equal(late.state.environment.realRain,observer.state.environment.realRain);
     assert.equal(gameHour(Date.now()+60_000,late.state.environment as EnvironmentState),18.5);
     assert.equal(late.state.environment.weatherChangedAt,observer.state.environment.weatherChangedAt);
+    const lobby=await (await fetch(endpoint)).json() as any;
+    assert.equal(lobby.environment.hour,18.5);assert.equal(lobby.environment.weather,'storm');assert.equal(lobby.environment.paused,true);
     admin.send('admin.environment',{hour:99});await until(()=>errors.length===2);assert.match(errors[1]!,/inválido/);
     assert.equal(world.state.environment.hour,18.5);
+    precipitation=0;await (world as any).cityWeather.refresh();
+    await until(()=>observer.state.environment.realRain===0);
+    assert.equal(observer.state.environment.weather,'storm','city updates preserve a manual override');
     admin.send('admin.environment',{reset:true});await until(()=>observer.state.environment.weather==='auto');
     assert.equal(world.state.environment.paused,false);assert.equal(world.state.environment.dayDurationMs,40*60_000);
+    assert.equal(weatherAt(Date.now()+12_000,observer.state.environment as EnvironmentState).rain,0);
     assert.ok((world as any).logQueue.some((entry:any)=>entry.event==='admin_environment'&&entry.userId==='admin'));
   }finally{
     await Promise.allSettled(rooms.filter(r=>r.connection?.isOpen).map(r=>r.leave()));await server.gracefullyShutdown(false);
     await new Promise<void>(r=>api.close(()=>r()));if(previous===undefined)delete process.env.API_INTERNAL_URL;else process.env.API_INTERNAL_URL=previous;
+    if(previousWeather===undefined)delete process.env.WEATHER_API_URL;else process.env.WEATHER_API_URL=previousWeather;
   }
 });

@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {CITY_FAR_CLIP,cityFog,lightningAt,weatherAt,type EnvironmentState} from '@bar/shared';
+import {CITY_FAR_CLIP,cityFog,lightningAt,weatherAt,formatWorldDate,type EnvironmentState} from '@bar/shared';
 import {daylightAt,type Rgb} from './day-night';
 import {WeatherEffects} from './weather-effects';
 import {WeatherSounds} from './weather-sound';
@@ -87,6 +87,7 @@ interface EngineCuller {processingMeshInstances:Set<pc.MeshInstance>}
 /** Natural lighting stays separate from the electrical circuit affected by events. */
 export class EnvironmentLighting {
   private settings?:EnvironmentState;
+  private serverTime=Date.now();
   private weather=weatherAt(Date.now());
   private flash=0;
   private readonly rain:WeatherEffects;
@@ -264,9 +265,10 @@ export class EnvironmentLighting {
     }
     // The map's lamps exist only now: the chosen shadow quality applies to them too.
     this.setQuality(this.quality,this.fogScale);
-    this.update(Date.now(),0,'');
+    this.update(this.serverTime,0,'');
   }
   update(serverTime:number,dt:number,event:string):void {
+    this.serverTime=serverTime;
     const state=this.sampled=daylightAt(serverTime,this.settings),weather=this.weather=weatherAt(serverTime,this.settings);
     const flash=this.flash=lightningAt(serverTime,weather).flash;
     const nowNight=state.night+(1-state.night)*weather.cloud*.35;
@@ -467,7 +469,7 @@ export class EnvironmentLighting {
   get daylight():number{return Math.min(1,Math.max(0,this.sampled.sunIntensity/.6));}
   telemetry(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled&&entity.light.intensity>.001,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;
-    return {...this.sampled,weather:{...this.weather,mode:this.settings?.weather??'clear',flash:this.flash,...this.rain.telemetry(),sound:this.sounds.telemetry()},electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
+    return {...this.sampled,serverTime:this.serverTime,date:formatWorldDate(this.serverTime),weather:{...this.weather,mode:this.settings?.weather??'clear',flash:this.flash,...this.rain.telemetry(),sound:this.sounds.telemetry()},electrical:this.electrical,party:this.party,sun:light(this.sun),moon:light(this.moon),
       lamps:this.lamps.map(lamp=>({name:lamp.entity.name,position:lamp.entity.getPosition().toArray(),outside:lamp.outside,street:lamp.street,enabled:lamp.entity.light!.enabled,intensity:lamp.entity.light!.intensity,shadows:lamp.entity.light!.castShadows,live:this.live.has(lamp.entity.light!),direction:lamp.entity.up.clone().mulScalar(-1).toArray()})),
       cityLights:[...this.cityLights].map(light=>({name:light.entity.parent?.name??'',enabled:light.enabled,intensity:+light.intensity.toFixed(3),shadows:light.castShadows})),
       facade:{materials:this.signs.map(sign=>({name:sign.material.name,emissive:sign.material.emissive.toString(false),intensity:+sign.material.emissiveIntensity.toFixed(3)})),

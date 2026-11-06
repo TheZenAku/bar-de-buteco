@@ -39,7 +39,7 @@ const bars=(page:Page)=>page.evaluate(()=>Object.fromEntries((window as any).fix
 test('Mixamo locomotion and seated idle remain active on every skin after the authored bar banks load',async({page})=>{
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao'];
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo'];
   const actorId=(skin:string)=>skin==='magrao'?'bartender':`mixamo-${skin}`;
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
   const animations=()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations().map((actor:any)=>({
@@ -194,7 +194,7 @@ test('a whole cigarette (fumar_mixamo) on every skin: pack and lighter in hand, 
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(['error','warning'].includes(message.type()))errors.push(message.text());});
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
   await page.evaluate(()=>(window as any).fixture.hour(14));
-  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao'],ids=skins.map(skin=>skin==='magrao'?'bartender':`cig-${skin}`);
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo'],ids=skins.map(skin=>skin==='magrao'?'bartender':`cig-${skin}`);
   const smokers=(state:string,ago:number):Actor[]=>skins.map((skin,index)=>[ids[index]!,skin,9+index,.15,1.6,0,state,ago]);
   // Lighting up (Roteiro: the flame from about 6.1 s to 7.3 s).
   await sync(page,smokers('cigarette',6600));
@@ -226,7 +226,7 @@ test('a whole cigarette (fumar_mixamo) on every skin: pack and lighter in hand, 
 test('smoking contacts follow the lips and fingers of every skin without stretching the arms',async({page})=>{
   test.setTimeout(240000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao','tonico','rafael-rose'];
+  const skins=['nathan','leandro','rafael','read','magrao','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo','tonico','rafael-rose'];
   const id=(skin:string)=>skin==='magrao'?'bartender':skin==='tonico'?'tonico':`contact-${skin}`;
   const actors=(state:string,ago:number):Actor[]=>skins.map((skin,i)=>[id(skin),skin,9+i,.15,1.6,i%2?0:Math.PI,state,ago]);
   await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);

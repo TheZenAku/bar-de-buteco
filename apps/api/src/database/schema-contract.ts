@@ -24,7 +24,7 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   inventory_ledger:{id:['text'],user_id:['text'],item_id:['text'],quantity:['integer'],reason:['text'],created_at:['timestamp with time zone',false,'now()']},
   phone_lines:{user_id:['text'],number:['text'],created_at:['timestamp with time zone',false,'now()']},
   phone_contacts:{owner_id:['text'],contact_id:['text'],created_at:['timestamp with time zone',false,'now()']},
-  phone_messages:{id:['text'],sender_id:['text'],recipient_id:['text'],body:['text'],created_at:['timestamp with time zone',false,'now()'],read_at:['timestamp with time zone',true],media_id:['text',true],media_kind:['text',true],media_ms:['integer',true]},
+  phone_messages:{id:['text'],sender_id:['text'],recipient_id:['text'],body:['text'],created_at:['timestamp with time zone',false,'now()'],read_at:['timestamp with time zone',true],media_id:['text',true],media_kind:['text',true],media_ms:['integer',true],location:['jsonb',true]},
   gram_posts:{id:['text'],author_id:['text'],caption:['text',false,"''::text"],image:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_likes:{post_id:['text'],user_id:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_comments:{id:['text'],post_id:['text'],author_id:['text'],body:['text'],created_at:['timestamp with time zone',false,'now()']},
@@ -78,7 +78,7 @@ const indexes:Record<string,string[]>={
   phone_messages_pair_idx:['phone_messages','sender_id,recipient_id,created_atdesc'],phone_messages_unread_idx:['phone_messages','recipient_id,read_at'],
   gram_posts_created_idx:['gram_posts','created_atdesc'],gram_posts_author_idx:['gram_posts','author_id,created_atdesc'],gram_comments_post_idx:['gram_comments','post_id,created_at'],
   gram_follows_followed_idx:['gram_follows','followed_id,created_atdesc'],phone_media_owner_idx:['phone_media','owner_id,created_at'],
-  game_logs_created_idx:['game_logs','created_atdesc'],game_logs_user_idx:['game_logs','user_id,created_atdesc'],currency_ledger_created_idx:['currency_ledger','created_atdesc'],
+  game_logs_created_idx:['game_logs','created_atdesc'],game_logs_user_idx:['game_logs','user_id,created_atdesc'],currency_ledger_created_idx:['currency_ledger','created_atdesc'],currency_ledger_reason_idx:['currency_ledger','reason'],
   inventory_ledger_created_idx:['inventory_ledger','created_atdesc'],moderation_created_idx:['moderation_actions','created_atdesc'],reports_created_idx:['reports','created_atdesc'],
 };
 

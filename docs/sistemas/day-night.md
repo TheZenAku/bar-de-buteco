@@ -4,11 +4,21 @@ Um dia completo do jogo dura **40 minutos reais**. Amanhecer, dia, entardecer, n
 
 Os parâmetros padrão estão em `packages/shared/src/environment.ts`: `DAY_NIGHT.durationMs`, `epochMs` e `offsetHours`. O horário é acelerado e não corresponde à hora civil nem a uma simulação astronômica da cidade. O servidor transmite `WorldState.environment`, com a referência do relógio e o clima; o cenário e o relógio do celular usam essa mesma referência.
 
+O cliente mantém **um único relógio do servidor** (`apps/web/src/server-clock.ts`), usado pelo cenário, celular, clima e efeitos compartilhados. Depois da primeira amostra, ele avança com `performance.now()`: mudar a hora ou a data do computador não altera o mundo. Os pacotes da sala atualizam a referência e o ping/pong corrige o atraso de transporte a cada 3 segundos. Entrar depois, recarregar e reconectar recupera o estado atual da sala.
+
+Na entrada, `GET /game/environment` fornece o mesmo relógio e os parâmetros do ambiente, sem cache, consultados a cada 30 segundos e ao voltar à aba. Sair da sala preserva a referência até a próxima consulta, em vez de restaurar um ciclo local. O ciclo continua durando **40 minutos**, salvo alteração administrativa.
+
+A **data civil** exibida no celular e no calendário vem do relógio do servidor no fuso **America/Sao_Paulo**, igual para todos, e não avança a cada meia-noite do ciclo acelerado. A grade do calendário usa datas sem fuso para evitar que jogadores em outros países vejam outro dia; atualiza a marca de hoje à meia-noite da cidade. Os relógios mundiais também usam o instante do servidor.
+
 ## Controles de administrador
 
 Em **Administração → Tempo e clima**, é possível definir o horário, usar os atalhos de amanhecer/meio-dia/entardecer/meia-noite, pausar e retomar o relógio e escolher a duração de um dia entre **5 e 240 minutos reais**. Pausar congela apenas a hora do jogo: entregas, partidas, empregos, ingressos e clima seguem o relógio real do servidor. Mudar a velocidade ou retomar preserva a hora atual.
 
-O clima pode ser **Automático**, **Céu limpo**, **Nublado**, **Chuva** ou **Tempestade**. Um clima fixo permanece até outra alteração. No automático, um ciclo determinístico de oito períodos de seis minutos alterna céu limpo, nuvens, chuva e tempestade. A passagem entre condições leva **12 segundos**, inclusive quando um administrador interrompe uma transição. Alterar a hora do jogo não altera a fase do clima.
+O clima pode ser **Automático**, **Céu limpo**, **Nublado**, **Chuva** ou **Tempestade**. Um clima fixo permanece até outra alteração. No automático (padrão), o servidor consulta as condições atuais de **Santa Bárbara d’Oeste** (−22,7539, −47,4136) na Open-Meteo ao abrir a sala e a cada **5 minutos**, transmitindo a mesma leitura para todos. A passagem entre condições leva **12 segundos**, inclusive quando um administrador interrompe uma transição. Alterar a hora do jogo não altera o clima. Restaurar o padrão preserva a leitura meteorológica mais recente.
+
+A precipitação acumulada é convertida para **mm/h** usando o intervalo informado pela API. A densidade cresce continuamente da garoa (mínimo visual de 8%) até chuva de 20 mm/h (100% do limite de gotas). Precipitação zero interrompe a chuva; somente códigos meteorológicos de tempestade (95–99), acompanhados de precipitação, ativam relâmpagos. Nuvens e vento também acompanham a leitura. A fonte usa modelos meteorológicos e, nesta região, dados horários interpolados: consultar a cada 5 minutos não garante detecção instantânea de chuva na rua. [Documentação da Open-Meteo](https://open-meteo.com/en/docs).
+
+Falhas da API mantêm a última leitura válida por até **30 minutos contados do horário meteorológico**, depois suavizam para tempo seco, sem inventar chuva. Cada consulta tem limite de 8 segundos e não se sobrepõe à anterior. `WEATHER_API_URL` permite um endpoint compatível; `off` desliga as consultas. Testes usam fontes locais e não acessam a API externa. Climas fixos do administrador prevalecem sobre as atualizações meteorológicas até retornar ao automático.
 
 O comando `admin.environment` valida tipos e limites, exige o papel de administrador e registra `admin_environment` no log. As configurações são replicadas a todos os jogadores, incluindo reconexões e novas entradas. Valem por sala até o servidor reiniciar. **Restaurar tempo e clima** retoma o relógio global, o dia de 40 minutos e o clima automático.
 
@@ -16,7 +26,7 @@ O comando `admin.environment` valida tipos e limites, exige o papel de administr
 
 Nuvens procedurais se movem com o vento e reduzem a luz do sol, da lua e das estrelas. Chuva fecha a névoa e tempestades intensificam vento, precipitação e escurecimento. Relâmpagos amplos e breves seguem o relógio compartilhado; o trovão vem depois, sem reproduzir trovões antigos ao entrar na sala.
 
-A chuva é uma malha com uma chamada de desenho e movimento na GPU, em torno da câmera. A quantidade máxima varia de 650 a 2.400 gotas conforme a qualidade de sombras. Os pisos, sólidos, telhados e os tetos da varanda limitam a altura das gotas; elas não atravessam os interiores. O som procedural fica abafado sob cobertura, respeita o volume geral e silencia ao sair ou esconder a aba. Não há download de gravações para esses efeitos.
+A chuva é uma malha com uma chamada de desenho e movimento na GPU, em torno da câmera. A quantidade máxima varia de 650 a 2.400 gotas conforme a qualidade de sombras. Os pisos, sólidos, telhados e os tetos da varanda limitam a altura das gotas; elas não atravessam os interiores. O som procedural fica abafado sob cobertura, respeita o volume geral e silencia ao sair ou esconder a aba. Chuva e trovões usam ganho 40% menor para permitir ouvir os demais sons. Não há download de gravações para esses efeitos.
 
 ## Luz natural e luminárias
 
@@ -41,6 +51,9 @@ A névoa linear vem dos extras da cena da cidade: de **90 a 650 m** de dia, fech
 ## Arquivos e validação
 
 - `packages/shared/src/environment.ts`: relógio, comandos, clima automático, transições e relâmpagos determinísticos.
+- `apps/server/src/world/city-weather.ts`: consulta meteorológica, validação, conversão de mm/h e controle de requisições.
+- `apps/web/src/server-clock.ts` e `networking.ts`: relógio monotônico único, sincronização por estado, ping/pong e entrada.
+- `apps/server/src/http.ts`: amostra pública do relógio e ambiente para a entrada.
 - `apps/web/src/admin/environment.ts`: controles em Tempo e clima.
 - `apps/web/src/engine/day-night.ts`: paleta e trajetória solar/lunar.
 - `apps/web/src/engine/weather-effects.ts` e `weather-sound.ts`: precipitação e áudio procedural.
@@ -49,6 +62,9 @@ A névoa linear vem dos extras da cena da cidade: de **90 a 650 m** de dia, fech
 - `tests/integration/day-night.test.ts`: periodicidade, continuidade, direções e névoa.
 - `tests/integration/environment.test.ts`: relógio controlado, transições, comandos, relâmpagos e coberturas.
 - `apps/server/test/environment.integration.test.ts`: permissões e replicação para observadores e novas entradas.
+- `apps/server/test/city-weather.test.ts`: intensidade, unidades, validade, falhas e descarte das consultas.
+- `tests/integration/server-clock.test.ts`: computadores com relógios divergentes, suspensão, compensação de atraso e viradas da data civil.
+- `tests/e2e/environment-sync.spec.ts`: dois jogadores em fusos e datas locais diferentes, mudanças dia/noite e tempestade, calendário, nova entrada e retorno ao lobby.
 - `tests/e2e/weather.spec.ts` e cenário de tempo e clima em `admin.spec.ts`: renderização e controles no navegador.
 - `tests/e2e/environment.spec.ts`: renderização do mapa em horários diferentes, direção real das luzes, sombras, eventos, transparência da TV e relógio no jogo/lobby.
 

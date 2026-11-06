@@ -13,7 +13,7 @@ test('Nathan is free for new accounts; purchases persist and duplicate/racing re
   assert.equal(register.json().user.equippedSkin,'nathan');assert.equal('character' in register.json().user,false);
   assert.equal((await post('/api/game-ticket',{})).statusCode,200,'A new account enters the bar without any appearance step');
   let view=(await get('/api/wardrobe')).json();assert.equal(view.balance,0);
-  assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['rafael-rose',false,2500],['read',false,850],['gilmar-gordo',false,900],['gabriel',false,900],['flavio-hipotetico',false,900],['tiao',false,900]]);
+  assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['rafael-rose',false,2500],['read',false,850],['gilmar-gordo',false,900],['gabriel',false,900],['flavio-hipotetico',false,900],['tiao',false,900],['primo',false,1000]]);
   assert.deepEqual(view.catalog.filter((s:any)=>s.base==='rafael').map((s:any)=>[s.id,s.variant,s.rarity]),[['rafael','Original','epic'],['rafael-rose','Rosé','legendary']]);
   assert.deepEqual(view.skills.map((s:any)=>[s.id,s.skin,s.owned,s.price,s.available]),[['horse','tiao',false,800,true],['karate','rafael',false,500,true],['air-kick','rafael',false,800,true]]);
   assert.equal((await post('/api/wardrobe/daily',{})).statusCode,409,'No income is enabled by default');

@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {CAR_MODEL,CAR_NAME,DEFAULT_CAR_COLOR,NEW_CAR_PARTS,vehicleName,vehiclePhoto,type VehicleModel} from '@bar/shared';
+import {defaultVehicleColor,CAR_MODEL,CAR_NAME,DEFAULT_CAR_COLOR,MOTO_FOGO_MODEL,MOTO_FOGO_NAME,NEW_CAR_PARTS,vehicleName,vehiclePhoto,vehiclePriceKey,type VehicleModel} from '@bar/shared';
 import {and,asc,desc,eq,gte,inArray,like,sql} from 'drizzle-orm';
 import {COURIER_LEVELS,GARAGE,HIGHFOOD_CUSTOMERS,MAX_COIN_BALANCE,MOTO_MODEL,MOTO_NAME,NEW_MOTO_PARTS,deliveryPay,makePlate,type OwnedVehicle,deliveryStars,priceOf,type CustomerLook,type CustomerProfile,type DeliveryFacts,type HighfoodHistoryEntry,type HighfoodReceipt,type HighfoodView,type PublicUser,type VehicleView} from '@bar/shared';
 import type {Database} from './database/index.js';
@@ -7,7 +7,7 @@ import {controls,currencyLedger,highfoodCustomers,highfoodDeliveries,moderationA
 import type {PricingService} from './pricing-service.js';
 
 export class HighfoodError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
-const startOfDay=(now=new Date())=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+import {startOfBarDay as startOfDay} from '@bar/shared';
 const RECENT=30;
 export interface DeliveryRecord extends DeliveryFacts {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;durationMs:number}
 export interface LostOrder {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;length:number;reason:'cancelled'|'gave-up'|'left'}
@@ -38,12 +38,13 @@ export class HighfoodService {
   async vehicle(userId:string,model:string=MOTO_MODEL):Promise<VehicleView>{
     const [prices,vehicles]=await Promise.all([this.pricing.table(),this.owned(userId)]);
     const models=[{model:MOTO_MODEL,name:MOTO_NAME,price:priceOf(prices,'vehicle:moto'),seats:1,photo:vehiclePhoto(MOTO_MODEL)},
+      {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,price:priceOf(prices,'vehicle:moto-fogo'),seats:1,photo:vehiclePhoto(MOTO_FOGO_MODEL)},
       {model:CAR_MODEL,name:CAR_NAME,price:priceOf(prices,'vehicle:carro'),seats:4,photo:vehiclePhoto(CAR_MODEL)}];
     const selected=models.find(each=>each.model===model)??models[0]!;
     return {...selected,models,tow:priceOf(prices,'vehicle:tow'),owned:vehicles.length>0,limit:GARAGE.VEHICLE_LIMIT,vehicles};
   }
   /** A new vehicle: a free plate (random, and the unique column has the last word) and all parts new. */
-  private async addVehicle(tx:Pick<Database,'insert'>,userId:string,model:string=MOTO_MODEL,color=DEFAULT_CAR_COLOR):Promise<void>{
+  private async addVehicle(tx:Pick<Database,'insert'>,userId:string,model:string=MOTO_MODEL,color:string=defaultVehicleColor(model)):Promise<void>{
     for(let attempt=0;attempt<32;attempt++){
       const added=await tx.insert(playerVehicles).values({id:randomUUID(),plate:makePlate(),userId,model,color,parts:model===CAR_MODEL?NEW_CAR_PARTS:NEW_MOTO_PARTS}).onConflictDoNothing({target:playerVehicles.plate}).returning({id:playerVehicles.id});
       if(added.length)return;
@@ -51,9 +52,9 @@ export class HighfoodService {
     throw new HighfoodError(503,'Não foi possível emplacar o veículo. Tente de novo.');
   }
   /** The world learns about it through a `sync` control, as with anything else that changes outside the room. */
-  async buy(user:PublicUser,requestId:string,model:VehicleModel=MOTO_MODEL,color=DEFAULT_CAR_COLOR):Promise<VehicleView&{balance:number}>{
+  async buy(user:PublicUser,requestId:string,model:VehicleModel=MOTO_MODEL,color:string=defaultVehicleColor(model)):Promise<VehicleView&{balance:number}>{
     if(!user.verified)throw new HighfoodError(403,'Confirme seu e-mail antes de comprar.');
-    const price=await this.pricing.get(model===CAR_MODEL?'vehicle:carro':'vehicle:moto'),receipt=`vehicle:${requestId}`;
+    const price=await this.pricing.get(vehiclePriceKey(model)),receipt=`vehicle:${requestId}`;
     const balance=await this.db.transaction(async tx=>{
       const [wallet]=await tx.select().from(wallets).where(eq(wallets.userId,user.id)).for('update');
       if(!wallet)throw new HighfoodError(409,'Abra a carteira primeiro: entre no bar uma vez.');
@@ -73,14 +74,16 @@ export class HighfoodService {
     return {...await this.vehicle(user.id,model),balance};
   }
   async paint(userId:string,vehicleId:string,color:string):Promise<VehicleView>{
+    let paintedModel:string=CAR_MODEL;
     await this.db.transaction(async tx=>{
       const [vehicle]=await tx.select().from(playerVehicles).where(and(eq(playerVehicles.id,vehicleId),eq(playerVehicles.userId,userId))).for('update');
       if(!vehicle)throw new HighfoodError(404,'Você não tem a chave desse veículo.');
-      if(vehicle.model!==CAR_MODEL)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
+      if(vehicle.model!==CAR_MODEL&&vehicle.model!==MOTO_FOGO_MODEL)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
+      paintedModel=vehicle.model;
       await tx.update(playerVehicles).set({color:color.toLowerCase(),updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
       await tx.insert(controls).values({id:randomUUID(),payload:{action:'sync',playerId:userId,issuedAt:Date.now()}});
     });
-    return this.vehicle(userId,CAR_MODEL);
+    return this.vehicle(userId,paintedModel);
   }
   /** What the world keeps of a bike: how it is and how far it has gone. */
   async saveVehicles(updates:ReadonlyArray<{vehicleId:string;parts:string;mileage:number;fuel?:number}>):Promise<void>{

@@ -20,6 +20,10 @@ export interface PhoneHost {
   balance(balance:number):void;
   /** The game view as a JPEG, cropped from its middle (BarScene.capture). */
   capture(width:number,height:number,quality?:number):Promise<Blob|null>;
+  /** The same cut as a bitmap, for a video call (BarScene.captureBitmap); encoding happens in a worker. */
+  captureBitmap(width:number,height:number):Promise<ImageBitmap|null>;
+  /** Bytes the connection has not sent yet (a slow line): a video call skips frames while it grows. */
+  backlog():number;
   setSelfie(on:boolean):void;
   /** The camera's zoom (1 = the game's own view). */
   setZoom(factor:number):void;

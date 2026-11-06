@@ -1,4 +1,4 @@
-import { CONSUMABLES, applyConsumable, canRun, createNeeds, damage, maxHp, relieve, sickAfterDrink, tickNeeds, NEEDS, type NeedsEvent, type NeedsState } from '@bar/shared';
+import { CONSUMABLES, applyConsumable, canRun, createNeeds, damage, killNeeds, maxHp, relieve, reviveNeeds, sickAfterDrink, tickNeeds, NEEDS, type NeedsEvent, type NeedsState } from '@bar/shared';
 import type { Player } from '../state.js';
 
 /**
@@ -49,6 +49,10 @@ export class NeedsDirector {
   }
   relieve(player: Player, now: number, portion = 1): void { relieve(this.state(player.id, now), portion); this.sync(player, now); }
   damage(player: Player, amount: number, now: number): void { damage(this.state(player.id, now), amount, now); this.sync(player, now); }
+  /** The administration's kill: HP, ring and heart, to zero. The Morte is started by the room. */
+  kill(player: Player, now: number): void { const state = this.state(player.id, now); killNeeds(state); state.dead = true; this.sync(player, now); }
+  /** Back from a death (the Morte's minigame won). */
+  revive(player: Player, now: number): void { reviveNeeds(this.state(player.id, now)); this.sync(player, now); }
 
   /** One roll per faint: with NEEDS.faint.itemLossChance, a random eligible item is removed. */
   loseItemOnFaint(playerId: string): string | undefined {
@@ -62,7 +66,7 @@ export class NeedsDirector {
   sync(player: Player, now: number): void {
     const state = this.state(player.id, now), whole = (value: number) => Math.round(Number.isFinite(value) ? value : 0);
     const values = { hp: whole(state.hp), hpMax: whole(maxHp(state, now)), stamina: whole(state.stamina), hunger: whole(state.hunger),
-      thirst: whole(state.thirst), bladder: whole(state.bladder), drunk: whole(state.drunk), exhausted: state.exhausted,
+      thirst: whole(state.thirst), hpCore: whole(state.hpCore), staminaCore: whole(state.staminaCore), hungerCore: whole(state.hungerCore), thirstCore: whole(state.thirstCore), bladder: whole(state.bladder), drunk: whole(state.drunk), exhausted: state.exhausted,
       condition: state.condition, conditionUntil: state.conditionUntil, faintCause: state.condition === 'fainted' ? state.faintCause ?? '' : '' };
     for (const [key, value] of Object.entries(values)) if ((player as unknown as Record<string, unknown>)[key] !== value) (player as unknown as Record<string, unknown>)[key] = value;
   }

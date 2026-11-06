@@ -7,6 +7,7 @@ export default defineConfig({
   // API's per-address limit, including observer contexts. Limits stay enabled;
   // the trusted local Vite proxy forwards these test-only headers.
   projects:[
+    {name:'footsteps',testMatch:'**/footstep-sound.spec.ts'},
     {name:'refueling',testMatch:'**/refueling.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.18'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu']}}},
     {name:'car',testMatch:'**/car.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.17'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'horse',testMatch:['**/horse.spec.ts','**/horse-sound.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.16'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
@@ -19,7 +20,10 @@ export default defineConfig({
     {name:'doors',testMatch:'**/doors.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'ambient',testMatch:'**/ambient.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.3'}}},
     {name:'environment',testMatch:['**/environment.spec.ts','**/weather.spec.ts']},
+    {name:'environment-sync',testMatch:'**/environment-sync.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'rigs',testMatch:'**/rigs.spec.ts'},
+    // VR without a headset (docs/sistemas/vr.md): the fixture's scene, drawn on the GPU like the stage.
+    {name:'vr',testMatch:'**/vr.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=d3d11','--enable-gpu']}}},
     // Two players' worlds at once: drawn on the GPU where the host has one (software rendering starves their input loops).
     // The bar animations: many skinned bodies, props and particles; drawn on the GPU like the stage.
     {name:'bar-animations',testMatch:'**/bar-animations.spec.ts',use:{launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
@@ -28,7 +32,7 @@ export default defineConfig({
     {name:'truco',testMatch:'**/truco.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.14'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     {name:'foosball',testMatch:'**/foosball.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.6'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     // The delivery bike: real keys over a real room, two players' worlds, drawn on the GPU like the stage.
-    {name:'moto',testMatch:['**/moto.spec.ts','**/moto-v4.spec.ts','**/moto-actions.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
+    {name:'moto',testMatch:['**/moto.spec.ts','**/moto-v4.spec.ts','**/moto-fogo.spec.ts','**/moto-actions.spec.ts','**/moto-crash.spec.ts','**/moto-parts.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.7'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     // Rafael's kicks: two players' worlds at once, drawn on the GPU like the stage.
     {name:'kick',testMatch:'**/kick.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.12'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']}}},
     // The city: streamed sectors, the real game on the bike; drawn on the GPU like the stage.
@@ -41,7 +45,9 @@ export default defineConfig({
     // The collection's fixture, and the whole flow in the game with the panel: drawn on the GPU like the stage.
     {name:'collection',testMatch:'**/collection.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.14'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
     {name:'profile',testMatch:['**/profile.spec.ts','**/achievements.spec.ts'],use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.9'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
-    {name:'phone',testMatch:'**/phone.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.5'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
+    // Touch play: a phone on its side, the real game and real touch events; drawn on the GPU like the stage.
+    {name:'touch',testMatch:'**/touch.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.19'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu']}}},
+    {name:'phone',testMatch:'**/phone.spec.ts',use:{extraHTTPHeaders:{'X-Forwarded-For':'127.0.0.5'},launchOptions:{args:['--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader','--use-angle=d3d11','--enable-gpu','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}}},
   ],
   webServer:{command:'node tests/e2e/server.mjs',url:'http://localhost:5273',reuseExistingServer:false,timeout:120000},
 });

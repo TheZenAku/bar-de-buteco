@@ -42,15 +42,15 @@ test('room keeps inventory private, removes through the API and applies an item 
     assert.deepEqual(states.at(-1).stacks,stacks);assert.equal(states.at(-1).capacity,INVENTORY_CAPACITY);
     assert.equal('inventory' in room.state,false,'private inventory must not be exposed in the room schema');
 
-    const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=10;
+    const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=100;needs.hungerCore=10;
     // A snack goes into the hand: had over the same time as at a table, the player free to move meanwhile.
     room.send('inventory.use',{itemId:'coxinha'});
     await until(()=>inventoryCalls===1&&player.holding==='coxinha');
     assert.equal(player.interactionState,'');assert.equal(player.holdingUntil-player.holdingSince,consumeMs('coxinha'));
     await until(()=>results.some(result=>result.action==='use'),4000);
-    assert.ok(needs.hunger<12,'its effects come in as it goes');
+    assert.ok(needs.hungerCore<12,'its effects come in as it goes');
     player.holdingUntil=Date.now();await until(()=>player.holding==='');
-    assert.ok(needs.hunger>=44&&needs.hunger<=46,`all of it once finished: ${needs.hunger}`);
+    await until(()=>needs.intake.hunger===0,8000);assert.ok(needs.hungerCore>=44&&needs.hungerCore<=46,`all of it once finished, into the core: ${needs.hungerCore}`);
     assert.equal(states.at(-1).stacks.some((stack:any)=>stack.itemId==='coxinha'),false);
 
     room.send('inventory.use',{itemId:'coxinha'});await until(()=>errors.some(error=>error.toLowerCase().includes('mochila')));

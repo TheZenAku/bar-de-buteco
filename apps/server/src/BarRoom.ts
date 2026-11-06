@@ -1,13 +1,16 @@
+import {vrArmsSchema,encodeVrArms} from '@bar/shared';
 import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity,stepWheelie,HORSE_REAR} from '@bar/shared';
 import { randomInt, randomUUID } from 'node:crypto';
+import {FIREWORK,fireworkFireSchema,fireworkOrigin,fireworkFlightMs,type FireworkShot,type FireworkVector} from '@bar/shared';
 import {CAR_MODEL,CAR_SEATS,NEW_CAR_PARTS,NEW_MOTO_PARTS,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts} from '@bar/shared';
-import {applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt} from '@bar/shared';
+import {applyCityWeather,applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt,WEATHER_CITY} from '@bar/shared';
+import {CityWeather} from './world/city-weather.js';
 import {HORSE,horseFits,isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {ServerPerformanceSampler} from './performance.js';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
+import { AOI_RADIUS, crowdSkinIndex, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, flyPlayer, fallPlayer, groundBelow, floorHeight, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
@@ -39,6 +42,7 @@ import {Jukebox,MediaEntry} from './state.js';
 import {VideoCheck} from './world/media-check.js';
 import { readWorldConfig } from './config.js';
 import { FileOutbox } from './world/outbox.js';
+import { CrowdPlanner, type CrowdEntry } from './world/crowd.js';
 import {Refueling,type FuelJournal} from './world/refueling.js';
 import { ControlRelay, ResultRelay, type MatchResult } from './world/relays.js';
 import { health, logLine, worldMetrics } from './observability.js';
@@ -56,6 +60,8 @@ import { Musicians, type MusicianEnd } from './world/musicians.js';
 import { BotRunner } from './world/bots.js';
 import { PhoneCalls, type PhoneCall } from './world/phone-calls.js';
 import { AchievementTracker } from './world/achievements.js';
+import { DeathDirector } from './world/death.js';
+import { DEATH_GONE_STATE, DEATH_STATE, SCENE_AUDIO_RADIUS, SERIES_CATEGORY, deathInputSchema, dominantCategory, type DeathPlan, type MorteCategory } from '@bar/shared';
 import { ACHIEVEMENT_BLADDER_MIN, ACHIEVEMENT_CALL_MS, seriesOfItem, type Badge } from '@bar/shared';
 import { PHONE, isJpeg, phoneCallIdSchema, phoneCallSchema, phonePingSchema, type PhoneCallEnd, type PhoneCallView, type PhonePing } from '@bar/shared';
 
@@ -80,6 +86,8 @@ const FOOD_UNLOAD = 'food-unload', FOOD_TALK = 'food-talk', FOOD_LOCKER = 'food-
 const CUSTOMERS_EVERY_MS = 60_000;
 const RECOVER_HIPS_BEHIND = .42;
 interface Presence {
+  /** When the API last confirmed this session (maintenance spreads the checks out: config.accessRecheckMs). */
+  validatedAt?:number;
   /** The skills this player bought (SKILLS). */
   skills:Set<string>;
   joinedAt:number;
@@ -90,6 +98,10 @@ interface Presence {
   /** On a delivery bike, its inputs instead (simulated like walking: at most one a tick); when the last one came. */
   motoQueue: MotoInput[];
   horseRearHeld?:boolean;
+  /** An administrator in flight (admin.fly): moves by flyPlayer, ignoring the map's solids. */
+  flying?:boolean;
+  /** Let go of the flight (B again): falls until it meets a surface (stepFall), then lands. */
+  falling?:boolean;
   motoInputAt: number;
   /** How many bike inputs real time allows right now, and when that was counted (stepMotos). */
   motoBudget: number;
@@ -97,6 +109,8 @@ interface Presence {
   lastReceived: number;
   lastInputAt: number;
   seen: Set<Schema>;
+  /** The sprites last sent (shared/crowd.ts): an identical set is not sent again. */
+  crowdSent?: Uint8Array;
   revoked: boolean;
   rejectReconnect?: () => void;
   interactionEndsAt?: number;
@@ -120,6 +134,7 @@ interface Presence {
   inventory:Map<ItemId,number>;
   inventoryBusy?:boolean;
   inventoryItem?:ItemId;
+  fireworkAt?:number;
   /** Coins as last confirmed by the API (the API decides every change; this only feeds the HUD and messages). */
   balance:number;
   /** The counter drink paid for and not yet served; refunded if the order is dropped. */
@@ -144,9 +159,26 @@ const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemak
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
 
+/** How often a session is confirmed with the API, and how many go out per 3 s round and at the same time. */
+const ACCESS_RECHECKS_PER_ROUND = 24, ACCESS_RECHECK_PARALLEL = 6;
+
+/** Promise.allSettled over `items` with at most `limit` running at once, in order. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, work: (item: T) => Promise<R>): Promise<Array<PromiseSettledResult<R>>> {
+  const results: Array<PromiseSettledResult<R>> = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) {
+      try { results[i] = { status: 'fulfilled', value: await work(items[i]!) }; } catch (reason) { results[i] = { status: 'rejected', reason }; }
+    }
+  }));
+  return results;
+}
+
 export class BarRoom extends Room<{ state: BarState }> {
   private administrativeEvent?:{commandId:string;eventId:string};
   static activeId: string | undefined;
+  /** The bar this process runs (the gateway reads its occupancy from /health to place new players). */
+  static active: BarRoom | undefined;
   state = new BarState();
   /** Validated once per room (apps/server/src/config.ts); a bad variable stops the world at start. */
   private readonly config = readWorldConfig();
@@ -203,10 +235,37 @@ export class BarRoom extends Room<{ state: BarState }> {
   private botIds = new Set<string>();
   /** What players did since the last report to the API: goals in it give badges (docs/sistemas/conquistas.md). */
   private achievements = new AchievementTracker();
+  /**
+   * Death (docs/sistemas/morte.md). The game has no cause of death of its own yet (needs.ts only faints), so the one cause is the
+   * administration's "Matar jogador" button, which arrives as the `kill` control.
+   */
+  private readonly deathActivity = new Map<string, Partial<Record<MorteCategory, number>>>();
+  private readonly deaths = new DeathDirector({
+    now: () => Date.now(), random: () => Math.random(),
+    body: id => { const player = this.state.players.get(id); return player?.connected && this.sessions.getByUser(id) ? { x: player.x, y: player.y, z: player.z, rotation: player.rotation, name: player.displayName } : undefined; },
+    hold: (id, state) => this.holdForDeath(id, state),
+    scene: plan => this.broadcastDeath(plan),
+    screen: (id, message) => this.sessions.getByUser(id)?.client.send('death.screen', message),
+    respawn: (id, avoid) => this.respawnAfterDeath(id, avoid),
+    category: id => dominantCategory(this.deathActivity.get(id)),
+    log: (event, details) => this.log(event, details),
+  });
   private achievementsAt = Date.now();
   private maintenanceBusy = false;
   private lastTableJson = '';
   private tickCount = 0;
+  /** Who is a model and who a sprite for each client (world/crowd.ts); refreshes counted to send the sprites every third one. */
+  private readonly crowd = new CrowdPlanner();
+  private viewRound = 0;
+  private readonly usedSlots = new Set<number>();
+  private nextSlot = 1;
+  private takeSlot(): number {
+    for (let tries = 0; tries < 65535; tries++) {
+      const slot = this.nextSlot; this.nextSlot = this.nextSlot >= 65535 ? 1 : this.nextSlot + 1;
+      if (!this.usedSlots.has(slot)) { this.usedSlots.add(slot); return slot; }
+    }
+    return 0;
+  }
   /** Numbers the bikes the administration spawns. */
   private motoSerial = 0;
   /** Highfood (docs/sistemas/highfood.md): the shifts, the customers' profiles, and what is owed to the API. */
@@ -293,6 +352,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     onMatch: summary => this.poolMatch(summary),
   })] as const));
   private foosballTimer?: ReturnType<typeof setInterval>;
+  private readonly cityWeather=new CityWeather(this.config.weatherUrl,
+    reading=>this.state.environment.assign(applyCityWeather(this.state.environment,reading,Date.now())),
+    error=>this.log('city_weather_error',{error:error instanceof Error?error.message:String(error)}));
   /** The tables' fixed steps catch up on the timer's real pace (Windows timers run late); frames go 30 times a second. */
   private foosballClock = { last: 0, owed: 0, frameAt: 0 };
 
@@ -300,7 +362,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     // The primary bar persists even empty. A locked/full bar must never overflow
     // into an unrelated world through joinOrCreate's automatic create fallback.
     if (BarRoom.activeId && BarRoom.activeId !== this.roomId) throw new ServerError(503, 'BAR_FULL: O bar está cheio. Aguarde uma vaga.');
-    BarRoom.activeId = this.roomId;
+    BarRoom.activeId = this.roomId; BarRoom.active = this;
     this.autoDispose = false;
     this.maxClients = this.config.capacity;
     this.maxMessagesPerSecond = 100;
@@ -320,7 +382,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     void this.refueling.recover();
     for (const job of JOBS) this.state.jobs.set(job.id, new JobSlotState());
     this.syncJobs();
-    this.setFixedTimestep(() => { const started = performance.now(); this.step(); const ms=performance.now()-started;this.performanceSampler.record(ms);worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', ms); }, 1000 / TICK_MS);
+    // One failing step (a disk refusal, a bug in one minigame) is logged and the next tick runs: an exception out of this timer would end the whole world.
+    let lastTickError = 0;
+    this.setFixedTimestep(() => { const started = performance.now(); try { this.step(); } catch (error) { if (started - lastTickError > 5000) { lastTickError = started; this.log('tick_error', { error: error instanceof Error ? (error.stack ?? error.message) : String(error) }); } } const ms=performance.now()-started;this.performanceSampler.record(ms);worldMetrics.observe('bar_world_tick_ms', 'Simulation step duration in ms', ms); }, 1000 / TICK_MS);
     health.roomId = this.roomId;
     worldMetrics.gauge('bar_world_players_connected', 'Players connected to the bar', () => [...this.state.players.values()].filter(p => p.connected).length);
     worldMetrics.gauge('bar_world_avatars', 'Avatars in the bar, including those waiting offline', () => this.state.players.size);
@@ -339,6 +403,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     worldMetrics.gauge('bar_world_api_last_ok_seconds', 'Seconds since the API last answered the maintenance round trip', () => health.apiOkAt ? (Date.now() - health.apiOkAt) / 1000 : undefined);
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
     this.clock.setInterval(() => this.countTime(Date.now()), ACHIEVEMENT_SAMPLE_MS);
+    void this.cityWeather.refresh();
+    this.clock.setInterval(() => { void this.cityWeather.refresh(); }, WEATHER_CITY.pollMs);
     this.registerMessages();
   }
 
@@ -367,13 +433,15 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.assign({ displayName: auth.displayName, color: auth.color, connected: true, lastProcessedInput: -1 });
       player.skin=skin;
     } else {
-      player = new Player().assign({ id: auth.userId, displayName: auth.displayName, color: auth.color, skin,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
+      player = new Player().assign({ id: auth.userId, slot: this.takeSlot(), displayName: auth.displayName, color: auth.color, skin,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
       this.state.players.set(auth.userId, player);
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
     const presence:Presence={skills:new Set(auth.ownedSkills),vehicles:auth.vehicles??[],joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
+    // A flight does not outlive its connection: the avatar left in the air comes down.
+    const left=this.state.players.get(auth.userId);if(left?.animationState.startsWith('fly')){presence.flying=true;this.land(left,presence);}
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
     this.syncTable();
@@ -383,6 +451,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.sendJob(presence);
     if (auth.bot) this.botIds.add(auth.userId);
     this.log(previous ? 'takeover' : 'join', { playerId: auth.userId });
+    this.deaths.resume(auth.userId);
   }
 
   onDrop(client: Client): void {
@@ -446,6 +515,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
+    this.deaths.disconnected(userId);
     this.refueling.cancel(userId,'Atendimento interrompido por desconexão.');
     worldMetrics.inc('bar_world_leaves_total', 'Participations ended');
     // Pending orders are refunded while the session is still registered (refunds go to its wallet owner).
@@ -455,7 +525,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const player = this.state.players.get(userId);
     // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
     // (or seated) where it was.
-    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); this.state.players.delete(userId); }
+    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); if (player) this.usedSlots.delete(player.slot); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -504,7 +574,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { this.performanceSampler.destroy();this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) BarRoom.activeId = undefined; if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { this.cityWeather.stop();this.performanceSampler.destroy();this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) { BarRoom.activeId = undefined; BarRoom.active = undefined; } if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).
@@ -531,6 +601,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       const presence = this.forClient(client)!, sender = this.player(client), target = this.sessions.getByUser(to);
       if (!target || target.revoked || to === sender.id || target.blocked.has(sender.id) || presence.blocked.has(to)) return;
       target.client.send('phone.ping', { kind, from: sender.id, fromName: sender.displayName } satisfies PhonePing);
+    });
+    // VR hands (docs/sistemas/vr.md): kept as a short string everyone draws the arms from; nothing in the game depends on it.
+    this.handle('player.arms', vrArmsSchema, 20, (client, arms) => {
+      const player = this.player(client), encoded = encodeVrArms(arms);
+      if (player.vrArms !== encoded) player.vrArms = encoded;
     });
     this.handle('player.input', inputSchema, 55, (client, input) => {
       const p = this.forClient(client)!;
@@ -597,6 +672,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('player.interact', z.object({ objectId: z.string().max(64), item: z.enum(DRINK_ITEMS).optional() }).strict(), 5, (client, command) => this.interact(client, command.objectId, command.item));
     this.handle('inventory.sync',z.object({}).strict(),2,async client=>{await this.syncPresence(this.forClient(client)!);});
     this.handle('inventory.use',z.object({itemId:z.enum(ITEM_IDS)}).strict(),3,(client,{itemId})=>this.useInventory(client,itemId));
+    this.handle('firework.fire',fireworkFireSchema,3,(client,{direction})=>this.fireFirework(client,direction));
+    this.handle('firework.stow',z.object({}).strict(),3,client=>{this.player(client).fireworkEquipped=false;});
     this.handle('inventory.discard',z.object({itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10)}).strict(),3,async(client,{itemId,quantity})=>{
       const player=this.player(client);if(player.interactionState||player.currentTableId)throw new Error('Encerre a ação atual antes de mexer na mochila.');
       const presence=this.forClient(client)!;const view=await this.removeInventory(presence,itemId,quantity,'discard');
@@ -751,6 +828,22 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.log('admin_environment',{playerId:admin,...patch});
       client.send('admin.world',this.adminSnapshot());
     });
+    // Flight (B): administrators only; it ends when the role goes or an activity takes the body (step).
+    this.handle('admin.fly',z.object({on:z.boolean()}).strict(),3,(client,{on})=>{
+      this.requireAdmin(client);
+      const presence=this.forClient(client)!,player=this.player(client);
+      if(!on){
+        // From the air it falls (step); from a hand's breadth above the floor it simply lands.
+        if(!presence.flying||presence.falling)return;
+        if(player.y-(groundBelow(player.x,player.z,player.y)??0)<.3){this.land(player,presence);return;}
+        presence.falling=true;presence.queue.length=0;Object.assign(player,{animationState:'fly-fall',animationStartedAt:Date.now()});return;
+      }
+      if(player.interactionState||player.currentTableId)throw new Error('Levante-se primeiro.');
+      if(presence.flying)return;
+      presence.flying=true;presence.queue.length=0;
+      Object.assign(player,{y:(player.y??0)+1.5,animationState:'fly-idle',animationStartedAt:Date.now()});
+      this.log('admin_fly',{playerId:player.id,on});
+    });
     this.handle('admin.performance',z.object({}).strict(),1,client=>{
       this.requireAdmin(client);
       client.send('admin.performance',this.performanceSampler.snapshot({players:this.state.occupancy,capacity:this.state.capacity,npcs:this.state.npcs.size,motos:this.state.motos.size,
@@ -794,7 +887,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.log('admin_moto_despawn',{playerId:admin,ids:ids.join(', ')});client.send('admin.world',this.adminSnapshot());
     });
     // Development bots for performance tests: how many the bar should have (0 takes them out), never more than fit in it.
-    this.handle('admin.bots',z.object({count:z.number().int().min(0).max(128)}).strict(),3,(client,{count})=>{
+    this.handle('admin.bots',z.object({count:z.number().int().min(0).max(1024)}).strict(),3,(client,{count})=>{
       const admin=this.requireAdmin(client),room=this.botRoom();
       if(count>room)throw new Error(`O bar comporta ${this.config.capacity} pessoas: cabem até ${room} bots além dos jogadores. Aumente ROOM_CAPACITY no .env e reinicie o mundo.`);
       this.bots.set(count);this.botsAdmin=client;
@@ -956,7 +1049,9 @@ export class BarRoom extends Room<{ state: BarState }> {
       const { player, table } = this.atPool(client), view = table.aim(player.id, aim);
       if (view) for (const [id, presence] of this.sessions) if (id !== player.id && (presence.watching === table.id || table.seatOf(id))) presence.client.send('pool.aim', view);
     });
-    this.handle('ping', z.object({ at: z.number().finite() }).strict(), 3, (client, { at }) => client.send('pong', { at }));
+    // Every press of the sequence game is judged by the room (world/death.ts); the client only reports which button.
+    this.handle('death.input', deathInputSchema, 12, (client, { button }) => { const presence = this.forClient(client); if (presence) this.deaths.press(presence.ticket.userId, button); });
+    this.handle('ping', z.object({ at: z.number().finite() }).strict(), 3, (client, { at }) => client.send('pong', { at,serverTime:Date.now() }));
   }
 
   private handle<T>(name: string, schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } }, limit: number, handler: (client: Client, payload: T) => void|Promise<void>): void {
@@ -972,17 +1067,39 @@ export class BarRoom extends Room<{ state: BarState }> {
       const parsed = schema.safeParse(message);
       if (!parsed.success) { rejected('invalid'); client.send('error', { message: 'Comando inválido.' }); return; }
       const subject = this.state.players.get(presence.ticket.userId)!;
+      // A dead player does nothing but press the game's buttons.
+      if (this.deaths.isDead(presence.ticket.userId) && name !== 'death.input' && name !== 'ping') {
+        rejected('dead');
+        // The body does not move, but the client's queue of unanswered inputs must still drain: with 12 waiting it sends no more, and would stay frozen after the respawn.
+        const seq = (parsed.data as { seq?: unknown }).seq;
+        if ((name === 'player.input' || name === 'moto.input') && typeof seq === 'number') { presence.lastReceived = Math.max(presence.lastReceived, seq); subject.lastProcessedInput = presence.lastReceived; }
+        return;
+      }
+      if (presence.flying && name !== 'phone.call' && (NEEDS_CONSCIOUS.has(name) || name === 'player.skill')) { rejected('flying'); client.send('error', { message: 'Pouse (B) antes.' }); return; }
       if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { rejected('unconscious'); client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
       try { await handler(client, parsed.data); } catch (e) { rejected('refused'); client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
     });
   }
 
+  /** The state patch runs on its own timer, outside the tick: time it, it is the per-client encoding cost. */
+  override broadcastPatch(): boolean {
+    const started = performance.now();
+    try { return super.broadcastPatch(); }
+    finally { const ms = performance.now() - started; this.performanceSampler.recordPatch(ms); worldMetrics.observe('bar_world_patch_ms', 'State patch encode and send in ms', ms); }
+  }
+
   private step(): void {
     const now = Date.now();
     this.state.serverTime = now;
+    let lapAt = performance.now();
+    const lap = (name: string) => { const t = performance.now(); this.performanceSampler.recordPhase(name, t - lapAt); worldMetrics.observe(`bar_world_phase_${name.replace(/\W/g, '_')}_ms`, `Tick phase ${name} in ms`, t - lapAt, 200); lapAt = t; };
     for (const call of this.phoneCalls.expire(now)) this.sendCall(call, 'missed');
+    this.deaths.update(now);
+    // The bikes do not move while the players do (stepMotos comes after): one list per tick, not one per walking player.
+    let obstacles: ReturnType<typeof motoObstacle>[] | undefined;
     for (const [id, presence] of this.sessions) {
       const player = this.state.players.get(id)!;
+      if(player.fireworkEquipped&&!this.canFirework(player))player.fireworkEquipped=false;
       if (!player.connected || presence.revoked) continue;
       if(presence.gestureEndsAt&&now>=presence.gestureEndsAt){
         if(player.animationState===presence.gestureState)player.animationState='idle';
@@ -993,6 +1110,14 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (player.holding) this.updateHolding(player, presence, now);
       // A job task keeps the hands busy for its whole duration (the use clip is shorter, so it restarts).
       if ((player.interactionState === 'job' || isRepairingMoto(player.interactionState)) && player.animationState === 'use' && now - player.animationStartedAt >= TASK_GESTURE_MS) player.animationStartedAt = now;
+      if (presence.flying && (presence.ticket.role !== 'admin' || player.interactionState || player.currentTableId)) this.land(player, presence);
+      if (presence.falling) {
+        presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
+        const next = fallPlayer(player, TICK_MS / 1000, (now - player.animationStartedAt) / 1000);
+        Object.assign(player, { y: next.y });
+        if (next.landed) this.land(player, presence);
+        continue;
+      }
       const input = presence.queue.shift();
       if(player.animationState==='horse-rear'&&now-player.horseRearAt>=HORSE_REAR.durationMs)player.animationState='horse-idle';
       let moving = false, running = false;
@@ -1010,10 +1135,14 @@ export class BarRoom extends Room<{ state: BarState }> {
             player.x=next.x;player.y=next.y;player.z=next.z;player.rotation=next.rotation;
             player.animationState=moving?(input.running?'horse-gallop':'horse-walk'):'horse-idle';
           }
+        } else if (presence.flying) {
+          const next = flyPlayer(player, input, TICK_MS / 1000);
+          moving = !!(input.dx || input.dz || input.dy);
+          Object.assign(player, { x: next.x, y: next.y, z: next.z, rotation: input.rotation, animationState: input.dx || input.dz ? 'fly' : 'fly-idle' });
         } else if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
-          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), [...this.state.motos.values()].map(motoObstacle));
+          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle));
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
           if (moving) this.achieved(id, 'andarilho', Math.hypot(position.x - player.x, position.z - player.z));
@@ -1022,22 +1151,26 @@ export class BarRoom extends Room<{ state: BarState }> {
           else if (player.animationState === 'walk' || player.animationState === 'run') player.animationState = 'idle';
         }
         player.lastProcessedInput = input.seq;
-      } else if (now - presence.lastInputAt > 250 && ['walk', 'run','horse-walk','horse-gallop'].includes(player.animationState)) player.animationState = isRidingHorse(player.interactionState)?'horse-idle':'idle';
-      for (const event of this.needs.tick(player, TICK_MS / 1000, now, { running, moving })) this.onNeeds(player, presence, event, now);
+      } else if (now - presence.lastInputAt > 250 && ['walk', 'run','horse-walk','horse-gallop','fly'].includes(player.animationState)) player.animationState = player.animationState === 'fly' ? 'fly-idle' : isRidingHorse(player.interactionState)?'horse-idle':'idle';
+      if (!this.deaths.isDead(id)) for (const event of this.needs.tick(player, TICK_MS / 1000, now, { running, moving })) this.onNeeds(player, presence, event, now);
       if (player.stageUntil && now >= player.stageUntil) this.endStagePass(player, presence);
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
     }
+    lap('players');
     this.refueling.update(now,TICK_MS/1000);
     this.stepMotos(now);
+    lap('motos');
     this.syncPassengers(now);
     this.stepKicks(now);
     this.stepThrown(now);
     this.stepHighfood(now);
     this.stepTrades(now);
+    lap('combat+jobs');
     for (const end of this.musicians.update(now, id => this.state.players.get(id)?.connected)) this.finishMusician(end);
     this.blackjack.tick(now);
     this.checkTruco();
     this.truco.tick(now);
+    lap('minigames-a');
     this.syncTable();
     this.checkFoosball();
     this.syncFoosball();
@@ -1045,11 +1178,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const table of this.pool.values()) table.tick(now);
     this.syncPool();
     if (this.events.update(now, this.state.occupancy)) this.syncEvent(now);
+    lap('minigames-b');
     this.serveDrinks(now);
     this.serveTables(now);
     this.runJobs(now);
+    lap('service');
     this.npcs.update([...this.state.npcs.values()].filter(npc => !isCustomerNpc(npc.id)), [...this.state.players.values()].filter(p => p.connected), this.state.event.type, now);
-    if (++this.tickCount % 2 === 0) this.refreshViews();
+    lap('npcs');
+    // Who sees whom: 5 times a second (a thousand players packed in one place cost 25 ms a round; 10 Hz was a quarter of a core there).
+    if (++this.tickCount % 4 === 0) { this.refreshViews(); lap('views'); }
   }
 
   /**
@@ -1266,8 +1403,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (!body.sim.asleep) continue;
       if (body.hurt > 0) {
         this.needs.damage(player, body.hurt, now); body.hurt = 0;
-        // No life left: the next tick's needs make this a faint, right where the body lies.
-        if (player.hp <= 0) continue;
+        // No life left, ring and heart: the next tick's needs make this a death, right where the body lies.
+        if (player.hp <= 0 && player.hpCore <= 0) continue;
       }
       // `levantar_chao` starts lying with the feet the way it faces and the hips behind its origin: turned and placed so it starts as the body lies.
       const x = rest.x - Math.sin(rest.heading) * RECOVER_HIPS_BEHIND, z = rest.z - Math.cos(rest.heading) * RECOVER_HIPS_BEHIND;
@@ -2360,6 +2497,14 @@ export class BarRoom extends Room<{ state: BarState }> {
   private jobView(playerId:string){return {task:this.jobs.view(playerId)??null};}
   private sendJob(presence:Presence):void {presence.client.send('job.state',this.jobView(presence.ticket.userId));}
   private syncJobs():void {for(const view of this.jobs.slots())this.state.jobs.get(view.id)?.assign(view);}
+  /** Ends the flight: down to the floor below (or the nearest standing spot if that is inside something). */
+  private land(player:Player,presence:Presence):void {
+    if(!presence.flying)return;
+    presence.flying=false;presence.falling=false;presence.queue.length=0;
+    const y=groundBelow(player.x,player.z,player.y)??floorHeight(player.x,player.z)??0,spot=standingPosition({x:player.x,y,z:player.z},player.rotation);
+    Object.assign(player,{x:spot.x,y:spot.y??y,z:spot.z,animationState:'idle',animationStartedAt:Date.now()});
+    player.lastProcessedInput=presence.lastReceived;
+  }
   private requireAdmin(client:Client):string {
     const presence=this.forClient(client);if(presence?.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');
     return presence.ticket.userId;
@@ -2393,6 +2538,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   private setInventory(presence:Presence,stacks:readonly InventoryStack[]):void {
     presence.inventory=new Map(stacks.filter(stack=>stack.quantity>0&&itemById(stack.itemId)).map(stack=>[stack.itemId,stack.quantity]));
+    if(!presence.inventory.get('rojao')){const player=this.state.players.get(presence.ticket.userId);if(player)player.fireworkEquipped=false;}
   }
   private sendInventory(presence:Presence,view?:Partial<InventoryView>):void {
     const stacks=[...presence.inventory].map(([itemId,quantity])=>({itemId,quantity}));
@@ -2410,6 +2556,13 @@ export class BarRoom extends Room<{ state: BarState }> {
   private async useInventory(client:Client,itemId:ItemId):Promise<void>{
     const item=itemById(itemId);if(!item)throw new Error('Item inválido.');
     const player=this.player(client),presence=this.forClient(client)!;
+    if(itemId==='rojao'){
+      if(player.fireworkEquipped){player.fireworkEquipped=false;return;}
+      if(!this.canFirework(player)||presence.inventoryBusy)throw new Error('Fique de pé e libere as mãos para equipar o rojão.');
+      if(!(presence.inventory.get('rojao')??0))throw new Error('Você não tem rojão na mochila.');
+      player.fireworkEquipped=true;return;
+    }
+    if(player.fireworkEquipped)throw new Error('Guarde o rojão com R antes de usar outro item.');
     if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a ação atual antes de usar um item.');
     if(item.category==='peca')throw new Error('Essa peça se usa na moto: botão direito nela, Informações do veículo.');
     const inHand=consumedOverTime(itemId);
@@ -2424,6 +2577,25 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.animationState='use';player.drinkItem='';presence.interactionEndsAt=player.animationStartedAt+USE_DURATION_MS;
     }
     this.sendInventory(presence,view);
+  }
+
+  private canFirework(player:Player):boolean {
+    return player.connected&&isConscious(player)&&!this.deaths.isDead(player.id)&&!player.interactionState&&!player.currentTableId&&!player.holding&&!player.carrying&&!player.parcel&&!player.looking&&!player.phone&&['idle','walk','run'].includes(player.animationState);
+  }
+  private async fireFirework(client:Client,direction:FireworkVector):Promise<void> {
+    const player=this.player(client),presence=this.forClient(client)!,now=Date.now();
+    if(!player.fireworkEquipped||!this.canFirework(player))throw new Error('Equipe o rojão na mochila e libere as mãos para disparar.');
+    if(presence.inventoryBusy||now-(presence.fireworkAt??0)<FIREWORK.cooldownMs)throw new Error('Aguarde para soltar outro rojão.');
+    const length=Math.hypot(direction.x,direction.y,direction.z);
+    const unit={x:direction.x/length,y:direction.y/length,z:direction.z/length};
+    const origin=fireworkOrigin(player,player.rotation);
+    const view=await this.removeInventory(presence,'rojao',1,'use');
+    if(this.forClient(client)!==presence)return;
+    presence.fireworkAt=Date.now();
+    this.sendInventory(presence,view);
+    const shot:FireworkShot={id:randomUUID(),playerId:player.id,launchedAt:Date.now(),origin,direction:unit,flightMs:fireworkFlightMs(origin,unit),hue:randomInt(360)};
+    this.broadcast('firework.shot',shot);
+    client.send('inventory.result',{action:'use',itemId:'rojao',quantity:1});
   }
 
   /** A backpack item used at once, a toilet or urinal visit, getting up from a chair, a cigarette put out or smoked whole, or being sick ran its full time. */
@@ -2528,6 +2700,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.lastProcessedInput = presence.lastReceived;
   }
   private onNeeds(player: Player, presence: Presence, event: NeedsEvent, now: number): void {
+    // HP and its heart ran out: the Morte comes for them (and if there is no body to take, life goes on).
+    if (event.type === 'died') { if (!this.deaths.kill(player.id, 'vida')) this.needs.revive(player, now); return; }
     if (event.type === 'faint' || event.type === 'stumble') {
       this.knockDown(player, presence);
       player.interactionState = event.type === 'faint' ? 'fainted' : 'stumbling';
@@ -3056,18 +3230,42 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private refreshViews(): void {
+    // The players as plain numbers, once: the nearest FULL_DETAIL_MAX of each viewer are models, the rest of the crowd sprites.
+    const sendCrowd = this.viewRound++ % 2 === 0, t0 = performance.now();
+    let tModels = 0, tSprites = 0, tViews = 0;
+    const entries: CrowdEntry[] = [], byId = new Map<string, CrowdEntry>();
+    for (const player of this.state.players.values()) {
+      const state = player.interactionState;
+      const grouped = player.currentTableId || /^(?:foosball|pool|truco):[^:]+/.exec(state)?.[0] || '';
+      const entry: CrowdEntry = { id: player.id, slot: player.slot, x: player.x, y: player.y, z: player.z, rotation: player.rotation, skin: crowdSkinIndex(player.skin),
+        gait: player.animationState === 'run' ? 2 : player.animationState === 'walk' ? 1 : 0,
+        // A rider is seen as far as the bike is (the bikes have no area of interest), not a bike riding itself.
+        rider: isRidingMoto(state) || state === THROWN, noSprite: state !== '' && state !== 'smoke' && !isRidingMoto(state) && state !== THROWN, group: grouped };
+      entries.push(entry); byId.set(entry.id, entry);
+    }
+    this.crowd.build(entries, sendCrowd);
+    this.performanceSampler.recordPhase('views:entries', performance.now() - t0);
     for (const [id, presence] of this.sessions) {
-      const self = this.state.players.get(id);
-      if (!self || !presence.client.view) continue;
+      const self = this.state.players.get(id), viewer = byId.get(id);
+      if (!self || !viewer || !presence.client.view) continue;
+      let t = performance.now();
+      const models = this.crowd.models(viewer, new Set([...presence.seen].map(item => (item as { id?: string }).id ?? '')));
       const visible = new Set<Schema>();
-      // A rider is seen as far as the bike is (the bikes have no area of interest), not a bike riding itself.
-      for (const player of this.state.players.values()) if (player.id === id || isRidingMoto(player.interactionState) || player.interactionState === THROWN || distance(self, player) <= AOI_RADIUS) visible.add(player);
+      for (const modelId of models) { const player = this.state.players.get(modelId); if (player) visible.add(player); }
+      tModels += performance.now() - t; t = performance.now();
+      if (sendCrowd) {
+        const sprites = this.crowd.sprites(viewer, models), last = presence.crowdSent;
+        if (sprites.length !== (last?.length ?? 0) || (last && Buffer.compare(sprites, last) !== 0)) { presence.client.sendBytes('crowd', sprites); presence.crowdSent = sprites; }
+      }
+      tSprites += performance.now() - t; t = performance.now();
       const customer = this.highfood.orderOf(id)?.id;
       for (const npc of this.state.npcs.values()) if (distance(self, npc) <= AOI_RADIUS || (customer && npc.id === HIGHFOOD_NPC_PREFIX + customer)) visible.add(npc);
       for (const old of presence.seen) if (!visible.has(old)) presence.client.view.remove(old);
       for (const item of visible) if (!presence.seen.has(item)) presence.client.view.add(item);
       presence.seen = visible;
+      tViews += performance.now() - t;
     }
+    this.performanceSampler.recordPhase('views:models', tModels); this.performanceSampler.recordPhase('views:sprites', tSprites); this.performanceSampler.recordPhase('views:diff', tViews);
   }
 
   private async maintenance(): Promise<void> {
@@ -3075,14 +3273,20 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.maintenanceBusy = true;
     try {
       this.sessions.pruneExpiredNonces(Date.now());
-      const checks = await Promise.allSettled([...this.sessions].map(async ([id, p]) => {
+      // One /validate per player every 3 s was N API requests (each several queries) in one burst per round: the cost of a
+      // crowd landed on the API, not on the room. Each session is confirmed every config.accessRecheckMs (12 s) instead (bans and kicks
+      // do not wait for it: they arrive as controls on every round), the oldest first, a few at a time.
+      const nowMs = Date.now();
+      const due = [...this.sessions].filter(([, p]) => nowMs - (p.validatedAt ?? 0) >= this.config.accessRecheckMs).sort((a, b) => (a[1].validatedAt ?? 0) - (b[1].validatedAt ?? 0)).slice(0, ACCESS_RECHECKS_PER_ROUND);
+      const checks = await mapLimit(due, ACCESS_RECHECK_PARALLEL, async ([id, p]) => {
         const access = await validateAccess(p.ticket.sessionId, id);
+        p.validatedAt = Date.now();
         // The snapshot may be stale after a takeover. In particular, an invalid response for the
         // previous API session must never expel the presence that replaced it while this awaited.
         if (p.revoked || !this.sessions.isCurrent(id, p)) return;
         if (!access.valid){if(access.banned)this.removeByAdmin(id,'ban','Sua conta está banida do bar.');else this.expel(id, 'Sua sessão terminou ou a conta foi suspensa.');}
         else { p.blocked = new Set(access.blocked); p.ticket.role = access.role;const player=this.state.players.get(id);if(player)this.applyAppearance(player,access); }
-      }));
+      });
       if (checks.some(r => r.status === 'rejected')) this.log('auth_refresh_unavailable', {});
       const { applied, failed } = await this.controls.poll(control => this.applyControl(control));
       health.apiOkAt = Date.now();
@@ -3109,7 +3313,56 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   /** Development bots earn nothing. */
-  private achieved(userId: string, series: string, amount = 1): void { if (!this.botIds.has(userId)) this.achievements.add(userId, series, amount); }
+  private achieved(userId: string, series: string, amount = 1): void {
+    if (this.botIds.has(userId)) return;
+    this.achievements.add(userId, series, amount);
+    // What the Morte says to a player follows what they did most this session (SERIES_CATEGORY).
+    const category = SERIES_CATEGORY[series];
+    if (category) { const counts = this.deathActivity.get(userId) ?? {}; counts[category] = (counts[category] ?? 0) + (series === 'motoboy' ? amount / 50 : amount); this.deathActivity.set(userId, counts); }
+  }
+
+  /** Holds the victim's body still for the whole death, out of tables, chairs, bikes and shifts. */
+  private holdForDeath(id: string, state: typeof DEATH_STATE | typeof DEATH_GONE_STATE): void {
+    const player = this.state.players.get(id), presence = this.sessions.getByUser(id);
+    if (!player) return;
+    const now = Date.now();
+    if (state === DEATH_STATE) {
+      const moto = this.state.motos.get(vehicleOfInteraction(player.interactionState));
+      if (moto) { const driver = !isPassenger(player.interactionState); this.freeMoto(moto, player); if (driver) { moto.assign(STOPPED_VEHICLE); moto.steer = 0; moto.lights = 0; } }
+      if (presence) this.knockDown(player, presence);
+      this.park(player);
+      player.animationState = 'idle'; player.animationStartedAt = now; player.looking = false;
+    }
+    player.interactionState = state;
+    if (presence) { presence.interactionEndsAt = undefined; presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+  }
+  /** The scene goes to everyone near the victim, and to the victim. Nothing is replayed to someone who arrives later. */
+  private broadcastDeath(plan: DeathPlan): void {
+    for (const [id, presence] of this.sessions) {
+      const other = this.state.players.get(id);
+      if (!other?.connected || presence.revoked) continue;
+      if (id === plan.victim || (Math.abs(other.y - plan.vy) < 6 && Math.hypot(other.x - plan.vx, other.z - plan.vz) <= Math.max(AOI_RADIUS, SCENE_AUDIO_RADIUS))) presence.client.send('death.scene', plan);
+    }
+  }
+  /** A random walkable place, 6 m or more from where the Morte stood and clear of other players; the body stands up there, free. */
+  private respawnAfterDeath(id: string, avoid: { x: number; z: number }): void {
+    const player = this.state.players.get(id), presence = this.sessions.getByUser(id);
+    if (!player) return;
+    const others = [...this.state.players.values()].filter(p => p !== player && p.connected), anchor = MAP_MARKERS.Spawn_Jogador;
+    let spot = findSpawn(others, anchor);
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const angle = Math.random() * Math.PI * 2, reach = Math.sqrt(Math.random()) * 28;
+      try {
+        const candidate = findSpawn(others, { x: anchor.x + Math.cos(angle) * reach, y: anchor.y, z: anchor.z + Math.sin(angle) * reach });
+        if (Math.hypot(candidate.x - avoid.x, candidate.z - avoid.z) >= 6) { spot = candidate; break; }
+      } catch { /* no free place round this anchor: try another */ }
+    }
+    Object.assign(player, spot);
+    player.rotation = Math.random() * Math.PI * 2;
+    player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();
+    this.needs.revive(player, Date.now());
+    if (presence) { presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
+  }
   /** Having something: its effects, and its part towards the badges of what is being had. */
   private consume(player: Player, item: string, now: number, portion = 1): void {
     this.needs.consume(player, item, now, portion);
@@ -3190,6 +3443,11 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** One administrative control. Throws to reject it for good (the API records it as failed). */
   private applyControl(control: Control): void {
     if (control.action === 'prices') { this.pricesLoaded = false; return; }
+    if (control.action === 'kill') {
+      // The kill really takes the life: HP, ring and heart, to zero, and then the Morte comes.
+      if (control.playerId && this.deaths.kill(control.playerId, 'admin')) { const target = this.state.players.get(control.playerId); if (target) this.needs.kill(target, Date.now()); }
+      return;
+    }
     if (control.action === 'sync') { const presence = control.playerId ? this.sessions.getByUser(control.playerId) : undefined; if (presence) void this.syncPresence(presence).catch(() => {}); return; }
     if ((control.action === 'kick' || control.action === 'ban') && control.playerId){
       const presence=this.sessions.getByUser(control.playerId);
@@ -3286,6 +3544,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (now - (presence.videoWindowAt ?? 0) >= 1000) { presence.videoWindowAt = now; presence.videoFrames = 0; }
     presence.videoFrames = (presence.videoFrames ?? 0) + 1;
     if (presence.videoFrames > PHONE.videoFps + 4) return;
+    // Frames share the socket with voice and game state. Drop new video before it can build a stale send queue.
+    const socket=listener.client.ref as {bufferedAmount?:number}|undefined;
+    if ((socket?.bufferedAmount??0)>PHONE.videoFrameTargetBytes*2) return;
     listener.client.sendBytes('phone.video', bytes);
   }
 

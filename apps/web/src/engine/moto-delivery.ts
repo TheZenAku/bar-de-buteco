@@ -4,14 +4,17 @@ import {MOTO,MOTO_ENGINE,motoLampLevel,motoSteerAngle,readMotoParts,type MotoBod
 import {closeHand,type HandRig} from './drink-props';
 import {palmUp,reach} from './serving-props';
 import {RoomTrack,SNAP_DISTANCE} from './moto-motion';
-import {lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-lights';
+import {FOGO_LAMPS,lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-lights';
 import {MotoSounds} from './moto-sound';
 import {CarRig,CarLights} from './car-rig';
 import {CarSounds} from './car-sound';
 import {MotoBag} from './moto-bag';
 import {VehicleHorns} from './vehicle-horn';
 import {wheeliePose} from '@bar/shared';
-import {CAR_MODEL,isCar,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
+import {CAR_MODEL,isCar,isFogo,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
+import {MotoFire} from './moto-fire';
+import {MotoExhaust} from './moto-exhaust';
+import {MotoPaint} from './moto-paint';
 
 const RAD_TO_DEG=180/Math.PI;
 const BONES=['chassi','direcao','suspensao_diant','balanca','descanso','roda_dianteira','roda_traseira'] as const;
@@ -51,11 +54,13 @@ export class MotoRig {
   private readonly q=new pc.Quat();
   private readonly tmp=new pc.Quat();
 
-  constructor(readonly entity:pc.Entity) {
+  /** `wheelRadius` is the model's own (the Caveira em Chamas has 29,7 cm); a bone the model lacks (its stand) is skipped without a word. */
+  constructor(readonly entity:pc.Entity,wheelRadius=MOTO.WHEEL_RADIUS) {
+    this.raioRoda=wheelRadius;
     for(const nome of BONES){
       const entidade=this.ponto(nome);
       if(entidade)this.ossos.set(nome,{entidade,repouso:entidade.getLocalRotation().clone(),pos:entidade.getLocalPosition().clone()});
-      else console.warn(`moto: osso "${nome}" não encontrado`);
+      else if(nome!=='descanso')console.warn(`moto: osso "${nome}" não encontrado`);
     }
   }
   /** glTF front is +Z; PlayCanvas forward is -Z. */
@@ -79,7 +84,7 @@ export class MotoRig {
   /** A node of the rig by name: the attachment points and the bones. */
   ponto(nome:string):pc.Entity {
     let node=this.pontos.get(nome);
-    if(!node){node=this.entity.findByName(nome) as pc.Entity;this.pontos.set(nome,node);}
+    if(!node){node=this.entity.findByName(nome) as pc.Entity;if(node)this.pontos.set(nome,node);}
     return node;
   }
   private girar(nome:string,x:number,y:number,z:number):void {
@@ -129,6 +134,10 @@ export interface Bike {
   predicted?:MotoBody;track:RoomTrack;riddenHere:boolean;gap:{x:number;z:number;yaw:number};
   drawn:{x:number;y:number;z:number;yaw:number;pitch:number;wheelie?:number};
   deliveryBag?:pc.Entity;bagPending?:boolean;bagWanted?:boolean;
+  /** The flames on the wheels of the Caveira em Chamas. */
+  fire?:MotoFire;
+  /** The Caveira em Chamas' tail pipes (smoke, backfires) and the owner's paint on its reds. */
+  exhaust?:MotoExhaust;paint?:MotoPaint;
 }
 
 /** The delivery bikes the room syncs, drawn between its patches (and the rider's prediction, for the local one). */
@@ -139,6 +148,7 @@ export class Motos {
   private readonly carSounds:CarSounds;
   private readonly horns:VehicleHorns;
   private model?:pc.ContainerResource;
+  private fogoModel?:pc.ContainerResource;
   private bagModel?:Promise<pc.ContainerResource>;
   private courierRiders=new Set<string>();
   private destroyed=false;
@@ -172,6 +182,10 @@ export class Motos {
       if(error||!asset){console.warn('Carro hatch indisponível.',error);return;}
       this.carModel=asset.resource as pc.ContainerResource;this.place();
     });
+    app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_fogo.glb`,'container',(error,asset)=>{
+      if(error||!asset){console.warn('Moto Caveira em Chamas indisponível.',error);return;}
+      this.fogoModel=asset.resource as pc.ContainerResource;this.place();
+    });
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_delivery.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Moto de entrega indisponível.',error);return;}
       this.model=asset.resource as pc.ContainerResource;this.place();
@@ -189,7 +203,7 @@ export class Motos {
   /** Courier state is public: every client derives the same bag attachment from the rider's shift. */
   couriers(ids:Iterable<string>):void {this.courierRiders=new Set(ids);}
   private deliveryBag(bike:Bike):void {
-    const wanted=bike.rig instanceof MotoRig&&!!bike.state.riderId&&this.courierRiders.has(bike.state.riderId)&&!bike.state.phase;
+    const wanted=bike.rig instanceof MotoRig&&!isFogo(bike.state)&&!!bike.state.riderId&&this.courierRiders.has(bike.state.riderId)&&!bike.state.phase;
     bike.bagWanted=wanted;
     if(!wanted){bike.deliveryBag?.destroy();bike.deliveryBag=undefined;return;}
     if(bike.deliveryBag||bike.bagPending)return;
@@ -200,14 +214,16 @@ export class Motos {
     }).catch(error=>console.warn('Bag de entrega indisponível.',error)).finally(()=>{bike.bagPending=false;});
   }
   /** The plate on the bike's back, under the lamp that lights it: Mercosul colours, on a thin box on the tail's node. */
-  private plate(rig:MotoRig,text:string):{material:pc.StandardMaterial;texture:pc.Texture} {
+  private plate(rig:MotoRig,text:string,black=false):{material:pc.StandardMaterial;texture:pc.Texture} {
     const canvas=document.createElement('canvas');canvas.width=256;canvas.height=96;
     const g=canvas.getContext('2d')!;
-    g.fillStyle='#f4f4f0';g.fillRect(0,0,256,96);
-    g.fillStyle='#123c9c';g.fillRect(0,0,256,22);
-    g.fillStyle='#fff';g.font='700 15px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('BRASIL',128,12);
-    g.fillStyle='#111';g.font='700 60px "Courier New",monospace';g.fillText(text,128,60,244);
-    g.strokeStyle='#111';g.lineWidth=5;g.strokeRect(2,2,252,92);
+    // The Caveira em Chamas' plate is only black and red: red characters and header band on black.
+    const paper=black?'#070707':'#f4f4f0',band=black?'#c4141b':'#123c9c',bandText=black?'#070707':'#fff',ink=black?'#e0141c':'#111',frame=black?'#c4141b':'#111';
+    g.fillStyle=paper;g.fillRect(0,0,256,96);
+    g.fillStyle=band;g.fillRect(0,0,256,22);
+    g.fillStyle=bandText;g.font='700 15px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('BRASIL',128,12);
+    g.fillStyle=ink;g.font='700 60px "Courier New",monospace';g.fillText(text,128,60,244);
+    g.strokeStyle=frame;g.lineWidth=5;g.strokeRect(2,2,252,92);
     const texture=new pc.Texture(this.app.graphicsDevice,{width:256,height:96,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,minFilter:pc.FILTER_LINEAR_MIPMAP_LINEAR,magFilter:pc.FILTER_LINEAR,anisotropy:4});
     texture.setSource(canvas);
     const material=new pc.StandardMaterial();
@@ -230,16 +246,16 @@ export class Motos {
     for(const state of this.states){
       const known=this.bikes.get(state.id);
       if(known){known.state=state;continue;}
-      const car=isCar(state),model=car?this.carModel:this.model;if(!model)continue;
+      const car=isCar(state),fogo=isFogo(state),model=car?this.carModel:fogo?this.fogoModel:this.model;if(!model)continue;
       const entity=new pc.Entity(`${car?'Carro':'Moto'} ${state.id}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
       const spec=vehiclePhysics(state.model);body.setLocalScale(spec.SCALE,spec.SCALE,spec.SCALE);
       entity.addChild(body);this.app.root.addChild(entity);
       const contact=this.shadow(entity);contact.setLocalScale(spec.HALF_WIDTH*4,1,spec.HALF_LENGTH*2.8);
-      const rig=car?new CarRig(body,this.app.graphicsDevice):new MotoRig(body);
-      const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate):undefined;
-      this.bikes.set(state.id,{entity,rig,plate,lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
+      const rig=car?new CarRig(body,this.app.graphicsDevice):new MotoRig(body,spec.WHEEL_RADIUS),fire=fogo?new MotoFire(body,this.app.graphicsDevice):undefined,exhaust=fogo?new MotoExhaust(body,this.app.graphicsDevice):undefined,paint=fogo?new MotoPaint(body):undefined;
+      const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate,fogo):undefined;
+      this.bikes.set(state.id,{entity,rig,plate,...(fire?{fire}:{}),...(exhaust?{exhaust}:{}),...(paint?{paint}:{}),lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials,fogo?FOGO_LAMPS:undefined),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
-    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.rig.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
+    for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.rig.destroy();bike.fire?.destroy();bike.exhaust?.destroy();bike.paint?.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
   }
   /** The local rider's own bike as it should be drawn this frame (undefined off the bike). */
   predict(id:string,body:MotoBody|undefined):void {const bike=this.bikes.get(id);if(bike)bike.predicted=body;}
@@ -290,6 +306,9 @@ export class Motos {
       lamps.lit=power&&mode>0;lamps.high=power&&mode===2;
       if(rig instanceof MotoRig){rig.freio=lamps.brake?1:0;rig.acelerador=power&&(bike.predicted&&this.localGas?.id===bike.state.id?this.localGas.open:bike.state.gas)?1:0;}
       rig.update(dt);
+      bike.fire?.update(dt,target.speed,bike.entity.forward,power,exposure);
+      bike.paint?.set(bike.state.color);
+      if(bike.exhaust){const gasOpen=bike.predicted&&this.localGas?.id===bike.state.id?this.localGas.open:!!bike.state.gas;bike.exhaust.update(dt,target.speed,power,gasOpen,Math.min(1,1/Math.max(exposure,.1)),exposure);}
       const parts=readDriveParts(bike.state),seed=bike.state.id.charCodeAt(bike.state.id.length-1)||0;
       bike.lights.update(lamps,now,camera,exposure,motoLampLevel(parts.farol,parts.bateria,now,seed),motoLampLevel(parts.lanterna,parts.bateria,now,seed+1));
     }
@@ -302,7 +321,10 @@ export class Motos {
   }
   /** The bike under a point of the view (CSS pixels of the canvas), the nearest first: a ray against its box, however it lies. */
   pick(camera:pc.CameraComponent,x:number,y:number):string|undefined {
-    const near=camera.screenToWorld(x,y,camera.nearClip,this.rayA),far=camera.screenToWorld(x,y,PICK_REACH,this.rayB);
+    return this.pickRay(camera.screenToWorld(x,y,camera.nearClip,this.rayA),camera.screenToWorld(x,y,PICK_REACH,this.rayB))?.id;
+  }
+  /** The bike a segment from `near` to `far` goes through, the nearest first, and where it enters (0 at `near`, 1 at `far`): the VR controller's ray. */
+  pickRay(near:pc.Vec3,far:pc.Vec3):{id:string;at:number}|undefined {
     let best:string|undefined,bestAt=Infinity;
     for(const bike of this.bikes.values()){
       const spec=vehiclePhysics(bike.state.model);
@@ -317,10 +339,10 @@ export class Motos {
       }
       if(enter<=leave&&enter<bestAt){bestAt=enter;best=bike.state.id;}
     }
-    return best;
+    return best===undefined?undefined:{id:best,at:bestAt};
   }
   soundTelemetry(id?:string) {const engine=id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);return {...engine,horn:id?this.horns.telemetry(id):undefined};}
-  destroy():void {this.destroyed=true;this.sounds.destroy();this.carSounds.destroy();this.horns.destroy();for(const bike of this.bikes.values()){bike.deliveryBag?.destroy();bike.rig.destroy();}}
+  destroy():void {this.destroyed=true;this.sounds.destroy();this.carSounds.destroy();this.horns.destroy();for(const bike of this.bikes.values()){bike.deliveryBag?.destroy();bike.rig.destroy();bike.fire?.destroy();bike.exhaust?.destroy();bike.paint?.destroy();}}
   ridden(playerId:string):Bike|undefined {for(const bike of this.bikes.values())if(vehicleSeat(bike.state,playerId)>=0)return bike;}
   /** The bike nearest to a point, not far off. */
   nearest(point:{x:number;z:number}):Bike|undefined {

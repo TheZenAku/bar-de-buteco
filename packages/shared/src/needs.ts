@@ -3,14 +3,30 @@ import {ITEM_CATALOG} from './inventory.js';
 /**
  * Character needs: HP, stamina, hunger, thirst, bladder and drunkenness. Pure, time-based rules shared by
  * the authoritative server (which owns the values) and the client (which predicts running and sway).
+ *
+ * HP, stamina, hunger and thirst are each two things: the ring (the level, `hp`, `stamina`...) and the core behind it
+ * (`hpCore`...). The ring is what is felt and it is refilled from the core, which is spent as it does; eating fills the core
+ * gradually. Damage past an empty ring takes the core. Only the heart (HP) kills: its ring and core both at zero is death.
  * Every tunable number lives in NEEDS; nothing below hard-codes balance.
  */
 export const NEEDS = {
   hp: {
     max: 100,
-    /** HP when waking from a faint caused by HP reaching zero. */
+    /** The ring's HP on coming back from a death. */
     recoverTo: 35,
+    /** The heart's own reserve is low: a notice. */
     alertAt: 25,
+  },
+  /** The cores: where they start, how fast each ring is refilled from its core, and how many core points a ring point costs. */
+  cores: {
+    start: 100,
+    /** Eaten points reach a core at this pace (points per second): a meal is felt for a few seconds. */
+    absorbPerSecond: 8,
+    hp: { refillPerSecond: 1.5, cost: 1 },
+    /** Rested stamina is cheap: a full bar costs 5 core points. With an empty core it comes back at this share of the pace. */
+    stamina: { refillPerSecond: 12, cost: .05, emptyShare: .2 },
+    hunger: { refillPerSecond: 3, cost: 1 },
+    thirst: { refillPerSecond: 3, cost: 1 },
   },
   stamina: {
     max: 100,
@@ -23,19 +39,21 @@ export const NEEDS = {
     exhaustedUntil: 30,
   },
   hunger: {
-    /** 100 is fed, 0 is starving. Empties in about four hours of play. */
+    /** 100 is fed, 0 is starving. The ring loses this much and takes it from the core: a full core lasts forty minutes. */
     max: 100,
-    drainPerMinute: 100 / 240,
+    drainPerMinute: 100 / 40,
     alertAt: 30,
+    /** Ring and core both empty: HP is lost at this pace (points per second), never in a burst. */
+    damagePerSecond: .25,
   },
   thirst: {
-    /** 100 is hydrated, 0 is dehydrated. Empties in about two and a half hours of play. */
+    /** 100 is hydrated, 0 is dehydrated. A full core lasts twenty-five minutes (half that running). */
     max: 100,
-    drainPerMinute: 100 / 150,
+    drainPerMinute: 100 / 25,
     runningMultiplier: 2,
     alertAt: 30,
-    /** At zero thirst, HP drains slowly (6 per minute), never in a burst. */
-    damagePerSecond: .1,
+    /** Ring and core both empty: HP is lost at this pace, never in a burst. */
+    damagePerSecond: .35,
     /** No dehydration damage for this long after waking up. */
     graceAfterWakingSeconds: 60,
   },
@@ -97,6 +115,11 @@ export type FaintCause = 'hp' | 'alcohol';
 export interface MaxHpBonus { source: string; amount: number; until: number }
 export interface NeedsState {
   hp: number; stamina: number; hunger: number; thirst: number; bladder: number; drunk: number;
+  /** The cores behind hp, stamina, hunger and thirst, and what was eaten and is still reaching them. */
+  hpCore: number; staminaCore: number; hungerCore: number; thirstCore: number;
+  intake: Record<CoreKey, number>;
+  /** HP and its core ran out: the death was reported once (the room clears it with `revive`). */
+  dead: boolean;
   bonuses: MaxHpBonus[];
   exhausted: boolean;
   /** Stamina may recover from this time (ms). */
@@ -111,7 +134,10 @@ export interface NeedsState {
   nextVomitAt: number;
   dehydrationGraceUntil: number;
 }
+export type CoreKey = 'hp' | 'stamina' | 'hunger' | 'thirst';
+export const CORE_KEYS: readonly CoreKey[] = ['hp', 'stamina', 'hunger', 'thirst'];
 export type NeedsEvent =
+  | { type: 'died' }
   | { type: 'faint'; cause: FaintCause }
   | { type: 'woke' }
   | { type: 'recovered' }
@@ -127,7 +153,9 @@ export interface ConsumableEffects {
   name: string;
   hunger?: number;
   thirst?: number;
-  /** Immediate HP recovery, up to the current maximum. */
+  /** Stamina for the stamina core. */
+  stamina?: number;
+  /** HP for the heart's core: it reaches it gradually, and the core refills the ring. */
   hp?: number;
   /** Temporary raise of maximum HP, and for how long. */
   maxHp?: { amount: number; seconds: number };
@@ -143,7 +171,9 @@ export const CONSUMABLES: Record<string, ConsumableEffects> = Object.fromEntries
 
 const clamp = (value: number, min: number, max: number) => Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
 export function createNeeds(now = 0): NeedsState {
+  const core = NEEDS.cores.start;
   return { hp: NEEDS.hp.max, stamina: NEEDS.stamina.max, hunger: NEEDS.hunger.max, thirst: NEEDS.thirst.max, bladder: 0, drunk: 0,
+    hpCore: core, staminaCore: core, hungerCore: core, thirstCore: core, intake: { hp: 0, stamina: 0, hunger: 0, thirst: 0 }, dead: false,
     bonuses: [], exhausted: false, restAt: now, condition: 'normal', conditionUntil: 0, faints: 0, nextStumbleAt: 0, nextVomitAt: 0, dehydrationGraceUntil: 0 };
 }
 /** Maximum HP right now: the base plus active temporary bonuses. */
@@ -193,10 +223,21 @@ export function swayInput<T extends { dx: number; dz: number }>(input: T, seq: n
   return { ...input, dx: input.dx * cos - input.dz * sin, dz: input.dx * sin + input.dz * cos };
 }
 
-/** Lowers HP (damage of any kind). Fainting is decided by the next tick, once, by the condition rules. */
+/** Lowers HP (damage of any kind): the ring first, what is left past it takes the heart's core. Death is decided by the next tick. */
 export function damage(state: NeedsState, amount: number, now: number): void {
   if (!(amount > 0)) return;
-  state.hp = clamp(state.hp - amount, 0, maxHp(state, now));
+  const ring = clamp(state.hp, 0, maxHp(state, now)), taken = Math.min(ring, amount);
+  state.hp = ring - taken;
+  state.hpCore = clamp(state.hpCore - (amount - taken), 0, NEEDS.cores.start);
+}
+/** HP, ring and heart, to zero: the death the administration sends. The next tick reports it (unless `dead` is already set). */
+export function killNeeds(state: NeedsState): void {
+  state.hp = 0; state.hpCore = 0; state.intake.hp = 0;
+}
+/** Back from a death: the ring at `NEEDS.hp.recoverTo`, an empty heart, nothing left to absorb. */
+export function reviveNeeds(state: NeedsState): void {
+  state.dead = false; state.hp = NEEDS.hp.recoverTo; state.hpCore = 0; state.intake.hp = 0;
+  state.condition = 'normal'; state.conditionUntil = 0;
 }
 
 /**
@@ -206,15 +247,18 @@ export function damage(state: NeedsState, amount: number, now: number): void {
 export function applyConsumable(state: NeedsState, effects: ConsumableEffects, now: number, portion = 1): boolean {
   if (!isConscious(state)) return false;
   const part = clamp(portion, 0, 1), amount = (value?: number) => Number.isFinite(value) ? value! : 0;
-  state.hunger = clamp(state.hunger + amount(effects.hunger) * part, 0, NEEDS.hunger.max);
-  state.thirst = clamp(state.thirst + amount(effects.thirst) * part, 0, NEEDS.thirst.max);
+  // Food and drink reach the cores gradually (tickNeeds); what takes away (salty food) is taken from the core at once.
+  const feed = (key: CoreKey, value: number) => {
+    if (value > 0) state.intake[key] = clamp(state.intake[key] + value * part, 0, NEEDS.cores.start);
+    else if (value < 0) state[`${key}Core` as const] = clamp(state[`${key}Core` as const] + value * part, 0, NEEDS.cores.start);
+  };
+  feed('hunger', amount(effects.hunger)); feed('thirst', amount(effects.thirst)); feed('stamina', amount(effects.stamina)); feed('hp', amount(effects.hp));
   state.bladder = clamp(state.bladder + amount(effects.bladder) * part, 0, NEEDS.bladder.max);
   // Alcohol hits harder on an empty stomach (hunger is measured before this item's own food value).
   const sensitivity = 1 + NEEDS.drunk.hungerSensitivity * (1 - clamp(state.hunger, 0, NEEDS.hunger.max) / NEEDS.hunger.max);
   state.drunk = clamp(state.drunk + amount(effects.drunk) * part * sensitivity, 0, NEEDS.drunk.max);
   if (effects.maxHp && amount(effects.maxHp.amount) > 0 && amount(effects.maxHp.seconds) > 0 && part > 0)
     state.bonuses.push({ source: effects.name, amount: effects.maxHp.amount * part, until: now + effects.maxHp.seconds * 1000 });
-  state.hp = clamp(state.hp + amount(effects.hp) * part, 0, maxHp(state, now));
   return true;
 }
 /**
@@ -226,7 +270,7 @@ export function sickAfterDrink(state: NeedsState, effects: ConsumableEffects, no
   if (!((effects.drunk ?? 0) > 0) || !isConscious(state) || drunkStage(state.drunk) < rule.fromStage || now < state.nextVomitAt || random() >= rule.chance) return false;
   state.nextVomitAt = now + rule.cooldownSeconds * 1000;
   state.drunk = clamp(state.drunk - rule.drunkRelief, 0, NEEDS.drunk.max);
-  state.thirst = clamp(state.thirst + rule.thirst, 0, NEEDS.thirst.max);
+  state.thirstCore = clamp(state.thirstCore + rule.thirst, 0, NEEDS.cores.start);
   return true;
 }
 /** Using a toilet; `portion` (0–1) for a visit cut short. */
@@ -247,33 +291,52 @@ export function tickNeeds(state: NeedsState, seconds: number, now: number, activ
   const ceiling = maxHp(state, now);
   state.hp = clamp(state.hp, 0, ceiling);
 
-  state.hunger = clamp(state.hunger - NEEDS.hunger.drainPerMinute / 60 * dt, 0, NEEDS.hunger.max);
-  state.thirst = clamp(state.thirst - NEEDS.thirst.drainPerMinute / 60 * dt * (activity.running ? NEEDS.thirst.runningMultiplier : 1), 0, NEEDS.thirst.max);
+  // What was eaten reaches the cores a little at a time.
+  for (const key of CORE_KEYS) {
+    const core = `${key}Core` as const, take = Math.min(state.intake[key], NEEDS.cores.absorbPerSecond * dt, NEEDS.cores.start - state[core]);
+    if (take > 0) { state[core] += take; state.intake[key] -= take; }
+  }
+  // Each ring is refilled from its core, spending it. `room` is how much the ring can take at most this tick.
+  const refill = (key: CoreKey, ring: number, max: number, pace: number): number => {
+    const rule = NEEDS.cores[key], core = `${key}Core` as const, got = Math.min(Math.max(0, max - ring), pace * dt, state[core] / rule.cost);
+    state[core] -= got * rule.cost;
+    return ring + got;
+  };
+  state.hunger = refill('hunger', clamp(state.hunger - NEEDS.hunger.drainPerMinute / 60 * dt, 0, NEEDS.hunger.max), NEEDS.hunger.max, NEEDS.cores.hunger.refillPerSecond);
+  state.thirst = refill('thirst', clamp(state.thirst - NEEDS.thirst.drainPerMinute / 60 * dt * (activity.running ? NEEDS.thirst.runningMultiplier : 1), 0, NEEDS.thirst.max), NEEDS.thirst.max, NEEDS.cores.thirst.refillPerSecond);
   state.drunk = clamp(state.drunk - NEEDS.drunk.soberPerMinute / 60 * dt, 0, NEEDS.drunk.max);
+  state.hp = refill('hp', state.hp, ceiling, NEEDS.cores.hp.refillPerSecond);
 
   if (activity.running) {
     state.stamina = clamp(state.stamina - NEEDS.stamina.runDrainPerSecond * staminaCost(state) * dt, 0, NEEDS.stamina.max);
     state.restAt = now + NEEDS.stamina.regenDelaySeconds * 1000;
     if (state.stamina <= 0 && !state.exhausted) { state.exhausted = true; events.push({ type: 'exhausted' }); }
   } else if (now >= state.restAt) {
-    state.stamina = clamp(state.stamina + NEEDS.stamina.regenPerSecond * staminaRecovery(state) * dt, 0, NEEDS.stamina.max);
+    // Rested from the core; with the core empty, only a slow trickle (never stuck for good).
+    const pace = NEEDS.stamina.regenPerSecond * staminaRecovery(state), before = state.staminaCore;
+    state.stamina = refill('stamina', state.stamina, NEEDS.stamina.max, pace);
+    const missing = pace * dt - (before - state.staminaCore) / NEEDS.cores.stamina.cost;
+    if (missing > 1e-9) state.stamina = clamp(state.stamina + missing * NEEDS.cores.stamina.emptyShare, 0, NEEDS.stamina.max);
   }
   if (state.exhausted && state.stamina >= NEEDS.stamina.exhaustedUntil) state.exhausted = false;
 
-  if (state.thirst <= 0 && state.condition !== 'fainted' && now >= state.dehydrationGraceUntil)
-    state.hp = clamp(state.hp - NEEDS.thirst.damagePerSecond * dt, 0, ceiling);
+  // No ring and no core of hunger or thirst: the body pays with HP (the heart's ring, then its core).
+  if (state.condition !== 'fainted') {
+    if (state.thirst <= 0 && state.thirstCore <= 0 && now >= state.dehydrationGraceUntil) damage(state, NEEDS.thirst.damagePerSecond * dt, now);
+    if (state.hunger <= 0 && state.hungerCore <= 0 && now >= state.dehydrationGraceUntil) damage(state, NEEDS.hunger.damagePerSecond * dt, now);
+  }
+  if (!state.dead && state.hp <= 0 && state.hpCore <= 0) { state.dead = true; events.push({ type: 'died' }); return events; }
 
   // Conditions: one transition per tick, each with its own timer; nothing restarts while it runs.
   if (state.condition === 'fainted') {
     if (now >= state.conditionUntil) {
-      if (state.faintCause === 'hp') state.hp = Math.max(state.hp, Math.min(NEEDS.hp.recoverTo, ceiling));
       if (state.faintCause === 'alcohol') state.drunk = Math.min(state.drunk, NEEDS.drunk.soberAfterFaintTo);
       state.dehydrationGraceUntil = now + NEEDS.thirst.graceAfterWakingSeconds * 1000;
       state.condition = 'recovering'; state.conditionUntil = now + NEEDS.faint.recoveringSeconds * 1000;
       events.push({ type: 'woke' });
     }
-  } else if (state.hp <= 0 || drunkStage(state.drunk) >= 4) {
-    const cause: FaintCause = state.hp <= 0 ? 'hp' : 'alcohol';
+  } else if (drunkStage(state.drunk) >= 4) {
+    const cause: FaintCause = 'alcohol';
     state.condition = 'fainted'; state.faintCause = cause; state.faints++;
     state.conditionUntil = now + (cause === 'alcohol' ? NEEDS.faint.alcoholSeconds : NEEDS.faint.seconds) * 1000;
     state.exhausted = false;

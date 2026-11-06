@@ -1,0 +1,16 @@
+{
+  "name": "Highland Bar",
+  "short_name": "Highland",
+  "description": "Seu personagem, sua galera e um bar 3D para conversar, explorar e jogar junto.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#181322",
+  "theme_color": "#181322",
+  "icons": [
+    {"src": "/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png"}
+  ]
+}

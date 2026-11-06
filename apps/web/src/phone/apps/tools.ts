@@ -1,4 +1,4 @@
-import {formatPhoneNumber} from '@bar/shared';
+import {formatPhoneNumber,worldCalendarDate} from '@bar/shared';
 import {escape as e} from '../../api';
 import {gameHour} from '../../engine/day-night';
 import {uiIcon} from '../../ui-icons';
@@ -33,23 +33,23 @@ export const notas:PhoneApp={id:'notas',name:'Notas',icon:'note',tint:'linear-gr
 
 /** Calendário: the real month, with events kept in this browser. */
 export const calendario:PhoneApp={id:'calendario',name:'Calendário',icon:'calendar',tint:'linear-gradient(160deg,#ffffff,#e9e9ee)',open(view,ctx){
-  const today=new Date();
-  let month=new Date(today.getFullYear(),today.getMonth(),1),day=today.getDate();
+  let today=worldCalendarDate(ctx.host.serverNow());
+  let month=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),1)),day=today.getUTCDate();
   let events=ctx.store.get<Record<string,string[]>>('events',{});
-  const key=(d:number)=>`${month.getFullYear()}-${month.getMonth()+1}-${d}`;
+  const key=(d:number)=>`${month.getUTCFullYear()}-${month.getUTCMonth()+1}-${d}`;
   function render():void {
-    const days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate(),offset=month.getDay(),list=events[key(day)]??[];
-    const isToday=(d:number)=>d===today.getDate()&&month.getMonth()===today.getMonth()&&month.getFullYear()===today.getFullYear();
-    view.innerHTML=`<div class="ph-body"><div class="ph-large cal-head"><h1>${e(month.toLocaleDateString('pt-BR',{month:'long'}))} <small>${month.getFullYear()}</small></h1><span><button type="button" class="ph-mini" data-cal="prev" aria-label="Mês anterior">${uiIcon('chevronLeft')}</button><button type="button" class="ph-mini flip" data-cal="next" aria-label="Próximo mês">${uiIcon('chevronLeft')}</button></span></div>
+    const days=new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth()+1,0)).getUTCDate(),offset=month.getUTCDay(),list=events[key(day)]??[];
+    const isToday=(d:number)=>d===today.getUTCDate()&&month.getUTCMonth()===today.getUTCMonth()&&month.getUTCFullYear()===today.getUTCFullYear();
+    view.innerHTML=`<div class="ph-body"><div class="ph-large cal-head"><h1>${e(month.toLocaleDateString('pt-BR',{month:'long',timeZone:'UTC'}))} <small>${month.getUTCFullYear()}</small></h1><span><button type="button" class="ph-mini" data-cal="prev" aria-label="Mês anterior">${uiIcon('chevronLeft')}</button><button type="button" class="ph-mini flip" data-cal="next" aria-label="Próximo mês">${uiIcon('chevronLeft')}</button></span></div>
       <div class="cal-grid">${['D','S','T','Q','Q','S','S'].map(letter=>`<small>${letter}</small>`).join('')}${'<span></span>'.repeat(offset)}${Array.from({length:days},(_,i)=>i+1).map(d=>`<button type="button" class="${d===day?'on':''} ${isToday(d)?'today':''} ${events[key(d)]?.length?'has':''}" data-cal="day" data-day="${d}">${d}</button>`).join('')}</div>
-      <h3 class="ph-section">${e(new Date(month.getFullYear(),month.getMonth(),day).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}))}</h3>
+      <h3 class="ph-section">${e(new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth(),day)).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}))}</h3>
       <div class="ph-list ph-card">${list.map((text,i)=>`<div class="ph-row"><i class="cal-dot"></i><span class="fl">${e(text)}</span><button type="button" class="ph-mini" data-cal="remove" data-index="${i}" aria-label="Apagar evento">${uiIcon('trash')}</button></div>`).join('')||'<p class="ph-empty small">Nada marcado.</p>'}</div>
       <form class="zap-compose cal-add" data-cal-form><input class="ph-input" name="text" maxlength="80" autocomplete="off" placeholder="Novo evento" aria-label="Novo evento"><button class="zap-send" type="submit" aria-label="Adicionar">${uiIcon('plus')}</button></form></div>`;
   }
   view.addEventListener('click',event=>{
     const button=(event.target as HTMLElement).closest<HTMLElement>('[data-cal]');if(!button)return;
     const action=button.dataset.cal;
-    if(action==='prev'||action==='next'){month=new Date(month.getFullYear(),month.getMonth()+(action==='next'?1:-1),1);day=1;}
+    if(action==='prev'||action==='next'){month=new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth()+(action==='next'?1:-1),1));day=1;}
     if(action==='day')day=Number(button.dataset.day);
     if(action==='remove'){const list=[...(events[key(day)]??[])];list.splice(Number(button.dataset.index),1);events={...events,[key(day)]:list};if(!list.length)delete events[key(day)];ctx.store.set('events',events);}
     render();
@@ -59,6 +59,12 @@ export const calendario:PhoneApp={id:'calendario',name:'Calendário',icon:'calen
     events={...events,[key(day)]:[...(events[key(day)]??[]),text]};ctx.store.set('events',events);render();view.querySelector<HTMLInputElement>('[name="text"]')?.focus();
   });
   render();
+  const timer=setInterval(()=>{
+    const next=worldCalendarDate(ctx.host.serverNow());if(next.getTime()===today.getTime())return;
+    const follow=day===today.getUTCDate()&&month.getUTCMonth()===today.getUTCMonth()&&month.getUTCFullYear()===today.getUTCFullYear();
+    today=next;if(follow){month=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),1));day=today.getUTCDate();}render();
+  },1000);
+  return ()=>clearInterval(timer);
 }};
 
 const ZONES:Array<[string,string]>=[['São Paulo','America/Sao_Paulo'],['Lisboa','Europe/Lisbon'],['Nova York','America/New_York'],['Tóquio','Asia/Tokyo']];
@@ -68,10 +74,10 @@ export const relogio:PhoneApp={id:'relogio',name:'Relógio',icon:'clock',tint:'l
   const watch=()=>elapsed+(started?Date.now()-started:0);
   const stopwatchText=(ms:number)=>`${duration(ms/1000)},${String(Math.floor(ms%1000/10)).padStart(2,'0')}`;
   function render():void {
-    const hour=gameHour(ctx.host.serverNow(),ctx.host.world()?.environment),h=Math.floor(hour),m=Math.floor((hour-h)*60);
+    const now=ctx.host.serverNow(),date=new Date(now),hour=gameHour(now,ctx.host.world()?.environment),h=Math.floor(hour),m=Math.floor((hour-h)*60);
     const body=tab==='world'?`<div class="ph-large"><h1>Relógio</h1></div><div class="ph-list">
         <div class="ph-row clock-row bar"><span class="fl"><small>Aqui no bar</small><b>Highland</b></span><time>${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}</time></div>
-        ${ZONES.map(([name,zone])=>`<div class="ph-row clock-row"><span class="fl"><small>${e(new Date().toLocaleDateString('pt-BR',{timeZone:zone,weekday:'long'}))}</small><b>${name}</b></span><time>${new Date().toLocaleTimeString('pt-BR',{timeZone:zone,hour:'2-digit',minute:'2-digit'})}</time></div>`).join('')}</div>
+        ${ZONES.map(([name,zone])=>`<div class="ph-row clock-row"><span class="fl"><small>${e(date.toLocaleDateString('pt-BR',{timeZone:zone,weekday:'long'}))}</small><b>${name}</b></span><time>${date.toLocaleTimeString('pt-BR',{timeZone:zone,hour:'2-digit',minute:'2-digit'})}</time></div>`).join('')}</div>
         <p class="ph-hint">No bar, um dia inteiro passa em 40 minutos.</p>`
       :`<div class="stopwatch"><output>${stopwatchText(watch())}</output><div class="stopwatch-actions"><button type="button" class="ph-round soft" data-clock="${started?'lap':'reset'}"><small>${started?'Volta':'Zerar'}</small></button><button type="button" class="ph-round ${started?'decline':'accept'}" data-clock="toggle"><small>${started?'Parar':'Iniciar'}</small></button></div>
         <div class="ph-list">${laps.map((lap,i)=>`<div class="ph-row"><span class="fl">Volta ${laps.length-i}</span><time>${stopwatchText(lap)}</time></div>`).join('')}</div></div>`;

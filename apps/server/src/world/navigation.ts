@@ -113,6 +113,19 @@ export class PathSearch {
   }
   private key(p: Point): string { return `${Math.round((p.x - this.start.x) / KEY)}:${Math.round((p.z - this.start.z) / KEY)}:${Math.round(p.y * 5)}`; }
 
+  /**
+   * Like run, but bounded by the clock instead of a node count: one expansion costs 0.1–0.2 ms here (every edge is walked
+   * in sub-steps against the map's colliders), so 400 nodes held the room's tick for 35–80 ms (measured). Expands in
+   * small batches until `ms` have passed; the result means the same as run's.
+   */
+  runFor(ms: number): Point[] | null | undefined {
+    const until = performance.now() + ms;
+    for (;;) {
+      const result = this.run(8);
+      if (result !== undefined || performance.now() >= until) return result;
+    }
+  }
+
   run(expansions: number): Point[] | null | undefined {
     if (this.result !== undefined) return this.result;
     const { open, best } = this;

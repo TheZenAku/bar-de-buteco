@@ -1,0 +1,54 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>VR fixture</title></head>
+<body><div id="app"></div>
+<script type="module">
+// The VR session without a headset (docs/sistemas/vr.md): the bar with one player, the game's own HUD, and a head that is
+// `fixture.vr.pose`. The panels (screen, hud, watch) are real; there are no controllers, so lasers are driven by hand:
+//   fixture.start()          begins the simulated session
+//   fixture.open()           opens the screen with the interface
+//   fixture.laser(u,v,down)  a laser on the screen at (u,v) of the picture (0..1), pressed or not
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/needs.css';
+import '../../apps/web/src/minimap.css';
+import '../../apps/web/src/vr/vr.css';
+import {gameUi} from '../../apps/web/src/game-ui.ts';
+import {createHudPanels} from '../../apps/web/src/hud-panels.ts';
+import {createNeedsHud} from '../../apps/web/src/needs-hud.ts';
+import {BarScene} from '/src/engine/BarScene.ts';
+import {DEFAULT_ENVIRONMENT} from '../../packages/shared/src/index.ts';
+document.querySelector('#app').innerHTML=gameUi();
+const game=document.querySelector('#game');
+document.querySelector('#lobby').classList.add('hidden');game.classList.remove('hidden');document.querySelector('#waiting').classList.add('hidden');
+const hud=createHudPanels(game);hud.forUser('fixture');
+createNeedsHud(game,()=>{},()=>Date.now());
+// Something clickable, to prove the laser reaches the real page.
+const probe=document.createElement('button');probe.id='probe';probe.textContent='Clique de teste';probe.style.cssText='position:fixed;left:40%;top:40%;padding:20px 40px;font-size:28px;z-index:50';
+let clicks=0;probe.addEventListener('click',()=>{clicks++;probe.textContent=`Clicado ${clicks}x`;});document.body.append(probe);
+const input=document.createElement('input');input.id='probe-input';input.style.cssText='position:fixed;left:40%;top:55%;padding:12px;font-size:26px;z-index:50';document.body.append(input);
+
+const player={id:'p1',displayName:'Rafa',skin:'nathan',color:'#ffffff',x:18,y:0,z:7,rotation:0,animationState:'idle',animationStartedAt:Date.now(),interactionState:'',currentTableId:'',lastProcessedInput:0,connected:true};
+const other={id:'p2',displayName:'Magrão do Balcão',skin:'nathan',color:'#ffffff',x:18.6,y:0,z:4.2,rotation:Math.PI,animationState:'idle',animationStartedAt:Date.now(),interactionState:'',currentTableId:'',lastProcessedInput:0,connected:true};
+const world={players:{p1:player,p2:other},npcs:{},tables:{},motos:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:1,capacity:32,serverTime:Date.now(),environment:{...DEFAULT_ENVIRONMENT,hour:12,paused:true,weather:'clear'}};
+const scene=new BarScene(document.querySelector('#world'),{vrWindowOpen:()=>window.fixture.windowOpen});
+scene.setWorld(world,'p1');scene.setEnabled(true);
+let vr;
+window.fixture={scene,ready:scene.ready,windowOpen:false,clicks:()=>clicks,player,other,refresh(){world.serverTime=Date.now();scene.setWorld(world,'p1');},
+  move(x,z){player.x=x;player.z=z;scene.setWorld(world,'p1');},
+  start(){vr=scene.simulateVr({enabled:true,turn:'snap',snapDegrees:30,comfort:true,resolution:.75});return true;},
+  vrSession:()=>scene.vr,
+  panels:()=>scene.vr.panels,
+  state:()=>({vr:scene.getVr(),camera:scene.getCamera(),input:scene.getInput()}),
+  eye:()=>{const p=scene.camera.getPosition();return [p.x,p.y,p.z];},
+  open(){scene.vr.panels.open(false);},
+  /** A laser on the screen at (u,v), 0..1 of the picture. Returns where it landed and whether it is over something clickable. */
+  laser(u,v,down){
+    const panels=scene.vr.panels,screen=panels.screen.entity,world=screen.getWorldTransform();
+    const Vec3=scene.camera.getPosition().constructor,point=world.transformPoint(new Vec3(u-.5,.5-v,0),new Vec3());
+    const origin=scene.camera.getPosition().clone(),direction=point.clone().sub(origin).normalize();
+    const hit=panels.rayScreen(origin,direction);
+    const clickable=panels.laser('test',hit,down);
+    panels.showCursor(hit);
+    return {hit,clickable};
+  },
+};
+</script></body></html>

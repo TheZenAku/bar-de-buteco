@@ -1,0 +1,23 @@
+/* VR (docs/sistemas/vr.md). The page itself is never seen inside the headset: dom-mirror.ts draws it to a texture, and these rules
+   style that picture and the keyboard that goes with it. `.vr-root` stands for <html> in the picture. */
+
+/* The touch controls make no sense with controllers in hand. */
+html.vr-active .tp{display:none!important}
+
+/* In the picture, panels are opaque enough to read over a bright street: the blur that made them readable is not drawn. */
+.vr-root .hud-panel,.vr-root .modal,.vr-root .panel-menu,.vr-root .menu-list,.vr-root .menu-detail{background-color:rgb(20 12 34 / 94%)!important}
+.vr-root .toasts{max-width:520px}
+.vr-root .modal-backdrop{background:rgb(8 4 16 / 45%)!important}
+
+/* The keyboard: big keys, since a laser pointer is far less exact than a finger. */
+.vr-keyboard{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9000;width:min(1080px,96vw);padding:14px;
+  background:rgb(20 12 34 / 96%);border:1px solid oklch(.7 .2 330 / 60%);box-shadow:0 12px 40px rgb(0 0 0 / 55%)}
+.vr-kb-rows{display:grid;gap:8px}
+.vr-kb-row{display:flex;gap:8px;justify-content:center}
+.vr-key{flex:1 1 0;min-width:0;height:62px;padding:0 6px;font:600 24px var(--font-body,system-ui);color:var(--foreground,#fff);
+  background:oklch(.28 .06 300);border:1px solid oklch(.45 .08 300);cursor:pointer}
+.vr-key:hover{background:oklch(.4 .13 330)}
+.vr-key.wide{flex:1.6 1 0;font-size:18px}
+.vr-key.space{flex:5 1 0;font-size:18px}
+.vr-key.on{background:oklch(.55 .22 330);border-color:oklch(.85 .15 330)}
+.vr-key.go{background:oklch(.5 .2 150)}

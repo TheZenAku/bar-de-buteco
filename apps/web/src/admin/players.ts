@@ -21,6 +21,7 @@ const CONFIRM:Record<string,(p:AdminPlayerDetail['account'])=>{title:string;text
   unkick:()=>({title:'Desfazer expulsão',text:'Cancela as expulsões pendentes e marca os registros como desfeitos. Quem já foi expulso pode entrar novamente. Esta ação não remove banimentos.'}),
   unban:()=>({title:'Remover banimento',text:'Remove todos os banimentos ativos. O jogador pode entrar novamente com seu login.'}),
   logout:()=>({title:'Encerrar sessões',text:'Desconecta a conta em todos os navegadores. Se estiver no bar, o jogador sai em alguns segundos e precisa entrar de novo com a senha.'}),
+  kill:()=>({title:'Matar jogador',text:'Teste da Morte: a cena toca ao redor do personagem (a Morte surge, golpeia e o leva), a tela dele escurece por 5 segundos e ele precisa repetir uma sequência para voltar em outro ponto do mapa. Mantém inventário, moedas e skin. Informe o motivo.'}),
   verify:()=>({title:'Confirmar e-mail',text:'Libera a entrada no bar sem o link de confirmação enviado por e-mail.'}),
 };
 function reversalText(log:AdminAudit):string {
@@ -105,11 +106,12 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
   }
   function moderationTab(d:AdminPlayerDetail):string {
     const p=d.account,actions=`${p.canModerate?`<button class="mini-button" data-admin="kick">Expulsar</button>${p.kickId?'<button class="mini-button" data-admin="unkick">Desfazer expulsão</button>':''}<button class="mini-button" data-admin="${p.banned?'unban':'ban'}">${p.banned?'Desbanir':'Banir'}</button>`:''}
+      ${p.owner&&p.id!==ctx.user()?.id?'':'<button class="mini-button danger" data-admin="kill">Matar jogador (teste)</button>'}
       ${p.canChangeRole?`<button class="mini-button" data-admin="role">${p.role==='admin'?'Remover administrador':'Dar administrador'}</button>`:''}`;
     return `<div class="admin-grid">${card('Acesso',`<div class="admin-player-actions">${actions.trim()||'<p class="fine-print">Nenhuma ação disponível para esta conta.</p>'}</div>
       ${p.owner?'<p class="fine-print">Conta principal protegida contra banimento e remoção de administrador.</p>':''}
       ${p.kickId?'<p class="fine-print">Há uma expulsão registrada. Expulsão encerra uma participação e não bloqueia a conta. Banimento é uma restrição separada.</p>':''}
-      ${['role','kick','ban','unkick','unban'].includes(mode)?confirmation(p):''}`,{icon:'shield'})}
+      ${['role','kick','ban','unkick','unban','kill'].includes(mode)?confirmation(p):''}`,{icon:'shield'})}
       ${card('Denúncias recebidas',d.reports.against.length?`<ul class="admin-feed">${d.reports.against.map(r=>`<li><b>${e(r.reporterName??'Jogador')}</b><span>${e(when(r.createdAt))} · ${r.resolvedAt?`resolvida por ${e(r.resolvedByName??'administração')}`:'aberta'}</span><p>${e(r.reason)}</p></li>`).join('')}</ul>`:empty('Nenhuma denúncia contra esta conta.'),
         {icon:'flag',actions:goButton('reports','Abrir denúncias')})}</div>`;
   }
@@ -212,6 +214,7 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
     else if(kind==='rename')player({op:'rename',displayName:String(values.displayName).trim()},'Nome alterado.');
     else if(kind==='verify')player({op:'verify'},'E-mail confirmado.');
     else if(kind==='logout')player({op:'logout'},'Sessões encerradas.');
+    else if(kind==='kill')player({op:'kill'},'Comando de morte enviado ao bar.');
     else if(kind==='item'){const quantity=Math.abs(Number(values.quantity));player({op:'item',itemId:String(values.itemId),quantity:submitter?.value==='remove'?-quantity:quantity},submitter?.value==='remove'?'Itens retirados da mochila.':`${itemById(String(values.itemId))?.name??'Item'} entregue na mochila.`);}
     else if(kind==='skin')player({op:'skin',skinId:String(values.skinId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Skin retirada da coleção.':'Skin adicionada à coleção.');
     else if(kind==='skill')player({op:'skill',skillId:String(values.skillId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Habilidade retirada.':'Habilidade adicionada.');

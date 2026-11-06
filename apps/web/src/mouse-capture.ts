@@ -15,7 +15,8 @@ export function createMouseCapture(canvas:HTMLCanvasElement,needsCursor:()=>bool
   const sync=()=>{
     const full=inFullscreen();
     if(full!==wasFull){wasFull=full;released=false;retryAt=0;}
-    const wanted=full&&!released&&!needsCursor();
+    // A finger has no cursor to hide, and a locked pointer would stop the touch drag that turns the view.
+    const wanted=full&&!released&&!needsCursor()&&!document.documentElement.classList.contains('touch-ui');
     if(!wanted&&captured()){if(!letGo){letGo=true;document.exitPointerLock();}}
     else if(wanted&&!captured()&&document.hasFocus()&&performance.now()>=retryAt){
       retryAt=performance.now()+RETRY_MS;
