@@ -2,6 +2,8 @@
 
 Quando um jogador morre, a Morte surge da névoa perto dele, flutua até ele, golpeia o chão ao lado do corpo, ri e o leva. A tela da vítima escurece por 5 segundos com uma frase, e ela só volta depois de repetir uma sequência de botões. Quem está perto vê a cena e ouve; só a vítima vê o escuro e o minigame.
 
+Ao morrer, o personagem entra imediatamente em **ragdoll**, sincronizado com os outros jogadores. O corpo cai e permanece no chão até a névoa levá-lo, sem iniciar a animação de levantar. Uma queda que já esteja em andamento, como a de um acidente fatal, é preservada. O ragdoll é removido quando o corpo some, no respawn ou ao sair.
+
 ## Causa da morte
 
 O jogo **ainda não tem causa de morte própria**: `needs.ts` só desmaia (e o desmaio não mata). A única causa é o botão **Matar jogador (teste)** da administração. Quando uma causa de verdade existir, basta chamar `deaths.kill(id, causa)` em `BarRoom.ts` (o `cause` vai para o log `death_start`).

@@ -48,6 +48,18 @@ test('death over real WebSockets: kill → scene to the ones near → dark → w
     await eventually(()=>heard.get('neighbour')!.scenes.length>0,'scene to the one standing near');
     assert.equal(heard.get('neighbour')!.scenes[0]!.victim,'victim');
     assert.equal(body().interactionState,DEATH_STATE,'still and out of everything');
+    assert.equal(body().animationState,'ragdoll','death immediately releases the body into physics');
+    const ragdoll=authority!.state.ragdolls.get('victim')!;
+    assert.ok(ragdoll,'the room publishes the death ragdoll');
+    assert.equal(ragdoll.startedAt,body().animationStartedAt);
+    await eventually(()=>!!neighbour.state.ragdolls.get('victim'),'the neighbour receives the same ragdoll');
+    assert.equal(neighbour.state.ragdolls.get('victim').seed,ragdoll.seed);
+    // Even after physics settles, death must never take the crash's automatic get-up path.
+    for(let i=0;i<180;i++)(authority as any).stepThrown(Date.now());
+    assert.equal((authority as any).thrown.get('victim').sim.asleep,true);
+    assert.equal(body().interactionState,DEATH_STATE);
+    assert.equal(body().animationState,'ragdoll');
+    assert.equal(authority!.state.ragdolls.get('victim'),ragdoll);
     assert.equal(body().hp,0,'the kill takes the ring');assert.equal(body().hpCore,0,'and the heart');
     // A second order while dying does nothing (no second scene).
     queued.push({id:'kill-2',action:'kill',playerId:'victim',issuedAt:Date.now()});await maintain();
@@ -61,6 +73,8 @@ test('death over real WebSockets: kill → scene to the ones near → dark → w
     // Only the victim gets the dark and the buttons.
     mock.timers.tick(deathDurationMs(plan)-1000);await new Promise(resolve=>setTimeout(resolve,100));
     await eventually(()=>body().interactionState===DEATH_GONE_STATE,'the body is taken by the cloud');
+    assert.equal(authority!.state.ragdolls.has('victim'),false,'the taken body no longer runs physics');
+    assert.equal((authority as any).thrown.has('victim'),false);
     assert.equal(heard.get('victim')!.screens.length,0,'no dark before the scene ends');
     mock.timers.tick(1000);
     await eventually(()=>!!screenOf('victim','blackout'),'blackout');
@@ -87,16 +101,24 @@ test('death over real WebSockets: kill → scene to the ones near → dark → w
     await eventually(()=>!!screenOf('victim','won'),'won');
     await eventually(()=>body().interactionState==='','back on their feet');
     assert.ok(isWalkable(body().x,body().z,body().y),'respawn on walkable ground');
+    assert.equal(body().animationState,'idle');
+    assert.equal(authority!.state.ragdolls.has('victim'),false,'respawn has no leftover ragdoll');
     assert.equal(body().hp,35,'alive again, with the ring at the configured value');assert.equal(body().hpCore,0);
     assert.ok(Math.hypot(body().x-plan.ax,body().z-plan.az)>=1,'not where the Morte stood');
     void spawn;
     // Alive again: the room takes commands from the victim again, and a new death is possible.
+    (authority as any).startThrown(body(),{x:body().x,y:body().y,z:body().z,yaw:body().rotation,vx:2,vz:0,closing:2,seated:false,seed:123});
+    const crash=authority!.state.ragdolls.get('victim'),crashBody=(authority as any).thrown.get('victim');
     queued.push({id:'kill-3',action:'kill',playerId:'victim',issuedAt:Date.now()});await maintain();
+    assert.equal(authority!.state.ragdolls.get('victim'),crash,'a fatal crash keeps the existing fall');
+    assert.equal((authority as any).thrown.get('victim'),crashBody);
+    assert.equal(body().animationState,'ragdoll');
     await eventually(()=>heard.get('victim')!.scenes.length===2,'a second death');
     // Leaving during a death ends it: back alive at the respawn point.
     await victimRoom.leave();
     await eventually(()=>(authority as any).deaths.isDead('victim')===false,'death ended on leaving');
     assert.equal(authority!.state.players.get('victim')!.interactionState,'');
+    assert.equal(authority!.state.ragdolls.has('victim'),false,'leaving also clears the corpse');
   }finally{
     mock.timers.reset();
     await Promise.allSettled(rooms.filter(room=>room.connection?.isOpen).map(room=>room.leave()));await server.gracefullyShutdown(false);

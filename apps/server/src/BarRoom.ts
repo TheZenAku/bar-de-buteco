@@ -1388,7 +1388,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const [id, body] of this.thrown) {
       const player = this.state.players.get(id);
       // Anything else that takes the player (falling unconscious, leaving): the body is no longer the crash's.
-      if (!player || player.interactionState !== THROWN) { this.thrown.delete(id); this.state.ragdolls.delete(id); continue; }
+      if (!player || (player.interactionState !== THROWN && player.interactionState !== DEATH_STATE)) { this.thrown.delete(id); this.state.ragdolls.delete(id); continue; }
       if (body.upAt) {
         if (now < body.upAt) continue;
         player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = now;
@@ -1400,7 +1400,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       body.sim.advance(TICK_MS / 1000);
       const rest = body.sim.rest();
       player.x = rest.x; player.y = rest.y; player.z = rest.z;
-      if (!body.sim.asleep) continue;
+      // A dead body settles in the same physics, but never starts getting up during the death scene.
+      if (player.interactionState === DEATH_STATE || !body.sim.asleep) continue;
       if (body.hurt > 0) {
         this.needs.damage(player, body.hurt, now); body.hurt = 0;
         // No life left, ring and heart: the next tick's needs make this a death, right where the body lies.
@@ -3321,17 +3322,29 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (category) { const counts = this.deathActivity.get(userId) ?? {}; counts[category] = (counts[category] ?? 0) + (series === 'motoboy' ? amount / 50 : amount); this.deathActivity.set(userId, counts); }
   }
 
-  /** Holds the victim's body still for the whole death, out of tables, chairs, bikes and shifts. */
+  /** Takes the victim out of activities and keeps their ragdoll down until the Morte takes the body. */
   private holdForDeath(id: string, state: typeof DEATH_STATE | typeof DEATH_GONE_STATE): void {
     const player = this.state.players.get(id), presence = this.sessions.getByUser(id);
     if (!player) return;
-    const now = Date.now();
     if (state === DEATH_STATE) {
+      if (presence) { presence.flying = false; presence.falling = false; }
+      const fallen = player.animationState === 'ragdoll' ? this.thrown.get(id) : undefined;
+      const at = { x: player.x, y: player.y, z: player.z };
       const moto = this.state.motos.get(vehicleOfInteraction(player.interactionState));
       if (moto) { const driver = !isPassenger(player.interactionState); this.freeMoto(moto, player); if (driver) { moto.assign(STOPPED_VEHICLE); moto.steer = 0; moto.lights = 0; } }
       if (presence) this.knockDown(player, presence);
       this.park(player);
-      player.animationState = 'idle'; player.animationStartedAt = now; player.looking = false;
+      if (fallen && this.state.ragdolls.has(id)) {
+        // A fatal crash already has a body on the ground: keep that fall and its synchronized start.
+        Object.assign(player, at); fallen.hurt = 0; fallen.upAt = undefined;
+        player.animationState = 'ragdoll';
+      } else {
+        this.startThrown(player, { x: player.x, y: player.y, z: player.z, yaw: player.rotation,
+          vx: 0, vz: 0, closing: 0, seated: false, lift: .01, seed: randomInt(0xffffffff) });
+      }
+      player.looking = false;
+    } else {
+      this.thrown.delete(id); this.state.ragdolls.delete(id);
     }
     player.interactionState = state;
     if (presence) { presence.interactionEndsAt = undefined; presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived; }
@@ -3357,6 +3370,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         if (Math.hypot(candidate.x - avoid.x, candidate.z - avoid.z) >= 6) { spot = candidate; break; }
       } catch { /* no free place round this anchor: try another */ }
     }
+    this.thrown.delete(id); this.state.ragdolls.delete(id);
     Object.assign(player, spot);
     player.rotation = Math.random() * Math.PI * 2;
     player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = Date.now();

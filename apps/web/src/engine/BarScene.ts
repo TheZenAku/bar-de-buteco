@@ -65,7 +65,7 @@ import {shootPortrait} from './skin-portrait';
 import {KICKS,skillById} from '@bar/shared';
 import {MorteScene} from './morte-scene';
 import type {DeathAudio} from '../death/death-audio';
-import {DEATH_GONE_STATE,type DeathPlan} from '@bar/shared';
+import {DEATH_GONE_STATE,DEATH_STATE,type DeathPlan} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
 type V3 = [number, number, number];
@@ -1176,6 +1176,10 @@ export class BarScene {
     const pull = this.deathPull, avatar = pull && this.actors.get(pull.victim);
     if (!pull || !avatar) return;
     const body = avatar.body;
+    if (avatar.actor.interactionState !== DEATH_STATE) {
+      if (this.deathPulled) { body.setLocalPosition(0, 0, 0); body.setLocalScale(1, 1, 1); this.deathPulled = false; }
+      return;
+    }
     if (pull.k <= 0) { if (this.deathPulled) { body.setLocalPosition(0, 0, 0); body.setLocalScale(1, 1, 1); this.deathPulled = false; } return; }
     const here = avatar.root.getPosition(), k = pull.k, target = new pc.Vec3(here.x + (pull.x - here.x) * .85 * k, here.y - 1.15 * k, here.z + (pull.z - here.z) * .85 * k);
     const local = new pc.Mat4().copy(avatar.root.getWorldTransform()).invert().transformPoint(target);
@@ -2041,6 +2045,7 @@ export class BarScene {
     // Taken by the Morte: not drawn while the room says so, and it comes back without gliding across the map.
     if (actor.interactionState === DEATH_GONE_STATE) {
       if (!avatar.deathHidden) { avatar.deathHidden = true; root.enabled = false; }
+      avatar.ragdoll = undefined; avatar.body.setLocalPosition(0, 0, 0); avatar.body.setLocalScale(1, 1, 1);
       root.setPosition(actor.x, actor.y ?? 0, actor.z); glideFrom.set(actor.x, actor.y ?? 0, actor.z); avatar.glideAt = this.elapsed; return;
     }
     if (avatar.deathHidden) { avatar.deathHidden = false; root.enabled = true; glideFrom.set(actor.x, actor.y ?? 0, actor.z); avatar.glideAt = this.elapsed; }
@@ -2773,7 +2778,6 @@ export class BarScene {
     if (this.vrShifted) { const p = this.vrShifted.root.getPosition(); this.vrShifted.root.setPosition(p.x - this.vrShift.x, p.y, p.z - this.vrShift.z); this.vrShifted = undefined; }
     for (const avatar of this.actors.values()) this.animateAvatar(avatar, dt);
     this.morte?.update(dt);
-    this.applyDeathPull();
     if (!this.vr.active && this.fovPunch !== this.fovPunchGoal) { this.fovPunch += (this.fovPunchGoal - this.fovPunch) * (1 - Math.exp(-(this.fovPunchGoal > this.fovPunch ? 18 : 5) * dt)); if (Math.abs(this.fovPunch - this.fovPunchGoal) < .01) this.fovPunch = this.fovPunchGoal; if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV - this.fovPunch; }
     this.updateProfiler.mark('avatars');
     this.callbacks.onFrame?.(realDt);
@@ -2786,6 +2790,8 @@ export class BarScene {
       return {id:a.actor.id,speed:a.speed??0,animation:a.actor.animation,rearAt:a.actor.horseRearAt??0,x:position.x,y:position.y+.2,z:position.z};
     }),this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.placeThrown(dt);
+    // Pull the posed corpse into the cloud after physics has placed its pelvis.
+    this.applyDeathPull();
     this.blowEffects.update(dt, this.camera);
     this.smokeBurst.update(dt, this.camera);
     this.fireworks.update(this.serverNow(),this.camera);
@@ -2976,7 +2982,10 @@ export class BarScene {
         avatar.contact.setPosition(x, avatar.ragdoll.ground() + .012, z);
         continue;
       }
-      if (avatar.ragdoll && !avatar.ragdoll.fade(dt, this.bodyRig(avatar, skin))) avatar.ragdoll = undefined;
+      // Respawn must not blend the old corpse across the map; only getting up uses that blend.
+      if (avatar.ragdoll && !start && actor.animation !== 'recover') {
+        avatar.ragdoll = undefined; avatar.body.setLocalPosition(0, 0, 0); avatar.body.setLocalScale(1, 1, 1);
+      } else if (avatar.ragdoll && !avatar.ragdoll.fade(dt, this.bodyRig(avatar, skin))) avatar.ragdoll = undefined;
     }
   }
   /** The kicking leg cuts the air at the same moment of the clip for everyone (clips run on the room's clock). A late arrival hears nothing. */

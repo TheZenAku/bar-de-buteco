@@ -377,3 +377,47 @@ test('live: walking to the urinal of the men\'s restroom and pressing E plays `u
   expect(errors.filter(e=>!/favicon|WebSocket/.test(e))).toEqual([]);
 });
 });
+
+
+test('death ragdolls settle, follow the cloud and clear on respawn on every player rig',async({page})=>{
+  test.setTimeout(120000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(fixture);await page.evaluate(()=>(window as any).fixture.ready);
+  const skins=['nathan','leandro','rafael','rafael-rose','read','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo'];
+  await page.evaluate(skins=>{
+    const f=(window as any).fixture,now=f.now();
+    const players=Object.fromEntries(skins.map((skin,index)=>[skin,{id:skin,skin,displayName:skin,color:'#fff',x:9+index,y:.15,z:1.6,rotation:0,
+      animationState:'ragdoll',animationStartedAt:now-9000,interactionState:'death',currentTableId:'',lastProcessedInput:0,connected:true}]));
+    const ragdolls=Object.fromEntries(Object.values(players).map((p:any)=>[p.id,{x:p.x,y:p.y,z:p.z,yaw:p.rotation,vx:0,vz:0,closing:0,seated:false,lift:.01,seed:123,startedAt:p.animationStartedAt}]));
+    (window as any).deathWorld={players,npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:skins.length,capacity:32,serverTime:now,ragdolls};
+    f.scene.setWorld((window as any).deathWorld,'');
+  },skins);
+  const ragdolls=()=>page.evaluate(()=>(window as any).fixture.scene.getRagdolls());
+  await expect.poll(async()=>(await ragdolls()).filter((r:any)=>r.asleep).length,{timeout:90000}).toBe(skins.length);
+  for(const body of await ragdolls()){
+    expect(body.pelvis[1],body.id+' pelvis is down').toBeLessThan(.65);
+    expect(body.head[1],body.id+' head is down').toBeLessThan(.9);
+    expect(body.hip.every(Number.isFinite),body.id+' has a finite pose').toBe(true);
+  }
+  // Physics must pose the corpse before the Morte pulls it, or it cancels the pull's displacement.
+  await page.evaluate(()=>{(window as any).fixture.scene.deathPull={victim:'nathan',k:.5,x:14,z:2};});
+  await expect.poll(()=>page.evaluate(()=>{
+    const a=(window as any).fixture.scene.actors.get('nathan');
+    return a.skin.hip.getPosition().distance(new (a.root.getPosition().constructor)(...a.ragdoll.pelvis()));
+  })).toBeGreaterThan(.5);
+  await page.evaluate(()=>{
+    const f=(window as any).fixture,w=(window as any).deathWorld;
+    f.scene.deathPull=undefined;w.ragdolls={};
+    for(const p of Object.values(w.players) as any[])p.interactionState='death-gone';
+    f.scene.setWorld(w,'');
+  });
+  await expect.poll(async()=>(await ragdolls()).length).toBe(0);
+  expect(await page.evaluate(()=>[...(window as any).fixture.scene.actors.values()].every((a:any)=>!a.root.enabled&&a.body.getLocalScale().y===1))).toBe(true);
+  await page.evaluate(()=>{
+    const f=(window as any).fixture,w=(window as any).deathWorld;
+    for(const p of Object.values(w.players) as any[]){p.interactionState='';p.animationState='idle';p.animationStartedAt=f.now();p.z+=8;}
+    f.scene.setWorld(w,'');
+  });
+  await expect.poll(()=>page.evaluate(()=>[...(window as any).fixture.scene.actors.values()].every((a:any)=>a.root.enabled&&!a.ragdoll&&Math.abs(a.root.getPosition().z-a.actor.z)<.01&&a.skin.bones.head.getPosition().y>1))).toBe(true);
+  expect(errors).toEqual([]);
+});
