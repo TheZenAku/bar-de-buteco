@@ -58,6 +58,10 @@ export async function shootPortrait(app:pc.AppBase,model:pc.ContainerResource,ma
     const drawn=(async()=>{await nextFrame(app);await nextFrame(app);await nextFrame(app);return texture.read(0,0,WIDTH,HEIGHT,{renderTarget:target,immediate:true});})();
     const pixels=await Promise.race([drawn,new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),DEADLINE_MS))]);
     if(!pixels)return undefined;
+    // A frame drawn before the model was ready comes back fully transparent: that is no portrait, and must not be cached.
+    let visible=false;
+    for(let i=3;i<(pixels as Uint8Array).length;i+=4)if((pixels as Uint8Array)[i]>8){visible=true;break;}
+    if(!visible)return undefined;
     const canvas=document.createElement('canvas');canvas.width=WIDTH;canvas.height=HEIGHT;
     const image=new ImageData(WIDTH,HEIGHT),row=WIDTH*4;
     // WebGL's rows run bottom-up.

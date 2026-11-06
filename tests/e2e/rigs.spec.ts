@@ -1,5 +1,59 @@
 import {test,expect} from '@playwright/test';
 
+test('camera gaze preserves skull geometry on the loaded rigs and releases the animated neck and head',async({page})=>{
+  test.setTimeout(120000);
+  await page.goto('/rigs.html');
+  await page.evaluate(()=>(window as any).rigFixture.ready);
+  const results=await page.evaluate(async()=>{
+    const module='/src/engine/head-look.ts', {HeadLookPose}=await import(module);
+    const fixture=(window as any).rigFixture;
+    await fixture.select('bank:Idle');fixture.pose(.4);
+    await new Promise<void>(resolve=>fixture.app.once('postrender',resolve));
+    const results=[];
+    for(const [id,actor] of fixture.actors){
+      const head=actor.model.findByName('head'),neck=head.parent,look=new HeadLookPose();
+      const Vec3=head.getPosition().constructor,Mat4=head.getWorldTransform().constructor;
+      const headBase=head.getLocalRotation().clone(),neckBase=neck.getLocalRotation().clone();
+      const samples:Array<{position:any;joints:number[];weights:number[];skin:any;original:any}>=[];
+      const point=(sample:any)=>{
+        const world=new Vec3(),matrix=new Mat4();
+        for(let k=0;k<4;k++)if(sample.weights[k]){
+          const joint=sample.joints[k];matrix.mul2(sample.skin.bones[joint].getWorldTransform(),sample.skin.skin.inverseBindPose[joint]);
+          world.add(matrix.transformPoint(sample.position).mulScalar(sample.weights[k]));
+        }
+        return new Mat4().copy(head.getWorldTransform()).invert().transformPoint(world);
+      };
+      if(id!=='nathan')for(const render of actor.model.findComponents('render'))for(const instance of render.meshInstances){
+        const skin=instance.skinInstance;if(!skin)continue;
+        const positions:number[]=[],joints:number[]=[],weights:number[]=[];
+        instance.mesh.getPositions(positions);instance.mesh.getVertexStream('BLENDINDICES',joints);instance.mesh.getVertexStream('BLENDWEIGHT',weights);
+        for(let i=0;i<positions.length/3;i++){
+          const sample={position:new Vec3(...positions.slice(i*3,i*3+3)),joints:joints.slice(i*4,i*4+4),weights:weights.slice(i*4,i*4+4),skin,original:undefined as any};
+          const world=new Mat4().mul2(head.getWorldTransform(),skin.skin.inverseBindPose[skin.bones.indexOf(head)]).transformPoint(sample.position);
+          if(world.y<head.getPosition().y+.03)continue;
+          if(sample.weights.some((w,k)=>w>0&&!/^(head|head_end|neck|spine_0[23]|shoulder_[lr])$/.test(skin.bones[sample.joints[k]!].name)))continue;
+          sample.original=point(sample);samples.push(sample);
+        }
+      }
+      let deformation=0,restoreError=0;
+      for(const [yaw,pitch] of [[80,50],[-80,-50],[80,-50],[-80,50]]){
+        look.apply(head,0,{headYaw:yaw!*Math.PI/180,headPitch:pitch!*Math.PI/180},1);
+        for(const sample of samples)deformation=Math.max(deformation,point(sample).distance(sample.original));
+        look.restore();
+        restoreError=Math.max(restoreError,1-Math.abs(head.getLocalRotation().dot(headBase)),1-Math.abs(neck.getLocalRotation().dot(neckBase)));
+      }
+      results.push({id,samples:samples.length,deformation,restoreError});
+    }
+    return results;
+  });
+  expect(results).toHaveLength(12);
+  for(const result of results){
+    if(result.id!=='nathan')expect(result.samples,result.id).toBeGreaterThan(100);
+    expect(result.deformation,`${result.id}: skull deformation`).toBeLessThan(.0001);
+    expect(result.restoreError,`${result.id}: animation restoration`).toBeLessThan(.000001);
+  }
+});
+
 test('all rendered rigs return to the same pose after actions without resetting their skeletons',async({page})=>{
   test.setTimeout(120000);
   const errors:string[]=[];

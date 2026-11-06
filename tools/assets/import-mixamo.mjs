@@ -21,6 +21,7 @@ import {objects,readGlb,retargetBase,writeGlb} from './lib/character-gltf.mjs';
 import {createRetarget} from './lib/animation-retarget.mjs';
 import {autoWeights} from './lib/auto-weights.mjs';
 import {mixamoBoneName} from './lib/mixamo-names.mjs';
+import {repairHeadWeights} from './lib/head-weights.mjs';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const mixamo=path.join(root,'assets-bar/mixamo'),download=path.join(mixamo,'download'),models=path.join(root,'apps/web/public/models');
@@ -307,6 +308,7 @@ async function importSkin(id,skin,fbx,meshes,textures,{bones,weights,source}){
   const output=path.join(models,`${id}.glb`);
   writeGlb(output,gltf,Buffer.concat(chunks));
   const adapted=retargetBase(readGlb(output),reference);
+  repairHeadWeights(adapted);
   writeGlb(output,adapted.json,adapted.bin);
   console.log(`${skin.name}: ${before} -> ${after} triangles (error ${worst.toFixed(4)}), ${bones} Mixamo bones, ${weights} weights, ${skin.height} m, ${(fs.statSync(output).size/1024/1024).toFixed(2)} MiB`);
 }

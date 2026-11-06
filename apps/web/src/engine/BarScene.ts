@@ -224,7 +224,7 @@ const MOUSE_JUMP = 500;
 const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
 const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'walk-smooth-20261104' : SKIN_VERSIONS[id];
+  const version = folder === 'animations' ? 'walk-smooth-20261104' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -1109,7 +1109,7 @@ export class BarScene {
     for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();}
   }
 
-  /** The animation has already posed the skeleton; only the head joint receives the camera offset. */
+  /** The animation has already posed the skeleton; distribute the camera offset through neck and head. */
   private applyHeadLooks(dt:number):void {
     for(const [id,avatar] of this.actors){
       if(avatar.npc||avatar.resting)continue;
@@ -1214,7 +1214,12 @@ export class BarScene {
     if (!this.skinModels.has(id)) this.loadSkin(id);
     for (let waited = 0; !this.skinModels.has(id) && waited < 20000; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
     const model = this.skinModels.get(id);
-    return model && !this.destroyed && this.camera.camera ? shootPortrait(this.app, model, this.camera.camera) : undefined;
+    // A blank frame (the GPU had not uploaded the model yet) comes back undefined: try again before giving up.
+    for (let attempt = 0; model && attempt < 3 && !this.destroyed && this.camera.camera; attempt++) {
+      const picture = await shootPortrait(this.app, model, this.camera.camera);
+      if (picture) return picture;
+    }
+    return undefined;
   }
   /** The bike under a point of the view (CSS pixels of the canvas). */
   pickMoto(x: number, y: number): string | undefined { return this.camera.camera ? this.motos.pick(this.camera.camera, x, y) : undefined; }

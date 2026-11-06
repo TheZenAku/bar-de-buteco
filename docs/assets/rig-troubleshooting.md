@@ -47,6 +47,25 @@ O E2E completo que caminha até o palco parou em `walk.ts` por não alcançar o 
 npx.cmd playwright test --project=rigs --project=bar-animations --project=stage --grep "all six rendered|every bar animation|stage fixture"
 ```
 
+## Cabeça acompanhando a câmera (06/11/2026)
+
+As skins Mixamo misturavam pesos do crânio com pescoço, peito e ombros; no Gilmar, o peito tinha mais influência que a cabeça em boa parte do rosto. Girar apenas `head` expunha essa mistura e comprimia a malha. Os modelos publicados agora mantêm o crânio solidário à cabeça, com transição suave de pesos no pescoço. O rig facial nativo do Nathan conserva seus pesos originais.
+
+`HeadLookPose` distribui 40% do deslocamento angular no pescoço e aplica o restante na cabeça, mantendo a direção final do olhar. As duas juntas recuperam a pose da animação antes do próximo quadro.
+
+O importador aplica `tools/assets/lib/head-weights.mjs` depois de gerar a skin. Para corrigir modelos já exportados sem reimportar geometria nem bancos:
+
+```powershell
+node tools/assets/repair-head-weights.mjs
+# Também aceita IDs específicos:
+node tools/assets/repair-head-weights.mjs gilmar-gordo primo
+node --test tests/tools/head-weights.test.mjs
+node --import tsx --test tests/integration/head-look.test.ts
+npx.cmd playwright test --project=rigs
+```
+
+Os testes medem a deformação dos vértices do crânio nos extremos de yaw/pitch, a restauração das juntas e a repetibilidade do reparo. A versão de cache dos modelos em `BarScene.ts` inclui `head-weights-20261106`.
+
 ## Quando reimportar um personagem
 
 `assets:animations` altera bancos e bengalas. `assets:retarget` também recalibra os clipes básicos dos modelos existentes. `assets:skins` reimporta geometria e pesos. Escolha o comando correspondente à causa identificada; reimportar todos os personagens para corrigir uma transição introduz outras variáveis sem tratar o defeito.

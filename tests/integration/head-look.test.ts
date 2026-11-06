@@ -18,27 +18,33 @@ test('head look uses the camera horizontally and vertically, wraps turns and res
   close(limited.headYaw,HEAD_LOOK_YAW);close(limited.headPitch,HEAD_LOOK_PITCH);
 });
 
-test('the additive pose changes only the head, with arbitrary skeleton axes and no accumulated rotation',()=>{
+test('head look shares the turn with the neck, preserves gaze and restores the animated pose without accumulation',()=>{
   for(const heading of [0,80,179,-120]){
-    const root=new pc.Entity(),spine=new pc.Entity(),neck=new pc.Entity(),head=new pc.Entity();
+    const root=new pc.Entity(),spine=new pc.Entity(),neck=new pc.Entity('neck'),head=new pc.Entity();
     root.addChild(spine);spine.addChild(neck);neck.addChild(head);
     root.setEulerAngles(0,heading,0);spine.setLocalEulerAngles(12,3,-4);neck.setLocalEulerAngles(-5,0,2);head.setLocalEulerAngles(0,0,90);
     const originals=[root,spine,neck,head].map(node=>node.getLocalRotation().clone());
-    const position=head.getPosition().clone(),look=new HeadLookPose();
+    head.setLocalPosition(0,.12,0);
+    const neckPosition=neck.getPosition().clone(),look=new HeadLookPose();
     for(let i=0;i<600;i++){
       look.restore();
       quat(head.getLocalRotation(),originals[3]!);
+      quat(neck.getLocalRotation(),originals[2]!);
       look.apply(head,heading*pc.math.DEG_TO_RAD,{headYaw:.6,headPitch:-.3},1/60);
-      for(const [index,node] of [root,spine,neck].entries())quat(node.getLocalRotation(),originals[index]!);
-      close(head.getPosition().distance(position),0);
+      for(const [index,node] of [root,spine].entries())quat(node.getLocalRotation(),originals[index]!);
+      close(neck.getPosition().distance(neckPosition),0);
+      close(head.getPosition().distance(neckPosition),.12);
     }
     close(look.yaw,.6);close(look.pitch,-.3);
-    const worldBase=new pc.Quat().mul2(neck.getRotation(),originals[3]!);
+    const neckBase=new pc.Quat().mul2(spine.getRotation(),originals[2]!);
+    const worldBase=new pc.Quat().mul2(neckBase,originals[3]!);
     const yaw=new pc.Quat().setFromAxisAngle(pc.Vec3.UP,.6*pc.math.RAD_TO_DEG);
     const angle=heading*pc.math.DEG_TO_RAD+.6;
     const tilt=new pc.Quat().setFromAxisAngle(new pc.Vec3(Math.cos(angle),0,-Math.sin(angle)),-.3*pc.math.RAD_TO_DEG);
     quat(head.getRotation(),new pc.Quat().mul2(tilt,new pc.Quat().mul2(yaw,worldBase)));
-    look.restore();quat(head.getLocalRotation(),originals[3]!);
+    const offset=new pc.Quat().mul2(tilt,yaw);
+    quat(neck.getRotation(),new pc.Quat().mul2(new pc.Quat().slerp(pc.Quat.IDENTITY,offset,.4),neckBase));
+    look.restore();quat(head.getLocalRotation(),originals[3]!);quat(neck.getLocalRotation(),originals[2]!);
     root.destroy();
   }
 });
@@ -73,7 +79,7 @@ function fixture(){
   const sent:PlayerInput[]=[];
   const network=Object.assign(Object.create(BarNetwork.prototype),{
     transportReady:true,stopped:false,user:{id:self.id},world:{players:{[self.id]:self}},
-    pending:[] as PlayerInput[],wasMoving:false,seq:0,position:{x:self.x,y:self.y,z:self.z},
+    pending:[] as PlayerInput[],wasMoving:false,sentRear:false,seq:0,position:{x:self.x,y:self.y,z:self.z},
     hooks:{input:()=>({...intention}),position:()=>{}},room:{send:(_type:string,input:PlayerInput)=>sent.push(input)},
   });
   return {self,intention,sent,network,tick:()=>network.sendInput()};
