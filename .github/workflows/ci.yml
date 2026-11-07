@@ -9,8 +9,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+      # setup-node must not invoke the runner's older npm inside this workspace:
+      # devEngines requires npm 11.20+, including for `npm config get cache`.
       - run: npm install --global npm@11.20.0
+        working-directory: ${{ runner.temp }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node24-npm11-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run build
       - run: npm test
@@ -24,8 +30,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+      # setup-node must not invoke the runner's older npm inside this workspace:
+      # devEngines requires npm 11.20+, including for `npm config get cache`.
       - run: npm install --global npm@11.20.0
+        working-directory: ${{ runner.temp }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node24-npm11-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -47,8 +59,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+      # setup-node must not invoke the runner's older npm inside this workspace:
+      # devEngines requires npm 11.20+, including for `npm config get cache`.
       - run: npm install --global npm@11.20.0
+        working-directory: ${{ runner.temp }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node24-npm11-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run test:load
       - uses: actions/upload-artifact@v4
@@ -81,8 +99,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+      # setup-node must not invoke the runner's older npm inside this workspace:
+      # devEngines requires npm 11.20+, including for `npm config get cache`.
       - run: npm install --global npm@11.20.0
+        working-directory: ${{ runner.temp }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node24-npm11-${{ hashFiles('**/package-lock.json') }}
       - run: npm ci
       - run: npm run test:postgres -w @bar/api
         env:
