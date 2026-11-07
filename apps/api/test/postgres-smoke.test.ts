@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import pg from 'pg';
 import {eq} from 'drizzle-orm';
-import {connectDatabase,migrateDatabase} from '../src/database/index.js';
+import {connectDatabase,defaultMigrationFolder,migrateDatabase} from '../src/database/index.js';
+import {loadMigrations} from '../src/database/migrations.js';
 import {controls,itemInventory,profiles,users} from '../src/database/schema.js';
 
 const adminUrl=process.env.TEST_DATABASE_URL;
@@ -111,9 +112,11 @@ test('PostgreSQL 17 separa owner, migrador concorrente e runtime sem DDL',{
       migrationRuntimeRole:runtimeRole,
       migrationLockTimeoutMs:10_000,
     };
+    const expectedMigrations=(await loadMigrations(defaultMigrationFolder)).map(migration=>migration.name).sort();
+    assert.ok(expectedMigrations.length>0);
     const migrations=await Promise.all([migrateDatabase(options),migrateDatabase(options)]);
-    assert.deepEqual(migrations.map(result=>result.applied.length).sort((a,b)=>a-b),[0,5]);
-    for(const result of migrations)assert.equal(result.applied.length+result.alreadyApplied.length,5);
+    assert.deepEqual(migrations.map(result=>result.applied.length).sort((a,b)=>a-b),[0,expectedMigrations.length]);
+    for(const result of migrations)assert.deepEqual([...result.applied,...result.alreadyApplied].sort(),expectedMigrations);
 
     const connection=await connectDatabase({url:runtimeUrl});
     try{
@@ -133,7 +136,7 @@ test('PostgreSQL 17 separa owner, migrador concorrente e runtime sem DDL',{
       const client=await runtime.connect();
       try{
         assert.equal((await client.query<{search_path:string}>('SHOW search_path')).rows[0]!.search_path,'pg_catalog, public');
-        assert.equal((await client.query<{count:number}>('SELECT count(*)::int AS count FROM bar_schema_migrations')).rows[0]!.count,6);
+        assert.deepEqual((await client.query<{name:string}>('SELECT name FROM bar_schema_migrations ORDER BY name')).rows.map(row=>row.name),expectedMigrations);
         await expectPermissionDenied(client,'CREATE TABLE runtime_must_not_create (id integer)');
         await expectPermissionDenied(client,'ALTER TABLE users ADD COLUMN runtime_must_not_alter integer');
         await expectPermissionDenied(client,`INSERT INTO bar_schema_migrations (name,checksum) VALUES ('999_forbidden.sql','${'f'.repeat(64)}')`);
