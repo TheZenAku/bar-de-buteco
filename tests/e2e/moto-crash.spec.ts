@@ -133,7 +133,7 @@ test('all the lamps, then a crash with real keys: thrown off with the bike\'s sp
   await page.keyboard.down('Space');await page.waitForTimeout(600);await page.keyboard.up('Space');
   await page.keyboard.press('e');
   await expect.poll(async()=>(await roomMoto(page)).riderId).toBe('');
-  await inVehicles(page,async()=>{await page.locator('[data-vehicle="despawn"]').click();await expect(page.locator('.admin-empty')).toHaveText('Nenhuma moto no mapa.');});
+  await inVehicles(page,async()=>{await page.locator('[data-vehicle="despawn"]').click();await expect(page.locator('.admin-empty')).toHaveText('Nenhum veículo no mapa.');});
   await page.request.post('/api/auth/logout').catch(()=>undefined);
   expect(errors).toEqual([]);
   expect(otherErrors).toEqual([]);

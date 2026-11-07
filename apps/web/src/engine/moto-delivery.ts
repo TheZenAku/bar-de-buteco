@@ -8,10 +8,12 @@ import {FOGO_LAMPS,lampState,MotoLampMaterials,MotoLights,type LampState} from '
 import {MotoSounds} from './moto-sound';
 import {CarRig,CarLights} from './car-rig';
 import {CarSounds} from './car-sound';
+import {TruckSounds} from './truck-sound';
+import {VehicleBrakeSounds} from './vehicle-brake-sound';
 import {MotoBag} from './moto-bag';
 import {VehicleHorns} from './vehicle-horn';
 import {wheeliePose} from '@bar/shared';
-import {CAR_MODEL,isCar,isFogo,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
+import {isCar,isFogo,isTruck,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
 import {MotoFire} from './moto-fire';
 import {MotoExhaust} from './moto-exhaust';
 import {MotoPaint} from './moto-paint';
@@ -130,7 +132,7 @@ const PICK_REACH=40,PICK_MARGIN=.12;
 export interface Bike {
   entity:pc.Entity;rig:MotoRig|CarRig;state:MotoState;lights:MotoLights|CarLights;
   /** The local rider's own bike as it should be drawn this frame (moto-motion.ts); everybody else's follows `track`. */
-  plate?:{material:pc.StandardMaterial;texture:pc.Texture}|undefined;
+  plate?:{material:pc.StandardMaterial;texture:pc.Texture;entity:pc.Entity;text:string}|undefined;
   predicted?:MotoBody;track:RoomTrack;riddenHere:boolean;gap:{x:number;z:number;yaw:number};
   drawn:{x:number;y:number;z:number;yaw:number;pitch:number;wheelie?:number};
   deliveryBag?:pc.Entity;bagPending?:boolean;bagWanted?:boolean;
@@ -145,7 +147,10 @@ export interface Bike {
 const PLATE_SIZE=[.2,.17,.002] as const;
 export class Motos {
   private carModel?:pc.ContainerResource;
+  private truckModel?:pc.ContainerResource;
   private readonly carSounds:CarSounds;
+  private readonly truckSounds:TruckSounds;
+  private readonly brakeSounds:VehicleBrakeSounds;
   private readonly horns:VehicleHorns;
   private model?:pc.ContainerResource;
   private fogoModel?:pc.ContainerResource;
@@ -171,16 +176,23 @@ export class Motos {
   private localLamps?:{id:string;bits:number};
   /** The local rider's throttle, ahead of the room: the engine answers the key at once. */
   private localGas?:{id:string;open:boolean};
+  private localBrake?:{id:string;held:boolean};
   private readonly sounds:MotoSounds;
 
   constructor(private readonly app:pc.AppBase,private readonly shadow:(root:pc.Entity)=>pc.Entity,volume:()=>number=()=>1) {
     this.lampMaterials=new MotoLampMaterials();
     this.sounds=new MotoSounds(volume,import.meta.env.BASE_URL);
     this.carSounds=new CarSounds(volume);
+    this.truckSounds=new TruckSounds(volume,import.meta.env.BASE_URL);
+    this.brakeSounds=new VehicleBrakeSounds(volume,import.meta.env.BASE_URL);
     this.horns=new VehicleHorns(volume);
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}carro/carro_hatch.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Carro hatch indisponível.',error);return;}
       this.carModel=asset.resource as pc.ContainerResource;this.place();
+    });
+    app.assets.loadFromUrl(`${import.meta.env.BASE_URL}caminhao/caminhao_bau.glb`,'container',(error,asset)=>{
+      if(error||!asset){console.warn('Caminhão baú indisponível.',error);return;}
+      this.truckModel=asset.resource as pc.ContainerResource;this.place();
     });
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_fogo.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Moto Caveira em Chamas indisponível.',error);return;}
@@ -214,7 +226,7 @@ export class Motos {
     }).catch(error=>console.warn('Bag de entrega indisponível.',error)).finally(()=>{bike.bagPending=false;});
   }
   /** The plate on the bike's back, under the lamp that lights it: Mercosul colours, on a thin box on the tail's node. */
-  private plate(rig:MotoRig,text:string,black=false):{material:pc.StandardMaterial;texture:pc.Texture} {
+  private plate(rig:MotoRig,text:string,black=false):NonNullable<Bike['plate']> {
     const canvas=document.createElement('canvas');canvas.width=256;canvas.height=96;
     const g=canvas.getContext('2d')!;
     // The Caveira em Chamas' plate is only black and red: red characters and header band on black.
@@ -235,7 +247,7 @@ export class Motos {
     const authored=rig.ponto('Moto_Placa');if(authored)authored.enabled=false;
     entity.setLocalEulerAngles(15,0,0);entity.setLocalScale(PLATE_SIZE[0],PLATE_SIZE[1],PLATE_SIZE[2]);
     const anchor=rig.ponto('ponto_placa');if(anchor)anchor.addChild(entity);
-    return {material,texture};
+    return {material,texture,entity,text};
   }
   sync(states:Record<string,MotoState>|undefined):void {
     this.states=Object.values(states??{});this.place();
@@ -245,13 +257,19 @@ export class Motos {
   private place():void {
     for(const state of this.states){
       const known=this.bikes.get(state.id);
-      if(known){known.state=state;continue;}
-      const car=isCar(state),fogo=isFogo(state),model=car?this.carModel:fogo?this.fogoModel:this.model;if(!model)continue;
+      if(known){
+        if(known.rig instanceof MotoRig&&state.plate!==known.plate?.text){
+          known.plate?.entity.destroy();known.plate?.material.destroy();known.plate?.texture.destroy();
+          known.plate=state.plate?this.plate(known.rig,state.plate,isFogo(state)):undefined;
+        }
+        known.state=state;continue;
+      }
+      const car=isCar(state),fogo=isFogo(state),model=isTruck(state)?this.truckModel:car?this.carModel:fogo?this.fogoModel:this.model;if(!model)continue;
       const entity=new pc.Entity(`${car?'Carro':'Moto'} ${state.id}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
       const spec=vehiclePhysics(state.model);body.setLocalScale(spec.SCALE,spec.SCALE,spec.SCALE);
       entity.addChild(body);this.app.root.addChild(entity);
       const contact=this.shadow(entity);contact.setLocalScale(spec.HALF_WIDTH*4,1,spec.HALF_LENGTH*2.8);
-      const rig=car?new CarRig(body,this.app.graphicsDevice):new MotoRig(body,spec.WHEEL_RADIUS),fire=fogo?new MotoFire(body,this.app.graphicsDevice):undefined,exhaust=fogo?new MotoExhaust(body,this.app.graphicsDevice):undefined,paint=fogo?new MotoPaint(body):undefined;
+      const rig=car?new CarRig(body,this.app.graphicsDevice,state.model):new MotoRig(body,spec.WHEEL_RADIUS),fire=fogo?new MotoFire(body,this.app.graphicsDevice):undefined,exhaust=fogo?new MotoExhaust(body,this.app.graphicsDevice):undefined,paint=fogo?new MotoPaint(body):undefined;
       const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate,fogo):undefined;
       this.bikes.set(state.id,{entity,rig,plate,...(fire?{fire}:{}),...(exhaust?{exhaust}:{}),...(paint?{paint}:{}),lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials,fogo?FOGO_LAMPS:undefined),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
@@ -263,6 +281,7 @@ export class Motos {
   lamps(id:string,bits:number):void {this.localLamps={id,bits};}
   /** The throttle the local rider holds this frame. */
   gas(id:string,open:boolean):void {this.localGas={id,open};}
+  brake(id:string,held:boolean):void {this.localBrake={id,held};}
   update(dt:number,camera:pc.Entity,exposure:number,raining=false):void {
     const wall=performance.now(),now=Date.now();
     this.clock+=dt*1000;
@@ -313,11 +332,15 @@ export class Motos {
       bike.lights.update(lamps,now,camera,exposure,motoLampLevel(parts.farol,parts.bateria,now,seed),motoLampLevel(parts.lanterna,parts.bateria,now,seed+1));
     }
     const ear=camera.getPosition();
-    this.horns.update([...this.bikes.values()].map(bike=>({state:bike.state,position:bike.drawn})),ear,camera.forward,camera.up);
+    this.brakeSounds.update([...this.bikes.values()].map(b=>({state:b.state,...b.drawn,speed:b.predicted?.speed??b.state.speed,lateralSpeed:b.predicted?.lateralSpeed??b.state.lateralSpeed??0,
+      held:b.predicted&&this.localBrake?.id===b.state.id?this.localBrake.held:!!b.state.handbrake})),ear,camera.forward,camera.up);
+    this.horns.update([...this.bikes.values()].filter(bike=>!isTruck(bike.state)).map(bike=>({state:bike.state,position:bike.drawn})),ear,camera.forward,camera.up);
     this.sounds.update(dt,[...this.bikes.values()].filter(bike=>!isCar(bike.state)).map(bike=>({id:bike.state.id,x:bike.drawn.x,y:bike.drawn.y,z:bike.drawn.z,
       view:{engine:bike.state.engine??MOTO_ENGINE.OFF,engineAt:bike.state.engineAt??0,crank:bike.state.crank??0,gas:!!bike.state.gas,speed:bike.predicted?.speed??bike.state.speed,parts:bike.state.parts??''},
       ...(bike.predicted&&this.localGas?.id===bike.state.id?{gasNow:this.localGas.open}:{})})),ear,camera.forward,camera.up);
-    this.carSounds.update([...this.bikes.values()].filter(b=>isCar(b.state)).map(b=>({state:b.state,...b.drawn,speed:b.predicted?.speed??b.state.speed})),ear,camera.forward,camera.up);
+    this.carSounds.update([...this.bikes.values()].filter(b=>isCar(b.state)&&!isTruck(b.state)).map(b=>({state:b.state,...b.drawn,speed:b.predicted?.speed??b.state.speed})),ear,camera.forward,camera.up);
+    this.truckSounds.update(dt,[...this.bikes.values()].filter(b=>isTruck(b.state)).map(b=>({state:b.state,...b.drawn,speed:b.predicted?.speed??b.state.speed,
+      ...(b.predicted&&this.localGas?.id===b.state.id?{gasNow:this.localGas.open}:{})})),ear,camera.forward,camera.up);
   }
   /** The bike under a point of the view (CSS pixels of the canvas), the nearest first: a ray against its box, however it lies. */
   pick(camera:pc.CameraComponent,x:number,y:number):string|undefined {
@@ -341,8 +364,8 @@ export class Motos {
     }
     return best===undefined?undefined:{id:best,at:bestAt};
   }
-  soundTelemetry(id?:string) {const engine=id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);return {...engine,horn:id?this.horns.telemetry(id):undefined};}
-  destroy():void {this.destroyed=true;this.sounds.destroy();this.carSounds.destroy();this.horns.destroy();for(const bike of this.bikes.values()){bike.deliveryBag?.destroy();bike.rig.destroy();bike.fire?.destroy();bike.exhaust?.destroy();bike.paint?.destroy();}}
+  soundTelemetry(id?:string) {const brake=this.brakeSounds.telemetry(id);if(id&&isTruck(this.bikes.get(id)?.state))return {...this.truckSounds.telemetry(id),brake};const engine=id&&isCar(this.bikes.get(id)?.state)?this.carSounds.telemetry(id):this.sounds.telemetry(id);return {...engine,horn:id?this.horns.telemetry(id):undefined,brake};}
+  destroy():void {this.destroyed=true;this.sounds.destroy();this.carSounds.destroy();this.truckSounds.destroy();this.brakeSounds.destroy();this.horns.destroy();for(const bike of this.bikes.values()){bike.deliveryBag?.destroy();bike.rig.destroy();bike.fire?.destroy();bike.exhaust?.destroy();bike.paint?.destroy();}}
   ridden(playerId:string):Bike|undefined {for(const bike of this.bikes.values())if(vehicleSeat(bike.state,playerId)>=0)return bike;}
   /** The bike nearest to a point, not far off. */
   nearest(point:{x:number;z:number}):Bike|undefined {

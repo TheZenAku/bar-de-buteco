@@ -185,7 +185,7 @@ test('the delivery bike with real keys: the administration spawns it, E to get o
     await expect(page.locator('[data-vehicle="despawn"]')).toHaveCount(1);
     await shot(page,'10-veiculos');
     await page.locator('[data-vehicle="despawn"]').click();
-    await expect(page.locator('.admin-empty')).toHaveText('Nenhuma moto no mapa.');
+    await expect(page.locator('.admin-empty')).toHaveText('Nenhum veículo no mapa.');
   });
   await expect.poll(()=>other.evaluate(()=>(window as any).barDebug.motos().length)).toBe(0);
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.motos().length)).toBe(0);

@@ -1,5 +1,5 @@
 import {CITY_SOLIDS} from './city.js';
-import {CAR_MODEL} from './vehicle-models.js';
+import {CAR_MODEL,TRUCK_MODEL} from './vehicle-models.js';
 
 export interface FuelPoint {x:number;y:number;z:number}
 export interface FuelPump extends FuelPoint {id:string;npcId:string;ux:number;uz:number;price:number}
@@ -19,13 +19,14 @@ export const pumpDock=(pump:FuelPump)=>pumpPoint(pump,.46,0,1.12);
 export const pumpStand=(pump:FuelPump)=>pumpPoint(pump,.97);
 export const pumpHome=(pump:FuelPump)=>pumpPoint(pump,.97,1.5);
 export const pumpNear=(v:FuelPoint)=>FUEL_PUMPS.filter(p=>Math.abs(p.y-v.y)<.6&&Math.hypot(p.x-v.x,p.z-v.z)<=FUEL.REACH).sort((a,b)=>Math.hypot(a.x-v.x,a.z-v.z)-Math.hypot(b.x-v.x,b.z-v.z))[0];
-/** Vehicle-local filler cap, +Z forward. The hatch's filler is on its rear right quarter. */
+/** Vehicle-local filler cap, +Z forward. The hatch's filler is on its rear right quarter; the truck's, on the left, by its tank. */
 export function vehicleFiller(v:FuelPoint&{yaw:number;model?:string}):FuelPoint {
-  const x=v.model===CAR_MODEL?-.78:0,z=v.model===CAR_MODEL?-.98:.12,y=v.model===CAR_MODEL?.85:.92;
+  const truck=v.model===TRUCK_MODEL,hatch=v.model===CAR_MODEL;
+  const x=truck?1.12:hatch?-.78:0,z=truck?.72:hatch?-.98:.12,y=truck?.72:hatch?.85:.92;
   return {x:v.x+Math.cos(v.yaw)*x+Math.sin(v.yaw)*z,y:v.y+y,z:v.z-Math.sin(v.yaw)*x+Math.cos(v.yaw)*z};
 }
 export function fillerStand(v:FuelPoint&{yaw:number;model?:string}):FuelPoint {
-  const p=vehicleFiller(v),side=v.model===CAR_MODEL?-.43:-.85;
+  const p=vehicleFiller(v),side=v.model===TRUCK_MODEL?.55:v.model===CAR_MODEL?-.43:-.85;
   return {x:p.x+Math.cos(v.yaw)*side,y:v.y,z:p.z-Math.sin(v.yaw)*side};
 }
 /** Coins are whole integers in the existing wallet; round once for the entire service. */

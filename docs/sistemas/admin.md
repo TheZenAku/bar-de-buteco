@@ -19,13 +19,41 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 | Preços | Todos os preços e pagamentos do jogo numa tabela editável |
 | Logs | Uma linha do tempo de tudo o que ficou registrado, com filtros |
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
-| Veículos | As motos de entrega do mapa: spawnar perto de você e despawnar ([moto.md](moto.md#spawnar-e-despawnar)) |
+| Veículos | Cadastro de veículos de todos os jogadores, incluindo offline e garagem: reparar, abastecer, recolher, transferir, pintar e excluir. Mantém também spawn/despawn dos veículos do mapa ([moto.md](moto.md#spawnar-e-despawnar)) |
 | Emblemas | O catálogo de emblemas: criar, editar, apagar, conceder e retirar, com raridade, ícone da lista ou PNG enviado ([perfil.md](perfil.md#emblemas)). Os 116 emblemas ganhos jogando aparecem aqui com a quantidade que os dá, incluindo sinuca e truco ([conquistas.md](conquistas.md#na-administração)) |
 | Coleção | As cartas de personagem e as habilidades: raridade, preço, texto, situação de venda, quantos donos e quanto renderam, com a carta ao vivo ([skins.md](skins.md)) |
 | Servidor | Processos da API e do mundo, memória e disco da máquina, banco de dados e filas |
 | Desempenho | FPS, 1% low, tempo de frame, travadas, CPU/GPU, memória, rede e tick do servidor; seleção de métricas para o HUD e relatório JSON ([desempenho.md](desempenho.md)) |
 
 O menu mostra quantas denúncias estão abertas. Nomes de jogadores em qualquer categoria (logs, denúncias, ranking, mundo) abrem a ficha do jogador.
+
+## Veículos dos jogadores
+
+**Administração → Veículos** tem três abas: **Veículos dos jogadores**, **Registrar veículo** e **Spawn**. As abas aceitam as setas esquerda/direita, Home e End; a última aba aberta é lembrada durante a sessão.
+
+Na aba **Veículos dos jogadores**, busque pela placa, nome ou usuário do dono e filtre por modelo. A lista mostra proprietário, presença no mapa desta sala, condição mínima das peças, combustível e quilometragem. Também há um atalho **Gerenciar veículos** na ficha do jogador, em **Itens e skins**.
+
+Em **Registrar veículo**, procure e selecione o jogador, escolha qualquer modelo do catálogo, a cor quando disponível e uma placa opcional. Sem placa preenchida, o servidor gera uma automaticamente. O veículo novo entra na garagem, com todas as peças e o tanque em 100% e quilometragem zero, e sua chave pertence ao jogador, sem cobrar moedas. Funciona com contas offline e respeita o limite de dez veículos, a confirmação do e-mail e a proteção de administradores. Repetir o mesmo pedido não cria outra unidade.
+
+Em **Spawn**, escolha o modelo e a cor quando disponível e use **Spawnar veículo**. A aba lista os veículos no mapa e permite removê-los individualmente ou todos juntos. Veículos de spawn são temporários e ficam disponíveis para quem estiver na sala; os registrados pertencem a um jogador e permanecem na garagem.
+
+`VEHICLE_CATALOG`, em `packages/shared/src/vehicle-models.ts`, é a fonte dos modelos permitidos, nomes, fotos, cores e disponibilidade de pintura. Um novo modelo jogável registrado nesse catálogo aparece automaticamente no spawn, no registro e nos filtros, sem criar botões ou condições no menu. O servidor valida o modelo pelo mesmo catálogo.
+
+Selecione uma ou várias linhas, ou use **Gerenciar** em uma linha. Escolha a ação e informe o motivo:
+
+- **Reparar todas as peças:** coloca todas as peças do modelo em 100%, sem zerar a quilometragem.
+- **Encher o tanque:** combustível em 100%, sem cobrar moedas.
+- **Recolher para a garagem:** retira o veículo do mapa, desembarcando os ocupantes; mantém dono e chave.
+- **Transferir proprietário:** procure e selecione uma conta com e-mail confirmado. O veículo e sua única chave passam ao destinatário; se estiver na rua, vai para a garagem. Respeita o limite de dez veículos por conta.
+- **Alterar pintura:** aplica a cor no Hatch 80 ou na moto Caveira em Chamas.
+- **Personalizar placa:** selecione um único veículo e informe uma placa Mercosul (`ABC1D23`). Letras são convertidas para maiúsculas e placas duplicadas são recusadas, inclusive em alterações concorrentes. Atualiza o cadastro, a chave e a placa visual do veículo que estiver no mapa.
+- **Excluir definitivamente:** remove o veículo e a chave, inclusive do banco e da garagem, sem reembolso. A seleção e o motivo ficam explícitos no formulário antes de aplicar.
+
+Os botões **Reparar todos os veículos**, **Abastecer todos os veículos** e **Recolher todos para a garagem** abrangem o cadastro completo, incluindo jogadores offline. Excluir, transferir e pintar exigem selecionar as linhas. As mesmas proteções de conta da carteira se aplicam: somente a conta principal pode alterar outro administrador. Ações globais de outros administradores pulam essas contas protegidas e informam a quantidade.
+
+`apps/api/src/admin-vehicles.ts` aplica mudanças e registra autor, placas e motivo na mesma transação. Um identificador de pedido evita duplicar transferências ou exclusões numa repetição. O controle `vehicles` leva as alterações para a sala. `player_vehicles.revision` impede que um salvamento antigo da sala desfaça a alteração; transferências entre jogadores também avançam essa revisão. Reparo e abastecimento chegam ao veículo em uso, e recolhimento, transferência e exclusão retiram seus ocupantes.
+
+As migrações **`022_vehicle_revision.sql`** e **`023_admin_vehicle_requests.sql`** são necessárias antes de iniciar a API com este código (`npm.cmd run migrate -w @bar/api`; o desenvolvimento já executa migrações no `predev`). A segunda guarda recibos duráveis de pedidos, separados dos logs. As verificações cobrem API, banco migrado, sala via WebSockets e interface no navegador: `admin-vehicles.test.ts`, `admin-vehicles.integration.test.ts` e o caso de veículos em `tests/e2e/admin.spec.ts`.
 
 ## Jogadores
 

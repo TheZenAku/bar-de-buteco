@@ -22,7 +22,7 @@ import {EnvironmentLighting} from './environment-lighting';
 import {ServerClock} from '../server-clock';
 import type {EnvironmentState} from '@bar/shared';
 import {CarRig,seatCar} from './car-rig';
-import {isCar,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
+import {isCar,isHatch,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
 import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
 import {Showcase,type ShowcasePose} from './showcase';
@@ -1335,14 +1335,14 @@ export class BarScene {
     // The switches stay as they are while the chat is open or the tab hidden.
     if (!this.enabled || this.inputHasFocus() || document.hidden) {
       const riding = this.motos.ridden(this.localId);
-      if (riding) this.motos.gas(riding.state.id, false);
+      if (riding) {this.motos.gas(riding.state.id, false);this.motos.brake(riding.state.id,false);}
       return { ...NO_MOTO_INTENT, lights: this.motoSwitches };
     }
     const held = (...codes: string[]) => Number(codes.some(code => this.keys.has(code)));
     const input = { throttle: clamp(held('KeyW', 'ArrowUp') - held('KeyS', 'ArrowDown') - this.touchAxis.y, -1, 1), steer: clamp(held('KeyD', 'ArrowRight') - held('KeyA', 'ArrowLeft') + this.touchAxis.x, -1, 1), brake: this.keys.has('Space'), lights: this.motoSwitches,horn:this.keys.has('KeyF'),wheelie:!isCar(vehicle?.state)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')) };
     const bike = this.motos.ridden(this.localId), speed = bike?.predicted?.speed ?? 0;
     const braking = input.brake || (input.throttle < 0 && speed > .1) || (input.throttle > 0 && speed < -.1);
-    if (bike) { this.motos.lamps(bike.state.id, this.motoSwitches | (braking ? MOTO_LIGHT.BRAKE : 0)); this.motos.gas(bike.state.id, input.throttle > 0 && bike.state.engine === MOTO_ENGINE.ON); }
+    if (bike) { this.motos.lamps(bike.state.id, this.motoSwitches | (braking ? MOTO_LIGHT.BRAKE : 0)); this.motos.gas(bike.state.id, input.throttle > 0 && bike.state.engine === MOTO_ENGINE.ON); this.motos.brake(bike.state.id,input.brake); }
     return input;
   }
   /** Z and C: the blinkers, X: both (hazard), H: the high beam. A blinker cancels itself once the turn is over, as on a real bike. */
@@ -1440,18 +1440,28 @@ export class BarScene {
       Number(this.keys.has('KeyS') || this.keys.has('ArrowDown')) - this.touchAxis.y, -1, 1);
     const length = Math.hypot(horizontal, vertical) || 1;
     const yaw = this.rig.yaw;
-    const dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * vertical) / length;
-    const dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * vertical) / length;
+    let dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * vertical) / length;
+    let dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * vertical) / length;
+    const flying = this.flying();
+    // Flying goes where the camera looks: forward is the view, pitch included, right stays level. `aim` is its vertical part.
+    let aim = 0;
+    if (flying) {
+      const cos = Math.cos(this.rig.pitch);
+      dx = (Math.cos(yaw) * horizontal - Math.sin(yaw) * cos * vertical) / length;
+      dz = (-Math.sin(yaw) * horizontal - Math.cos(yaw) * cos * vertical) / length;
+      aim = -Math.sin(this.rig.pitch) * vertical / length;
+    }
     // The body keeps following travel; looking around at rest only turns the head.
     const actor=this.actors.get(this.localId)?.actor;
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
     if(actor?.fireworkEquipped)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
-    const dy = this.flying() ? Number(this.keys.has('Space')) - Number(this.keys.has('ControlLeft')) : 0;
-    if (this.flying()) {
-      const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint, pace = (boost ? FLY.boost : FLY.speed) / Math.max(1, Math.hypot(dx, dz));
-      this.localFlyV.set(dx * pace, dy * FLY.climb * (boost ? 2 : 1), dz * pace); this.localFlyAt = this.elapsed;
+    const dy = flying ? Number(this.keys.has('Space')) - Number(this.keys.has('ControlLeft')) : 0;
+    if (flying) {
+      // dx, aim and dz are a unit direction at most (flyPlayer), so the speed is the pace itself.
+      const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint, pace = boost ? FLY.boost : FLY.speed;
+      this.localFlyV.set(dx * pace, aim * pace + dy * FLY.climb * (boost ? 2 : 1), dz * pace); this.localFlyAt = this.elapsed;
     }
-    return { dx, dz, dy: dy || undefined, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint,rear:isRidingHorse(actor?.interactionState)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||this.touchSprint), rotation: this.lastRotation,
+    return { dx, dz, dy: dy || undefined, aim: flying ? aim : undefined, running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint,rear:isRidingHorse(actor?.interactionState)&&(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||this.touchSprint), rotation: this.lastRotation,
       ...headLookAt(yaw,this.rig.pitch,this.lastRotation) };
   }
 
@@ -3065,7 +3075,7 @@ export class BarScene {
       const vehicle=this.motos.ridden(this.localId);
       if(vehicle&&vehicle.state.riderId===this.localId){
         if(event.code==='KeyF'){event.preventDefault();this.keys.add(event.code);return;}
-        const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',...(isCar(vehicle.state)?{KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'}:{})};
+        const action:Record<string,string>={KeyH:'headlights',KeyR:'engine',...(isHatch(vehicle.state)?{KeyN:'wipers',KeyO:'hood',KeyU:'trunk',KeyY:event.shiftKey?'right-door':'left-door'}:isCar(vehicle.state)?{KeyN:'wipers',KeyY:event.shiftKey?'right-door':'left-door'}:{})};
         if(action[event.code]){event.preventDefault();if(!event.repeat)this.callbacks.onVehicleControl?.(vehicle.state.id,action[event.code]!);return;}
       }
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }

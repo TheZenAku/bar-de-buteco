@@ -3,7 +3,7 @@ import {statfs} from 'node:fs/promises';
 import os from 'node:os';
 import {and,desc,eq,gte,ilike,inArray,isNotNull,isNull,lt,or,sql,type Column,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {ACCESS_LOG_EVENTS,barDayKey,startOfBarDay,DEATH,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
+import {ACCESS_LOG_EVENTS,barDayKey,startOfBarDay,DEATH,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,vehicleName,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
   type AdminEconomy,type AdminLedgerEntry,type AdminLogCategory,type AdminLogEntry,type AdminLogPage,type AdminPlayerDetail,type AdminPlayerOperation,type AdminReport,
   type AdminServerInfo,type AdminSummary,type LedgerSource,type PublicUser} from '@bar/shared';
 import type {MetricsRegistry} from '@bar/shared/metrics';
@@ -100,7 +100,7 @@ export class AdminConsole {
       account:{id:row.id,username:row.username,email:row.email,displayName:row.displayName,verified:row.verified,balance:row.balance,...state,createdAt:row.createdAt.toISOString(),equippedSkin:row.equippedSkin,phone:row.phone??null},
       wallet:{balance:row.balance,earned30d:flows?.earned??0,spent30d:flows?.spent??0,ledger:ledger.map(entry=>this.ledgerEntry(entry,names))},
       inventory:items.filter(item=>item.quantity>0).map(item=>({itemId:item.itemId,quantity:item.quantity})),
-      vehicles:(await this.db.select({id:t.playerVehicles.id,plate:t.playerVehicles.plate,model:t.playerVehicles.model,color:t.playerVehicles.color,parts:t.playerVehicles.parts,mileage:t.playerVehicles.mileage}).from(t.playerVehicles).where(eq(t.playerVehicles.userId,id))).map(vehicle=>({...vehicle,name:vehicle.model==='carro-hatch'?'Hatch 80':MOTO_NAME})),
+      vehicles:(await this.db.select({id:t.playerVehicles.id,plate:t.playerVehicles.plate,model:t.playerVehicles.model,color:t.playerVehicles.color,parts:t.playerVehicles.parts,mileage:t.playerVehicles.mileage}).from(t.playerVehicles).where(eq(t.playerVehicles.userId,id))).map(vehicle=>({...vehicle,name:vehicleName(vehicle.model)})),
       skins:SKINS.map(skin=>{const owned=skins.find(s=>s.skinId===skin.id);return {id:skin.id,name:skin.name,owned:skin.id===DEFAULT_SKIN||!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
       skills:SKILLS.map(skill=>{const owned=skills.find(s=>s.skillId===skill.id);return {id:skill.id,name:skill.name,owned:!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
       sessions:{active:sessions?.active??0,lastLoginAt:iso(lastLogin)},

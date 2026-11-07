@@ -36,6 +36,7 @@ export * from './vehicle-actions.js';
 export * from './car-parts.js';
 export * from './vehicle-parts.js';
 export * from './vehicle-controls.js';
+export * from './vehicle-storage.js';
 export * from './moto-parts.js';
 export * from './moto-crash.js';
 export * from './ragdoll.js';
@@ -91,8 +92,8 @@ export const HELD_DRINKS = [...DRINK_ITEMS, 'agua', 'refrigerante', 'cafe'] as c
 export type HeldDrink = typeof HELD_DRINKS[number];
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
-export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;rear?:boolean;/** Flying only: climb (+1) or sink (-1). */dy?:number }
-export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional()}).strict();
+export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;rear?:boolean;/** Flying only: climb (+1) or sink (-1). */dy?:number;/** Flying only: the vertical part of the camera's aim (see flyPlayer). */aim?:number }
+export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional(),aim:z.number().finite().min(-1).max(1).optional()}).strict();
 export interface PublicUser { id: string; username: string; displayName: string; email: string; verified: boolean; role: 'user' | 'admin'; color: string; equippedSkin?:string; isOwner?:boolean }
 export interface PlayerState extends Position { id: string; slot?: number; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and

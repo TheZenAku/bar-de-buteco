@@ -62,7 +62,7 @@ test('delivery bag transfers to v4, both vehicles honk, Shift raises the motorcy
     await shot(page,'04-highfood-desmontou');await page.evaluate(()=>(window as any).barDebug.send('food.stop',{}));
 
     await place(page,85,7);
-    await inVehicles(page,async()=>{await page.locator('[data-vehicle="spawn-car"]').click();await expect(page.locator('.admin-feedback')).toContainText('Moto spawnada');});
+    await inVehicles(page,async()=>{await page.getByLabel('Modelo para spawn',{exact:true}).selectOption('carro-hatch');await page.locator('[data-vehicle="spawn"]').click();await expect(page.locator('.admin-feedback')).toContainText('Hatch 80 spawnado');});
     const car=await page.evaluate(()=>Object.values((window as any).barDebug.snapshot().world.motos).find((m:any)=>m.model==='carro-hatch') as any);
     await place(observer,car.x,car.z+3);
     await place(page,car.x+Math.cos(car.yaw)*1.1,car.z-Math.sin(car.yaw)*1.1);await page.keyboard.press('e');

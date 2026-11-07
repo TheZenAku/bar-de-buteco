@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
-import {defaultVehicleColor,CAR_MODEL,CAR_NAME,DEFAULT_CAR_COLOR,MOTO_FOGO_MODEL,MOTO_FOGO_NAME,NEW_CAR_PARTS,vehicleName,vehiclePhoto,vehiclePriceKey,type VehicleModel} from '@bar/shared';
+import {defaultVehicleColor,CAR_MODEL,CAR_NAME,DEFAULT_CAR_COLOR,MOTO_FOGO_MODEL,MOTO_FOGO_NAME,NEW_CAR_PARTS,TRUCK_MODEL,TRUCK_NAME,carSpec,hasStorage,isCarModel,storageLoadOfUnits,vehicleName,vehiclePhoto,vehiclePriceKey,type VehicleModel} from '@bar/shared';
 import {and,asc,desc,eq,gte,inArray,like,sql} from 'drizzle-orm';
 import {COURIER_LEVELS,GARAGE,HIGHFOOD_CUSTOMERS,MAX_COIN_BALANCE,MOTO_MODEL,MOTO_NAME,NEW_MOTO_PARTS,deliveryPay,makePlate,type OwnedVehicle,deliveryStars,priceOf,type CustomerLook,type CustomerProfile,type DeliveryFacts,type HighfoodHistoryEntry,type HighfoodReceipt,type HighfoodView,type PublicUser,type VehicleView} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {controls,currencyLedger,highfoodCustomers,highfoodDeliveries,moderationActions,playerVehicles,wallets} from './database/schema.js';
+import {controls,currencyLedger,highfoodCustomers,highfoodDeliveries,moderationActions,playerVehicles,vehicleStorage,wallets} from './database/schema.js';
 import type {PricingService} from './pricing-service.js';
 
 export class HighfoodError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
@@ -11,7 +11,7 @@ import {startOfBarDay as startOfDay} from '@bar/shared';
 const RECENT=30;
 export interface DeliveryRecord extends DeliveryFacts {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;durationMs:number}
 export interface LostOrder {userId:string;orderId:string;customerId:string;customer:string;restaurant:string;items:string[];address:string;length:number;reason:'cancelled'|'gave-up'|'left'}
-const toVehicle=(row:typeof playerVehicles.$inferSelect):OwnedVehicle=>({id:row.id,model:row.model,name:vehicleName(row.model),plate:row.plate,parts:row.parts,mileage:row.mileage,color:row.color,fuel:row.fuel,boughtAt:row.boughtAt.getTime()});
+const toVehicle=(row:typeof playerVehicles.$inferSelect):OwnedVehicle=>({id:row.id,model:row.model,name:vehicleName(row.model),plate:row.plate,parts:row.parts,mileage:row.mileage,color:row.color,fuel:row.fuel,revision:row.revision,boughtAt:row.boughtAt.getTime()});
 const toProfile=(row:typeof highfoodCustomers.$inferSelect):CustomerProfile=>({id:row.id,name:row.name,skin:row.skin,look:row.look as CustomerLook,image:row.image,lines:row.lines as string[],active:row.active});
 
 /**
@@ -23,7 +23,11 @@ export class HighfoodService {
 
   /** The vehicles whose key this player holds. */
   async owned(userId:string):Promise<OwnedVehicle[]>{
-    return (await this.db.select().from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(asc(playerVehicles.boughtAt),asc(playerVehicles.id))).map(toVehicle);
+    const rows=await this.db.select().from(playerVehicles).where(eq(playerVehicles.userId,userId)).orderBy(asc(playerVehicles.boughtAt),asc(playerVehicles.id));
+    // How full each truck's hold is (the room draws the crates); other models have none, and an empty hold has no rows.
+    const holds=rows.filter(row=>hasStorage(row.model)).map(row=>row.id),loads=new Map<string,number>();
+    if(holds.length)for(const row of await this.db.select({vehicleId:vehicleStorage.vehicleId,units:sql<number>`sum(${vehicleStorage.quantity})`.mapWith(Number)}).from(vehicleStorage).where(inArray(vehicleStorage.vehicleId,holds)).groupBy(vehicleStorage.vehicleId))loads.set(row.vehicleId,storageLoadOfUnits(row.units));
+    return rows.map(row=>({...toVehicle(row),...(hasStorage(row.model)?{load:loads.get(row.id)??0}:{})}));
   }
   /** Internal aggregate audit: inspect grants/purchases without opening a live embedded database twice. */
   async ownershipAudit(){
@@ -39,14 +43,15 @@ export class HighfoodService {
     const [prices,vehicles]=await Promise.all([this.pricing.table(),this.owned(userId)]);
     const models=[{model:MOTO_MODEL,name:MOTO_NAME,price:priceOf(prices,'vehicle:moto'),seats:1,photo:vehiclePhoto(MOTO_MODEL)},
       {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,price:priceOf(prices,'vehicle:moto-fogo'),seats:1,photo:vehiclePhoto(MOTO_FOGO_MODEL)},
-      {model:CAR_MODEL,name:CAR_NAME,price:priceOf(prices,'vehicle:carro'),seats:4,photo:vehiclePhoto(CAR_MODEL)}];
+      {model:CAR_MODEL,name:CAR_NAME,price:priceOf(prices,'vehicle:carro'),seats:4,photo:vehiclePhoto(CAR_MODEL)},
+      {model:TRUCK_MODEL,name:TRUCK_NAME,price:priceOf(prices,'vehicle:caminhao'),seats:carSpec(TRUCK_MODEL).SEATS,photo:vehiclePhoto(TRUCK_MODEL)}];
     const selected=models.find(each=>each.model===model)??models[0]!;
     return {...selected,models,tow:priceOf(prices,'vehicle:tow'),owned:vehicles.length>0,limit:GARAGE.VEHICLE_LIMIT,vehicles};
   }
   /** A new vehicle: a free plate (random, and the unique column has the last word) and all parts new. */
   private async addVehicle(tx:Pick<Database,'insert'>,userId:string,model:string=MOTO_MODEL,color:string=defaultVehicleColor(model)):Promise<void>{
     for(let attempt=0;attempt<32;attempt++){
-      const added=await tx.insert(playerVehicles).values({id:randomUUID(),plate:makePlate(),userId,model,color,parts:model===CAR_MODEL?NEW_CAR_PARTS:NEW_MOTO_PARTS}).onConflictDoNothing({target:playerVehicles.plate}).returning({id:playerVehicles.id});
+      const added=await tx.insert(playerVehicles).values({id:randomUUID(),plate:makePlate(),userId,model,color,parts:isCarModel(model)?NEW_CAR_PARTS:NEW_MOTO_PARTS}).onConflictDoNothing({target:playerVehicles.plate}).returning({id:playerVehicles.id});
       if(added.length)return;
     }
     throw new HighfoodError(503,'Não foi possível emplacar o veículo. Tente de novo.');
@@ -78,7 +83,7 @@ export class HighfoodService {
     await this.db.transaction(async tx=>{
       const [vehicle]=await tx.select().from(playerVehicles).where(and(eq(playerVehicles.id,vehicleId),eq(playerVehicles.userId,userId))).for('update');
       if(!vehicle)throw new HighfoodError(404,'Você não tem a chave desse veículo.');
-      if(vehicle.model!==CAR_MODEL&&vehicle.model!==MOTO_FOGO_MODEL)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
+      if(!isCarModel(vehicle.model)&&vehicle.model!==MOTO_FOGO_MODEL)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
       paintedModel=vehicle.model;
       await tx.update(playerVehicles).set({color:color.toLowerCase(),updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
       await tx.insert(controls).values({id:randomUUID(),payload:{action:'sync',playerId:userId,issuedAt:Date.now()}});
@@ -86,8 +91,9 @@ export class HighfoodService {
     return this.vehicle(userId,paintedModel);
   }
   /** What the world keeps of a bike: how it is and how far it has gone. */
-  async saveVehicles(updates:ReadonlyArray<{vehicleId:string;parts:string;mileage:number;fuel?:number}>):Promise<void>{
-    for(const {vehicleId,parts,mileage,fuel} of updates)await this.db.update(playerVehicles).set({parts,mileage,...(fuel!==undefined?{fuel}:{}),updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
+  async saveVehicles(updates:ReadonlyArray<{vehicleId:string;parts:string;mileage:number;fuel?:number;revision?:number}>):Promise<void>{
+    for(const {vehicleId,parts,mileage,fuel,revision=0} of updates)await this.db.update(playerVehicles).set({parts,mileage,...(fuel!==undefined?{fuel}:{}),updatedAt:new Date()})
+      .where(and(eq(playerVehicles.id,vehicleId),eq(playerVehicles.revision,revision)));
   }
   async access(userId:string):Promise<{vehicles:OwnedVehicle[]}>{
     return {vehicles:await this.owned(userId)};
@@ -102,6 +108,7 @@ export class HighfoodService {
         if(!plate&&held.length>1)throw new HighfoodError(409,`Este jogador tem ${held.length} motos: informe a placa (${held.map(each=>each.plate).join(', ')}).`);
         const target=plate?held.find(each=>each.plate===plate):held[0];
         if(!target)throw new HighfoodError(404,'Este jogador não tem a moto dessa placa.');
+        await tx.delete(vehicleStorage).where(eq(vehicleStorage.vehicleId,target.id));
         await tx.delete(playerVehicles).where(eq(playerVehicles.id,target.id));
       }
       await tx.insert(moderationActions).values({id:randomUUID(),actorId:actor,userId:playerId,action:owned?'vehicle-grant':'vehicle-revoke',reason:plate?`${reason} · ${plate}`:reason});

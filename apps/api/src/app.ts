@@ -10,13 +10,15 @@ import { signTicket } from '@bar/shared/tickets';
 import {passwordProblem,VEHICLE_MODELS,PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
+import {StorageError,VehicleStorageService} from './vehicle-storage-service.js';
 import {WalletService} from './wallet-service.js';
 import {PhoneService} from './phone-service.js';
-import {zapLocationSchema} from '@bar/shared';
+import {zapLocationSchema,STORAGE} from '@bar/shared';
 import {ProfileService} from './profile-service.js';
 import {AchievementService} from './achievement-service.js';
 import {AdminService} from './admin-service.js';
 import {AdminConsole} from './admin-console.js';
+import {AdminVehiclesService} from './admin-vehicles.js';
 import {PricingService} from './pricing-service.js';
 import {HighfoodService} from './highfood-service.js';
 import {FuelPayments} from './fuel-service.js';
@@ -57,6 +59,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const pricing=new PricingService(db);
   const wardrobe=new WardrobeService(db,pricing);
   const inventory=new InventoryService(db,wardrobe);
+  const vehicleStorage=new VehicleStorageService(db);
   const wallet=new WalletService(db,wardrobe);
   const fuelPayments=new FuelPayments(db);
   const highfood=new HighfoodService(db,pricing);
@@ -66,6 +69,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const phone=new PhoneService(db,wardrobe,(userId,series)=>achievements.add([{userId,series,amount:1}]).catch((error:unknown)=>{app.log.error({err:error,series},'Falha ao contar conquista');}));
   const profile=new ProfileService(db,phone);
   const administration=new AdminService(db,wardrobe);
+  const adminVehicles=new AdminVehiclesService(db,administration);
   const mailer = new Mailer(config);
   const cookieName = config.production ? '__Host-bar_session' : 'bar_session';
   const cookieSettings = { path: '/', httpOnly: true, secure: config.production, sameSite: 'lax' as const };
@@ -402,6 +406,28 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return administration.overview(request.auth!.user,{...query,online:query.online.split(',').filter(id=>uuidSchema.safeParse(id).success)});
   });
   app.get('/api/admin/summary',{preHandler:administrator},request=>adminConsole.summary(request.auth!.user));
+  app.get('/api/admin/vehicles',{preHandler:administrator},request=>{
+    const query=z.object({search:z.string().trim().max(100).default(''),ownerId:uuidSchema.optional(),model:z.enum(VEHICLE_MODELS).optional(),
+      offset:z.coerce.number().int().min(0).max(1000000).default(0),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict().parse(request.query);
+    return adminVehicles.list(request.auth!.user,query);
+  });
+  app.post('/api/admin/vehicles/register',{preHandler:administrator},request=>{
+    const command=z.object({playerId:uuidSchema,model:z.enum(VEHICLE_MODELS),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      plate:z.string().trim().toUpperCase().regex(PLATE,'Use o formato ABC1D23 para a placa.').optional(),reason:reasonSchema,requestId:uuidSchema}).strict().parse(request.body);
+    return adminVehicles.register(request.auth!.user.id,command);
+  });
+  app.post('/api/admin/vehicles',{preHandler:administrator},request=>{
+    const command=z.object({operation:z.enum(['repair','refuel','recall','transfer','delete','paint','plate']),ids:z.array(uuidSchema).min(1).max(100).optional(),all:z.boolean().optional(),
+      targetId:uuidSchema.optional(),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),plate:z.string().trim().toUpperCase().regex(PLATE,'Use o formato ABC1D23 para a placa.').optional(),reason:reasonSchema,requestId:uuidSchema}).strict()
+      .superRefine((value,ctx)=>{
+        if(!!value.all===!!value.ids?.length)ctx.addIssue({code:'custom',message:'Selecione veículos ou escolha todos.'});
+        if(value.all&&!['repair','refuel','recall'].includes(value.operation))ctx.addIssue({code:'custom',message:'Esta ação exige uma seleção explícita de veículos.'});
+        if(value.operation==='transfer'?!value.targetId:!!value.targetId)ctx.addIssue({code:'custom',message:'Informe o destinatário somente para transferências.'});
+        if(value.operation==='paint'?!value.color:!!value.color)ctx.addIssue({code:'custom',message:'Informe uma cor somente para pintura.'});
+        if(value.operation==='plate'?!value.plate||value.ids?.length!==1:!!value.plate)ctx.addIssue({code:'custom',message:'Informe uma placa e selecione um único veículo para personalizá-la.'});
+      }).parse(request.body);
+    return adminVehicles.change(request.auth!.user.id,command);
+  });
   app.get('/api/admin/players/:id',{preHandler:administrator},request=>adminConsole.player(request.auth!.user,idParams.parse(request.params).id));
   app.post('/api/admin/player',{preHandler:administrator},async request=>{
     const base={playerId:uuidSchema,reason:reasonSchema};
@@ -509,6 +535,20 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
     return inventory.remove(body.userId,body.itemId,body.quantity,body.reason,body.requestId);
   });
+  // The truck's cargo hold (vehicle-storage-service.ts): the room checks who stands where, the API keeps the quantities.
+  app.post('/api/internal/vehicle-storage',internalOptions,async request=>{
+    const base={sessionId:uuidSchema,userId:uuidSchema,vehicleId:uuidSchema.toLowerCase()};
+    const body=z.discriminatedUnion('action',[
+      z.object({...base,action:z.literal('view')}).strict(),
+      z.object({...base,action:z.literal('move'),direction:z.enum(['deposit','withdraw']),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(STORAGE.MAX_MOVE),requestId:uuidSchema.toLowerCase()}).strict(),
+    ]).parse(request.body);
+    const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
+    if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
+    try{
+      const storage=body.action==='view'?await vehicleStorage.view(body.userId,body.vehicleId):await vehicleStorage.move(body.userId,body.vehicleId,body.direction,body.itemId,body.quantity,body.requestId);
+      return {storage,inventory:await inventory.view(body.userId)};
+    }catch(error){if(error instanceof StorageError)throw new HttpError(error.statusCode,error.message);throw error;}
+  });
   // Coins spent or earned in the room (apps/api/src/wallet-service.ts); only the live session's player.
   app.post('/api/internal/wallet',internalOptions,async request=>{
     const body=z.object({sessionId:uuidSchema,userId:uuidSchema,amount:z.number().int().min(-100_000).max(100_000).refine(n=>n!==0),
@@ -566,7 +606,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/internal/highfood/complete',internalOptions,async request=>highfood.complete(highfoodCompleteSchema.parse(request.body)));
   app.post('/api/internal/highfood/lost',internalOptions,async request=>{await highfood.lost(highfoodCancelSchema.parse(request.body));return {ok:true};});
   app.post('/api/internal/vehicles',internalOptions,async request=>{
-    const {updates}=z.object({updates:z.array(z.object({vehicleId:uuidSchema,parts:z.string().max(80).regex(/^[\d,]+$/),mileage:z.number().int().min(0).max(2_000_000_000),fuel:z.number().finite().min(0).max(100).optional()}).strict()).max(512)}).strict().parse(request.body);
+    const {updates}=z.object({updates:z.array(z.object({vehicleId:uuidSchema,parts:z.string().max(80).regex(/^[\d,]+$/),mileage:z.number().int().min(0).max(2_000_000_000),fuel:z.number().finite().min(0).max(100).optional(),revision:z.number().int().min(0).optional()}).strict()).max(512)}).strict().parse(request.body);
     await highfood.saveVehicles(updates);
     return {ok:true};
   });

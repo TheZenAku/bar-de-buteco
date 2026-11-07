@@ -163,8 +163,19 @@ export const playerVehicles=pgTable('player_vehicles',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),model:text('model').notNull(),parts:text('parts').notNull(),mileage:integer('mileage').notNull().default(0),
   color:text('color').notNull().default('#ccc9c2'),
   fuel:doublePrecision('fuel').notNull().default(100),
+    revision:integer('revision').notNull().default(0),
   boughtAt:date('bought_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
 },t=>[index('player_vehicles_owner_idx').on(t.userId,t.boughtAt)]);
+export const adminVehicleRequests=pgTable('admin_vehicle_requests',{
+  id:text('id').primaryKey(),actorId:text('actor_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  fingerprint:text('fingerprint').notNull(),changed:integer('changed').notNull(),skipped:integer('skipped').notNull(),
+  createdAt:date('created_at').notNull().defaultNow(),
+});
+/** What each truck's cargo hold keeps (vehicle-storage-service.ts); one row per item; no foreign key (see infra/migrations/024), HighfoodService.setVehicle clears a vehicle's rows. */
+export const vehicleStorage=pgTable('vehicle_storage',{
+  vehicleId:text('vehicle_id').notNull(),itemId:text('item_id').notNull(),
+  quantity:integer('quantity').notNull(),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.vehicleId,t.itemId]})]);
 /** Every trade that happened (trade-service.ts), written with what it moved: a retry finds it and changes nothing. */
 export const trades=pgTable('trades',{
   id:text('id').primaryKey(),userA:text('user_a').notNull(),userB:text('user_b').notNull(),offerA:jsonb('offer_a').notNull(),offerB:jsonb('offer_b').notNull(),fingerprint:text('fingerprint').notNull(),createdAt:date('created_at').notNull().defaultNow(),

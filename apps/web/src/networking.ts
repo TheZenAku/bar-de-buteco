@@ -1,5 +1,5 @@
 import {vehicleMoving} from '@bar/shared';
-import type {FireworkShot} from '@bar/shared';
+import type {FireworkShot,StorageView} from '@bar/shared';
 import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
@@ -71,6 +71,9 @@ export interface NetworkHooks {
   kicked?:(hit:{hp:number;by:string})=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
   inventoryResult?:(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>void;
+  /** The truck's hold, as the room answers opening it and each move; and the door going down (why: closed, away, idle, left, gone). */
+  storageState?:(message:{motoId:string;storage:StorageView})=>void;
+  storageClosed?:(message:{motoId:string;why:string})=>void;
   /** Coins after a change made in the room (media, counter, table, job, refund). */
   wallet?:(change:{balance:number;delta?:number;reason?:string})=>void;
   table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
@@ -220,6 +223,8 @@ export class BarNetwork {
     room.onMessage('player.kicked',(hit:{hp:number;by:string})=>this.hooks.kicked?.(hit));
     room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
+    room.onMessage('storage.state',(message:{motoId:string;storage:StorageView})=>this.hooks.storageState?.(message));
+    room.onMessage('storage.closed',(message:{motoId:string;why:string})=>this.hooks.storageClosed?.(message));
     room.onMessage('inventory.result',(result:{action:'use'|'discard';itemId:ItemId;quantity:number})=>this.hooks.inventoryResult?.(result));
     room.onMessage('voice',(frame:Uint8Array)=>this.hooks.voice?.(frame));
     room.onMessage('wallet.state',(change:{balance:number;delta?:number;reason?:string})=>this.hooks.wallet?.(change));
@@ -262,7 +267,7 @@ export class BarNetwork {
     const locked=!!((self.interactionState&&!isRidingHorse(self.interactionState))||self.currentTableId);
     const requested=this.hooks.input();
     const intention=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
-    const moving=!!(intention.dx||intention.dz||intention.dy);
+    const moving=!!(intention.dx||intention.dz||intention.dy||intention.aim);
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
@@ -292,8 +297,8 @@ export class BarNetwork {
     const intent=this.hooks.motoInput?.()??NO_MOTO_INTENT;
     // A switch thrown at rest still has to reach the others.
     const lamps=(intent.lights??0)|(intent.brake?16:0)|(intent.horn?32:0)|(intent.wheelie?64:0),changed=lamps!==this.sentLamps;
-    // Held horns/rears need keepalives even at rest; release must also cross the otherwise-idle input stream.
-    if(!changed&&!intent.horn&&!intent.wheelie&&!intent.throttle&&!intent.steer&&!vehicleMoving(body)&&!body.steer)return body;
+    // Held horns, handbrakes and wheelies need keepalives even at rest; releases must also cross the idle input stream.
+    if(!changed&&!intent.horn&&!intent.brake&&!intent.wheelie&&!intent.throttle&&!intent.steer&&!vehicleMoving(body)&&!body.steer)return body;
     this.sentLamps=lamps;
     const input={...intent,seq:++this.seq};
     this.pendingMoto.push(input);this.send('moto.input',input);

@@ -62,6 +62,7 @@ export function priceEntries():readonly PriceEntry[]{
     {key:'vehicle:moto',group:'highfood',label:'Moto de entrega',hint:'Venda no app HighMotors do celular',defaultValue:10_000,min:0,max:1_000_000},
     {key:'vehicle:moto-fogo',group:'highfood',label:'Caveira em Chamas',hint:'Moto esqueleto com fogo nas rodas, no HighMotors (sem bag de entrega)',defaultValue:25_000,min:0,max:1_000_000},
     {key:'vehicle:carro',group:'highfood',label:'Hatch 80',hint:'Carro de quatro lugares no HighMotors',defaultValue:35_000,min:0,max:1_000_000},
+    {key:'vehicle:caminhao',group:'highfood',label:'Caminhão Baú',hint:'Caminhão de dois lugares com baú de carga, no HighMotors',defaultValue:60_000,min:0,max:1_000_000},
     {key:'vehicle:tow',group:'highfood',label:'Guincho',hint:'Trazer a própria moto até a rua mais perto, pelo celular',defaultValue:30,min:0,max:10_000},
     {key:'highfood:base',group:'highfood',label:'Entrega: valor fixo',hint:'Por entrega, qualquer distância',defaultValue:8,min:0,max:1000},
     {key:'highfood:per-100m',group:'highfood',label:'Entrega: por 100 m de rota',hint:'Medido pelas ruas, de onde o pedido apareceu até o cliente',defaultValue:4,min:0,max:1000},

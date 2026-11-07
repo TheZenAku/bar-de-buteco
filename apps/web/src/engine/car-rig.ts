@@ -1,13 +1,20 @@
 import * as pc from 'playcanvas';
-import {CAR,CAR_SEATS,DEFAULT_CAR_COLOR,readCarParts,vehiclePowered,type MotoState} from '@bar/shared';
+import {DEFAULT_CAR_COLOR,DEFAULT_TRUCK_COLOR,carSpec,isTruck,readCarParts,vehicleSeats,vehiclePowered,type MotoState} from '@bar/shared';
 import {closeHand} from './drink-props';
 import {palmUp,reach} from './serving-props';
 import type {RiderRig} from './moto-delivery';
 import type {LampState} from './moto-lights';
 
 const DEGREES=180/Math.PI;
-const BONES=['chassi','volante','direcao_E','direcao_D','roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D','porta_E','porta_D','capo','tampa_traseira','limpador_E','limpador_D','limpador_traseiro'];
-const LENSES=['Luz_Farol','Luz_Lanterna','Luz_Re','Luz_Seta_E','Luz_Seta_D'];
+/** What differs between the four-wheelers' models: the hatch (carro_hatch.glb) and the box truck (caminhao_bau.glb): bones, materials, lenses. */
+interface CarProfile {bones:string[];lenses:string[];paint:string;plate:string;color:string;/** Degrees of steering wheel per degree of wheel. */wheelRatio:number}
+const HATCH_PROFILE:CarProfile={bones:['chassi','volante','direcao_E','direcao_D','roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D','porta_E','porta_D','capo','tampa_traseira','limpador_E','limpador_D','limpador_traseiro'],
+  lenses:['Luz_Farol','Luz_Lanterna','Luz_Re','Luz_Seta_E','Luz_Seta_D'],paint:'Carro_Pintura',plate:'Carro_Placa',color:DEFAULT_CAR_COLOR,wheelRatio:7.64};
+const TRUCK_PROFILE:CarProfile={bones:['chassi','volante','direcao_E','direcao_D','roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D','porta_E','porta_D','porta_bau','limpador_E','limpador_D','carga_1','carga_2','carga_3'],
+  lenses:['Luz_Farol','Luz_Lanterna','Luz_Re','Luz_Seta_E','Luz_Seta_D','Luz_Interna'],paint:'Caminhao_Pintura',plate:'Caminhao_Placa',color:DEFAULT_TRUCK_COLOR,wheelRatio:13};
+const profileOf=(model:string|undefined):CarProfile=>model==='caminhao-bau'?TRUCK_PROFILE:HATCH_PROFILE;
+/** The box's roll-up door closed and open: how much of its height is left (the bone scales its Y about the top of the opening). */
+const ROLL_DOOR_OPEN=.04;
 const adjustedPlateMeshes=new WeakSet<pc.Mesh>();
 
 function offsetRearPlate(mesh:pc.Mesh):void {
@@ -31,25 +38,29 @@ export class CarRig {
   private wheel=0;private steer=0;private roll=0;private doorL=0;private doorR=0;private hood=0;private hatch=0;private wipe=0;
   private state?:MotoState;
   private color='';
+  private readonly profile:CarProfile;private readonly wheelRadius:number;readonly model:string|undefined;
   private plateText='';private plateTexture?:pc.Texture;
   private q=new pc.Quat();private turn=new pc.Quat();
-  constructor(readonly entity:pc.Entity,private readonly device:pc.GraphicsDevice){
-    for(const name of BONES){const node=this.ponto(name);if(node)this.bones.set(name,{node,rest:node.getLocalRotation().clone()});}
+  constructor(readonly entity:pc.Entity,private readonly device:pc.GraphicsDevice,model?:string){
+    this.profile=profileOf(model);this.wheelRadius=carSpec(model).WHEEL_RADIUS;this.model=model;
+    for(const name of this.profile.bones){const node=this.ponto(name);if(node)this.bones.set(name,{node,rest:node.getLocalRotation().clone()});}
     for(const render of entity.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
       const source=instance.material;
       if(source?.name==='Carro_Placa'&&instance.mesh)offsetRearPlate(instance.mesh);
-      if(source instanceof pc.StandardMaterial&&(source.name==='Carro_Pintura'||source.name==='Carro_Placa'||LENSES.includes(source.name))){
+      if(source instanceof pc.StandardMaterial&&(source.name===this.profile.paint||source.name===this.profile.plate||this.profile.lenses.includes(source.name))){
         let material=this.materials.get(source.name);if(!material){material=source.clone();this.materials.set(source.name,material);}instance.material=material;
       }
       if(source instanceof pc.StandardMaterial&&source.blendType!==pc.BLEND_NONE)instance.castShadow=false;
     }
-    for(const name of LENSES)this.lens(name,0);
+    for(const name of this.profile.lenses)this.lens(name,0);
   }
   ponto(name:string):pc.Entity {
-    const alias:Record<string,string>={ponto_piloto:'ponto_motorista',ponto_farol:'ponto_farol_E',ponto_lanterna:'ponto_lanterna_E',ponto_entrega:'ponto_porta_malas',bau:'tampa_traseira',roda_dianteira:'roda_dianteira_E',roda_traseira:'roda_traseira_E',direcao:'direcao_E'};
+    const alias:Record<string,string>={ponto_piloto:'ponto_motorista',ponto_farol:'ponto_farol_E',ponto_lanterna:'ponto_lanterna_E',ponto_entrega:this.profile?.bones.includes('porta_bau')?'ponto_bau':'ponto_porta_malas',bau:this.profile?.bones.includes('porta_bau')?'porta_bau':'tampa_traseira',roda_dianteira:'roda_dianteira_E',roda_traseira:'roda_traseira_E',direcao:'direcao_E'};
     return this.entity.findByName(alias[name]??name) as pc.Entity;
   }
   private rotate(name:string,x:number,y:number,z:number):void {const bone=this.bones.get(name);if(bone)bone.node.setLocalRotation(this.turn.mul2(bone.rest,this.q.setFromEulerAngles(x,y,z)));}
+  /** The box's door (or the hatch) is up enough to see in. */
+  get boxOpen():boolean {return this.hatch>.25;}
   lens(name:string,level:number,exposure=1):void {
     level=level/Math.max(.5,exposure);
     if(this.levels.get(name)===level)return;this.levels.set(name,level);
@@ -59,14 +70,14 @@ export class CarRig {
     this.state=state;
     this.powered=vehiclePowered(state);
     this.headlightMode=this.powered?(state.headlights??0):0;
-    const color=state.color??DEFAULT_CAR_COLOR;
-    if(color!==this.color){this.color=color;const paint=this.materials.get('Carro_Pintura');if(paint){paint.diffuse.fromString(color);paint.update();}}
+    const color=state.color??this.profile.color;
+    if(color!==this.color){this.color=color;const paint=this.materials.get(this.profile.paint);if(paint){paint.diffuse.fromString(color);paint.update();}}
     if(state.plate&&state.plate!==this.plateText)this.plate(state.plate);
     this.raining=raining;
   }
   private raining=false;
   private plate(text:string):void {
-    this.plateText=text;const material=this.materials.get('Carro_Placa');if(!material)return;
+    this.plateText=text;const material=this.materials.get(this.profile.plate);if(!material)return;
     const canvas=document.createElement('canvas');canvas.width=512;canvas.height=168;const g=canvas.getContext('2d')!;
     g.fillStyle='#f4f4f0';g.fillRect(0,0,512,168);g.fillStyle='#123c9c';g.fillRect(0,0,512,34);
     g.fillStyle='#fff';g.font='bold 22px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText('BRASIL',256,18);
@@ -78,21 +89,32 @@ export class CarRig {
     const k=1-Math.exp(-7*dt),state=this.state,parts=readCarParts(state?.parts);
     this.steer=Math.max(-1,Math.min(1,this.direcao))*this.anguloDirecao;
     this.roll+=(Math.max(-3.5,Math.min(3.5,-this.lateralAcceleration*.22))-this.roll)*k;
-    this.wheel=(this.wheel+this.velocidade*dt/CAR.WHEEL_RADIUS*DEGREES)%360;
+    this.wheel=(this.wheel+this.velocidade*dt/this.wheelRadius*DEGREES)%360;
     for(const name of ['roda_dianteira_E','roda_dianteira_D','roda_traseira_E','roda_traseira_D'])this.rotate(name,this.wheel,0,0);
     this.rotate('direcao_E',0,-this.steer,0);this.rotate('direcao_D',0,-this.steer,0);
-    this.rotate('volante',0,-this.steer*7.64,0);this.rotate('chassi',0,0,this.roll);
+    this.rotate('volante',0,-this.steer*this.profile.wheelRatio,0);this.rotate('chassi',0,0,this.roll);
     const door=(bit:number,part:string)=>(state?.doors??0)&bit?Math.min(1,parts[part]!/35):0;
     this.doorL+=(door(1,'porta_esquerda')-this.doorL)*k;this.doorR+=(door(2,'porta_direita')-this.doorR)*k;
     this.hood+=((state?.hood?1:0)-this.hood)*k;this.hatch+=((state?.trunk?1:0)-this.hatch)*k;
-    this.rotate('porta_E',0,-68*this.doorL,0);this.rotate('porta_D',0,68*this.doorR,0);this.rotate('capo',-52*this.hood,0,0);this.rotate('tampa_traseira',78*this.hatch,0,0);
-    for(const [name,id] of [['porta_E','porta_esquerda'],['porta_D','porta_direita'],['capo','capo'],['tampa_traseira','porta_malas']])this.ponto(name!).setLocalScale(parts[id!]!<=0?0:1,parts[id!]!<=0?0:1,parts[id!]!<=0?0:1);
+    this.rotate('porta_E',0,-68*this.doorL,0);this.rotate('porta_D',0,68*this.doorR,0);
+    const truck=this.profile===TRUCK_PROFILE;
+    if(truck){
+      // The box's roll-up door rises into the roof: its bone scales the door's height about the top of the opening. A wrecked one is gone altogether.
+      const gone=parts.porta_malas!<=0,door=this.ponto('porta_bau');
+      if(door)door.setLocalScale(gone?0:1,gone?0:1-(1-ROLL_DOOR_OPEN)*this.hatch,gone?0:1);
+      // The crates inside follow how full the hold is (the room's `load`, 0..3).
+      for(let level=1;level<=3;level++){const crate=this.ponto(`carga_${level}`),on=(state?.load??0)>=level?1:0;if(crate)crate.setLocalScale(on,on,on);}
+      for(const [name,id] of [['porta_E','porta_esquerda'],['porta_D','porta_direita']])this.ponto(name!).setLocalScale(parts[id!]!<=0?0:1,parts[id!]!<=0?0:1,parts[id!]!<=0?0:1);
+    }else{
+      this.rotate('capo',-52*this.hood,0,0);this.rotate('tampa_traseira',78*this.hatch,0,0);
+      for(const [name,id] of [['porta_E','porta_esquerda'],['porta_D','porta_direita'],['capo','capo'],['tampa_traseira','porta_malas']])this.ponto(name!).setLocalScale(parts[id!]!<=0?0:1,parts[id!]!<=0?0:1,parts[id!]!<=0?0:1);
+    }
     const wiping=this.powered&&(state?.wipers||this.raining)&&parts.limpadores!>0&&parts.bateria!>0;
     if(wiping)this.wipe+=dt/1.6*Math.max(.25,parts.limpadores!/100);else this.wipe+=(Math.ceil(this.wipe)-this.wipe)*k;
-    const sweep=Math.sin(Math.PI*(this.wipe%1));this.rotate('limpador_E',0,-82*sweep,0);this.rotate('limpador_D',0,-82*sweep,0);this.rotate('limpador_traseiro',0,-165*sweep,0);
+    const sweep=Math.sin(Math.PI*(this.wipe%1));this.rotate('limpador_E',0,-82*sweep,0);this.rotate('limpador_D',0,-82*sweep,0);if(!truck)this.rotate('limpador_traseiro',0,-165*sweep,0);
   }
   telemetry(){return {guidao:this.steer,inclinacao:this.roll,rodas:this.wheel,topoRoda:-this.ponto('roda_traseira_E').up.dot(this.entity.forward),color:this.color,plate:this.plateText,
-    doors:[this.doorL,this.doorR],hood:this.hood,trunk:this.hatch,wipers:this.wipe,paint:this.materials.get('Carro_Pintura')?.diffuse.toString(false)};}
+    doors:[this.doorL,this.doorR],hood:this.hood,trunk:this.hatch,wipers:this.wipe,paint:this.materials.get(this.profile.paint)?.diffuse.toString(false)};}
   destroy():void {this.plateTexture?.destroy();for(const material of this.materials.values())material.destroy();}
 }
 
@@ -113,6 +135,7 @@ export class CarLights {
     const lit=this.rig.headlightMode>0,high=this.rig.headlightMode===2;
     this.rig.lens('Luz_Farol',lit?(high?3.5:2)*head:0,exposure);
     this.rig.lens('Luz_Lanterna',(state.brake?3:lit?1.2:0)*tail,exposure);
+    this.rig.lens('Luz_Interna',this.rig.powered||this.rig.boxOpen?(this.rig.boxOpen?3:0):0,exposure);
     this.rig.lens('Luz_Re',this.rig.powered&&this.rig.velocidade<-.05?2.5*tail:0,exposure);
     this.rig.lens('Luz_Seta_E',state.left&&blink?2.5*tail:0,exposure);this.rig.lens('Luz_Seta_D',state.right&&blink?2.5*tail:0,exposure);
     for(const entity of this.heads){const light=entity.light!;light.enabled=near&&lit&&head>0;light.range=high?45:28;light.intensity=(high?4:2.5)*head;}
@@ -123,10 +146,10 @@ export class CarLights {
 
 /** A seated clip placed on the authored bench, with driver's hands and feet on the moving wheel and pedals. */
 export function seatCar(car:CarRig,rider:RiderRig,seat:number,originalScale:pc.Vec3=pc.Vec3.ONE):void {
-  const anchor=car.ponto(CAR_SEATS[seat]!.node),up=car.entity.up.clone(),front=car.entity.forward.clone().mulScalar(-1),left=car.entity.right.clone();
+  const anchor=car.ponto(vehicleSeats(car.model)[seat]!.node),up=car.entity.up.clone(),front=car.entity.forward.clone().mulScalar(-1),left=car.entity.right.clone();
   // Different skeletons have different seated heights. Keep the head below the low hatch roof and restore the scale on exit.
   const torso=Math.max(.4,(rider.head.getPosition().y-rider.hip.getPosition().y)/Math.max(.01,rider.root.getLocalScale().y));
-  const fit=Math.min(1,.65/torso);rider.root.setLocalScale(originalScale.x*fit,originalScale.y*fit,originalScale.z*fit);
+  const fit=isTruck({...(car.model?{model:car.model}:{})})?1:Math.min(1,.65/torso);rider.root.setLocalScale(originalScale.x*fit,originalScale.y*fit,originalScale.z*fit);
   rider.root.setRotation(car.ponto('chassi').getRotation());
   const hip=anchor.getPosition().clone();rider.root.setPosition(rider.root.getPosition().clone().add(hip.sub(rider.hip.getPosition())));
   if(seat!==0)return;

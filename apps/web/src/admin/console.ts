@@ -26,7 +26,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'prices',label:'Preços',icon:'tag',description:'Quanto custa cada coisa e quanto o bar paga. As mudanças valem para todos em poucos segundos.',factory:pricesSection},
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
-  {id:'vehicles',label:'Veículos',icon:'bike',description:'As motos de entrega do mapa: spawne uma perto de você ou tire do mapa as que não quer mais.',factory:vehiclesSection},
+  {id:'vehicles',label:'Veículos',icon:'bike',description:'Gerencie a frota dos jogadores, registre veículos, personalize placas e use o spawn de todos os modelos.',factory:vehiclesSection},
   {id:'environment',label:'Tempo e clima',icon:'sun',description:'Horário do jogo, duração do dia e clima compartilhados por todos nesta sala.',factory:environmentSection},
   {id:'highfood',label:'Highfood',icon:'food',description:'As entregas de agora, o que elas pagam e os clientes: nome, corpo no jogo, falas e foto.',factory:highfoodSection},
   {id:'badges',label:'Emblemas',icon:'trophy',description:'Os emblemas da cidade: crie, edite, conceda e retire. Cada jogador escolhe até seis para mostrar no perfil.',factory:badgesSection},

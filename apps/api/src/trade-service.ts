@@ -87,7 +87,7 @@ export class TradeService {
           ]);
         }
         for(const id of side.offer.vehicles){
-          const moved=await tx.update(playerVehicles).set({userId:other.userId,updatedAt:new Date()}).where(and(eq(playerVehicles.id,id),eq(playerVehicles.userId,side.userId))).returning({id:playerVehicles.id});
+          const moved=await tx.update(playerVehicles).set({userId:other.userId,revision:sql`${playerVehicles.revision}+1`,updatedAt:new Date()}).where(and(eq(playerVehicles.id,id),eq(playerVehicles.userId,side.userId))).returning({id:playerVehicles.id});
           if(moved.length!==1)throw new TradeError(409,'Uma das chaves oferecidas não está mais com quem ofereceu.');
         }
       }

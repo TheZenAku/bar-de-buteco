@@ -1,5 +1,5 @@
 ﻿import {
-  CAR_PARTS,CAR_SEATS,MOTO_ENGINE,MOTO_LIGHT,MOTO_PARTS,atVehicleFuelPump,isCar,isRidingHorse,
+  CAR_PARTS,carSpec,vehicleSeats,MOTO_ENGINE,MOTO_LIGHT,MOTO_PARTS,atVehicleFuelPump,isCar,isRidingHorse,
   readVehicleParts,vehicleFuelUse,vehicleMotionSpeed,vehicleName,vehicleOccupants,vehiclePowered,
   vehicleSeat,vehicleSpeed,vehicleTank,type MotoBody,type MotoState,type PlayerState,
 } from '@bar/shared';
@@ -172,7 +172,7 @@ export function createVehicleHud(host:HTMLElement,onControl:(action:string)=>voi
       const fuel=typeof v.fuel==='number'&&Number.isFinite(v.fuel)?Math.max(0,Math.min(100,v.fuel)):undefined;
       const motion=vehicleMotionSpeed(v),actualSpeed=vehicleSpeed(v),lights=v.headlights??0,bits=v.lights??0;
       const raining=host.dataset.raining==='true',wiping=!!(v.wipers||raining)&&powered&&parts.limpadores!>0&&parts.bateria!>0;
-      text('seat',`${driver?'Motorista':CAR_SEATS[seat]?.name??'Passageiro'} - ${vehicleOccupants(v).filter(Boolean).length}/${car?4:1}`);
+      text('seat',`${driver?'Motorista':vehicleSeats(v.model)[seat]?.name??'Passageiro'} - ${vehicleOccupants(v).filter(Boolean).length}/${car?carSpec(v.model).SEATS:1}`);
       element('passenger')!.hidden=driver;
       // Same all-part average as the existing car/moto information panels.
       const partList=car?CAR_PARTS:MOTO_PARTS,overall=partList.reduce((sum,p)=>sum+(parts[p.id]??100),0)/partList.length;

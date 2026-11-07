@@ -1,6 +1,7 @@
 import {adminConsole} from './admin/console';
 import {isRidingHorse,vehicleSeat,weatherAt} from '@bar/shared';
-import {CAR_MODEL,CAR_SEATS,isCar,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts} from '@bar/shared';
+import {CAR_MODEL,isCar,isTruck,hasStorage,storageGap,storageRefusal,vehicleMotionSpeed,vehicleSeats,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts,type MotoState,type StorageView} from '@bar/shared';
+import {storagePanelHtml} from './storage-panel';
 import {PerformanceMonitor} from './performance/monitor';
 import {UpdateProfiler} from './performance/recording';
 import {createPerformanceHud} from './performance/hud';
@@ -254,7 +255,7 @@ function focusChat():void {
   panel.classList.add('chat-open');input.focus();
   if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
 }
-function showModal(title:string,content:string,type:string):void {if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function showModal(title:string,content:string,type:string):void {if(activeModal==='storage'&&type!=='storage')leaveStorage();if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
 const measureDesk=()=>{const left=$('.modal').getBoundingClientRect().left;deskCover=innerWidth>760?Math.max(0,1-left/innerWidth):0;};
@@ -271,7 +272,7 @@ function openLightDesk():void {
   document.body.classList.add('at-light-desk');
   measureDesk();addEventListener('resize',measureDesk);scene?.watchStage(()=>deskCover);
 }
-function closeModal():void {if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function closeModal():void {if(activeModal==='storage')leaveStorage();if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
 const profile=createProfileWindow({
   portrait:skin=>scene?.portrait(skin)??Promise.resolve(undefined),
@@ -339,8 +340,10 @@ const network=new BarNetwork({
   deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
   deathScreen:screen=>deathUi.screen(screen),
   kicked:({hp,by})=>notices.show({variant:'aviso',title:'Chutado',text:hp?`${by} acertou um chute em você: -${hp} de vida.`:`${by} acertou um chute em você.`}),
-  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();},
+  inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();if(activeModal==='storage')renderStorage();},
   inventoryResult:()=>{},
+  storageState:onStorageState,
+  storageClosed:onStorageClosed,
   firework:shot=>scene?.fireworkShot(shot),
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
@@ -543,15 +546,17 @@ function renderWorld():void {
   renderMapMarks(self);
   const food=foodPrompt(self);
   const interaction=self?nearestObject(self):undefined;
-  const moto=self&&!interaction&&!atStation?freeMotoNear(self):undefined;
-  const fallenMoto=self&&!interaction&&!atStation&&!moto?fallenMotoNear(self):undefined;
+  // At the back of your own truck E opens its hold: the rear counts before getting on (the doors are on the sides; "Entrar" is in its menu).
+  const truckBox=self&&!interaction&&!atStation?truckRearNear(self):undefined;
+  const moto=self&&!interaction&&!atStation&&!truckBox?freeMotoNear(self):undefined;
+  const fallenMoto=self&&!interaction&&!atStation&&!moto&&!truckBox?fallenMotoNear(self):undefined;
   // Near a free spot on the stage: its clips download now, so taking it starts without a wait.
   if(interaction?.type==='musician')scene?.preloadMusician(interaction.spot!);
   const context=$('#context');
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
   $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
-  context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!food&&!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto));
-  $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?(courier.state().order?.stage==='collect'?'Retirando o pedido…':courier.state().order?.transport==='horse'?'Pegando o pedido na mochila…':'Tirando o pedido do baú…'):self?.interactionState==='food-locker'?'Digitando o código':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':'');
+  context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!food&&!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto&&!truckBox));
+  $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?(courier.state().order?.stage==='collect'?'Retirando o pedido…':courier.state().order?.transport==='horse'?'Pegando o pedido na mochila…':'Tirando o pedido do baú…'):self?.interactionState==='food-locker'?'Digitando o código':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':truckBox?'para abrir o baú do caminhão':'');
   const event=world.event;
   if(isRidingHorse(self?.interactionState))$('#context-label').textContent='Desmontar do cavalo';
   if(fuel.service)$('#context-label').textContent='Frentista realizando abastecimento';
@@ -644,6 +649,38 @@ const shopBlip=createObjectiveBlip($<HTMLCanvasElement>('#shop-blip'),{accent:['
 const deskBlip=createObjectiveBlip($<HTMLCanvasElement>('#desk-blip'),{accent:['--blip-desk','#a77bff'],edge:false,within:BLIP_RADIUS});
 const telaoLabel=()=>world?.televisions?.telao?.status==='playing'?`Telão · pôr vídeo na fila · ${livePrice('media:telao')} moedas`:`Vídeo no telão · ${livePrice('media:telao')} moedas`;
 /** The parked delivery bike within reach, on foot and free (a bought one only for its owner): E gets on it. Anything else within reach comes first. */
+// The truck's hold (apps/web/src/storage-panel.ts): E standing behind your own truck, or "Abrir baú" in its menu. The room opens the door and answers with the hold.
+let storageView:StorageView|undefined,storageMoto='',storageSelected='',storageBusy=false;
+/** Your own truck whose back you stand at, still, and which the room would open (the same rules, shared). */
+function truckRearNear(self:PlayerState):MotoState|undefined {
+  if(self.interactionState||self.currentTableId||activeModal)return undefined;
+  return Object.values(world?.motos??{}).find(moto=>moto.ownerId===self.id&&hasStorage(moto.model)&&!!moto.vehicleId&&Math.abs((self.y??moto.y)-moto.y)<.7&&!storageRefusal(moto,self.id,storageGap(moto,self),vehicleMotionSpeed(moto),.3));
+}
+function openStorage(motoId:string):void {if(!inGame||!connected||activeModal&&activeModal!=='storage')return;storageBusy=true;network.send('storage.open',{motoId});}
+/** The panel goes (closed by the player, or by another window): the door goes down. */
+function leaveStorage():void {if(storageMoto)network.send('storage.close',{motoId:storageMoto});storageMoto='';storageView=undefined;storageSelected='';storageBusy=false;}
+function renderStorage():void {
+  if(activeModal!=='storage'||!storageView)return;
+  const kept=document.querySelector<HTMLElement>('#modal-content')?.scrollTop??0;
+  $('#modal-content').innerHTML=storagePanelHtml({storage:storageView,backpack:inventory?.stacks??[],backpackCapacity:inventory?.capacity??12,selected:storageSelected,busy:storageBusy});
+  document.querySelector<HTMLElement>('#modal-content')?.scrollTo({top:kept});
+}
+function onStorageState(message:{motoId:string;storage:StorageView}):void {
+  storageBusy=false;storageView=message.storage;
+  if(activeModal!=='storage'){storageMoto=message.motoId;showModal(message.storage.name,'','storage');}
+  storageMoto=message.motoId;
+  // The stack picked may be gone after a move: keep the selection only while it still exists on its side.
+  const [side,itemId]=storageSelected.split(':');
+  if(side==='hold'&&!message.storage.stacks.some(stack=>stack.itemId===itemId))storageSelected='';
+  renderStorage();
+}
+const STORAGE_CLOSED:Record<string,string>={away:'Você se afastou do caminhão: o baú fechou.',idle:'O baú fechou por inatividade.',left:'O baú fechou.',gone:'O caminhão não está mais aqui: o baú fechou.'};
+function onStorageClosed(message:{motoId:string;why:string}):void {
+  if(message.motoId!==storageMoto&&activeModal==='storage')return;
+  storageMoto='';storageView=undefined;storageBusy=false;
+  if(activeModal==='storage')closeModal();
+  if(STORAGE_CLOSED[message.why])toast(STORAGE_CLOSED[message.why]!);
+}
 function freeMotoNear(self:PlayerState){
   return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}),self.id);
 }
@@ -766,7 +803,7 @@ function interact():void {
   const station=jobStation();
   if(station&&touching(stationInteractable(station),self)){network.send('job.work');return;}
   const object=nearestObject(self);
-  if(!object){const moto=freeMotoNear(self)??fallenMotoNear(self);if(moto)network.send('moto.mount',{motoId:moto.id});return;}
+  if(!object){const box=truckRearNear(self);if(box){openStorage(box.id);return;}const moto=freeMotoNear(self)??fallenMotoNear(self);if(moto)network.send('moto.mount',{motoId:moto.id});return;}
   if(object.type==='counter'){orderDrink();return;}
   if(object.type==='blackjack')network.send('blackjack.join',{tableId:object.id});
   else if(object.type==='truco'){trucoView=undefined;network.send('truco.join',{tableId:'truco-1'});}
@@ -1044,6 +1081,13 @@ app.addEventListener('click',event=>{
       case 'inventory-use':useInventoryItem(button.dataset.item!);break;
       case 'firework-fire':scene?.fireworkFire();break;
       case 'firework-stow':network.send('firework.stow',{});break;
+      case 'storage-select':storageSelected=`${button.dataset.side}:${button.dataset.item}`;renderStorage();break;
+      case 'storage-move':{
+        if(storageBusy||!storageMoto)break;
+        storageBusy=true;renderStorage();
+        network.send('storage.move',{motoId:storageMoto,itemId:button.dataset.item,quantity:Number(button.dataset.amount),direction:button.dataset.direction,requestId:crypto.randomUUID()});
+        break;
+      }
       case 'inventory-select':selectedItem=button.dataset.item??'';renderInventory();document.querySelector<HTMLElement>(`.inventory-slot[data-item="${CSS.escape(selectedItem)}"]`)?.focus();break;
       case 'garage-take':network.send('garage.take',{garageId:garageShown,vehicleId:button.dataset.vehicle});break;
       case 'garage-store':network.send('garage.store',{garageId:garageShown,recall:button.dataset.recall==='true'});break;
@@ -1317,7 +1361,8 @@ async function start():Promise<void>{
         ...(player&&player===user?.id&&user?.role==='admin'?[{id:'die',icon:'ghost',label:'Morrer (teste)',choose:()=>void api('/admin/player',{playerId:player,op:'kill',reason:'Teste pelo menu do jogo'}).then(()=>toast('A Morte está a caminho.'),error=>toast(errorMessage(error),true))}]:[]),
         ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
-        ...(bike&&isCar(bike)?CAR_SEATS.filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${CAR_SEATS.indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:CAR_SEATS.indexOf(seat)})})):[]),
+        ...(bike&&isCar(bike)?vehicleSeats(bike.model).filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${vehicleSeats(bike.model).indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:vehicleSeats(bike.model).indexOf(seat)})})):[]),
+        ...(bike&&isTruck(bike)&&bike.ownerId&&bike.ownerId===user?.id?[{id:'storage',icon:'package',label:'Abrir baú',choose:()=>openStorage(bike.id)}]:[]),
         ...(bike?.ownerId&&bike.ownerId===user?.id?[{id:'lock',icon:bike.locked?'unlock':'lock',label:bike.locked?'Destrancar':'Trancar',choose:()=>lockOwnBike()}]:[]),
       ],bike?.plate?`${plateHtml(bike.plate)}<span>${bike.ownerId?`de ${e(bike.ownerName||'outro jogador')}${bike.locked?' · trancada':''}`:'Moto do bar'}</span>`:'');
     },

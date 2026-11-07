@@ -1,6 +1,7 @@
 import {buyCard,showCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
+import {CAR_MODEL,VEHICLE_CATALOG} from '../../packages/shared/src/vehicle-models';
 
 const password='AdminBrowserTests2026!';
 test.beforeEach(async({request})=>{
@@ -19,6 +20,108 @@ async function ready(page:Page){
 /** A category of the administration (the menu on the left) and a tab of the player's file. */
 const section=(page:Page,id:string)=>page.locator(`[data-admin-nav="${id}"]`).click();
 const fileTab=(page:Page,name:RegExp|string)=>page.getByRole('tab',{name}).click();
+
+test('veículos: gerenciar contas offline, reparar todos, transferir a chave e excluir pela administração',async({page,playwright})=>{
+  test.setTimeout(150000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
+  const accounts=await playwright.request.newContext({baseURL:'http://localhost:5273'});
+  try{
+    const register=async(username:string)=>{
+      const data={username,email:`${username}@vehicle-ui.test`,displayName:username,password};
+      const created=await accounts.post('/api/auth/register',{data});
+      const response=created.status()===409?await accounts.post('/api/auth/login',{data:{email:data.email,password}}):created;
+      expect(response.ok()).toBe(true);return (await response.json()).user.id as string;
+    };
+    const source=await register('vehicle_source_ui'),target=await register('vehicle_target_ui');
+    for(const id of [source,target]){
+      const vehicles=(await (await page.request.get(`/api/admin/vehicles?ownerId=${id}`)).json()).vehicles;
+      if(vehicles.length)expect((await page.request.post('/api/admin/vehicles',{data:{operation:'delete',ids:vehicles.map((v:any)=>v.id),requestId:crypto.randomUUID(),reason:'Limpar fixture de veículos'}})).ok()).toBe(true);
+    }
+    expect((await page.request.post('/api/admin/highfood/vehicle',{data:{playerId:source,owned:true,reason:'Veículo para teste da interface'}})).ok()).toBe(true);
+    const vehicle=(await (await page.request.get(`/api/admin/vehicles?ownerId=${source}`)).json()).vehicles[0];
+    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await page.getByLabel('Buscar veículos',{exact:true}).fill(vehicle.plate);
+    await page.locator('[data-owned-form="search"]').getByRole('button',{name:'Buscar',exact:true}).click();
+    await expect(page.locator('[data-owned-vehicles]')).toContainText('vehicle_source_ui');
+    await page.getByRole('button',{name:'Reparar todos os veículos',exact:true}).click();
+    await page.getByLabel('Motivo da alteração nos veículos').fill('Reparar frota de teste');
+    await page.getByRole('button',{name:'Reparar todas as peças · todos',exact:true}).click();
+    await expect(page.locator('.admin-feedback')).toContainText('veículo(s) atualizado(s)');
+    await page.getByRole('button',{name:'Gerenciar',exact:true}).click();
+    await page.getByLabel('Ação nos veículos',{exact:true}).selectOption('transfer');
+    await page.getByLabel('Buscar destinatário',{exact:true}).fill('vehicle_target_ui');
+    await page.getByRole('button',{name:'Buscar jogador',exact:true}).click();
+    await expect(page.getByLabel('Novo proprietário',{exact:true}).locator('option')).toHaveCount(2);
+    await page.getByLabel('Novo proprietário',{exact:true}).selectOption(target);
+    await page.getByLabel('Motivo da alteração nos veículos').fill('Transferir veículo para destinatário offline');
+    await page.getByRole('button',{name:'Transferir proprietário · 1',exact:true}).click();
+    await expect(page.locator('[data-owned-vehicles]')).toContainText('vehicle_target_ui');
+    await page.getByRole('button',{name:'Gerenciar',exact:true}).click();
+    await page.getByLabel('Ação nos veículos',{exact:true}).selectOption('delete');
+    await expect(page.locator('[data-owned-action]')).toContainText('Exclusão permanente');
+    await page.getByLabel('Motivo da alteração nos veículos').fill('Excluir veículo da fixture');
+    await page.getByRole('button',{name:'Excluir definitivamente · 1',exact:true}).click();
+    await expect(page.locator('[data-owned-vehicles]')).toContainText('Nenhum veículo encontrado.');
+    expect((await (await page.request.get(`/api/admin/vehicles?ownerId=${target}`)).json()).total).toBe(0);
+    expect(errors).toEqual([]);
+    await page.screenshot({path:'test-results/previews/admin-player-vehicles.png'});
+  }finally{await accounts.dispose();}
+});
+
+test('veículos: registrar para jogador, personalizar placa e spawnar todos os modelos do catálogo',async({page,playwright})=>{
+  test.setTimeout(150000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
+  const accounts=await playwright.request.newContext({baseURL:'http://localhost:5273'});
+  try{
+    const data={username:'vehicle_registered_ui',email:'vehicle_registered_ui@vehicle-ui.test',displayName:'vehicle_registered_ui',password};
+    const created=await accounts.post('/api/auth/register',{data});
+    const response=created.status()===409?await accounts.post('/api/auth/login',{data:{email:data.email,password}}):created;
+    expect(response.ok()).toBe(true);const playerId=(await response.json()).user.id;
+    const list=async()=>(await (await page.request.get(`/api/admin/vehicles?ownerId=${playerId}`)).json()).vehicles;
+    const old=await list();if(old.length)expect((await page.request.post('/api/admin/vehicles',{data:{operation:'delete',ids:old.map((v:any)=>v.id),reason:'Limpar registro de teste',requestId:crypto.randomUUID()}})).ok()).toBe(true);
+    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await expect(page.getByRole('tablist',{name:'Gerenciamento de veículos'}).getByRole('tab')).toHaveCount(3);
+    await page.getByRole('tab',{name:'Registrar veículo',exact:true}).click();
+    await page.getByLabel('Buscar jogador para registro',{exact:true}).fill(data.username);
+    await page.getByRole('button',{name:'Buscar jogador',exact:true}).click();
+    await expect(page.getByLabel('Proprietário do veículo',{exact:true}).locator('option')).toHaveCount(2);
+    await page.getByLabel('Proprietário do veículo',{exact:true}).selectOption(playerId);
+    await expect(page.getByLabel('Modelo para registro',{exact:true}).locator('option')).toHaveCount(VEHICLE_CATALOG.length);
+    await page.getByLabel('Modelo para registro',{exact:true}).selectOption(CAR_MODEL);
+    await page.getByLabel('Placa do registro (opcional)',{exact:true}).fill('UIR1A23');
+    await page.getByLabel('Motivo do registro',{exact:true}).fill('Registrar carro para jogador offline');
+    await page.getByRole('button',{name:'Registrar veículo',exact:true}).click();
+    await expect(page.locator('.admin-feedback')).toContainText('Veículo registrado na garagem');
+    expect((await list())[0]).toMatchObject({ownerId:playerId,model:CAR_MODEL,plate:'UIR1A23'});
+    await page.getByRole('tab',{name:'Veículos dos jogadores',exact:true}).click();
+    await page.getByLabel('Buscar veículos',{exact:true}).fill('UIR1A23');
+    await page.locator('[data-owned-form="search"]').getByRole('button',{name:'Buscar',exact:true}).click();
+    await page.getByRole('button',{name:'Gerenciar',exact:true}).click();
+    await page.getByLabel('Ação nos veículos',{exact:true}).selectOption('plate');
+    await page.getByLabel('Nova placa',{exact:true}).fill('UIR2B34');
+    await page.getByLabel('Motivo da alteração nos veículos',{exact:true}).fill('Personalizar emplacamento do carro');
+    await page.getByRole('button',{name:'Personalizar placa · 1',exact:true}).click();
+    await expect(page.locator('.admin-feedback')).toContainText('1 veículo(s) atualizado(s)');
+    expect((await list())[0].plate).toBe('UIR2B34');
+    await page.getByRole('button',{name:'Fechar janela',exact:true}).click();
+    await page.evaluate(()=>(window as any).barDebug.send('test.player.place',{x:60,y:0,z:7,rotation:0}));
+    await expect.poll(()=>page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId].x;})).toBeCloseTo(60,1);
+    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await page.getByRole('tab',{name:'Spawn',exact:true}).click();
+    await expect(page.getByLabel('Modelo para spawn',{exact:true}).locator('option')).toHaveCount(VEHICLE_CATALOG.length);
+    for(const vehicle of VEHICLE_CATALOG){
+      await page.getByLabel('Modelo para spawn',{exact:true}).selectOption(vehicle.model);
+      await page.getByRole('button',{name:'Spawnar veículo',exact:true}).click();
+      await expect(page.locator('.admin-feedback')).toContainText(`${vehicle.name} spawnado`);
+      await expect(page.locator('[data-spawn-list]')).toContainText(vehicle.name);
+      await page.locator('[data-vehicle="despawn-all"]').click();
+      await expect(page.locator('[data-spawn-list]')).toContainText('Nenhum veículo no mapa.');
+    }
+    await page.screenshot({path:'test-results/previews/admin-vehicle-spawn.png'});expect(errors).toEqual([]);
+  }finally{await accounts.dispose();}
+});
 
 test('tempo e clima: administração altera hora, pausa, velocidade e tempestade para a sala',async({page})=>{
   test.setTimeout(150000);

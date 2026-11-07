@@ -30,7 +30,7 @@ export function makePlate(random:()=>number=Math.random):string {
 }
 
 /** A vehicle in someone's name, as the API keeps it. `parts` and `mileage` are what it was last seen with: they survive anything but a repair. */
-export interface OwnedVehicle {id:string;model:string;name:string;plate:string;parts:string;mileage:number;boughtAt:number;color?:string;fuel?:number}
+export interface OwnedVehicle {id:string;model:string;name:string;plate:string;parts:string;mileage:number;boughtAt:number;color?:string;fuel?:number;revision?:number;/** How full its hold is, 0..3 (vehicle-storage.ts). */load?:number}
 /** The key, as the backpack shows it. It takes no slot and is never lost: the only way out of the backpack is a trade (trade.ts). */
 export interface VehicleKey {vehicleId:string;plate:string;name:string}
 export const VEHICLE_KEY={

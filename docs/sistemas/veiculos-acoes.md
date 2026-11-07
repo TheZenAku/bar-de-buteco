@@ -4,6 +4,7 @@ A auditoria da API local em uso (`/api/internal/vehicles/ownership-audit`, prote
 
 | Ação | Controle e comportamento |
 | --- | --- |
+| Freio de mão em todos os veículos | Barra de espaço: clique gravado ao acionar e soltar. Atrito dos pneus somente enquanto pressionado e com velocidade total acima de 0,65 m/s, incluindo ré e movimento lateral. O volume diminui ao parar. Acelerar e usar o freio normal não acionam essa camada |
 | Bag do Highfood | Ao montar durante o turno, a bag v3 é encaixada em `ponto_bau`. Ao desmontar ou sair do turno, a bag da moto é destruída; a mochila volta ao piloto a pé. O mesmo encaixe aparece nos outros clientes |
 | Buzina de moto/carro | Segurar F enquanto dirige. A moto usa um tom mais agudo e o carro dois tons mais graves. Áudio posicional até 65 m, com volume geral e limite de vozes. B continua sendo a tecla do microfone no modo apertar para falar |
 | Grau de moto | Segurar Shift com o motor ligado e velocidade para a frente acima de 1,2 m/s. Sobe suavemente até 34°. Soltar Shift, frear, dar ré, perder os comandos ou desmontar baixa a frente. Carros ignoram o grau |
@@ -14,6 +15,17 @@ O servidor limita quem pode acionar cada veículo, conserva o estado da buzina/g
 Grau e empinada são poses controladas sobre a simulação existente, sem introduzir uma simulação de equilíbrio ou tombos para trás. As colisões do veículo continuam usando os cascos compartilhados. O grau gira o conjunto sobre o eixo traseiro, preservando a altura da roda traseira. Os nós dos GLBs e os scripts do Blender não foram alterados.
 
 Arquivos principais: `packages/shared/src/vehicle-actions.ts`, `moto.ts` e `index.ts`; `apps/server/src/BarRoom.ts` e `state.ts`; `apps/web/src/networking.ts`; `engine/moto-delivery.ts`, `horse-mount.ts`, `horse-sound.ts`, `vehicle-horn.ts`, `BarScene.ts` e `scene-types.ts`; ajuda em `lobby-menu.ts`, `vehicle-hud.ts` e `car-panel.ts`. A auditoria está em `apps/api/src/highfood-service.ts` e `app.ts`; o importador de áudio é `tools/assets/import-horse-sounds.mjs`.
+
+O áudio de freio fica em `engine/vehicle-brake-sound.ts`. O motorista usa o estado
+local previsto da barra de espaço; os demais usam `Moto.handbrake` replicado pela
+sala, separado da luz de freio. O cliente mantém os comandos enquanto a tecla está
+pressionada, inclusive parado. Soltar, abrir um campo de texto ou perder foco dos
+comandos cancela o acionamento local; desmontagem, queda e 250 ms sem comandos
+cancelam o estado público. O motor não precisa estar ligado para ouvir o freio.
+Até seis veículos próximos tocam, com posição 3D, alcance de 70 m e volume geral;
+a aba oculta silencia o áudio mesmo sem novos frames. Os originais CC0 do
+BigSoundBank e os autores estão em `assets-bar/sounds/veiculos/CREDITS.md`.
+`npm run assets:veiculos:sound` gera três WAV PCM de 48 kHz, com manifesto e hashes.
 
 Validação:
 

@@ -3,6 +3,7 @@ import {MigrationError,type SqlExecutor} from './migrations.js';
 type ColumnSpec=readonly [type:string,nullable?:boolean,defaultFragment?:string];
 const columns:Record<string,Record<string,ColumnSpec>>={
   bar_schema_migrations:{name:['text'],checksum:['text'],applied_at:['timestamp with time zone',false,'now()']},
+  admin_vehicle_requests:{id:['text'],actor_id:['text'],fingerprint:['text'],changed:['integer'],skipped:['integer'],created_at:['timestamp with time zone',false,'now()']},
   users:{id:['text'],username:['text'],email:['text'],password_hash:['text'],role:['text',false,"'player'::text"],verified:['boolean',false,'false'],created_at:['timestamp with time zone',false,'now()']},
   user_profiles:{user_id:['text'],display_name:['text'],avatar_config:['jsonb',false,'#cf7549'],equipped_skin:['text',false,"'nathan'::text"],status_message:['text',false,"''::text"],skill_loadouts:['jsonb',false,"'{}'::jsonb"]},
   sessions:{id:['text'],user_id:['text'],token_hash:['text'],expires_at:['timestamp with time zone'],created_at:['timestamp with time zone',false,'now()']},
@@ -34,7 +35,8 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   user_badges:{user_id:['text'],badge_id:['text'],shown_at:['smallint',true],granted_at:['timestamp with time zone',false,'now()'],notified_at:['timestamp with time zone',true]},
   user_achievements:{user_id:['text'],series:['text'],value:['integer',false,'0'],updated_at:['timestamp with time zone',false,'now()']},
   trades:{id:['text'],user_a:['text'],user_b:['text'],offer_a:['jsonb'],offer_b:['jsonb'],fingerprint:['text'],created_at:['timestamp with time zone',false,'now()']},
-  player_vehicles:{id:['text'],plate:['text'],user_id:['text'],model:['text'],parts:['text'],mileage:['integer',false,'0'],color:['text',false,"'#ccc9c2'"],fuel:['double precision',false,'100'],bought_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
+  player_vehicles:{id:['text'],plate:['text'],user_id:['text'],model:['text'],parts:['text'],mileage:['integer',false,'0'],color:['text',false,"'#ccc9c2'"],fuel:['double precision',false,'100'],revision:['integer',false,'0'],bought_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
+ vehicle_storage:{vehicle_id:['text'],item_id:['text'],quantity:['integer'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_customers:{id:['text'],name:['text'],skin:['text'],look:['jsonb'],image_id:['text',true],lines:['jsonb'],active:['boolean',false,'true'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_deliveries:{id:['text'],user_id:['text'],customer_id:['text'],customer:['text'],restaurant:['text'],items:['jsonb'],address:['text'],length_m:['integer'],duration_ms:['integer'],paid:['integer',false,'0'],stars:['smallint',true],on_time:['boolean',false,'false'],crashes:['smallint',false,'0'],status:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_follows:{follower_id:['text'],followed_id:['text'],created_at:['timestamp with time zone',false,'now()']},
@@ -45,14 +47,16 @@ const columns:Record<string,Record<string,ColumnSpec>>={
 
 const primaryKeys:Record<string,string>={
   bar_schema_migrations:'name',
+    admin_vehicle_requests:'id',
   users:'id',user_profiles:'user_id',sessions:'id',email_verifications:'token_hash',password_resets:'token_hash',fuel_services:'id',
   blocks:'user_id,blocked_id',reports:'id',moderation_actions:'id',game_statistics:'user_id',game_results:'id',
   game_controls:'id',wallets:'user_id',skin_inventory:'user_id,skin_id',skill_inventory:'user_id,skill_id',skin_catalog:'key',currency_ledger:'id',item_inventory:'user_id,item_id',inventory_ledger:'id',
   phone_lines:'user_id',phone_contacts:'owner_id,contact_id',phone_messages:'id',gram_posts:'id',gram_likes:'post_id,user_id',gram_comments:'id',
-  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',badges:'id',user_badges:'user_id,badge_id',badge_images:'id',user_achievements:'user_id,series',player_vehicles:'id',trades:'id',highfood_customers:'id',highfood_deliveries:'id',
+  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',badges:'id',user_badges:'user_id,badge_id',badge_images:'id',user_achievements:'user_id,series',player_vehicles:'id',vehicle_storage:'vehicle_id,item_id',trades:'id',highfood_customers:'id',highfood_deliveries:'id',
 };
 
 const foreignKeys:Array<readonly [table:string,column:string,cascade:boolean]>=[
+  ['admin_vehicle_requests','actor_id',true],
   ['user_profiles','user_id',true],['sessions','user_id',true],['email_verifications','user_id',true],['password_resets','user_id',true],
   ['blocks','user_id',true],['blocks','blocked_id',true],['reports','reporter_id',false],['reports','user_id',false],
   ['moderation_actions','actor_id',false],['moderation_actions','user_id',false],['game_statistics','user_id',true],['game_results','user_id',false],
@@ -67,7 +71,7 @@ const uniqueConstraints:Array<readonly [table:string,column:string]>=[['users','
 const checkConstraints:Array<readonly [table:string,fragments:string[]]>=[
   ['bar_schema_migrations',['length(checksum)=64']],['skin_catalog',['availability','sale','closed','hidden']],['skin_catalog',['rarity','legendary']],['user_achievements',['value>=0']],['player_vehicles',['mileage>=0']],['trades',['user_a<>user_b']],['highfood_deliveries',['paid>=0']],['highfood_deliveries',['status','delivered','gave-up']],
   ['users',['role','player','admin']],['blocks',['user_id<>blocked_id']],['wallets',['balance>=0']],
-  ['item_inventory',['quantity>0']],['inventory_ledger',['quantity<>0']],
+  ['item_inventory',['quantity>0']],['vehicle_storage',['quantity>0']],['inventory_ledger',['quantity<>0']],
   ['phone_contacts',['owner_id<>contact_id']],['phone_messages',['sender_id<>recipient_id']],['phone_lines',['number']],
   ['gram_follows',['follower_id<>followed_id']],['gram_profiles',['handle']],['economy_prices',['value>=0']],['game_logs',['source','api','world']],['phone_media',['kind','photo','audio','video']],['phone_messages',['media_kind','length(body)']],['badge_images',['length(id)=64']],['badges',['rarity','common','legendary']],
 ];

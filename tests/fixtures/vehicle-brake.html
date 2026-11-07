@@ -1,0 +1,11 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Vehicle brakes</title>
+<button>Ativar áudio</button><script type="module">
+import {VehicleBrakeSounds} from '../../apps/web/src/engine/vehicle-brake-sound.ts';
+import {VEHICLE_CATALOG,parkedMoto} from '../../packages/shared/src/index.ts';
+const f=window.fixture={volume:1,active:true,selected:0,ear:{x:0,y:1,z:2},views:VEHICLE_CATALOG.map((v,i)=>({state:{...parkedMoto({id:`brake-${i}`,x:0,y:0,z:0,yaw:0}),model:v.model},x:0,y:0,z:0,speed:0,lateralSpeed:0,held:false}))};
+f.sounds=new VehicleBrakeSounds(()=>f.volume,'/');
+document.querySelector('button').onclick=()=>{f.sounds.update(f.views,f.ear,{x:0,y:0,z:-1},{x:0,y:1,z:0});f.analyser=f.sounds.context.createAnalyser();f.analyser.fftSize=4096;f.sounds.bus.connect(f.analyser);};
+window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();f.views[f.selected].held=true;}});
+window.addEventListener('keyup',e=>{if(e.code==='Space')f.views[f.selected].held=false;});
+function frame(){if(f.active)f.sounds.update(f.views,f.ear,{x:0,y:0,z:-1},{x:0,y:1,z:0});requestAnimationFrame(frame);}frame();
+</script></html>

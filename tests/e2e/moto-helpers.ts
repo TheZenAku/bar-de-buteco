@@ -60,6 +60,7 @@ export async function orbit(page:Page,dx:number,dy=0):Promise<void>{
 export async function inVehicles(page:Page,act:()=>Promise<void>):Promise<void>{
   await page.getByRole('button',{name:'Administração',exact:true}).click();
   await page.locator('[data-admin-nav="vehicles"]').click();
+  await page.getByRole('tab',{name:'Spawn',exact:true}).click();
   await act();
   await page.getByRole('button',{name:'Fechar janela'}).click();
 }
@@ -109,7 +110,7 @@ export async function spawnBikeOnStreet(page:Page,options:{directPlacement?:bool
   },{timeout:60_000}).toBeLessThan(.03);
   await inVehicles(page,async()=>{
     await page.locator('[data-vehicle="spawn"]').click();
-    await expect(page.locator('.admin-feedback')).toContainText('Moto spawnada');
+    await expect(page.locator('.admin-feedback')).toContainText('spawnado');
   });
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.motos()?.length??0),{timeout:30_000}).toBeGreaterThan(0);
 }

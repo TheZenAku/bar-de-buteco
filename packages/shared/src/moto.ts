@@ -4,7 +4,7 @@ import {findSpawn,floorHeight,isWalkable,PLAYER_RADIUS,roadHeight,solidsBetween,
 import type {Collider,Position} from './index.js';
 import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
-import {CAR,CAR_MODEL,MOTO_FOGO_MODEL,VEHICLE_MODELS,isPassenger,vehicleOccupants} from './vehicle-models.js';
+import {CAR,TRUCK,TRUCK_MODEL,MOTO_FOGO_MODEL,VEHICLE_MODELS,carSpec,isCarModel,isPassenger,vehicleOccupants,vehicleSeats} from './vehicle-models.js';
 
 /** v4 is authored in metres (30 cm tyres and an 80 cm seat). No scooter scale correction. */
 const SCALE=1;
@@ -37,15 +37,17 @@ export const MOTO={
   LIMIT:12,
 } as const;
 
-type VehiclePhysics={[K in keyof typeof MOTO]:number};
+/** WHEEL_TRACK is only there for the four-wheelers: it is what tells the ground check to read four wheels. */
+type VehiclePhysics={[K in keyof typeof MOTO]:number}&{WHEEL_TRACK?:number};
 const CAR_PHYSICS:VehiclePhysics={...MOTO,...CAR};
+const TRUCK_PHYSICS:VehiclePhysics={...MOTO,...TRUCK};
 /**
  * The Caveira em Chamas (moto_fogo.glb, scripts/58_moto_fogo.py): the delivery bike's engine and handling on its own measurements,
  * taken from the model: round 29,7 cm wheels (rebuilt on their axles), axles 1,5128 m apart, 2,16 m long. The hull is the body and the grips; the spiked bar
  * ends (±0,63 m, above 1 m) are left out so it does not stick on doorways.
  */
 export const MOTO_FOGO:VehiclePhysics={...MOTO,WHEELBASE:1.5128,WHEEL_RADIUS:.297,HALF_WIDTH:.46,HALF_LENGTH:1.08,CENTRE_Z:-.0225,HEIGHT:1.18};
-export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===CAR_MODEL?CAR_PHYSICS:model===MOTO_FOGO_MODEL?MOTO_FOGO:MOTO;
+export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===TRUCK_MODEL?TRUCK_PHYSICS:isCarModel(model)?CAR_PHYSICS:model===MOTO_FOGO_MODEL?MOTO_FOGO:MOTO;
 export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number;/** Local +X velocity (m/s), and yaw velocity (rad/s). Absent legacy fields read as zero. */lateralSpeed?:number;yawRate?:number}
 /** Which lamps are lit beyond the ones always on (MotoState.lights). */
 export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
@@ -57,7 +59,7 @@ export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;
  * starting, `gas` whether the throttle is open, and `parts` the condition of each part in MOTO_PARTS's order.
  */
 export interface MotoState extends MotoBody {id:string;/** Who holds its key (docs/sistemas/garagem.md). '' for the administration's, which anyone may ride. */ownerId?:string;/** The key holder's name, the plate on its back, and the row it is in the API. */ownerName?:string;plate?:string;vehicleId?:string;/** Only the key holder gets on it. */locked?:boolean;riderId:string;ticks:number;phase:MotoPhase;lifterId:string;lights:number;qx:number;qy:number;qz:number;qw:number;engine:number;engineAt:number;crank:number;gas:boolean;parts:string}
-export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;wipers?:boolean;headlights?:number;ignition?:boolean;fuel?:number;horn?:boolean;wheelie?:number}
+export interface MotoState {color?:string;passengers?:string[];doors?:number;hood?:boolean;trunk?:boolean;/** How full the truck's hold is, 0..3 (the crates drawn in it). */load?:number;wipers?:boolean;headlights?:number;ignition?:boolean;fuel?:number;horn?:boolean;wheelie?:number;/** Space held by the rider, independent of the service brake light. */handbrake?:boolean}
 export interface MotoIntent {throttle:number;steer:number;brake:boolean;horn?:boolean;wheelie?:boolean;/** MOTO_LIGHT.LEFT, RIGHT and HIGH: the rider's switches. */lights?:number}
 /** W/S (forward, brake and reverse), A/D (+1 is right), the handbrake and the switches. */
 export interface MotoInput extends MotoIntent {seq:number}
@@ -69,7 +71,7 @@ export const NO_MOTO_INTENT:MotoIntent={throttle:0,steer:0,brake:false};
 export const motoInteraction=(motoId:string)=>`moto:${motoId}`;
 export const isRidingMoto=(interaction:string|undefined)=>!!interaction?.startsWith('moto:')||isPassenger(interaction);
 export const parkedMoto=(spot:{id:string;x:number;y:number;z:number;yaw:number;pitch?:number}):MotoState=>({pitch:0,...spot,ownerId:'',ownerName:'',plate:'',vehicleId:'',locked:false,speed:0,steer:0,lateralSpeed:0,yawRate:0,riderId:'',ticks:0,phase:'',lifterId:'',lights:0,qx:0,qy:0,qz:0,qw:1,engine:MOTO_ENGINE.OFF,engineAt:0,crank:0,gas:false,parts:NEW_MOTO_PARTS});
-export const motoSpawnSchema=z.object({model:z.enum(VEHICLE_MODELS).optional()}).strict();
+export const motoSpawnSchema=z.object({model:z.enum(VEHICLE_MODELS).optional(),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).optional()}).strict();
 /** How far a body is from the hull, seen from above. */
 export const motoDistance=(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position)=>hullGap(moto,position);
 /** One bike, or every bike when there is no id. */
@@ -91,7 +93,7 @@ export function vehicleVelocity(body:Pick<MotoBody,'speed'|'lateralSpeed'|'yaw'>
 export const STOPPED_VEHICLE={speed:0,lateralSpeed:0,yawRate:0} as const;
 /** The most the front wheel may turn at this speed (radians): full lock while slow, less as the tyres would let go. */
 export function motoSteerAngle(speed:number,model?:string):number {
-  if(model===CAR_MODEL)return carSteerAngle(speed);
+  if(isCarModel(model))return carSteerAngle(speed,model);
   const spec=vehiclePhysics(model);
   return Math.min(spec.MAX_STEER,Math.atan(spec.WHEELBASE*spec.GRIP/Math.max(speed*speed,.01)));
 }
@@ -100,9 +102,9 @@ export function motoSteerAngle(speed:number,model?:string):number {
 function ground(x:number,z:number,yaw:number,reference:number,spec:VehiclePhysics=MOTO):{y:number;pitch:number}|undefined {
   const s=Math.sin(yaw),c=Math.cos(yaw),axle=spec.WHEELBASE/2;
   let front=roadHeight(x+s*axle,z+c*axle,reference),rear=roadHeight(x-s*axle,z-c*axle,reference);
-  if(spec===CAR_PHYSICS){
-    const wheel=(side:number,along:number)=>roadHeight(x+c*side+s*along,z-s*side+c*along,reference);
-    const fl=wheel(CAR.WHEEL_TRACK/2,axle),fr=wheel(-CAR.WHEEL_TRACK/2,axle),rl=wheel(CAR.WHEEL_TRACK/2,-axle),rr=wheel(-CAR.WHEEL_TRACK/2,-axle);
+  if(spec.WHEEL_TRACK!==undefined){
+    const wheel=(side:number,along:number)=>roadHeight(x+c*side+s*along,z-s*side+c*along,reference),half=spec.WHEEL_TRACK/2;
+    const fl=wheel(half,axle),fr=wheel(-half,axle),rl=wheel(half,-axle),rr=wheel(-half,-axle);
     if(fl===undefined||fr===undefined||rl===undefined||rr===undefined)return;
     front=(fl+fr)/2;rear=(rl+rr)/2;
   }
@@ -169,7 +171,7 @@ function advanceCar(body:MotoBody,input:MotoIntent,dt:number,obstacles:readonly 
   let current:MotoBody&{lateralSpeed:number;yawRate:number}={model:body.model,x:body.x,y:body.y,z:body.z,yaw:body.yaw,pitch:body.pitch,
     speed:body.speed,steer:body.steer,lateralSpeed:body.lateralSpeed??0,yawRate:body.yawRate??0};
   if(dt<=0)return {body:current};
-  const spec=CAR_PHYSICS;
+  const spec=vehiclePhysics(body.model);
   const reach=spec.HALF_LENGTH+vehicleSpeed(body)*dt+spec.ENGINE/spec.MASS*dt*dt+1;
   const near=solidsBetween(body.x-reach,body.z-reach,body.x+reach,body.z+reach),solids=obstacles.length?[...near,...obstacles]:near;
   const free=!overlaps(body.x,body.z,body.yaw,body.y,solids,spec);
@@ -213,7 +215,7 @@ function advanceCar(body:MotoBody,input:MotoIntent,dt:number,obstacles:readonly 
 export function stepMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):MotoBody {return advanceMoto(body,input,dt,obstacles,handling).body;}
 /** The same step, also telling what it ran into (the room throws the rider off by that: moto-crash.ts). */
 export function advanceMoto(body:MotoBody,input:MotoIntent,dt=.05,obstacles:readonly Collider[]=[],handling:MotoHandling=FULL_HANDLING):{body:MotoBody;hit?:MotoHit} {
-  if(body.model===CAR_MODEL)return advanceCar(body,input,dt,obstacles,handling);
+  if(isCarModel(body.model))return advanceCar(body,input,dt,obstacles,handling);
   const spec=vehiclePhysics(body.model);
   const throttle=clamp(input.throttle,-1,1),wanted=clamp(input.steer,-1,1);
   const rate=(wanted===0||wanted*body.steer<0?spec.STEER_RETURN:spec.STEER_RATE)*dt;
@@ -307,7 +309,7 @@ function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position):nu
 }
 /** Close enough to get on (the server allows `slack` more for latency), on its floor, on its wheels, nobody riding it. */
 export function canMountMoto(moto:MotoState,position:Position,slack=0,who?:string):boolean {
-  return (moto.model===CAR_MODEL?vehicleOccupants(moto).filter(Boolean).length<CAR.SEATS&&vehicleMotionSpeed(moto)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
+  return (isCarModel(moto.model)?vehicleOccupants(moto).filter(Boolean).length<carSpec(moto.model).SEATS&&vehicleMotionSpeed(moto)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
 }
 /** Close enough to work on it, standing or lying, and nobody on it, nobody lifting it, and it is not moving. */
 export function canRepairMoto(moto:MotoState,position:Position,slack=0):boolean {
@@ -332,9 +334,11 @@ export function motoDismountSpot(moto:MotoBody,seat=0,obstacles:readonly Collide
   const s=Math.sin(moto.yaw),c=Math.cos(moto.yaw),spec=vehiclePhysics(moto.model);
   const hulls=[motoObstacle({...moto,id:'dismount'}),...obstacles];
   const offsets:Array<readonly [number,number]>=[];
-  if(moto.model===CAR_MODEL){
-    const side=seat===1||seat===3?-1:1,width=spec.HALF_WIDTH+PLAYER_RADIUS+.15;
-    for(const sign of [side,-side])for(const back of [seat>=2?-.8:.15,-1.3,1.3])offsets.push([sign*width,back]);
+  if(isCarModel(moto.model)){
+    const side=(vehicleSeats(moto.model)[seat]?.side??1)<0?-1:1,width=spec.HALF_WIDTH+PLAYER_RADIUS+.15;
+    // The truck is 6,6 m long: more places along its sides to try.
+    const backs=moto.model===TRUCK_MODEL?[.15,-1.3,1.3,-2.6,2.6]:[seat>=2?-.8:.15,-1.3,1.3];
+    for(const sign of [side,-side])for(const back of backs)offsets.push([sign*width,back]);
     offsets.push([0,spec.CENTRE_Z-spec.HALF_LENGTH-PLAYER_RADIUS-.15],[0,spec.CENTRE_Z+spec.HALF_LENGTH+PLAYER_RADIUS+.15]);
   }else{
     offsets.push([1,0],[-1,0],[1,.8],[1,-.8],[-1,.8],[-1,-.8],[0,-1.5],[0,1.4]);

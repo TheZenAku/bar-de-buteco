@@ -12,6 +12,14 @@ test('flight moves in the air, boosts, climbs and stays between the ground and t
   assert.equal(flyPlayer({x:0,y:FLY.ceiling,z:0},{dx:0,dz:0,running:true,dy:1},dt).y,FLY.ceiling);
   assert.ok(flyPlayer({x:0,y:.01,z:0},{dx:0,dz:0,running:true,dy:-1},dt).y>=0,'never under the ground');
 });
+test('with an aim, the flight goes where the camera looks, at the same speed',()=>{
+  const start={x:0,y:20,z:0},up=flyPlayer(start,{dx:0,dz:-1,aim:1,running:false},dt);
+  assert.ok(Math.abs(up.x)<1e-9&&Math.abs(up.y-20-FLY.speed*dt/Math.SQRT2)<1e-9&&Math.abs(up.z+FLY.speed*dt/Math.SQRT2)<1e-9,'a 45° dive is no faster than level');
+  const level=flyPlayer(start,{dx:0,dz:-1,aim:0,running:false},dt);
+  assert.ok(Math.abs(level.z+FLY.speed*dt)<1e-9&&level.y===20,'aim 0 is level flight');
+  assert.equal(inputSchema.safeParse({...base,aim:-1}).success,true);
+  assert.equal(inputSchema.safeParse({...base,aim:2}).success,false);
+});
 test('the climb axis travels with the input and cannot be abused',()=>{
   assert.equal(inputSchema.safeParse({...base,dy:1}).success,true);
   assert.equal(inputSchema.safeParse({...base,dy:2}).success,false);

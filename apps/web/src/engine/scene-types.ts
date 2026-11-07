@@ -68,6 +68,8 @@ export interface SceneInput {
   rear?:boolean;
   /** Flying only: climb (+1, Space) or sink (-1, Ctrl). */
   dy?:number;
+  /** Flying only: the vertical part of the camera's aim (the flight goes where the camera looks). */
+  aim?:number;
   headYaw?:number;
   headPitch?:number;
   dx: number;

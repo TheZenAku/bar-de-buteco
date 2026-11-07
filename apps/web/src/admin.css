@@ -175,6 +175,8 @@
 .admin-subtabs [aria-selected=true],.admin-subtabs [aria-selected=true]:hover{background:var(--active);color:var(--active-foreground)}
 .admin-subtabs i{font:600 10px var(--font-mono);font-style:normal;opacity:.75}
 .admin-subtab-body{padding-top:4px}
+.admin-vehicle-tabs{position:sticky;top:-20px;z-index:3;background:var(--background,#100918);margin-bottom:16px}
+.admin-vehicle-tabs button{display:inline-flex;align-items:center;gap:6px}
 .admin-wallet-form fieldset{min-width:0;margin:0;padding:0;border:0}
 .admin-wallet-form legend{display:none}
 .admin-wallet-preview{min-height:28px;font:400 11px/1.6 var(--font-mono)!important}

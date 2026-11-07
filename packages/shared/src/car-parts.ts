@@ -1,4 +1,3 @@
-import {CAR_MODEL} from './vehicle-models.js';
 import type {MotoParts} from './moto-parts.js';
 
 const part=(id:string,name:string,group:string,worn:string,bad:string,dead=bad)=>({id,name,group,good:'Em bom estado.',worn,bad,dead});
@@ -50,4 +49,3 @@ export function carMileageWear(text:string,random:()=>number=Math.random):string
   const p=readCarParts(text),ids=['pneu_de','pneu_dd','pneu_te','pneu_td','freios','motor','suspensao','escapamento'];
   const id=ids[Math.min(ids.length-1,Math.floor(random()*ids.length))]!;p[id]=Math.max(0,p[id]!-1);return writeCarParts(p);
 }
-export const isCarModel=(model:string|undefined)=>model===CAR_MODEL;

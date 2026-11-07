@@ -40,10 +40,22 @@ test('horns and wheelies belong to the driver, stop on stale input, and a horse 
     assert.equal(moto.horn,true,'A viewer cannot release the driver horn');
     // No more driver packets: a held horn must not get stuck after a lost connection.
     await until(()=>!moto.horn);await until(()=>moto.wheelie<.02);
+    // Space has its own replicated state; service braking must not masquerade as it.
+    const checkHandbrake=async()=>{
+      for(let i=0;i<6;i++){driver.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:true});await pause(50);}
+      await until(()=>moto.handbrake&&viewer.state.motos.get(moto.id)?.handbrake);
+      viewer.send('moto.input',{seq:2,throttle:0,steer:0,brake:false});await pause(60);
+      assert.equal(moto.handbrake,true,'A viewer cannot release the handbrake');
+      driver.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:false});await until(()=>!moto.handbrake&&!viewer.state.motos.get(moto.id)?.handbrake);
+      driver.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:true});await until(()=>moto.handbrake);
+      await until(()=>!moto.handbrake);await until(()=>!viewer.state.motos.get(moto.id)?.handbrake);
+    };
+    await checkHandbrake();
     driver.send('admin.moto.despawn',{});await until(()=>room.state.motos.size===0);
     p.assign({x:60,y:0,z:7,rotation:-Math.PI/2});driver.send('admin.moto.spawn',{model:'carro-hatch'});await until(()=>room.state.motos.size===1);
     moto=[...room.state.motos.values()][0]!;p.assign({x:moto.x,y:moto.y,z:moto.z+.9});driver.send('moto.mount',{motoId:moto.id});await until(()=>moto.riderId==='driver');
     driver.send('moto.input',{seq:++seq,throttle:0,steer:0,brake:false,horn:true,wheelie:true});await until(()=>moto.horn);assert.equal(moto.wheelie,0,'Cars cannot wheelie');
+    await checkHandbrake();
     driver.send('admin.moto.despawn',{});await until(()=>room.state.motos.size===0);
     p.assign({x:60,y:0,z:7,rotation:0});room.state.players.get('viewer')!.assign({x:60,y:0,z:10});driver.send('player.skill',{skill:'horse'});await until(()=>p.interactionState==='horse');
     const start={x:p.x,z:p.z};driver.send('player.input',{seq:++seq,dx:0,dz:1,running:true,rear:true,rotation:0});

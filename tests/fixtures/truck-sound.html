@@ -1,0 +1,14 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Truck audio</title>
+<button>Ativar áudio</button><script type="module">
+import {TruckSounds} from '../../apps/web/src/engine/truck-sound.ts';
+import {parkedMoto,TRUCK_MODEL} from '../../packages/shared/src/index.ts';
+const f=window.fixture={volume:1,active:true,oscillators:0,ear:{x:0,y:1,z:2},trucks:[]};
+const original=AudioContext.prototype.createOscillator;AudioContext.prototype.createOscillator=function(){f.oscillators++;return original.call(this);};
+f.state={...parkedMoto({id:'truck',x:0,y:0,z:0,yaw:0}),model:TRUCK_MODEL};
+f.view={state:f.state,x:0,y:0,z:0,speed:0};f.trucks=[f.view];
+f.sounds=new TruckSounds(()=>f.volume,'/');
+f.set=patch=>Object.assign(f.state,patch,{engineAt:Date.now()});
+f.update=()=>f.sounds.update(1/60,f.trucks,f.ear,{x:0,y:0,z:-1},{x:0,y:1,z:0});
+document.querySelector('button').onclick=()=>{f.set({engine:1,crank:0});f.update();f.analyser=f.sounds.context.createAnalyser();f.analyser.fftSize=4096;f.sounds.bus.connect(f.analyser);};
+function frame(){if(f.active)f.update();requestAnimationFrame(frame);}frame();
+</script></html>

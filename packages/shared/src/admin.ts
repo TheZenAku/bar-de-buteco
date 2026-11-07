@@ -2,8 +2,18 @@ import {itemById} from './inventory.js';
 import {skinById} from './skins.js';
 import {skillById} from './profile.js';
 import type {PriceGroup} from './prices.js';
+import type {OwnedVehicle} from './garage.js';
 
 export const MAX_COIN_BALANCE=1_000_000_000;
+export type AdminVehicleOperation='repair'|'refuel'|'recall'|'transfer'|'delete'|'paint'|'plate';
+export interface AdminVehicle extends OwnedVehicle {ownerId:string;ownerName:string;ownerUsername:string;canEdit:boolean}
+export interface AdminVehicles {vehicles:AdminVehicle[];total:number;offset:number;limit:number}
+export interface AdminVehicleCommand {
+  operation:AdminVehicleOperation;ids?:string[];all?:boolean;targetId?:string;color?:string;plate?:string;reason:string;requestId:string;
+}
+export interface AdminVehicleRegistration {playerId:string;model:string;color?:string;plate?:string;reason:string;requestId:string}
+/** A committed administrative change sent to the room; older vehicle saves carry an earlier revision. */
+export interface AdminVehicleChange {id:string;ownerId:string;revision:number;parts:string;fuel:number;mileage:number;color:string;plate?:string}
 export interface AdminAccount {
   id:string;username:string;displayName:string;email:string;role:'admin'|'user';verified:boolean;
   owner:boolean;banned:boolean;balance:number;kickId:string|null;
@@ -153,13 +163,13 @@ const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão de
   'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas','player-kill':'Jogador morto (teste)',
   'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','catalog-edit':'Carta da coleção editada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
-  'vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
+  'vehicle-register':'Veículo registrado','vehicle-plate':'Placa personalizada','vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','vehicle-repair':'Veículos reparados','vehicle-refuel':'Veículos abastecidos','vehicle-recall':'Veículos recolhidos','vehicle-transfer':'Veículos transferidos','vehicle-delete':'Veículos excluídos','vehicle-paint':'Pintura de veículos alterada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
   'report-resolve':'Denúncia resolvida','report-reopen':'Denúncia reaberta'};
 /** The name of an administrative action (moderation_actions.action); `undo-*` reads "Reversão: …". */
 export const adminActionLabel=(action:string):string=>action.startsWith('undo-')?`Reversão: ${ACTION_LABELS[action.slice(5)]??action.slice(5)}`:ACTION_LABELS[action]??action;
 
 /** inventory_ledger.reason in the panel's words. */
-export const ITEM_LOG_REASONS:Readonly<Record<string,string>>={starter:'Itens iniciais',purchase:'Comprado na mochila',use:'Usado',discard:'Descartado',faint:'Perdido no desmaio',admin:'Ajuste da administração',trade:'Negociação com outro jogador'};
+export const ITEM_LOG_REASONS:Readonly<Record<string,string>>={starter:'Itens iniciais',purchase:'Comprado na mochila',use:'Usado',discard:'Descartado',faint:'Perdido no desmaio',admin:'Ajuste da administração',trade:'Negociação com outro jogador','storage-deposit':'Guardado no baú do caminhão','storage-withdraw':'Retirado do baú do caminhão'};
 /** game_logs written by the API (logins); registrations come from the accounts themselves. */
 export const ACCESS_LOG_EVENTS:Readonly<Record<string,string>>={register:'Criou a conta',login:'Entrou na conta',login_failed:'Errou a senha',logout:'Saiu da conta',password_reset:'Trocou a senha'};
 

@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import type {ItemId} from './inventory.js';
 import {CAR_PART_IDS,carDriveParts} from './car-parts.js';
-import {CAR_MODEL} from './vehicle-models.js';
+import {isCarModel} from './vehicle-models.js';
 
 /** The bike's parts, in the order the panel lists them; `MotoState.parts` carries their condition in this same order. */
 export const MOTO_PARTS=[
@@ -30,7 +30,7 @@ export function readMotoParts(text:string|undefined):MotoParts {
   return Object.fromEntries(MOTO_PARTS.map((part,i)=>{const value=Number(values[i]);return [part.id,values[i]!==undefined&&values[i]!==''&&Number.isFinite(value)?Math.max(0,Math.min(100,value)):100];})) as MotoParts;
 }
 export const writeMotoParts=(parts:MotoParts):string=>MOTO_PARTS.map(part=>Math.round(parts[part.id])).join(',');
-export const readDriveParts=(vehicle:{model?:string;parts?:string}):MotoParts=>vehicle.model===CAR_MODEL?carDriveParts(vehicle.parts):readMotoParts(vehicle.parts);
+export const readDriveParts=(vehicle:{model?:string;parts?:string}):MotoParts=>isCarModel(vehicle.model)?carDriveParts(vehicle.parts):readMotoParts(vehicle.parts);
 
 /** What a condition means, for the panel. Every part crosses these at the same marks; what happens at each is in MOTO_PARTS. */
 export type MotoPartStatus='good'|'worn'|'bad'|'dead';
@@ -82,7 +82,7 @@ export function motoHandling(moto:{id:string;model?:string;parts?:string;engine?
     power:running?fade(parts.motor,60,.45)*fade(parts.pneu_traseiro,25,.7)*fade(parts.escapamento,35,.9):0,
     brake:fade(parts.freios,70,.3),
     turn:Math.min(fade(parts.pneu_dianteiro,25,.55),fade(parts.suspensao,35,.75)),
-    ...(moto.model===CAR_MODEL?{frontGrip:fade(parts.pneu_dianteiro,40,.35)*fade(parts.suspensao,35,.75),rearGrip:fade(parts.pneu_traseiro,40,.35)*fade(parts.suspensao,35,.75)}:{}),
+    ...(isCarModel(moto.model)?{frontGrip:fade(parts.pneu_dianteiro,40,.35)*fade(parts.suspensao,35,.75),rearGrip:fade(parts.pneu_traseiro,40,.35)*fade(parts.suspensao,35,.75)}:{}),
     rolling:flat(parts.pneu_dianteiro)+flat(parts.pneu_traseiro)-1,
     pull:parts.direcao>=35?0:side*(1-parts.direcao/35)*.28,
   };

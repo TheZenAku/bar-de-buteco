@@ -1,0 +1,45 @@
+[
+  {
+    "name": "aciona",
+    "file": "3100",
+    "from": 0.39,
+    "to": 0.9,
+    "rms": 0.12,
+    "rate": 48000,
+    "bits": 16,
+    "channels": 1,
+    "seconds": 0.51,
+    "sourceUrl": "https://bigsoundbank.com/UPLOAD/bwf-en/3100.wav",
+    "sourceSha256": "713feae17a7407b3072209b00c81e529852005245a94e73ca11bb94fc249f0e1",
+    "sha256": "4ddccdfe905a900c8efc5de4e6632c04409365c97cb32b7a10a720ccab9bfe54"
+  },
+  {
+    "name": "solta",
+    "file": "3104",
+    "from": 0.3,
+    "to": 1.06,
+    "rms": 0.1,
+    "rate": 48000,
+    "bits": 16,
+    "channels": 1,
+    "seconds": 0.76,
+    "sourceUrl": "https://bigsoundbank.com/UPLOAD/bwf-en/3104.wav",
+    "sourceSha256": "645d1e3eb00a747a96eea93d718cbdf513e1f36f0a8131f7e433766287ce95f2",
+    "sha256": "32ae6c2a9de0757423b7183b1ac0a31d544848d49dddbee4de3d6a6a58668d14"
+  },
+  {
+    "name": "pneu",
+    "file": "2368",
+    "from": 0.22,
+    "to": 1.52,
+    "loop": 0.12,
+    "rms": 0.19,
+    "rate": 48000,
+    "bits": 16,
+    "channels": 1,
+    "seconds": 1.18,
+    "sourceUrl": "https://bigsoundbank.com/UPLOAD/bwf-en/2368.wav",
+    "sourceSha256": "25758acdbf01343e6d0cbea4a386e9b85f950fb35d177061c91338d4da45381d",
+    "sha256": "dad1603814d7e0770493dcb9ff1415725f75d9b2c0c7b97ac368b31834b79239"
+  }
+]

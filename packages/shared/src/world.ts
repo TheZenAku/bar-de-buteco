@@ -340,11 +340,13 @@ export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'r
 
 /** Admin flight: no collisions (a noclip), only the ground below and a ceiling. `running` boosts; `dy` climbs (+1) or sinks (-1). */
 export const FLY={speed:9,boost:24,climb:6,ceiling:60,fall:12};
-export function flyPlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>&{dy?:number},dt=.05):Required<Position> {
-  const step=Math.min(Math.max(dt,0),.1),boost=input.running?1:0,scale=(boost?FLY.boost:FLY.speed)*step/Math.max(1,Math.hypot(input.dx,input.dz));
-  const x=position.x+input.dx*scale,z=position.z+input.dz*scale,y0=position.y??0;
+/** `aim` (the camera's vertical part) makes dx/dz/aim one direction in the air: the flight goes where the camera looks. */
+export function flyPlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>&{dy?:number;aim?:number},dt=.05):Required<Position> {
+  const step=Math.min(Math.max(dt,0),.1),boost=input.running?1:0,speed=(boost?FLY.boost:FLY.speed)*step;
+  const aim=input.aim??0,length=Math.max(1,input.aim===undefined?Math.hypot(input.dx,input.dz):Math.hypot(input.dx,aim,input.dz));
+  const x=position.x+input.dx*speed/length,z=position.z+input.dz*speed/length,y0=position.y??0;
   const floor=groundBelow(x,z,y0)??0;
-  return {x,z,y:Math.min(FLY.ceiling,Math.max(floor,y0+(input.dy??0)*FLY.climb*(1+boost)*step))};
+  return {x,z,y:Math.min(FLY.ceiling,Math.max(floor,y0+aim*speed/length+(input.dy??0)*FLY.climb*(1+boost)*step))};
 }
 
 /** Letting go of the flight: straight down, gathering speed up to `FLY.fall` over its first second (`age`: seconds since it began), onto whatever is below (a floor, a roof, a table top). `landed` when it arrived. */

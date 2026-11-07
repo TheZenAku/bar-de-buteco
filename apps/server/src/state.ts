@@ -329,6 +329,10 @@ export class Moto extends Schema {
   @type('boolean') gas = false;
   /** Each part's condition, whole percents in MOTO_PARTS's order. */
   @type('string') parts = NEW_MOTO_PARTS;
+  /** How full a truck's hold is, 0..3: the crates drawn in it (packages/shared/src/vehicle-storage.ts). */
+  @type('uint8') load = 0;
+  /** Space held by the rider; observers use it for brake audio. */
+  @type('boolean') handbrake = false;
 }
 /** A body thrown from a bike or by a kick (RagdollStart in packages/shared/src/ragdoll.ts): the same steps run from here in the room and in each browser. */
 export class RagdollState extends Schema {

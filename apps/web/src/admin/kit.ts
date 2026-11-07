@@ -37,7 +37,7 @@ export interface WorldSnapshot {
   waiter:{phase:string;current?:WorldOrder;queue:WorldOrder[]};counterQueue:string[];
   jobs:Array<{id:string;name:string;slots:number;workers:Array<{playerId:string;tasks:number;earned:number;station:string;endsInS:number;orders?:Array<{customer:string;table:number;picked:boolean}>}>;pay:number;enabled:boolean;tasks?:number;paid?:number}>;
   dirtyTables?:number[];
-  motos?:Array<{id:string;model?:string;color?:string;occupants?:number;owner?:string;plate?:string;locked?:boolean;x:number;y:number;z:number;speed:number;phase?:string;riderId:string;rider:string}>;
+  motos?:Array<{id:string;vehicleId?:string;model?:string;color?:string;occupants?:number;owner?:string;plate?:string;locked?:boolean;x:number;y:number;z:number;speed:number;phase?:string;riderId:string;rider:string}>;
   highfood?:Array<{playerId:string;name:string;status:string;done:number;earned:number;order:string;address:string}>;
   media:Array<{kind:string;id:string;videoId:string;status:string;updatedBy:string;revision:number;title:string;by:string;live:boolean;queue:Array<{key:string;videoId:string;title:string;byName:string}>}>;
   bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
