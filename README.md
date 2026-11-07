@@ -4,6 +4,11 @@ MVP de um boteco social 3D para navegadores desktop: contas, mundo multiplayer, 
 
 ## Abrir o projeto
 
+O repositório canônico é [TheZenAku/bar-de-buteco](https://github.com/TheZenAku/bar-de-buteco)
+e a linha atual de desenvolvimento é `main`. As branches antigas `marco-0/baseline`
+e `marco-1/fundacao` foram integradas em 07/11/2026, preservando o histórico.
+Referências a esses nomes nos registros de execução são históricas.
+
 No Windows, também é possível abrir **`tools/iniciar.bat`** com dois cliques. Use `tools/reiniciar.bat`, `tools/parar.bat` e `tools/status.bat` para controlar os serviços. Consulte [os iniciadores do Windows](tools/README.md) para logs e diagnóstico.
 
 Requer **Node.js 24** e **npm 11.20.x** (a mesma versão fixada na CI e nas imagens). Na raiz:

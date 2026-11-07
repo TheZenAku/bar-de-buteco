@@ -1,6 +1,6 @@
 # Estado da execução
 
-- **Marco atual:** 1, modularização e operação. **Em andamento** em 24/10/2026, na branch `marco-1/fundacao`.
+- **Linha atual:** `main`, no repositório canônico `TheZenAku/bar-de-buteco`. Consolidação em 07/11/2026: o histórico de `marco-0/baseline` e `marco-1/fundacao` foi incorporado sem reescrita. Os registros de marcos abaixo preservam suas datas e nomes originais.
 - **Ponto de partida:** `main` @ `76cfc5d` (auditoria em `54a4c66`, mais um commit só de documentação). A árvore estava limpa.
 
 ## O que foi feito
