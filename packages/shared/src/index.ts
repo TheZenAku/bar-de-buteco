@@ -18,6 +18,7 @@ export {solidRayFraction} from './world.js';
 export * from './economy.js';
 export * from './musicians.js';
 export * from './bar-animations.js';
+export * from './smoking.js';
 export * from './phone.js';
 export * from './rarity.js';
 export * from './skins.js';
@@ -99,6 +100,7 @@ export interface PlayerState extends Position { id: string; slot?: number; displ
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
    *  since/until when (server clock): the same time as at a table (consumeMs). They walk around meanwhile. */
   holding?: string; holdingSince?: number; holdingUntil?: number;
+  smokingSince?:number; smokingStopAt?:number;
   fireworkEquipped?:boolean;
   /** Camera-driven head offsets; the body's rotation remains independent. */
   headYaw?:number; headPitch?:number;

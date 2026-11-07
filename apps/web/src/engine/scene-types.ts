@@ -37,6 +37,8 @@ export interface SceneActor {
   fireworkEquipped?:boolean;
   holdingSince?: number;
   holdingUntil?: number;
+  smokingSince?:number;
+  smokingStopAt?:number;
   /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
   carrying?: string;
   carryingOrder?: string;

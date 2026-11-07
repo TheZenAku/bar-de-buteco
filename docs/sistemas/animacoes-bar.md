@@ -1,5 +1,22 @@
 # Animações do bar
 
+O fluxo atual de **F** usa `Cigarettes`, separado dos antigos clipes de corpo
+inteiro, que permanecem no painel F8 para inspeção. O servidor replica
+`smokingSince` e `smokingStopAt`, sem ocupar `interactionState` ou trocar a
+animação de andar, dançar ou sentar. Acender e apagar só alteram braços e dedos;
+não alteram quadril, pernas ou pés. O cigarro acompanha o canto direito dos
+lábios depois da animação e do movimento de cabeça, inclusive durante goles.
+Isqueiro, chama, brasa, tragadas e fumaça usam `smokingTimeline` no relógio da sala.
+F novamente durante o acendimento agenda a retirada depois da passagem à boca.
+Ao terminar de apagar, o estado é limpo sem interromper outra ação. Quedas,
+desmaios e desconexão também limpam o cigarro. O atalho antigo Shift+F é um alias
+de F; o botão duplicado de cigarro inteiro foi retirado da barra.
+
+No balcão, o cliente usa **Idle** nas pernas, **Order** (`Acknowledging.fbx`) no
+pescoço e braço direito e um gesto discreto da mão. Toca uma vez em 1,93 s e volta
+ao repouso normal durante a espera, sem ficar repetindo gestos. Os bancos das
+doze skins foram regenerados com `npm run assets:animations`.
+
 Os personagens fumam (um cigarro até apagar, ou um cigarro inteiro), vomitam, caem e levantam do chão, sentam à mesa puxando a cadeira do mapa, comem, levantam, limpam a mesa pela quina e usam o mictório. O Magrão tira o chopp e busca a long neck no freezer. As ações específicas vêm de `18_animacoes_bar.py` e, o cigarro inteiro, de `19_fumar_mixamo.py` (`assets-bar/map/BarBoteco/export/animacoes/bar_*.glb`); as genéricas usam os FBXs Mixamo de `assets-bar/anim`, convertidos em bancos por skin. Os lugares do mapa vêm de `17_lugares_animacao.py`.
 
 ## No jogo
@@ -10,8 +27,7 @@ Os personagens fumam (um cigarro até apagar, ou um cigarro inteiro), vomitam, c
 | Comer | Pedir comida na mesa (**P**: coxinha, pastel ou torresmo) | Quando o prato chega à mesa, o personagem come com o garfo (`comer_comecar` e `comer_loop`) até terminar o item; depois vêm `comer_terminar` e `sentado_loop`. O prato servido substitui o prato de batatas do clipe. |
 | Levantar | **E** sentado (*Levantar / encerrar*) | `levantar`. Pedido no meio do `sentar`, começa quando o corpo chega à cadeira. A cadeira fica ocupada até o fim. O personagem termina em pé ao lado da cadeira, de frente para a mesa. No banco de piquenique, levanta na hora, 0,55 m atrás do banco. |
 | Urinar | **E** no mictório do banheiro masculino (*Usar o mictório*) | `urinar` (11,5 s) no `Mictorio_Lugar_N`, com o jato em partículas. Esvazia a bexiga. Um por mictório. **E** sai antes e conta a parte feita. A câmera mantém o ângulo e a distância escolhidos pelo jogador, atravessando as paredes do banheiro livremente. Os vasos sanitários (*Usar o banheiro*) continuam com o clipe de espera do jogo. |
-| Fumar | **F** ou o botão **Fumar** | `fumar_acender` e depois `fumar_loop`, com cigarro, brasa e fumaça. O personagem fica parado. **F** de novo ou **E** apaga: `fumar_apagar`, a bituca cai e é pisada (fica no chão 60 s). Pedido antes de acender, apaga quando o cigarro estiver aceso. |
-| Fumar um cigarro inteiro | **Shift+F** ou o botão **Um cigarro** | `fumar_mixamo` (17,9 s, o "Smoking" do Mixamo): tira o maço do bolso (mão esquerda), puxa o cigarro (direita), põe na boca, guarda o maço, acende com o isqueiro (chama e brasa), traga, solta a baforada, joga o cigarro no chão e pisa. O personagem fica parado até o fim; **E** e **F** não interrompem. No meio, o corpo dá um passo à frente para pisar e volta: termina onde começou. A bituca fica no chão 60 s. |
+| Fumar | **F** ou o botão **Fumar** | Acende com isqueiro e leva o cigarro aos lábios em 3,6 s, movendo somente os braços. Permanece na boca enquanto anda, corre, bebe, senta ou interage; tragadas ocasionais, brasa e fumaça seguem o rosto. **F** novamente retira e apaga em 1,8 s, sem mover as pernas. |
 | Vomitar | Bebedeira | Bêbado no estágio 3 (alto), terminar uma bebida alcoólica tem 40% de chance de fazer passar mal (no máximo a cada 2 min). Toca `vomitar` com partículas verdes, e a poça fica no chão 60 s. Vomitar tira 10 de embriaguez e 8 de sede (`NEEDS.drunk.vomit`). |
 | Cair e levantar do chão | Desmaio (HP ou álcool) | `cair` segura a última pose enquanto o personagem está desmaiado; ao acordar, `levantar_chao`. Vale também para o Tonico no evento "O Zé acordou inspirado". |
 | Limpar a mesa | Emprego *Ajudante do Magrão*, tarefa **Limpar a mesa N** | O servidor põe o ajudante na quina livre mais perto, e `limpar_mesa` passa o pano. A tarefa dura o clipe (9 s). |
@@ -37,8 +53,8 @@ Tudo sai do estado que já é sincronizado: `animationState`, `animationStartedA
   - **E** sentado vira `stand-up` e só libera ao fim de `levantar`;
   - o consumo da mesa para quando o personagem começa a levantar;
   - o mictório é o `Interactable` novo do tipo `urinal` (`mictorio-1..3`);
-  - fumar é o emote `smoke`, com o movimento travado;
-  - o cigarro inteiro é o emote `cigarette`: `interactionState` e `animationState` `cigarette` por `barClipMs('fumar_mixamo')`, movimento travado, **E** e **F** ignorados até o fim; como o clipe termina onde começou, o servidor não move o corpo;
+  - fumar é o emote `smoke`, com timestamps independentes e movimento livre;
+  - o emote legado `cigarette` é um alias do mesmo toggle; o clipe de corpo inteiro só permanece no painel F8;
   - vomitar sai de `NeedsDirector.sick`, ao terminar uma bebida;
   - sair do bar no meio do `levantar` deixa o avatar em pé ao lado da cadeira.
 - **Magrão** (`apps/server/src/world/bartender.ts`): não anda mais até o cliente. O clipe leva o corpo dele até a chopeira ou o freezer e de volta. Começado o clipe, um pedido cancelado é terminado do mesmo jeito, mas ninguém recebe a bebida.

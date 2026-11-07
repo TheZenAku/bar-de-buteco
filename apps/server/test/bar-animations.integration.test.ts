@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {INTERACTABLES,MAGRAO_SPOT,NEEDS,URINALS,barClipMs,consumeMs,seatExit,standUpSpot} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {INTERACTABLES,MAGRAO_SPOT,NEEDS,URINALS,SMOKING,barClipMs,consumeMs,seatExit,standUpSpot} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean,ms=4000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -66,38 +66,29 @@ test('bar animations over real WebSockets: urinal, chair in and out, a cigarette
     assert.equal(a.player().interactionState,'');
     assert.ok(Math.hypot(a.player().x-behind.x,a.player().z-behind.z)<.01,'Behind the bench, on free floor');
 
-    // A cigarette: lit, smoked with the body held still, put out on request (once lit) and stepped on.
-    a.room.send('player.emote',{emote:'smoke'});await until(()=>a.player().animationState==='smoke');
-    const lit=a.player().animationStartedAt,{x,z}=a.player();
-    a.room.send('player.input',{seq:a.presence().lastReceived+1,dx:1,dz:0,running:false,rotation:0});await pause(200);
-    assert.deepEqual([a.player().x,a.player().z],[x,z],'Smoking holds the body');
-    a.room.send('player.emote',{emote:'dance'});await until(()=>a.errors.some(e=>e.includes('Levante-se')));
-    a.room.send('player.emote',{emote:'smoke'});await until(()=>a.player().animationState==='smoke-stop');
-    assert.equal(a.player().animationStartedAt,lit+barClipMs('fumar_acender'),'Put out only once lit');
-    await until(()=>a.player().animationState==='idle',barClipMs('fumar_acender')+barClipMs('fumar_apagar')+2000);
-    assert.equal(a.player().interactionState,'');
-
-    // A whole cigarette (Shift+F): held still for all of `fumar_mixamo`, seen by others, not cut short; free where it began.
-    a.room.send('player.emote',{emote:'cigarette'});await until(()=>a.player().animationState==='cigarette');
-    const smoked=a.player().animationStartedAt,held=[a.player().x,a.player().z];
-    assert.equal(a.player().interactionState,'cigarette');
-    assert.equal(a.presence().interactionEndsAt,smoked+barClipMs('fumar_mixamo'),'Free when the clip ends');
-    await until(()=>seenA()?.animationState==='cigarette');
-    a.room.send('player.input',{seq:a.presence().lastReceived+1,dx:1,dz:0,running:false,rotation:0});
-    a.room.send('player.interact',{objectId:'stand'});a.room.send('player.emote',{emote:'smoke'});await pause(200);
-    assert.deepEqual([a.player().x,a.player().z],held,'Smoking it holds the body');
-    assert.equal(a.player().animationState,'cigarette','E and F wait for the butt to be stepped on');
-    // Its 17.9 s, fast-forwarded.
-    a.presence().interactionEndsAt=Date.now();
-    await until(()=>a.player().animationState==='idle');
-    assert.equal(a.player().interactionState,'');
-    assert.deepEqual([a.player().x,a.player().z],held,'The step onto the butt comes back');
+    // A cigarette is independent: movement, dance and other interactions keep working.
+    a.player().assign({x:60,y:0,z:7,animationState:'idle',interactionState:''});b.player().assign({x:60,y:0,z:9});
+    a.room.send('player.emote',{emote:'smoke'});await until(()=>a.player().smokingSince>0);
+    const lit=a.player().smokingSince,{x,z}=a.player();
+    assert.equal(a.player().interactionState,'');assert.equal(a.presence().interactionEndsAt,undefined);
+    await until(()=>seenA()?.smokingSince===lit);
+    a.room.send('player.input',{seq:a.presence().lastReceived+1,dx:1,dz:0,running:false,rotation:0});await pause(150);
+    assert.ok(Math.hypot(a.player().x-x,a.player().z-z)>.01,'The legs remain free while lighting');
+    a.room.send('player.emote',{emote:'dance'});await until(()=>a.player().animationState==='dance');
+    assert.equal(a.player().smokingSince,lit,'Dancing does not discard the cigarette');
+    a.room.send('player.emote',{emote:'smoke'});await until(()=>a.player().smokingStopAt>0);
+    assert.equal(a.player().smokingStopAt,lit+SMOKING.lightMs,'An early toggle finishes the handoff before extinguishing');
+    const stop=a.player().smokingStopAt;
+    a.room.send('player.emote',{emote:'smoke'});await pause(100);assert.equal(a.player().smokingStopAt,stop,'No restart while putting it out');
+    await until(()=>a.player().smokingSince===0,SMOKING.lightMs+SMOKING.putOutMs+1000);
+    await until(()=>seenA()?.smokingSince===0);assert.equal(a.player().animationState,'dance','Extinguishing never resets another action');
+    a.room.send('player.emote',{emote:'idle'});await until(()=>a.player().animationState==='idle');
 
     // Magrão: pours the chopp from his place behind the counter; when the clip ends it goes into the customer's hand, who
     // is free to walk away with it and has it over the same time as at a table.
     const counter=INTERACTABLES.find(i=>i.id==='counter')!,bartender=room.state.npcs.get('bartender')!;
     assert.deepEqual([bartender.x,bartender.z].map(v=>+v.toFixed(3)),[MAGRAO_SPOT.x,MAGRAO_SPOT.z]);
-    b.player().assign({x:16.9,y:.3,z:-7.75});await pause(150);
+    b.player().assign({x:16.9,y:.3,z:-7.75});a.player().assign({x:16.9,y:.3,z:-5.75});await pause(150);
     b.room.send('player.interact',{objectId:counter.id,item:'copo'});await until(()=>bartender.animationState==='serve-chopp');
     const poured=bartender.animationStartedAt;
     await until(()=>a.room.state.npcs?.get('bartender')?.animationState==='serve-chopp');

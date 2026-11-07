@@ -40,6 +40,9 @@ export class Player extends Schema {
   @type('string') holding = '';
   @type('number') holdingSince = 0;
   @type('number') holdingUntil = 0;
+  /** Independent cigarette: lighting start and optional extinguishing start, on the room clock. */
+  @type('number') smokingSince = 0;
+  @type('number') smokingStopAt = 0;
   // Needs, as whole points (precise values live in NeedsDirector). Everyone sees drunkenness and the
   // condition; the HUD shows the rest to the player.
   @type('uint8') hp = 100;

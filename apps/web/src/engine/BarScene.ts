@@ -55,6 +55,8 @@ import {LATE_MS,lifterPose,RagdollPuppet,type RagdollRig} from './moto-ragdoll';
 import {BlowSounds} from './blow-sound';
 import {BlowEffects} from './blow-fx';
 import {SmokeBurst} from './smoke-burst';
+import {Cigarettes,counterRequest} from './cigarettes';
+import {smokingTimeline} from '@bar/shared';
 import {CrowdSprites} from './crowd';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
@@ -108,6 +110,8 @@ interface SkinnedRig {
   rightHand?: HandRig;
   /** The Drink clip on the left arm and the neck only (HAND_LAYER), over the body's clip, for a drink in hand. */
   handLayer?: pc.AnimComponentLayer;
+  orderLayer?:pc.AnimComponentLayer;
+  headBind?:pc.Quat;
   /** The hips, found on first use (the contact shadow follows them during a bar animation). */
   hip?: pc.Entity;
 }
@@ -224,7 +228,7 @@ const MOUSE_JUMP = 500;
 const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
 const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'walk-smooth-20261104' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
+  const version = folder === 'animations' ? 'bar-social-20261107' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -354,6 +358,7 @@ export class BarScene {
   /** The local flier's velocity from the keys, as of the last input the room was sent (getInput), and when. */
   private readonly localFlyV = new pc.Vec3(); private localFlyAt = -99;
   private readonly smokeBurst:SmokeBurst;
+  private readonly cigarettes:Cigarettes;
   private readonly fireworks:Fireworks;
   private fireworkPressedAt=-Infinity;
   /** The people beyond the avatars, as sprites (crowd.ts); the slots of the avatars drawn now keep theirs hidden. */
@@ -595,6 +600,7 @@ export class BarScene {
     this.blowEffects=new BlowEffects(this.app);
     this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.smokeBurst=new SmokeBurst(this.app);
+    this.cigarettes=new Cigarettes(this.app);
     this.fireworks=new Fireworks(this.app,()=>this.callbacks.motoVolume?.()??1);
     this.crowd=new CrowdSprites(this.app);
     this.speedBlur=new SpeedBlur(this.app);
@@ -1105,6 +1111,7 @@ export class BarScene {
 
   /** Before PlayCanvas evaluates any clip, remove last frame's additive head rotation. */
   private restoreHeadLooks():void {
+    this.cigarettes.restore();
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
     for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();}
   }
@@ -1400,6 +1407,7 @@ export class BarScene {
   /** Kicks and falls: what was heard and what is showing (tests). */
   getBlows() { return { ...this.blowSounds.telemetry(), effects: this.blowEffects.showing }; }
   getSmokeBurst() { return { showing: this.smokeBurst.showing, color: this.smokeBurst.lastColor }; }
+  getSmoking(){return this.cigarettes.telemetry();}
   getFireworks() {return {showing:this.fireworks.showing,equipped:!!this.actors.get(this.localId)?.firework?.enabled};}
   fireworkShot(shot:FireworkShot):void {this.fireworks.shot(shot,this.serverNow());}
   fireworkFire():void {this.shootFirework();}
@@ -1762,7 +1770,7 @@ export class BarScene {
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.morte?.destroy();this.morte=undefined;
-    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.crowd.destroy();this.horseSounds.destroy();
+    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -1889,10 +1897,11 @@ export class BarScene {
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
     for (const asset of bank.animations) {
       const track = asset.resource as pc.AnimTrack;
-      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick'].includes(track.name);
+      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order'].includes(track.name);
       skin.model.anim!.assignAnimation(track.name, track, undefined, 1, loop);
       skin.tracks.add(track.name);
       if (track.name === 'Drink') this.addHandLayer(skin, track);
+      if (track.name === 'Order') this.addOrderLayer(skin,track);
     }
   }
 
@@ -1917,6 +1926,17 @@ export class BarScene {
     anim.rebind();
   }
 
+  /** Acknowledging once, masked above the shoulders, over the normal planted idle. */
+  private addOrderLayer(skin:SkinnedRig,track:pc.AnimTrack):void {
+    const anim=skin.model.anim!;if(skin.orderLayer)return;
+    const paths=track.curves.flatMap(c=>c.paths.map(p=>p.entityPath)),mask:Record<string,{children:boolean}>={};
+    for(const node of [skin.bones.head.parent,skin.bones.upperarm_r.parent]){
+      const path=paths.find(p=>p.at(-1)===node?.name);if(path)mask[path.join('/') ]={children:true};
+    }
+    if(!Object.keys(mask).length)return;
+    skin.orderLayer=anim.addLayer('Order',0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
+    anim.assignAnimation('Order',track,'Order',1,false);anim.rebind();
+  }
   private loadCane(id:string):void{
     if(this.caneRequests.has(id))return;this.caneRequests.add(id);
     this.app.assets.loadFromUrl(skinAsset('props', `old-cane-${id}`, id),'container',(error,asset)=>{
@@ -1983,6 +2003,7 @@ export class BarScene {
       if (bank) this.assignClips(skin, bank);
     }
     if(id)this.attachCane(skin,id);
+    skin.headBind=entity.getRotation().clone().invert().mul(bones.head.getRotation());
     skin.drinkHand=findHand(entity,'l');
     skin.rightHand=findHand(entity,'r');
     return skin;
@@ -2505,13 +2526,14 @@ export class BarScene {
     // Gestures are built on the static Pose; plain standing uses the animated Idle.
     const gesture = seated > 0.01 || dancing || drinking || waving;
     const action = isRidingHorse(actor.interactionState) ? 'ride' : actor.animation;
+    const ordering=action==='wait'&&!!actor.drinkItem;
     const stage=drunkStage(actor.drunk??0);
     // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
-      : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
+      : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
     const locomotion = !bar && !show && ['Idle', 'Walk', 'Run', 'DrunkWalk'].includes(requested);
@@ -2549,7 +2571,13 @@ export class BarScene {
     // whatever pace the walk sets for the clips).
     const now = this.serverNow();
     const held = actor.holding && (actor.holdingUntil ?? 0) > now ? HELD_DRINKS.find(id => id === actor.holding) : undefined;
-    const handOn = !!held && !bar && !show && HAND_FREE_CLIPS.has(clip) && !!skin.handLayer;
+    if(skin.orderLayer){
+      const age=Math.max(0,(now-(actor.animationStartedAt??now))/1000),duration=skin.orderLayer.activeStateDuration;
+      const fade=(v:number)=>{const t=clamp(v,0,1);return t*t*(3-2*t);};
+      skin.orderLayer.weight=ordering?fade(age/.28)*fade((duration-age)/.35):0;
+      if(ordering&&duration>0)skin.orderLayer.activeStateCurrentTime=Math.min(age,duration);
+    }
+    const handOn = !!held && !bar && !show && HAND_FREE_CLIPS.has(clip) && !!skin.handLayer && smokingTimeline(actor,now,actor.id).phase!=='lighting';
     if (skin.handLayer) {
       skin.handLayer.weight = lerp(skin.handLayer.weight, handOn ? 1 : 0, 1 - Math.exp(-10 * pose.dt));
       const duration = skin.handLayer.activeStateDuration;
@@ -2897,6 +2925,17 @@ export class BarScene {
     this.applyHeadLooks(dt);
     if (this.vr.active && vrView) this.vrBody(player, vrView.yaw, vrFoot && !vrSpecial);
     this.vrArms(player, realDt);
+    const cigaretteActors=[],smokingNow=this.serverNow();
+    for(const avatar of this.actors.values()){
+      const {actor,skin}=avatar;if(!skin)continue;
+      if(actor.animation==='wait'&&actor.drinkItem)counterRequest(skin,(smokingNow-(actor.animationStartedAt??smokingNow))/1000,avatar.body);
+      if(actor.smokingSince)cigaretteActors.push({id:actor.id,skin:avatar.skinId!,state:actor,rig:skin,
+        hidden:!!avatar.deathHidden||['ragdoll','fallen','recover','vomit'].includes(actor.animation??''),
+        armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&
+          (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
+          ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
+    }
+    this.cigarettes.update(cigaretteActors,smokingNow,dt,this.camera,this.app.graphicsDevice.height);
     this.showOwnHead(player);
     this.footstepSounds.update(realDt,this.enabled?[...this.actors.values()].map(avatar=>{
       const position=avatar.root.getPosition(),actor=avatar.actor;
@@ -3081,8 +3120,8 @@ export class BarScene {
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
-      // F lights one and keeps smoking until F again; Shift+F smokes a whole cigarette and steps on the butt.
-      if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.(event.shiftKey ? 'cigarette' : 'smoke'); }
+      // F lights a persistent cigarette or puts it out; locomotion remains independent.
+      if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.('smoke'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
       if (!event.repeat && event.code === 'KeyQ') { event.preventDefault(); this.callbacks.onCameraChange?.(this.rig.cycle(),this.rig.reach); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }

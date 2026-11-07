@@ -536,8 +536,9 @@ function renderWorld():void {
   needsHud.update(self);
   const ordering=self?.interactionState==='counter'&&self.animationState!=='drink';
   $('#dance-button').setAttribute('aria-pressed',String(self?.animationState==='dance'));
-  $('#smoke-button').setAttribute('aria-pressed',String(self?.interactionState==='smoke'));
-  $('#cigarette-button').setAttribute('aria-pressed',String(self?.interactionState==='cigarette'));
+  $('#smoke-button').setAttribute('aria-pressed',String(!!self?.smokingSince&&!self.smokingStopAt));
+  $('#smoke-button').setAttribute('aria-label',self?.smokingSince?'Apagar cigarro':'Acender cigarro');
+  $('#smoke-button .tip').textContent=self?.smokingStopAt?'Apagando cigarro…':self?.smokingSince?'Apagar cigarro':'Fumar';
   renderSkillButton();
   const station=jobStation(),atStation=!!station&&!!self&&!self.interactionState&&!self.currentTableId&&touching(stationInteractable(station),self);
   if(self)gps.update(self.x,self.z);
@@ -819,20 +820,14 @@ function orderDrink():void {
   const option=(id:'garrafa'|'copo',hint:string)=>{const item=itemById(id)!;return `<button class="button primary" data-action="order" data-item="${id}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)} · ${coins(itemCost(id))}</b><small>${hint}</small></span></button>`;};
   showModal('PEDIR AO MAGRÃO',`<p class="modal-description">O Magrão cobra, prepara e entrega. Você bebe quando ele terminar. Carteira: ${coins(inventory?.balance??0)}</p><div class="drink-choice">${option('garrafa','Cerveja na garrafa')}${option('copo','Chopp no copo')}</div><p class="fine-print">Sentado numa mesa? Peça comida e bebida ao Tonico com T.</p>`,'order');
 }
-/** F: lights a cigarette where the player stands, or puts it out (the room plays both). */
+/** F toggles a cigarette independently of walking, holding a drink and seated interactions. */
 function smoke():void {
-  if(!connected||activeModal||!world||!user||performing())return;
+  if(!connected||activeModal||!world||!user)return;
   const self=world.players[user.id];
-  if(self?.interactionState&&self.interactionState!=='smoke'){toast('Encerre a ação atual antes de acender um cigarro.');return;}
+  if(!self?.smokingSince&&(performing()||(self?.interactionState&&!self.interactionState.startsWith('seat-')))){toast('Encerre a a\u00e7\u00e3o atual antes de acender um cigarro.');return;}
   network.send('player.emote',{emote:'smoke'});
 }
-/** Shift+F: a whole cigarette where the player stands, from the pack to the butt stepped on (about 18 s, held still). */
-function cigarette():void {
-  if(!connected||activeModal||!world||!user||performing())return;
-  const self=world.players[user.id];
-  if(self?.interactionState){toast(self.interactionState==='cigarette'?'Você já está fumando um cigarro.':'Encerre a ação atual antes de acender um cigarro.');return;}
-  network.send('player.emote',{emote:'cigarette'});
-}
+function cigarette():void {smoke();}
 /** The active skill of the skin being worn and its key (chosen in the profile window, tab Skill). */
 let skillLoadouts:SkillLoadouts={};
 /** The skills this account bought: the hotbar only offers those (the room checks it again). */
@@ -1342,7 +1337,7 @@ async function start():Promise<void>{
     onFirework:direction=>network.send('firework.fire',{direction}),
     onFireworkStow:()=>network.send('firework.stow',{}),
     onFrame:dt=>network.rideFrame(dt),
-    onEmote:emote=>performing()?undefined:emote==='smoke'?smoke():emote==='cigarette'?cigarette():network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
+    onEmote:emote=>emote==='smoke'?smoke():emote==='cigarette'?cigarette():performing()?undefined:network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
     vrWindowOpen,
     onVrEnd:reason=>{refreshVrButton();toast(reason);},
     onVrNotice:text=>toast(text),
@@ -1397,7 +1392,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility

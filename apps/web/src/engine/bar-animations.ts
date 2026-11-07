@@ -80,7 +80,7 @@ void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0||vColor.a<=0.0)discar
 gl_FragColor=vec4(vColor.rgb*brightness*(1.0-0.25*d),vColor.a*(1.0-smoothstep(0.35,1.0,d)));}`;
 
 /** Particulas: one point cloud for every emitter, in world space. */
-class BarParticles {
+export class BarParticles {
   readonly entity:pc.Entity;
   private readonly mesh:pc.Mesh;
   private readonly material:pc.ShaderMaterial;
@@ -108,6 +108,7 @@ class BarParticles {
   }
 
   get count():number {return this.alive;}
+  forgetEmitter(key:string):void {this.owed.delete(key);}
 
   /** Emits from an FX node this frame (`key` keeps the fractional rate per emitter). */
   emit(key:string,typeName:string,node:pc.GraphNode,dt:number,floorY:number):void {

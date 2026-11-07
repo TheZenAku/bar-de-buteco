@@ -11,6 +11,56 @@ import {walk} from './walk';
  */
 const map=JSON.parse(readFileSync(new URL('../../packages/shared/src/map-data.json',import.meta.url),'utf8')) as typeof import('../../packages/shared/src/map-data.json');
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
+
+test('polished cigarette: upper body lighting, persistent lip contact on every skin, puffs and free legs; counter greeting once',async({page})=>{
+  test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/@fs/'+fileURLToPath(new URL('../fixtures/smoking.html',import.meta.url)).replaceAll('\\','/'));
+  await page.evaluate(()=>(window as any).fixture.ready);
+  const status=()=>page.evaluate(()=>(window as any).fixture.status());
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations()[0]?.skin),{timeout:60000}).toBe('nathan');
+  await page.evaluate(()=>(window as any).fixture.clock(2200));
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.cigarettes.saved.size)).toBeGreaterThan(8);
+  await expect.poll(async()=>(await status()).actors.a?.flame).toBe(true);
+  await page.screenshot({path:'test-results/previews/smoke-lighting.png'});
+  await page.evaluate(()=>(window as any).fixture.clock(5000));
+  await expect.poll(async()=>(await status()).actors.a?.phase).toBe('lit');
+  expect((await status()).actors.a.mouthError).toBeLessThan(.002);
+  await page.screenshot({path:'test-results/previews/smoke-mouth.png'});
+  await page.evaluate(()=>{const f=(window as any).fixture;f.patch({holding:'garrafa',holdingSince:f.since,holdingUntil:f.since+50000});});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations()[0]?.drink?.item)).toBe('garrafa');
+  expect((await status()).actors.a.phase).toBe('lit');
+  expect((await status()).actors.a.mouthError).toBeLessThan(.002);
+  await page.screenshot({path:'test-results/previews/smoke-with-drink.png'});
+  await page.evaluate(()=>(window as any).fixture.patch({holding:'',holdingSince:0,holdingUntil:0}));
+  await page.evaluate(()=>(window as any).fixture.all());
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations().filter((v:any)=>v.skin===v.id).length),{timeout:60000}).toBe(10);
+  await expect.poll(async()=>Object.keys((await status()).actors).length).toBe(10);
+  for(const a of Object.values((await status()).actors) as any[])expect(a.mouthError).toBeLessThan(.002);
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getAnimations().every((a:any)=>a.clip==='Idle'&&!a.bar))).toBe(true);
+  await page.screenshot({path:'test-results/previews/smoke-all-skins.png'});
+  // Only arm/finger joints are ever overridden, even during the lighting handoff.
+  await page.evaluate(()=>(window as any).fixture.clock(2200));
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.cigarettes.saved.size)).toBeGreaterThan(8);
+  const saved=await page.evaluate(()=>[...(window as any).fixture.scene.cigarettes.saved.keys()].map((n:any)=>n.name));
+  expect(saved.length).toBeGreaterThan(8);expect(saved.some((n:string)=>/hip|leg|foot|root/i.test(n))).toBe(false);
+  // Every avatar follows its actual head when looking around or walking.
+  await page.evaluate(()=>{const f=(window as any).fixture;f.clock(16000);f.patch({headYaw:.4,headPitch:.15,animationState:'walk'});f.scene.setEnabled(true);});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations().every((a:any)=>a.clip==='Walk'))).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.scene.getAnimations().every((a:any)=>a.look?.yaw>.3))).toBe(true);
+  for(const a of Object.values((await status()).actors) as any[])expect(a.mouthError).toBeLessThan(.002);
+  await expect.poll(async()=>(await status()).particles).toBeGreaterThan(0);
+  await page.evaluate(()=>(window as any).fixture.stop());
+  await expect.poll(async()=>Object.values((await status()).actors).every((a:any)=>a.phase==='extinguishing')).toBe(true);
+  await page.evaluate(()=>(window as any).fixture.clock(18000));await expect.poll(async()=>Object.keys((await status()).actors).length).toBe(0);
+  // The customer uses Idle below the shoulders and a short imported nod, then waits neutrally.
+  await page.evaluate(()=>{const f=(window as any).fixture;f.skin('nathan');f.clock(700);f.patch({smokingSince:0,animationState:'wait',drinkItem:'copo'});f.view([61,1.8,10],[60,1.1,7]);});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.legs()[0]?.order)).toBeGreaterThan(.5);
+  expect(await page.evaluate(()=>(window as any).fixture.legs()[0]?.clip)).toBe('Idle');
+  await page.screenshot({path:'test-results/previews/counter-request.png'});
+  await page.evaluate(()=>(window as any).fixture.clock(3500));
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.legs()[0]?.order)).toBe(0);
+  expect(errors).toEqual([]);
+});
 const seat=map.seats.find(s=>s.id==='seat-9')!,urinal=map.barAnimations.urinals[0]!,magrao=map.barAnimations.counter.magrao,table=map.tables.find(t=>t.number===3)!;
 const corner=(()=>{const {x,z,yaw}=table.anchor,{x:cx,z:cz}=map.barAnimations.clips.limpar_mesa.start,cos=Math.cos(yaw),sin=Math.sin(yaw);
   return {x:x+cx*cos+cz*sin,z:z-cx*sin+cz*cos,rotation:yaw+map.barAnimations.clips.limpar_mesa.start.yaw};})();
@@ -284,27 +334,22 @@ test('live: F lights a cigarette and puts it out through the room, and the F8 pa
   await expect.poll(async()=>(await self())?.connected).toBe(true);
   expect(await page.evaluate(()=>(window as any).barDebug.map().barAnimations)).toMatchObject({cadeiras:124,mesas:31,mictorios:3,balcao:true});
   await page.locator('#world').click({position:{x:400,y:300}});
+  await page.evaluate(()=>(window as any).barDebug.send('test.player.place',{x:60,y:0,z:7}));
+  await expect.poll(async()=>(await self())?.x).toBeCloseTo(60,1);
+  const smoke=()=>page.evaluate(()=>{const d=(window as any).barDebug;return d.smoking().actors[d.snapshot().localId];});
   await page.keyboard.press('KeyF');
-  await expect.poll(async()=>(await self())?.animationState).toBe('smoke');
-  await expect.poll(mine,{timeout:60000}).toMatch(/^fumar_(acender|loop)$/);
-  await expect(page.locator('#context-label')).toHaveText('Apagar o cigarro');
-  await page.keyboard.press('KeyF');
-  await expect.poll(async()=>(await self())?.animationState).toBe('smoke-stop');
-  await expect.poll(mine,{timeout:20000}).toBe('fumar_apagar');
-  await expect.poll(async()=>(await self())?.animationState,{timeout:20000}).toBe('idle');
-  // Shift+F: a whole cigarette, the room holding the player for the clip and freeing them where they stood, the butt left.
-  const before=await self(),butts=()=>page.evaluate(()=>(window as any).barDebug.map().barAnimations.leftovers.filter((name:string)=>name==='Bar leftover Prop_Cigarro').length);
-  // (Putting the first one out left its butt too.)
-  const left=await butts();
-  await page.keyboard.press('Shift+KeyF');
-  await expect.poll(async()=>(await self())?.animationState).toBe('cigarette');
-  await expect.poll(mine,{timeout:60000}).toBe('fumar_mixamo');
-  await expect(page.locator('#context-label')).toHaveText('Fumando um cigarro…');
-  await expect(page.locator('#cigarette-button')).toHaveAttribute('aria-pressed','true');
-  await expect.poll(async()=>(await self())?.animationState,{timeout:30000}).toBe('idle');
-  const after=await self();
-  expect(Math.hypot(after.x-before.x,after.z-before.z)).toBeLessThan(.01);
-  await expect.poll(butts).toBe(left+1);
+  await expect.poll(async()=>(await self())?.smokingSince).toBeGreaterThan(0);
+  expect((await self()).interactionState).toBe('');
+  await expect.poll(async()=>(await smoke())?.phase).toBe('lighting');
+  await expect(page.locator('#smoke-button')).toHaveAttribute('aria-pressed','true');
+  await expect.poll(async()=>(await smoke())?.phase,{timeout:10000}).toBe('lit');
+  const before=await self();await page.keyboard.down('KeyD');await page.waitForTimeout(350);await page.keyboard.up('KeyD');
+  await expect.poll(async()=>{const after=await self();return Math.hypot(after.x-before.x,after.z-before.z);}).toBeGreaterThan(.2);
+  expect((await self()).smokingSince).toBe(before.smokingSince);
+  await page.keyboard.press('KeyF');await expect.poll(async()=>(await self())?.smokingStopAt).toBeGreaterThan(0);
+  await expect.poll(async()=>(await smoke())?.phase).toBe('extinguishing');
+  await expect.poll(async()=>(await self())?.smokingSince,{timeout:5000}).toBe(0);
+  await expect(page.locator('#smoke-button')).toHaveAttribute('aria-pressed','false');
   // Development panel: Magrão pours a chopp for this browser only; the whole cigarette has its button too.
   await page.keyboard.press('F8');
   await expect(page.locator('#bar-animations-debug')).toBeVisible();

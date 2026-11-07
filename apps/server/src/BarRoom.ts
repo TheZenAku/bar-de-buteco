@@ -1,4 +1,5 @@
 import {vrArmsSchema,encodeVrArms} from '@bar/shared';
+import {SMOKING} from '@bar/shared';
 import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity,stepWheelie,HORSE_REAR} from '@bar/shared';
 import { randomInt, randomUUID } from 'node:crypto';
 import {FIREWORK,fireworkFireSchema,fireworkOrigin,fireworkFlightMs,type FireworkShot,type FireworkVector} from '@bar/shared';
@@ -537,7 +538,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** Ends what needs a connected player (blackjack seat, orders, drinks, kicks); a chair stays taken. */
   private park(player: Player): void {
     if(isRidingHorse(player.interactionState))this.dismountHorse(player);
-    player.drinkItem = ''; this.dropHolding(player);
+    player.drinkItem = ''; this.dropHolding(player);this.clearSmoking(player);
     this.blackjack.leave(player.id);
     // Off the pebolim table (a match with coins on it is lost; a friendly goes on with Zé do Totó).
     this.leaveFoosball(player);
@@ -899,25 +900,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'smoke', 'cigarette']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
-      // A cigarette: lit and smoked where the player stands (movement held), put out and stepped on when asked again.
-      if (emote === 'smoke' && p.interactionState === 'smoke') { this.stopSmoking(p, this.forClient(client)!, Date.now()); return; }
+      // The cigarette never owns the movement/interaction state. F is a toggle, even while seated or waiting.
+      if(emote==='smoke'||emote==='cigarette'){
+        if(p.smokingSince){if(!p.smokingStopAt)p.smokingStopAt=Math.max(Date.now(),p.smokingSince+SMOKING.lightMs);return;}
+        if(!isConscious(p)||p.animationState==='kick'||p.fireworkEquipped)throw new Error('Espere a a\u00e7\u00e3o atual terminar.');
+        if(p.interactionState&&!p.interactionState.startsWith('seat-'))throw new Error('Levante-se primeiro.');
+        p.smokingSince=Date.now();p.smokingStopAt=0;
+        return;
+      }
       if (p.interactionState) throw new Error('Levante-se primeiro.');
-      if (emote === 'smoke') {
-        if (p.animationState === 'kick') throw new Error('Espere o golpe terminar.');
-        const presence = this.forClient(client)!;
-        p.interactionState = 'smoke'; p.animationState = 'smoke'; p.animationStartedAt = Date.now(); p.drinkItem = '';
-        presence.gestureEndsAt = undefined; presence.queue.length = 0; p.lastProcessedInput = presence.lastReceived;
-        return;
-      }
-      // A whole cigarette (`fumar_mixamo`): pack, lighter, a drag, the butt stepped on; held still until the clip ends.
-      if (emote === 'cigarette') {
-        if (p.animationState === 'kick') throw new Error('Espere o golpe terminar.');
-        const presence = this.forClient(client)!;
-        p.interactionState = 'cigarette'; p.animationState = 'cigarette'; p.animationStartedAt = Date.now(); p.drinkItem = '';
-        presence.interactionEndsAt = p.animationStartedAt + barClipMs('fumar_mixamo');
-        presence.gestureEndsAt = undefined; presence.queue.length = 0; p.lastProcessedInput = presence.lastReceived;
-        return;
-      }
       if(emote==='wave'){
         this.playTemporary(p,this.forClient(client)!,'wave',WAVE_DURATION_MS);
         this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
@@ -1112,6 +1103,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       // The drink is finished and leaves the hand together with the interaction.
       if (presence.interactionEndsAt && now >= presence.interactionEndsAt) this.finishInteraction(player, presence, now);
       if (player.holding) this.updateHolding(player, presence, now);
+      this.updateSmoking(player,now);
       // A job task keeps the hands busy for its whole duration (the use clip is shorter, so it restarts).
       if ((player.interactionState === 'job' || isRepairingMoto(player.interactionState)) && player.animationState === 'use' && now - player.animationStartedAt >= TASK_GESTURE_MS) player.animationStartedAt = now;
       if (presence.flying && (presence.ticket.role !== 'admin' || player.interactionState || player.currentTableId)) this.land(player, presence);
@@ -2753,6 +2745,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     const from = Math.max(now, player.animationStartedAt + barClipMs('fumar_acender'));
     player.animationState = 'smoke-stop'; player.animationStartedAt = from; presence.interactionEndsAt = from + barClipMs('fumar_apagar');
   }
+  private clearSmoking(player:Player):void {player.smokingSince=0;player.smokingStopAt=0;}
+  private updateSmoking(player:Player,now:number):void {
+    if(!player.smokingSince)return;
+    if(!isConscious(player)||['ragdoll','fallen','recover','vomit'].includes(player.animationState)){this.clearSmoking(player);return;}
+    if(player.smokingStopAt&&now>=player.smokingStopAt+SMOKING.putOutMs){
+      if(player.smokingStopAt-player.smokingSince>=SMOKING.lightMs)this.achieved(player.id,'fumante');
+      this.clearSmoking(player);
+    }
+  }
   /** Sick where they stand, held still for the whole clip; the puddle is the clip's. */
   private startVomiting(player: Player, presence: Presence, now: number): void {
     player.interactionState = 'vomit'; player.animationState = 'vomit'; player.animationStartedAt = now; player.drinkItem = '';
@@ -2771,6 +2772,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   /** Falling ends whatever the character was doing: table, order, drink (spilled), chair, dance. */
   private knockDown(player: Player, presence: Presence): void {
+    this.clearSmoking(player);
     this.dropHolding(player);
     if (player.currentTableId) { this.blackjack.leave(player.id); player.currentTableId = ''; this.cleanTable(); this.syncTable(); }
     if (player.interactionState.startsWith('foosball:')) this.leaveFoosball(player);

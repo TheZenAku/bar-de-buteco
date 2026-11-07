@@ -27,6 +27,8 @@ const clips = {
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
+  // A restrained nod to the bartender, played once above a planted idle (never a looping wait pose).
+  Order: misc('Acknowledging.fbx'),
   Wait: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
   // Highfood: looking at the phone (the customer waiting, anyone with the phone open), thanking for the delivery, the bag coming out of the box.
   Text: misc('Texting While Standing.fbx'), Thank: misc('Thankful.fbx'), Pick: misc('Picking Up Object.fbx'),
