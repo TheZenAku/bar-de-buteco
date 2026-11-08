@@ -8,10 +8,18 @@ export const MOTO_FOGO_MODEL='moto-fogo';
 export const MOTO_FOGO_NAME='Caveira em Chamas';
 /** The red the bike's texture was painted with: the colour that leaves it as it came (engine/moto-paint.ts repaints the reds to the owner's). */
 export const FOGO_DEFAULT_COLOR='#6b1d1d';
+export const MOTO_CLASSICA_MODEL='moto-classica';
+export const MOTO_CLASSICA_NAME='Clássica Raiada';
+/** The tank's black as authored (glTF base colour 0,012 linear, in sRGB): the colour that leaves it as it came. */
+export const CLASSICA_DEFAULT_COLOR='#222225';
+export const MOTO_SCOOTER_MODEL='moto-scooter';
+export const MOTO_SCOOTER_NAME='Scooter de Entrega';
 /** Register a playable model here once: administration spawn, registration and filters use this catalogue. */
 export const VEHICLE_CATALOG=[
   {model:'moto-delivery',name:'Highland Bar Delivery',kind:'moto',seats:1,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-v4.webp'},
   {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,kind:'moto',seats:1,defaultColor:FOGO_DEFAULT_COLOR,paintable:true,photo:'moto/foto-fogo.webp'},
+  {model:MOTO_CLASSICA_MODEL,name:MOTO_CLASSICA_NAME,kind:'moto',seats:1,defaultColor:CLASSICA_DEFAULT_COLOR,paintable:true,photo:'moto/foto-classica.webp'},
+  {model:MOTO_SCOOTER_MODEL,name:MOTO_SCOOTER_NAME,kind:'moto',seats:1,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-scooter.webp'},
   {model:CAR_MODEL,name:CAR_NAME,kind:'carro',seats:4,defaultColor:DEFAULT_CAR_COLOR,paintable:true,photo:'carro/foto.png'},
   {model:TRUCK_MODEL,name:TRUCK_NAME,kind:'carro',seats:2,defaultColor:DEFAULT_TRUCK_COLOR,paintable:true,photo:'caminhao/foto.png'},
 ] as const;
@@ -26,9 +34,11 @@ export const isCar=(vehicle:{model?:string}|undefined)=>isCarModel(vehicle?.mode
 export const isHatch=(vehicle:{model?:string}|undefined)=>vehicle?.model===CAR_MODEL;
 export const isTruck=(vehicle:{model?:string}|undefined)=>vehicle?.model===TRUCK_MODEL;
 export const isFogo=(vehicle:{model?:string}|undefined)=>vehicle?.model===MOTO_FOGO_MODEL;
+export const isScooter=(vehicle:{model?:string}|undefined)=>vehicle?.model===MOTO_SCOOTER_MODEL;
+export const isClassica=(vehicle:{model?:string}|undefined)=>vehicle?.model===MOTO_CLASSICA_MODEL;
 export const vehicleName=(model:string)=>vehicleDefinition(model)?.name??model;
 /** The price table's key for a model (prices.ts). */
-export const vehiclePriceKey=(model:string)=>model===CAR_MODEL?'vehicle:carro':model===TRUCK_MODEL?'vehicle:caminhao':model===MOTO_FOGO_MODEL?'vehicle:moto-fogo':'vehicle:moto';
+export const vehiclePriceKey=(model:string)=>model===CAR_MODEL?'vehicle:carro':model===TRUCK_MODEL?'vehicle:caminhao':model===MOTO_FOGO_MODEL?'vehicle:moto-fogo':model===MOTO_CLASSICA_MODEL?'vehicle:moto-classica':model===MOTO_SCOOTER_MODEL?'vehicle:moto-scooter':'vehicle:moto';
 export const vehiclePhoto=(model:string)=>vehicleDefinition(model)?.photo??VEHICLE_CATALOG[0].photo;
 /** Measured from the supplied rig, at its authored metre scale. */
 export const CAR={SCALE:1,WHEELBASE:2.314,WHEEL_TRACK:1.33,WHEEL_RADIUS:.285,HALF_WIDTH:.76,HALF_LENGTH:1.80,CENTRE_Z:0,HEIGHT:1.39,

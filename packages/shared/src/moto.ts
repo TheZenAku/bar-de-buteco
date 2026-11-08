@@ -4,7 +4,7 @@ import {findSpawn,floorHeight,isWalkable,PLAYER_RADIUS,roadHeight,solidsBetween,
 import type {Collider,Position} from './index.js';
 import type {MotoPhase} from './moto-crash.js';
 import {FULL_HANDLING,MOTO_ENGINE,NEW_MOTO_PARTS,type MotoHandling} from './moto-parts.js';
-import {CAR,TRUCK,TRUCK_MODEL,MOTO_FOGO_MODEL,VEHICLE_MODELS,carSpec,isCarModel,isPassenger,vehicleOccupants,vehicleSeats} from './vehicle-models.js';
+import {CAR,TRUCK,TRUCK_MODEL,MOTO_FOGO_MODEL,MOTO_CLASSICA_MODEL,MOTO_SCOOTER_MODEL,VEHICLE_MODELS,carSpec,isCarModel,isPassenger,vehicleOccupants,vehicleSeats} from './vehicle-models.js';
 
 /** v4 is authored in metres (30 cm tyres and an 80 cm seat). No scooter scale correction. */
 const SCALE=1;
@@ -47,7 +47,17 @@ const TRUCK_PHYSICS:VehiclePhysics={...MOTO,...TRUCK};
  * ends (±0,63 m, above 1 m) are left out so it does not stick on doorways.
  */
 export const MOTO_FOGO:VehiclePhysics={...MOTO,WHEELBASE:1.5128,WHEEL_RADIUS:.297,HALF_WIDTH:.46,HALF_LENGTH:1.08,CENTRE_Z:-.0225,HEIGHT:1.18};
-export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===TRUCK_MODEL?TRUCK_PHYSICS:isCarModel(model)?CAR_PHYSICS:model===MOTO_FOGO_MODEL?MOTO_FOGO:MOTO;
+/**
+ * The Clássica Raiada (moto_classica.glb, scripts/61_moto_classica_tripo.py): the same engine on its own measurements: 30 cm spoked wheels,
+ * axles 1,372 m apart, 1,98 m long. The hull is the body and the grips (±0,29 m); the mirrors (±0,48 m, above 1,2 m) are left out like the Caveira's bar ends.
+ */
+export const MOTO_CLASSICA:VehiclePhysics={...MOTO,WHEELBASE:1.372,WHEEL_RADIUS:.30,HALF_WIDTH:.4,HALF_LENGTH:.99,CENTRE_Z:0,HEIGHT:1.36};
+/**
+ * The Scooter de Entrega (moto_scooter.glb: the first delivery bike, scripts/20_moto_delivery.py + 20b_scooter_pontos.py): the same engine on
+ * its own measurements: 22,5 cm wheels, axles 1,342 m apart, 1,99 m long with the box. The hull is the body and the shield (±0,36 m); the bar ends and mirrors are left out.
+ */
+export const MOTO_SCOOTER:VehiclePhysics={...MOTO,WHEELBASE:1.342,WHEEL_RADIUS:.225,HALF_WIDTH:.4,HALF_LENGTH:.994,CENTRE_Z:-.054,HEIGHT:1.47};
+export const vehiclePhysics=(model:string|undefined):VehiclePhysics=>model===TRUCK_MODEL?TRUCK_PHYSICS:isCarModel(model)?CAR_PHYSICS:model===MOTO_FOGO_MODEL?MOTO_FOGO:model===MOTO_CLASSICA_MODEL?MOTO_CLASSICA:model===MOTO_SCOOTER_MODEL?MOTO_SCOOTER:MOTO;
 export interface MotoBody {model?:string;x:number;y:number;z:number;yaw:number;pitch:number;speed:number;steer:number;/** Local +X velocity (m/s), and yaw velocity (rad/s). Absent legacy fields read as zero. */lateralSpeed?:number;yawRate?:number}
 /** Which lamps are lit beyond the ones always on (MotoState.lights). */
 export const MOTO_LIGHT={BRAKE:1,LEFT:2,RIGHT:4,HIGH:8} as const;

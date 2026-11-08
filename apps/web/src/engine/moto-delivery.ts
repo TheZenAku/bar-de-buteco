@@ -4,7 +4,7 @@ import {MOTO,MOTO_ENGINE,motoLampLevel,motoSteerAngle,readMotoParts,type MotoBod
 import {closeHand,type HandRig} from './drink-props';
 import {palmUp,reach} from './serving-props';
 import {RoomTrack,SNAP_DISTANCE} from './moto-motion';
-import {FOGO_LAMPS,lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-lights';
+import {CLASSICA_LAMPS,FOGO_LAMPS,SCOOTER_LAMPS,lampState,MotoLampMaterials,MotoLights,type LampState} from './moto-lights';
 import {MotoSounds} from './moto-sound';
 import {CarRig,CarLights} from './car-rig';
 import {CarSounds} from './car-sound';
@@ -13,13 +13,15 @@ import {VehicleBrakeSounds} from './vehicle-brake-sound';
 import {MotoBag} from './moto-bag';
 import {VehicleHorns} from './vehicle-horn';
 import {wheeliePose} from '@bar/shared';
-import {isCar,isFogo,isTruck,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
+import {isCar,isClassica,isFogo,isScooter,isTruck,readDriveParts,vehiclePhysics,vehicleSeat,vehiclePowered} from '@bar/shared';
 import {MotoFire} from './moto-fire';
 import {MotoExhaust} from './moto-exhaust';
-import {MotoPaint} from './moto-paint';
+import {MotoPaint,TankPaint} from './moto-paint';
 
 const RAD_TO_DEG=180/Math.PI;
 const BONES=['chassi','direcao','suspensao_diant','balanca','descanso','roda_dianteira','roda_traseira'] as const;
+/** The Scooter de Entrega has no stand, fork travel or swing arm. */
+const OPTIONAL_BONES:ReadonlySet<string>=new Set(['descanso','suspensao_diant','balanca']);
 /**
  * moto_v4/moto_delivery.js, ported to the client's modules: the game has no vehicle script
  * components, and the same fields and arithmetic drive the bones. Only what is drawn: speed and steering come from the
@@ -56,13 +58,16 @@ export class MotoRig {
   private readonly q=new pc.Quat();
   private readonly tmp=new pc.Quat();
 
-  /** `wheelRadius` is the model's own (the Caveira em Chamas has 29,7 cm); a bone the model lacks (its stand) is skipped without a word. */
-  constructor(readonly entity:pc.Entity,wheelRadius=MOTO.WHEEL_RADIUS) {
+  /**
+   * `wheelRadius` is the model's own (the Caveira em Chamas has 29,7 cm); a bone the model lacks (its stand) is skipped without a word.
+   * `standDown`: the model's stand rests on the ground in its rest pose (the Clássica Raiada), so closing it turns it back and up 85°.
+   */
+  constructor(readonly entity:pc.Entity,wheelRadius=MOTO.WHEEL_RADIUS,private readonly standDown=false) {
     this.raioRoda=wheelRadius;
     for(const nome of BONES){
       const entidade=this.ponto(nome);
       if(entidade)this.ossos.set(nome,{entidade,repouso:entidade.getLocalRotation().clone(),pos:entidade.getLocalPosition().clone()});
-      else if(nome!=='descanso')console.warn(`moto: osso "${nome}" não encontrado`);
+      else if(!OPTIONAL_BONES.has(nome))console.warn(`moto: osso "${nome}" não encontrado`);
     }
   }
   /** glTF front is +Z; PlayCanvas forward is -Z. */
@@ -111,7 +116,7 @@ export class MotoRig {
     if(suspension){this.v.set(0,this.mergulho,0);suspension.repouso.transformVector(this.v,this.v);suspension.entidade.setLocalPosition(this.v.add(suspension.pos));}
     this.girar('balanca',this.freioVis*-2+this.acelVis*1.5,0,0);
     this.descanso+=((this.descansoAberto?1:0)-this.descanso)*k*.6;
-    this.girar('descanso',-90*this.descanso,0,0);
+    this.girar('descanso',this.standDown?85*(1-this.descanso):-90*this.descanso,0,0);
   }
   telemetry() {
     // How far the top of the rear wheel has rolled towards the headlight (+1 at a quarter turn), read from the bone itself.
@@ -139,7 +144,7 @@ export interface Bike {
   /** The flames on the wheels of the Caveira em Chamas. */
   fire?:MotoFire;
   /** The Caveira em Chamas' tail pipes (smoke, backfires) and the owner's paint on its reds. */
-  exhaust?:MotoExhaust;paint?:MotoPaint;
+  exhaust?:MotoExhaust;paint?:MotoPaint|TankPaint;
 }
 
 /** The delivery bikes the room syncs, drawn between its patches (and the rider's prediction, for the local one). */
@@ -154,6 +159,8 @@ export class Motos {
   private readonly horns:VehicleHorns;
   private model?:pc.ContainerResource;
   private fogoModel?:pc.ContainerResource;
+  private classicaModel?:pc.ContainerResource;
+  private scooterModel?:pc.ContainerResource;
   private bagModel?:Promise<pc.ContainerResource>;
   private courierRiders=new Set<string>();
   private destroyed=false;
@@ -198,6 +205,14 @@ export class Motos {
       if(error||!asset){console.warn('Moto Caveira em Chamas indisponível.',error);return;}
       this.fogoModel=asset.resource as pc.ContainerResource;this.place();
     });
+    app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_classica.glb`,'container',(error,asset)=>{
+      if(error||!asset){console.warn('Moto Clássica Raiada indisponível.',error);return;}
+      this.classicaModel=asset.resource as pc.ContainerResource;this.place();
+    });
+    app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_scooter.glb`,'container',(error,asset)=>{
+      if(error||!asset){console.warn('Scooter de Entrega indisponível.',error);return;}
+      this.scooterModel=asset.resource as pc.ContainerResource;this.place();
+    });
     app.assets.loadFromUrl(`${import.meta.env.BASE_URL}moto/moto_delivery.glb`,'container',(error,asset)=>{
       if(error||!asset){console.warn('Moto de entrega indisponível.',error);return;}
       this.model=asset.resource as pc.ContainerResource;this.place();
@@ -215,7 +230,7 @@ export class Motos {
   /** Courier state is public: every client derives the same bag attachment from the rider's shift. */
   couriers(ids:Iterable<string>):void {this.courierRiders=new Set(ids);}
   private deliveryBag(bike:Bike):void {
-    const wanted=bike.rig instanceof MotoRig&&!isFogo(bike.state)&&!!bike.state.riderId&&this.courierRiders.has(bike.state.riderId)&&!bike.state.phase;
+    const wanted=bike.rig instanceof MotoRig&&!isFogo(bike.state)&&!isScooter(bike.state)&&!!bike.state.riderId&&this.courierRiders.has(bike.state.riderId)&&!bike.state.phase;
     bike.bagWanted=wanted;
     if(!wanted){bike.deliveryBag?.destroy();bike.deliveryBag=undefined;return;}
     if(bike.deliveryBag||bike.bagPending)return;
@@ -264,14 +279,14 @@ export class Motos {
         }
         known.state=state;continue;
       }
-      const car=isCar(state),fogo=isFogo(state),model=isTruck(state)?this.truckModel:car?this.carModel:fogo?this.fogoModel:this.model;if(!model)continue;
+      const car=isCar(state),fogo=isFogo(state),classica=isClassica(state),scooter=isScooter(state),model=isTruck(state)?this.truckModel:car?this.carModel:fogo?this.fogoModel:classica?this.classicaModel:scooter?this.scooterModel:this.model;if(!model)continue;
       const entity=new pc.Entity(`${car?'Carro':'Moto'} ${state.id}`),body=model.instantiateRenderEntity({castShadows:true,receiveShadows:true});
       const spec=vehiclePhysics(state.model);body.setLocalScale(spec.SCALE,spec.SCALE,spec.SCALE);
       entity.addChild(body);this.app.root.addChild(entity);
       const contact=this.shadow(entity);contact.setLocalScale(spec.HALF_WIDTH*4,1,spec.HALF_LENGTH*2.8);
-      const rig=car?new CarRig(body,this.app.graphicsDevice,state.model):new MotoRig(body,spec.WHEEL_RADIUS),fire=fogo?new MotoFire(body,this.app.graphicsDevice):undefined,exhaust=fogo?new MotoExhaust(body,this.app.graphicsDevice):undefined,paint=fogo?new MotoPaint(body):undefined;
+      const rig=car?new CarRig(body,this.app.graphicsDevice,state.model):new MotoRig(body,spec.WHEEL_RADIUS,classica),fire=fogo?new MotoFire(body,this.app.graphicsDevice):undefined,exhaust=fogo?new MotoExhaust(body,this.app.graphicsDevice):undefined,paint=fogo?new MotoPaint(body):classica?new TankPaint(body):undefined;
       const plate=state.plate&&rig instanceof MotoRig?this.plate(rig,state.plate,fogo):undefined;
-      this.bikes.set(state.id,{entity,rig,plate,...(fire?{fire}:{}),...(exhaust?{exhaust}:{}),...(paint?{paint}:{}),lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials,fogo?FOGO_LAMPS:undefined),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
+      this.bikes.set(state.id,{entity,rig,plate,...(fire?{fire}:{}),...(exhaust?{exhaust}:{}),...(paint?{paint}:{}),lights:rig instanceof CarRig?new CarLights(rig):new MotoLights(rig,this.lampMaterials,fogo?FOGO_LAMPS:classica?CLASSICA_LAMPS:scooter?SCOOTER_LAMPS:undefined),state,track:new RoomTrack(),riddenHere:false,gap:{x:0,z:0,yaw:0},drawn:{x:state.x,y:state.y,z:state.z,yaw:state.yaw,pitch:state.pitch}});
     }
     for(const [id,bike] of this.bikes)if(!this.states.some(state=>state.id===id)){bike.rig.destroy();bike.fire?.destroy();bike.exhaust?.destroy();bike.paint?.destroy();bike.entity.destroy();bike.plate?.material.destroy();bike.plate?.texture.destroy();this.bikes.delete(id);}
   }
@@ -323,7 +338,7 @@ export class Motos {
       const power=vehiclePowered(bike.state),mode=bike.state.headlights??1;
       const lamps:LampState=lampState(power,bike.predicted&&this.localLamps?.id===bike.state.id?this.localLamps.bits:bike.state.lights);
       lamps.lit=power&&mode>0;lamps.high=power&&mode===2;
-      if(rig instanceof MotoRig){rig.freio=lamps.brake?1:0;rig.acelerador=power&&(bike.predicted&&this.localGas?.id===bike.state.id?this.localGas.open:bike.state.gas)?1:0;}
+      if(rig instanceof MotoRig){rig.descansoAberto=isClassica(bike.state)&&!bike.state.riderId&&!bike.state.phase;rig.freio=lamps.brake?1:0;rig.acelerador=power&&(bike.predicted&&this.localGas?.id===bike.state.id?this.localGas.open:bike.state.gas)?1:0;}
       rig.update(dt);
       bike.fire?.update(dt,target.speed,bike.entity.forward,power,exposure);
       bike.paint?.set(bike.state.color);

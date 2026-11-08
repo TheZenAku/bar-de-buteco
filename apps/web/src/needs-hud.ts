@@ -33,7 +33,7 @@ const DRUNK_LINE='<defs><linearGradient id="need-drunk-line" x1="0" y1="0" x2="1
  * The only meter worth a notice: low life ends in fainting. The others turn critical in the cores around the minimap.
  * It alerts once until life gets back to a comfortable level (no spam).
  */
-const LOW_HP={title:'Você não está bem',text:'Sua reserva de vida está acabando. Coma algo: se ela e a vida chegarem a zero, você morre.'};
+const LOW_HP={title:'Você não está bem',text:'Sua reserva de vida está acabando. Coma e beba água para recuperá-la aos poucos. Se ela e a vida zerarem, você morre.'};
 /** The meters with a core behind their ring (the bladder and drunkenness have none). */
 const CORED=new Set(['hp','stamina','hunger','thirst']);
 

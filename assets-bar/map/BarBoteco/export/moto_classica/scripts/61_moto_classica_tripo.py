@@ -457,6 +457,13 @@ def medir_pivos_e_pontos():
     }
     for (l, onde), cc in seta.items():
         pts["ponto_seta_%s_%s" % (onde, l)] = ("direcao" if onde == "frente" else "chassi", cc)
+    # a referencia nao tem seta atras: o pisca de tras do jogo (moto-lights.ts) sai das pontas da lanterna
+    pl = next((p for k, (cc, p) in luz.items() if SAIDA_DE[k] == "Luz_Lanterna"), None)
+    for l, s in (("E", 1), ("D", -1)):
+        if ("ponto_seta_tras_" + l) not in pts and pl is not None:
+            x = pl[:, 0]
+            q = pl[x > 0.75 * x.max()] if s > 0 else pl[x < 0.75 * x.min()]   # ultimo quarto de cada lado
+            pts["ponto_seta_tras_" + l] = ("chassi", (q[:, 0].mean(), q[:, 1].max() + 0.01, q[:, 2].mean()))
     if "descanso" in PIVOS:
         pv = PIVOS["descanso"]
         pts["ponto_descanso_chao"] = ("raiz", (pv[0] + 0.10, pv[1] + 0.05, 0.0))

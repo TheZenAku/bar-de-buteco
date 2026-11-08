@@ -2,6 +2,8 @@ import {fileURLToPath} from 'node:url';
 import {expect,test,type Page} from '@playwright/test';
 import type {VehicleView} from '@bar/shared';
 import {MOTO_PARTS,NEW_MOTO_PARTS} from '../../packages/shared/src/moto-parts';
+import {VEHICLE_CATALOG,vehiclePriceKey} from '../../packages/shared/src/vehicle-models';
+const catalogPrices:Record<string,number>={'vehicle:moto':10000,'vehicle:moto-fogo':25000,'vehicle:moto-classica':15000,'vehicle:moto-scooter':8000,'vehicle:carro':35000,'vehicle:caminhao':60000};
 
 const MOTO_MODEL='moto-delivery',MOTO_NAME='Highland Bar Delivery';
 
@@ -10,9 +12,41 @@ const stock=():VehicleView=>({model:MOTO_MODEL,name:MOTO_NAME,price:10_000,tow:3
 const events=(page:Page)=>page.evaluate(()=>(window as any).fixture.events);
 async function open(page:Page,data=stock()):Promise<void>{
   await page.route('**/api/vehicles',route=>route.fulfill({json:data}));
+  await page.route('**/api/prices',route=>route.fulfill({json:{prices:catalogPrices}}));
   await page.goto(fixture);await expect(page.locator('.hm-page-title')).toBeVisible();
 }
 const detail=(page:Page,id:string)=>page.locator(`[data-hm="detail"][data-vehicle="${id}"]`);
+const deliveryOffer=(page:Page)=>page.locator(`[data-hm="offer"][data-model="${MOTO_MODEL}"]`);
+
+test('the shop restores all registered vehicles from missing or incomplete offers, with current prices and the correct purchase model',async({page})=>{
+  const prices:Record<string,number>={...catalogPrices,'vehicle:caminhao':65432};
+  let data:VehicleView={...stock(),owned:false,vehicles:[]};
+  await page.route('**/api/vehicles',route=>route.fulfill({json:data}));
+  await page.route('**/api/prices',route=>route.fulfill({json:{prices}}));
+  await page.goto(fixture);await expect(page.locator('.hm-page-title')).toBeVisible();
+  for(const incomplete of [undefined,[],[{model:MOTO_MODEL,name:MOTO_NAME,price:10000,seats:1,photo:'moto/foto-v4.webp'}]]){
+    data={...data,models:incomplete};
+    await page.evaluate(()=>(window as any).fixture.open({balance:500000}));
+    await page.getByRole('tab',{name:'Loja'}).click();
+    await expect(page.locator('.hm-sale')).toHaveCount(VEHICLE_CATALOG.length);
+    for(const vehicle of VEHICLE_CATALOG){
+      const card=page.locator(`.hm-sale[data-model="${vehicle.model}"]`);
+      await expect(card.locator('h3')).toHaveText(vehicle.name);
+      await expect(card.locator('.hm-price')).toContainText(prices[vehiclePriceKey(vehicle.model)]!.toLocaleString('pt-BR'));
+      await card.locator('[data-hm="offer"]').click();
+      await expect(page.locator('.hm-detail-title h2')).toHaveText(vehicle.name);
+      await expect(page.locator('[data-hm="buy"]')).toBeEnabled();
+      await page.locator('[data-ph="back"]').click();
+    }
+  }
+  let purchased='';
+  await page.route('**/api/vehicles/buy',route=>{purchased=route.request().postDataJSON().model;return route.fulfill({json:{...data,balance:434568}});});
+  await page.locator('[data-hm="offer"][data-model="caminhao-bau"]').click();
+  await page.locator('[data-hm="buy"]').click();await page.locator('[data-hm="confirm"]').click();
+  await expect(page.getByText('O veículo é seu!')).toBeVisible();expect(purchased).toBe('caminhao-bau');
+  await page.getByRole('button',{name:'Ver meus veículos'}).click();await page.getByRole('tab',{name:'Loja'}).click();
+  await expect(page.locator('.hm-sale')).toHaveCount(VEHICLE_CATALOG.length);
+});
 
 test('ownership and sale stay separate, including an empty garage and keyboard tab navigation',async({page})=>{
   await open(page,{...stock(),owned:false,vehicles:[]});
@@ -20,8 +54,8 @@ test('ownership and sale stay separate, including an empty garage and keyboard t
   await expect(page.getByText('Sua garagem começa aqui')).toBeVisible();
   await expect(page.locator('.hm-sale')).toHaveCount(0);
   await page.getByRole('button',{name:'Explorar a loja'}).click();
-  await expect(page.locator('.hm-sale')).toBeVisible();
-  await expect(page.locator('.hm-sale')).toContainText('À venda');
+  await expect(page.locator('.hm-sale')).toHaveCount(VEHICLE_CATALOG.length);
+  await expect(page.locator('.hm-sale').first()).toContainText('À venda');
   await page.getByRole('tab',{name:'Loja'}).focus();await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('tab',{name:'Meus veículos'})).toBeFocused();
   await expect(page.locator('.hm-sale')).toHaveCount(0);
@@ -66,7 +100,7 @@ test('a purchase confirms the balance, updates ownership and lands in the garage
   const data={...stock(),owned:false,vehicles:[]};await open(page,data);
   let purchases=0;
   await page.route('**/api/vehicles/buy',async route=>{purchases++;await route.fulfill({json:{...stock(),vehicles:stock().vehicles.slice(0,1),balance:15000}});});
-  await page.getByRole('tab',{name:'Loja'}).click();await page.getByRole('button',{name:'Ver detalhes'}).click();await page.locator('[data-hm="buy"]').click();
+  await page.getByRole('tab',{name:'Loja'}).click();await deliveryOffer(page).click();await page.locator('[data-hm="buy"]').click();
   await expect(page.locator('.hm-confirm')).toContainText('Saldo depois');await expect(page.locator('.hm-confirm')).toContainText('15.000');
   await page.locator('[data-ph="back"]').click();await expect(page.locator('.hm-detail-title')).toContainText(MOTO_NAME);expect(purchases).toBe(0);
   await page.locator('[data-hm="buy"]').click();await page.locator('[data-hm="confirm"]').click();await expect(page.getByText('O veículo é seu!')).toBeVisible();expect(purchases).toBe(1);
@@ -77,19 +111,19 @@ test('a purchase confirms the balance, updates ownership and lands in the garage
 
 test('insufficient coins, the ownership limit and request failures keep actions recoverable',async({page})=>{
   await open(page);
-  await page.getByRole('tab',{name:'Loja'}).click();await page.getByRole('button',{name:'Ver detalhes'}).click();await expect(page.locator('[data-hm="buy"]')).toBeDisabled();await expect(page.locator('[data-hm="buy"]')).toContainText('Limite de 10');
+  await page.getByRole('tab',{name:'Loja'}).click();await deliveryOffer(page).click();await expect(page.locator('[data-hm="buy"]')).toBeDisabled();await expect(page.locator('[data-hm="buy"]')).toContainText('Limite de 10');
   await page.unroute('**/api/vehicles');
   await page.route('**/api/vehicles',route=>route.fulfill({json:{...stock(),vehicles:stock().vehicles.slice(0,1)}}));
   await page.evaluate(()=>(window as any).fixture.open({balance:20,motos:{}}));await expect(page.locator('.hm-owned')).toHaveCount(1);
   await detail(page,'vehicle-0').click();await expect(page.locator('[data-hm="tow"]')).toBeDisabled();
-  await page.locator('[data-ph="back"]').click();await page.getByRole('tab',{name:'Loja'}).click();await page.getByRole('button',{name:'Ver detalhes'}).click();await expect(page.locator('[data-hm="buy"]')).toContainText('Faltam 9.980');
+  await page.locator('[data-ph="back"]').click();await page.getByRole('tab',{name:'Loja'}).click();await deliveryOffer(page).click();await expect(page.locator('[data-hm="buy"]')).toContainText('Faltam 9.980');
   await page.unroute('**/api/vehicles');let failed=true;
   await page.route('**/api/vehicles',route=>failed?route.fulfill({status:503,json:{error:'Conexão indisponível.'}}):route.fulfill({json:{...stock(),vehicles:[]}}));
   await page.evaluate(()=>(window as any).fixture.open());await expect(page.getByText('Conexão indisponível.')).toBeVisible();failed=false;
   await page.getByRole('button',{name:'Tentar novamente'}).click();await expect(page.getByText('Sua garagem começa aqui')).toBeVisible();
   await page.evaluate(()=>(window as any).fixture.open({balance:25000}));await expect(page.getByText('Sua garagem começa aqui')).toBeVisible();
   await page.route('**/api/vehicles/buy',route=>route.fulfill({status:409,json:{error:'Tente novamente.'}}));
-  await page.getByRole('tab',{name:'Loja'}).click();await page.getByRole('button',{name:'Ver detalhes'}).click();await page.locator('[data-hm="buy"]').click();await page.locator('[data-hm="confirm"]').click();
+  await page.getByRole('tab',{name:'Loja'}).click();await deliveryOffer(page).click();await page.locator('[data-hm="buy"]').click();await page.locator('[data-hm="confirm"]').click();
   await expect(page.locator('[data-hm="buy"]')).toBeEnabled();expect(await events(page)).toContainEqual({type:'error',text:'Tente novamente.'});
 });
 
@@ -105,7 +139,7 @@ test('dark and light layouts fit the phone on desktop and a small viewport',asyn
       await expect(detail(page,'vehicle-0')).toBeVisible();
       await expect(page.locator('.hm-owned').first().locator('img')).toHaveCount(0);
       await page.screenshot({path:`test-results/highmotors/garage-${viewport.width}-${dark?'dark':'light'}.png`});
-      await page.getByRole('tab',{name:'Loja'}).click();await expect(page.locator('.hm-sale')).toBeVisible();
+      await page.getByRole('tab',{name:'Loja'}).click();await expect(page.locator('.hm-sale').first()).toBeVisible();
       expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
       await page.screenshot({path:`test-results/highmotors/shop-${viewport.width}-${dark?'dark':'light'}.png`});
       await page.getByRole('tab',{name:'Meus veículos'}).click();

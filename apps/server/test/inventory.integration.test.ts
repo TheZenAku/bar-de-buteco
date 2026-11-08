@@ -43,6 +43,8 @@ test('room keeps inventory private and applies full effects at the start, never 
     assert.equal('inventory' in room.state,false,'private inventory must not be exposed in the room schema');
 
     const player=authoritative.state.players.get('inventory-player')!,needs=authoritative.needs.state(player.id);needs.hunger=100;needs.hungerCore=10;needs.hpCore=10;needs.staminaCore=10;
+    // Keep nutrition recovery inactive so these checks isolate the item's single immediate dose.
+    needs.thirstCore=0;
     // A snack goes into the hand: had over the same time as at a table, the player free to move meanwhile.
     room.send('inventory.use',{itemId:'coxinha'});
     await until(()=>inventoryCalls===1&&player.holding==='coxinha');
@@ -60,7 +62,7 @@ test('room keeps inventory private and applies full effects at the start, never 
     room.send('inventory.discard',{itemId:'agua',quantity:1});await until(()=>results.some(result=>result.action==='discard'));
     assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1},{itemId:'curativo',quantity:1}]);
 
-    needs.thirstCore=10;needs.bladder=0;
+    needs.hungerCore=0;needs.thirstCore=10;needs.bladder=0;
     room.send('inventory.use',{itemId:'agua'});await until(()=>player.holding==='agua');
     assert.ok(needs.thirstCore>41&&needs.thirstCore<=42,'the whole drink applies immediately');assert.equal(needs.bladder,14);
     (authoritative as any).dropHolding(player);

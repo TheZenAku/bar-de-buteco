@@ -57,6 +57,12 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     assert.equal(player.interactionState,'');
     other.assign({x:12,y:.3,z:-4});
 
+    // Nutrition rebuilds the heart gradually on the server, with both costs visible to another player.
+    needs.hp=100;needs.hpCore=30;needs.hungerCore=80;needs.thirstCore=80;
+    await until(()=>seen()?.hpCore>=31&&seen()?.hungerCore<80&&seen()?.thirstCore<80);
+    assert.equal(seen()?.hp,100,'recovery fills the heart reserve without exceeding full HP');
+    assert.ok(needs.hpCore<33,'the reserve recovers gradually instead of jumping to full');
+
     // Life gone (ring and heart): the Morte comes for them; coming back, the ring is at the configured value and the heart empty.
     player.assign({x:12,y:.3,z:-6});
     authoritative.needs.damage(player,1000,Date.now());

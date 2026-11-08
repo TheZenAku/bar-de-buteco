@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
-import {defaultVehicleColor,CAR_MODEL,CAR_NAME,DEFAULT_CAR_COLOR,MOTO_FOGO_MODEL,MOTO_FOGO_NAME,NEW_CAR_PARTS,TRUCK_MODEL,TRUCK_NAME,carSpec,hasStorage,isCarModel,storageLoadOfUnits,vehicleName,vehiclePhoto,vehiclePriceKey,type VehicleModel} from '@bar/shared';
+import {defaultVehicleColor,CAR_MODEL,NEW_CAR_PARTS,hasStorage,isCarModel,storageLoadOfUnits,vehicleDefinition,vehicleName,vehicleOffers,vehiclePriceKey,type VehicleModel} from '@bar/shared';
 import {and,asc,desc,eq,gte,inArray,like,sql} from 'drizzle-orm';
-import {COURIER_LEVELS,GARAGE,HIGHFOOD_CUSTOMERS,MAX_COIN_BALANCE,MOTO_MODEL,MOTO_NAME,NEW_MOTO_PARTS,deliveryPay,makePlate,type OwnedVehicle,deliveryStars,priceOf,type CustomerLook,type CustomerProfile,type DeliveryFacts,type HighfoodHistoryEntry,type HighfoodReceipt,type HighfoodView,type PublicUser,type VehicleView} from '@bar/shared';
+import {COURIER_LEVELS,GARAGE,HIGHFOOD_CUSTOMERS,MAX_COIN_BALANCE,MOTO_MODEL,NEW_MOTO_PARTS,deliveryPay,makePlate,type OwnedVehicle,deliveryStars,priceOf,type CustomerLook,type CustomerProfile,type DeliveryFacts,type HighfoodHistoryEntry,type HighfoodReceipt,type HighfoodView,type PublicUser,type VehicleView} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {controls,currencyLedger,highfoodCustomers,highfoodDeliveries,moderationActions,playerVehicles,vehicleStorage,wallets} from './database/schema.js';
 import type {PricingService} from './pricing-service.js';
@@ -41,10 +41,7 @@ export class HighfoodService {
   }
   async vehicle(userId:string,model:string=MOTO_MODEL):Promise<VehicleView>{
     const [prices,vehicles]=await Promise.all([this.pricing.table(),this.owned(userId)]);
-    const models=[{model:MOTO_MODEL,name:MOTO_NAME,price:priceOf(prices,'vehicle:moto'),seats:1,photo:vehiclePhoto(MOTO_MODEL)},
-      {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,price:priceOf(prices,'vehicle:moto-fogo'),seats:1,photo:vehiclePhoto(MOTO_FOGO_MODEL)},
-      {model:CAR_MODEL,name:CAR_NAME,price:priceOf(prices,'vehicle:carro'),seats:4,photo:vehiclePhoto(CAR_MODEL)},
-      {model:TRUCK_MODEL,name:TRUCK_NAME,price:priceOf(prices,'vehicle:caminhao'),seats:carSpec(TRUCK_MODEL).SEATS,photo:vehiclePhoto(TRUCK_MODEL)}];
+    const models=vehicleOffers(prices);
     const selected=models.find(each=>each.model===model)??models[0]!;
     return {...selected,models,tow:priceOf(prices,'vehicle:tow'),owned:vehicles.length>0,limit:GARAGE.VEHICLE_LIMIT,vehicles};
   }
@@ -83,7 +80,7 @@ export class HighfoodService {
     await this.db.transaction(async tx=>{
       const [vehicle]=await tx.select().from(playerVehicles).where(and(eq(playerVehicles.id,vehicleId),eq(playerVehicles.userId,userId))).for('update');
       if(!vehicle)throw new HighfoodError(404,'Você não tem a chave desse veículo.');
-      if(!isCarModel(vehicle.model)&&vehicle.model!==MOTO_FOGO_MODEL)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
+      if(!vehicleDefinition(vehicle.model)?.paintable)throw new HighfoodError(400,'Este modelo não oferece pintura personalizada.');
       paintedModel=vehicle.model;
       await tx.update(playerVehicles).set({color:color.toLowerCase(),updatedAt:new Date()}).where(eq(playerVehicles.id,vehicleId));
       await tx.insert(controls).values({id:randomUUID(),payload:{action:'sync',playerId:userId,issuedAt:Date.now()}});

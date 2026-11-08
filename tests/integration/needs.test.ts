@@ -35,12 +35,80 @@ test('1. damage takes the ring first, then the heart; both at zero is death, rep
   reviveNeeds(s);assert.equal(s.dead,false);assert.equal(s.hp,NEEDS.hp.recoverTo);assert.equal(s.hpCore,0);
 });
 
-test('1b. the ring refills from the heart, spending it; an empty heart refills nothing',()=>{
+test('1b. the ring spends the heart reserve while nutrition rebuilds it; without water an empty heart cannot refill HP',()=>{
   const s=createNeeds(0),clock={now:0};damage(s,30,0);
   run(s,clock,10);
   assert.ok(Math.abs(s.hp-85)<.2,`${NEEDS.cores.hp.refillPerSecond}/s for ten seconds: ${s.hp}`);
-  assert.ok(Math.abs(s.hpCore-85)<.2,'every point the ring got came out of the heart');
-  const empty=createNeeds(0);empty.hpCore=0;damage(empty,30,0);run(empty,clock,10);assert.equal(empty.hp,70);
+  assert.ok(Math.abs(s.hpCore-(85+NEEDS.hpCoreRecovery.perSecond*10))<.01,'the heart pays for HP and receives gradual nutrition recovery');
+  const empty=createNeeds(0);empty.hpCore=0;empty.thirstCore=0;damage(empty,30,0);run(empty,clock,10);assert.equal(empty.hp,70);
+});
+
+test('nutrition gradually rebuilds an empty heart, charging both reserves only for actual gains',()=>{
+  const s=createNeeds(0),baseline=createNeeds(0);s.hpCore=0;
+  run(s,{now:0},60);run(baseline,{now:0},60);
+  const gained=s.hpCore,rule=NEEDS.hpCoreRecovery;
+  assert.ok(Math.abs(gained-rule.perSecond*60)<1e-9,'steady recovery over time, without an instant refill');
+  assert.equal(s.hp,100,'metabolism fills the reserve');
+  assert.ok(Math.abs(baseline.hungerCore-s.hungerCore-gained*rule.hungerCost)<1e-9,'food pays for every recovered point, besides normal hunger drain');
+  assert.ok(Math.abs(baseline.thirstCore-s.thirstCore-gained*rule.thirstCost)<1e-9,'water pays for every recovered point, besides normal thirst drain');
+
+  const injured=createNeeds(0);injured.hp=50;injured.hpCore=0;
+  run(injured,{now:0},30);
+  assert.ok(injured.hp>50&&injured.hp<65,'a rebuilt reserve gradually reaches the HP ring too');
+});
+
+test('heart recovery slows smoothly with low nutrition and running, preserving basic reserves',()=>{
+  const recover=(nutrition:number,running=false)=>{
+    const s=createNeeds(0);s.hpCore=0;s.hungerCore=s.thirstCore=nutrition;
+    run(s,{now:0},5,{running,moving:running});return s;
+  };
+  const rested=recover(100),running=recover(100,true),halfFed=recover(30),low=recover(15);
+  assert.ok(Math.abs(running.hpCore-rested.hpCore*NEEDS.hpCoreRecovery.runningShare)<1e-9);
+  assert.ok(rested.hpCore>halfFed.hpCore&&halfFed.hpCore>low.hpCore&&low.hpCore>0);
+  for(const key of ['hungerCore','thirstCore','hunger','thirst'] as const){
+    const s=createNeeds(0);s.hpCore=0;s[key]=0;
+    run(s,{now:0},1);assert.equal(s.hpCore,0,`${key}: both food and water must be available`);
+  }
+  const scarce=recover(NEEDS.hpCoreRecovery.minReserve);
+  assert.equal(scarce.hpCore,0,'recovery does not use the last basic reserves');
+  const nearlyEmpty=recover(NEEDS.hpCoreRecovery.minReserve+.001);
+  assert.ok(nearlyEmpty.hungerCore>=0&&nearlyEmpty.thirstCore>=0,'small reserves never turn negative');
+});
+
+test('a full heart stops nutrition costs and the final fraction is never overcharged',()=>{
+  const s=createNeeds(0),baseline=createNeeds(0),rule=NEEDS.hpCoreRecovery;s.hpCore=99.99;
+  tickNeeds(s,1,1000,{running:false,moving:false});tickNeeds(baseline,1,1000,{running:false,moving:false});
+  assert.equal(s.hpCore,100);
+  assert.ok(Math.abs(baseline.hungerCore-s.hungerCore-.01*rule.hungerCost)<1e-9);
+  assert.ok(Math.abs(baseline.thirstCore-s.thirstCore-.01*rule.thirstCost)<1e-9);
+  const hungerGap=baseline.hungerCore-s.hungerCore,thirstGap=baseline.thirstCore-s.thirstCore;
+  run(s,{now:1000},30);run(baseline,{now:1000},30);
+  assert.equal(s.hpCore,100);
+  assert.ok(Math.abs(baseline.hungerCore-s.hungerCore-hungerGap)<1e-9,'no food spent at full reserve');
+  assert.ok(Math.abs(baseline.thirstCore-s.thirstCore-thirstGap)<1e-9,'no water spent at full reserve');
+});
+
+test('metabolism cannot prevent death, revive the dead or refill an unconscious character',()=>{
+  const killed=createNeeds(0);killNeeds(killed);
+  assert.deepEqual(run(killed,{now:0},2),[{type:'died'}]);assert.equal(killed.hpCore,0);
+  const dead=createNeeds(0);dead.dead=true;dead.hp=NEEDS.hp.recoverTo;dead.hpCore=0;
+  run(dead,{now:0},2);assert.equal(dead.hpCore,0,'only an explicit revive allows recovery');
+  for(const condition of ['fainted','stumbling'] as const){
+    const s=createNeeds(0);s.hpCore=0;s.condition=condition;s.conditionUntil=10000;
+    run(s,{now:0},2);assert.equal(s.hpCore,0,condition);
+  }
+  reviveNeeds(killed);run(killed,{now:0},5);
+  assert.ok(killed.hp>NEEDS.hp.recoverTo,'recovery resumes after an explicit revive');
+});
+
+test('heart metabolism stays gradual at different tick rates and ignores invalid durations',()=>{
+  const fine=createNeeds(0),coarse=createNeeds(0);fine.hpCore=coarse.hpCore=20;
+  run(fine,{now:0},10);
+  for(let second=1;second<=10;second++)tickNeeds(coarse,1,second*1000,{running:false,moving:false});
+  for(const key of ['hpCore','hungerCore','thirstCore'] as const)assert.ok(Math.abs(fine[key]-coarse[key])<1e-9,key);
+  const before=[fine.hpCore,fine.hungerCore,fine.thirstCore];
+  for(const seconds of [0,-1,Number.NaN,Infinity])tickNeeds(fine,seconds,10000,{running:false,moving:false});
+  assert.deepEqual([fine.hpCore,fine.hungerCore,fine.thirstCore],before);
 });
 
 test('2. a faint blocks consuming and ends: back to normal after recovering',()=>{
@@ -100,7 +168,7 @@ test('7b. hunger empty (ring and core) costs HP too; grace after waking',()=>{
   run(s,clock,10);assert.ok(Math.abs(s.hp-(100-NEEDS.hunger.damagePerSecond*10))<.05,`${s.hp}`);
 });
 
-test('7c. eating fills the reserves immediately, and only the ring refills over time',()=>{
+test('7c. eating fills the reserves immediately, and the hunger ring refills over time',()=>{
   const s=createNeeds(0),clock={now:0};s.hungerCore=10;s.hunger=60;
   assert.ok(applyConsumable(s,CONSUMABLES.coxinha!,0));
   assert.equal(s.hungerCore,10+CONSUMABLES.coxinha!.hunger!,'the whole item reaches the reserve at once');
@@ -120,6 +188,8 @@ test('every consumable applies all reserve gains and losses in one operation, wi
       assert.equal(s[`${key}Core`],expected,`${effects.name}: ${key}`);
     }
     assert.equal(s.bladder,20+(effects.bladder??0));assert.equal(s.drunk,10+(effects.drunk??0));
+    // Isolate the item's immediate effects from the nutrition-to-heart recovery tested above.
+    s.thirstCore=0;
     const reserves=[s.hpCore,s.staminaCore,s.hungerCore,s.thirstCore];
     tickNeeds(s,.5,500,{running:false,moving:false},()=>.99);
     [s.hpCore,s.staminaCore,s.hungerCore,s.thirstCore].forEach((value,i)=>assert.ok(value<=reserves[i]!,`${effects.name}: no queued effects`));
@@ -196,7 +266,7 @@ test('11. foods fill the cores immediately and raise the ring ceiling for a whil
   const stew={name:'Caldo de mocotó',hunger:40,hp:10,maxHp:{amount:20,seconds:30}};
   assert.ok(applyConsumable(s,stew,0));
   assert.equal(s.hpCore,60);assert.equal(s.hungerCore,60);assert.equal(maxHp(s,0),120);
-  run(s,clock,10);assert.ok(Math.abs(s.hungerCore-60)<1,`${s.hungerCore}`);assert.ok(s.hpCore>=30,'the heart took the stew (and paid for the raised ceiling)');assert.equal(maxHp(s,clock.now),120);
+  run(s,clock,10);assert.ok(s.hungerCore>55&&s.hungerCore<60,'food pays for basic needs and gradual heart recovery');assert.ok(s.hpCore>=30,'the heart took the stew (and paid for the raised ceiling)');assert.equal(maxHp(s,clock.now),120);
   run(s,clock,31);assert.equal(maxHp(s,clock.now),100);assert.ok(s.hp<=100,'Bonus ends, HP brought down to the maximum');
   applyConsumable(s,{name:'Inválido',hp:Number.NaN,hunger:Infinity,maxHp:{amount:-5,seconds:10}},clock.now);
   run(s,clock,10);sane(s);assert.equal(maxHp(s,clock.now),100);

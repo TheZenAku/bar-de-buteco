@@ -34,6 +34,8 @@
     "assets:drinks": "node tools/assets/import-drinks.mjs",
     "assets:moto": "node tools/assets/import-moto.mjs && node tools/assets/render-moto-photo.mjs",
     "assets:moto-fogo": "node tools/assets/import-moto-fogo.mjs",
+    "assets:moto-classica": "node tools/assets/import-moto-classica.mjs",
+    "assets:moto-scooter": "node tools/assets/import-moto-scooter.mjs",
     "assets:carro": "node tools/assets/import-car.mjs",
     "assets:caminhao": "node tools/assets/import-truck.mjs",
     "assets:horse": "node tools/assets/import-horse.mjs",

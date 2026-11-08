@@ -49,6 +49,10 @@ type LampName=keyof typeof spots;
 export interface LampProfile {skip?:readonly LampName[];halo?:Partial<Record<LampName,number>>;brakeOnTail?:boolean;/** The headlight is two lamps, one per eye (ponto_olho_E/D), in the colour of the bike's flames. */eyes?:boolean}
 /** The Caveira em Chamas: the skull's eyes are the headlight, the amber balls the blinkers and the tail's recessed lens the tail and brake. */
 export const FOGO_LAMPS:LampProfile={skip:['head','plate','panel','brake'],halo:{eyeE:.2,eyeD:.2,positionL:.1,positionR:.1,tail:.2,rearL:.1,rearR:.1},brakeOnTail:true,eyes:true};
+/** The Clássica Raiada: lenses of its own (headlight, front blinkers, the wide tail lamp, which is the brake too); the back blinkers are the tail lamp's ends. */
+/** The Scooter de Entrega: no lens meshes of its own (generated ones), the wide tail lamp is the brake too. */
+export const SCOOTER_LAMPS:LampProfile={skip:['brake'],halo:{positionL:.14,positionR:.14,rearL:.14,rearR:.14},brakeOnTail:true};
+export const CLASSICA_LAMPS:LampProfile={skip:['brake'],halo:{positionL:.14,positionR:.14,rearL:.14,rearR:.14},brakeOnTail:true};
 
 const haloVertex=`
 attribute vec3 aPosition;attribute vec2 aUv0;

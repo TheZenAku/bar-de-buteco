@@ -1,9 +1,9 @@
-import {MOTO_MODEL,MOTO_PARTS,motoPartStatus,nearestGarage,readMotoParts,type OwnedVehicle,type VehicleView} from '@bar/shared';
+import {MOTO_MODEL,MOTO_PARTS,motoPartStatus,nearestGarage,readMotoParts,vehicleOffers,type OwnedVehicle,type PriceTable,type VehicleView} from '@bar/shared';
 import {api,escape as e} from '../../api';
 import {plateHtml} from '../../garage-panel';
 import {uiIcon} from '../../ui-icons';
 import {header,type PhoneApp} from '../core';
-import {CAR_MODEL,TRUCK_MODEL,DEFAULT_CAR_COLOR,FOGO_DEFAULT_COLOR,MOTO_FOGO_MODEL,defaultVehicleColor,isCarModel,vehicleParts,vehiclePhoto,readVehicleParts} from '@bar/shared';
+import {CAR_MODEL,TRUCK_MODEL,DEFAULT_CAR_COLOR,FOGO_DEFAULT_COLOR,MOTO_FOGO_MODEL,MOTO_CLASSICA_MODEL,MOTO_SCOOTER_MODEL,defaultVehicleColor,vehicleDefinition,isCarModel,vehicleParts,vehiclePhoto,readVehicleParts} from '@bar/shared';
 import {isFogoPhoto,paintFogoPhotos} from './fogo-photo';
 
 const SPECS:ReadonlyArray<readonly [string,string,string]>=[['gauge','Velocidade','55 km/h'],['package','Bag','Item separado, não inclusa'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']];
@@ -14,15 +14,21 @@ const money=(value:number)=>value.toLocaleString('pt-BR');
 const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]/g,'');
 // Artwork belongs to the model; future models without a photo get a neutral placeholder.
 // The truck's photo has a white cab and a mask of it (caminhao/foto_mask.png): the colour being chosen multiplies over the mask, so the buyer sees it before paying.
-const photo=(model:string,colour?:string)=>model===TRUCK_MODEL?`<span class="hm-tint" data-tint style="--tint:${e(colour??defaultVehicleColor(model))}"><img src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy"></span>`:isFogoPhoto(model)?`<img class="hm-photo-moto hm-photo-fogo" src="/${vehiclePhoto(model)}" data-fogo-photo${colour?` data-fogo-colour="${e(colour)}"`:''} alt="" draggable="false" loading="lazy">`:model===MOTO_MODEL||model===MOTO_FOGO_MODEL||isCarModel(model)?`<img class="${isCarModel(model)?'':'hm-photo-moto'}" src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy">`:uiIcon('bike');
+const photo=(model:string,colour?:string)=>model===TRUCK_MODEL?`<span class="hm-tint" data-tint style="--tint:${e(colour??defaultVehicleColor(model))}"><img src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy"></span>`:isFogoPhoto(model)?`<img class="hm-photo-moto hm-photo-fogo" src="/${vehiclePhoto(model)}" data-fogo-photo${colour?` data-fogo-colour="${e(colour)}"`:''} alt="" draggable="false" loading="lazy">`:model===MOTO_MODEL||model===MOTO_FOGO_MODEL||model===MOTO_CLASSICA_MODEL||model===MOTO_SCOOTER_MODEL||isCarModel(model)?`<img class="${isCarModel(model)?'':model===MOTO_CLASSICA_MODEL||model===MOTO_SCOOTER_MODEL?'hm-photo-moto hm-photo-rua':'hm-photo-moto'}" src="/${vehiclePhoto(model)}" alt="" draggable="false" loading="lazy">`:uiIcon('bike');
 
 /** Ownership and shopping have separate lists. Maintenance and actions live in each vehicle's detail view. */
 export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',tint:'linear-gradient(160deg,#39414f,#0e1116)',open(view,ctx){
   let vehicle:VehicleView|undefined,screen:'list'|'detail'|'offer'|'confirm'|'bought'='list',tab:Tab='garage',filter:Filter='all',query='',selected='',busy=false,failed='',closed=false;
   let towTimer:ReturnType<typeof setTimeout>|undefined;
   let paintColor=DEFAULT_CAR_COLOR;
-  const paintHtml=(color:string,model:string=CAR_MODEL)=>`<div class="hm-action-card"><h3>${uiIcon('palette')}Cor da pintura</h3><label>Escolher cor<input type="color" name="hm-color" value="${e(color)}" aria-label="Cor da pintura"></label>${model===MOTO_FOGO_MODEL?`<button type="button" class="ph-pill-btn soft" data-hm="paint-reset">Voltar ao vermelho original</button><p class="hm-note">Só o vermelho da moto muda: ossos, metal e fogo ficam como são. A pintura pertence a esta moto e acompanha sua chave.</p>`:'<p class="hm-note">A pintura pertence a este carro e acompanha sua chave.</p>'}</div>`;
-  const paintable=(model:string)=>isCarModel(model)||model===MOTO_FOGO_MODEL;
+  let prices:PriceTable={};
+  function updateVehicle(result:VehicleView):void {
+    const offered=new Map(result.models?.map(offer=>[offer.model,offer]));
+    // Older or partial API responses must not hide registered vehicles from the store.
+    vehicle={...result,models:vehicleOffers(prices).map(offer=>({...offer,...offered.get(offer.model),...(offer.model===result.model?{price:result.price}:{})}))};
+  }
+  const paintHtml=(color:string,model:string=CAR_MODEL)=>`<div class="hm-action-card"><h3>${uiIcon('palette')}Cor da pintura</h3><label>Escolher cor<input type="color" name="hm-color" value="${e(color)}" aria-label="Cor da pintura"></label>${model===MOTO_FOGO_MODEL?`<button type="button" class="ph-pill-btn soft" data-hm="paint-reset">Voltar ao vermelho original</button><p class="hm-note">Só o vermelho da moto muda: ossos, metal e fogo ficam como são. A pintura pertence a esta moto e acompanha sua chave.</p>`:model===MOTO_CLASSICA_MODEL?`<button type="button" class="ph-pill-btn soft" data-hm="paint-reset">Voltar ao preto original</button><p class="hm-note">A cor vai no tanque; banco, metal e rodas ficam como são. A pintura pertence a esta moto e acompanha sua chave.</p>`:'<p class="hm-note">A pintura pertence a este carro e acompanha sua chave.</p>'}</div>`;
+  const paintable=(model:string)=>!!vehicleDefinition(model)?.paintable;
   const scroll:Record<Tab,number>={garage:0,shop:0};
   const wallet=()=>ctx.host.wallet()??0;
   const parked=()=>{const me=ctx.host.user()?.id;return me?Object.values(ctx.host.world()?.motos??{}).find(moto=>moto.ownerId===me):undefined;};
@@ -37,7 +43,10 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
   }
   async function load():Promise<void> {
     failed='';render();
-    try{const result=await api<VehicleView>('/vehicles');if(closed)return;vehicle=result;}
+    try{
+      const [result,table]=await Promise.all([api<VehicleView>('/vehicles'),api<{prices:PriceTable}>('/prices')]);
+      if(closed)return;prices=table.prices;updateVehicle(result);
+    }
     catch(error){if(closed)return;failed=error instanceof Error?error.message:'Não foi possível carregar seus veículos.';}
     render();
   }
@@ -82,7 +91,7 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
     const offers=item.models??[{...item,seats:1,photo:vehiclePhoto(item.model)}];
     return `<div class="hm-page-title"><small>ENCONTRE SEU PRÓXIMO</small><h2>Loja de veículos</h2><p>Escolha seu próximo veículo para rodar pela cidade.</p></div>${offers.map(offer=>{
       const owned=item.vehicles.filter(each=>each.model===offer.model).length;
-      return `<article class="hm-sale" data-model="${offer.model}"><div class="hm-sale-photo">${photo(offer.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-sale-info"><small>${offer.model===TRUCK_MODEL?'Caminhão baú · 2 lugares · Baú de carga':offer.model===CAR_MODEL?'Hatch · 4 lugares · Cor personalizável':offer.model===MOTO_FOGO_MODEL?'Moto esqueleto · Fogo nas rodas':'Moto de entrega · Bag não inclusa'}</small><h3>${e(offer.name)}</h3>${owned?`<p class="hm-already">${uiIcon('key')}Você já tem ${owned} deste modelo</p>`:''}<p class="hm-price">${money(offer.price)} <small>moedas</small></p><button type="button" class="ph-pill-btn wide" data-hm="offer" data-model="${offer.model}">Ver detalhes</button></div></article>`;
+      return `<article class="hm-sale" data-model="${offer.model}"><div class="hm-sale-photo">${photo(offer.model)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-sale-info"><small>${offer.model===TRUCK_MODEL?'Caminhão baú · 2 lugares · Baú de carga':offer.model===CAR_MODEL?'Hatch · 4 lugares · Cor personalizável':offer.model===MOTO_FOGO_MODEL?'Moto esqueleto · Fogo nas rodas':offer.model===MOTO_CLASSICA_MODEL?'Moto clássica · Tanque personalizável':offer.model===MOTO_SCOOTER_MODEL?'Scooter de entrega · Baú da casa':'Moto de entrega · Bag não inclusa'}</small><h3>${e(offer.name)}</h3>${owned?`<p class="hm-already">${uiIcon('key')}Você já tem ${owned} deste modelo</p>`:''}<p class="hm-price">${money(offer.price)} <small>moedas</small></p><button type="button" class="ph-pill-btn wide" data-hm="offer" data-model="${offer.model}">Ver detalhes</button></div></article>`;
     }).join('')}<p class="hm-shop-note">${uiIcon('key')}Comprou? Ele aparece em <b>Meus veículos</b>.</p>`;
   }
   function detailHtml(item:OwnedVehicle):string {
@@ -96,8 +105,8 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
       <div class="hm-action-card"><h3>${uiIcon('truck')}Precisa de um guincho?</h3><p>Traz o veículo até a rua mais perto de você.</p><button type="button" class="ph-pill-btn wide soft" data-hm="tow" data-vehicle="${e(item.id)}" ${busy||towReason?'disabled':''}>${busy?'Chamando guincho…':`Chamar guincho · ${money(tow)} moedas`}</button>${towReason?`<p class="hm-note">${towReason}</p>`:''}</div></div></div>`;
   }
   function offerHtml(item:VehicleView):string {
-    const specs=item.model===TRUCK_MODEL?[['gauge','Velocidade','Até 86 km/h'],['users','Lugares','2: motorista e passageiro'],['package','Baú','Porta de enrolar e 24 pilhas de carga, só para quem tem a chave'],['wrench','Manutenção','18 peças individuais'],['palette','Pintura','Cabine personalizável']]:item.model===CAR_MODEL?[['gauge','Velocidade','Até 140 km/h'],['users','Lugares','4: motorista e 3 passageiros'],['wrench','Manutenção','18 peças individuais'],['palette','Pintura','Personalizável por carro']]:item.model===MOTO_FOGO_MODEL?[['gauge','Velocidade','55 km/h'],['flame','Visual','Chamas nas duas rodas'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']]:SPECS;
-    return `${header('Detalhes do veículo')}<div class="ph-body hm-detail"><div class="hm-detail-photo">${photo(item.model,paintColor)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-detail-info"><div class="hm-detail-title"><small>${item.model===MOTO_MODEL?'Moto de entrega':item.model===MOTO_FOGO_MODEL?'Moto esqueleto':item.model===TRUCK_MODEL?'Caminhão com baú de carga':'Hatch de quatro lugares'}</small><h2>${e(item.name)}</h2><p class="hm-price">${money(item.price)} <small>moedas</small></p></div><ul class="hm-specs">${specs.map(([icon,label,value])=>`<li>${uiIcon(icon!)}<span><small>${label}</small>${value}</span></li>`).join('')}</ul>${isCarModel(item.model)?paintHtml(paintColor):item.model===MOTO_FOGO_MODEL?`${paintHtml(paintColor,item.model)}<p class="hm-note">Moto de passeio, com fogo nas rodas e placa preta e vermelha. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. Não leva a bag de entrega.</p>`:'<p class="hm-note">Com a moto você pode entregar pelo Highfood. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. A bag é um item separado e não acompanha a moto.</p>'}<button type="button" class="ph-pill-btn wide" data-hm="buy" ${buyBlocked()?'disabled':''}>${buyLabel()}</button></div></div>`;
+    const specs=item.model===TRUCK_MODEL?[['gauge','Velocidade','Até 86 km/h'],['users','Lugares','2: motorista e passageiro'],['package','Baú','Porta de enrolar e 24 pilhas de carga, só para quem tem a chave'],['wrench','Manutenção','18 peças individuais'],['palette','Pintura','Cabine personalizável']]:item.model===CAR_MODEL?[['gauge','Velocidade','Até 140 km/h'],['users','Lugares','4: motorista e 3 passageiros'],['wrench','Manutenção','18 peças individuais'],['palette','Pintura','Personalizável por carro']]:item.model===MOTO_FOGO_MODEL?[['gauge','Velocidade','55 km/h'],['flame','Visual','Chamas nas duas rodas'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']]:item.model===MOTO_SCOOTER_MODEL?[['gauge','Velocidade','55 km/h'],['package','Baú','Baú vermelho com o emblema da casa'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']]:item.model===MOTO_CLASSICA_MODEL?[['gauge','Velocidade','55 km/h'],['palette','Pintura','Cor do tanque à escolha'],['wrench','Peças','Conserto com Peça de moto'],['users','Lugares','1, com tranca e chave']]:SPECS;
+    return `${header('Detalhes do veículo')}<div class="ph-body hm-detail"><div class="hm-detail-photo">${photo(item.model,paintColor)}<span class="hm-sale-badge">À venda · 0 km</span></div><div class="hm-detail-info"><div class="hm-detail-title"><small>${item.model===MOTO_MODEL?'Moto de entrega':item.model===MOTO_FOGO_MODEL?'Moto esqueleto':item.model===MOTO_CLASSICA_MODEL?'Moto clássica':item.model===MOTO_SCOOTER_MODEL?'Scooter de entrega':item.model===TRUCK_MODEL?'Caminhão com baú de carga':'Hatch de quatro lugares'}</small><h2>${e(item.name)}</h2><p class="hm-price">${money(item.price)} <small>moedas</small></p></div><ul class="hm-specs">${specs.map(([icon,label,value])=>`<li>${uiIcon(icon!)}<span><small>${label}</small>${value}</span></li>`).join('')}</ul>${isCarModel(item.model)?paintHtml(paintColor):item.model===MOTO_FOGO_MODEL?`${paintHtml(paintColor,item.model)}<p class="hm-note">Moto de passeio, com fogo nas rodas e placa preta e vermelha. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. Não leva a bag de entrega.</p>`:item.model===MOTO_SCOOTER_MODEL?'<p class="hm-note">A scooter vermelha das primeiras entregas, com o baú da casa. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. Com ela você pode entregar pelo Highfood; a bag é um item separado e não acompanha a scooter.</p>':item.model===MOTO_CLASSICA_MODEL?`${paintHtml(paintColor,item.model)}<p class="hm-note">A clássica de rodas raiadas. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. Também serve para entregar pelo Highfood; a bag é um item separado e não acompanha a moto.</p>`:'<p class="hm-note">Com a moto você pode entregar pelo Highfood. Ela vem emplacada, fica guardada na garagem e a chave vai para a sua mochila. A bag é um item separado e não acompanha a moto.</p>'}<button type="button" class="ph-pill-btn wide" data-hm="buy" ${buyBlocked()?'disabled':''}>${buyLabel()}</button></div></div>`;
   }
   /** The Caveira's photos wear the colour being chosen (the detail, offer and confirm pages) or the owner's (lists). */
   function repaintPhotos():void {
@@ -131,7 +140,7 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
       ctx.host.balance(result.balance);ctx.host.food.setOwned(true);
       ctx.host.send('inventory.sync');
       if(closed)return;
-      vehicle=result;screen='bought';scroll.garage=0;query='';filter='all';
+      updateVehicle(result);screen='bought';scroll.garage=0;query='';filter='all';
     }catch(error){if(!closed){ctx.host.error(error instanceof Error?error.message:'Não foi possível comprar.');screen='offer';}}
     finally{busy=false;render();}
   }
@@ -148,7 +157,7 @@ export const highmotors:PhoneApp={id:'highmotors',name:'HighMotors',icon:'bike',
       case 'paint-reset':{paintColor=defaultVehicleColor(vehicle?.vehicles.find(v=>v.id===selected)?.model??vehicle?.model??'');const input=view.querySelector<HTMLInputElement>('[name="hm-color"]');if(input)input.value=paintColor;repaintPhotos();break;}
       case 'paint':{
         if(busy||!selected)return;busy=true;render();
-        void api<VehicleView>('/vehicles/paint',{vehicleId:selected,color:paintColor}).then(next=>{if(!closed){vehicle=next;ctx.host.send('inventory.sync');ctx.banner('highmotors','Pintura salva','A cor deste carro foi atualizada.');}}).catch(error=>ctx.host.error(error instanceof Error?error.message:'Não foi possível salvar a pintura.')).finally(()=>{busy=false;render();});break;
+        void api<VehicleView>('/vehicles/paint',{vehicleId:selected,color:paintColor}).then(next=>{if(!closed){updateVehicle(next);ctx.host.send('inventory.sync');ctx.banner('highmotors','Pintura salva','A cor deste carro foi atualizada.');}}).catch(error=>ctx.host.error(error instanceof Error?error.message:'Não foi possível salvar a pintura.')).finally(()=>{busy=false;render();});break;
       }
       case 'buy':if(!buyBlocked()){screen='confirm';render();}break;
       case 'confirm':void buy();break;

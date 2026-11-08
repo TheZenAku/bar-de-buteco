@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import {FOGO_DEFAULT_COLOR} from '@bar/shared';
+import {CLASSICA_DEFAULT_COLOR,FOGO_DEFAULT_COLOR} from '@bar/shared';
 
 /**
  * The red of the Caveira em Chamas is painted into its texture (fenders, tank ribs, grips, decals): there is no separate paint
@@ -90,4 +90,31 @@ export class MotoPaint {
   }
   telemetry(){return {colour:this.current,materials:this.materials.length};}
   destroy():void {for(const m of this.materials)m.destroy();this.materials.length=0;}
+}
+
+/**
+ * The Clássica Raiada has a paint material of its own (Moto_Pintura: the tank, neutral texture times the base colour), so its paint is
+ * that colour on a copy of the material per bike. No colour, or the grey an unpainted vehicle carries, is the black it came in.
+ */
+export class TankPaint {
+  private readonly materials:pc.StandardMaterial[]=[];
+  private colour='';
+  constructor(root:pc.Entity) {
+    const copies=new Map<pc.Material,pc.StandardMaterial>();
+    for(const render of root.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
+      const material=instance.material;
+      if(material?.name!=='Moto_Pintura')continue;
+      let copy=copies.get(material);
+      if(!copy){copy=(material as pc.StandardMaterial).clone();copies.set(material,copy);this.materials.push(copy);}
+      instance.material=copy;
+    }
+    if(!this.materials.length)console.warn('moto: material Moto_Pintura não encontrado');
+  }
+  set(hex:string|undefined):void {
+    const colour=!hex||hex.toLowerCase()==='#ccc9c2'?CLASSICA_DEFAULT_COLOR:hex.toLowerCase();
+    if(colour===this.colour)return;
+    this.colour=colour;
+    for(const material of this.materials){material.diffuse.fromString(colour);material.update();}
+  }
+  destroy():void {for(const material of this.materials)material.destroy();}
 }

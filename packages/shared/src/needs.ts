@@ -6,7 +6,8 @@ import {ITEM_CATALOG} from './inventory.js';
  *
  * HP, stamina, hunger and thirst are each two things: the ring (the level, `hp`, `stamina`...) and the core behind it
  * (`hpCore`...). The ring is what is felt and it is refilled from the core, which is spent as it does; eating fills the core
- * immediately when consumption starts. Damage past an empty ring takes the core. Only the heart (HP) kills: its ring and core both at zero is death.
+ * immediately when consumption starts. Food and water reserves also rebuild the heart's core gradually, at a cost to both.
+ * Damage past an empty ring takes the core. Only the heart (HP) kills: its ring and core both at zero is death.
  * Every tunable number lives in NEEDS; nothing below hard-codes balance.
  */
 export const NEEDS = {
@@ -25,6 +26,18 @@ export const NEEDS = {
     stamina: { refillPerSecond: 12, cost: .05, emptyShare: .2 },
     hunger: { refillPerSecond: 3, cost: 1 },
     thirst: { refillPerSecond: 3, cost: 1 },
+  },
+  /** Food and water rebuild the heart's reserve, which still pays for refilling the HP ring. */
+  hpCoreRecovery: {
+    /** At good nutrition and rest, rebuilding 100 points takes about five minutes. */
+    perSecond: .35,
+    /** Both costs are paid for every point actually added to the heart's reserve. */
+    hungerCost: .5,
+    thirstCost: .75,
+    /** Keep a small reserve for basic needs; ease into full recovery as nutrition improves. */
+    minReserve: 10,
+    fullSpeedAt: 50,
+    runningShare: .4,
   },
   stamina: {
     max: 100,
@@ -275,6 +288,25 @@ export function relieve(state: NeedsState, portion = 1): void {
   state.bladder = clamp(state.bladder - (state.bladder - target) * clamp(portion, 0, 1), 0, NEEDS.bladder.max);
 }
 
+/** Gradual metabolism: both nutrition reserves pay together, only for the space left in the heart. */
+function recoverHpCore(state: NeedsState, seconds: number, running: boolean): void {
+  // Metabolism cannot undo a death or start while the character is unconscious.
+  if (state.dead || (state.hp <= 0 && state.hpCore <= 0) || !isConscious(state)) return;
+  const rule = NEEDS.hpCoreRecovery;
+  const nutrition = Math.min(state.hunger, state.thirst, state.hungerCore, state.thirstCore);
+  const fed = clamp((nutrition - rule.minReserve) / (rule.fullSpeedAt - rule.minReserve), 0, 1);
+  const pace = rule.perSecond * fed * fed * (3 - 2 * fed) * (running ? rule.runningShare : 1);
+  const recovered = Math.max(0, Math.min(
+    NEEDS.cores.start - state.hpCore,
+    pace * seconds,
+    (state.hungerCore - rule.minReserve) / rule.hungerCost,
+    (state.thirstCore - rule.minReserve) / rule.thirstCost,
+  ));
+  state.hpCore += recovered;
+  state.hungerCore -= recovered * rule.hungerCost;
+  state.thirstCore -= recovered * rule.thirstCost;
+}
+
 /**
  * Advances needs by `seconds` of real time. `running` means a running step was taken in this interval.
  * `random` is injected so the server's dice and the tests are reproducible.
@@ -297,6 +329,7 @@ export function tickNeeds(state: NeedsState, seconds: number, now: number, activ
   state.thirst = refill('thirst', clamp(state.thirst - NEEDS.thirst.drainPerMinute / 60 * dt * (activity.running ? NEEDS.thirst.runningMultiplier : 1), 0, NEEDS.thirst.max), NEEDS.thirst.max, NEEDS.cores.thirst.refillPerSecond);
   state.drunk = clamp(state.drunk - NEEDS.drunk.soberPerMinute / 60 * dt, 0, NEEDS.drunk.max);
   state.hp = refill('hp', state.hp, ceiling, NEEDS.cores.hp.refillPerSecond);
+  recoverHpCore(state, dt, activity.running);
 
   if (activity.running) {
     state.stamina = clamp(state.stamina - NEEDS.stamina.runDrainPerSecond * staminaCost(state) * dt, 0, NEEDS.stamina.max);

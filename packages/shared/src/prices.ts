@@ -6,6 +6,7 @@ import {TRUCO_BET,TRUCO_LEVEL_INFO} from './truco/stakes.js';
 import {POOL_BET,POOL_LEVEL_STAKES} from './pool/index.js';
 import {DEFAULT_SKIN,SKINS} from './skins.js';
 import {SKILLS} from './profile.js';
+import {VEHICLE_CATALOG,vehiclePriceKey,type VehicleOffer} from './vehicle-models.js';
 
 /**
  * Everything in the game that costs or pays coins, under one key each ("item:coxinha", "media:tv", "job:bar").
@@ -61,6 +62,8 @@ export function priceEntries():readonly PriceEntry[]{
     {key:'cap:job-daily',group:'trabalho',label:'Teto diário do trabalho',hint:'Máximo que um jogador ganha trabalhando por dia',defaultValue:JOB_DAILY_CAP,min:0,max:1_000_000},
     {key:'vehicle:moto',group:'highfood',label:'Moto de entrega',hint:'Venda no app HighMotors do celular',defaultValue:10_000,min:0,max:1_000_000},
     {key:'vehicle:moto-fogo',group:'highfood',label:'Caveira em Chamas',hint:'Moto esqueleto com fogo nas rodas, no HighMotors (sem bag de entrega)',defaultValue:25_000,min:0,max:1_000_000},
+    {key:'vehicle:moto-classica',group:'highfood',label:'Clássica Raiada',hint:'Moto clássica preta com tanque personalizável, no HighMotors',defaultValue:15_000,min:0,max:1_000_000},
+    {key:'vehicle:moto-scooter',group:'highfood',label:'Scooter de Entrega',hint:'Scooter vermelha com baú da casa, no HighMotors',defaultValue:8_000,min:0,max:1_000_000},
     {key:'vehicle:carro',group:'highfood',label:'Hatch 80',hint:'Carro de quatro lugares no HighMotors',defaultValue:35_000,min:0,max:1_000_000},
     {key:'vehicle:caminhao',group:'highfood',label:'Caminhão Baú',hint:'Caminhão de dois lugares com baú de carga, no HighMotors',defaultValue:60_000,min:0,max:1_000_000},
     {key:'vehicle:tow',group:'highfood',label:'Guincho',hint:'Trazer a própria moto até a rua mais perto, pelo celular',defaultValue:30,min:0,max:10_000},
@@ -92,6 +95,8 @@ export function defaultPrices(env:Record<string,string|undefined>={}):PriceTable
 }
 
 export const priceOf=(table:PriceTable,key:string)=>table[key]??priceEntry(key)?.defaultValue??0;
+/** Every registered vehicle is sold in HighMotors at its current configured price. */
+export const vehicleOffers=(table:PriceTable):VehicleOffer[]=>VEHICLE_CATALOG.map(({model,name,seats,photo})=>({model,name,seats,photo,price:priceOf(table,vehiclePriceKey(model))}));
 export const itemPrice=(table:PriceTable,item:ItemId|string)=>priceOf(table,`item:${item}`);
 /** The jukebox, a TV or the stage screen (the TV whose id is `telao`). */
 export const mediaPriceKey=(kind:'jukebox'|'tv',id:string)=>kind==='jukebox'?'media:jukebox':id==='telao'?'media:telao':'media:tv';
