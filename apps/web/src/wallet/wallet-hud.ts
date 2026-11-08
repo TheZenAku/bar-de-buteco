@@ -31,12 +31,10 @@ export function createWalletHud(panel:HTMLElement){
   function roll(to:number):void {
     cancelAnimationFrame(frame);
     const from=shown??to,start=performance.now(),duration=still()?0:Math.min(1400,450+Math.log10(Math.abs(to-from)+1)*160);
-    // The panel is as wide as the number and sits beside the level chip: hold the widest text so the header does not shift at each digit.
-    value.style.minWidth=`${Math.max(money(from).length,money(to).length)}ch`;
     const step=(now:number)=>{
       const t=duration?Math.min(1,(now-start)/duration):1;
       shown=Math.round(from+(to-from)*ease(t));value.textContent=money(shown);
-      if(t<1)frame=requestAnimationFrame(step);else value.style.minWidth=`${money(to).length}ch`;
+      if(t<1)frame=requestAnimationFrame(step);
     };
     frame=requestAnimationFrame(step);
   }

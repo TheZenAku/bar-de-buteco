@@ -1,5 +1,7 @@
 /* The header wallet (wallet-hud.ts): the balance rolls, "+N"/"−N" floats off it, and the panel flashes mint or red. */
-.game-header .hud-wallet{position:relative}
+/* The header is a row aligned to the right: a wallet as wide as its number pushed the level chip and the buttons each time a
+   digit came or went. Room for 999.999 (icon 14 + gap 8 + padding 32) keeps everything still. */
+.game-header .hud-wallet{position:relative;min-width:calc(7ch + 54px)}
 #hud-balance{display:inline-block;font-variant-numeric:tabular-nums}
 .hud-wallet.wl-gain{animation:wl-flash-up 1.1s ease-out}
 .hud-wallet.wl-loss{animation:wl-flash-down .9s ease-out}

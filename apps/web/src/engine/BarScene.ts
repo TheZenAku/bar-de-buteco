@@ -117,6 +117,7 @@ interface SkinnedRig {
   orderLayer?:pc.AnimComponentLayer;
   /** The fist fight's guard: FightIdle on both arms only (GUARD_LAYER), over the legs' steps while moving with the guard up. */
   guardLayer?:pc.AnimComponentLayer;
+  guardGone?:number;
   headBind?:pc.Quat;
   /** The hips, found on first use (the contact shadow follows them during a bar animation). */
   hip?: pc.Entity;
@@ -189,6 +190,9 @@ interface Avatar {
   flinch?: FlinchPose;
   velocity?: pc.Vec3;
   guardStep?: string;
+  guardCand?: string;
+  guardCandAt?: number;
+  fightBusyAt?: number;
   swungKey?: string;
   /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
   contact: pc.Entity;
@@ -3147,6 +3151,7 @@ export class BarScene {
   private fightClip(avatar: Avatar, skin: SkinnedRig): { clip: string; key: string; age: number; guard: boolean; local: boolean } | undefined {
     const { actor } = avatar, local = actor.id === this.localId, ahead = local ? this.callbacks.fight?.() : undefined, fist = actor.fist, now = this.serverNow();
     const action = actor.animation ?? 'idle';
+    if (action === 'punch' || action === 'hit' || (local && (ahead?.punch || ahead?.blow))) avatar.fightBusyAt = performance.now();
     if (action === 'ragdoll' || action === 'death' || actor.interactionState === 'thrown') return undefined;
     const has = (clip: string) => skin.tracks.has(clip);
     // A blow taken: drawn from the message for the one hit, from the room's state for everyone else.
@@ -3173,12 +3178,23 @@ export class BarScene {
   }
   /** The guard's step clip from how the body moves against where it faces: still, forward (Walk), back, or to either side; a little stickiness at the edges. */
   private guardStep(avatar: Avatar): string {
-    const v = avatar.velocity, speed = v ? Math.hypot(v.x, v.z) : 0, previous = avatar.guardStep ?? 'FightIdle';
-    if (!v || speed < (previous === 'FightIdle' ? .45 : .25)) return avatar.guardStep = 'FightIdle';
-    const yaw = avatar.yaw / RAD_TO_DEG, ahead = v.x * Math.sin(yaw) + v.z * Math.cos(yaw), left = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
-    const angle = Math.atan2(left, ahead) * RAD_TO_DEG, sticky = previous === 'FightIdle' ? 0 : 12;
-    const forward = Math.abs(angle) <= 55 + (previous === 'Walk' ? sticky : 0), back = Math.abs(angle) >= 125 - (previous === 'FightBack' ? sticky : 0);
-    return avatar.guardStep = forward ? 'Walk' : back ? 'FightBack' : angle > 0 ? 'FightLeft' : 'FightRight';
+    const now = performance.now(), held = avatar.guardStep ?? 'FightIdle';
+    // A punch's lunge and push, and the turn to its target, move the body for a moment: not a reason to change steps (that flickered the arms).
+    if (now - (avatar.fightBusyAt ?? -1e9) < 600) { avatar.guardCand = undefined; return avatar.guardStep = 'FightIdle'; }
+    const v = avatar.velocity, speed = v ? Math.hypot(v.x, v.z) : 0;
+    let raw = 'FightIdle';
+    if (v && speed >= (held === 'FightIdle' ? .6 : .3)) {
+      const yaw = avatar.yaw / RAD_TO_DEG, ahead = v.x * Math.sin(yaw) + v.z * Math.cos(yaw), left = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
+      const angle = Math.atan2(left, ahead) * RAD_TO_DEG, sticky = held === 'FightIdle' ? 0 : 12;
+      const forward = Math.abs(angle) <= 55 + (held === 'Walk' ? sticky : 0), back = Math.abs(angle) >= 125 - (held === 'FightBack' ? sticky : 0);
+      raw = forward ? 'Walk' : back ? 'FightBack' : angle > 0 ? 'FightLeft' : 'FightRight';
+    }
+    if (raw === held) { avatar.guardCand = undefined; return held; }
+    // A new step must hold for a moment before the clip changes.
+    if (avatar.guardCand !== raw) { avatar.guardCand = raw; avatar.guardCandAt = now; }
+    if (now - (avatar.guardCandAt ?? now) < 220) return held;
+    avatar.guardCand = undefined;
+    return avatar.guardStep = raw;
   }
   /**
    * Each frame of a fight clip: a punch or a blow stays on its clock (a late one catches up by playing faster instead of jumping, a landed punch
@@ -3187,8 +3203,15 @@ export class BarScene {
   private fightSync(avatar: Avatar, skin: SkinnedRig, fight: ReturnType<BarScene['fightClip']>, dt: number): void {
     const anim = skin.model.anim!, layer = anim.baseLayer;
     if (skin.guardLayer) {
-      const on = fight?.guard && skin.clip !== 'FightIdle' ? 1 : 0, duration = skin.guardLayer.activeStateDuration;
-      skin.guardLayer.weight = lerp(skin.guardLayer.weight, on, 1 - Math.exp(-14 * dt));
+      // Up the whole time the guard is up, FightIdle included (same pose, so harmless there): toggling it with the clip dipped the arms on every
+      // still↔step change. Short gaps (a frame with no fight clip) keep it; it fades out only once the guard has been gone a moment.
+      const duration = skin.guardLayer.activeStateDuration;
+      if (fight?.guard) { skin.guardGone = 0; skin.guardLayer.weight = Math.min(1, skin.guardLayer.weight + dt * 12); }
+      else {
+        skin.guardGone = (skin.guardGone ?? 0) + dt;
+        // A punch or a blow (fight set, not guard) owns the arms at once; only a frame with no fight clip at all gets the grace.
+        if (fight || skin.guardGone > .25) skin.guardLayer.weight = lerp(skin.guardLayer.weight, 0, 1 - Math.exp(-14 * dt));
+      }
       // Its own clock: the steps' pace sets the component's speed, the bounce of the guard keeps its own.
       if (skin.guardLayer.weight > .001 && duration > 0) skin.guardLayer.activeStateCurrentTime = (this.elapsed + avatar.phase) % duration;
     }
