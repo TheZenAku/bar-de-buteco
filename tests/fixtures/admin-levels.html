@@ -1,0 +1,30 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<!-- The administration's level tools with an API in memory: the player file's Nível tab and the section Níveis e XP. ?section=levels opens the second. -->
+<div class="modal-backdrop"><section class="modal admin-modal"><header class="modal-header"><h2>Administração</h2></header><div id="modal-content"><div id="admin-console"><div class="admin-console"><aside class="admin-nav"><div class="admin-nav-head"><b>Administrador</b></div><nav><button aria-current="true">Jogadores</button></nav></aside><div class="admin-main"><header class="admin-main-head"><h3>Jogadores</h3><p class="admin-feedback" role="status"></p></header><div class="admin-section" id="admin-section"></div></div></div></div></div></section></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/admin.css';
+import '../../apps/web/src/levels/levels.css';
+import {priceEntries,xpAtLevel} from '../../packages/shared/src/index.ts';
+import {playersSection} from '../../apps/web/src/admin/players.ts';
+import {levelsSection} from '../../apps/web/src/admin/prices.ts';
+import {lock} from '../../apps/web/src/admin/kit.ts';
+const account={id:'p1',username:'bia',displayName:'Bia',email:'bia@bar.test',role:'user',verified:true,owner:false,banned:false,balance:1250,kickId:null,canModerate:true,canEditWallet:true,canChangeRole:false,createdAt:'2026-10-01T12:00:00Z',equippedSkin:'nathan',phone:null};
+let levels={xp:xpAtLevel(37)+420,daily:{day:4,claimed:true}};
+const writes=[],root=document.querySelector('#admin-section'),feedback=document.querySelector('.admin-feedback');
+const detail=()=>({account,wallet:{balance:1250,earned30d:0,spent30d:0,ledger:[]},inventory:[],vehicles:[],skins:[],skills:[],sessions:{active:1,lastLoginAt:null},stats:{gamesPlayed:0,wins:0,losses:0,draws:0},levels,history:[],reports:{against:[],made:0}});
+const api=async(path,data)=>{
+  if(data)writes.push({path,data});
+  if(path.startsWith('/admin/overview'))return {users:[account],total:1,offset:0,limit:20,canManageAdmins:false,logs:[],reports:[]};
+  if(path==='/admin/players/p1')return detail();
+  if(path==='/admin/player'&&data.op==='xp'){const after={add:levels.xp+data.amount,remove:levels.xp-data.amount,set:data.amount,level:xpAtLevel(data.amount)}[data.mode];levels={...levels,xp:after};return {message:'ok'};}
+  if(path==='/admin/player'&&data.op==='daily-reset'){levels={...levels,daily:{...levels.daily,claimed:false}};return {message:'ok'};}
+  if(path==='/admin/prices')return {rows:priceEntries().map(entry=>({...entry,value:entry.key==='xp:bebum'?20:entry.defaultValue,override:entry.key==='xp:bebum',updatedAt:null,updatedBy:null})),changes:[]};
+  throw new Error(`Unexpected request: ${path}`);
+};
+const ctx={api,go:()=>{},world:()=>null,user:()=>({id:'admin'}),message:text=>{feedback.textContent=text;},async run(job,success){const unlock=lock(root);try{await job();feedback.textContent=success;return true;}catch(error){feedback.textContent=error.message;return false;}finally{unlock();}}};
+const levelsOnly=new URLSearchParams(location.search).get('section')==='levels';
+(levelsOnly?levelsSection:playersSection)(root,ctx,levelsOnly?{}:{player:'p1'});
+window.fixture={writes,levels:()=>levels};
+</script></body></html>

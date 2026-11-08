@@ -66,6 +66,9 @@ import {completeBasePose} from './animation-tracks';
 import {walkPlaybackRate,walkTransitionSeconds} from './walk-playback';
 import {shootPortrait} from './skin-portrait';
 import {KICKS,skillById} from '@bar/shared';
+import {FIGHT_MOVES,HIT_REACTIONS,PUNCH_IDS,punchById,punchContact,type FightHit,type FightTarget} from '@bar/shared';
+import {FlinchPose} from './fight-flinch';
+import {DamageNumbers} from '../fight/damage-numbers';
 import {MorteScene} from './morte-scene';
 import type {DeathAudio} from '../death/death-audio';
 import {DEATH_GONE_STATE,DEATH_STATE,type DeathPlan} from '@bar/shared';
@@ -112,6 +115,8 @@ interface SkinnedRig {
   /** The Drink clip on the left arm and the neck only (HAND_LAYER), over the body's clip, for a drink in hand. */
   handLayer?: pc.AnimComponentLayer;
   orderLayer?:pc.AnimComponentLayer;
+  /** The fist fight's guard: FightIdle on both arms only (GUARD_LAYER), over the legs' steps while moving with the guard up. */
+  guardLayer?:pc.AnimComponentLayer;
   headBind?:pc.Quat;
   /** The hips, found on first use (the contact shadow follows them during a bar animation). */
   hip?: pc.Entity;
@@ -177,6 +182,14 @@ interface Avatar {
   swungAt?: number;
   /** A kick has just landed: the clip holds until then (performance.now), so it has weight. */
   hitStopUntil?: number;
+  /**
+   * The fist fight (docs/sistemas/luta.md): the jolt of a blow on the upper body; the velocity as drawn (the guard's steps go by the way the body
+   * moves against where it faces) and the step clip chosen; the punch whose swing was last heard.
+   */
+  flinch?: FlinchPose;
+  velocity?: pc.Vec3;
+  guardStep?: string;
+  swungKey?: string;
   /** The soft shadow at the feet, and whether a roof is above (re-checked after the avatar moves some distance). */
   contact: pc.Entity;
   covered?: { x: number; z: number; value: boolean };
@@ -229,7 +242,7 @@ const MOUSE_JUMP = 500;
 const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
 const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'bar-social-20261107' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
+  const version = folder === 'animations' ? 'bar-fight-20261108' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -247,12 +260,23 @@ const AVATAR_SHADOW_RANGE = 12;
 const AVATAR_SHADOW_MARGIN = 1.5;
 const OFFSTAGE_NEAR = 8;
 const OFFSTAGE_MARGIN = 2;
-const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble']);
+const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble', 'punch', 'hit']);
 // Approximate ground pace at 1×, measured from the Mixamo feet's backward travel while planted (metres/second).
 // Run is Standard Run's own root motion, which the converter prints: 4 m/s on Nathan (3.4–4.4 across the skins).
 // Walk's exported cycle is stretched by 20% for a more relaxed gait; its cadence eases with ground speed.
 // Rates remain capped at 2.2× so fast players do not spin their legs.
-const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Run: 4, DrunkWalk: .74 };
+// The guard's steps (fight clips), measured the same way: back 1.15, to its left 1.61, to its right 1.6.
+const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Run: 4, DrunkWalk: .74, FightBack: 1.15, FightLeft: 1.61, FightRight: 1.6 };
+/**
+ * The fist fight (docs/sistemas/luta.md). The clips of the guard (FightIdle, then the steps by direction, forward being Walk); the arms' layer that
+ * keeps the guard up over the steps; how long a landed punch holds its clip (ms, light and heavy); how hard a blow jolts the upper body (degrees);
+ * how far ahead of the room's clock a late punch seen by others starts (s, so its wind-up shows) and how fast it catches up.
+ */
+const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'FightBack', 'FightLeft', 'FightRight']);
+const GUARD_LAYER = 'Guard';
+const PUNCH_HIT_STOP_MS = { light: 55, heavy: 90 };
+const FLINCH_DEGREES: Readonly<Record<string, number>> = { jab: 8, cross: 12, hook: 14, heavy: 20 };
+const FIGHT_CATCH_UP_S = .12, FIGHT_CATCH_UP_RATE = 1.8;
 // Positions arrive in steps: local predictions every input tick, everyone else with each server patch.
 // Gliding a little longer than the interval keeps a constant speed despite timer jitter.
 const INPUT_GLIDE = TICK_MS / 1000 * 1.2;
@@ -353,6 +377,10 @@ export class BarScene {
   private readonly horseSounds:HorseSounds;
   private readonly footstepSounds:FootstepSounds;
   private readonly blowEffects:BlowEffects;
+  /** The fist fight: the damage numbers over the scene, the landed punches already drawn (puncher:count), how far each local punch was followed (ms). */
+  private readonly damageNumbers:DamageNumbers;
+  private readonly fightShown=new Set<string>();
+  private readonly predictedFrom=new Map<number,number>();
   private readonly flySounds:FlySounds;
   /** The local flier: how far into the dash (0 to 1), whether the barrier may break again, and when it last did (scene seconds). */
   private flyShare = 0; private boomArmed = true; private boomAt = -99;
@@ -603,6 +631,7 @@ export class BarScene {
       return {x:ear.x,y:ear.y,z:ear.z,forward:this.camera.forward,up:this.camera.up};
     });
     this.blowEffects=new BlowEffects(this.app);
+    this.damageNumbers=new DamageNumbers(canvas.parentElement??document.body);
     this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.smokeBurst=new SmokeBurst(this.app);
     this.cigarettes=new Cigarettes(this.app);
@@ -1120,7 +1149,7 @@ export class BarScene {
     this.cigarettes.restore();
     this.crossedArms.restore();
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
-    for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();}
+    for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();avatar.flinch?.restore();}
   }
 
   /** The animation has already posed the skeleton; distribute the camera offset through neck and head. */
@@ -1133,7 +1162,7 @@ export class BarScene {
       const actor=avatar.actor,local=id===this.localId,bodyYaw=avatar.yaw/RAD_TO_DEG;
       // Mouth/phone props and physical falls retain their authored head pose.
       const free=this.enabled&&!actor.musician&&!actor.holding&&!avatar.riding&&!avatar.ragdoll&&
-        !['drink','text','kick','fallen','recover','stumble','ragdoll','ride'].includes(actor.animation??'')&&
+        !['drink','text','kick','fallen','recover','stumble','ragdoll','ride','punch','hit'].includes(actor.animation??'')&&
         (!avatar.bar||avatar.bar.clip==='sentado_loop')&&!(local&&(this.watchingTv||this.watchingStage));
       // In the selfie the eyes go to the lens, wherever the mouse has carried the phone.
       const lens=local&&this.selfie?this.camera.getPosition().clone().sub(head.getPosition()):undefined;
@@ -1141,6 +1170,10 @@ export class BarScene {
         local?headLookAt(this.rig.yaw,this.rig.pitch,bodyYaw):
         {headYaw:actor.headYaw??0,headPitch:actor.headPitch??0};
       (avatar.headLook??=new HeadLookPose()).apply(head,bodyYaw,look,dt);
+      if(avatar.flinch?.active&&avatar.skin){
+        const skin=avatar.skin,spine=avatar.spine??=(skin.model.findByName('spine_02') as pc.Entity|null)??null;
+        avatar.flinch.apply([spine,skin.model.findByName('spine_03'),skin.bones.head.parent,skin.bones.head],this.elapsed);
+      }
     }
   }
   getCamera() { return { ...this.rig.telemetry(), fov: +(this.camera.camera?.fov ?? 0).toFixed(2), rush: +this.rush.toFixed(3), blur: this.speedBlur.drawn }; }
@@ -1480,6 +1513,8 @@ export class BarScene {
     // The body keeps following travel; looking around at rest only turns the head.
     const actor=this.actors.get(this.localId)?.actor;
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
+    // With the guard up the body faces where the camera looks, and the keys step that way or aside (the guard's steps).
+    if(this.callbacks.fight?.()?.guard&&!actor?.interactionState&&!actor?.currentTableId)this.lastRotation=this.fightView();
     if(actor?.fireworkEquipped)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
     // Standing for a selfie, the body turns to the phone once the head alone could not reach it (past ~40°).
     else if(this.selfie&&!dx&&!dz&&!actor?.interactionState&&!actor?.currentTableId&&Math.abs(normalizeHeading(yaw+Math.PI-this.lastRotation))>.7)this.lastRotation=normalizeHeading(yaw+Math.PI);
@@ -1790,6 +1825,7 @@ export class BarScene {
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.morte?.destroy();this.morte=undefined;
+    this.damageNumbers.destroy();
     this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
@@ -1917,11 +1953,12 @@ export class BarScene {
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
     for (const asset of bank.animations) {
       const track = asset.resource as pc.AnimTrack;
-      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order'].includes(track.name);
+      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order', 'Jab', 'Cross', 'Hook', 'Heavy', ...Object.keys(HIT_REACTIONS)].includes(track.name);
       skin.model.anim!.assignAnimation(track.name, track, undefined, 1, loop);
       skin.tracks.add(track.name);
       if (track.name === 'Drink') this.addHandLayer(skin, track);
       if (track.name === 'Order') this.addOrderLayer(skin,track);
+      if (track.name === 'FightIdle') this.addGuardLayer(skin,track);
     }
   }
 
@@ -1944,6 +1981,21 @@ export class BarScene {
     // Idle/Walk may already have bound these joints before the bank arrived. Their blend targets
     // still have room for only the base layer; rebuild them so the hand layer can drive them too.
     anim.rebind();
+  }
+
+  /**
+   * The guard over the steps (docs/sistemas/luta.md): FightIdle, looping, on both arms from the collarbones down. The legs' clips (strafes, walking
+   * back) were taken with the arms anywhere; this keeps the fists up whichever way the fighter steps.
+   */
+  private addGuardLayer(skin:SkinnedRig,track:pc.AnimTrack):void {
+    const anim=skin.model.anim!;if(skin.guardLayer||anim.findAnimationLayer(GUARD_LAYER))return;
+    const paths=track.curves.flatMap(c=>c.paths.map(p=>p.entityPath)),mask:Record<string,{children:boolean}>={};
+    for(const node of [skin.bones.upperarm_l.parent,skin.bones.upperarm_r.parent]){
+      const path=paths.find(p=>p.at(-1)===node?.name);if(path)mask[path.join('/')]={children:true};
+    }
+    if(!Object.keys(mask).length)return;
+    skin.guardLayer=anim.addLayer(GUARD_LAYER,0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
+    anim.assignAnimation('FightIdle',track,GUARD_LAYER,1,true);anim.rebind();
   }
 
   /** Acknowledging once, masked above the shoulders, over the normal planted idle. */
@@ -2119,6 +2171,9 @@ export class BarScene {
       glideFrom.copy(root.getPosition()); avatar.glideAt = this.elapsed;
     } else root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
     const drawn = root.getPosition(), last = avatar.lastDrawn ??= drawn.clone();
+    // The way the body moves, smoothed: the guard's steps are chosen against where it faces (guardStep).
+    const velocity = avatar.velocity ??= new pc.Vec3(), smoothing = 1 - Math.exp(-dt / .1), frame = Math.max(dt, 1e-3);
+    velocity.x += ((drawn.x - last.x) / frame - velocity.x) * smoothing; velocity.z += ((drawn.z - last.z) / frame - velocity.z) * smoothing;
     avatar.speed = lerp(avatar.speed ?? 0, Math.min(isRidingHorse(actor.interactionState)?HORSE.fastSpeed:(actor.animation??'').startsWith('fly')?FLY.boost+4:8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
     last.copy(drawn);
     // A bar animation (sitting at a table, the urinal, a cigarette, Magrão at the counter...): undefined while its clip loads.
@@ -2551,18 +2606,20 @@ export class BarScene {
     // On a stage spot: the musician's clip of the phase, once converted for this skin (meanwhile the avatar idles there).
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
-    const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+    // The fist fight (fightClip): a punch, a blow taken, the guard and its steps; anything else the game draws the usual way.
+    const fight = !bar && !show ? this.fightClip(avatar, skin) : undefined;
+    const requested = fight ? fight.clip : bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking && !this.selfieOf(avatar)) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
-    const locomotion = !bar && !show && ['Idle', 'Walk', 'Run', 'DrunkWalk'].includes(requested);
+    const locomotion = !bar && !show && (['Idle', 'Walk', 'Run', 'DrunkWalk'].includes(requested) || !!fight?.guard);
     const actionImported = !!requested && skin.tracks.has(requested);
     const oldGait=!!actor.oldWalk&&!gesture&&skin.tracks.has('OldCaneWalk')&&skin.tracks.has('OldCaneHold');
     const imported=actionImported||oldGait;
     const clip = actionImported ? requested : oldGait ? (pose.walking?'OldCaneWalk':'OldCaneHold') : pose.walking && seated < 0.5 ? 'Walk' : gesture ? 'Pose' : 'Idle';
     if(skin.cane)skin.cane.enabled=oldGait&&!actionImported;
-    const playbackKey = bar ? `${clip}:${bar.step.startedAt}` : show ? `${clip}:${show.startedAt}` : locomotion ? clip : `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
+    const playbackKey = bar ? `${clip}:${bar.step.startedAt}` : show ? `${clip}:${show.startedAt}` : fight && !fight.guard ? fight.key : locomotion ? clip : `${clip}:${actionImported ? actor.animationStartedAt ?? 0 : 0}`;
     if (skin.clip !== clip || skin.playbackKey !== playbackKey) {
       // The take, start and loop clips follow each other frame to frame; the take and stop clips blend in, as palco_musicos.js does.
       // Bar clips follow each other as barTimeline says (0 from a clip's last frame into the next), enter in 0.3 s and
@@ -2572,11 +2629,15 @@ export class BarScene {
       const walkingBlend=!bar&&!show?walkTransitionSeconds(skin.clip,clip):undefined;
       const blend = bar?.body ? .3 : bar ? (fromAction ? bar.step.blend : bar.step.blend || .3) : show ? show.blend
         : fromAction ? (avatar.barRelease === 0 ? 0 : avatar.barRelease ?? .3) : skin.clip.startsWith('Palco ') ? MUSICIANS.releaseSeconds : clip.startsWith('OldCane')||skin.clip.startsWith('OldCane')?.35:.25;
-      anim.baseLayer?.transition(clip, skin.clip ? walkingBlend??blend : 0);
+      // A punch or a blow comes in fast (it must read at once); the guard's idle and steps blend like walking does.
+      const fightBlend = fight ? (fight.guard ? (GUARD_CLIPS.has(skin.clip) ? .2 : .18) : .08) : undefined;
+      anim.baseLayer?.transition(clip, skin.clip ? fightBlend ?? walkingBlend ?? blend : 0);
       skin.clip = clip; skin.playbackKey = playbackKey;
       if (bar && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = bar.body
         ? Math.max(0, (this.serverNow() - bar.step.startedAt) / 1000) % anim.baseLayer.activeStateDuration : bar.step.time;
       else if (show && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = musicianTime(show.spot,show.phase,show.startedAt,show.now);
+      // Someone else's punch seen late starts a little behind the room's clock, so its wind-up shows, and catches up (fightSync).
+      else if (fight && !fight.guard && anim.baseLayer) anim.baseLayer.activeStateCurrentTime = Math.max(0, fight.age - (fight.local ? 0 : FIGHT_CATCH_UP_S));
       else if (actionImported && !locomotion && actor.animationStartedAt && anim.baseLayer) {
         const age = Math.max(0, (this.serverNow() - actor.animationStartedAt) / 1000);
         const duration = anim.baseLayer.activeStateDuration;
@@ -2603,6 +2664,7 @@ export class BarScene {
       const duration = skin.handLayer.activeStateDuration;
       if (handOn && duration > 0) skin.handLayer.activeStateCurrentTime = (Math.max(0, now - (actor.holdingSince ?? now)) / 1000) % duration;
     }
+    this.fightSync(avatar, skin, fight, pose.dt);
     if (show) this.musicians!.play(show.spot.id,show.phase,show.startedAt,show.now,show.blend);
     // The body keeps to the room's clock (a hidden tab, a slow frame): props and chair are drawn at that time too.
     else if (bar && anim.baseLayer?.activeState === clip) {
@@ -2856,6 +2918,8 @@ export class BarScene {
     // Pull the posed corpse into the cloud after physics has placed its pelvis.
     this.applyDeathPull();
     this.blowEffects.update(dt, this.camera);
+    this.predictPunch();
+    this.drawDamage();
     this.smokeBurst.update(dt, this.camera);
     this.fireworks.update(this.serverNow(),this.camera);
     this.crowd.update(dt, this.camera, this.modelSlots, .55 + .45 * this.environment.daylight);
@@ -3075,6 +3139,151 @@ export class BarScene {
       } else if (avatar.ragdoll && !avatar.ragdoll.fade(dt, this.bodyRig(avatar, skin))) avatar.ragdoll = undefined;
     }
   }
+  /**
+   * The fist fight's clip for this avatar this frame (docs/sistemas/luta.md), or undefined to let the game's other clips decide. A blow taken and a
+   * punch are on the room's clock (`age`, seconds into the clip); the local player's own, from the click or the room's message, ahead of the room
+   * (fight-controller.ts). With the guard up and nothing thrown: its idle, or its steps by the way the body moves against where it faces.
+   */
+  private fightClip(avatar: Avatar, skin: SkinnedRig): { clip: string; key: string; age: number; guard: boolean; local: boolean } | undefined {
+    const { actor } = avatar, local = actor.id === this.localId, ahead = local ? this.callbacks.fight?.() : undefined, fist = actor.fist, now = this.serverNow();
+    const action = actor.animation ?? 'idle';
+    if (action === 'ragdoll' || action === 'death' || actor.interactionState === 'thrown') return undefined;
+    const has = (clip: string) => skin.tracks.has(clip);
+    // A blow taken: drawn from the message for the one hit, from the room's state for everyone else.
+    if (ahead?.blow && has(ahead.blow.reaction)) {
+      const age = (performance.now() - ahead.blow.startedAt) / 1000;
+      if (age < (HIT_REACTIONS[ahead.blow.reaction as keyof typeof HIT_REACTIONS] ?? 1000) / 1000) return { clip: ahead.blow.reaction, key: `hit:${ahead.blow.startedAt}`, age, guard: false, local: true };
+    }
+    if (action === 'hit' && fist?.hit && has(fist.hit) && !(local && ahead?.blow)) return { clip: fist.hit, key: `hit:${fist.hitAt}`, age: Math.max(0, now - (fist.hitAt ?? now)) / 1000, guard: false, local };
+    // A punch: the local player's from the click (the room's, later by the trip, would set it back), everyone else's from the room.
+    if (local) {
+      const move = ahead?.punch ? FIGHT_MOVES[ahead.punch.move] : undefined;
+      if (ahead?.punch && move && has(move.clip)) {
+        const age = (performance.now() - ahead.punch.startedAt) / 1000;
+        if (age < move.durationMs / 1000) return { clip: move.clip, key: `punch:${ahead.punch.n}:${ahead.punch.startedAt}`, age, guard: false, local: true };
+      }
+    } else if (action === 'punch') {
+      const move = punchById(fist?.punch);
+      if (move && has(move.clip)) return { clip: move.clip, key: `punch:${fist?.n}:${fist?.at}`, age: Math.max(0, now - (fist?.at ?? now)) / 1000, guard: false, local: false };
+    }
+    const guard = local ? !!ahead?.guard : !!fist?.fight;
+    if (!guard || !['idle', 'walk', 'run', 'punch', 'hit'].includes(action) || actor.interactionState && actor.interactionState !== 'stagger' || !has('FightIdle')) return undefined;
+    const step = this.guardStep(avatar);
+    return { clip: has(step) ? step : 'FightIdle', key: step, age: 0, guard: true, local };
+  }
+  /** The guard's step clip from how the body moves against where it faces: still, forward (Walk), back, or to either side; a little stickiness at the edges. */
+  private guardStep(avatar: Avatar): string {
+    const v = avatar.velocity, speed = v ? Math.hypot(v.x, v.z) : 0, previous = avatar.guardStep ?? 'FightIdle';
+    if (!v || speed < (previous === 'FightIdle' ? .45 : .25)) return avatar.guardStep = 'FightIdle';
+    const yaw = avatar.yaw / RAD_TO_DEG, ahead = v.x * Math.sin(yaw) + v.z * Math.cos(yaw), left = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
+    const angle = Math.atan2(left, ahead) * RAD_TO_DEG, sticky = previous === 'FightIdle' ? 0 : 12;
+    const forward = Math.abs(angle) <= 55 + (previous === 'Walk' ? sticky : 0), back = Math.abs(angle) >= 125 - (previous === 'FightBack' ? sticky : 0);
+    return avatar.guardStep = forward ? 'Walk' : back ? 'FightBack' : angle > 0 ? 'FightLeft' : 'FightRight';
+  }
+  /**
+   * Each frame of a fight clip: a punch or a blow stays on its clock (a late one catches up by playing faster instead of jumping, a landed punch
+   * holds an instant first), the swing is heard as the fist goes, and the guard layer comes in over the steps.
+   */
+  private fightSync(avatar: Avatar, skin: SkinnedRig, fight: ReturnType<BarScene['fightClip']>, dt: number): void {
+    const anim = skin.model.anim!, layer = anim.baseLayer;
+    if (skin.guardLayer) {
+      const on = fight?.guard && skin.clip !== 'FightIdle' ? 1 : 0, duration = skin.guardLayer.activeStateDuration;
+      skin.guardLayer.weight = lerp(skin.guardLayer.weight, on, 1 - Math.exp(-14 * dt));
+      // Its own clock: the steps' pace sets the component's speed, the bounce of the guard keeps its own.
+      if (skin.guardLayer.weight > .001 && duration > 0) skin.guardLayer.activeStateCurrentTime = (this.elapsed + avatar.phase) % duration;
+    }
+    if (!fight || fight.guard || !layer || layer.activeState !== skin.clip || skin.clip !== fight.clip) return;
+    const duration = layer.activeStateDuration, wanted = Math.min(fight.age, duration), current = layer.activeStateCurrentTime, gap = wanted - current;
+    if ((avatar.hitStopUntil ?? 0) > performance.now()) anim.speed = 0;
+    else if (Math.abs(gap) > .35) { layer.activeStateCurrentTime = wanted; anim.speed = 1; }
+    else anim.speed = clamp(1 + gap * 5, .6, FIGHT_CATCH_UP_RATE);
+    const move = PUNCH_IDS.map(id => FIGHT_MOVES[id]).find(candidate => candidate.clip === fight.clip);
+    if (move && avatar.swungKey !== fight.key && current * 1000 >= move.swingMs) {
+      avatar.swungKey = fight.key;
+      if ((current * 1000 - move.swingMs) < 250) { const at = avatar.root.getPosition(); this.blowSounds.swing(move.heavy, { x: at.x, y: at.y + 1.3, z: at.z }); }
+    }
+  }
+  /** Whom the local player's punch may go at: the others as drawn (the aim goes at what the player sees, fight.ts punchAim). */
+  fightTargets(): FightTarget[] {
+    const targets: FightTarget[] = [];
+    for (const [id, avatar] of this.actors) {
+      const { actor } = avatar;
+      if (avatar.npc || id === this.localId || actor.connected === false || actor.currentTableId || avatar.ragdoll || (actor.interactionState && actor.interactionState !== 'stagger' && actor.interactionState !== 'kick')) continue;
+      const at = avatar.root.getPosition();
+      targets.push({ id, x: at.x, y: at.y, z: at.z, skin: actor.skin });
+    }
+    return targets;
+  }
+  /** Where the camera looks, as a heading (the guard faces it). */
+  fightView(): number { return normalizeHeading(this.rig.yaw + Math.PI); }
+  /**
+   * The local player's punch, as drawn, against the others as drawn, frame by frame: the instant the fist meets a body here, the blow is heard and
+   * seen and the clip holds, without waiting for the room (whose word, a moment later, brings the number: fightHit).
+   */
+  private predictPunch(): void {
+    const ahead = this.callbacks.fight?.(), punch = ahead?.punch, me = this.actors.get(this.localId);
+    if (!punch || punch.landed || !me) return;
+    const move = FIGHT_MOVES[punch.move], age = performance.now() - punch.startedAt, from = this.predictedFrom.get(punch.n) ?? 0;
+    if (age < move.activeFrom - 20 || from >= move.activeTo) return;
+    this.predictedFrom.set(punch.n, age);
+    const feet = me.root.getPosition(), pose = { x: feet.x, y: feet.y, z: feet.z, rotation: this.lastRotation };
+    let best: { id: string; contact: NonNullable<ReturnType<typeof punchContact>> } | undefined;
+    for (const target of this.fightTargets()) {
+      if (Math.abs(target.x - feet.x) > 3 || Math.abs(target.z - feet.z) > 3) continue;
+      const avatar = this.actors.get(target.id)!, body = { x: target.x, y: target.y ?? 0, z: target.z, rotation: avatar.yaw / RAD_TO_DEG };
+      const contact = punchContact(me.actor.skin, punch.move, from, age, () => pose, target.skin, () => body);
+      if (contact && (!best || contact.ms < best.contact.ms)) best = { id: target.id, contact };
+    }
+    if (!best) return;
+    punch.landed = true;
+    this.fightShown.add(`${this.localId}:${punch.n}`);
+    const at = { x: best.contact.x, y: best.contact.y, z: best.contact.z };
+    this.blowSounds.hit(move.heavy, at);
+    this.blowEffects.star(at, move.heavy ? .7 : .42);
+    me.hitStopUntil = performance.now() + PUNCH_HIT_STOP_MS[move.heavy ? 'heavy' : 'light'];
+    const victim = this.actors.get(best.id);
+    if (victim) (victim.flinch ??= new FlinchPose()).hit(this.elapsed, Math.atan2(best.contact.x - feet.x, best.contact.z - feet.z), FLINCH_DEGREES[punch.move] ?? 10);
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) this.rig.shake(move.heavy ? .03 : .016);
+  }
+  /**
+   * A punch landed (the room's fight.hit, to everyone near): its number where the fist met the body, and, unless this browser already drew it
+   * (the puncher's own, predictPunch), the blow heard and seen, the clip holding an instant and the upper body jolted.
+   */
+  fightHit(hit: FightHit): void {
+    const victim = this.actors.get(hit.to), puncher = this.actors.get(hit.by), move = FIGHT_MOVES[hit.move], key = `${hit.by}:${hit.n}`;
+    // The room's point, moved with the body as it is drawn now (the room saw it a moment ago).
+    const drawn = victim?.root.getPosition(), at = drawn && victim ? { x: hit.x + drawn.x - victim.actor.x, y: hit.y + drawn.y - (victim.actor.y ?? 0), z: hit.z + drawn.z - victim.actor.z } : { x: hit.x, y: hit.y, z: hit.z };
+    const kind = hit.ko ? 'ko' : hit.to === this.localId ? 'taken' : move.heavy ? 'heavy' : 'hit';
+    this.damageNumbers.show(at, hit.ko ? `${hit.damage} KO` : String(hit.damage), kind, this.elapsed);
+    const felt = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!this.fightShown.has(key)) {
+      this.fightShown.add(key);
+      this.blowSounds.hit(move.heavy || hit.ko, at);
+      this.blowEffects.star(at, move.heavy || hit.ko ? .7 : .42);
+      if (puncher) puncher.hitStopUntil = performance.now() + PUNCH_HIT_STOP_MS[move.heavy ? 'heavy' : 'light'];
+      if (victim && !hit.ko) (victim.flinch ??= new FlinchPose()).hit(this.elapsed, hit.yaw, FLINCH_DEGREES[hit.move] ?? 10);
+      if (felt && hit.by === this.localId) this.rig.shake(move.heavy ? .03 : .016);
+    }
+    if (felt && hit.to === this.localId) this.rig.shake(hit.ko ? .09 : move.heavy ? .07 : .035);
+    if (this.fightShown.size > 64) this.fightShown.delete(this.fightShown.values().next().value!);
+  }
+  /** The damage numbers follow the view: projected each frame, in front of the eye only, drifting along the screen's sideways. */
+  private drawDamage(): void {
+    const camera = this.camera.camera;
+    if (!camera) return;
+    const eye = this.camera.getPosition(), forward = this.camera.forward, right = this.camera.right;
+    this.damageNumbers.update(this.elapsed, (x, y, z) => {
+      const ahead = (x - eye.x) * forward.x + (y - eye.y) * forward.y + (z - eye.z) * forward.z;
+      if (ahead < .2) return undefined;
+      camera.worldToScreen(this.tempPoint.set(x, y, z), this.tempScreen);
+      return { x: this.tempScreen.x, y: this.tempScreen.y, distance: Math.hypot(x - eye.x, y - eye.y, z - eye.z) };
+    }, { x: right.x, z: right.z });
+  }
+  /** The fight as drawn (tests): the numbers shown, and each avatar's fight clip and guard layer. */
+  getFight() {
+    return { numbers: [...this.damageNumbers.shown], avatars: [...this.actors].filter(([, a]) => a.skin).map(([id, a]) => ({ id, clip: a.skin!.clip, guard: +(a.skin!.guardLayer?.weight ?? 0).toFixed(2), step: a.guardStep, yaw: +a.yaw.toFixed(2), x: +a.root.getPosition().x.toFixed(3), z: +a.root.getPosition().z.toFixed(3), vx: +(a.velocity?.x??0).toFixed(2), vz: +(a.velocity?.z??0).toFixed(2), time: +(a.skin!.model.anim?.baseLayer?.activeStateCurrentTime ?? 0).toFixed(3), flinch: !!a.flinch?.active })) };
+  }
+
   /** The kicking leg cuts the air at the same moment of the clip for everyone (clips run on the room's clock). A late arrival hears nothing. */
   private swingKick(avatar: Avatar, now: number): void {
     const { actor } = avatar, blow = KICKS[actor.skill ?? ''], age = now - (actor.animationStartedAt ?? now);
@@ -3151,6 +3360,9 @@ export class BarScene {
         if(action[event.code]){event.preventDefault();if(!event.repeat)this.callbacks.onVehicleControl?.(vehicle.state.id,action[event.code]!);return;}
       }
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
+      // R: the fist fight's guard (on a bike R is its engine, handled above). The touch buttons press these made-up codes for the punches.
+      if (!event.repeat && event.code === 'KeyR') { event.preventDefault(); this.callbacks.onGuard?.(); }
+      if (event.code === 'FightLight' || event.code === 'FightHeavy') { this.callbacks.onPunch?.(event.code === 'FightLight' ? 'light' : 'heavy'); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
       // F1 toggles an upper-body overlay; the locomotion clip keeps owning the legs.
@@ -3158,6 +3370,7 @@ export class BarScene {
       // F lights a persistent cigarette or puts it out; locomotion remains independent.
       if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.('smoke'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
+      if (!event.repeat && event.code === 'KeyZ') { event.preventDefault(); this.callbacks.onShowNames?.(); }
       if (!event.repeat && event.code === 'KeyQ') { event.preventDefault(); this.callbacks.onCameraChange?.(this.rig.cycle(),this.rig.reach); }
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }
       if (!event.repeat && this.callbacks.onSkillKey?.(event.code)) event.preventDefault();
@@ -3168,6 +3381,8 @@ export class BarScene {
       if (event.pointerType === 'touch') { this.touchDown(event); return; }
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (event.button !== 0 && event.button !== 2)) return;
       this.press = { x: event.clientX, y: event.clientY, at: performance.now(), button: event.button,travel:0 };
+      // With the guard up the buttons punch: left a light one, right the heavy one (the drag still turns the view when the mouse is free).
+      if (this.enabled && this.callbacks.onPunch?.(event.button === 0 ? 'light' : 'heavy')) this.press = undefined;
       // A locked pointer cannot be captured, and it looks around anyway.
       if (this.mouseCaptured) return;
       this.dragging = true;
@@ -3186,7 +3401,7 @@ export class BarScene {
       this.dragging = false;
       const press = this.press; this.press = undefined;
       if(press?.button===0&&event.button===0&&press.travel<=6&&this.enabled&&!this.watchingTv&&Math.hypot(event.clientX-press.x,event.clientY-press.y)<=6&&performance.now()-press.at<450&&this.shootFirework())return;
-      if (!press || press.button !== 2 || !this.enabled || this.watchingTv || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6 || performance.now() - press.at > 450) return;
+      if (!press || press.button !== 2 || !this.enabled || this.watchingTv || this.callbacks.fight?.()?.guard || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6 || performance.now() - press.at > 450) return;
       const rect = this.canvas.getBoundingClientRect();
       // With no cursor on the screen, a click is at the middle of the view.
       const x = this.mouseCaptured ? rect.width / 2 : event.clientX - rect.left, y = this.mouseCaptured ? rect.height / 2 : event.clientY - rect.top;

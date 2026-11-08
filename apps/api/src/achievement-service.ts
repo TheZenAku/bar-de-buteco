@@ -1,24 +1,26 @@
 import {and,eq,inArray,isNull,sql} from 'drizzle-orm';
-import {ACHIEVEMENT_SERIES,achievementBadgeId,achievementSeries,crossedLevels,type AchievementEvent,type AchievementView,type Badge} from '@bar/shared';
+import {ACHIEVEMENT_SERIES,achievementBadgeId,achievementSeries,crossedLevels,xpOfCounters,type AchievementEvent,type AchievementView,type Badge} from '@bar/shared';
 import type {Database} from './database/index.js';
+import type {PricingService} from './pricing-service.js';
 import {badges,userAchievements,userBadges,users} from './database/schema.js';
 
 const badgeColumns={id:badges.id,name:badges.name,description:badges.description,icon:badges.icon,color:badges.color,rarity:badges.rarity,image:badges.image};
 
 /** What players earn by playing (docs/sistemas/conquistas.md): a counter per player and series, whose goals give badges. */
 export class AchievementService {
-  constructor(private db:Database){}
+  /** `pricing`: the panel's XP values (`xp:<series>`); without it, the code's. */
+  constructor(private db:Database,private pricing?:PricingService){}
 
-  /** Adds to the counters and gives the badges of the goals they pass. A series or a player that does not exist counts for nothing. */
-  async add(events:readonly AchievementEvent[]):Promise<void>{
+  /** Adds to the counters and gives the badges of the goals they pass, and answers whose counters moved. A series or a player that does not exist counts for nothing. */
+  async add(events:readonly AchievementEvent[]):Promise<string[]>{
     const totals=new Map<string,AchievementEvent>();
     for(const event of events){
       if(!achievementSeries(event.series)||event.amount<=0)continue;
       const key=`${event.userId}\n${event.series}`,total=totals.get(key);
       if(total)total.amount+=event.amount;else totals.set(key,{...event});
     }
-    if(!totals.size)return;
-    await this.db.transaction(async tx=>{
+    if(!totals.size)return [];
+    return this.db.transaction(async tx=>{
       const ids=[...new Set([...totals.values()].map(event=>event.userId))];
       const people=new Set((await tx.select({id:users.id}).from(users).where(inArray(users.id,ids))).map(row=>row.id));
       for(const {userId,series,amount} of totals.values()){
@@ -31,7 +33,14 @@ export class AchievementService {
         const existing=await tx.select({id:badges.id}).from(badges).where(inArray(badges.id,earned));
         if(existing.length)await tx.insert(userBadges).values(existing.map(({id})=>({userId,badgeId:id}))).onConflictDoNothing();
       }
+      return ids.filter(id=>people.has(id));
     });
+  }
+  /** Each player's total XP, read from all of their counters (levels.ts). */
+  async xp(userIds:readonly string[]):Promise<Array<{userId:string;xp:number}>>{
+    if(!userIds.length)return [];
+    const [rows,table]=await Promise.all([this.db.select({userId:userAchievements.userId,series:userAchievements.series,value:userAchievements.value}).from(userAchievements).where(inArray(userAchievements.userId,[...userIds])),this.pricing?.table()]);
+    return userIds.map(userId=>({userId,xp:xpOfCounters(rows.filter(row=>row.userId===userId),table)}));
   }
   /** The badges these players got and were not told about yet, from any source (a goal, the phone, the administration). Told once. */
   async unlocked(userIds:readonly string[]):Promise<Array<{userId:string;badge:Badge}>>{

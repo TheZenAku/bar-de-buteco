@@ -45,6 +45,7 @@
     "assets:moto:sound": "node tools/assets/import-moto-sounds.mjs",
     "assets:kick:sound": "node tools/assets/import-kick-sounds.mjs",
     "assets:kicks": "node tools/assets/measure-kicks.mjs",
+    "assets:punches": "node tools/assets/measure-punches.mjs",
     "assets:cards": "node tools/assets/render-skin-cards.mjs",
     "assets:phone:sound": "node tools/assets/import-phone-sounds.mjs",
     "assets:gps": "tsx --tsconfig tsconfig.base.json tools/assets/build-gps.ts",

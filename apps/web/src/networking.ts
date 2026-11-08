@@ -3,6 +3,7 @@ import type {FireworkShot,StorageView} from '@bar/shared';
 import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
+import {NO_PUNCH,fightMove,punchAllowed,punchKind,streamOf,throwPunch,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
 import {setDoorStates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import type {DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
@@ -18,7 +19,9 @@ export interface NetworkHooks {
   serverPerformance?:(snapshot:ServerPerformance)=>void;
   /** The player just got a badge (docs/sistemas/conquistas.md). */
   achievement?:(badge:Badge)=>void;
-  state:(world:WorldState)=>void; position:(position:Position)=>void;
+  /** The player's XP as the API last counted it, and what was gained since the previous report (docs/sistemas/niveis.md). */
+  xp?:(state:{xp:number;gained:number})=>void;
+  state:(world:WorldState)=>void; position:(position:Position&{rotation?:number})=>void;
   chat:(message:ChatMessage)=>void; status:(message:string,connected:boolean)=>void;
   error:(message:string)=>void; ping:(ms:number)=>void;
   input:()=>Omit<PlayerInput,'seq'>;
@@ -67,6 +70,13 @@ export interface NetworkHooks {
   /** The Morte's scene near this player (docs/sistemas/morte.md), and the victim's own screen: the dark, the phrase, the buttons. */
   deathScene?:(plan:DeathPlan)=>void;
   deathScreen?:(screen:DeathScreen)=>void;
+  /**
+   * The fist fight (fight-controller.ts): for each input being built (`seq`), the guard and a punch thrown with it, given the punches as predicted
+   * (`stream`); after each state, the room's word on the local fight (`acked`: the last input it ran); and a punch that landed near (fight.hit).
+   */
+  fight?:(seq:number,stream:PunchStream,self:PlayerState)=>{fight:boolean;punch?:PunchCommand;rotation?:number};
+  fightState?:(self:PlayerState,acked:number)=>void;
+  fightHit?:(hit:FightHit)=>void;
   /** Rafael's kick landed on this player: the life it took, and who it was. */
   kicked?:(hit:{hp:number;by:string})=>void;
   inventory?:(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>void;
@@ -126,6 +136,10 @@ export class BarNetwork {
     }catch{/* Offline entry: retain the last server reference until the next sample. */}
   }
   private pending:PlayerInput[]=[];
+  /** The local player's punches as predicted (fight.ts, PunchStream): the room's, with the inputs it has not run on top, as for the position. */
+  private punchStream:PunchStream=NO_PUNCH;
+  /** When the last state arrived (performance.now): how old the world being drawn is, for lag compensation. */
+  private stateAt=0;
   private pendingMoto:MotoInput[]=[];
   /** The bike being ridden, as predicted, and its id. */
   private ride?:PredictedRide;
@@ -164,12 +178,12 @@ export class BarNetwork {
   }
   private attach(room:Room):void {
     let removal:{kind:'kick'|'ban';reason:string}|undefined;
-    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;this.sentRear=false;this.sentRotation=undefined;this.sentLamps=0;
+    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.punchStream=NO_PUNCH;this.transportReady=true;this.wasMoving=false;this.sentRear=false;this.sentRotation=undefined;this.sentLamps=0;
     Object.assign(room.reconnection,{minUptime:0,minDelay:500,maxDelay:2000,delay:500,maxRetries:15,maxEnqueuedMessages:0});
     this.hooks.status('Você está no bar',true);
     room.onStateChange((state:any)=>{
       const world=(typeof state.toJSON==='function'?state.toJSON():state) as WorldState;
-      this.clock.sync(world.serverTime);
+      this.clock.sync(world.serverTime);this.stateAt=performance.now();
       if(world.environment)this.environment=world.environment;
       this.world=world;
       // Prediction must collide with doors exactly where the server has them.
@@ -180,8 +194,12 @@ export class BarNetwork {
         this.seq=Math.max(this.seq,self.lastProcessedInput);
         this.pending=this.pending.filter(input=>input.seq>self.lastProcessedInput);
         this.position={x:self.x,y:self.y,z:self.z};
-        if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending)this.position=this.predict(input,self);
+        // The punches too: the room's stream, then the unanswered inputs through the same rules (a punch the room did not take yet is assumed).
+        let stream=streamOf(self.fist);
+        if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending){stream=this.thrown(stream,input);this.position=this.predict(input,self,stream);}
+        this.punchStream=stream;
         this.hooks.position(this.position);
+        this.hooks.fightState?.(self,self.lastProcessedInput);
         this.reconcileMoto(world,self);
       }
     });
@@ -223,7 +241,9 @@ export class BarNetwork {
     room.onMessage('death.scene',(plan:DeathPlan)=>this.hooks.deathScene?.(plan));
     room.onMessage('death.screen',(screen:DeathScreen)=>this.hooks.deathScreen?.(screen));
     room.onMessage('player.kicked',(hit:{hp:number;by:string})=>this.hooks.kicked?.(hit));
+    room.onMessage('fight.hit',(hit:FightHit)=>this.hooks.fightHit?.(hit));
     room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
+    room.onMessage('xp.state',(message:{xp:number;gained:number})=>this.hooks.xp?.(message));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
     room.onMessage('storage.state',(message:{motoId:string;storage:StorageView})=>this.hooks.storageState?.(message));
     room.onMessage('storage.closed',(message:{motoId:string;why:string})=>this.hooks.storageClosed?.(message));
@@ -268,21 +288,26 @@ export class BarNetwork {
     if(isRidingMoto(self.interactionState)){this.wasMoving=false;return;}
     const locked=!!((self.interactionState&&!isRidingHorse(self.interactionState))||self.currentTableId);
     const requested=this.hooks.input();
-    const intention=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
+    let intention:Omit<PlayerInput,'seq'>=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
+    // The fist fight: the guard rides on every input, a punch on the one that throws it (its aim turns the body), a planted punch keeps its facing.
+    const fighting=this.hooks.fight?.(this.seq+1,this.punchStream,self);
+    if(fighting?.fight)intention={...intention,fight:true,running:false,...(fighting.punch?{punch:fighting.punch}:{}),...(fighting.rotation!==undefined&&!locked?{rotation:fighting.rotation}:{})};
     const moving=!!(intention.dx||intention.dz||intention.dy||intention.aim);
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
     // Turning in place (to the selfie's phone, a firework's aim) has to reach the room too.
     const turning=this.sentRotation!==undefined&&Math.abs(normalizeHeading(intention.rotation-this.sentRotation))>.001;
-    if(!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
+    // In the guard every input goes, still or not: the room counts a punch's planted feet in inputs (fight.ts, punchStep).
+    if(!fighting?.fight&&!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
     this.wasMoving=moving;
     this.sentRear=!!intention.rear;
     this.sentRotation=intention.rotation;
     // A drawn vehicle can have many complete turns. Never let that heading poison the unacknowledged walking queue.
     const input={...intention,rotation:normalizeHeading(intention.rotation),seq:++this.seq};
     this.pending.push(input);
-    if(!locked){this.position=this.predict(input,self);this.hooks.position(this.position);}
+    this.punchStream=this.thrown(this.punchStream,input);
+    if(!locked){this.position=this.predict(input,self,this.punchStream);this.hooks.position(input.fight?{...this.position,rotation:input.rotation}:this.position);}
     this.send('player.input',input);
   }
   /**
@@ -338,8 +363,19 @@ export class BarNetwork {
    * The server's step: running only with stamina, a drunk walk drifts (packages/shared/src/needs.ts), the stage only with
    * a pass. The raw input is what is sent.
    */
-  private predict(input:PlayerInput,self:PlayerState):Position {
+  /** The punches after this input, by the room's rule: a punch it carries is thrown when the feet are free (fight.ts). */
+  private thrown(stream:PunchStream,input:PlayerInput):PunchStream {
+    const punch=input.punch;
+    return punch&&input.fight&&punchAllowed(stream,input.seq,punchKind(punch.m))===punch.m?throwPunch(punch,input.seq,input.rotation):stream;
+  }
+  /** The world being drawn: the newest state's time in the room, and how long ago it arrived (ms). */
+  seen():{seen:number;ago:number}{return {seen:this.world?.serverTime??0,ago:this.stateAt?performance.now()-this.stateAt:0};}
+  /** Where the local player is, as predicted (the room's position with the unanswered inputs on top). */
+  predicted():Position {return this.position;}
+  private predict(input:PlayerInput,self:PlayerState,stream:PunchStream=NO_PUNCH):Position {
     if(self.animationState==='fly-fall')return this.position;
+    // In the guard: planted or stepping in while a punch holds the feet, else the guard's pace.
+    if(input.fight&&!self.animationState?.startsWith('fly')&&!isRidingHorse(self.interactionState))return fightMove(this.position,stream,input.seq,input,TICK_MS/1000,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle));
     if(self.animationState?.startsWith("fly"))return flyPlayer(this.position,input,TICK_MS/1000);
     if(isRidingHorse(self.interactionState))return self.animationState==='horse-rear'?this.position:moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
     return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle));

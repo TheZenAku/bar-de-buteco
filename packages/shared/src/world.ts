@@ -313,10 +313,13 @@ function throughDoorway(fromX:number,fromZ:number,x:number,z:number,y:number,wx:
     if(!obstructed(px,pz,y))return {x:px,z:pz};
   }
 }
-/** `stagePass`: may step onto the stage (a paid pass); without one the steps stop the body, as a wall would. */
-export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false,obstacles:readonly Collider[]=[]):Required<Position> {
+/**
+ * `stagePass`: may step onto the stage (a paid pass); without one the steps stop the body, as a wall would. `pace` (m/s) replaces the walking,
+ * running or cane speed: the fist fight's guard (FIGHT.speed) and a punch's step in (fight.ts, punchStep).
+ */
+export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false,obstacles:readonly Collider[]=[],pace?:number):Required<Position> {
   const magnitude=Math.hypot(input.dx,input.dz);
-  const scale=(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED)*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
+  const scale=(pace??(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED))*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
   // A vehicle can stop over someone. Let them leave its hull, then block re-entry.

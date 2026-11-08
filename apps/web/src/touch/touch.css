@@ -47,6 +47,11 @@ html.touch-ui #world{touch-action:none}
 .tp-horn{--dx:0px;--dy:calc(var(--r) + var(--b) * 1.04)}
 .tp-brake{--dx:0px;--dy:calc(var(--r) + var(--b) * 2.04)}
 .tp[data-kind=bike] :is(.tp-brake,.tp-horn),.tp[data-kind=car] :is(.tp-brake,.tp-horn){display:grid}
+/* The fist fight: the punches take the brake and horn places, on foot with the guard up. */
+.tp-punch,.tp-heavy{display:none;--w:calc(var(--b) * .92)}
+.tp-punch{--dx:0px;--dy:calc(var(--r) + var(--b) * 1.04)}
+.tp-heavy{--dx:0px;--dy:calc(var(--r) + var(--b) * 2.04)}
+.tp[data-guard=on][data-kind=walk] :is(.tp-punch,.tp-heavy){display:grid}
 .tp[data-kind=car] .tp-run{display:none}
 /* On the horse the bike's Shift (rearing) is the only extra. */
 

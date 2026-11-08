@@ -3,7 +3,7 @@ import {statfs} from 'node:fs/promises';
 import os from 'node:os';
 import {and,desc,eq,gte,ilike,inArray,isNotNull,isNull,lt,or,sql,type Column,type SQL} from 'drizzle-orm';
 import {alias} from 'drizzle-orm/pg-core';
-import {ACCESS_LOG_EVENTS,barDayKey,startOfBarDay,DEATH,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,vehicleName,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
+import {ACCESS_LOG_EVENTS,ADMIN_XP_REMOVED_SERIES,ADMIN_XP_SERIES,DAILY_XP_SERIES,MAX_LEVEL,dailyXp,levelOf,xpAtLevel,xpOfCounters,barDayKey,startOfBarDay,DEATH,DEFAULT_SKIN,INVENTORY_CAPACITY,ITEM_LOG_REASONS,LEDGER_SOURCES,MOTO_NAME,vehicleName,SKILLS,SKINS,skillById,WORLD_LOG_EVENTS,adminActionLabel,itemById,ledgerText,ledgerSource,priceEntry,
   type AdminEconomy,type AdminLedgerEntry,type AdminLogCategory,type AdminLogEntry,type AdminLogPage,type AdminPlayerDetail,type AdminPlayerOperation,type AdminReport,
   type AdminServerInfo,type AdminSummary,type LedgerSource,type PublicUser} from '@bar/shared';
 import type {MetricsRegistry} from '@bar/shared/metrics';
@@ -91,6 +91,9 @@ export class AdminConsole {
         .from(t.reports).leftJoin(reporter,eq(t.reports.reporterId,reporter.userId)).leftJoin(resolver,eq(t.reports.resolvedBy,resolver.userId)).where(eq(t.reports.userId,id)).orderBy(desc(t.reports.createdAt)).limit(30),
       this.db.select({n:sql<number>`count(*)`.mapWith(Number)}).from(t.reports).where(eq(t.reports.reporterId,id)),
     ]);
+    const [counters,table]=await Promise.all([this.db.select({series:t.userAchievements.series,value:t.userAchievements.value}).from(t.userAchievements).where(eq(t.userAchievements.userId,id)),this.pricing.table()]);
+    // Today's bonus as the player's window reads it (wardrobe.ts dailyView).
+    const claimed=counters.find(c=>c.series===`${DAILY_XP_SERIES}:${dayKey()}`),yesterday=counters.find(c=>c.series===`${DAILY_XP_SERIES}:${dayKey(new Date(Date.now()-DAY))}`);
     const names=await this.names(ledger.flatMap(entry=>entry.reason.startsWith('pix:')||entry.reason.startsWith('trade:')?[entry.reason.split(':')[2]!]:[]));
     const state=states.get(id)!;
     // The last login: an active session, or the log when every session ended.
@@ -105,6 +108,7 @@ export class AdminConsole {
       skills:SKILLS.map(skill=>{const owned=skills.find(s=>s.skillId===skill.id);return {id:skill.id,name:skill.name,owned:!!owned,acquiredAt:iso(owned?.acquiredAt)};}),
       sessions:{active:sessions?.active??0,lastLoginAt:iso(lastLogin)},
       stats:{gamesPlayed:stats?.gamesPlayed??0,wins:stats?.blackjackWins??0,losses:stats?.blackjackLosses??0,draws:stats?.blackjackDraws??0},
+      levels:{xp:xpOfCounters(counters,table),daily:{day:claimed?.value??(yesterday?yesterday.value%dailyXp(table).length+1:1),claimed:!!claimed}},
       history,
       reports:{against:against.map(r=>({id:r.id,reason:r.reason,reporterId:r.reporterId,reporterName:r.reporterName,targetName:row.displayName,targetId:id,createdAt:r.createdAt.toISOString(),
         resolvedAt:iso(r.resolvedAt),resolvedByName:r.resolvedByName,resolution:r.resolution})),made:made?.n??0},
@@ -215,6 +219,33 @@ export class AdminConsole {
           await sync();
           return {message:operation.grant?`Habilidade ${skill.name} adicionada.`:`Habilidade ${skill.name} retirada.`};
         }
+        case 'xp':{
+          // XP is read from the counters (levels.ts): the change goes to the administration's two (added, taken), kept at their smallest.
+          requireWallet();
+          const {mode,amount}=operation;
+          if(!Number.isSafeInteger(amount)||amount<0)throw new AdminError(400,'Informe um número inteiro.');
+          if(mode==='level'&&(amount<1||amount>MAX_LEVEL))throw new AdminError(400,`Escolha um nível de 1 a ${MAX_LEVEL}.`);
+          if((mode==='add'||mode==='remove')&&!amount)throw new AdminError(400,'Informe uma quantidade maior que zero.');
+          const rows=await tx.select({series:t.userAchievements.series,value:t.userAchievements.value}).from(t.userAchievements).where(eq(t.userAchievements.userId,target.id)).for('update');
+          const own=(series:string)=>rows.find(r=>r.series===series)?.value??0,adjusted=own(ADMIN_XP_SERIES)-own(ADMIN_XP_REMOVED_SERIES);
+          const rest=xpOfCounters(rows.filter(r=>r.series!==ADMIN_XP_SERIES&&r.series!==ADMIN_XP_REMOVED_SERIES),await this.pricing.table());
+          const before=Math.max(0,rest+adjusted),after=mode==='add'?before+amount:mode==='remove'?before-amount:mode==='set'?amount:xpAtLevel(amount);
+          if(after<0)throw new AdminError(409,`O jogador tem só ${before.toLocaleString('pt-BR')} XP.`);
+          if(after===before)return {message:'O XP já é este.'};
+          const net=after-rest;
+          for(const [series,value] of [[ADMIN_XP_SERIES,Math.max(0,net)],[ADMIN_XP_REMOVED_SERIES,Math.max(0,-net)]] as const)
+            await tx.insert(t.userAchievements).values({userId:target.id,series,value}).onConflictDoUpdate({target:[t.userAchievements.userId,t.userAchievements.series],set:{value,updatedAt:new Date()}});
+          const from=levelOf(before).level,to=levelOf(after).level,diff=Math.abs(after-before).toLocaleString('pt-BR');
+          await record(after>before?'xp-add':'xp-remove',`${diff} XP (${before.toLocaleString('pt-BR')} → ${after.toLocaleString('pt-BR')}; nível ${from}${from===to?'':` → ${to}`}).`);
+          return {message:`${after>before?'Adicionados':'Retirados'} ${diff} XP: nível ${to}. Se estiver no bar, o jogador vê em alguns segundos.`};
+        }
+        case 'daily-reset':{
+          requireWallet();
+          const removed=await tx.delete(t.userAchievements).where(and(eq(t.userAchievements.userId,target.id),eq(t.userAchievements.series,`${DAILY_XP_SERIES}:${dayKey()}`))).returning({value:t.userAchievements.value});
+          if(!removed.length)throw new AdminError(409,'O jogador ainda não recebeu o bônus de hoje.');
+          await record('daily-reset',`Dia ${removed[0]!.value} da sequência.`);
+          return {message:'Bônus de hoje liberado de novo: o XP do dia pode ser recebido outra vez. As moedas do dia não se repetem.'};
+        }
       }
     });
     if('owner' in result)await ensureOwnerAdministrator(this.db);
@@ -289,8 +320,12 @@ export class AdminConsole {
         .then(rows=>rows.map(r=>({id:`denuncia:${r.id}`,at:r.at.toISOString(),category:'denuncias' as const,kind:r.resolvedAt?'resolved':'open',title:r.resolvedAt?'Denúncia (resolvida)':'Denúncia',detail:r.reason,amount:null,playerId:r.playerId,playerName:r.playerName,actorName:r.reporterName}))));
     }
     const merged=(await Promise.all(jobs)).flat().sort((a,b)=>b.at.localeCompare(a.at)||b.id.localeCompare(a.id));
-    const entries=merged.slice(0,limit);
-    return {entries,next:merged.length>limit?entries[entries.length-1]!.at:null};
+    // The cursor is a time (`before` is strict): lines written in one transaction share it, so a page never splits them.
+    // shortcut: a tie larger than one source's `take` still loses lines; a compound (time, id) cursor if that ever happens.
+    let end=Math.min(limit,merged.length);
+    while(end>0&&end<merged.length&&merged[end]!.at===merged[end-1]!.at)end++;
+    const entries=merged.slice(0,end);
+    return {entries,next:merged.length>end?entries[entries.length-1]!.at:null};
   }
   private async gameLogEntries(source:'api'|'world',window:SQL|undefined,person:SQL|undefined,take:number):Promise<AdminLogEntry[]>{
     const name=alias(t.profiles,'log_name');

@@ -7,6 +7,8 @@ import {POOL_BET,POOL_LEVEL_STAKES} from './pool/index.js';
 import {DEFAULT_SKIN,SKINS} from './skins.js';
 import {SKILLS} from './profile.js';
 import {VEHICLE_CATALOG,vehiclePriceKey,type VehicleOffer} from './vehicle-models.js';
+import {ACHIEVEMENT_SERIES} from './achievements.js';
+import {DAILY_XP,XP_PER_UNIT} from './levels.js';
 
 /**
  * Everything in the game that costs or pays coins, under one key each ("item:coxinha", "media:tv", "job:bar").
@@ -14,7 +16,7 @@ import {VEHICLE_CATALOG,vehiclePriceKey,type VehicleOffer} from './vehicle-model
  * in the panel's Preços (apps/api/src/pricing-service.ts keeps the overrides). The API answers the effective table to
  * the browser (GET /api/prices) and to the world, which charges and pays with it and tells the players when it changes.
  */
-export type PriceGroup='itens'|'skins'|'midia'|'palco'|'jogos'|'trabalho'|'highfood'|'recompensas';
+export type PriceGroup='itens'|'skins'|'midia'|'palco'|'jogos'|'trabalho'|'highfood'|'recompensas'|'xp';
 export interface PriceEntry {
   key:string;group:PriceGroup;label:string;
   /** Where the value is used, in the panel's words. */
@@ -31,6 +33,7 @@ export const PRICE_GROUPS:ReadonlyArray<{id:PriceGroup;label:string;description:
   {id:'trabalho',label:'Trabalho',description:'O que o bar paga por tarefa concluída e o teto diário por jogador.'},
   {id:'highfood',label:'Highfood e veículos',description:'A moto, o guincho e o que cada entrega paga. Veja o cálculo em docs/sistemas/highfood.md antes de mexer: é a maior torneira de moedas do jogo.'},
   {id:'recompensas',label:'Recompensas',description:'Moedas que entram na economia sem compra: boas-vindas e bônus diário.'},
+  {id:'xp',label:'XP e níveis',description:'Quanto XP cada ação dá e quanto vale cada dia do bônus diário. O XP é recalculado do histórico: mudar um valor sobe ou desce o nível de todo mundo que já fez aquilo.'},
 ];
 
 const MEDIA_LABELS:Record<MediaPriceKind,string>={jukebox:'Jukebox',tv:'TV do salão',telao:'Telão do palco'};
@@ -74,7 +77,9 @@ export function priceEntries():readonly PriceEntry[]{
     {key:'highfood:late-pct',group:'highfood',label:'Pagamento depois disso (%)',hint:'Porcentagem do valor normal',defaultValue:50,min:0,max:100},
     {key:'cap:highfood-daily',group:'highfood',label:'Teto diário do Highfood',hint:'Máximo que um jogador ganha entregando por dia',defaultValue:700,min:0,max:1_000_000},
     {key:'reward:initial',group:'recompensas',label:'Moedas de boas-vindas',hint:'Na primeira vez que a conta abre a carteira',defaultValue:0,min:0,max:1_000_000},
-    {key:'reward:daily',group:'recompensas',label:'Bônus diário',hint:'Resgatado uma vez por dia na coleção (0 desativa)',defaultValue:0,min:0,max:1_000_000},
+    {key:'reward:daily',group:'recompensas',label:'Bônus diário',hint:'Junto do XP, na janela do bônus diário (0 = só XP)',defaultValue:0,min:0,max:1_000_000},
+    ...ACHIEVEMENT_SERIES.filter(series=>series.id in XP_PER_UNIT).map(series=>({key:`xp:${series.id}`,group:'xp' as const,label:series.name,hint:`XP por ${series.unit[0]}`,defaultValue:XP_PER_UNIT[series.id]!,min:0,max:10_000})),
+    ...DAILY_XP.map((xp,i)=>({key:`xp:daily-${i+1}`,group:'xp' as const,label:`Bônus diário: dia ${i+1}`,hint:i===DAILY_XP.length-1?'Último dia da sequência':'XP no resgate deste dia',defaultValue:xp,min:0,max:100_000})),
   ];
 }
 export const priceEntry=(key:string)=>priceEntries().find(entry=>entry.key===key);

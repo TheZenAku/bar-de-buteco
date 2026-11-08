@@ -35,5 +35,18 @@
   "Text": 6000,
   "Thank": 3000,
   "Pick": 3433,
-  "Order": 1933
+  "Order": 1933,
+  "FightIdle": 2967,
+  "Jab": 1026,
+  "Cross": 1156,
+  "Hook": 974,
+  "Heavy": 1573,
+  "HitLight": 848,
+  "HitMedium": 1000,
+  "HitSide": 1121,
+  "HitHeavy": 1533,
+  "HitBack": 1267,
+  "FightBack": 1200,
+  "FightLeft": 1033,
+  "FightRight": 1033
 }

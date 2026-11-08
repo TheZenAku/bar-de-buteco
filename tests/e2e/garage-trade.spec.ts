@@ -21,12 +21,12 @@ const place=async(page:Page,x:number,y:number,z:number)=>{
 };
 const ownBike=(page:Page,id:string)=>page.evaluate(owner=>Object.values((window as any).barDebug.snapshot().world.motos??{}).find((moto:any)=>moto.ownerId===owner) as any,id);
 const motoOnScreen=(page:Page)=>page.evaluate(()=>(window as any).barDebug.motos()[0]);
-const labelOf=(page:Page,name:string)=>page.evaluate(wanted=>{
-  const label=[...document.querySelectorAll<HTMLElement>('.world-label')].find(node=>node.textContent===wanted);
+const labelOf=async(page:Page,name:string)=>{await page.keyboard.press('z');return page.evaluate(wanted=>{
+  const label=[...document.querySelectorAll<HTMLElement>('.world-label .label-name')].find(node=>node.textContent===wanted)?.closest('.world-label');
   if(!label)return null;
   const box=label.getBoundingClientRect();
   return {x:box.x+box.width/2,y:box.y+box.height+40};
-},name);
+},name);};
 /** Right click on someone's body, under the label that follows them. */
 const menuOnPlayer=async(page:Page,name:string)=>{
   await expect(async()=>{

@@ -6,7 +6,7 @@ Ao morrer, o personagem entra imediatamente em **ragdoll**, sincronizado com os 
 
 ## Causa da morte
 
-O jogo **ainda não tem causa de morte própria**: `needs.ts` só desmaia (e o desmaio não mata). A única causa é o botão **Matar jogador (teste)** da administração. Quando uma causa de verdade existir, basta chamar `deaths.kill(id, causa)` em `BarRoom.ts` (o `cause` vai para o log `death_start`).
+Desde 2026-11-08 a [luta](luta.md) mata: o soco que esvazia a vida e a reserva do coração derruba o corpo em ragdoll, e quando ele para a vida acaba e a morte começa (causa `vida`). Além disso, há o botão **Matar jogador (teste)** da administração. Quando uma causa de verdade existir, basta chamar `deaths.kill(id, causa)` em `BarRoom.ts` (o `cause` vai para o log `death_start`).
 
 Admin → Jogadores → ficha → aba **Moderação** → *Matar jogador (teste)*, com motivo obrigatório (o mesmo formulário de confirmação do banimento). `POST /api/admin/player {op:'kill'}`:
 

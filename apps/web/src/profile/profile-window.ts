@@ -1,7 +1,8 @@
-import {BADGE_RARITY_INFO,formatPhoneNumber,isSkillKey,isTakenKey,keyLabel,loadoutOf,PROFILE,SKINS,skillsOf,type AchievementView,type Badge,type BadgeRarity,type ProfileView,type SkillLoadouts} from '@bar/shared';
+import {BADGE_RARITY_INFO,formatPhoneNumber,levelOf,rankOf,isSkillKey,isTakenKey,keyLabel,loadoutOf,PROFILE,SKINS,skillsOf,type AchievementView,type Badge,type BadgeRarity,type ProfileView,type SkillLoadouts} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {price} from '../prices';
 import {uiIcon} from '../ui-icons';
+import {rankIcon} from '../levels/rank-icon';
 import {badgeMedal,openBadgeCard,rarityAttributes} from './badge-card';
 import {floatingWindow,type FloatingWindow} from './floating-window';
 import './profile.css';
@@ -120,10 +121,15 @@ export function createProfileWindow(hooks:ProfileHooks){
       <div class="pf-keyrow"><span>${uiIcon('keyboard')} Tecla</span><button type="button" class="pf-key${capturing?' listening':''}" data-pf="key" aria-label="Mudar a tecla da skill">${capturing?'Aperte uma tecla…':`<kbd>${e(keyLabel(loadout.key))}</kbd>Mudar`}</button></div>
       <p class="pf-hint${keyError?' error':''}" role="status">${e(keyError||'Letras e números que o jogo ainda não usa. Vale só para esta skin.')}</p>`;
   }
+  /** Level, rank and the XP bar, for anyone's profile (docs/sistemas/niveis.md). */
+  function levelHtml(xp:number):string {
+    const p=levelOf(xp),rank=rankOf(p.level),pct=p.need?p.into/p.need*100:100;
+    return `<div class="pf-level" style="--rank:${rank.colors[0]}">${rankIcon(p.level,36)}<b>Nível <span>${p.level}</span> · ${e(rank.name)}</b><span class="lv-bar" role="progressbar" aria-label="XP do nível" aria-valuemin="0" aria-valuemax="${p.need||p.xp}" aria-valuenow="${p.need?p.into:p.xp}"><i class="lv-fill" style="width:${pct.toFixed(1)}%"></i><em class="lv-xp">${p.need?`${p.into.toLocaleString('pt-BR')} / ${p.need.toLocaleString('pt-BR')} XP`:`${p.xp.toLocaleString('pt-BR')} XP · máximo`}</em></span></div>`;
+  }
   function render():void {
     if(!window_||!view)return;
     const v=view,photo=v.photo?`<img src="/api/phone/gram/avatars/${encodeURIComponent(v.id)}?v=${e(v.photo)}" alt="">`:e(v.name.slice(0,1).toUpperCase());
-    window_.head.innerHTML=`<span class="pf-avatar" style="--avatar:${e(v.color)}">${photo}</span><div class="pf-id"><h2>${e(v.name)}</h2><button type="button" class="pf-gram" data-pf="gram" title="Abrir no Highgram">${uiIcon('gram')}<span>@${e(v.handle)}</span>${uiIcon('chevronRight')}</button></div>`;
+    window_.head.innerHTML=`<span class="pf-avatar" style="--avatar:${e(v.color)}">${photo}</span><div class="pf-id"><h2>${e(v.name)}</h2>${levelHtml(v.xp)}<button type="button" class="pf-gram" data-pf="gram" title="Abrir no Highgram">${uiIcon('gram')}<span>@${e(v.handle)}</span>${uiIcon('chevronRight')}</button></div>`;
     window_.setLabel(v.mine?'Seu perfil':`Perfil de ${v.name}`);
     window_.body.innerHTML=`${v.mine?`<nav class="pf-tabs" role="tablist"><button type="button" role="tab" data-pf="tab" data-tab="profile" aria-selected="${tab==='profile'}">Perfil</button><button type="button" role="tab" data-pf="tab" data-tab="achievements" aria-selected="${tab==='achievements'}">Conquistas</button><button type="button" role="tab" data-pf="tab" data-tab="skill" aria-selected="${tab==='skill'}">Skill</button></nav>`:''}<div class="pf-panel">${tab==='skill'&&v.mine?skillHtml(v):tab==='achievements'&&v.mine?achievementsHtml():profileHtml(v)}</div>`;
     if(tab==='profile'||!v.mine)void showPortrait(v);

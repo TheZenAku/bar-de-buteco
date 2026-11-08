@@ -5,7 +5,7 @@ import {overviewSection} from './overview';
 import {playersSection} from './players';
 import {reportsSection} from './reports';
 import {economySection} from './economy';
-import {pricesSection} from './prices';
+import {levelsSection,pricesSection} from './prices';
 import {logsSection} from './logs';
 import {worldSection} from './world';
 import {environmentSection} from './environment';
@@ -24,6 +24,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'reports',label:'Denúncias',icon:'flag',description:'O que os jogadores denunciaram, para analisar e marcar como resolvido.',factory:reportsSection},
   {id:'economy',label:'Economia',icon:'trendingUp',description:'Moedas em circulação, inflação, de onde as moedas vêm e para onde vão.',factory:economySection},
   {id:'prices',label:'Preços',icon:'tag',description:'Quanto custa cada coisa e quanto o bar paga. As mudanças valem para todos em poucos segundos.',factory:pricesSection},
+  {id:'levels',label:'Níveis e XP',icon:'trophy',description:'Quanto XP cada ação dá e o bônus diário de cada dia. O XP de um jogador, o nível e o bônus dele ficam na ficha, aba Nível.',factory:levelsSection},
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
   {id:'vehicles',label:'Veículos',icon:'bike',description:'Gerencie a frota dos jogadores, registre veículos, personalize placas e use o spawn de todos os modelos.',factory:vehiclesSection},

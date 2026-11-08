@@ -1,3 +1,4 @@
+import {nameLabel,seeName} from './names';
 import {test,expect,type Browser,type Page} from '@playwright/test';
 // Chromium's fake microphone (launch flags in playwright.config.ts) beeps about once a second.
 const password='ButecoTeste2026!';
@@ -29,7 +30,7 @@ test('proximity voice: microphone, relay, spatial playback, muting and push-to-t
   // Heard nearby, loud, and the label lights up while speaking.
   await expect.poll(()=>played(b.page,a.id),{timeout:20000}).toBeGreaterThan(20);
   expect((await voice(b.page)).peers.find((p:any)=>p.id===a.id).gain).toBeGreaterThan(.5);
-  await expect(b.page.locator('.world-label.speaking').filter({hasText:'Falante'})).toBeVisible({timeout:10000});
+  await seeName(b.page,nameLabel(b.page,'Falante','.speaking'),10000);
   // Other voices off: nothing more is played.
   await b.page.locator('#voice-listen').click();await expect(b.page.locator('#voice-listen')).toHaveAttribute('aria-pressed','false');
   await b.page.waitForTimeout(1000);const silenced=await played(b.page,a.id);await b.page.waitForTimeout(2500);

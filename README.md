@@ -48,6 +48,7 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | Arrastar o mouse / roda | Girar a câmera e o olhar da cabeça / ajustar distância |
 | E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto; levantar a moto caída |
 | W/S, A/D, Espaço (na moto) | Acelerar, frear e dar ré; virar; freio de mão ([moto de entrega](docs/sistemas/moto.md)) |
+| Z | Mostrar por alguns segundos os nomes acima das pessoas (ocultos por padrão) |
 | Z, C, X, H (na moto) | Seta esquerda, seta direita, pisca-alerta, farol alto |
 | G | Dançar / parar |
 | V | Acenar para o pessoal |
@@ -70,6 +71,8 @@ A **jukebox** e as **TVs** são independentes: cada uma com seu link (YouTube, V
 As **portas** do mapa abrem e fecham com **E**, girando nas próprias dobradiças, sincronizadas para todos e com colisão que acompanha a folha; o personagem se vira para o objeto e estende a mão ao usar portas, jukebox e TVs. Veja [portas](docs/sistemas/doors.md). No balcão, escolha **long neck** ou **copo de chopp**: o Magrão cobra, o personagem espera o atendimento e bebe com o objeto real na mão. Veja [cerveja](docs/sistemas/drinks.md).
 
 A **economia** usa moedas do jogo, sem dinheiro real. Sentado a uma mesa, aperte **P** e o **Tonico** busca o pedido no balcão e leva até você, por um caminho calculado no mapa. A jukebox, as TVs e o **telão do palco** cobram por vídeo novo, e o balcão cobra a bebida. Pedido cancelado volta para a carteira. As moedas vêm do emprego de **Ajudante do Magrão** (**J**), com poucas vagas, tarefas por estação e limite diário. A administração acompanha e ajusta tudo em **⚙ → Mundo ao vivo**. Veja [economia](docs/sistemas/economia.md). Os gráficos têm presets, resolução dinâmica, sombras, névoa e limite de FPS em **Configurações** ([gráficos](docs/sistemas/graficos.md)). O que falta da lista de funcionalidades e o plano estão em [funcionalidades](docs/projeto/funcionalidades.md).
+
+Tudo o que se faz no bar dá **XP**: o nível vai de 1 a 100, com dez postos e um ícone para cada nível, mostrado no HUD, ao lado do nome e no perfil. O botão de presente, ao lado do nível, abre o **bônus diário** (XP crescente em sete dias seguidos, mais as moedas de `reward:daily`). Veja [níveis](docs/sistemas/niveis.md).
 
 O personagem tem **vida, fôlego, fome, sede, bexiga e embriaguez**, no canto inferior direito da tela. Correr cansa, a cerveja sobe (e enche a bexiga: use os banheiros com **E**), quem bebe demais ganha postura e caminhada próprias, cambaleia, apaga e se levanta antes de voltar ao normal; a galera leva quem exagerou para tomar um ar na calçada. Veja [necessidades](docs/sistemas/needs.md).
 

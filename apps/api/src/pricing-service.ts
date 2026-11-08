@@ -66,7 +66,9 @@ export class PricingService {
       }
       if(!applied.length)return {changed:0};
       const id=randomUUID();
-      await tx.insert(moderationActions).values({id,actorId,userId:null,action:'price-set',reason:`${reason} · ${applied.join('; ')}.`});
+      // XP values (Níveis e XP) are not prices: kept out of the economy's count of price changes.
+      const action=changes.every(change=>change.key.startsWith('xp:'))?'xp-values-set':'price-set';
+      await tx.insert(moderationActions).values({id,actorId,userId:null,action,reason:`${reason} · ${applied.join('; ')}.`});
       await tx.insert(controls).values({id,payload:{id,action:'prices',issuedAt:Date.now()}});
       return {changed:applied.length};
     });

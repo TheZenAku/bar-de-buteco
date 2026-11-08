@@ -17,6 +17,7 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 | Denúncias | A fila de denúncias, para resolver com uma decisão registrada ou reabrir |
 | Economia | Moedas em circulação, inflação, de onde as moedas vêm e para onde vão, distribuição e maiores saldos |
 | Preços | Todos os preços e pagamentos do jogo numa tabela editável |
+| Níveis e XP | Quanto XP cada ação dá e quanto vale cada dia do bônus diário, na mesma tabela editável dos preços ([niveis.md](niveis.md#na-administração)) |
 | Logs | Uma linha do tempo de tudo o que ficou registrado, com filtros |
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
 | Veículos | Cadastro de veículos de todos os jogadores, incluindo offline e garagem: reparar, abastecer, recolher, transferir, pintar e excluir. Mantém também spawn/despawn dos veículos do mapa ([moto.md](moto.md#spawnar-e-despawnar)) |
@@ -59,12 +60,13 @@ As migrações **`022_vehicle_revision.sql`** e **`023_admin_vehicle_requests.sq
 
 À esquerda: **Buscar jogador** (nome, usuário ou e-mail), filtros **Todos**, **No bar** (quem o mundo diz que está conectado agora), **Administradores**, **Banidos** e **E-mail pendente**, a ordem (**Mais recentes**, **Nome**, **Maior saldo**), **Atualizar painel** e páginas de 20 contas. Quem está no bar tem um ponto ciano ao lado do nome.
 
-À direita, a ficha: nome, e-mail, usuário, selos (conta principal, administrador, no bar, banido, expulsão registrada, e-mail pendente) e o **Saldo atual**, sempre à vista, e cinco abas (a aba escolhida continua ao trocar de jogador):
+À direita, a ficha: nome, e-mail, usuário, selos (conta principal, administrador, no bar, banido, expulsão registrada, e-mail pendente) e o **Saldo atual**, sempre à vista, e seis abas (a aba escolhida continua ao trocar de jogador):
 
 | Aba | Conteúdo |
 | --- | --- |
 | Resumo | Conta criada, último login, sessões abertas, número do celular, skin em uso, partidas de blackjack, denúncias recebidas e feitas, onde está no bar agora. **Nome no jogo** com motivo (vale a partir da próxima entrada no bar), **Confirmar e-mail** e **Encerrar sessões** (desconecta a conta em todos os navegadores; se estiver no bar, sai em alguns segundos) |
 | Carteira | Ganhos e gastos dos últimos 30 dias, o ajuste manual de moedas e as últimas 40 movimentações com origem e descrição |
+| Nível | Nível, posto e XP com a barra do HUD. **Ajustar XP**: adicionar, retirar, definir o XP total ou definir o nível (vai para o começo dele), com prévia do resultado e motivo. **Bônus diário**: o dia da sequência e se já recebeu hoje, com **Liberar o bônus de hoje de novo** ([niveis.md](niveis.md#na-administração)) |
 | Itens e skins | A mochila (quantidade de cada item), **Entregar**/**Retirar** itens respeitando o limite de cada pilha e as 12 posições da mochila; as skins da coleção, com **Dar skin**/**Retirar skin** (retirar a skin em uso veste o Nathan); as habilidades, com **Dar habilidade**/**Retirar habilidade**. O mundo relê a mochila na hora (controle `sync`) |
 | Moderação | Expulsar, desfazer expulsão, banir, desbanir, dar ou remover administrador, e as denúncias contra a conta |
 | Histórico | Toda ação da administração sobre a conta, com a reversão de cada uma quando ela existe |

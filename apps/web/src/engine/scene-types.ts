@@ -1,5 +1,5 @@
 import type { CameraMode } from './camera-rig';
-import type {MusicianState} from '@bar/shared';
+import type {FistState,MusicianState,PunchId} from '@bar/shared';
 
 /** Small presentation-only contracts. All game rules belong to the server. */
 export interface SceneActor {
@@ -59,6 +59,18 @@ export interface SceneActor {
   skill?: string;
   /** The stage spot this player plays at, as the room syncs it (packages/shared/src/musicians.ts). */
   musician?: MusicianState;
+  /** The fist fight as the room has it (packages/shared/src/fight.ts): the guard, the last punch, the last blow taken. */
+  fist?: Partial<FistState>;
+}
+
+/**
+ * The local player's fight as drawn ahead of the room (apps/web/src/fight/fight-controller.ts): the guard asked for here, the punch from the click
+ * (performance.now), and the blow taken from the room's message.
+ */
+export interface LocalFightView {
+  guard: boolean;
+  punch?: { move: PunchId; n: number; startedAt: number; landed?: boolean };
+  blow?: { reaction: string; yaw: number; startedAt: number; until: number };
 }
 
 export interface SceneWorld {
@@ -116,6 +128,8 @@ export interface SceneCallbacks {
   onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette' | 'cross-arms') => void;
   onChat?: () => void;
   onSkins?: () => void;
+  /** Z: the names over the heads show for a few seconds. */
+  onShowNames?: () => void;
   /** B: an administrator takes off or lands (the room refuses anyone else). */
   onFly?: () => void;
   /** A key the game has no use for on foot, pressed in the world: true when it was the active skill's. */
@@ -138,4 +152,8 @@ export interface SceneCallbacks {
   /** The player's overall volume, for world effects including engines and footsteps (0–1). */
   motoVolume?: () => number;
   onVehicleControl?:(id:string,action:string)=>void;
+  /** The fist fight: R (guard up or down), a mouse button or touch button with the guard up (true when it threw, so the click is not the view's), and what this browser draws ahead of the room. */
+  onGuard?:()=>void;
+  onPunch?:(kind:'light'|'heavy')=>boolean;
+  fight?:()=>LocalFightView|undefined;
 }

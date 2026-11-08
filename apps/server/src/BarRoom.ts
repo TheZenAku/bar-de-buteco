@@ -62,8 +62,9 @@ import { BotRunner } from './world/bots.js';
 import { PhoneCalls, type PhoneCall } from './world/phone-calls.js';
 import { AchievementTracker } from './world/achievements.js';
 import { DeathDirector } from './world/death.js';
+import { FightDirector } from './world/fight.js';
 import { DEATH_GONE_STATE, DEATH_STATE, SCENE_AUDIO_RADIUS, SERIES_CATEGORY, deathInputSchema, dominantCategory, type DeathPlan, type MorteCategory } from '@bar/shared';
-import { ACHIEVEMENT_BLADDER_MIN, ACHIEVEMENT_CALL_MS, seriesOfItem, type Badge } from '@bar/shared';
+import { ACHIEVEMENT_BLADDER_MIN, ACHIEVEMENT_CALL_MS, levelOf, rankOf, seriesOfItem, type Badge } from '@bar/shared';
 import { PHONE, isJpeg, phoneCallIdSchema, phoneCallSchema, phonePingSchema, type PhoneCallEnd, type PhoneCallView, type PhonePing } from '@bar/shared';
 
 // Interactions need the player to touch the object; the server tolerates a little drift from latency.
@@ -80,7 +81,14 @@ const MOTO_KNOCK_GAP_MS = 500, MOTO_FALL_FORCE = .4;
 /** The Player.interactionState of a body thrown by a crash, until it has got up; and of someone lifting a fallen bike. */
 const THROWN = 'thrown', LIFTING = 'moto-lift:';
 /** What a kick can interrupt: being free, and what ends with nothing left hanging (another kick, a cigarette). */
-const KICKABLE = new Set(['', 'kick', 'smoke', 'cigarette']);
+const KICKABLE = new Set(['', 'kick', 'smoke', 'cigarette', 'stagger']);
+/**
+ * The fist fight (world/fight.ts). While a punch holds the feet or a blow stuns, these wait (the hands are busy); with the guard up these are refused
+ * (dancing, smoking, eating and the like need the guard down first: R). Anything else that takes the player (a chair, a bike) lowers the guard.
+ */
+const FIGHT_BUSY = new Set(['player.interact', 'player.emote', 'player.skill', 'moto.mount', 'inventory.use', 'inventory.discard', 'storage.open', 'garage.take', 'garage.store', 'job.start', 'job.work',
+  'food.start', 'food.unload', 'food.talk', 'food.locker', 'food.deliver', 'moto.repair', 'blackjack.join', 'truco.join', 'foosball.join', 'pool.join', 'stage.buy', 'firework.fire', 'trade.request']);
+const FIGHT_GUARDED = new Set(['player.emote', 'inventory.use', 'firework.fire']);
 /** Taking the bag out of the box, and the customer's dialog. */
 const FOOD_UNLOAD = 'food-unload', FOOD_TALK = 'food-talk', FOOD_LOCKER = 'food-locker';
 /** How often the customers' profiles are read again from the API. */
@@ -250,7 +258,23 @@ export class BarRoom extends Room<{ state: BarState }> {
     category: id => dominantCategory(this.deathActivity.get(id)),
     log: (event, details) => this.log(event, details),
   });
+  /** The fist fight (docs/sistemas/luta.md): guards, punches on their way, blows. The rules are shared with the browser (packages/shared/src/fight.ts). */
+  private readonly fights = new FightDirector({
+    guardRefusal: player => this.guardRefusal(player),
+    keepsGuard: player => this.keepsGuard(player),
+    hittable: (target, now) => this.punchable(target, now),
+    damage: (target, amount, now) => this.needs.damage(target, amount, now),
+    knockout: (target, start, hurt) => this.startThrown(target, start, hurt),
+    stun: target => this.stagger(target),
+    push: (target, dx, dz) => this.pushBody(target, dx, dz),
+    broadcast: (hit, near) => this.sendNear(near, 'fight.hit', hit),
+    refuse: (player, message) => this.sessions.getByUser(player.id)?.client.send('error', { message }),
+    log: (event, details) => this.log(event, details),
+    random: () => Math.random(),
+  });
   private achievementsAt = Date.now();
+  /** The XP each player here was last told, so the next report tells them only what they gained. */
+  private xpSeen = new Map<string, number>();
   private maintenanceBusy = false;
   private lastTableJson = '';
   private tickCount = 0;
@@ -524,10 +548,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelCounter(userId); this.cancelTable(userId); this.dropCall(userId); this.releaseMedia(userId);
     this.leaveTrades(userId, `${this.state.players.get(userId)?.displayName ?? 'A outra pessoa'} saiu do bar.`);
     this.sessions.remove(userId, presence);
+    this.xpSeen.delete(userId);
     const player = this.state.players.get(userId);
     // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
     // (or seated) where it was.
-    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); if (player) this.usedSlots.delete(player.slot); this.state.players.delete(userId); }
+    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); this.fights.forget(userId); if (player) this.usedSlots.delete(player.slot); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -537,6 +562,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** Ends what needs a connected player (blackjack seat, orders, drinks, kicks); a chair stays taken. */
   private park(player: Player): void {
+    this.fights.lower(player);
     if(isRidingHorse(player.interactionState))this.dismountHorse(player);
     player.drinkItem = ''; this.dropHolding(player);this.clearSmoking(player);
     this.blackjack.leave(player.id);
@@ -1077,6 +1103,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
       if (presence.flying && name !== 'phone.call' && (NEEDS_CONSCIOUS.has(name) || name === 'player.skill')) { rejected('flying'); client.send('error', { message: 'Pouse (B) antes.' }); return; }
       if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { rejected('unconscious'); client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
+      if (FIGHT_BUSY.has(name) && this.fights.busy(subject, subject.lastProcessedInput, now)) { rejected('fighting'); client.send('error', { message: 'Espere o golpe terminar.' }); return; }
+      if (FIGHT_GUARDED.has(name) && subject.fist.fight) { rejected('guard'); client.send('error', { message: 'Baixe a guarda (R) antes.' }); return; }
       try { await handler(client, parsed.data); } catch (e) { rejected('refused'); client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
     });
   }
@@ -1124,6 +1152,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       let moving = false, running = false;
       if (input) {
         player.headYaw=input.headYaw??0;player.headPitch=input.headPitch??0;
+        // The guard rides on every input (R): up when the room allows it, before this input moves the body at its pace.
+        this.fights.guard(player, input);
         if (isRidingHorse(player.interactionState)) {
           if(input.rear&&!presence.horseRearHeld&&(!player.horseRearAt||now-player.horseRearAt>=HORSE_REAR.cooldownMs)){
             player.horseRearAt=now;player.animationStartedAt=now;
@@ -1140,6 +1170,11 @@ export class BarRoom extends Room<{ state: BarState }> {
           const next = flyPlayer(player, input, TICK_MS / 1000);
           moving = !!(input.dx || input.dz || input.dy || input.aim);
           Object.assign(player, { x: next.x, y: next.y, z: next.z, rotation: input.rotation, animationState: input.dx || input.dz || input.aim ? 'fly' : 'fly-idle' });
+        } else if (!player.interactionState && player.fist.fight) {
+          // In the guard (world/fight.ts): punches, the feet planted while one holds them, the guard's pace; the browser predicts the same.
+          const fromX = player.x, fromZ = player.z;
+          moving = this.fights.move(player, input, now, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle));
+          if (moving) this.achieved(id, 'andarilho', Math.hypot(player.x - fromX, player.z - fromZ));
         } else if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
@@ -1163,6 +1198,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     lap('motos');
     this.syncPassengers(now);
     this.checkStorage(now);
+    this.fights.step(now, this.state.players.values());
     this.stepKicks(now);
     this.stepThrown(now);
     this.stepHighfood(now);
@@ -1340,6 +1376,51 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.achieved(rider.id, 'barbeiro');
     if (this.highfood.crashed(rider.id)) this.sendFood(rider.id);
     this.log('moto_crash', { playerId: rider.id, moto: moto.id, speed: +Math.hypot(vx, vz).toFixed(1), closing: +closing.toFixed(1) });
+  }
+
+  /** Why the guard cannot go up now ('' when it can): the hands busy, seated, riding, working, flying, out of it. */
+  private guardRefusal(player: Player): string {
+    if (!player.connected || !isConscious(player) || this.deaths.isDead(player.id)) return 'Espere recuperar os sentidos.';
+    if ((player.interactionState && player.interactionState !== 'stagger') || player.currentTableId) return 'Termine o que está fazendo antes de levantar a guarda.';
+    if (player.holding || player.carrying || player.parcel) return 'Largue o que está na mão antes de levantar a guarda.';
+    if (player.fireworkEquipped) return 'Guarde o fogo de artifício antes de lutar.';
+    if (player.smokingSince) return 'Apague o cigarro (F) antes de lutar.';
+    if (this.sessions.getByUser(player.id)?.flying) return 'Pouse (B) antes de lutar.';
+    return '';
+  }
+  /** Whether the guard stays up: anything that takes the player elsewhere (a chair, a bike, a drink in hand, fainting, leaving) lowers it. */
+  private keepsGuard(player: Player): boolean {
+    return player.connected && isConscious(player) && !this.deaths.isDead(player.id) && (!player.interactionState || player.interactionState === 'stagger' || player.interactionState === 'kick')
+      && !player.currentTableId && !player.holding && !player.carrying && !player.parcel && !player.fireworkEquipped && !player.smokingSince && !this.sessions.getByUser(player.id)?.flying;
+  }
+  /** Who a punch can hit: anyone up and free on foot, fighting or not (or in the middle of a kick); not seated, riding, working, flying, nor just back on their feet. */
+  private punchable(target: Player, now: number): boolean {
+    if (!target.connected || target.currentTableId || !isConscious(target) || this.deaths.isDead(target.id)) return false;
+    if (target.interactionState && target.interactionState !== 'stagger' && target.interactionState !== 'kick') return false;
+    const presence = this.sessions.getByUser(target.id);
+    return !!presence && !presence.flying && now >= (presence.kickSafeUntil ?? 0);
+  }
+  /** A blow lands: a kick or a gesture on its way stops, and the inputs that come until the stun ends move nothing (interactionState). */
+  private stagger(target: Player): void {
+    const presence = this.sessions.getByUser(target.id);
+    target.interactionState = 'stagger';
+    this.kicks.delete(target.id);
+    if (presence) { presence.interactionEndsAt = undefined; presence.gestureEndsAt = undefined; presence.gestureState = undefined; }
+  }
+  /** The push of a blow: this far, against walls, furniture and bikes. */
+  private pushBody(target: Player, dx: number, dz: number): void {
+    const length = Math.hypot(dx, dz), dt = TICK_MS / 1000;
+    if (length < 1e-4) return;
+    const next = movePlayer(target, { dx: dx / length, dz: dz / length, running: false }, dt, false, hasStagePass(target), [...this.state.motos.values()].map(motoObstacle), length / dt);
+    target.x = next.x; target.y = next.y; target.z = next.z;
+  }
+  /** A message to everyone whose avatar is near `near` (as far as the avatars are seen, AOI_RADIUS). */
+  private sendNear(near: Player, type: string, message: unknown): void {
+    for (const [id, presence] of this.sessions) {
+      const player = this.state.players.get(id);
+      if (!player || presence.revoked) continue;
+      if (Math.hypot(player.x - near.x, player.z - near.z) <= AOI_RADIUS) presence.client.send(type, message);
+    }
   }
 
   /** Who a kick can throw: someone up and free, or busy with something a blow can cut short. Sitting, working, playing or riding, it passes them by. */
@@ -3492,7 +3573,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private async flushAchievements(): Promise<void> {
     const events = this.achievements.take(), online = [...this.sessions].filter(([, presence]) => !presence.revoked && !presence.ticket.bot).map(([id]) => id);
     if (!events.length && !online.length) return;
-    let answer: { unlocked?: Array<{ userId: string; badge: Badge }> };
+    let answer: { unlocked?: Array<{ userId: string; badge: Badge }>; xp?: Array<{ userId: string; xp: number }> };
     try { answer = await internal('achievements', { events, online }); }
     catch (error) {
       // A refusal would be the same next time; anything else waits for the next round.
@@ -3500,6 +3581,18 @@ export class BarRoom extends Room<{ state: BarState }> {
       throw error;
     }
     for (const { userId, badge } of answer.unlocked ?? []) this.celebrate(userId, badge);
+    for (const { userId, xp } of answer.xp ?? []) this.showXp(userId, xp);
+  }
+  /** The level everyone sees and the player's own bar: what they gained since the last report (nothing on the first one here). */
+  private showXp(userId: string, xp: number): void {
+    const player = this.state.players.get(userId), presence = this.sessions.getByUser(userId);
+    if (!player || !presence) return;
+    const before = this.xpSeen.get(userId), was = player.level, level = levelOf(xp).level;
+    this.xpSeen.set(userId, xp);
+    if (before === xp && was === level) return;
+    player.level = level;
+    presence.client.send('xp.state', { xp, gained: before === undefined ? 0 : Math.max(0, xp - before) });
+    if (before !== undefined && was > 0 && rankOf(level).index > rankOf(was).index) this.systemMessage(`${player.displayName} chegou ao posto ${rankOf(level).name}: nível ${level}!`, player);
   }
   /** The player hears it with the card a click away; the bar hears about the rarer ones, and all of it about the rarest. */
   private celebrate(userId: string, badge: Badge): void {

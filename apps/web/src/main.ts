@@ -30,6 +30,8 @@ import './admin.css';
 import {BarScene,BLIP_RADIUS} from './engine/BarScene';
 import {CAMERA_HEIGHT_LIMIT,CAMERA_LABELS,CAMERA_MODES,CAMERA_SENSITIVITY_LIMITS,CAMERA_ZOOMS,CAMERA_ZOOM_LABELS,isCameraMode,type CameraFeel} from './engine/camera-rig';
 import {BarNetwork} from './networking';
+import {FightController} from './fight/fight-controller';
+import type {FightHit} from '@bar/shared';
 import {api,ApiError,escape as e} from './api';
 import {BarAudio} from './audio';
 import {JukeboxController,TelevisionController,type MediaController} from './jukebox';
@@ -79,6 +81,12 @@ import {consumptions} from './consumption';
 import {createPhone} from './phone/phone';
 import {PhoneSounds} from './phone/core';
 import {createProfileWindow} from './profile/profile-window';
+import './levels/levels.css';
+import {createLevelHud} from './levels/level-hud';
+import './wallet/wallet.css';
+import './fight/fight.css';
+import {createWalletHud} from './wallet/wallet-hud';
+import {rankIcon} from './levels/rank-icon';
 import {badgeMedal,openBadgeCard} from './profile/badge-card';
 import {BADGE_RARITY_INFO} from '@bar/shared';
 
@@ -105,6 +113,23 @@ const vehicleHud=createVehicleHud($('#vehicle-hud'),action=>{
   sendVehicleControl(vehicle.id,action);
 });
 const notices=createNotifications($('#toasts'));
+// Levels and the daily bonus (docs/sistemas/niveis.md), in the header beside the wallet.
+const levelHud=createLevelHud($('#level-hud'),{
+  toast:(text,error)=>toast(text,error),
+  openProfile:()=>{if(user)void profile.open(user.id);},
+  dailyReady:open=>notices.show({variant:'acao',id:'daily-bonus',title:'Bônus diário liberado',text:'Seu XP do dia está esperando.',duration:9000,action:{label:'Abrir',run:open}}),
+  coinsChanged:()=>network.send('inventory.sync'),
+});
+// Every coin in or out rolls the wallet and floats off it (wallet/wallet-hud.ts); renderBalance is its only caller.
+const walletHud=createWalletHud($('.hud-wallet'));
+/** Z shows the names over the heads for a few seconds; hidden, they are not even projected. */
+const NAMES_MS=4000,NAMES_FADE_MS=500;
+let namesUntil=0,namesTimer=0;
+function showNames():void {
+  if(!inGame)return;
+  namesUntil=performance.now()+NAMES_MS;$('#labels').classList.add('names-on');
+  clearTimeout(namesTimer);namesTimer=window.setTimeout(()=>$('#labels').classList.remove('names-on'),NAMES_MS);
+}
 // Highfood (docs/sistemas/highfood.md): the shift as the room tells it, the GPS's line and the customer's dialog.
 const courier=createCourier();
 const ROUTE_COLOURS={delivery:'#ff3d5a',waypoint:'#17d4f4',bike:'#ff9f0a'} as const;
@@ -124,7 +149,41 @@ const lockerPad=createLockerPad($('#game'),{submit:(orderId,code)=>network.send(
 createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>hud.closeMenu());
 // What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the Painéis menu. The chat is typed.
 const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden');
-const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,text=>notices.show({variant:'acao',title:'Tela cheia',text}));
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>fight.guard,()=>fight.lower());
+/**
+ * The fist fight (docs/sistemas/luta.md): R raises the guard, the buttons punch. The controller decides each punch with the shared rules and draws it
+ * ahead of the room; the room's word comes back with each state (reconcile) and each landed punch (fight.hit).
+ */
+const fight:FightController=new FightController({
+  serverNow:():number=>serverNow(),
+  view:()=>scene?.fightView()??0,
+  position:()=>{const at=network.predicted();return {x:at.x,y:at.y??0,z:at.z};},
+  targets:()=>scene?.fightTargets()??[],
+  seen:()=>network.seen(),
+  changed:guard=>{
+    renderFightPrompt();
+    // The mouse turns the view and the buttons punch: mouse-capture.ts holds it while the guard is up. One request only (here, from R's keystroke,
+    // which the browser trusts): a second one made it drop the first and the guard fell by itself.
+    mouseCapture.sync();
+    if(guard&&!fightTold){fightTold=true;notices.show({variant:'acao',title:'Guarda alta',text:touchMode()?'Soco e Forte aparecem ao lado do direcional. Mais › Luta baixa a guarda.':'Clique para socar (jab, direto, gancho) e use o botão direito para o soco forte. R ou Esc baixa a guarda.'});}
+  },
+});
+let fightTold=false;
+const fightPrompt=document.createElement('div');
+fightPrompt.className='fight-prompt';fightPrompt.hidden=true;fightPrompt.setAttribute('aria-live','polite');
+fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>R</kbd>Baixar</span>`;
+$('#game').append(fightPrompt);
+function renderFightPrompt():void {fightPrompt.hidden=!fight.guard||!inGame;}
+/** A punch landed near: the scene draws it, the controller holds the one hit; a knockout is told to the two involved. */
+function onFightHit(hit:FightHit):void {
+  scene?.fightHit(hit);
+  if(!user)return;
+  fight.hit(hit,user.id);
+  if(!hit.ko)return;
+  const name=(id:string)=>world?.players[id]?.displayName??'Alguém';
+  if(hit.to===user.id)notices.show({variant:'aviso',title:'Nocaute',text:`${name(hit.by)} te nocauteou.`});
+  else if(hit.by===user.id)notices.show({variant:'acao',title:'Nocaute',text:`Você nocauteou ${name(hit.to)}.`});
+}
 // On a phone or tablet: a stick, buttons and a sheet that press the keys (docs/sistemas/toque.md). Shown while the world takes input.
 const touchControls=createTouchControls($('#game'),{
   visible:()=>touchMode()&&!needsCursor()&&!document.body.classList.contains('watching-tv')&&$('#blackjack').classList.contains('hidden'),
@@ -132,6 +191,7 @@ const touchControls=createTouchControls($('#game'),{
   axis:(x,y)=>scene?.setTouchAxis(x,y),
   sprint:on=>scene?.setTouchSprint(on),
   skillButton:()=>document.querySelector<HTMLButtonElement>('#skill-button'),
+  guard:()=>fight.guard,
 });
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 const minimap=createMinimap($('#game'));
@@ -331,6 +391,7 @@ const network=new BarNetwork({
     else if(update.message)notices.show({variant:'aviso',title:'Palco',text:update.message});
   },
   voice:frame=>voice.receive(frame),
+  xp:({xp,gained})=>levelHud.set(xp,gained),
   achievement:badge=>{
     notices.show({variant:'conquista',id:`badge-${badge.id}`,title:badge.name,text:badge.description,tone:BADGE_RARITY_INFO[badge.rarity].color,art:badgeMedal(badge),duration:9000,action:{label:'Ver a carta',run:()=>openBadgeCard(badge)}});
     if(profile.ownId)void profile.open(profile.ownId);
@@ -339,6 +400,9 @@ const network=new BarNetwork({
   motoStruck:({hp,by})=>notices.show({variant:'aviso',title:'Atropelado',text:`${by||'Uma moto desgovernada'} passou por cima de você: -${hp} de vida.`}),
   deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
   deathScreen:screen=>deathUi.screen(screen),
+  fight:(seq,stream,self)=>fight.decorate(seq,stream,self),
+  fightState:(self,acked)=>fight.reconcile(self,acked),
+  fightHit:onFightHit,
   kicked:({hp,by})=>notices.show({variant:'aviso',title:'Chutado',text:hp?`${by} acertou um chute em você: -${hp} de vida.`:`${by} acertou um chute em você.`}),
   inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();if(activeModal==='storage')renderStorage();},
   inventoryResult:()=>{},
@@ -482,9 +546,9 @@ async function enterBar():Promise<void> {
     if(!admission.isCurrentEntry(attempt))return;
     const [result,owned,items,own]=await Promise.all([api<{blocked:string[]}>('/blocks'),api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory'),api<ProfileView>(`/profile/${encodeURIComponent(user.id)}`).catch(()=>undefined)]);
     if(!admission.isCurrentEntry(attempt))return;
-    blocked=new Set(result.blocked);wardrobe=owned;knownSkills=owned.skills.filter(skill=>skill.owned).map(skill=>skill.id);inventory=items;skillLoadouts=own?.loadouts??{};await network.connect();
+    blocked=new Set(result.blocked);wardrobe=owned;knownSkills=owned.skills.filter(skill=>skill.owned).map(skill=>skill.id);inventory=items;skillLoadouts=own?.loadouts??{};if(own)levelHud.set(own.xp);await network.connect();
     if(!admission.isCurrentEntry(attempt))return;
-    await voice.enter();phone.enter();
+    await voice.enter();phone.enter();levelHud.enter();
     if(!admission.completeEntry(attempt)&&(admission.phase==='leaving'||admission.phase==='outside'))voice.leave();
   }
   catch(error){const departure=admission.failEntry(attempt);if(!departure)return;await leaveBarWith(departure);toast(errorMessage(error),true);}
@@ -501,7 +565,7 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   vehicleHud.reset();$('#game').classList.remove('vehicle-mounted');hud.setAvailable('actions',true);
   gps.reset();foodDialog.reset();lockerPad.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
-  deathUi.reset();scene?.stopDeath();scene?.exitVr();inGame=false;connected=false;refreshVrButton();tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  deathUi.reset();scene?.stopDeath();scene?.exitVr();inGame=false;connected=false;refreshVrButton();tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();levelHud.reset();namesUntil=0;$('#labels').classList.remove('names-on');minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#truco').classList.add('hidden');trucoUi.reset();trucoView=undefined;$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';$('#pool').classList.add('hidden');poolUi.reset();poolWatching='';poolViews.clear();closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
@@ -522,8 +586,8 @@ function renderChat(arrived=false):void {
   const panel=$('[data-panel="chat"]'),messages=$('#messages');
   panel.addEventListener('focusout',event=>{if(!panel.contains(event.relatedTarget as Node|null)){panel.classList.remove('chat-open');messages.scrollTop=messages.scrollHeight;}});
 }
-/** The wallet in the money panel; written only when it changes, since the room's patches call this ten times a second. */
-function renderBalance():void {const node=$('#hud-balance'),text=wardrobe?wardrobe.balance.toLocaleString('pt-BR'):'…';if(node.textContent!==text)node.textContent=text;}
+/** The wallet in the money panel; the HUD ignores repeats, since the room's patches call this ten times a second. */
+function renderBalance():void {walletHud.set(wardrobe?.balance);}
 function renderWorld():void {
   if(!world||!user)return;
   const self=world.players[user.id];
@@ -883,10 +947,10 @@ function renderPeopleContent():void {
     return;
   }
   const players=Object.values(world?.players||{}).filter(player=>player.id!==user?.id);
-  const key=JSON.stringify(['people',world?.occupancy,world?.capacity,...players.map(p=>[p.id,p.displayName,p.connected,p.voice,blocked.has(p.id),voice.isMuted(p.id)])]);
+  const key=JSON.stringify(['people',world?.occupancy,world?.capacity,...players.map(p=>[p.id,p.displayName,p.level,p.connected,p.voice,blocked.has(p.id),voice.isMuted(p.id)])]);
   if(key===peopleKey)return;peopleKey=key;
   const occupancy=world?.occupancy??0,capacity=world?.capacity??0;
-  panel.innerHTML=`<div class="occupancy"><div class="status-row"><span>${uiIcon('users')} No bar agora</span><b id="occupancy">${occupancy} / ${capacity}</b></div><div class="hud-track"><i id="occupancy-fill" style="width:${capacity?Math.min(100,occupancy/capacity*100):0}%"></i></div><div class="status-row net-row"><span>${uiIcon('signal')} Sua conexão</span><b><span id="hud-status">${e(netStatus)}</span> · <span id="ping">${e(netPing)}</span></b></div></div><p class="modal-description">Você vê as pessoas próximas a você.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${e(player.displayName)}</b><small>${player.connected?(player.voice?'No bar · microfone ligado':'No bar'):'Ausente'}</small></div><button class="mini-button" data-action="profile" data-id="${e(player.id)}">Perfil</button><button class="mini-button" data-action="voice-mute" data-id="${e(player.id)}" aria-pressed="${voice.isMuted(player.id)}">${voice.isMuted(player.id)?'Ouvir voz':'Silenciar voz'}</button><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Silenciar voz vale só para você. Bloquear oculta mensagens de chat e corta a voz nos dois sentidos. Denúncias são encaminhadas à administração.</p>`;
+  panel.innerHTML=`<div class="occupancy"><div class="status-row"><span>${uiIcon('users')} No bar agora</span><b id="occupancy">${occupancy} / ${capacity}</b></div><div class="hud-track"><i id="occupancy-fill" style="width:${capacity?Math.min(100,occupancy/capacity*100):0}%"></i></div><div class="status-row net-row"><span>${uiIcon('signal')} Sua conexão</span><b><span id="hud-status">${e(netStatus)}</span> · <span id="ping">${e(netPing)}</span></b></div></div><p class="modal-description">Você vê as pessoas próximas a você.</p><div class="people-list">${players.map(player=>`<div class="person"><span class="profile-initial" style="--avatar:${e(player.color)}">${e(player.displayName[0])}</span><div><b>${player.level?`${rankIcon(player.level,18)} `:''}${e(player.displayName)}</b><small>${player.connected?(player.voice?'No bar · microfone ligado':'No bar'):'Ausente'}</small></div><button class="mini-button" data-action="profile" data-id="${e(player.id)}">Perfil</button><button class="mini-button" data-action="voice-mute" data-id="${e(player.id)}" aria-pressed="${voice.isMuted(player.id)}">${voice.isMuted(player.id)?'Ouvir voz':'Silenciar voz'}</button><button class="mini-button" data-action="block" data-id="${e(player.id)}">${blocked.has(player.id)?'Desbloquear':'Bloquear'}</button><button class="mini-button" data-action="report" data-id="${e(player.id)}">Denunciar</button></div>`).join('')||'<div class="empty-state">Por enquanto, só você por aqui.<br>Abra outra janela e convide alguém para chegar.</div>'}</div><p class="fine-print">Silenciar voz vale só para você. Bloquear oculta mensagens de chat e corta a voz nos dois sentidos. Denúncias são encaminhadas à administração.</p>`;
 }
 async function mailbox():Promise<void> {
   if(!import.meta.env.DEV)return;
@@ -1026,7 +1090,6 @@ async function skins(focusOn?:string):Promise<void> {
       volume:()=>settings.get().master,toast,
       buy:async skin=>{const next=await api<Wardrobe>('/wardrobe/buy',{skin});if(user?.id===owner)keep(next);return next;},
       buySkill:async skill=>{const next=await api<Wardrobe>('/wardrobe/skill',{skill});if(user?.id!==owner)return next;keep(next);network.send('player.appearance');if(profile.ownId)void profile.open(profile.ownId);return next;},
-      daily:async()=>{const next=await api<Wardrobe>('/wardrobe/daily',{});if(user?.id===owner)keep(next);return next;},
       equip:async skin=>{
         const next=await api<Wardrobe&{user:PublicUser}>('/wardrobe/equip',{skin});
         if(user?.id===owner){user=next.user;keep(next);network.send('player.appearance');if(profile.ownId)void profile.open(profile.ownId);}
@@ -1344,16 +1407,19 @@ async function start():Promise<void>{
     onVrArms:arms=>network.send('player.arms',arms),
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins();},
+    onShowNames:showNames,
     // B is also push-to-talk: with that voice mode the key keeps talking.
     onFly:()=>{if(inGame&&!activeModal&&user?.role==='admin'&&settings.get().voiceMode!=='ptt')network.send('admin.fly',{on:!world?.players[user.id]?.animationState.startsWith('fly')});},
     onSkillKey:code=>{const active=activeSkill();if(active?.key!==code)return false;useSkill();return true;},
+    // The fist fight: R raises or lowers the guard; with it up the mouse buttons (and the touch buttons) punch.
+    onGuard:()=>{if(!inGame||activeModal)return;const why=fight.toggle(world?.players[user?.id??'']);if(why)toast(why,true);},
+    onPunch:kind=>inGame&&!activeModal&&fight.press(kind),
+    fight:()=>fight.guard||fight.local||fight.blow?{guard:fight.guard,punch:fight.local,blow:fight.blow}:undefined,
     onWorldMenu:(x,y,{player,moto})=>{
       if(!inGame||activeModal)return;
       const bike=moto?world?.motos?.[moto]:undefined,other=player&&player!==user?.id&&world?.players[player]?.connected!==false;
       worldMenu({x,y},[
         ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
-        // Administrators test the Morte on themselves (the same kill as the player file's button, docs/sistemas/morte.md).
-        ...(player&&player===user?.id&&user?.role==='admin'?[{id:'die',icon:'ghost',label:'Morrer (teste)',choose:()=>void api('/admin/player',{playerId:player,op:'kill',reason:'Teste pelo menu do jogo'}).then(()=>toast('A Morte está a caminho.'),error=>toast(errorMessage(error),true))}]:[]),
         ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
         ...(bike&&isCar(bike)?vehicleSeats(bike.model).filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${vehicleSeats(bike.model).indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:vehicleSeats(bike.model).indexOf(seat)})})):[]),
@@ -1365,6 +1431,8 @@ async function start():Promise<void>{
     onVehicleControl:(vehicleId,action)=>sendVehicleControl(vehicleId,action),
     onCameraChange:(mode,distance)=>{settings.update({camera:mode,cameraDistance:distance});syncCameraSettings();},
     onMediaFrame:()=>{
+      // A window, the phone or a minigame in front of the world lowers the guard (the mouse goes to it).
+      if(fight.guard&&needsCursor())fight.lower();
       mediaProfiler.begin();mouseCapture.sync();touchControls.sync();mediaProfiler.mark('mouse');
       media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));mediaProfiler.mark('video');
       minimap.render(inGame?()=>scene?.mapView():null);mediaProfiler.mark('minimap');
@@ -1392,7 +1460,7 @@ let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),fight:()=>({...scene?.getFight(),guard:fight.guard,local:fight.local?{...fight.local}:undefined,blow:fight.blow?{...fight.blow}:undefined}),fightPress:(kind:'light'|'heavy')=>fight.press(kind),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility
@@ -1404,16 +1472,17 @@ setInterval(()=>{
   $('#firework-hud').classList.toggle('hidden',!fireworkVisible);
   if(fireworkVisible)$('#firework-count').textContent=String(inventory?.stacks.find(stack=>stack.itemId==='rojao')?.quantity??0);
   if(!inGame||!scene||!world)return;
-  const labels=scene.projectLabels?.()||[],container=$('#labels'),seen=new Set<string>();
+  const labels=performance.now()<namesUntil+NAMES_FADE_MS?scene.projectLabels?.()||[]:[],container=$('#labels'),seen=new Set<string>();
   // Leaving the bar empties the container (replaceChildren): its nodes are made again.
   for(const [id,label] of worldLabels)if(label.node.parentNode!==container)worldLabels.delete(id);
   for(const label of labels){
     const speaking=label.local?voice.transmitting:voice.isSpeaking(label.id),mic=!label.npc&&world?.players[label.id]?.voice,onCall=!label.npc&&world?.players[label.id]?.phone==='call';
-    const html=`${onCall?`<i class="label-phone" title="No celular" aria-hidden="true">${uiIcon('phone')}</i>`:''}${mic?`<i class="label-mic" aria-hidden="true">${uiIcon('mic')}</i>`:''}${e(label.name)}`;
+    const level=label.npc?0:world?.players[label.id]?.level??0;
+    const html=`${onCall?`<i class="label-phone" title="No celular" aria-hidden="true">${uiIcon('phone')}</i>`:''}${mic?`<i class="label-mic" aria-hidden="true">${uiIcon('mic')}</i>`:''}<span class="label-name">${e(label.name)}</span>`;
     let shown=worldLabels.get(label.id);
     if(!shown){const node=document.createElement('span');node.className='world-label';container.append(node);shown={node,html:'',speaking:false,x:'',y:''};worldLabels.set(label.id,shown);}
     seen.add(label.id);
-    if(shown.html!==html){shown.html=html;shown.node.innerHTML=html;}
+    if(shown.html!==`${level}|${html}`){shown.html=`${level}|${html}`;shown.node.innerHTML=(level?rankIcon(level,18):'')+html;}
     if(shown.speaking!==speaking){shown.speaking=speaking;shown.node.classList.toggle('speaking',speaking);}
     const x=`${label.x}px`,y=`${label.y}px`;
     if(shown.x!==x){shown.x=x;shown.node.style.left=x;}

@@ -1,12 +1,13 @@
 import {plateHtml} from '../garage-panel';
-import {ITEM_CATALOG,LEDGER_SOURCES,MAX_COIN_BALANCE,adminActionLabel,itemById,type AdminAudit,type AdminOverview,type AdminPlayerDetail,type AdminPlayerFilter,type AdminPlayerSort} from '@bar/shared';
+import {ITEM_CATALOG,LEDGER_SOURCES,MAX_COIN_BALANCE,MAX_LEVEL,adminActionLabel,levelOf,rankOf,xpAtLevel,itemById,type AdminAudit,type AdminOverview,type AdminPlayerDetail,type AdminPlayerFilter,type AdminPlayerSort} from '@bar/shared';
 import {ApiError} from '../api';
 import {itemImage} from '../ui-icons';
+import {rankIcon} from '../levels/rank-icon';
 import {badge,card,chips,e,empty,lock,n,reasonField,requestId,signed,uiIcon,when,type SectionFactory} from './kit';
 import {goButton,followGo} from './overview';
 
-type Tab='summary'|'wallet'|'items'|'moderation'|'history';
-const TABS:ReadonlyArray<readonly [Tab,string]>=[['summary','Resumo'],['wallet','Carteira'],['items','Itens e skins'],['moderation','Moderação'],['history','Histórico']];
+type Tab='summary'|'wallet'|'levels'|'items'|'moderation'|'history';
+const TABS:ReadonlyArray<readonly [Tab,string]>=[['summary','Resumo'],['wallet','Carteira'],['levels','Nível'],['items','Itens e skins'],['moderation','Moderação'],['history','Histórico']];
 const FILTERS:ReadonlyArray<readonly [AdminPlayerFilter,string]>=[['all','Todos'],['online','No bar'],['admins','Administradores'],['banned','Banidos'],['unverified','E-mail pendente']];
 const PAGE=20;
 // The tab stays when another player is picked, and between openings of the window.
@@ -89,6 +90,27 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
       ${card('Últimas movimentações',d.wallet.ledger.length?`<table class="admin-table"><thead><tr><th>Quando</th><th>Origem</th><th>Descrição</th><th class="num">Moedas</th></tr></thead><tbody>${d.wallet.ledger.map(row=>`<tr><td>${e(when(row.createdAt))}</td><td>${e(LEDGER_SOURCES[row.source])}</td><td>${e(row.label)}</td><td class="num ${row.amount>0?'up':'down'}">${signed(row.amount)}</td></tr>`).join('')}</tbody></table>`:empty('Nenhuma movimentação.'),
         {icon:'receipt',actions:goButton('logs','Ver no log',{player:d.account.id,category:'moedas'})})}</div>`;
   }
+  /** What an XP adjustment leaves, as the form is filled in (null: not a valid result). */
+  function xpAfter(xp:number,mode:string,amount:number):number|null {
+    if(!Number.isSafeInteger(amount)||amount<0)return null;
+    const after=mode==='add'?xp+amount:mode==='remove'?xp-amount:mode==='set'?amount:amount>=1&&amount<=MAX_LEVEL?xpAtLevel(amount):-1;
+    return after>=0?after:null;
+  }
+  function levelsTab(d:AdminPlayerDetail):string {
+    const p=d.account,{xp,daily}=d.levels,lv=levelOf(xp),rank=rankOf(lv.level);
+    const head=`<div class="admin-level" style="--rank:${rank.colors[0]}">${rankIcon(lv.level,64)}<div><b>Nível <span>${lv.level}</span></b><small>${e(rank.name)} · ${n(xp)} XP no total</small>
+      <span class="lv-bar"><i class="lv-fill" style="width:${lv.need?(lv.into/lv.need*100).toFixed(1):100}%"></i><em class="lv-xp">${lv.need?`${n(lv.into)} / ${n(lv.need)} XP para o nível ${lv.level+1}`:'Nível máximo'}</em></span></div></div>`;
+    const form=p.canEditWallet?`<form data-admin-form="xp" class="admin-wallet-form"><fieldset><legend>Ajustar XP</legend>
+      <div class="admin-fields"><label>Operação<select name="mode" aria-label="Operação de XP"><option value="add">Adicionar XP</option><option value="remove">Retirar XP</option><option value="set">Definir XP total</option><option value="level">Definir nível</option></select></label>
+      <label>Quantidade<input type="number" name="amount" aria-label="Quantidade de XP ou nível" min="0" max="100000000" step="1" required inputmode="numeric"></label></div>
+      <p class="admin-wallet-preview" aria-live="polite">Escolha a operação e informe a quantidade. "Definir nível" leva ao começo do nível.</p>
+      ${reasonField('Motivo do ajuste de XP','Ex.: compensar o XP perdido na queda do servidor')}
+      <button class="button primary" type="submit">Aplicar ajuste</button></fieldset></form>`:'<p class="fine-print">O XP desta conta só pode ser alterado pela conta principal.</p>';
+    const dailyHtml=`<dl class="admin-rows"><div><dt>Sequência</dt><dd>Dia ${daily.day} de 7</dd></div><div><dt>Hoje</dt><dd>${daily.claimed?'Já recebeu':'Ainda não recebeu'}</dd></div></dl>
+      ${daily.claimed&&p.canEditWallet?`<form data-admin-form="daily-reset" class="admin-inline-form">${reasonField('Motivo para liberar o bônus de novo','Ex.: o resgate falhou para o jogador')}<button class="button secondary" type="submit">Liberar o bônus de hoje de novo</button></form>
+      <p class="fine-print">O jogador pode receber o XP do dia outra vez. As moedas do bônus não se repetem no mesmo dia.</p>`:''}`;
+    return `<div class="admin-grid">${card('Nível e XP',head+form,{icon:'trophy'})}${card('Bônus diário',dailyHtml,{icon:'gift',actions:goButton('levels','Valores de XP')})}</div>`;
+  }
   function itemsTab(d:AdminPlayerDetail):string {
     const p=d.account,have=new Map(d.inventory.map(i=>[i.itemId,i.quantity]));
     const items=ITEM_CATALOG.map(item=>`<li class="${have.get(item.id)?'':'none'}"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><b>${e(item.name)}</b><span>${n(have.get(item.id)??0)}/${item.stackMax}</span></li>`).join('');
@@ -128,7 +150,7 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
     if(!detail||detail.account.id!==selectedId)return '<p class="admin-loading">Carregando a ficha…</p>';
     const p=detail.account,here=online().has(p.id);
     const badges=[p.owner?badge('Conta principal','magenta'):p.role==='admin'?badge('Administrador','magenta'):'',here?badge('No bar','cyan'):'',p.banned?badge('Banido','red'):'',p.kickId?badge('Expulsão registrada','gold'):'',p.verified?'':badge('E-mail pendente','gold')].join('');
-    const body=tab==='wallet'?walletTab(detail):tab==='items'?itemsTab(detail):tab==='moderation'?moderationTab(detail):tab==='history'?historyTab(detail):summaryTab(detail);
+    const body=tab==='wallet'?walletTab(detail):tab==='levels'?levelsTab(detail):tab==='items'?itemsTab(detail):tab==='moderation'?moderationTab(detail):tab==='history'?historyTab(detail):summaryTab(detail);
     return `<header class="admin-player-head"><div><h3>${e(p.displayName)}</h3><p class="admin-player-email">${e(p.email)} · @${e(p.username)}</p><div class="admin-badges">${badges}</div></div>
         <div class="admin-current-balance"><span>Saldo atual</span><b>${n(p.balance)} <small>moedas</small></b></div></header>
       <div class="admin-subtabs" role="tablist" aria-label="Ficha do jogador">${TABS.map(([id,label])=>`<button type="button" role="tab" data-admin="tab" data-tab="${id}" aria-selected="${id===tab}">${label}${id==='history'&&detail!.history.length?` <i>${detail!.history.length}</i>`:''}</button>`).join('')}</div>
@@ -190,6 +212,12 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
   const change=(event:Event)=>{
     const target=event.target as HTMLElement;
     if(target.matches('[data-admin-sort]')){sort=(target as HTMLSelectElement).value as AdminPlayerSort;offset=0;void loadList();return;}
+    const xpForm=target.closest<HTMLFormElement>('[data-admin-form="xp"]');
+    if(xpForm&&detail){
+      const values=new FormData(xpForm),after=xpAfter(detail.levels.xp,String(values.get('mode')),Number(values.get('amount')));
+      xpForm.querySelector('.admin-wallet-preview')!.textContent=after===null?(values.get('mode')==='level'?`Escolha um nível de 1 a ${MAX_LEVEL}.`:`O jogador tem ${n(detail.levels.xp)} XP: o resultado não pode ficar abaixo de 0.`):`Após o ajuste: ${n(after)} XP, nível ${levelOf(after).level} (${rankOf(levelOf(after).level).name}).`;
+      return;
+    }
     const form=target.closest<HTMLFormElement>('[data-admin-form="wallet"]'),p=detail?.account;if(!form||!p)return;
     const values=new FormData(form),amount=Number(values.get('amount')),operation=String(values.get('operation'));
     const balance=operation==='set'?amount:p.balance+(operation==='remove'?-amount:amount);
@@ -211,6 +239,8 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
       const signature=JSON.stringify(payload);if(pending?.signature!==signature)pending={signature,id:requestId()};const id=pending.id;
       void ctx.run(async()=>{await ctx.api('/admin/wallet',{...payload,requestId:id});pending=undefined;await reload();},'Carteira atualizada.',{wallet:true});
     }
+    else if(kind==='xp')player({op:'xp',mode:String(values.mode),amount:Number(values.amount)},'XP atualizado. Se estiver no bar, o jogador vê em alguns segundos.');
+    else if(kind==='daily-reset')player({op:'daily-reset'},'Bônus diário liberado de novo.');
     else if(kind==='rename')player({op:'rename',displayName:String(values.displayName).trim()},'Nome alterado.');
     else if(kind==='verify')player({op:'verify'},'E-mail confirmado.');
     else if(kind==='logout')player({op:'logout'},'Sessões encerradas.');

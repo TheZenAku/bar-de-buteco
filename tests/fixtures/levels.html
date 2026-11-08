@@ -1,0 +1,38 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{overflow:auto!important;background:#1a0f2e}.stage{position:relative;min-height:100vh}.game-header{position:relative!important;inset:auto!important;padding:12px 16px;justify-content:flex-end}
+.icons{display:grid;grid-template-columns:repeat(10,64px);gap:10px;padding:16px;pointer-events:auto}.icons figure{margin:0;display:grid;justify-items:center;gap:2px;font:10px var(--font-mono);color:var(--muted-foreground)}
+.names{position:relative;height:60px;margin:0 16px;pointer-events:auto}.names .world-label{position:absolute}</style></head><body>
+<div id="app"><main id="game" class="game" style="position:relative;pointer-events:auto">
+  <header class="game-header"><div class="lv-hud" id="level-hud" role="group" aria-label="Seu nível"></div><div class="money-panel hud-wallet" role="group" aria-label="Carteira"><p class="cash"><span id="wallet-icon"></span><b id="hud-balance">…</b></p></div></header>
+  <div class="names" id="labels-demo"></div>
+  <section class="icons" id="icons"></section>
+</main></div>
+<script type="module">
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/voice.css';
+import '../../apps/web/src/profile/profile.css';
+import '../../apps/web/src/levels/levels.css';
+import '../../apps/web/src/wallet/wallet.css';
+import {createWalletHud} from '../../apps/web/src/wallet/wallet-hud.ts';
+import {uiIcon} from '../../apps/web/src/ui-icons.ts';
+import {xpAtLevel} from '../../packages/shared/src/index.ts';
+import {createLevelHud} from '../../apps/web/src/levels/level-hud.ts';
+import {rankIcon} from '../../apps/web/src/levels/rank-icon.ts';
+// The API of the daily bonus, in memory: the fixture's day starts unclaimed on day 3 of a run.
+let daily={day:3,claimed:false,coins:25,rewards:[50,75,100,150,200,250,400]};
+window.fetch=async(url,options)=>{
+  if(String(url).endsWith('/api/daily')){
+    if(options?.method==='POST'){const gained=daily.claimed?undefined:{xp:daily.rewards[daily.day-1],coins:daily.coins};daily={...daily,claimed:true};return new Response(JSON.stringify(gained?{...daily,gained}:daily));}
+    return new Response(JSON.stringify(daily));
+  }
+  return new Response('{}',{status:404});
+};
+const fixture=window.levelsFixture={dailyReady:0,coins:0,toasts:[]};
+const hud=createLevelHud(document.querySelector('#level-hud'),{toast:t=>fixture.toasts.push(t),openProfile:()=>{},dailyReady:()=>{fixture.dailyReady++;},coinsChanged:()=>{fixture.coins++;}});
+fixture.hud=hud;fixture.xpAtLevel=xpAtLevel;
+document.querySelector('#wallet-icon').outerHTML=uiIcon('wallet');
+fixture.wallet=createWalletHud(document.querySelector('.hud-wallet'));fixture.wallet.set(1250);
+document.querySelector('#icons').innerHTML=Array.from({length:100},(_,i)=>`<figure>${rankIcon(i+1,56)}<figcaption>${i+1}</figcaption></figure>`).join('');
+document.querySelector('#labels-demo').innerHTML=[[1,'Chico',20],[37,'Bia',200],[100,'Rafael',380]].map(([lv,name,x])=>`<span class="world-label" style="left:${x+60}px;top:40px">${rankIcon(lv,18)}<span class="label-name">${name}</span></span>`).join('');
+</script></body></html>

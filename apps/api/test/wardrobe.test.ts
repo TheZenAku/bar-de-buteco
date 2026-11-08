@@ -16,7 +16,11 @@ test('Nathan is free for new accounts; purchases persist and duplicate/racing re
   assert.deepEqual(view.catalog.map((s:any)=>[s.id,s.owned,s.price]),[['nathan',true,0],['leandro',false,750],['rafael',false,1000],['rafael-rose',false,2500],['read',false,850],['gilmar-gordo',false,900],['gabriel',false,900],['flavio-hipotetico',false,900],['tiao',false,900],['primo',false,1000]]);
   assert.deepEqual(view.catalog.filter((s:any)=>s.base==='rafael').map((s:any)=>[s.id,s.variant,s.rarity]),[['rafael','Original','epic'],['rafael-rose','Rosé','legendary']]);
   assert.deepEqual(view.skills.map((s:any)=>[s.id,s.skin,s.owned,s.price,s.available]),[['horse','tiao',false,800,true],['karate','rafael',false,500,true],['air-kick','rafael',false,800,true]]);
-  assert.equal((await post('/api/wardrobe/daily',{})).statusCode,409,'No income is enabled by default');
+  assert.deepEqual((({day,claimed,coins})=>[day,claimed,coins])((await get('/api/daily')).json()),[1,false,0],'Day one of the run, XP only by default');
+  const dailyClaims=await Promise.all([0,1].map(()=>post('/api/daily',{})));
+  assert.ok(dailyClaims.every(r=>r.statusCode===200));assert.equal(dailyClaims.filter(r=>r.json().gained).length,1,'Once a day, however many ask at once');
+  assert.deepEqual(dailyClaims.find(r=>r.json().gained)!.json().gained,{xp:50,coins:0});assert.equal((await get('/api/daily')).json().claimed,true);
+  assert.equal((await get(`/api/profile/${userId}`)).json().xp,50,'The XP of the bonus counts in the profile');
   assert.equal((await post('/api/wardrobe/buy',{skin:'nathan'})).statusCode,200,'Buying the free skin is a no-op');
   assert.equal((await post('/api/wardrobe/equip',{skin:'rafael'})).statusCode,403);
   assert.equal((await post('/api/wardrobe/equip',{skin:'custom'})).statusCode,400);

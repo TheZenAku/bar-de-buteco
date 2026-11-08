@@ -6,8 +6,10 @@ type GroupFilter='all'|PriceGroup;
 /**
  * Preços: every price and payment of the game in one table, edited in place. Changes wait in a draft (highlighted)
  * until saved together with a reason; the API records them and the world applies them in a few seconds.
+ * The same table, limited to the XP values, is the section Níveis e XP.
  */
-export const pricesSection:SectionFactory=(root,ctx)=>{
+const priceTableSection=(only?:readonly PriceGroup[]):SectionFactory=>(root,ctx)=>{
+  const shown=PRICE_GROUPS.filter(g=>only?only.includes(g.id):g.id!=='xp');
   let data:AdminPrices|undefined,group:GroupFilter='all',disposed=false;
   const drafts=new Map<string,number>();
   const row=(key:string)=>data?.rows.find(r=>r.key===key);
@@ -34,9 +36,9 @@ export const pricesSection:SectionFactory=(root,ctx)=>{
   function render():void {
     if(disposed)return;
     if(!data){root.innerHTML='<p class="admin-loading">Carregando preços…</p>';return;}
-    const groups=PRICE_GROUPS.filter(g=>group==='all'||g.id===group);
-    root.innerHTML=`<div class="admin-toolbar">${chips('group',[['all','Todos'],...PRICE_GROUPS.map(g=>[g.id,g.label] as const)],group)}
-        <form class="admin-percent" data-price-percent><label>Reajuste<input type="number" name="percent" aria-label="Reajuste em porcentagem" step="1" min="-90" max="500" placeholder="%" required></label><button class="mini-button" type="submit">${uiIcon('percent')}Aplicar a ${group==='all'?'todos':e(PRICE_GROUPS.find(g=>g.id===group)!.label.toLowerCase())}</button></form></div>
+    const groups=shown.filter(g=>group==='all'||g.id===group);
+    root.innerHTML=`<div class="admin-toolbar">${shown.length>1?chips('group',[['all','Todos'],...shown.map(g=>[g.id,g.label] as const)],group):''}
+        <form class="admin-percent" data-price-percent><label>Reajuste<input type="number" name="percent" aria-label="Reajuste em porcentagem" step="1" min="-90" max="500" placeholder="%" required></label><button class="mini-button" type="submit">${uiIcon('percent')}Aplicar a ${group==='all'&&shown.length>1?'todos':e((shown.find(g=>g.id===group)??shown[0]!).label.toLowerCase())}</button></form></div>
       ${groups.map(g=>{const rows=data!.rows.filter(r=>r.group===g.id);return rows.length?card(g.label,`<p class="admin-note">${e(g.description)}</p><table class="admin-table admin-prices"><thead><tr><th>Item</th><th class="num">Padrão</th><th class="num">Atual</th><th>Novo valor</th><th class="num">vs. padrão</th><th></th></tr></thead><tbody>${rows.map(rowHtml).join('')}</tbody></table>`,{icon:'tag'}):'';}).join('')}
       <div class="admin-save-slot">${footer()}</div>
       ${card('Últimas alterações',data.changes.length?`<ul class="admin-feed">${data.changes.map(c=>`<li><b>${e(c.actorName??'Administração')}</b><span>${e(when(c.createdAt))}</span><p>${e(c.reason)}</p></li>`).join('')}</ul>`:empty('Os preços ainda são os padrões do jogo.'),{icon:'clock'})}`;
@@ -73,16 +75,18 @@ export const pricesSection:SectionFactory=(root,ctx)=>{
     if(form.matches('[data-price-percent]')){
       event.preventDefault();event.stopPropagation();
       const percent=Number(new FormData(form).get('percent'));if(!Number.isFinite(percent))return;
-      for(const r of data?.rows??[])if(group==='all'||r.group===group){const value=Math.max(r.min,Math.min(r.max,Math.round(r.value*(1+percent/100))));if(value===r.value)drafts.delete(r.key);else drafts.set(r.key,value);}
+      for(const r of data?.rows??[])if(shown.some(g=>g.id===r.group)&&(group==='all'||r.group===group)){const value=Math.max(r.min,Math.min(r.max,Math.round(r.value*(1+percent/100))));if(value===r.value)drafts.delete(r.key);else drafts.set(r.key,value);}
       render();ctx.message(`Reajuste de ${n(percent)}% preparado. Confira e salve com um motivo.`);return;
     }
     if(!form.matches('[data-price-save]'))return;
     event.preventDefault();event.stopPropagation();
     const reason=String(new FormData(form).get('reason')??'').trim(),changes=pending().map(([key,value])=>({key,value}));
     if(!changes.length)return;
-    void ctx.run(async()=>{await ctx.api('/admin/prices',{changes,reason});drafts.clear();await load();},'Preços atualizados. O bar aplica em alguns segundos.');
+    void ctx.run(async()=>{await ctx.api('/admin/prices',{changes,reason});drafts.clear();await load();},only?'Valores salvos. O XP de quem está no bar é recalculado em alguns segundos.':'Preços atualizados. O bar aplica em alguns segundos.');
   };
   root.addEventListener('input',input);root.addEventListener('click',click);root.addEventListener('submit',submit);
   render();void load();
   return {destroy(){disposed=true;root.removeEventListener('input',input);root.removeEventListener('click',click);root.removeEventListener('submit',submit);}};
 };
+export const pricesSection=priceTableSection();
+export const levelsSection=priceTableSection(['xp']);

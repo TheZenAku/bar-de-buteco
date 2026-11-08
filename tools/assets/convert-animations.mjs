@@ -32,9 +32,21 @@ const clips = {
   Wait: misc('Standing Idle 03.fbx'), Recover: misc('Standing Up.fbx'),
   // Highfood: looking at the phone (the customer waiting, anyone with the phone open), thanking for the delivery, the bag coming out of the box.
   Text: misc('Texting While Standing.fbx'), Thank: misc('Thankful.fbx'), Pick: misc('Picking Up Object.fbx'),
+  // The fist fight (docs/sistemas/luta.md, FIGHT_MOVES in packages/shared/src/fight.ts). The punches and the blows taken come from one boxing set:
+  // they start and end on the same guard, so a punch, the next one and a reaction follow each other without a jump. `rate` plays the source faster,
+  // baked into the clip: its length here is the length in the game. After changing any of these, run npm run assets:punches.
+  FightIdle: misc('Bouncing Fight Idle.fbx'),
+  Jab: {...misc('Lead Jab (1).fbx'),rate:1.3}, Cross: {...misc('Elbow Punch.fbx'),rate:1.5}, Hook: {...misc('Punching.fbx'),rate:1.3},
+  Heavy: {...misc('Hook Punch.fbx'),from:.2,rate:1.25},
+  HitLight: {...misc('Head Hit (2).fbx'),rate:1.1}, HitMedium: misc('Medium Hit To Head.fbx'), HitSide: {...misc('Head Hit (1).fbx'),rate:1.1},
+  HitHeavy: misc('Head Hit.fbx'), HitBack: misc('Standing React Small From Back.fbx'),
+  // The legs in the guard (the arms stay up by a masked layer): back, and to each side. Forward is Walk.
+  FightBack: misc('Standing Walk Back.fbx'), FightLeft: misc('Left Strafe Walking.fbx'), FightRight: misc('Right Strafe Walking.fbx'),
 };
 // Clips that only some skins use: Rafael's skills, in every variant of him (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
 const exclusive = { Kick: ['rafael', 'rafael-rose'], AirKick: ['rafael', 'rafael-rose'], Bartend: ['magrao'] };
+const FIGHT_CLIPS = new Set(['FightIdle', 'Jab', 'Cross', 'Hook', 'Heavy', 'HitLight', 'HitMedium', 'HitSide', 'HitHeavy', 'HitBack', 'FightBack', 'FightLeft', 'FightRight']);
+const NPC_ONLY = new Set(['magrao', 'tonico']);
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
 // Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,
 // matching the five-second gameplay recovery instead of freezing on the source's trailing frames.
@@ -157,7 +169,8 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
     const sourceRig=definition.mixamo?createRetarget(model.nodes,[...sourceBones.values()],node=>canonicalSourceName(node.name)):rig;
     const adapted=retargeted||!!definition.mixamo;
     const mixer = new AnimationMixer(source); mixer.clipAction(clip).play();
-    const from = trims[name]?.from ?? 0, duration = (trims[name]?.to ?? clip.duration) - from;
+    // `rate` speeds the source up: every sampled moment below is source time, the clip written is `rate` times shorter.
+    const rate = definition.rate ?? 1, from = trims[name]?.from ?? definition.from ?? 0, duration = (trims[name]?.to ?? definition.to ?? clip.duration) - from;
     if (trims[name]?.faceForward) {
       // Measure where the hips face at the first kept frame and turn the whole source to face +Z.
       mixer.setTime(from); source.updateMatrixWorld(true);
@@ -225,10 +238,11 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
       });
     }
     let outputDuration=duration;
-    if(name==='Walk'){
+    if(name==='Walk'&&rate===1){
       const polished=polishWalkCycle(times,rotations,translations);
       ({times,rotations,translations}=polished);outputDuration=polished.duration;
     }
+    if(rate!==1){times=times.map(time=>time/rate);outputDuration/=rate;}
     const input=accessor(times,1);
     const animation = { name, channels: [], samplers: [] };
     model.nodes.forEach((node, index) => {
@@ -250,6 +264,8 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
   const actions = bank(), dancing = bank();
   for (const [name, definition] of Object.entries(clips)) {
     if (exclusive[name] && !exclusive[name].includes(id)) continue;
+    // Seu Zé and Tonico are never a player: they do not fight.
+    if (FIGHT_CLIPS.has(name) && NPC_ONLY.has(id)) continue;
     convert(actions, name, definition);
   }
   for (const { name, definition } of dances) convert(dancing, name, definition);

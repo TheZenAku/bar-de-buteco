@@ -5,6 +5,7 @@ import {eq} from 'drizzle-orm';
 import {verifyTicket} from '@bar/shared/tickets';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
+import {xpAtLevel} from '@bar/shared';
 import {OWNER_EMAIL} from '../src/admin-policy.js';
 import {controls,economyPrices,users,wallets} from '../src/database/schema.js';
 
@@ -85,8 +86,37 @@ test('administration console: prices for the whole game, player file and changes
     assert.equal((await change({op:'verify'})).statusCode,200);
     assert.equal((await inject('POST','/api/admin/player',{playerId:owner.id,op:'rename',displayName:'Outro',reason:'Tentativa contra a principal'},staff.cookie)).statusCode,403);
     assert.equal((await inject('POST','/api/admin/player',{playerId:staff.id,op:'logout',reason:'A si mesma'},staff.cookie)).statusCode,400);
+    // XP and the daily bonus (aba Nível): the file shows them, the administration's counter moves them, the world sees them.
+    const levels=async()=>(await inject('GET',`/api/admin/players/${player.id}`,undefined,staff.cookie)).json().levels;
+    assert.deepEqual(await levels(),{xp:0,daily:{day:1,claimed:false}});
+    assert.equal((await change({op:'xp',mode:'remove',amount:1})).statusCode,409,'no XP to take');
+    assert.equal((await change({op:'xp',mode:'level',amount:101})).statusCode,400);
+    assert.equal((await change({op:'xp',mode:'add',amount:500})).statusCode,200);
+    assert.equal((await change({op:'xp',mode:'remove',amount:120})).statusCode,200);
+    assert.equal((await levels()).xp,380);
+    assert.equal((await change({op:'xp',mode:'level',amount:10})).statusCode,200);
+    assert.equal((await levels()).xp,xpAtLevel(10));
+    assert.equal((await inject('GET',`/api/profile/${player.id}`,undefined,player.cookie)).json().xp,xpAtLevel(10),'the profile reads the same XP');
+    const report=await internal('POST','/api/internal/achievements',{events:[],online:[player.id]});
+    assert.deepEqual(report.json().xp,[{userId:player.id,xp:xpAtLevel(10)}],'whoever is online gets their XP every round');
+    assert.equal((await change({op:'daily-reset'})).statusCode,409,'nothing claimed today');
+    assert.equal((await inject('POST','/api/daily',{},player.cookie)).json().gained.xp,50);
+    assert.deepEqual((await levels()).daily,{day:1,claimed:true});
+    assert.equal((await change({op:'daily-reset'})).statusCode,200);
+    assert.equal((await inject('POST','/api/daily',{},player.cookie)).json().gained.xp,50,'claimed again');
+    assert.equal((await change({op:'xp',mode:'set',amount:0})).statusCode,200);
+    assert.equal((await levels()).xp,0,'set wins over every counter');
+    // The XP values are prices: an hour worth more raises the XP of everyone who stayed, and the daily days count from the next claim.
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:daily-1',value:80}],reason:'Bônus maior'},staff.cookie)).statusCode,200);
+    assert.equal((await inject('GET','/api/daily',undefined,player.cookie)).json().rewards[0],80);
+    assert.equal((await levels()).xp,0,'the daily counter keeps the XP already received: new values count from the next claim');
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:frequentador',value:600}],reason:'Hora vale mais'},staff.cookie)).statusCode,200);
+    await internal('POST','/api/internal/achievements',{events:[{userId:player.id,series:'frequentador',amount:360}],online:[]});
+    assert.equal((await levels()).xp,60,'six minutes at 600 XP an hour');
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:frequentador',value:null}],reason:'Voltar'},staff.cookie)).statusCode,200);
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:daily-1',value:null}],reason:'Voltar'},staff.cookie)).statusCode,200);
     const history=(await inject('GET',`/api/admin/players/${player.id}`,undefined,staff.cookie)).json().history.map((h:{action:string})=>h.action);
-    for(const action of ['player-rename','items-add','items-remove','skin-grant','skin-revoke','player-verify'])assert.ok(history.includes(action),action);
+    for(const action of ['player-rename','items-add','items-remove','skin-grant','skin-revoke','player-verify','xp-add','xp-remove','daily-reset'])assert.ok(history.includes(action),action);
     const second=await inject('POST','/api/auth/login',{email:'cliente@console.test',password});
     const extra=`${second.cookies[0].name}=${second.cookies[0].value}`;
     assert.equal((await change({op:'logout'})).statusCode,200);
@@ -133,7 +163,7 @@ test('administration console: prices for the whole game, player file and changes
     assert.equal(economy.supply.total,balances);assert.equal(economy.series.length,7);assert.equal(economy.series.at(-1).supply,balances);
     assert.ok(economy.sources.some((s:{source:string})=>s.source==='mochila'));
     // The index weighs what was bought in the period (water only), against the defaults.
-    assert.equal(economy.inflation.priceIndex,100,'water is back at its default');assert.equal(economy.inflation.priceChanges,2);
+    assert.equal(economy.inflation.priceIndex,100,'water is back at its default');assert.equal(economy.inflation.priceChanges,2,'XP values are not prices');
     await inject('POST','/api/admin/prices',{changes:[{key:'item:agua',value:24}],reason:'Dobrar a água'},owner.cookie);
     assert.equal((await inject('GET','/api/admin/economy?days=7',undefined,owner.cookie)).json().inflation.priceIndex,200);
     assert.equal((await inject('GET','/api/admin/economy?days=5',undefined,owner.cookie)).statusCode,400);

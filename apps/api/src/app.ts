@@ -64,10 +64,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const fuelPayments=new FuelPayments(db);
   const highfood=new HighfoodService(db,pricing);
   const trade=new TradeService(db,highfood);
-  const achievements=new AchievementService(db);
+  const achievements=new AchievementService(db,pricing);
   // A counter that fails must not take the message or the Pix down with it.
-  const phone=new PhoneService(db,wardrobe,(userId,series)=>achievements.add([{userId,series,amount:1}]).catch((error:unknown)=>{app.log.error({err:error,series},'Falha ao contar conquista');}));
-  const profile=new ProfileService(db,phone);
+  const phone=new PhoneService(db,wardrobe,(userId,series)=>achievements.add([{userId,series,amount:1}]).then(()=>{}).catch((error:unknown)=>{app.log.error({err:error,series},'Falha ao contar conquista');}));
+  const profile=new ProfileService(db,phone,pricing);
   const administration=new AdminService(db,wardrobe);
   const adminVehicles=new AdminVehiclesService(db,administration);
   const mailer = new Mailer(config);
@@ -258,7 +258,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   app.post('/api/wardrobe/buy',{preHandler:authenticated},request=>wardrobe.buy(request.auth!.user,skinMessageSchema.parse(request.body).skin));
   app.post('/api/wardrobe/skill',{preHandler:authenticated},request=>wardrobe.buySkill(request.auth!.user,skillPurchaseSchema.parse(request.body).skill));
-  app.post('/api/wardrobe/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
+  app.get('/api/daily',{preHandler:authenticated},request=>wardrobe.dailyView(request.auth!.user));
+  app.post('/api/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
   app.get('/api/inventory',{preHandler:authenticated},request=>inventory.view(request.auth!.user.id));
   app.post('/api/inventory/buy',{preHandler:authenticated},request=>{
     const body=z.object({itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
@@ -439,6 +440,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({...base,op:z.literal('item'),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(-100).max(100)}).strict(),
       z.object({...base,op:z.literal('skin'),skinId:z.string().max(32),grant:z.boolean()}).strict(),
       z.object({...base,op:z.literal('skill'),skillId:z.string().max(32),grant:z.boolean()}).strict(),
+      z.object({...base,op:z.literal('xp'),mode:z.enum(['add','remove','set','level']),amount:z.number().int().min(0).max(100_000_000)}).strict(),
+      z.object({...base,op:z.literal('daily-reset')}).strict(),
     ]).parse(request.body);
     const {playerId,reason,...operation}=body;
     const result=await adminConsole.changePlayer(request.auth!.user.id,playerId,operation,reason);
@@ -457,7 +460,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return adminConsole.logs({categories,playerId:query.player,q:query.q,since:query.since?new Date(query.since):undefined,before:query.before?new Date(query.before):undefined,limit:query.limit});
   });
   app.get('/api/admin/economy',{preHandler:administrator},request=>adminConsole.economy(Number(z.object({days:z.enum(['7','30','90']).default('30')}).strict().parse(request.query).days)));
-  app.get('/api/admin/prices',{preHandler:administrator},async request=>({rows:await pricing.rows(),changes:await administration.audits(request.auth!.user,eq(tables.moderationActions.action,'price-set'),20)}));
+  app.get('/api/admin/prices',{preHandler:administrator},async request=>({rows:await pricing.rows(),changes:await administration.audits(request.auth!.user,inArray(tables.moderationActions.action,['price-set','xp-values-set']),20)}));
   app.get('/api/admin/collection',{preHandler:administrator},async()=>({entries:await wardrobe.adminCatalog()}));
   app.post('/api/admin/collection',{preHandler:administrator},async request=>({entries:await wardrobe.saveCatalogEntry(request.auth!.user.id,catalogEntrySchema.parse(request.body))}));
   app.post('/api/admin/prices',{preHandler:administrator},request=>{
@@ -623,8 +626,9 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   // What the players did since the last report (docs/sistemas/conquistas.md); answers the badges to tell those who are online about.
   app.post('/api/internal/achievements', { ...internalOptions, bodyLimit: 262_144 }, async (request) => {
     const { events, online } = achievementReportSchema.parse(request.body);
-    await achievements.add(events);
-    return { unlocked: await achievements.unlocked(online) };
+    const touched = await achievements.add(events);
+    // The XP of whoever did something, and of everyone online: the administration's adjustments and XP values show up within a round.
+    return { unlocked: await achievements.unlocked(online), xp: await achievements.xp([...new Set([...touched, ...online])]) };
   });
   // Previous world versions: each control delivered once, as before (no confirmation).
   app.get('/api/internal/controls', internalOptions, async () => ({ controls: await claimControlsOnce(db) }));

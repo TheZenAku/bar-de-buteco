@@ -49,6 +49,8 @@ export interface AdminPlayerDetail {
   skills:Array<{id:string;name:string;owned:boolean;acquiredAt:string|null}>;
   sessions:{active:number;lastLoginAt:string|null};
   stats:{gamesPlayed:number;wins:number;losses:number;draws:number};
+  /** XP (levels.ts) and today's daily bonus: the run's day and whether it was claimed. */
+  levels:{xp:number;daily:{day:number;claimed:boolean}};
   /** Administrative actions on this account, newest first, with their reversal state. */
   history:AdminAudit[];
   reports:{against:AdminReport[];made:number};
@@ -61,7 +63,11 @@ export type AdminPlayerOperation=
   |{op:'kill'}
   |{op:'item';itemId:string;quantity:number}
   |{op:'skin';skinId:string;grant:boolean}
-  |{op:'skill';skillId:string;grant:boolean};
+  |{op:'skill';skillId:string;grant:boolean}
+  /** `level`: to the start of that level; the others in XP. */
+  |{op:'xp';mode:'add'|'remove'|'set'|'level';amount:number}
+  /** Lets today's daily bonus be claimed again (what was received stays). */
+  |{op:'daily-reset'};
 
 /** The panel's Visão geral. */
 export interface AdminSummary {
@@ -159,9 +165,9 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
 
 const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão desfeita',ban:'Banimento',unban:'Banimento removido',event:'Evento',
   'admin-grant':'Administrador concedido','admin-revoke':'Administrador removido','owner-bootstrap':'Conta principal habilitada',
-  'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados',
+  'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados','xp-values-set':'Valores de XP alterados',
   'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas','player-kill':'Jogador morto (teste)',
-  'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','catalog-edit':'Carta da coleção editada',
+  'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','xp-add':'XP adicionado','xp-remove':'XP retirado','daily-reset':'Bônus diário liberado de novo','catalog-edit':'Carta da coleção editada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
   'vehicle-register':'Veículo registrado','vehicle-plate':'Placa personalizada','vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','vehicle-repair':'Veículos reparados','vehicle-refuel':'Veículos abastecidos','vehicle-recall':'Veículos recolhidos','vehicle-transfer':'Veículos transferidos','vehicle-delete':'Veículos excluídos','vehicle-paint':'Pintura de veículos alterada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
   'report-resolve':'Denúncia resolvida','report-reopen':'Denúncia reaberta'};

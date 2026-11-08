@@ -5,7 +5,7 @@ import {SKILLS,SKINS} from '@bar/shared';
 import {createCollection} from '../../apps/web/src/collection/collection';
 
 function wardrobe(balance=3400,owned=['nathan','rafael'],skills=['karate']){
-  return {equippedSkin:'rafael',balance,dailyReward:0,dailyClaimed:false,
+  return {equippedSkin:'rafael',balance,
     catalog:SKINS.map(skin=>({id:skin.id,name:skin.name,base:skin.base,variant:skin.variant,rarity:skin.rarity,accent:skin.accent,description:skin.description,price:skin.price,owned:owned.includes(skin.id),available:true})),
     skills:SKILLS.map(skill=>({id:skill.id,skin:skill.skin,name:skill.name,description:skill.description,icon:skill.icon,rarity:skill.rarity,price:skill.price,owned:skills.includes(skill.id),available:true}))};
 }
@@ -21,7 +21,6 @@ const fixture={
       buy:async skin=>{const price=view.catalog.find(card=>card.id===skin).price;view={...view,balance:view.balance-price,catalog:view.catalog.map(card=>card.id===skin?{...card,owned:true}:card)};return view;},
       buySkill:async skill=>{const price=view.skills.find(each=>each.id===skill).price;view={...view,balance:view.balance-price,skills:view.skills.map(each=>each.id===skill?{...each,owned:true}:each)};return view;},
       equip:async skin=>{worn=skin;view={...view,equippedSkin:skin};return view;},
-      daily:async()=>view,
     },focus);
   },
   close(){instance?.destroy();instance=undefined;},

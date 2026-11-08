@@ -13,6 +13,8 @@ export interface TouchHost {
   sprint(on:boolean):void;
   /** The active skill's button, when the player has one on a key (it hides itself otherwise). */
   skillButton():HTMLButtonElement|null;
+  /** The fist fight's guard is up: the punch buttons show (docs/sistemas/luta.md). */
+  guard?():boolean;
 }
 
 interface Tile {id:string;icon:string;label:string;code?:string;shift?:boolean;hold?:boolean;run?:()=>void;kinds:readonly TouchKind[]}
@@ -25,6 +27,7 @@ const TILES:readonly Tile[]=[
   {id:'table',icon:'food',label:'Pedir na mesa',code:'KeyP',kinds:['walk']},
   {id:'dance',icon:'music',label:'Dançar',code:'KeyG',kinds:['walk']},
   {id:'wave',icon:'hand',label:'Acenar',code:'KeyV',kinds:['walk']},
+  {id:'guard',icon:'shield',label:'Luta (guarda)',code:'KeyR',kinds:['walk']},
   {id:'smoke',icon:'smoke',label:'Fumar',code:'KeyF',kinds:['walk']},
   {id:'cigarette',icon:'flame',label:'Um cigarro',code:'KeyF',shift:true,kinds:['walk']},
   {id:'skins',icon:'shirt',label:'Coleção',code:'KeyC',kinds:['walk','horse']},
@@ -55,6 +58,7 @@ export const TOUCH_KEYS:ReadonlyArray<readonly [string,string]>=[
   ['Papo','Abre o chat com o teclado do celular'],
   ['Mais','Gestos, celular, mochila, câmera, microfone e, nos veículos, motor, farol, piscas, capô e portas'],
   ['Freio · Buzina','Aparecem quando você está numa moto ou num carro'],
+  ['Soco · Forte','Aparecem com a guarda alta (Mais › Luta): soco leve em sequência e o soco forte'],
 ];
 /** The stick: past this much of its radius it is held, and past this much it runs. */
 const DEAD=.14,RUN=.9;
@@ -100,6 +104,8 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
       <button type="button" class="tp-btn tp-more" data-tp="more" aria-label="Mais ações" aria-expanded="false">${uiIcon('ellipsis')}<b>Mais</b></button>
       <button type="button" class="tp-btn tp-brake" data-tp="brake" aria-label="Freio de mão">${uiIcon('stop')}<b>Freio</b></button>
       <button type="button" class="tp-btn tp-horn" data-tp="horn" aria-label="Buzina">${uiIcon('volume')}<b>Buzina</b></button>
+      <button type="button" class="tp-btn tp-punch" data-tp="punch" aria-label="Soco">${uiIcon('hand')}<b>Soco</b></button>
+      <button type="button" class="tp-btn tp-heavy" data-tp="heavy" aria-label="Soco forte">${uiIcon('bolt')}<b>Forte</b></button>
     </div>
     <div class="tp-sheet hidden" data-tp-sheet role="menu" aria-label="Mais ações"></div>`;
   parent.append(root);
@@ -172,6 +178,9 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
   bind(more,()=>sheet.classList.contains('hidden')?openSheet():closeSheet());
   {const brake=holdKey('Space');bind($('[data-tp="brake"]'),brake.down,brake.up);}
   {const horn=holdKey('KeyF');bind($('[data-tp="horn"]'),horn.down,horn.up);}
+  // The punches press made-up codes the scene reads only with the guard up (BarScene keydown).
+  bind($('[data-tp="punch"]'),()=>{closeSheet();press('FightLight');});
+  bind($('[data-tp="heavy"]'),()=>{closeSheet();press('FightHeavy');});
   // The run button: a latch on foot (the stick's edge runs too), and Shift held to rear up on a bike or a horse.
   {
     const shift=holdKey('ShiftLeft');
@@ -207,6 +216,8 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
     const visible=host.visible();
     if(visible!==shown){shown=visible;root.classList.toggle('tp-hidden',!visible);if(!visible)release();else keepAwake();}
     if(!visible)return;
+    const guard=host.guard?.()?'on':'off';
+    if(root.dataset.guard!==guard)root.dataset.guard=guard;
     const now=host.context();
     if(now!==kind){
       kind=now;root.dataset.kind=now;

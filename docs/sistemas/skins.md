@@ -88,7 +88,7 @@ O servidor do mundo consulta a API ao entrar e reconectar, e revalida durante a 
 
 A compra é permanente, exige conta confirmada e usa uma transação com bloqueio da carteira. A coleção tem chave única por conta/carta. Repetir uma compra não cobra novamente; compras concorrentes não podem produzir saldo negativo. Preço, débito, posse e lançamento vêm do servidor, nunca do formulário. Cada compra grava sua própria linha no extrato, então uma carta retirada pela administração pode ser comprada de novo. A loja não vende moeda nem usa dinheiro real; as moedas vêm do trabalho no bar (J) e das entregas, descritos em [economia](economia.md) e [Highfood](highfood.md).
 
-O saldo inicial e o bônus diário estão preparados para futura configuração e permanecem desativados (`WALLET_INITIAL_COINS`, `WALLET_DAILY_COINS`). O botão do bônus diário só aparece com valor acima de zero. As variáveis `SKIN_PRICE_<ID>` continuam valendo como padrão das cartas (`SKIN_PRICE_RAFAEL_ROSE`, por exemplo).
+O saldo inicial e o bônus diário estão preparados para futura configuração e permanecem desativados (`WALLET_INITIAL_COINS`, `WALLET_DAILY_COINS`). As moedas do bônus diário saíram da coleção e vêm junto com o XP na janela do bônus diário ([níveis](niveis.md)). As variáveis `SKIN_PRICE_<ID>` continuam valendo como padrão das cartas (`SKIN_PRICE_RAFAEL_ROSE`, por exemplo).
 
 As contas de demonstração preparadas pelo seed e os bots de teste recebem a coleção completa e todas as habilidades. Isso não altera o cadastro normal. O seed continua proibido em produção. Os testes de navegador usam serviços e banco separados e dão **somente às suas contas de teste** 10.000 moedas; esse valor não é aplicado ao bar em `localhost:5173`.
 

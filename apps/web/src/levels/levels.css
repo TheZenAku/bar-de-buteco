@@ -1,0 +1,117 @@
+/* Levels (docs/sistemas/niveis.md): the badge of each rank, the header chip, the level-up moment and the daily bonus. */
+.rank-icon{display:inline-block;flex:none;vertical-align:middle;overflow:visible;filter:drop-shadow(0 1px 2px oklch(0 0 0 / 55%))}
+.rank-icon .rank-notches .on{fill:#fff;fill-opacity:1}
+.rank-9{filter:drop-shadow(0 0 6px oklch(.9 .15 95 / 70%))}
+
+/* Header chip, beside the wallet */
+.lv-hud{position:relative;display:flex;gap:1px;align-items:stretch}
+.lv-chip{--rank:var(--hl-gold);position:relative;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;column-gap:8px;align-items:center;min-height:44px;padding:4px 12px 5px 6px;
+  border:0;background:var(--panel);color:var(--foreground);font:inherit;cursor:pointer;text-align:left}
+.lv-chip:hover{background:oklch(.16 .06 300 / 94%)}
+.lv-chip:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+.lv-icon{grid-row:1/3;display:grid;place-items:center;width:34px;height:34px}
+.lv-text{display:flex;align-items:baseline;gap:6px;white-space:nowrap;line-height:1.1}
+.lv-text b{font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.06em}
+.lv-num{color:var(--rank);display:inline-block}
+.lv-rank{font:400 10px var(--font-mono);color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.08em}
+.lv-bar{position:relative;display:block;width:128px;height:11px;margin-top:3px;background:oklch(1 0 0 / 8%);overflow:hidden;box-shadow:inset 0 0 0 1px oklch(1 0 0 / 6%)}
+.lv-fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,var(--hl-magenta),var(--rank));box-shadow:0 0 10px var(--rank)}
+.lv-shine{position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,oklch(1 0 0 / 55%) 50%,transparent 70%);transform:translateX(-120%);pointer-events:none}
+.lv-xp{position:absolute;inset:0;display:grid;place-items:center;font:500 8.5px/1 var(--font-mono);font-style:normal;letter-spacing:.04em;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000}
+.lv-chip.lv-gain .lv-shine{animation:lv-shine .9s ease-out}
+.lv-chip.lv-gain .lv-icon{animation:lv-bump .45s ease-out}
+.lv-chip.lv-leveled{animation:lv-flash 1.2s ease-out}
+.lv-chip.lv-leveled .lv-num{animation:lv-num .7s cubic-bezier(.2,1.6,.4,1)}
+@keyframes lv-shine{to{transform:translateX(120%)}}
+@keyframes lv-bump{40%{transform:scale(1.18) rotate(-6deg)}}
+@keyframes lv-num{0%{transform:scale(2.2);filter:brightness(2)}}
+@keyframes lv-flash{0%{box-shadow:0 0 0 0 var(--rank),inset 0 0 24px var(--rank)}100%{box-shadow:0 0 0 14px transparent,inset 0 0 0 transparent}}
+
+.lv-daily{position:relative;min-width:44px;height:44px;padding:0 12px;color:var(--soft)}
+.lv-daily.ready{color:var(--hl-gold)}
+.lv-daily.ready .ui-icon{animation:lv-gift 2.4s ease-in-out infinite}
+.lv-dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--hl-magenta);box-shadow:0 0 0 0 var(--hl-magenta);animation:lv-ping 1.8s ease-out infinite}
+@keyframes lv-gift{0%,70%,100%{transform:none}76%{transform:rotate(-14deg) scale(1.12)}84%{transform:rotate(12deg) scale(1.12)}92%{transform:rotate(-6deg)}}
+@keyframes lv-ping{0%{box-shadow:0 0 0 0 oklch(.62 .28 330 / 70%)}100%{box-shadow:0 0 0 9px transparent}}
+
+/* What was gained floats up from the bar */
+.lv-pops{position:absolute;top:100%;left:52px;width:0;height:0;pointer-events:none}
+.lv-pop{position:absolute;top:2px;left:0;padding:2px 8px;white-space:nowrap;font:700 12px var(--font-display);letter-spacing:.04em;color:var(--hl-gold);
+  background:oklch(.12 .045 300 / 88%);box-shadow:0 0 12px oklch(.85 .17 90 / 35%);animation:lv-pop 1.9s cubic-bezier(.2,.8,.3,1) forwards}
+@keyframes lv-pop{0%{opacity:0;transform:translate(var(--dx),14px) scale(.6)}15%{opacity:1;transform:translate(var(--dx),0) scale(1.12)}30%{transform:translate(var(--dx),2px) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(var(--dx),34px)}}
+
+/* Level up */
+.lv-up{--rank:var(--hl-gold);--rank-dark:#7a4a00;position:absolute;left:50%;top:22%;z-index:150;display:grid;justify-items:center;gap:2px;width:360px;margin-left:-180px;pointer-events:none;text-align:center;animation:lv-up-in .55s cubic-bezier(.2,1.4,.4,1) both}
+.lv-up.leaving{animation:lv-up-out .7s ease-in forwards}
+.lv-up-rays{position:absolute;top:-34px;left:50%;width:300px;height:300px;margin-left:-150px;border-radius:50%;opacity:.55;
+  background:repeating-conic-gradient(from 0deg,var(--rank) 0 6deg,transparent 6deg 22deg);-webkit-mask:radial-gradient(circle,#000 18%,transparent 66%);mask:radial-gradient(circle,#000 18%,transparent 66%);animation:lv-spin 9s linear infinite}
+.lv-up-badge{position:relative;display:grid;place-items:center;width:132px;height:132px;animation:lv-badge 1s cubic-bezier(.2,1.5,.4,1) both}
+.lv-up-badge .rank-icon{filter:drop-shadow(0 0 18px var(--rank)) drop-shadow(0 4px 10px #000)}
+.lv-spark{position:absolute;top:50%;left:50%;width:7px;height:7px;margin:-3.5px;background:var(--rank);transform:rotate(var(--a)) translateY(0) scale(0);box-shadow:0 0 8px var(--rank);animation:lv-spark 1.1s var(--t) cubic-bezier(.1,.8,.3,1) forwards}
+.lv-spark:nth-child(odd){width:4px;height:12px;background:#fff}
+.lv-up-kicker{position:relative;margin:6px 0 0;font:500 11px var(--font-mono);text-transform:uppercase;letter-spacing:.3em;color:var(--soft)}
+.lv-up h2{position:relative;margin:0;font:700 42px/1 var(--font-display);text-transform:uppercase;letter-spacing:.06em;color:#fff;text-shadow:0 0 18px var(--rank),0 3px 0 var(--rank-dark),0 4px 14px #000}
+.lv-up small{position:relative;padding:3px 12px;font:600 13px var(--font-display);text-transform:uppercase;letter-spacing:.18em;color:var(--rank);background:oklch(.12 .045 300 / 85%)}
+@keyframes lv-up-in{0%{opacity:0;transform:translateY(24px) scale(.7)}}
+@keyframes lv-up-out{to{opacity:0;transform:translateY(-30px) scale(.94)}}
+@keyframes lv-spin{to{transform:rotate(360deg)}}
+@keyframes lv-badge{0%{transform:scale(0) rotate(-200deg)}60%{transform:scale(1.15) rotate(8deg)}}
+@keyframes lv-spark{0%{transform:rotate(var(--a)) translateY(0) scale(0)}25%{transform:rotate(var(--a)) translateY(calc(var(--d) * -.6)) scale(1.2)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.3)}}
+
+/* Daily bonus window */
+.dl-window{width:min(560px,calc(100vw - 16px))}
+.dl-window .fw-title h2{display:flex;align-items:center;gap:8px}
+.dl-window .fw-title h2 .ui-icon{width:18px;height:18px;color:var(--hl-gold)}
+.dl-window .fw-body{padding:14px 16px 16px}
+.dl-lead{margin:0 0 14px;color:var(--soft);font-size:13px}
+.dl-days{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 14px;padding:0;list-style:none}
+.dl-day{position:relative;display:grid;justify-items:center;gap:4px;padding:10px 6px 9px;background:oklch(1 0 0 / 4%);box-shadow:inset 0 0 0 1px var(--border);color:var(--muted-foreground);
+  animation:dl-in .45s calc(var(--i) * 55ms) cubic-bezier(.2,1.3,.4,1) both;overflow:visible}
+.dl-day.big{grid-column:span 2}
+.dl-n{font:500 10px var(--font-mono);text-transform:uppercase;letter-spacing:.12em}
+.dl-gift .ui-icon{width:26px;height:26px}
+.dl-day b{font:700 14px var(--font-display);color:var(--foreground)}
+.dl-day small{display:flex;align-items:center;gap:3px;font:500 10px var(--font-mono);color:var(--money)}
+.dl-day small .ui-icon{width:11px;height:11px}
+.dl-check{position:absolute;top:5px;right:5px;display:none;width:18px;height:18px;place-items:center;border-radius:50%;background:var(--vw-mint);color:#062}
+.dl-check .ui-icon{width:12px;height:12px;stroke-width:3}
+.dl-day.done{opacity:.72}
+.dl-day.done .dl-check{display:grid}
+.dl-day.today{color:var(--hl-gold);background:oklch(.85 .17 90 / 9%);box-shadow:inset 0 0 0 1px var(--hl-gold),0 0 18px oklch(.85 .17 90 / 22%)}
+.dl-day.today:not(.done) .dl-gift{animation:lv-gift 1.8s ease-in-out infinite}
+.dl-day.today.done{opacity:1}
+.dl-day.claiming{animation:dl-claim .6s cubic-bezier(.2,1.6,.4,1)}
+.dl-burst{position:absolute;top:38%;left:50%;width:0;height:0}
+.dl-burst i{position:absolute;width:3px;height:14px;margin:-7px -1.5px;background:var(--hl-gold);transform:rotate(var(--a)) translateY(0);animation:dl-burst .8s ease-out forwards}
+.dl-gain{position:absolute;top:50%;left:50%;z-index:2;padding:3px 10px;white-space:nowrap;font:700 14px var(--font-display);color:var(--hl-gold);background:oklch(.12 .045 300 / 95%);box-shadow:0 0 16px oklch(.85 .17 90 / 40%);animation:dl-gain 1.3s cubic-bezier(.2,.9,.3,1) forwards}
+.dl-wait{display:flex;align-items:center;justify-content:center;gap:8px;margin:0;padding:11px;background:oklch(1 0 0 / 4%);color:var(--muted-foreground);font-size:13px}
+.dl-wait b{font:500 14px var(--font-mono);color:var(--foreground)}
+.dl-wait .ui-icon{width:16px;height:16px}
+.dl-claim{animation:dl-glow 2s ease-in-out infinite}
+@keyframes dl-in{0%{opacity:0;transform:translateY(12px) scale(.9)}}
+@keyframes dl-claim{40%{transform:scale(1.12)}}
+@keyframes dl-burst{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(-48px)}}
+@keyframes dl-gain{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}35%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-120%)}}
+@keyframes dl-glow{50%{box-shadow:0 0 20px oklch(.62 .28 330 / 55%)}}
+
+/* Names over the heads: hidden until Z, which fades them in for a few seconds */
+#labels{opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s linear .45s}
+#labels.names-on{opacity:1;visibility:visible;transition:opacity .35s ease,visibility 0s}
+.world-label .rank-icon{margin:-3px 0 -3px -3px}
+
+/* Profile header */
+.pf-level{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;margin-top:6px}
+.pf-level .rank-icon{grid-row:1/3}
+.pf-level b{font:600 12px var(--font-display);text-transform:uppercase;letter-spacing:.08em}
+.pf-level b span{color:var(--rank)}
+.pf-level .lv-bar{width:100%;height:10px;margin:0}
+.pf-level .lv-xp{font-size:8px}
+.person .rank-icon{margin-right:2px}
+
+@media(max-width:760px){.game-header .lv-hud{grid-column:2;grid-row:1;justify-self:end}.lv-bar{width:84px}.lv-rank{display:none}.lv-chip{min-height:40px}.lv-daily{height:40px;min-width:40px;padding:0 8px}}
+@media(prefers-reduced-motion:reduce){
+  .lv-chip.lv-gain .lv-shine,.lv-chip.lv-gain .lv-icon,.lv-chip.lv-leveled,.lv-chip.lv-leveled .lv-num,.lv-daily.ready .ui-icon,.lv-dot,.lv-up-rays,.lv-up-badge,.lv-spark,.dl-day,.dl-day.today .dl-gift,.dl-claim{animation:none}
+  .lv-pop,.lv-up,.lv-up.leaving,.dl-gain{animation-duration:.01s}
+  .lv-spark,.dl-burst{display:none}
+  #labels,#labels.names-on{transition:none}
+}

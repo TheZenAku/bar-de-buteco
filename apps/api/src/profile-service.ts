@@ -1,9 +1,10 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {and,asc,desc,eq,inArray,isNotNull,sql} from 'drizzle-orm';
-import {isSkillKey,PROFILE,skillsOf,skinBase,type AdminBadge,type AdminBadgeHolder,type Badge,type BadgeRarity,type ProfileView,type SkillLoadout,type SkillLoadouts} from '@bar/shared';
+import {isSkillKey,PROFILE,skillsOf,skinBase,xpOfCounters,type AdminBadge,type AdminBadgeHolder,type Badge,type BadgeRarity,type ProfileView,type SkillLoadout,type SkillLoadouts} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {badgeImages,badges,moderationActions,profiles,skillInventory,userBadges,users} from './database/schema.js';
+import {badgeImages,badges,moderationActions,profiles,skillInventory,userAchievements,userBadges,users} from './database/schema.js';
 import type {PhoneService} from './phone-service.js';
+import type {PricingService} from './pricing-service.js';
 
 export class ProfileError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
 const badgeColumns={id:badges.id,name:badges.name,description:badges.description,icon:badges.icon,color:badges.color,rarity:badges.rarity,image:badges.image};
@@ -26,20 +27,21 @@ function pngSize(bytes:Buffer):{width:number;height:number}|undefined {
 
 /** The profile window (docs/sistemas/perfil.md): what anyone sees of a player, what they edit in their own, and the badges in the administration. */
 export class ProfileService {
-  constructor(private db:Database,private phone:PhoneService){}
+  constructor(private db:Database,private phone:PhoneService,private pricing?:PricingService){}
 
   async view(viewer:string,userId:string):Promise<ProfileView>{
     const card=await this.phone.card(viewer,userId),mine=viewer===userId;
-    const [[profile],owned,skills]=await Promise.all([
+    const [[profile],owned,skills,counters]=await Promise.all([
       this.db.select({skin:profiles.equippedSkin,status:profiles.statusMessage,loadouts:profiles.skillLoadouts}).from(profiles).where(eq(profiles.userId,userId)),
       this.db.select({...badgeColumns,shownAt:userBadges.shownAt}).from(userBadges).innerJoin(badges,eq(userBadges.badgeId,badges.id)).where(eq(userBadges.userId,userId)).orderBy(desc(userBadges.grantedAt),asc(badges.name)),
       mine?this.db.select({id:skillInventory.skillId}).from(skillInventory).where(eq(skillInventory.userId,userId)):Promise.resolve([]),
+      this.db.select({series:userAchievements.series,value:userAchievements.value}).from(userAchievements).where(eq(userAchievements.userId,userId)),
     ]);
     if(!profile)throw new ProfileError(404,'Jogador não encontrado.');
     const plain=({shownAt:_,...badge}:Badge&{shownAt:number|null}):Badge=>badge;
     return {
       id:userId,name:card.name,color:card.color,skin:profile.skin,status:profile.status,mine,
-      handle:card.gram.author.handle,...(card.gram.author.photo?{photo:card.gram.author.photo}:{}),number:card.number,saved:card.saved,
+      handle:card.gram.author.handle,...(card.gram.author.photo?{photo:card.gram.author.photo}:{}),number:card.number,saved:card.saved,xp:xpOfCounters(counters,await this.pricing?.table()),
       badges:owned.filter(badge=>badge.shownAt!==null).sort((a,b)=>a.shownAt!-b.shownAt!).map(plain),
       ...(mine?{owned:owned.map(plain),loadouts:profile.loadouts as SkillLoadouts,ownedSkills:skills.map(skill=>skill.id)}:{}),
     };

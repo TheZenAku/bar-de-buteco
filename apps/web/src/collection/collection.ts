@@ -13,7 +13,6 @@ export interface CollectionHooks {
   buy:(skin:string)=>Promise<Wardrobe>;
   equip:(skin:string)=>Promise<Wardrobe>;
   buySkill:(skill:string)=>Promise<Wardrobe>;
-  daily:()=>Promise<Wardrobe>;
   volume:()=>number;
   toast:(text:string,error?:boolean)=>void;
 }
@@ -54,7 +53,7 @@ export function createCollection(root:HTMLElement,first:Wardrobe,hooks:Collectio
     <header class="cl-head">
       <div class="cl-title"><span class="eyebrow">Coleção</span><h2>Suas cartas</h2></div>
       <div class="cl-progress" role="status"><small></small><span class="cl-track"><i></i></span></div>
-      <div class="cl-actions"><span class="cl-daily"></span><span class="cl-wallet" title="Sua carteira">${uiIcon('coins')}<b id="wallet-balance"></b></span></div>
+      <div class="cl-actions"><span class="cl-wallet" title="Sua carteira">${uiIcon('coins')}<b id="wallet-balance"></b></span></div>
     </header>
     <div class="cl-stage">
       <section class="cl-variants" aria-label="Variantes do personagem"><h3>Variantes</h3><div class="cl-variant-list"></div></section>
@@ -76,7 +75,6 @@ export function createCollection(root:HTMLElement,first:Wardrobe,hooks:Collectio
     const owned=wardrobe.catalog.filter(card=>card.owned).length,total=wardrobe.catalog.length;
     root.querySelector('.cl-progress small')!.textContent=`${owned} de ${total} cartas`;
     root.querySelector<HTMLElement>('.cl-track i')!.style.width=`${(owned/Math.max(1,total)*100).toFixed(1)}%`;
-    root.querySelector('.cl-daily')!.innerHTML=wardrobe.dailyReward>0?`<button type="button" class="mini-button" data-cl="daily" ${wardrobe.dailyClaimed?'disabled':''}>${uiIcon('gift')}${wardrobe.dailyClaimed?'Bônus de hoje recebido':`Bônus diário: ${coins(wardrobe.dailyReward)}`}</button>`:'';
     countTo(wardrobe.balance);
   }
   const writeBalance=(value:number)=>{const node=root.querySelector('#wallet-balance');if(node)node.innerHTML=`${coins(value)} <small>moedas</small>`;};
@@ -334,7 +332,6 @@ export function createCollection(root:HTMLElement,first:Wardrobe,hooks:Collectio
       case 'skill-buy':ask(`skill:${button.dataset.id!}`);break;
       case 'skill-confirm':void buySkill(button.dataset.id!);break;
       case 'cancel':askedOff();renderInfo(false);break;
-      case 'daily':void act(hooks.daily).then(ok=>{if(ok)refresh();});break;
     }
   };
   const pointer=(event:Event)=>{if((event.target as HTMLElement).closest('.cl-hand-card'))cardSounds.flick(hooks.volume());};

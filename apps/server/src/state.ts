@@ -2,6 +2,23 @@ import { Schema, type, view, MapSchema, ArraySchema } from '@colyseus/schema';
 import type { MotoPhase } from '@bar/shared';
 import { DEFAULT_ENVIRONMENT, DEFAULT_SHOW, DEFAULT_SKIN, NEW_MOTO_PARTS, type EnvironmentState } from '@bar/shared';
 
+/**
+ * A player's fist fight (docs/sistemas/luta.md, FistState in packages/shared/src/fight.ts). The guard; the last punch as the inputs threw it (the input,
+ * its facing, its step in per input, the puncher's own count) and when the room took it; the last blow taken and until when it stuns.
+ */
+export class Fist extends Schema {
+  @type('boolean') fight = false;
+  @type('string') punch = '';
+  @type('int32') seq = -1_000_000_000;
+  @type('float32') yaw = 0;
+  @type('float32') lunge = 0;
+  @type('uint8') n = 0;
+  @type('number') at = 0;
+  @type('number') hitAt = 0;
+  @type('string') hit = '';
+  @type('float32') hitYaw = 0;
+  @type('number') stunUntil = 0;
+}
 export class Player extends Schema {
   @type('string') id = '';
   /** A short number for this avatar in the crowd records (shared/crowd.ts), so a sprite and its model are known to be one player. */
@@ -79,6 +96,10 @@ export class Player extends Schema {
   @type('string') parcel = '';
   /** Has the phone out, so everyone sees them look at it while standing. */
   @type('boolean') looking = false;
+  /** Level 1-100 (packages/shared/src/levels.ts), shown beside the name; 0 until the API reports it. */
+  @type('uint8') level = 0;
+  /** The fist fight (packages/shared/src/fight.ts, FistState): nested, a Schema holds at most 63 fields. */
+  @type(Fist) fist = new Fist();
 }
 export class Npc extends Schema {
   @type('string') id = '';

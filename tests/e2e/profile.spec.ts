@@ -1,3 +1,4 @@
+import {nameLabel,seeName} from './names';
 import {test,expect,type Browser,type Page} from '@playwright/test';
 import {achievementOfBadge} from '../../packages/shared/src/achievements';
 import {enterAsAdmin} from './moto-helpers';
@@ -9,7 +10,8 @@ const myId=(page:Page)=>page.evaluate(()=>(window as any).barDebug.snapshot().lo
 /** A point on a player's body: under their name over the head (world labels are placed by the scene). */
 async function bodyOf(page:Page,name:string):Promise<{x:number;y:number}> {
   // Read in one go: the labels are written anew several times a second.
-  const box=await page.evaluate(name=>{const label=[...document.querySelectorAll('.world-label')].find(each=>each.textContent===name);if(!label)return null;const {x,y,width,height}=label.getBoundingClientRect();return {x,y,width,height};},name);
+  await page.keyboard.press('z');
+  const box=await page.evaluate(name=>{const label=[...document.querySelectorAll('.world-label .label-name')].find(each=>each.textContent===name)?.closest('.world-label');if(!label)return null;const {x,y,width,height}=label.getBoundingClientRect();return {x,y,width,height};},name);
   if(!box)throw new Error(`No label for ${name}`);
   return {x:box.x+box.width/2,y:box.y+box.height+40};
 }
@@ -64,7 +66,7 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
 
   // A left click on someone no longer opens anything.
   const other=await enter(browser,'Vizinho');
-  await expect(page.locator('.world-label',{hasText:/^Vizinho$/})).toBeVisible({timeout:30000});
+  await seeName(page,nameLabel(page,/^Vizinho$/));
   const neighbour=await bodyOf(page,'Vizinho');
   await page.mouse.click(neighbour.x,neighbour.y);
   await page.waitForTimeout(600);
@@ -210,7 +212,7 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
   await expect.poll(()=>clip(page,me),{timeout:15000}).not.toBe('Kick');
 
   // Another player sees the badges and the status, nothing to edit, and the way to the number.
-  await expect(other.locator('.world-label',{hasText:/^primary_admin$/})).toBeVisible({timeout:30000});
+  await seeName(other,nameLabel(other,/^primary_admin$/));
   await openFromWorld(other,'primary_admin');
   await expect(other.locator('.pf-grid .pf-slot.filled')).toHaveCount(2);
   await expect(other.locator('.pf-status p')).toContainText('Sextou');

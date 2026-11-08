@@ -43,7 +43,7 @@ export function loadoutOf(loadouts:SkillLoadouts|undefined,skin:string|undefined
   return {skill:skills.some(skill=>skill.id===saved?.skill)?saved!.skill:skills[0]!.id,key:saved&&isSkillKey(saved.key)?saved.key:DEFAULT_SKILL_KEY};
 }
 // The keys the game uses on foot (BarScene and main.ts). On a bike Z, X, C and H are its switches, and they win there.
-const TAKEN_KEYS=new Set(['KeyW','KeyA','KeyS','KeyD','KeyE','KeyG','KeyV','KeyF','KeyC','KeyQ','KeyT','KeyM','KeyI','KeyB','KeyP','KeyK','KeyJ']);
+const TAKEN_KEYS=new Set(['KeyW','KeyA','KeyS','KeyD','KeyE','KeyG','KeyV','KeyF','KeyC','KeyQ','KeyT','KeyM','KeyI','KeyB','KeyP','KeyK','KeyJ','KeyZ']);
 /** A letter or number the game does not use for anything else on foot. */
 export const isSkillKey=(code:string):boolean=>/^(?:Key[A-Z]|Digit\d|Numpad\d)$/.test(code)&&!TAKEN_KEYS.has(code);
 export const isTakenKey=(code:string):boolean=>TAKEN_KEYS.has(code);
@@ -54,6 +54,8 @@ export const keyLabel=(code:string):string=>code.startsWith('Key')?code.slice(3)
 export interface ProfileView {
   id:string;name:string;color:string;skin:string;status:string;mine:boolean;
   handle:string;photo?:number;number:string;saved:boolean;
+  /** Total XP (levels.ts, levelOf). */
+  xp:number;
   /** On show, in the order chosen. */
   badges:Badge[];
   owned?:Badge[];loadouts?:SkillLoadouts;ownedSkills?:string[];

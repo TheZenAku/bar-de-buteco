@@ -59,7 +59,6 @@ export interface WardrobeSkill {id:string;skin:string;name:string;description:st
 export interface Wardrobe {
   equippedSkin:string;balance:number;
   catalog:WardrobeCard[];skills:WardrobeSkill[];
-  dailyReward:number;dailyClaimed:boolean;
 }
 export const skillPurchaseSchema=z.object({skill:z.string().min(1).max(32)}).strict();
 

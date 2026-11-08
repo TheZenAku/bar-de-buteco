@@ -1,8 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import {and,eq,inArray,sql} from 'drizzle-orm';
-import {barDayKey,DEFAULT_SKIN,SKILLS,SKINS,priceEntry,skillById,skinById,type AdminCatalogEntry,type CatalogAvailability,type PublicUser,type Rarity,type Wardrobe} from '@bar/shared';
+import {barDayKey,dailyXp,DAILY_XP_SERIES,DEFAULT_SKIN,SKILLS,SKINS,priceEntry,skillById,skinById,type AdminCatalogEntry,type CatalogAvailability,type DailyView,type PublicUser,type Rarity,type Wardrobe} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {currencyLedger,moderationActions,profiles,skillInventory,skinCatalog,skinInventory,wallets} from './database/schema.js';
+import {currencyLedger,moderationActions,profiles,skillInventory,skinCatalog,skinInventory,userAchievements,wallets} from './database/schema.js';
 import {PricingService} from './pricing-service.js';
 
 export class WardrobeError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
@@ -28,12 +28,11 @@ export class WardrobeService {
   async view(user:PublicUser):Promise<Wardrobe>{
     await this.initialize(user.id);
     const prices=await this.pricing.table();
-    const [[profile],[wallet],inventory,skills,overrides,[daily]]=await Promise.all([
+    const [[profile],[wallet],inventory,skills,overrides]=await Promise.all([
       this.db.select().from(profiles).where(eq(profiles.userId,user.id)),this.db.select().from(wallets).where(eq(wallets.userId,user.id)),
       this.db.select().from(skinInventory).where(eq(skinInventory.userId,user.id)),
       this.db.select().from(skillInventory).where(eq(skillInventory.userId,user.id)),
       this.overrides(),
-      this.db.select().from(currencyLedger).where(eq(currencyLedger.id,this.dailyKey(user.id))),
     ]);
     const catalog=SKINS.flatMap(skin=>{
       const set=overrides.get(`skin:${skin.id}`),owned=owns(inventory,skin.id),availability=set?.availability??(skin.adminOnly?'hidden':'sale');
@@ -47,20 +46,40 @@ export class WardrobeService {
       if(availability==='hidden'&&!owned)return [];
       return [{id:skill.id,skin:skill.skin,name:skill.name,description:set?.description??skill.description,icon:skill.icon,rarity:set?.rarity??skill.rarity,price:prices[`skill:${skill.id}`]??0,owned,available:availability==='sale'}];
     });
-    return {equippedSkin:profile.equippedSkin,balance:wallet.balance,catalog,skills:shown,dailyReward:prices['reward:daily']??0,dailyClaimed:!!daily};
+    return {equippedSkin:profile.equippedSkin,balance:wallet.balance,catalog,skills:shown};
   }
-  private dailyKey(userId:string){return `daily:${userId}:${barDayKey()}`;}
-  async claimDaily(user:PublicUser){
-    if(!user.verified)throw new WardrobeError(403,'Confirme seu e-mail para receber moedas.');
-    const dailyReward=await this.pricing.get('reward:daily');
-    if(!dailyReward)throw new WardrobeError(409,'O bônus diário está desativado.');
+  // shortcut: each claim is a `diario:<day>` row of user_achievements (value = day of the run), which makes it once a day
+  // without a new table; a dedicated table if the bonus ever needs more than the run and the day.
+  private dailyRow=(day:string)=>`${DAILY_XP_SERIES}:${day}`;
+  async dailyView(user:PublicUser):Promise<DailyView>{
+    const today=barDayKey(),yesterday=barDayKey(new Date(Date.now()-86_400_000));
+    const rows=await this.db.select({series:userAchievements.series,value:userAchievements.value}).from(userAchievements)
+      .where(and(eq(userAchievements.userId,user.id),inArray(userAchievements.series,[this.dailyRow(today),this.dailyRow(yesterday)])));
+    const claimed=rows.find(row=>row.series===this.dailyRow(today)),before=rows.find(row=>row.series===this.dailyRow(yesterday));
+    const table=await this.pricing.table(),rewards=dailyXp(table);
+    return {day:claimed?.value??(before?before.value%rewards.length+1:1),claimed:!!claimed,coins:table['reward:daily']??0,rewards};
+  }
+  /** Today's XP (more each day of a run) and the coins of the price table, once per bar day; a second claim changes nothing. */
+  async claimDaily(user:PublicUser):Promise<DailyView&{gained?:{xp:number;coins:number}}>{
+    if(!user.verified)throw new WardrobeError(403,'Confirme seu e-mail para receber o bônus.');
     await this.initialize(user.id);
-    await this.db.transaction(async tx=>{
+    const view=await this.dailyView(user);
+    if(view.claimed)return view;
+    const xp=view.rewards[view.day-1]!,coins=view.coins,day=barDayKey();
+    const given=await this.db.transaction(async tx=>{
       await tx.select().from(wallets).where(eq(wallets.userId,user.id)).for('update');
-      const inserted=await tx.insert(currencyLedger).values({id:this.dailyKey(user.id),userId:user.id,amount:dailyReward,reason:'daily'}).onConflictDoNothing().returning();
-      if(inserted.length)await tx.update(wallets).set({balance:sql`${wallets.balance}+${dailyReward}`}).where(eq(wallets.userId,user.id));
+      const inserted=await tx.insert(userAchievements).values({userId:user.id,series:this.dailyRow(day),value:view.day}).onConflictDoNothing().returning();
+      if(!inserted.length)return false;
+      await tx.insert(userAchievements).values({userId:user.id,series:DAILY_XP_SERIES,value:xp})
+        .onConflictDoUpdate({target:[userAchievements.userId,userAchievements.series],set:{value:sql`${userAchievements.value}+${xp}`,updatedAt:new Date()}});
+      if(coins>0){
+        // The ledger key is the one the collection's old button used: coins already taken today are not given twice.
+        const paid=await tx.insert(currencyLedger).values({id:`daily:${user.id}:${day}`,userId:user.id,amount:coins,reason:'daily'}).onConflictDoNothing().returning();
+        if(paid.length)await tx.update(wallets).set({balance:sql`${wallets.balance}+${coins}`}).where(eq(wallets.userId,user.id));
+      }
+      return true;
     });
-    return this.view(user);
+    return given?{...view,claimed:true,gained:{xp,coins}}:{...view,claimed:true};
   }
   async buy(user:PublicUser,skinId:string){
     const skin=skinById(skinId);if(!skin)throw new WardrobeError(400,'Skin inválida.');

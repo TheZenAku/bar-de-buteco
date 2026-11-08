@@ -1,0 +1,32 @@
+/* The header wallet (wallet-hud.ts): the balance rolls, "+N"/"−N" floats off it, and the panel flashes mint or red. */
+.game-header .hud-wallet{position:relative}
+#hud-balance{display:inline-block;font-variant-numeric:tabular-nums}
+.hud-wallet.wl-gain{animation:wl-flash-up 1.1s ease-out}
+.hud-wallet.wl-loss{animation:wl-flash-down .9s ease-out}
+.hud-wallet.wl-gain .ui-icon{animation:wl-bump .5s cubic-bezier(.2,1.6,.4,1)}
+.hud-wallet.wl-gain #hud-balance{animation:wl-num-up .6s cubic-bezier(.2,1.6,.4,1)}
+.hud-wallet.wl-loss #hud-balance{animation:wl-shake .4s ease-out}
+@keyframes wl-flash-up{0%{box-shadow:0 0 0 0 var(--money),inset 0 0 22px oklch(.85 .17 90 / 45%)}100%{box-shadow:0 0 0 12px transparent,inset 0 0 0 transparent}}
+@keyframes wl-flash-down{0%{box-shadow:inset 0 0 20px oklch(.66 .2 20 / 55%)}100%{box-shadow:inset 0 0 0 transparent}}
+@keyframes wl-bump{40%{transform:scale(1.25) rotate(-10deg)}}
+@keyframes wl-num-up{0%{transform:scale(1.3);filter:brightness(1.8)}}
+@keyframes wl-shake{20%{transform:translateX(-3px)}45%{transform:translateX(3px)}70%{transform:translateX(-1px)}}
+
+/* What came in or went out floats from under the panel */
+.wl-pops{position:absolute;top:100%;right:16px;width:0;height:0;pointer-events:none}
+.wl-pop{position:absolute;top:2px;right:0;padding:2px 8px;white-space:nowrap;font:700 12px var(--font-display);letter-spacing:.04em;background:oklch(.12 .045 300 / 88%);
+  animation:wl-pop 1.9s cubic-bezier(.2,.8,.3,1) forwards}
+.wl-pop.up{color:var(--money);box-shadow:0 0 12px oklch(.85 .17 90 / 35%)}
+.wl-pop.down{color:var(--destructive);box-shadow:0 0 12px oklch(.66 .2 20 / 30%);animation-name:wl-drop}
+.wl-coin{position:absolute;top:50%;left:50%;width:9px;height:9px;margin:-4.5px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c4,var(--hl-gold) 45%,#8a5a00);
+  box-shadow:0 0 6px oklch(.85 .17 90 / 70%);transform:rotate(var(--a)) translateY(0) scale(0);animation:wl-coin .9s var(--t) cubic-bezier(.1,.8,.3,1) forwards}
+@keyframes wl-pop{0%{opacity:0;transform:translate(var(--dx),14px) scale(.6)}15%{opacity:1;transform:translate(var(--dx),0) scale(1.12)}30%{transform:translate(var(--dx),2px) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(var(--dx),34px)}}
+@keyframes wl-drop{0%{opacity:0;transform:translate(var(--dx),-6px) scale(1.2)}15%{opacity:1;transform:translate(var(--dx),2px) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(var(--dx),26px)}}
+@keyframes wl-coin{0%{transform:rotate(var(--a)) translateY(0) scale(0)}30%{transform:rotate(var(--a)) translateY(calc(var(--d) * -.7)) scale(1.1)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.4)}}
+
+@media(max-width:760px){.wl-pops{right:12px}}
+@media(prefers-reduced-motion:reduce){
+  .hud-wallet.wl-gain,.hud-wallet.wl-loss,.hud-wallet.wl-gain .ui-icon,.hud-wallet.wl-gain #hud-balance,.hud-wallet.wl-loss #hud-balance{animation:none}
+  .wl-pop,.wl-pop.down{animation-duration:.01s}
+  .wl-coin{display:none}
+}
