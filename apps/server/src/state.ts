@@ -43,6 +43,8 @@ export class Player extends Schema {
   /** Independent cigarette: lighting start and optional extinguishing start, on the room clock. */
   @type('number') smokingSince = 0;
   @type('number') smokingStopAt = 0;
+  /** F1 pose: only the arms change, so movement and independent props keep working. */
+  @type('boolean') armsCrossed = false;
   // Needs, as whole points (precise values live in NeedsDirector). Everyone sees drunkenness and the
   // condition; the HUD shows the rest to the player.
   @type('uint8') hp = 100;

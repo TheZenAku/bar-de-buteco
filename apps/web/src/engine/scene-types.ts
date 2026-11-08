@@ -39,6 +39,7 @@ export interface SceneActor {
   holdingUntil?: number;
   smokingSince?:number;
   smokingStopAt?:number;
+  armsCrossed?:boolean;
   /** Tonico's tray: the items he carries, comma-separated, and the order they belong to. */
   carrying?: string;
   carryingOrder?: string;
@@ -112,7 +113,7 @@ export interface SceneCallbacks {
   /** The backdrop could not keep a steady frame rate and switched itself off. */
   onShowcaseSlow?: () => void;
   onInteract?: () => void;
-  onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette') => void;
+  onEmote?: (emote: 'dance' | 'wave' | 'smoke' | 'cigarette' | 'cross-arms') => void;
   onChat?: () => void;
   onSkins?: () => void;
   /** B: an administrator takes off or lands (the room refuses anyone else). */

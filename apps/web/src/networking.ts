@@ -142,6 +142,8 @@ export class BarNetwork {
   private transportReady=false;
   private wasMoving=false;
   private sentRear=false;
+  /** The heading last sent: a turn in place is sent once, and a horse still turning to it does not count. */
+  private sentRotation?:number;
   user?:PublicUser;
   constructor(private hooks:NetworkHooks){}
   async connect():Promise<void> {
@@ -162,7 +164,7 @@ export class BarNetwork {
   }
   private attach(room:Room):void {
     let removal:{kind:'kick'|'ban';reason:string}|undefined;
-    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;this.sentRear=false;this.sentLamps=0;
+    this.room=room;this.pending=[];this.pendingMoto=[];this.seq=0;this.transportReady=true;this.wasMoving=false;this.sentRear=false;this.sentRotation=undefined;this.sentLamps=0;
     Object.assign(room.reconnection,{minUptime:0,minDelay:500,maxDelay:2000,delay:500,maxRetries:15,maxEnqueuedMessages:0});
     this.hooks.status('Você está no bar',true);
     room.onStateChange((state:any)=>{
@@ -271,9 +273,12 @@ export class BarNetwork {
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
     const looking=Math.abs((intention.headYaw??0)-(last.headYaw??0))>.001||Math.abs((intention.headPitch??0)-(last.headPitch??0))>.001;
-    if(!moving&&!this.wasMoving&&!looking&&!!intention.rear===this.sentRear)return;
+    // Turning in place (to the selfie's phone, a firework's aim) has to reach the room too.
+    const turning=this.sentRotation!==undefined&&Math.abs(normalizeHeading(intention.rotation-this.sentRotation))>.001;
+    if(!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
     this.wasMoving=moving;
     this.sentRear=!!intention.rear;
+    this.sentRotation=intention.rotation;
     // A drawn vehicle can have many complete turns. Never let that heading poison the unacknowledged walking queue.
     const input={...intention,rotation:normalizeHeading(intention.rotation),seq:++this.seq};
     this.pending.push(input);

@@ -101,6 +101,8 @@ export interface PlayerState extends Position { id: string; slot?: number; displ
    *  since/until when (server clock): the same time as at a table (consumeMs). They walk around meanwhile. */
   holding?: string; holdingSince?: number; holdingUntil?: number;
   smokingSince?:number; smokingStopAt?:number;
+  /** F1 upper-body pose. It is independent from locomotion and from the cigarette state. */
+  armsCrossed?:boolean;
   fireworkEquipped?:boolean;
   /** Camera-driven head offsets; the body's rotation remains independent. */
   headYaw?:number; headPitch?:number;

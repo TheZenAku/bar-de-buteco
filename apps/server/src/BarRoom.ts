@@ -898,8 +898,13 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.bots.set(count);this.botsAdmin=client;
       this.log('admin_bots',{playerId:admin,count});client.send('admin.world',this.adminSnapshot());
     });
-    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'smoke', 'cigarette']) }).strict(), 4, (client, { emote }) => {
+    this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'smoke', 'cigarette', 'cross-arms']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
+      // F1 is a persistent upper-body toggle. It never owns animationState/interactionState, hence walking remains free.
+      if(emote==='cross-arms'){
+        if(!isConscious(p)||p.animationState==='kick'||p.fireworkEquipped)throw new Error('Espere a a\u00e7\u00e3o atual terminar.');
+        p.armsCrossed=!p.armsCrossed;return;
+      }
       // The cigarette never owns the movement/interaction state. F is a toggle, even while seated or waiting.
       if(emote==='smoke'||emote==='cigarette'){
         if(p.smokingSince){if(!p.smokingStopAt)p.smokingStopAt=Math.max(Date.now(),p.smokingSince+SMOKING.lightMs);return;}

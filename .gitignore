@@ -13,6 +13,7 @@ playwright-report/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
+node_modules.corrompido-20261108
 
 # Source animation archive is already extracted under assets-bar/anim/misc.
 assets-bar/anim/ANIMS.zip

@@ -1337,7 +1337,7 @@ async function start():Promise<void>{
     onFirework:direction=>network.send('firework.fire',{direction}),
     onFireworkStow:()=>network.send('firework.stow',{}),
     onFrame:dt=>network.rideFrame(dt),
-    onEmote:emote=>emote==='smoke'?smoke():emote==='cigarette'?cigarette():performing()?undefined:network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
+    onEmote:emote=>emote==='smoke'?smoke():emote==='cigarette'?cigarette():emote==='cross-arms'?network.send('player.emote',{emote}):performing()?undefined:network.send('player.emote',{emote:emote==='wave'?'wave':world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'}),
     vrWindowOpen,
     onVrEnd:reason=>{refreshVrButton();toast(reason);},
     onVrNotice:text=>toast(text),

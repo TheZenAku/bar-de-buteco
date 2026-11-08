@@ -233,6 +233,11 @@ export class CameraRig {
   face(heading:number):void {
     this.yawGoal+=wrapped(heading+Math.PI-this.yawGoal);this.sinceDrag=0;
   }
+  /** A view someone else places (the selfie): the mouse still turns the heading and elevation that movement follows. */
+  turn(dt:number):void {
+    this.yaw=trail(this.yaw,this.yawGoal,this.yawGoalBefore,TURN_RATE,dt);this.yawGoalBefore=this.yawGoal;
+    this.pitch+=(this.pitchGoal-this.pitch)*ease(TURN_RATE,dt);
+  }
   /** Third person keeps the horizon: back from first person's free turns on the nearest turn, without unwinding them on screen. */
   private holdPitch():void {
     if(this.mode!=='third')return;

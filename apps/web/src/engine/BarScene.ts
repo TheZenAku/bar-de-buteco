@@ -56,6 +56,7 @@ import {BlowSounds} from './blow-sound';
 import {BlowEffects} from './blow-fx';
 import {SmokeBurst} from './smoke-burst';
 import {Cigarettes,counterRequest} from './cigarettes';
+import {CrossedArms} from './crossed-arms';
 import {smokingTimeline} from '@bar/shared';
 import {CrowdSprites} from './crowd';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
@@ -359,6 +360,7 @@ export class BarScene {
   private readonly localFlyV = new pc.Vec3(); private localFlyAt = -99;
   private readonly smokeBurst:SmokeBurst;
   private readonly cigarettes:Cigarettes;
+  private readonly crossedArms:CrossedArms;
   private readonly fireworks:Fireworks;
   private fireworkPressedAt=-Infinity;
   /** The people beyond the avatars, as sprites (crowd.ts); the slots of the avatars drawn now keep theirs hidden. */
@@ -524,6 +526,9 @@ export class BarScene {
   private shadowsPending = false;
   /** The phone's front camera (setSelfie): the view turns to the player's face. */
   private selfie = false;
+  /** Head joint minus the feet, eased: the selfie frames the face without the walk's bob shaking the picture. */
+  private readonly selfieHead = new pc.Vec3();
+  private selfieHeadSet = false;
   /** Canvases the phone's camera draws into, one per size (a video call targets up to 24 frames a second). */
   private captureCanvases = new Map<string, HTMLCanvasElement>();
 
@@ -601,6 +606,7 @@ export class BarScene {
     this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.smokeBurst=new SmokeBurst(this.app);
     this.cigarettes=new Cigarettes(this.app);
+    this.crossedArms=new CrossedArms();
     this.fireworks=new Fireworks(this.app,()=>this.callbacks.motoVolume?.()??1);
     this.crowd=new CrowdSprites(this.app);
     this.speedBlur=new SpeedBlur(this.app);
@@ -1112,6 +1118,7 @@ export class BarScene {
   /** Before PlayCanvas evaluates any clip, remove last frame's additive head rotation. */
   private restoreHeadLooks():void {
     this.cigarettes.restore();
+    this.crossedArms.restore();
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
     for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();}
   }
@@ -1127,8 +1134,11 @@ export class BarScene {
       // Mouth/phone props and physical falls retain their authored head pose.
       const free=this.enabled&&!actor.musician&&!actor.holding&&!avatar.riding&&!avatar.ragdoll&&
         !['drink','text','kick','fallen','recover','stumble','ragdoll','ride'].includes(actor.animation??'')&&
-        (!avatar.bar||avatar.bar.clip==='sentado_loop')&&!(local&&(this.selfie||this.watchingTv||this.watchingStage));
-      const look:HeadLook=!free?{headYaw:0,headPitch:0}:local?headLookAt(this.rig.yaw,this.rig.pitch,bodyYaw):
+        (!avatar.bar||avatar.bar.clip==='sentado_loop')&&!(local&&(this.watchingTv||this.watchingStage));
+      // In the selfie the eyes go to the lens, wherever the mouse has carried the phone.
+      const lens=local&&this.selfie?this.camera.getPosition().clone().sub(head.getPosition()):undefined;
+      const look:HeadLook=!free?{headYaw:0,headPitch:0}:lens?headLookAt(Math.atan2(-lens.x,-lens.z),-Math.atan2(lens.y,Math.hypot(lens.x,lens.z)),bodyYaw):
+        local?headLookAt(this.rig.yaw,this.rig.pitch,bodyYaw):
         {headYaw:actor.headYaw??0,headPitch:actor.headPitch??0};
       (avatar.headLook??=new HeadLookPose()).apply(head,bodyYaw,look,dt);
     }
@@ -1193,7 +1203,14 @@ export class BarScene {
     body.setLocalPosition(local); body.setLocalScale(1 - .35 * k, 1 - .35 * k, 1 - .35 * k); this.deathPulled = true;
   }
   /** The phone's front camera: at arm's length in front of the face, looking back at it, until switched off. */
-  setSelfie(on: boolean): void { this.selfie = on; }
+  setSelfie(on: boolean): void {
+    // The phone comes up in front of the face, wherever the view was turned.
+    const player = this.actors.get(this.localId);
+    if (on && !this.selfie && player) { this.rig.face(player.yaw / RAD_TO_DEG); this.selfieHeadSet = false; }
+    this.selfie = on;
+  }
+  /** The local player holds the phone up for its front camera (selfie or a video call), not looking down at it. */
+  private selfieOf(avatar: Avatar): boolean { return this.selfie && this.enabled && avatar.actor.id === this.localId; }
   /** The phone camera's zoom: the lens narrows (1× is the game's own 57° view). */
   setZoom(factor: number): void {
     const zoom = Math.max(1, Math.min(8, factor || 1));
@@ -1408,6 +1425,7 @@ export class BarScene {
   getBlows() { return { ...this.blowSounds.telemetry(), effects: this.blowEffects.showing }; }
   getSmokeBurst() { return { showing: this.smokeBurst.showing, color: this.smokeBurst.lastColor }; }
   getSmoking(){return this.cigarettes.telemetry();}
+  getCrossedArms(){return this.crossedArms.telemetry();}
   getFireworks() {return {showing:this.fireworks.showing,equipped:!!this.actors.get(this.localId)?.firework?.enabled};}
   fireworkShot(shot:FireworkShot):void {this.fireworks.shot(shot,this.serverNow());}
   fireworkFire():void {this.shootFirework();}
@@ -1463,6 +1481,8 @@ export class BarScene {
     const actor=this.actors.get(this.localId)?.actor;
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
     if(actor?.fireworkEquipped)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
+    // Standing for a selfie, the body turns to the phone once the head alone could not reach it (past ~40°).
+    else if(this.selfie&&!dx&&!dz&&!actor?.interactionState&&!actor?.currentTableId&&Math.abs(normalizeHeading(yaw+Math.PI-this.lastRotation))>.7)this.lastRotation=normalizeHeading(yaw+Math.PI);
     const dy = flying ? Number(this.keys.has('Space')) - Number(this.keys.has('ControlLeft')) : 0;
     if (flying) {
       // dx, aim and dz are a unit direction at most (flyPlayer), so the speed is the pace itself.
@@ -1770,7 +1790,7 @@ export class BarScene {
     this.destroyed = true;
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.morte?.destroy();this.morte=undefined;
-    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crowd.destroy();this.horseSounds.destroy();
+    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -2186,7 +2206,7 @@ export class BarScene {
   private dressCourier(avatar: Avatar, skin: SkinnedRig | undefined, busy: boolean): void {
     const { actor, body } = avatar, moving = actor.animation === 'ragdoll' || actor.animation === 'ride' || actor.animation === 'sit';
     const holding = !!skin && !busy && !moving && actor.parcel === 'bag', wearing = !!skin && !busy && !moving && !!actor.courier;
-    const texting = !!skin && !busy && (actor.animation === 'text' || (actor.animation === 'idle' && !!actor.looking));
+    const texting = !!skin && !busy && (actor.animation === 'text' || (actor.animation === 'idle' && !!actor.looking)) && !this.selfieOf(avatar);
     if (avatar.phoneProp) avatar.phoneProp.enabled = texting;
     if (!holding && !wearing && !texting) { if (avatar.parcelProp) avatar.parcelProp.enabled = false; if (avatar.packProp) avatar.packProp.enabled = false; return; }
     this.highfoodProps ??= new HighfoodProps(this.app, this.materials);
@@ -2532,7 +2552,7 @@ export class BarScene {
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     const requested = bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
-      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
+      : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking && !this.selfieOf(avatar)) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
       : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
@@ -2876,11 +2896,19 @@ export class BarScene {
       this.rig.idle();
       vrFresh = vrSpecial = true;
     } else if (player && this.enabled && this.selfie && player.skin) {
-      // Arm's length in front of the face, a little to the side and above the eyes, as a phone held up.
-      const head = player.skin.bones.head.getPosition(), facing = player.yaw / RAD_TO_DEG;
-      const ahead = { x: Math.sin(facing), z: Math.cos(facing) }, side = { x: -ahead.z, z: ahead.x };
-      this.camera.setPosition(head.x + ahead.x * .85 + side.x * .2, head.y + .12, head.z + ahead.z * .85 + side.z * .2);
+      // Arm's length in front of the face, a little to the right, as a phone held up in the right hand. The mouse turns it
+      // round the face (and up and down), and movement follows the same heading, so what the keys do matches the picture.
+      this.rig.turn(realDt);
+      const bones = player.skin.bones, feet = player.root.getPosition(), joint = bones.head.getPosition(), eased = this.selfieHead;
+      const offset = this.tempPosition.set(joint.x - feet.x, joint.y - feet.y, joint.z - feet.z);
+      if (!this.selfieHeadSet || eased.distance(offset) > 1) { eased.copy(offset); this.selfieHeadSet = true; } else eased.lerp(eased, offset, 1 - Math.exp(-8 * realDt));
+      const head = new pc.Vec3(feet.x + eased.x, feet.y + eased.y, feet.z + eased.z), yaw = this.rig.yaw, lift = clamp(this.rig.pitch, -.25, .6);
+      const ahead = new pc.Vec3(-Math.sin(yaw), 0, -Math.cos(yaw)), side = new pc.Vec3(Math.cos(yaw), 0, -Math.sin(yaw));
+      const lens = head.clone().add(ahead.clone().mulScalar(.85 * Math.cos(lift))).add(side.clone().mulScalar(.2)).add(new pc.Vec3(0, .85 * Math.sin(lift) + .02, 0));
+      this.camera.setPosition(lens);
       this.camera.lookAt(head.x, head.y + .02, head.z);
+      // The right arm reaches for the phone, aimed under the lens so it leaves the picture by its bottom edge.
+      reach(bones.upperarm_r, bones.lowerarm_r, bones.hand_r, lens.clone().add(new pc.Vec3(0, -.3, 0)), side.clone().add(new pc.Vec3(0, -1, 0)));
       this.rig.idle();
       vrFresh = vrSpecial = true;
     } else if (player && this.enabled) {
@@ -2925,16 +2953,21 @@ export class BarScene {
     this.applyHeadLooks(dt);
     if (this.vr.active && vrView) this.vrBody(player, vrView.yaw, vrFoot && !vrSpecial);
     this.vrArms(player, realDt);
-    const cigaretteActors=[],smokingNow=this.serverNow();
+    const cigaretteActors=[],crossedActors=[],smokingNow=this.serverNow();
     for(const avatar of this.actors.values()){
       const {actor,skin}=avatar;if(!skin)continue;
       if(actor.animation==='wait'&&actor.drinkItem)counterRequest(skin,(smokingNow-(actor.animationStartedAt??smokingNow))/1000,avatar.body);
+      const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&!actor.holding&&
+        (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
+        ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Wait','Sit'].includes(skin.clip);
+      crossedActors.push({id:actor.id,active:!!actor.armsCrossed,available:armsAvailable,rig:skin});
       if(actor.smokingSince)cigaretteActors.push({id:actor.id,skin:avatar.skinId!,state:actor,rig:skin,
         hidden:!!avatar.deathHidden||['ragdoll','fallen','recover','vomit'].includes(actor.animation??''),
         armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&
           (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
           ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
     }
+    this.crossedArms.update(crossedActors,dt);
     this.cigarettes.update(cigaretteActors,smokingNow,dt,this.camera,this.app.graphicsDevice.height);
     this.showOwnHead(player);
     this.footstepSounds.update(realDt,this.enabled?[...this.actors.values()].map(avatar=>{
@@ -3120,6 +3153,8 @@ export class BarScene {
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
       if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
+      // F1 toggles an upper-body overlay; the locomotion clip keeps owning the legs.
+      if (!event.repeat && event.code === 'F1') { event.preventDefault(); this.callbacks.onEmote?.('cross-arms'); }
       // F lights a persistent cigarette or puts it out; locomotion remains independent.
       if (!event.repeat && event.code === 'KeyF') { event.preventDefault(); this.callbacks.onEmote?.('smoke'); }
       if (!event.repeat && event.code === 'KeyC') { event.preventDefault(); this.callbacks.onSkins?.(); }
