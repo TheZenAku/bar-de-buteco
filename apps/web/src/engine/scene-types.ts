@@ -154,6 +154,6 @@ export interface SceneCallbacks {
   onVehicleControl?:(id:string,action:string)=>void;
   /** The fist fight: R (guard up or down), a mouse button or touch button with the guard up (true when it threw, so the click is not the view's), and what this browser draws ahead of the room. */
   onGuard?:()=>void;
-  onPunch?:(kind:'light'|'heavy')=>boolean;
+  onPunch?:(kind:'light'|'heavy'|'kick')=>boolean;
   fight?:()=>LocalFightView|undefined;
 }

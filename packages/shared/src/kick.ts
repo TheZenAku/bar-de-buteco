@@ -20,27 +20,13 @@ export interface KickBlow {
 }
 export const KICKS:Readonly<Record<string,KickBlow>>={
   karate:{hp:12,speed:9,lift:3.8,closing:2.5,swingMs:430,heavy:false},
-  // Rafael's karate with the guard up goes round these too (KARATE_ROUND), each a little harder.
-  'karate-alto':{hp:15,speed:9.5,lift:4.3,closing:3,swingMs:470,heavy:false},
-  'karate-frontal':{hp:17,speed:10.5,lift:3.6,closing:2,swingMs:660,heavy:true},
   'air-kick':{hp:20,speed:12,lift:4.8,closing:4,swingMs:640,heavy:true},
 };
 /** The leg and the body it can touch (a standing capsule, a little generous so a kick that looks like it touched lands); how far the player turns to a target. */
 export const KICK={legRadius:.17,bodyRadius:.34,bodyHeight:1.75,sweepMs:20,aimRange:2.4,aimCone:1.25} as const;
 
-/** The kicks that are not skills of their own: their clip, and how long they hold the body (ms, the clip's length in durations.json). */
-export const KICK_VARIANTS:Readonly<Record<string,{clip:string;durationMs:number}>>={
-  'karate-alto':{clip:'KickHigh',durationMs:1391},
-  'karate-frontal':{clip:'KickFront',durationMs:1605},
-};
-/** Rafael's karate with the guard up: each press throws the next of these. */
-export const KARATE_ROUND=['karate','karate-alto','karate-frontal'] as const;
-/** The clip a kick plays: a skill's own, or a variant's. */
-export const kickClip=(id:string|undefined):string|undefined=>skillById(id)?.clip??KICK_VARIANTS[id??'']?.clip;
-/** The kick a press of `skill` throws: with the guard up the karate goes round KARATE_ROUND (`round`: the presses before this one). */
-export function kickVariant(skill:string,guard:boolean,round:number):string {
-  return skill==='karate'&&guard?KARATE_ROUND[round%KARATE_ROUND.length]!:skill;
-}
+/** The clip a kick plays: a skill's own. (With the guard up Rafael's kicks are not these: they are combo blows, FIGHT_MOVES in fight.ts.) */
+export const kickClip=(id:string|undefined):string|undefined=>skillById(id)?.clip;
 
 export interface KickBody {x:number;y:number;z:number;rotation:number}
 type Feet=Pick<KickBody,'x'|'y'|'z'>;

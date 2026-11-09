@@ -250,7 +250,7 @@ const MOUSE_JUMP = 500;
 const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
 const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'bar-fight-20261108' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
+  const version = folder === 'animations' ? 'bar-fight-20261108b' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -281,7 +281,7 @@ const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Jog: 1.61, R
 const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'Run', 'FightBack', 'FightLeft', 'FightRight']);
 const GUARD_LAYER = 'Guard';
 const PUNCH_HIT_STOP_MS = { light: 55, heavy: 90 };
-const FLINCH_DEGREES: Readonly<Record<string, number>> = { jab: 8, cross: 12, hook: 14, heavy: 20 };
+const FLINCH_DEGREES: Readonly<Record<string, number>> = { jab: 8, cross: 12, hook: 14, elbow: 13, heavy: 20, frontKick: 15, bodyKick: 19, roundKick: 24 };
 const FIGHT_CATCH_UP_S = .12, FIGHT_CATCH_UP_RATE = 1.8;
 // Positions arrive in steps: local predictions every input tick, everyone else with each server patch.
 // Gliding a little longer than the interval keeps a constant speed despite timer jitter.

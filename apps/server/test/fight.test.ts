@@ -8,10 +8,13 @@ import {FightDirector,type FightHost} from '../src/world/fight.js';
 const OPEN={x:60,z:7};
 
 function room(){
+  /** Whether the players here have bought a kick skill. */
+  const owns={kick:true};
   const hits:FightHit[]=[],kos:string[]=[],refusals:string[]=[],pushes:number[]=[];
   const host:FightHost={
     guardRefusal:player=>player.holding?'Largue o que está na mão.':'',
     keepsGuard:player=>player.connected&&!player.holding,
+    kicks:()=>owns.kick,
     hittable:target=>target.connected&&(!target.interactionState||target.interactionState==='stagger'),
     damage:(target,amount)=>{const ring=Math.min(target.hp,amount);target.hp-=ring;target.hpCore=Math.max(0,target.hpCore-(amount-ring));},
     knockout:target=>{target.interactionState='thrown';kos.push(target.id);},
@@ -45,9 +48,9 @@ function room(){
     const aim=target?punchAim(player.skin,m,player,player.rotation,[{id:target.id,x:target.x,y:target.y,z:target.z,skin:target.skin}]):{yaw:player.rotation,lunge:0};
     return {punch:{m,n:7,lunge:aim.lunge,seen,ago},rotation:aim.yaw} satisfies Partial<PlayerInput>;
   };
-  return {fights,players,add,tick,punch,hits,kos,refusals,pushes,get now(){return now;}};
+  return {fights,players,add,tick,punch,owns,hits,kos,refusals,pushes,get now(){return now;},get seq(){return seq;}};
 }
-const ideal=(move:PunchId)=>fistPath('nathan',move).reach+FIGHT.bodyRadius;
+const ideal=(move:PunchId,skin='nathan')=>fistPath(skin,move).reach+FIGHT.bodyRadius;
 
 test('a jab lands on the one in front: life, stun, the push, the message, and the stun ends on time',()=>{
   const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
@@ -183,4 +186,48 @@ test('the guard walks short steps, and runs with Shift (the room checks the stam
   const from=a.z;r.tick(new Map([[a,{dz:1,running:true}]]));
   assert.ok(Math.abs(a.z-from-FIGHT.runSpeed*TICK_MS/1000)<1e-6);assert.equal(a.animationState,'run');
   assert.equal(a.fist.fight,true,'The guard stays up');
+});
+
+test('Rafaels kicks ride the same stream: they land with more damage, stun and a push, never a flight; without the skill, or on another skin, they are refused',()=>{
+  for(const id of ['frontKick','bodyKick','roundKick'] as const){
+    const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal(id,'rafael'),Math.PI);
+    a.skin='rafael';
+    // Not every kick starts a chain: the body kick follows the cross and the round kick the hook, with their feet free again.
+    const lead={bodyKick:'cross',roundKick:'hook'}[id as string];
+    if(lead){a.fist.punch=lead;a.fist.seq=r.seq+1-FIGHT_MOVES[lead as PunchId].lockSteps;}
+    r.tick(new Map([[a,r.punch(a,id,b)]]));
+    assert.equal(a.fist.punch,id,`${id} is thrown`);
+    for(let i=0;i<24&&!r.hits.length;i++)r.tick();
+    const hit=r.hits[0]!,move=FIGHT_MOVES[id];
+    assert.ok(hit,`${id} lands`);
+    assert.deepEqual([hit.move,hit.damage,hit.ko,hit.reaction],[id,move.damage,false,move.reaction]);
+    assert.ok(move.damage>FIGHT_MOVES.hook.damage);
+    assert.equal(b.hp,100-move.damage);assert.equal(b.interactionState,'stagger','held, not thrown');assert.equal(r.kos.length,0);
+    const before={x:b.x,z:b.z};
+    for(let i=0;i<4;i++)r.tick();
+    assert.ok(Math.abs(Math.hypot(b.x-before.x,b.z-before.z)-move.knockback)<1e-6,`${id}: pushed ${move.knockback} m`);
+  }
+  // Another skin's browser cannot throw a kick, and neither can one that has not bought the skill.
+  const other=room(),n=other.add('n',OPEN.x,OPEN.z,0);
+  other.tick(new Map([[n,other.punch(n,'frontKick')]]));
+  assert.equal(n.fist.punch,'');
+  const unpaid=room(),u=unpaid.add('u',OPEN.x,OPEN.z,0);u.skin='rafael';unpaid.owns.kick=false;
+  unpaid.tick(new Map([[u,unpaid.punch(u,'frontKick')]]));
+  assert.equal(u.fist.punch,'');
+  unpaid.tick(new Map([[u,unpaid.punch(u,'jab')]]));
+  assert.equal(u.fist.punch,'jab','the punches stay open');
+});
+
+test('a combo thrown in rhythm lands whole: jab, cross, then the body kick on someone who stands there',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab','rafael'),Math.PI);
+  a.skin='rafael';b.skin='rafael';b.hp=1000;
+  const order:string[]=[];
+  for(const id of ['jab','cross','bodyKick'] as const){
+    // The press is repeated every tick, as the controller's buffer does: the room takes it once the feet are free.
+    for(let i=0;i<40&&a.fist.punch!==id;i++)r.tick(new Map([[a,r.punch(a,id,b)]]));
+    order.push(a.fist.punch);
+    for(let i=0;i<40&&r.hits.length<order.length;i++)r.tick();
+  }
+  assert.deepEqual(order,['jab','cross','bodyKick']);
+  assert.deepEqual(r.hits.map(hit=>hit.move),['jab','cross','bodyKick']);
 });

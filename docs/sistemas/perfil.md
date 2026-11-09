@@ -48,7 +48,7 @@ Os dois chutes do Rafael derrubam quem o pé tocar: o corpo voa em ragdoll, cai,
 
 **O corpo anda com o chute** (root motion, 08/11): a sala leva o Rafael para onde o clipe vai (`kickRoot`, a cada tick, em `stepKicks`) e julga a perna a partir de onde o chute começou. O pé de apoio fica pregado no chão (`anchor` no pé de apoio, `stays`: o corpo só avança, até 15 cm no karatê); o chute voador vai e volta com o salto, inclusive os 0,66 m para o lado que o clipe tem. Antes o `inPlace` tirava o salto em linha reta ao longo do clipe inteiro, e depois de pousar o corpo deslizava de volta à origem.
 
-**De guarda alta** (R), a tecla do karatê alterna três chutes, cada um um pouco mais forte (`KARATE_ROUND` e `kickVariant` em `kick.ts`; a sala conta os chutes de cada um): o karatê de sempre (12), o **chute alto** de perna direita, na altura do peito (15, clipe `KickHigh`, 1,4 s) e o **chute frontal** de perna esquerda, um empurrão de perto (17, clipe `KickFront`, 1,6 s; o quadril recua e o pé vai a 0,7 m, então só pega até ~1,2 m). Sem guarda é sempre o karatê.
+**De guarda alta** (R) a tecla da skill deixa de lançar: o chute vira golpe da luta, entra nos combos com os socos, tira mais vida que qualquer soco e **não joga o corpo longe** (empurra no máximo 1 m; só um nocaute faz o corpo voar). Veja [Luta › Combos](luta.md#combos). Só vale para quem comprou o karatê ou o chute voador; sem guarda é sempre o chute que lança, como acima.
 
 As distâncias são em rua aberta. Dentro do bar, a parede para o corpo antes, e ele bate e volta.
 

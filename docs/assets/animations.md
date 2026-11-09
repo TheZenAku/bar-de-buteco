@@ -26,7 +26,8 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Dealer | `carta-distribui.fbx` / `carta-recomeco.fbx` | Distribui e recolhe/prepara as cartas. |
 | Seu Zé | `Bartending.fbx` | Atendimento atrás do balcão, exclusivo da skin Magrão. |
 | Karatê | `karate-kick.fbx` | Skill de 2 s da skin Rafael, sem deslocamento. [Acerta quem o pé tocar](../sistemas/perfil.md#o-chute-que-acerta), pelo caminho do pé medido do clipe (`npm run assets:kicks`). |
-| Chute alto / frontal | `misc/Mma Kick.fbx` (`rate` 1,15) / `misc/Kicking.fbx` (`rate` 1,35) | `KickHigh` e `KickFront`, só nas skins Rafael: as variantes do karatê de guarda alta. Mesma medição dos pés (`npm run assets:kicks`). |
+| Chute no tronco / frontal | `misc/Mma Kick.fbx` (`from` 0,15 s, `rate` 1,15) / `misc/Kicking.fbx` (`from` 0,4 s, `rate` 1,35) | `KickHigh` e `KickFront`, só nas skins Rafael: golpes de combo da guarda ([Luta](../sistemas/luta.md#combos)). O `from` corta a espera parada do começo. Medidos pelo `npm run assets:punches` (pé em vez de punho). |
+| Cotovelada | `misc/Illegal Elbow Punch.fbx` (`from` 0,2, `to` 1,5, `rate` 1,3) | `Elbow`, em todas as skins de jogador: golpe de combo (jab → cotovelada → forte). |
 | Chute voador | `misc/Drop Kick.fbx` | Skill de 2,9 s da skin Rafael. Salta e cai de costas; `inPlace` traz o quadril de volta, e o avatar fica parado para o servidor. Acerta como o karatê. |
 | Bengala | `A_Male_Walk_OldCane*.fbx` | Caminhada e repouso do comando `/velho`, com a bengala presa à mão direita. |
 

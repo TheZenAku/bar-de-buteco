@@ -3,7 +3,7 @@ import type {FireworkShot,StorageView} from '@bar/shared';
 import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
-import {NO_PUNCH,fightMove,punchAllowed,punchCarries,punchKind,streamOf,throwPunch,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
+import {NO_PUNCH,fightMove,punchCarries,punchThrowable,streamOf,throwPunch,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
 import {setDoorStates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import type {DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
@@ -200,7 +200,7 @@ export class BarNetwork {
         this.position={x:self.x,y:self.y,z:self.z};
         // The punches too: the room's stream, then the unanswered inputs through the same rules (a punch the room did not take yet is assumed).
         let stream=streamOf(self.fist),carry=(self.animationState as string)==='punch';
-        if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending){stream=this.thrown(stream,input);carry=punchCarries(carry,stream,input.seq,input);this.position=this.predict(input,self,stream,carry);}
+        if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending){stream=this.thrown(stream,input,self.skin);carry=punchCarries(carry,stream,input.seq,input);this.position=this.predict(input,self,stream,carry);}
         this.punchStream=stream;this.punchCarry=carry;
         this.hooks.position(this.position);
         this.hooks.fightState?.(self,self.lastProcessedInput);
@@ -311,7 +311,7 @@ export class BarNetwork {
     // A drawn vehicle can have many complete turns. Never let that heading poison the unacknowledged walking queue.
     const input={...intention,rotation:normalizeHeading(intention.rotation),seq:++this.seq};
     this.pending.push(input);
-    this.punchStream=this.thrown(this.punchStream,input);
+    this.punchStream=this.thrown(this.punchStream,input,self.skin);
     this.punchCarry=punchCarries(this.punchCarry,this.punchStream??NO_PUNCH,input.seq,input);
     if(!locked){this.position=this.predict(input,self,this.punchStream,this.punchCarry);this.hooks.position(input.fight?{...this.position,rotation:input.rotation}:this.position);}
     this.send('player.input',input);
@@ -370,9 +370,9 @@ export class BarNetwork {
    * a pass. The raw input is what is sent.
    */
   /** The punches after this input, by the room's rule: a punch it carries is thrown when the feet are free (fight.ts). */
-  private thrown(stream:PunchStream,input:PlayerInput):PunchStream {
+  private thrown(stream:PunchStream,input:PlayerInput,skin?:string):PunchStream {
     const punch=input.punch;
-    return punch&&input.fight&&punchAllowed(stream,input.seq,punchKind(punch.m))===punch.m?throwPunch(punch,input.seq,input.rotation):stream;
+    return punch&&input.fight&&punchThrowable(stream,input.seq,punch.m,skin)?throwPunch(punch,input.seq,input.rotation):stream;
   }
   /** The world being drawn: the newest state's time in the room, and how long ago it arrived (ms). */
   seen():{seen:number;ago:number}{return {seen:this.world?.serverTime??0,ago:this.stateAt?performance.now()-this.stateAt:0};}

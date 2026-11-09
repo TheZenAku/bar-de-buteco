@@ -1,4 +1,4 @@
-import {FIGHT,FIGHT_MOVES,punchAim,punchAllowed,punchStep,type FightHit,type FightTarget,type PlayerState,type PunchCommand,type PunchId,type PunchStream} from '@bar/shared';
+import {FIGHT,FIGHT_MOVES,punchAim,punchAllowed,punchStep,type FightHit,type FightTarget,type PlayerState,type PressKind,type PunchCommand,type PunchId,type PunchStream} from '@bar/shared';
 
 /**
  * The fist fight in this browser (docs/sistemas/luta.md): the guard the player asked for (R), the presses waiting for the feet to be free (the
@@ -27,7 +27,7 @@ export class FightController {
   guard=false;
   local?:LocalPunch;
   blow?:LocalBlow;
-  private presses:{kind:'light'|'heavy';at:number}[]=[];
+  private presses:{kind:PressKind;at:number}[]=[];
   private n=0;
   /** The first input sent with the guard up since it was raised: once the room has answered it, its state is the truth. */
   private askedAt?:number;
@@ -39,7 +39,6 @@ export class FightController {
     if(!self)return '';
     const why=self.holding||self.carrying||self.parcel?'Largue o que está na mão antes de levantar a guarda.'
       :self.fireworkEquipped?'Guarde o fogo de artifício antes de lutar.'
-      :self.smokingSince?'Apague o cigarro (F) antes de lutar.'
       :(self.interactionState&&self.interactionState!=='stagger')||self.currentTableId?'Termine o que está fazendo antes de levantar a guarda.':'';
     if(why)return why;
     this.guard=true;this.askedAt=undefined;this.presses.length=0;
@@ -51,8 +50,8 @@ export class FightController {
     this.guard=false;this.askedAt=undefined;this.presses.length=0;
     this.hooks.changed(false);
   }
-  /** Left button: a light punch, right: the heavy one. False when the guard is down (the click is the view's). */
-  press(kind:'light'|'heavy'):boolean {
+  /** Left button: a light punch, right: the heavy one, the skill key: a kick (Rafael's). False when the guard is down (the click is the view's). */
+  press(kind:PressKind):boolean {
     if(!this.guard)return false;
     this.presses.push({kind,at:performance.now()});
     // Mashing does not stack up punches for later: two waiting at most.
@@ -74,7 +73,7 @@ export class FightController {
     const now=performance.now();
     this.presses=this.presses.filter(press=>now-press.at<=FIGHT.bufferMs);
     if(this.presses.length&&!this.stunned(self)){
-      const move=punchAllowed(stream,seq,this.presses[0]!.kind);
+      const move=punchAllowed(stream,seq,this.presses[0]!.kind,self.skin);
       if(move){
         this.presses.shift();
         const aim=punchAim(self.skin,move,this.hooks.position(),this.hooks.view(),this.hooks.targets()),{seen,ago}=this.hooks.seen();

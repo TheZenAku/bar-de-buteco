@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hitReaction,punchAim,punchAllowed,punchCarries,punchClear,punchContact,punchInReach,
-  punchRoot,punchStep,rewindOf,seenAt,streamOf,throwPunch,type FightPose,type PunchId,type PunchStream} from '@bar/shared';
+import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hasKicks,hitReaction,isKick,punchAim,punchAllowed,punchCarries,punchClear,punchContact,punchInReach,
+  punchRoot,punchStep,punchThrowable,rewindOf,seenAt,streamOf,throwPunch,type FightPose,type PunchId,type PunchStream} from '@bar/shared';
 // @ts-expect-error The tool is a plain script, with no types.
 import {measurePunches,PUNCHES} from '../../tools/assets/measure-punches.mjs';
 
@@ -12,6 +12,10 @@ const durations=JSON.parse(fs.readFileSync(new URL('../../apps/web/public/animat
 const players=SKINS.filter(skin=>!skin.adminOnly).map(skin=>skin.id);
 const still=(pose:FightPose)=>()=>pose;
 const dt=TICK_MS/1000;
+/** The blows a skin has: the punches, and the kicks only where the bank carries them (Rafael's). */
+const movesOf=(skin:string)=>PUNCH_IDS.filter(id=>!isKick(id)||hasKicks(skin));
+/** A skin that has a given blow: Rafael for the kicks. */
+const skinFor=(id:PunchId)=>isKick(id)?'rafael':'nathan';
 
 /** A punch thrown at someone `away` metres ahead along the view, `side` metres to the left: the aim, the step in, then the whole of the fist's way. */
 function throwAt(skin:string,move:PunchId,away:number,side=0,targetSkin=skin){
@@ -27,7 +31,7 @@ test('every player skin has its fists measured from its own clips, and the table
   for(const id of players)assert.ok(FIGHT_BODIES[id],`${id} has its fight body (npm run assets:punches)`);
   // Run npm run assets:punches when this fails: a punch's clip changed, or a skin was added.
   for(const id of Object.keys(FIGHT_BODIES)){
-    const table=measurePunches(fs.readFileSync(new URL(`../../apps/web/public/animations/${id}.glb`,import.meta.url)));
+    const table=measurePunches(fs.readFileSync(new URL(`../../apps/web/public/animations/${id}.glb`,import.meta.url)),id);
     assert.deepEqual(table,JSON.parse(JSON.stringify(FIGHT_BODIES[id])),id);
   }
 });
@@ -71,19 +75,19 @@ test('the light punches chain jab, cross, hook and back to the jab; the heavy on
 
 test('a punch plants the feet for its inputs and steps in only as far as it allows, plus its own step, the same every time',()=>{
   for(const id of PUNCH_IDS){
-    const move=FIGHT_MOVES[id];
+    const move=FIGHT_MOVES[id],skin=skinFor(id);
     for(const asked of [-1,0,.2,5]){
       const stream=throwPunch({m:id,n:0,lunge:asked},7,.6);
       let at={...OPEN,y:0};
       for(let seq=7;seq<7+move.lockSteps;seq++){
-        assert.ok(punchStep(stream,seq).locked);
+        assert.ok(punchStep(stream,seq,skin).locked);
         // Keys held do nothing while planted.
-        at=fightMove(at,stream,seq,{dx:1,dz:0},dt,false,[]);
+        at=fightMove(at,stream,seq,{dx:1,dz:0},dt,false,[],skin);
       }
-      assert.equal(punchStep(stream,7+move.lockSteps).locked,false);
+      assert.equal(punchStep(stream,7+move.lockSteps,skin).locked,false);
       // Along the punch: the step in it allows, and the clip's own step (root motion), nothing to the side.
       const along=(at.x-OPEN.x)*Math.sin(.6)+(at.z-OPEN.z)*Math.cos(.6),aside=(at.x-OPEN.x)*Math.cos(.6)-(at.z-OPEN.z)*Math.sin(.6);
-      const expected=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,asked))+punchRoot(undefined,id,move.lockSteps);
+      const expected=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,asked))+punchRoot(skin,id,move.lockSteps);
       assert.ok(Math.abs(along-expected)<1e-6,`${id} asked ${asked}: stepped ${along}, not ${expected}`);
       assert.ok(Math.abs(aside)<1e-6,'along the punch');
     }
@@ -112,7 +116,7 @@ test('a punch played through carries the body where its clip goes and back; cut 
 });
 
 test('every punch of every skin lands on someone in front at the distance the aim takes it to, on any other skin',()=>{
-  for(const skin of players)for(const id of PUNCH_IDS)for(const other of ['nathan','gilmar-gordo','rafael']){
+  for(const skin of players)for(const id of movesOf(skin))for(const other of ['nathan','gilmar-gordo','rafael']){
     const ideal=fistPath(skin,id).reach+FIGHT.bodyRadius;
     for(const away of [ideal-.25,ideal,ideal+FIGHT_MOVES[id].lungeMax*.9]){
       const {contact}=throwAt(skin,id,away,0,other);
@@ -126,7 +130,7 @@ test('every punch of every skin lands on someone in front at the distance the ai
 });
 
 test('a punch misses whoever is out of its reach, behind, or to the side the fist never goes',()=>{
-  for(const skin of players)for(const id of PUNCH_IDS){
+  for(const skin of players)for(const id of movesOf(skin)){
     const path=fistPath(skin,id),far=path.reach+FIGHT.bodyRadius+FIGHT_MOVES[id].lungeMax+.45;
     assert.equal(throwAt(skin,id,far).contact,undefined,`${skin} ${id}: too far (${far.toFixed(2)} m)`);
     const puncher={...OPEN,rotation:0};
@@ -197,4 +201,74 @@ test('the room\'s fist state reads back as the stream it was',()=>{
   assert.deepEqual(streamOf({punch:'',seq:5}),NO_PUNCH);
   assert.deepEqual(streamOf({punch:'uppercut',seq:5}),NO_PUNCH);
   assert.deepEqual(streamOf(undefined),NO_PUNCH);
+});
+
+/** Throws `kinds` in order at the first input each may go, the way a player pressing in rhythm would; returns the blows. */
+function combo(kinds:readonly ('light'|'heavy'|'kick')[],skin:string,waitSteps=0){
+  let stream:PunchStream=NO_PUNCH,seq=10;const thrown:PunchId[]=[];
+  for(const kind of kinds){
+    seq+=waitSteps;
+    while(punchAllowed(stream,seq,kind,skin)===undefined)seq++;
+    const move=punchAllowed(stream,seq,kind,skin)!;thrown.push(move);
+    stream=throwPunch({m:move,n:thrown.length,lunge:0},seq,0);
+  }
+  return thrown;
+}
+
+test('the presses make combos: each blow offers the next ones, and a late press starts over',()=>{
+  const L='light',H='heavy',K='kick';
+  assert.deepEqual(combo([L,L,L,L],'nathan'),['jab','cross','hook','jab']);
+  assert.deepEqual(combo([L,H,H],'nathan'),['jab','elbow','heavy']);
+  assert.deepEqual(combo([L,L,H],'nathan'),['jab','cross','heavy']);
+  assert.deepEqual(combo([L,H,L,H],'nathan'),['jab','elbow','hook','heavy']);
+  assert.deepEqual(combo([H,L],'nathan'),['heavy','jab'],'the heavy ends the chain');
+  // Rafael: the kick key, alone and inside the punches.
+  assert.deepEqual(combo([K,K,K],'rafael'),['frontKick','bodyKick','roundKick']);
+  assert.deepEqual(combo([L,L,K],'rafael'),['jab','cross','bodyKick']);
+  assert.deepEqual(combo([L,L,L,K],'rafael'),['jab','cross','hook','roundKick']);
+  assert.deepEqual(combo([K,L,L],'rafael-rose'),['frontKick','cross','hook']);
+  assert.deepEqual(combo([L,H,K],'rafael'),['jab','elbow','bodyKick']);
+  assert.deepEqual(combo([H,K],'rafael'),['heavy','roundKick']);
+  assert.deepEqual(combo([K,K,K,K],'rafael'),['frontKick','bodyKick','roundKick','frontKick'],'the finisher ends it: the next kick starts over');
+  // Waiting past a blow's window starts the chain over, whichever press it is.
+  assert.deepEqual(combo([L,L],'nathan',FIGHT_MOVES.jab.chainSteps+1),['jab','jab']);
+  assert.deepEqual(combo([K,K],'rafael',FIGHT_MOVES.frontKick.chainSteps+1),['frontKick','frontKick']);
+});
+
+test('every blow can be reached, every branch is a blow the skin has, and the kick key does nothing for a skin without kicks',()=>{
+  const reached=new Set<PunchId>();
+  for(const skin of ['nathan','rafael']){
+    const seen=new Set<PunchId>();
+    const visit=(id:PunchId)=>{
+      if(seen.has(id))return;seen.add(id);
+      for(const [kind,next] of Object.entries(FIGHT_MOVES[id].then)){
+        assert.ok(PUNCH_IDS.includes(next),`${id} then ${next}`);
+        // A press of the kick key does nothing for a skin without kicks, so nothing a kick press offers is reached.
+        if(kind==='kick'&&!hasKicks(skin))continue;
+        visit(next);
+      }
+    };
+    for(const kind of ['light','heavy','kick'] as const){const start=punchAllowed(NO_PUNCH,1,kind,skin);if(start)visit(start);}
+    for(const id of seen){reached.add(id);if(skin==='nathan')assert.ok(!isKick(id),`${skin} would be thrown into ${id}`);}
+  }
+  assert.deepEqual([...reached].sort(),[...PUNCH_IDS].sort());
+  assert.equal(punchAllowed(NO_PUNCH,1,'kick','nathan'),undefined);
+  assert.equal(punchAllowed(NO_PUNCH,1,'kick'),undefined);
+  // The room's check: what a browser threw is allowed by some press, and a kick never is for Nathan.
+  const jab=throwPunch({m:'jab',n:1,lunge:0},10,0);
+  assert.ok(punchThrowable(jab,10+FIGHT_MOVES.jab.lockSteps,'cross','nathan'));
+  assert.equal(punchThrowable(jab,10+FIGHT_MOVES.jab.lockSteps,'hook','nathan'),false,'the hook is not what a jab offers');
+  assert.equal(punchThrowable(NO_PUNCH,1,'roundKick','nathan'),false);
+  assert.equal(punchThrowable(NO_PUNCH,1,'frontKick','rafael'),true);
+});
+
+test('Rafael\'s kicks hit harder and stun longer than any punch, push little, and are thicker than a fist',()=>{
+  const kicks=PUNCH_IDS.filter(isKick).map(id=>FIGHT_MOVES[id]),punches=PUNCH_IDS.filter(id=>!isKick(id)).map(id=>FIGHT_MOVES[id]);
+  assert.equal(kicks.length,3);
+  const lightest=Math.min(...kicks.map(k=>k.damage));
+  assert.ok(lightest>Math.max(...punches.filter(p=>p.id!=='heavy').map(p=>p.damage)),'every kick beats every light punch');
+  assert.ok(Math.max(...kicks.map(k=>k.damage))>FIGHT_MOVES.heavy.damage,'the finisher beats the heavy punch');
+  assert.ok(Math.min(...kicks.map(k=>k.stunMs))>Math.max(...punches.filter(p=>p.id!=='heavy').map(p=>p.stunMs)));
+  // Not thrown: a push of a metre at most (the free kick sends the body 8 m or more).
+  for(const kick of kicks){assert.ok(kick.knockback<=1,`${kick.id} pushes, it does not throw`);assert.ok(kick.radius>FIGHT_MOVES.jab.radius);}
 });

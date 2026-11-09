@@ -2,7 +2,7 @@
 
 **R** levanta a guarda. Com a guarda alta, o **clique** dá os socos leves em sequência (jab, direto, gancho, e o jab de novo) e o **botão direito** dá o soco forte. Qualquer pessoa a pé pode ser socada, com ou sem guarda, e um soco pode matar: quem fica sem vida e sem a reserva do coração cai em ragdoll e a [Morte](morte.md) vem buscar. Cada soco que acerta mostra a vida que tirou num número que sobe do ponto do impacto, para todo mundo perto.
 
-Esta primeira versão tem só socos, de propósito. A base (dados de cada golpe, tabela do punho, netcode, reações) foi feita para receber outros golpes sem mexer na estrutura.
+Os golpes se encadeiam em **combos** (veja abaixo): cada golpe oferece os próximos conforme o botão apertado. As skins Rafael ganham a tecla da skill como terceiro botão, com **chutes** que entram no meio dos socos.
 
 ## Controles
 
@@ -10,12 +10,13 @@ Esta primeira versão tem só socos, de propósito. A base (dados de cada golpe,
 | --- | --- |
 | R | Levanta ou baixa a guarda. Com ela alta, o corpo olha para onde a câmera olha e o mouse fica preso ao jogo. Esc solta o mouse e baixa a guarda. |
 | Clique | Soco leve. Clicando no ritmo: jab → direto → gancho → jab… |
-| Botão direito | Soco forte. Demora para sair, tira mais e empurra longe. |
+| Botão direito | Soco forte; dentro de um combo, o golpe pesado que a corrente oferece (cotovelada, forte). Demora para sair, tira mais e empurra longe. |
+| Tecla da skill (X por padrão) | **Só skins Rafael que compraram o karatê ou o chute voador:** o chute do combo. Com a guarda alta ela não lança ninguém. |
 | W A S D | Com a guarda alta: passos curtos (2,2 m/s) para frente, para os lados e para trás. Com Shift corre de guarda alta (4,8 m/s), gastando fôlego como a corrida normal. |
 
 No toque: **Mais › Luta (guarda)**; com a guarda alta, **Soco** e **Forte** aparecem no lugar de Freio e Buzina.
 
-A guarda não sobe com algo na mão (bebida, bandeja, sacola do Highfood), com fogo de artifício, com cigarro aceso, sentado, montado, trabalhando ou voando; a sala diz o motivo uma vez. Qualquer coisa que tire o jogador dali (sentar, subir na moto, receber a bebida, desmaiar, sair) baixa a guarda. Com a guarda alta, dançar, acenar, fumar e usar item pedem para baixá-la antes. Enquanto um soco segura os pés ou um golpe atordoa, as outras ações esperam ("Espere o golpe terminar").
+Dá para lutar com o cigarro na boca: ele continua aceso e preso aos lábios enquanto os braços ficam na guarda. A guarda não sobe com algo na mão (bebida, bandeja, sacola do Highfood), com fogo de artifício, sentado, montado, trabalhando ou voando; a sala diz o motivo uma vez. Qualquer coisa que tire o jogador dali (sentar, subir na moto, receber a bebida, desmaiar, sair) baixa a guarda. Com a guarda alta, dançar, acenar, acender outro cigarro e usar item pedem para baixá-la antes. Enquanto um soco segura os pés ou um golpe atordoa, as outras ações esperam ("Espere o golpe terminar").
 
 ## Os golpes
 
@@ -26,13 +27,44 @@ Números em `FIGHT_MOVES` (`packages/shared/src/fight.ts`).
 | Jab | Lead Jab (1), 1,3× | 0,20–0,34 s | 7 inputs (0,35 s) | 7 | 0,28 s | 0,12 m |
 | Direto | Elbow Punch, 1,5× | 0,30–0,56 s | 12 (0,6 s) | 11 | 0,38 s | 0,22 m |
 | Gancho | Punching, 1,3× | 0,34–0,50 s | 11 (0,55 s) | 14 | 0,45 s | 0,3 m |
+| Cotovelada | Illegal Elbow Punch, 1,3× | 0,24–0,47 s | 10 (0,5 s) | 12 | 0,42 s | 0,3 m |
 | Soco forte | Hook Punch, 1,25× | 0,56–0,76 s | 17 (0,85 s) | 24 | 0,65 s | 0,8 m |
+| Chute frontal (Rafael) | Kicking, 1,35× | 0,48–0,68 s | 14 (0,7 s) | 16 | 0,52 s | 0,5 m |
+| Chute no tronco (Rafael) | Mma Kick, 1,15× | 0,34–0,50 s | 11 (0,55 s) | 19 | 0,58 s | 0,6 m |
+| Chute de karatê (Rafael) | o karatê, 1× | 0,48–0,76 s | 17 (0,85 s) | 27 | 0,8 s | 1 m |
 
-- **Sequência:** o próximo soco leve sai quando os pés soltam (fim de "pés presos"). Até o fim da janela da sequência (`chainSteps`) ele é o próximo da corrente; depois, volta ao jab. O forte sai a qualquer momento com os pés livres e termina a corrente.
+- **Sequência:** o próximo golpe sai quando os pés soltam (fim de "pés presos"). Até o fim da janela do combo (`chainSteps`) ele é o que o golpe anterior oferece para aquele botão (`then`, tabela abaixo); depois, o botão recomeça pelo seu primeiro golpe (jab, forte, chute frontal).
 - **Buffer:** um clique dado com os pés ainda presos espera até 320 ms para sair (`FIGHT.bufferMs`); no máximo dois esperam. Apertar sem parar não empilha socos para depois.
 - **Passo para dentro e mira:** ao sair, o soco gira o corpo para quem estiver até 2,6 m e até ~52° da direção da câmera, e dá um passo até a distância em que o ponto doce do punho encontra o corpo (até `lungeMax`; perto demais, até 0,25 m para trás). O gancho e o soco forte vêm de lado, então o corpo vira um pouco para fora para o punho chegar no alvo (o `aim` de cada skin, medido do clipe).
 - **Quem leva:** perde a vida (o anel primeiro, depois a reserva do coração, como qualquer dano em `needs.ts`), fica atordoado (não anda nem soca), é empurrado na direção do golpe (contra paredes e móveis) e faz a reação: leve, média, de lado ou pesada conforme o soco, e para frente quando o golpe vem de trás (mais de ~110° fora de onde olha). Um soco que estava saindo é cortado.
 - **Nocaute:** quando o golpe é maior que a vida mais a reserva, o corpo voa em ragdoll (mais longe no soco forte) e, quando para, a vida acaba e a Morte vem. Quem levanta de um nocaute (ou de qualquer queda) fica 2,5 s sem poder ser socado ou chutado.
+
+### Combos
+
+Cada golpe diz o que vem depois para cada botão (`then` em `FIGHT_MOVES`). Sem golpe anterior (ou fora da janela), o clique dá o jab, o botão direito o forte e a skill o chute frontal.
+
+| Depois de | Clique | Botão direito | Chute (Rafael) |
+| --- | --- | --- | --- |
+| Jab | Direto | Cotovelada | Chute frontal |
+| Direto | Gancho | Forte | Chute no tronco |
+| Gancho | Jab (recomeça) | Forte | Chute de karatê |
+| Cotovelada | Gancho | Forte | Chute no tronco |
+| Chute frontal | Direto | Forte | Chute no tronco |
+| Chute no tronco | Gancho | Forte | Chute de karatê |
+| Forte | (jab, recomeça) | (forte) | Chute de karatê |
+| Chute de karatê | fim do combo | | |
+
+Exemplos: **1-2-3** (clique ×3: jab, direto, gancho); **jab, cotovelada, forte** (clique, direito, direito); **jab, direto, chute no tronco** e **jab, direto, gancho, chute de karatê** (cliques e a skill); **combo de chutes** (skill ×3: frontal, tronco, karatê); **forte, chute de karatê** (direito, skill). O chute de karatê fecha o combo: o próximo golpe recomeça.
+
+### Os chutes na guarda (Rafael)
+
+Os chutes são golpes como os socos: viajam dentro do input, usam a tabela de trajetória (`fight-paths.ts`, medida do **pé**, bola de 17 cm em vez dos 9 cm do punho) e a mesma sala decide o acerto, com rewind. Diferenças:
+
+- **Dano maior** que qualquer soco leve (16, 19 e 27 contra 7 a 14; o karatê passa até o soco forte, 24) e atordoamento maior.
+- **Não jogam o corpo longe.** Quem leva é empurrado até 1 m, reage (`HitMedium`/`HitHeavy`) e fica atordoado, como num soco forte. Só o nocaute (golpe maior que a vida mais a reserva) faz o corpo voar, em ragdoll, e a Morte vem como com qualquer soco. O chute livre, sem guarda, continua lançando longe ([Perfil](perfil.md#o-chute-que-acerta)).
+- **Só quem tem o chute:** a sala recusa um chute de outra skin (o banco não tem os clipes) e de quem não comprou o karatê ou o chute voador (`FightHost.kicks`). Os socos continuam abertos.
+- Com a guarda alta, a tecla da skill no cliente aperta o botão de chute (`useSkill` em `main.ts`); a sala ignora a mensagem `player.skill` de quem está de guarda (cliente antigo não lança ninguém).
+- No celular, o chute está em **Mais › (nome da skill)**; não há botão próprio ainda.
 
 ### Quem pode ser socado
 
@@ -99,14 +131,15 @@ Sons: os mesmos do chute (`blow-sound.ts`): o ar cortando quando o punho passa (
 
 ### Para mudar um golpe ou acrescentar outro
 
-1. O clipe em `convert-animations.mjs` (`rate`/`from` se precisar) e `npm run assets:animations`.
+1. O clipe em `convert-animations.mjs` (`rate`/`from`/`to` se precisar) e `npm run assets:animations`. Chute: `foot` em vez de `hand` em `PUNCHES`, `only` com as skins que têm o clipe, e `then` nos golpes que o oferecem.
 2. A janela em `PUNCHES` de `measure-punches.mjs` (`--probe` mostra onde o punho está) e `npm run assets:punches`.
 3. A entrada em `FIGHT_MOVES` (a duração tem que bater com `durations.json`; o teste confere) e, se for novo, o id em `PUNCH_IDS`.
 4. Subir a versão dos bancos em `skinAsset` (`BarScene.ts`), senão os navegadores ficam com o banco antigo em cache.
 
 ## Pendências e o que não foi verificado
 
-- Sons escolhidos sem ouvir.
+- Sons escolhidos sem ouvir (os chutes usam os mesmos do soco forte).
+- **Os combos novos e os chutes na guarda não foram vistos em quadro:** as janelas de acerto vêm da medição do pé (`--probe`), a emenda entre os clipes de chute e a guarda do boxe não foi conferida por imagem, e o botão de chute no toque também não.
 - Não testado em celular de verdade nem nos óculos VR (no VR não há botão de soco).
 - Os passos laterais e para trás foram conferidos pela telemetria (clipe e camada certos), não por um quadro de perto.
 - Bloqueio, esquiva, estamina por golpe e barra de vida do adversário ficaram para depois, de propósito (só soco nesta versão).

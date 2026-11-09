@@ -18,11 +18,17 @@ const TICK_MS=50;
  * Which fist throws each punch, and the stretch of the clip (ms, as converted) written to the table: a little wider than the moments it can land
  * (FIGHT_MOVES.activeFrom/activeTo in packages/shared/src/fight.ts), so the room can sweep the whole way the fist went between two of its steps.
  */
+const KICKERS=['rafael','rafael-rose'];
 export const PUNCHES={
   Jab:{hand:'l',from:160,to:380,contact:300},
   Cross:{hand:'r',from:260,to:600,contact:480},
   Hook:{hand:'l',from:300,to:540,contact:425},
   Heavy:{hand:'r',from:520,to:800,contact:700},
+  Elbow:{hand:'r',from:200,to:520,contact:330},
+  // Rafael's kicks (his bank only): the ball is the ankle (`foot`), not the knuckles; the leg's thickness is FIGHT_MOVES' `radius`.
+  Kick:{foot:'r',from:420,to:800,contact:620,only:KICKERS},
+  KickHigh:{foot:'r',from:300,to:560,contact:430,only:KICKERS},
+  KickFront:{foot:'l',from:440,to:720,contact:600,only:KICKERS},
 };
 // `contact`: where the punch is meant to land (its sweet spot). The aim turns the body so that this point of the fist's way meets the target, and the
 // step in brings the target to this distance: a hook comes from the side and the haymaker from wide on the right, so neither lands straight ahead.
@@ -93,18 +99,21 @@ export function readBank(bytes){
 const round=v=>+v.toFixed(3);
 /** The knuckles of one hand, `ms` into a clip. */
 export function fistAt(bank,clip,hand,ms){
+  if(hand==='foot_l'||hand==='foot_r')return bank.at(clip,hand,ms);
   const wrist=bank.at(clip,`hand_${hand}`,ms);
   let finger;try{finger=bank.at(clip,`middle_01_${hand}`,ms);}catch{finger=bank.at(clip,`index_01_${hand}`,ms);}
   return wrist.map((v,k)=>v+(finger[k]-v)*KNUCKLES);
 }
 
 /** The table for one skin's bank: each punch's knuckles every STEP_MS, and the body standing in the guard (hips and head heights). */
-export function measurePunches(bytes){
+export function measurePunches(bytes,id){
   const bank=readBank(bytes);
   if(!bank.clips.has('FightIdle'))return undefined;
   const hip=bank.at('FightIdle','hip',0),head=bank.at('FightIdle','head',0);
   const moves={};
-  for(const [clip,{hand,from,to,contact}] of Object.entries(PUNCHES)){
+  for(const [clip,{hand:fist_hand,foot,from,to,contact,only}] of Object.entries(PUNCHES)){
+    if(only&&!only.includes(id))continue;
+    const hand=foot?`foot_${foot}`:fist_hand;
     if(!bank.clips.has(clip))throw new Error(`the bank has no ${clip}`);
     const fist=[];
     for(let ms=from;ms<=to;ms+=STEP_MS)fist.push(...fistAt(bank,clip,hand,ms).map(round));
@@ -125,7 +134,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     if(probe){
       if(id!==process.argv[process.argv.indexOf('--probe')+1])continue;
       const bank=readBank(bytes);
-      for(const [clip,{hand}] of Object.entries(PUNCHES)){
+      for(const [clip,{hand:fist_hand,foot,only}] of Object.entries(PUNCHES)){
+        if(only&&!only.includes(id))continue;
+        const hand=foot?`foot_${foot}`:fist_hand;
         console.log(`\n${clip} (${hand}) ${Math.round(bank.clips.get(clip).duration*1000)} ms`);
         let last;
         for(let ms=0;ms<=bank.clips.get(clip).duration*1000;ms+=20){
@@ -135,7 +146,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
       }
       process.exit(0);
     }
-    const table=measurePunches(bytes);
+    const table=measurePunches(bytes,id);
     if(table)bodies[id]=table;
   }
   const lines=Object.entries(bodies).map(([id,{hip,head,moves}])=>`  '${id}':{hip:${hip},head:${head},moves:{\n${Object.entries(moves).map(([clip,{from,step,fist,aim,reach,height,root}])=>`    ${clip}:{from:${from},step:${step},aim:${aim},reach:${reach},height:${height},fist:[${fist.join(',')}],root:[${root.join(',')}]},`).join('\n')}\n  }},`);

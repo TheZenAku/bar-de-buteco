@@ -14,8 +14,6 @@ const STEP_MS=50;
 const KICKS={
   Kick:{from:400,to:850,feet:['foot_r']},
   AirKick:{from:900,to:1450,feet:['foot_l','foot_r']},
-  KickHigh:{from:400,to:750,feet:['foot_r']},
-  KickFront:{from:600,to:1000,feet:['foot_l']},
 };
 
 const multiply=(a,b)=>[a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];

@@ -1,5 +1,5 @@
 import {adminConsole} from './admin/console';
-import {isRidingHorse,vehicleSeat,weatherAt} from '@bar/shared';
+import {isRidingHorse,kickClip,vehicleSeat,weatherAt} from '@bar/shared';
 import {CAR_MODEL,isCar,isTruck,hasStorage,storageGap,storageRefusal,vehicleMotionSpeed,vehicleSeats,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts,type MotoState,type StorageView} from '@bar/shared';
 import {storagePanelHtml} from './storage-panel';
 import {PerformanceMonitor} from './performance/monitor';
@@ -960,6 +960,8 @@ function activeSkill(){
 function useSkill():void {
   const active=activeSkill();
   if(!active||!connected||activeModal||performing())return;
+  // With the guard up Rafael's kick key throws the fight's kicks (combos with the punches, FIGHT_MOVES); the free throwing kick is for no guard.
+  if(fight.guard){if(kickClip(active.skill.id))fight.press('kick');return;}
   network.send('player.skill',{skill:active.skill.id});
 }
 let shownSkill:string|undefined;

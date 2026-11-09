@@ -24,9 +24,9 @@ const clips = {
   Kick: {filename:'karate-kick',anchor:'foot_l',stays:true}, Bartend: {filename:'Bartending'},
   // Rafael's jump kick lands away from where it took off: that way forward is root motion (`anchor`), the room carries the body.
   AirKick: {filename:path.join('misc','Drop Kick.fbx'),mixamo:true,anchor:'hip',sideways:true},
-  // His karate with the guard up goes round two more kicks (KARATE_ROUND in packages/shared/src/kick.ts): high with the right leg, front with the
-  // left. After changing either, run npm run assets:kicks.
-  KickHigh: {...misc('Mma Kick.fbx'),rate:1.15,anchor:'foot_l',stays:true}, KickFront: {...misc('Kicking.fbx'),rate:1.35,anchor:'foot_r',stays:true},
+  // With the guard up, Rafael's kicks are combo pieces (FIGHT_MOVES, `then`) with Kick, the karate: KickHigh (the body kick, right leg) and KickFront
+  // (the push kick, left leg). `from` skips the wind-up where he stands still, so the combo flows. After changing any, run npm run assets:punches.
+  KickHigh: {...misc('Mma Kick.fbx'),from:.15,rate:1.15,anchor:'foot_l',stays:true}, KickFront: {...misc('Kicking.fbx'),from:.4,rate:1.35,anchor:'foot_r',stays:true},
   // Standard Run was exported with root motion: inPlace removes its forward travel (the server moves the avatar).
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
@@ -47,6 +47,8 @@ const clips = {
   // or by walking leaves the body where the step had taken it, instead of snapping it back to where the punch started.
   Jab: {...misc('Lead Jab (1).fbx'),rate:1.3,anchor:'hip'}, Cross: {...misc('Elbow Punch.fbx'),rate:1.5,anchor:'hip'}, Hook: {...misc('Punching.fbx'),rate:1.3,anchor:'hip'},
   Heavy: {...misc('Hook Punch.fbx'),from:.2,rate:1.25,anchor:'hip'},
+  // The elbow is a combo piece (FIGHT_MOVES, `then`) in every skin; the source is long, so only the swing and its return are kept.
+  Elbow: {...misc('Illegal Elbow Punch.fbx'),from:.2,to:1.5,rate:1.3,anchor:'hip'},
   HitLight: {...misc('Head Hit (2).fbx'),rate:1.1}, HitMedium: misc('Medium Hit To Head.fbx'), HitSide: {...misc('Head Hit (1).fbx'),rate:1.1},
   HitHeavy: misc('Head Hit.fbx'), HitBack: misc('Standing React Small From Back.fbx'),
   // The legs in the guard (the arms stay up by a masked layer): back, and to each side. Forward is Walk.
@@ -54,7 +56,7 @@ const clips = {
 };
 // Clips that only some skins use: Rafael's skills, in every variant of him (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
 const exclusive = { Kick: ['rafael', 'rafael-rose'], AirKick: ['rafael', 'rafael-rose'], KickHigh: ['rafael', 'rafael-rose'], KickFront: ['rafael', 'rafael-rose'], Bartend: ['magrao'] };
-const FIGHT_CLIPS = new Set(['FightIdle', 'Jab', 'Cross', 'Hook', 'Heavy', 'HitLight', 'HitMedium', 'HitSide', 'HitHeavy', 'HitBack', 'FightBack', 'FightLeft', 'FightRight']);
+const FIGHT_CLIPS = new Set(['FightIdle', 'Jab', 'Cross', 'Hook', 'Heavy', 'Elbow', 'HitLight', 'HitMedium', 'HitSide', 'HitHeavy', 'HitBack', 'FightBack', 'FightLeft', 'FightRight']);
 const NPC_ONLY = new Set(['magrao', 'tonico']);
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
 // Use only the deliberate button press, not the long anticipation/recovery. Recovery stops once upright,

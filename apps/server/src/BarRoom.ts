@@ -20,7 +20,7 @@ import { TradeDesk, type Trade } from './world/trades.js';
 import { vehicleFuelUse, vehiclePowered, GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
 import { WALK_SPEED, type Position } from '@bar/shared';
 import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, atPickup, foodCodeSchema, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt, type HighfoodState } from '@bar/shared';
-import { FIGHT, KICKS, KICK_VARIANTS, kickAim, kickClear, kickLaunch, kickRoot, kickTouches, kickVariant, kickWindow } from '@bar/shared';
+import { FIGHT, KICKS, kickAim, kickClear, kickLaunch, kickRoot, kickTouches, kickWindow } from '@bar/shared';
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
@@ -123,8 +123,6 @@ interface Presence {
   revoked: boolean;
   rejectReconnect?: () => void;
   interactionEndsAt?: number;
-  /** How many kicks this player threw with the guard up: the karate goes round its variants (kickVariant). */
-  kicksInGuard?: number;
   /** Just got up: no punch lands on this player until then (FIGHT.graceMs). Kicks do. */
   punchSafeUntil?: number;
   /** A short non-blocking gesture (wave/use/recovery) and the state it may safely restore. */
@@ -265,6 +263,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     guardRefusal: player => this.guardRefusal(player),
     keepsGuard: player => this.keepsGuard(player),
     hittable: (target, now) => this.punchable(target, now),
+    kicks: player => !!this.sessions.getByUser(player.id)?.skills.has('karate') || !!this.sessions.getByUser(player.id)?.skills.has('air-kick'),
     damage: (target, amount, now) => this.needs.damage(target, amount, now),
     knockout: (target, start, hurt) => this.startThrown(target, start, hurt),
     stun: target => this.stagger(target),
@@ -967,11 +966,13 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
       if (p.interactionState === 'kick' || p.interactionState === 'stagger') return;
       if (p.interactionState) throw new Error('Levante-se primeiro.');
+      // With the guard up the kick is a blow of the fight (it rides in the inputs, FightDirector.move), never this throwing one.
+      if (p.fist.fight) return;
       const aim = kickAim(p, [...this.state.players.values()].filter(target => this.kickable(p, target)));
       if (aim !== undefined) p.rotation = aim;
-      const kick = kickVariant(chosen.id, p.fist.fight, p.fist.fight ? presence.kicksInGuard = (presence.kicksInGuard ?? -1) + 1 : 0);
+      const kick = chosen.id;
       p.skill = kick; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
-      presence.interactionEndsAt = p.animationStartedAt + (KICK_VARIANTS[kick]?.durationMs ?? chosen.durationMs);
+      presence.interactionEndsAt = p.animationStartedAt + chosen.durationMs;
       if (kickWindow(kick)) this.kicks.set(p.id, { startedAt: p.animationStartedAt, checkedMs: 0, hit: new Set(), from: { x: p.x, y: p.y, z: p.z, rotation: p.rotation } });
       presence.queue.length = 0;
       p.lastProcessedInput = presence.lastReceived;
@@ -1409,14 +1410,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     if ((player.interactionState && player.interactionState !== 'stagger') || player.currentTableId) return 'Termine o que está fazendo antes de levantar a guarda.';
     if (player.holding || player.carrying || player.parcel) return 'Largue o que está na mão antes de levantar a guarda.';
     if (player.fireworkEquipped) return 'Guarde o fogo de artifício antes de lutar.';
-    if (player.smokingSince) return 'Apague o cigarro (F) antes de lutar.';
     if (this.sessions.getByUser(player.id)?.flying) return 'Pouse (B) antes de lutar.';
     return '';
   }
   /** Whether the guard stays up: anything that takes the player elsewhere (a chair, a bike, a drink in hand, fainting, leaving) lowers it. */
   private keepsGuard(player: Player): boolean {
     return player.connected && isConscious(player) && !this.deaths.isDead(player.id) && (!player.interactionState || player.interactionState === 'stagger' || player.interactionState === 'kick')
-      && !player.currentTableId && !player.holding && !player.carrying && !player.parcel && !player.fireworkEquipped && !player.smokingSince && !this.sessions.getByUser(player.id)?.flying;
+      && !player.currentTableId && !player.holding && !player.carrying && !player.parcel && !player.fireworkEquipped && !this.sessions.getByUser(player.id)?.flying;
   }
   /** Who a punch can hit: anyone up and free on foot, fighting or not (or in the middle of a kick); not seated, riding, working, flying, nor just back on their feet. */
   private punchable(target: Player, now: number): boolean {

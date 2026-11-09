@@ -8,8 +8,8 @@ import type {Collider,Position} from './index.js';
 export {FIGHT_BODIES,type FightBody,type FistPath} from './fight-paths.js';
 
 /**
- * The fist fight (docs/sistemas/luta.md). R puts the guard up; the left button throws the light punches, one after the other (jab, cross, hook,
- * and the jab again), the right one the heavy punch. The room decides every punch and every hit; the browser of the one punching runs the same
+ * The fist fight (docs/sistemas/luta.md). R puts the guard up; the left button throws the light punches, the right one the heavy ones, and Rafael's
+ * skill key his kicks; each blow offers the next ones (`then`), so the presses make combos. The room decides every punch and every hit; the browser of the one punching runs the same
  * rules below on its own inputs, so the punch starts at the click and the body never has to be put back.
  *
  * Two clocks, each where it is exact:
@@ -24,9 +24,9 @@ export const FIGHT={
   speed:2.2,runSpeed:4.8,
   /**
    * The body a fist meets: a standing capsule from a little above the hips to past the head joint, as the skin stands in the guard (fight-paths.ts),
-   * this thick. The fist is a ball this thick around the knuckles.
+   * this thick. A fist or a foot is a ball around the knuckles or the ankle, as thick as the blow says (FIGHT_MOVES radius).
    */
-  bodyRadius:.22,bodyFrom:.05,bodyTo:.14,fistRadius:.09,
+  bodyRadius:.22,bodyFrom:.05,bodyTo:.14,
   /** How finely the fist is followed between two steps of the room (ms). */
   sweepMs:10,
   /**
@@ -48,24 +48,30 @@ export const FIGHT={
   graceMs:1500,
 } as const;
 
-export const PUNCH_IDS=['jab','cross','hook','heavy'] as const;
+/** The blows: the punches (every skin), and Rafael's kicks (only skins whose bank has them, `hasKicks`). */
+export const PUNCH_IDS=['jab','cross','hook','elbow','heavy','frontKick','bodyKick','roundKick'] as const;
 export type PunchId=typeof PUNCH_IDS[number];
 /** How the one hit reacts: by the punch, or from behind. */
 export const HIT_REACTIONS={HitLight:848,HitMedium:1000,HitSide:1121,HitHeavy:1533,HitBack:1267} as const;
 export type HitReaction=keyof typeof HIT_REACTIONS;
-export const FIGHT_CLIPS=['FightIdle','Jab','Cross','Hook','Heavy',...Object.keys(HIT_REACTIONS),'FightBack','FightLeft','FightRight'] as const;
+export const FIGHT_CLIPS=['FightIdle','Jab','Cross','Hook','Elbow','Heavy',...Object.keys(HIT_REACTIONS),'FightBack','FightLeft','FightRight'] as const;
 
+/** What a press asks for: the left button, the right button, the kick key. */
+export type PressKind='light'|'heavy'|'kick';
+export const PRESS_KINDS:readonly PressKind[]=['light','heavy','kick'];
 export interface PunchMove {
   id:PunchId;name:string;
   /** The clip (tools/assets/convert-animations.mjs) and its length as converted (ms). */
-  clip:'Jab'|'Cross'|'Hook'|'Heavy';durationMs:number;
+  clip:'Jab'|'Cross'|'Hook'|'Elbow'|'Heavy'|'KickFront'|'KickHigh'|'Kick';durationMs:number;
   /** When the fist can land (ms into the clip), and when it cuts the air (for its sound). */
   activeFrom:number;activeTo:number;swingMs:number;
   /**
-   * In inputs (TICK_MS each), counting from the one that threw it: how many keep the feet planted (the next punch can be thrown from then on), and
-   * up to which one a light press goes on with the chain (`next`) instead of starting it over with a jab.
+   * In inputs (TICK_MS each), counting from the one that threw it: how many keep the feet planted (the next blow can be thrown from then on), and
+   * up to which one a press goes on with the combo (`then`: which blow each kind of press throws next) instead of starting over (STARTERS).
    */
-  lockSteps:number;chainSteps:number;next?:PunchId;
+  lockSteps:number;chainSteps:number;then:Partial<Record<PressKind,PunchId>>;
+  /** How thick the fist (or the foot) is around the point the table follows (m). */
+  radius:number;
   /** The most it steps in towards the target (m), spread over its first inputs. */
   lungeMax:number;lungeSteps:number;
   /** What it does to the one hit: life, how long they cannot act (ms), how far they are pushed (m), how they react. */
@@ -81,15 +87,29 @@ export interface PunchMove {
  * The light ones push little and the hook steps in far, so the chain thrown in rhythm lands whole on someone who stands there (tested).
  */
 export const FIGHT_MOVES:Readonly<Record<PunchId,PunchMove>>={
-  jab:{id:'jab',name:'Jab',clip:'Jab',durationMs:1026,activeFrom:200,activeTo:340,swingMs:190,lockSteps:7,chainSteps:16,next:'cross',lungeMax:.35,lungeSteps:4,
+  jab:{id:'jab',name:'Jab',clip:'Jab',durationMs:1026,activeFrom:200,activeTo:340,swingMs:190,lockSteps:7,chainSteps:16,then:{light:'cross',heavy:'elbow',kick:'frontKick'},radius:.09,lungeMax:.35,lungeSteps:4,
     damage:7,stunMs:280,knockback:.12,reaction:'HitLight',launch:{speed:2.5,lift:1.4,closing:1},heavy:false},
-  cross:{id:'cross',name:'Direto',clip:'Cross',durationMs:1156,activeFrom:300,activeTo:560,swingMs:290,lockSteps:12,chainSteps:20,next:'hook',lungeMax:.5,lungeSteps:6,
+  cross:{id:'cross',name:'Direto',clip:'Cross',durationMs:1156,activeFrom:300,activeTo:560,swingMs:290,lockSteps:12,chainSteps:20,then:{light:'hook',heavy:'heavy',kick:'bodyKick'},radius:.09,lungeMax:.5,lungeSteps:6,
     damage:11,stunMs:380,knockback:.22,reaction:'HitMedium',launch:{speed:3.5,lift:1.8,closing:1.5},heavy:false},
-  hook:{id:'hook',name:'Gancho',clip:'Hook',durationMs:974,activeFrom:340,activeTo:500,swingMs:320,lockSteps:11,chainSteps:18,next:'jab',lungeMax:.55,lungeSteps:5,
+  hook:{id:'hook',name:'Gancho',clip:'Hook',durationMs:974,activeFrom:340,activeTo:500,swingMs:320,lockSteps:11,chainSteps:18,then:{light:'jab',heavy:'heavy',kick:'roundKick'},radius:.09,lungeMax:.55,lungeSteps:5,
     damage:14,stunMs:450,knockback:.35,reaction:'HitSide',launch:{speed:4,lift:2,closing:2.5},heavy:false},
-  heavy:{id:'heavy',name:'Soco forte',clip:'Heavy',durationMs:1573,activeFrom:560,activeTo:760,swingMs:540,lockSteps:17,chainSteps:17,lungeMax:.6,lungeSteps:8,
+  // The elbow comes across from the right after a short wind-up: quick, and it opens the way to the heavy punch or a kick.
+  elbow:{id:'elbow',name:'Cotovelada',clip:'Elbow',durationMs:1000,activeFrom:240,activeTo:470,swingMs:230,lockSteps:10,chainSteps:18,then:{light:'hook',heavy:'heavy',kick:'bodyKick'},radius:.1,lungeMax:.45,lungeSteps:4,
+    damage:12,stunMs:420,knockback:.3,reaction:'HitSide',launch:{speed:3.8,lift:1.9,closing:2},heavy:false},
+  heavy:{id:'heavy',name:'Soco forte',clip:'Heavy',durationMs:1573,activeFrom:560,activeTo:760,swingMs:540,lockSteps:17,chainSteps:24,then:{kick:'roundKick'},radius:.09,lungeMax:.6,lungeSteps:8,
     damage:24,stunMs:650,knockback:.8,reaction:'HitHeavy',launch:{speed:6,lift:2.6,closing:3},heavy:true},
+  // Rafael's kicks (docs/sistemas/luta.md): they hit harder than any punch and stun longer, push but never throw the body (the free kick outside the
+  // guard does; here a knockout is the only flight). The leg is thicker than a fist, and the way it goes is the foot's.
+  frontKick:{id:'frontKick',name:'Chute frontal',clip:'KickFront',durationMs:1309,activeFrom:480,activeTo:680,swingMs:460,lockSteps:14,chainSteps:22,then:{light:'cross',heavy:'heavy',kick:'bodyKick'},radius:.17,lungeMax:.45,lungeSteps:5,
+    damage:16,stunMs:520,knockback:.5,reaction:'HitMedium',launch:{speed:5,lift:2.4,closing:2.5},heavy:false},
+  bodyKick:{id:'bodyKick',name:'Chute no tronco',clip:'KickHigh',durationMs:1261,activeFrom:340,activeTo:500,swingMs:320,lockSteps:11,chainSteps:20,then:{light:'hook',heavy:'heavy',kick:'roundKick'},radius:.17,lungeMax:.5,lungeSteps:4,
+    damage:19,stunMs:580,knockback:.6,reaction:'HitHeavy',launch:{speed:5.5,lift:2.6,closing:3},heavy:true},
+  // The karate's round kick, head high with a long wind-up: the finisher, the biggest damage of the guard.
+  roundKick:{id:'roundKick',name:'Chute de karatê',clip:'Kick',durationMs:2000,activeFrom:480,activeTo:760,swingMs:440,lockSteps:17,chainSteps:17,then:{},radius:.17,lungeMax:.6,lungeSteps:6,
+    damage:27,stunMs:800,knockback:1,reaction:'HitHeavy',launch:{speed:7,lift:3,closing:3.5},heavy:true},
 };
+/** Whether a blow is one of Rafael's kicks (their clips are Kick, KickHigh, KickFront). */
+export const isKick=(id:PunchId):boolean=>FIGHT_MOVES[id].clip.startsWith('Kick');
 export const punchById=(id:string|undefined):PunchMove|undefined=>PUNCH_IDS.includes(id as PunchId)?FIGHT_MOVES[id as PunchId]:undefined;
 
 /** A punch thrown with an input: which, the browser's own count of its punches (0-255), its step in (m), and how old the world it saw was. */
@@ -107,17 +127,24 @@ export const punchCommandSchema=z.object({m:z.enum(PUNCH_IDS),n:z.number().int()
 export interface PunchStream {move:PunchId|'';seq:number;yaw:number;lunge:number;n:number}
 export const NO_PUNCH:PunchStream={move:'',seq:-1e9,yaw:0,lunge:0,n:0};
 
+/** The blow each kind of press throws when no combo is on (the first of a chain). */
+export const STARTERS:Readonly<Record<PressKind,PunchId>>={light:'jab',heavy:'heavy',kick:'frontKick'};
+/** Whether this skin has the kicks: its bank carries the kick clips (fight-paths.ts), which only Rafael's do. */
+export const hasKicks=(skin:string|undefined):boolean=>!!fightBody(skin).moves.Kick;
+
 /**
- * The punch a press may throw with input `seq`: the chain's next one or a jab for a light press, the heavy one for a heavy press; undefined while the
- * last punch still has the feet planted (the browser keeps the press for FIGHT.bufferMs).
+ * The blow a press may throw with input `seq`: the one the last blow offers for this kind of press while the combo window is open (`then`), else the
+ * kind's own first blow (STARTERS); undefined while the last blow still has the feet planted (the browser keeps the press for FIGHT.bufferMs), or for a
+ * kick press from a skin without kicks.
  */
-export function punchAllowed(stream:PunchStream,seq:number,kind:'light'|'heavy'):PunchId|undefined {
+export function punchAllowed(stream:PunchStream,seq:number,kind:PressKind,skin?:string):PunchId|undefined {
+  if(kind==='kick'&&!hasKicks(skin))return undefined;
   const last=punchById(stream.move),steps=seq-stream.seq;
   if(last&&steps<last.lockSteps)return undefined;
-  if(kind==='heavy')return 'heavy';
-  return last?.next&&steps<=last.chainSteps?last.next:'jab';
+  return (last&&steps<=last.chainSteps?last.then[kind]:undefined)??STARTERS[kind];
 }
-export const punchKind=(id:PunchId):'light'|'heavy'=>id==='heavy'?'heavy':'light';
+/** Whether `move` is a blow the rules allow at input `seq`, by whichever press (the room checks what the browser threw). */
+export const punchThrowable=(stream:PunchStream,seq:number,move:PunchId,skin?:string):boolean=>PRESS_KINDS.some(kind=>punchAllowed(stream,seq,kind,skin)===move);
 /** The stream after a punch is thrown with input `seq`, facing `yaw`, asking to step `lunge` metres (clamped to what the punch allows). */
 export function throwPunch(command:Pick<PunchCommand,'m'|'n'|'lunge'>,seq:number,yaw:number):PunchStream {
   const move=FIGHT_MOVES[command.m],lunge=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,command.lunge));
@@ -125,7 +152,8 @@ export function throwPunch(command:Pick<PunchCommand,'m'|'n'|'lunge'>,seq:number
 }
 /** How far forward a skin's punch has carried its body after `steps` inputs (fight-paths.ts root: the clip's own step, m). */
 export function punchRoot(skin:string|undefined,move:PunchId,steps:number):number {
-  const root=fistPath(skin,move).root;
+  // A skin without this blow's clip (a kick, for anyone but Rafael) has no step of its own.
+  const root=fightBody(skin).moves[FIGHT_MOVES[move].clip]?.root??[];
   return root.length?root[Math.max(0,Math.min(root.length-1,steps))]!:0;
 }
 /**
@@ -177,7 +205,7 @@ export function fightBody(skin:string|undefined):FightBody {
   return FIGHT_BODIES[skin??'']??FIGHT_BODIES[skinBase(skin??'')]??FIGHT_BODIES.nathan??Object.values(FIGHT_BODIES)[0]!;
 }
 export function fistPath(skin:string|undefined,move:PunchId):FistPath {return fightBody(skin).moves[FIGHT_MOVES[move].clip]!;}
-/** The knuckles `ms` into the punch, in the puncher's axes (+X its left, +Z its front); clamped to the table's ends. */
+/** The knuckles (or the foot of a kick) `ms` into the blow, in the puncher's axes (+X its left, +Z its front); clamped to the table's ends. */
 export function fistAt(path:FistPath,ms:number):[number,number,number] {
   const last=path.fist.length/3-1,at=Math.max(0,Math.min(last,(ms-path.from)/path.step)),i=Math.min(last-1,Math.floor(at)),f=at-i,k=i*3,way=path.fist;
   return [way[k]!+(way[k+3]!-way[k]!)*f,way[k+1]!+(way[k+4]!-way[k+1]!)*f,way[k+2]!+(way[k+5]!-way[k+2]!)*f];
@@ -229,7 +257,7 @@ export interface PunchContact {ms:number;x:number;y:number;z:number}
 export function punchContact(skin:string|undefined,move:PunchId,fromMs:number,toMs:number,puncher:(ms:number)=>FightPose,targetSkin:string|undefined,target:(ms:number)=>FightPose):PunchContact|undefined {
   const blow=FIGHT_MOVES[move],path=fistPath(skin,move),start=Math.max(fromMs,blow.activeFrom),end=Math.min(toMs,blow.activeTo);
   if(start>end)return undefined;
-  const reach=FIGHT.fistRadius+FIGHT.bodyRadius;
+  const reach=blow.radius+FIGHT.bodyRadius;
   let previous=toWorld(puncher(start),fistAt(path,start));
   for(let ms=start;;){
     const next=Math.min(end,ms+FIGHT.sweepMs),fist=toWorld(puncher(next),fistAt(path,next)),body=target(next),box=hurtbox(targetSkin,body);
@@ -251,7 +279,7 @@ export function punchClear(puncher:Position,target:Position):boolean {
 /** Whether the target is still within this punch's reach now, give or take FIGHT.slack: past it, a hit seen in the past no longer counts. */
 export function punchInReach(skin:string|undefined,move:PunchId,puncher:Position,target:Position):boolean {
   const path=fistPath(skin,move),most=Math.max(path.reach,...Array.from({length:path.fist.length/3},(_,i)=>Math.hypot(path.fist[i*3]!,path.fist[i*3+2]!)+Math.max(0,...path.root)));
-  return Math.hypot(target.x-puncher.x,target.z-puncher.z)<=most+FIGHT.fistRadius+FIGHT.bodyRadius+FIGHT.slack&&Math.abs((target.y??0)-(puncher.y??0))<1.2;
+  return Math.hypot(target.x-puncher.x,target.z-puncher.z)<=most+FIGHT_MOVES[move].radius+FIGHT.bodyRadius+FIGHT.slack&&Math.abs((target.y??0)-(puncher.y??0))<1.2;
 }
 
 /** Someone the aim may turn to. */

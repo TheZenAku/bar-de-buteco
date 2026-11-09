@@ -1,4 +1,4 @@
-import {FIGHT,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PATCH_MS,TICK_MS,fightMove,hitReaction,punchAllowed,punchById,punchClear,punchContact,punchInReach,punchKind,punchStep,rewindOf,streamOf,throwPunch,
+import {FIGHT,FIGHT_MOVES,HIT_REACTIONS,isKick,NO_PUNCH,PATCH_MS,TICK_MS,fightMove,hitReaction,punchById,punchClear,punchContact,punchInReach,punchStep,punchThrowable,rewindOf,streamOf,throwPunch,
   type Collider,type FightHit,type FightPose,type PlayerInput,type PunchId,type RagdollStart} from '@bar/shared';
 import type {Player} from '../state.js';
 
@@ -8,6 +8,8 @@ export interface FightHost {
   guardRefusal(player:Player):string;
   /** Whether the guard stays up: anything that takes the player (a chair, a bike, a drink in hand, fainting) lowers it. */
   keepsGuard(player:Player):boolean;
+  /** Whether this player has bought a kick skill: only then do the kick presses of the guard throw (the skin's clips are checked by the rules). */
+  kicks(player:Player):boolean;
   /** Who a punch may hit now: up and free (or fighting), not just back on their feet. */
   hittable(target:Player,now:number):boolean;
   /** Takes life: the ring first, then the heart's reserve (needs.ts). */
@@ -82,7 +84,7 @@ export class FightDirector {
   forget(id:string):void {this.fighters.delete(id);}
   /** Held by a punch or a blow: the room refuses other actions meanwhile (BarRoom.handle). */
   busy(player:Player,seq:number,now:number):boolean {
-    return now<player.fist.stunUntil||punchStep(streamOf(player.fist),seq+1).locked;
+    return now<player.fist.stunUntil||punchStep(streamOf(player.fist),seq+1,player.skin).locked;
   }
   /** A punch on its way (tests, admin). */
   activeOf(id:string){return this.fighters.get(id)?.active;}
@@ -122,13 +124,13 @@ export class FightDirector {
     const fist=player.fist;
     let stream=streamOf(fist);
     const command=input.punch;
-    if(command&&now>=fist.stunUntil&&punchAllowed(stream,input.seq,punchKind(command.m))===command.m){
+    if(command&&now>=fist.stunUntil&&punchThrowable(stream,input.seq,command.m,player.skin)&&(!isKick(command.m)||this.host.kicks(player))){
       stream=throwPunch(command,input.seq,input.rotation);
       fist.punch=stream.move;fist.seq=stream.seq;fist.yaw=stream.yaw;fist.lunge=stream.lunge;fist.n=stream.n;fist.at=now;
       player.animationState='punch';player.animationStartedAt=now;
       this.fighter(player.id).active={move:command.m,at:now,rewind:rewindOf(now,command,PATCH_MS),checked:0,skin:player.skin,n:stream.n};
     }
-    const {locked}=punchStep(stream,input.seq),next=fightMove(player,stream,input.seq,input,TICK_MS/1000,stagePass,obstacles,player.skin,player.animationState==='punch');
+    const {locked}=punchStep(stream,input.seq,player.skin),next=fightMove(player,stream,input.seq,input,TICK_MS/1000,stagePass,obstacles,player.skin,player.animationState==='punch');
     const moving=next.x!==player.x||next.z!==player.z;
     player.x=next.x;player.y=next.y;player.z=next.z;
     player.rotation=locked?stream.yaw:input.rotation;
