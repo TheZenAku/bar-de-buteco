@@ -23,6 +23,7 @@ const CONFIRM:Record<string,(p:AdminPlayerDetail['account'])=>{title:string;text
   unban:()=>({title:'Remover banimento',text:'Remove todos os banimentos ativos. O jogador pode entrar novamente com seu login.'}),
   logout:()=>({title:'Encerrar sessões',text:'Desconecta a conta em todos os navegadores. Se estiver no bar, o jogador sai em alguns segundos e precisa entrar de novo com a senha.'}),
   kill:()=>({title:'Matar jogador',text:'Teste da Morte: a cena toca ao redor do personagem (a Morte surge, golpeia e o leva), a tela dele escurece por 5 segundos e ele precisa repetir uma sequência para voltar em outro ponto do mapa. Mantém inventário, moedas e skin. Informe o motivo.'}),
+  god:()=>({title:'Dar god',text:'Recupera uma vez a vida, energia, fome, sede e todas as reservas. Zera álcool e bexiga, elimina o cansaço e recupera o jogador de desmaio ou morte. O jogador precisa estar no bar.'}),
   verify:()=>({title:'Confirmar e-mail',text:'Libera a entrada no bar sem o link de confirmação enviado por e-mail.'}),
 };
 function reversalText(log:AdminAudit):string {
@@ -78,7 +79,8 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
       ['No bar agora',live?`Sim · ${e(live.interaction||live.animation)}${live.job?` · trabalhando`:''} · (${live.x}, ${live.z})`:'Não'],
     ];
     const self=p.id===ctx.user()?.id,canAccount=self||p.canModerate;
-    return `<div class="admin-grid">${card('Ficha',`<dl class="admin-rows">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`,{icon:'idCard'})}
+    return `<div class="admin-grid">${card('Ficha',`<dl class="admin-rows">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+      <div class="admin-player-actions"><button class="mini-button" data-admin="god" ${live?'':'disabled'}>Dar god</button></div>${mode==='god'?confirmation(p):''}`,{icon:'idCard'})}
       ${card('Conta',canAccount?`<form data-admin-form="rename" class="admin-inline-form"><label>Nome no jogo<input name="displayName" aria-label="Nome no jogo" value="${e(p.displayName)}" minlength="2" maxlength="32" required></label>${reasonField('Motivo da mudança de nome')}<button class="button secondary" type="submit">Salvar nome</button></form>
         <p class="fine-print">O novo nome aparece no bar a partir da próxima entrada.</p>
         <div class="admin-player-actions">${p.verified?'':'<button class="mini-button" data-admin="verify">Confirmar e-mail</button>'}${self?'':'<button class="mini-button" data-admin="logout">Encerrar sessões</button>'}</div>${mode==='verify'||mode==='logout'?confirmation(p):''}`
@@ -245,6 +247,7 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
     else if(kind==='verify')player({op:'verify'},'E-mail confirmado.');
     else if(kind==='logout')player({op:'logout'},'Sessões encerradas.');
     else if(kind==='kill')player({op:'kill'},'Comando de morte enviado ao bar.');
+    else if(kind==='god')player({op:'god'},'God enviado ao bar: recuperação completa dos atributos.');
     else if(kind==='item'){const quantity=Math.abs(Number(values.quantity));player({op:'item',itemId:String(values.itemId),quantity:submitter?.value==='remove'?-quantity:quantity},submitter?.value==='remove'?'Itens retirados da mochila.':`${itemById(String(values.itemId))?.name??'Item'} entregue na mochila.`);}
     else if(kind==='skin')player({op:'skin',skinId:String(values.skinId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Skin retirada da coleção.':'Skin adicionada à coleção.');
     else if(kind==='skill')player({op:'skill',skillId:String(values.skillId),grant:submitter?.value!=='revoke'},submitter?.value==='revoke'?'Habilidade retirada.':'Habilidade adicionada.');
@@ -257,6 +260,8 @@ export const playersSection:SectionFactory=(root,ctx,params)=>{
     world(){
       // Only the "no bar" marks change with the world: the forms keep what is being typed.
       const slot=root.querySelector('.admin-list-slot');if(slot&&list&&!slot.contains(document.activeElement))slot.innerHTML=listHtml();
+      const god=root.querySelector<HTMLButtonElement>('button[data-admin="god"]');
+      if(god)god.disabled=!online().has(selectedId);
     },
     destroy(){disposed=true;root.removeEventListener('click',click);root.removeEventListener('change',change);root.removeEventListener('input',change);root.removeEventListener('submit',submit);},
   };

@@ -72,7 +72,18 @@ test('walk cadence accelerates and slows gradually without depending on render f
   const slower=walkPlaybackRate(2.2,1,1/60);
   assert.ok(slower<2.2&&slower>2,'a slower movement snapshot does not snap the legs to a new cadence');
   assert.equal(walkPlaybackRate(1,3.5,0),1);
-  assert.ok(at(60)<=2.2);
+  assert.ok(at(60)<=1.35);
+});
+
+test('normal walking stays below 116 steps per minute across every measured skin',async()=>{
+  const {CLIP_PACES}=await import('../../apps/web/src/engine/clip-paces.ts');
+  for(const [skin,paces] of Object.entries(CLIP_PACES)){
+    for(const speed of [2.6,3.5,6]){
+      let rate;
+      for(let frame=0;frame<180;frame++)rate=walkPlaybackRate(rate,speed,1/60,paces.Walk);
+      assert.ok(rate>1&&rate*2/1.4*60<116,`${skin} at ${speed} m/s keeps a walking cadence`);
+    }
+  }
 });
 
 test('walking blends ease starts and stops while respecting action-specific transition timings',()=>{

@@ -30,7 +30,7 @@ const clips = {
   // Standard Run was exported with root motion: inPlace removes its forward travel (the server moves the avatar).
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
-  // The everyday pace (WALK_SPEED, 3.5 m/s) is a jog: the relaxed walk keeps up only to about 2.4 m/s. BarScene picks it by speed; NPCs keep walking.
+  // Retained as a separate bank clip; normal movement uses Walk regardless of travel speed.
   // `even`: its foot on the floor speeds up and slows down in the source; re-timed to one speed so one playback rate keeps it planted.
   Jog: {...misc('Jogging.fbx'),even:true},
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),

@@ -12,6 +12,103 @@ import {walk} from './walk';
 const map=JSON.parse(readFileSync(new URL('../../packages/shared/src/map-data.json',import.meta.url),'utf8')) as typeof import('../../packages/shared/src/map-data.json');
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
 
+test('normal movement keeps a walking gait on every player skin and still runs on request',async({page})=>{
+  test.setTimeout(120000);
+  await page.goto('/@fs/'+fileURLToPath(new URL('../fixtures/smoking.html',import.meta.url)).replaceAll('\\','/'));
+  await page.evaluate(()=>(window as any).fixture.ready);
+  await page.evaluate(()=>(window as any).fixture.all());
+  await expect.poll(()=>page.evaluate(()=>{
+    const actors=[...(window as any).fixture.scene.actors.values()] as any[];
+    return actors.length===10&&actors.every(a=>a.skin?.tracks.has('Jog')&&a.skin.tracks.has('Run'));
+  }),{timeout:60000}).toBe(true);
+  const results=await page.evaluate(()=>{
+    const scene=(window as any).fixture.scene;
+    scene.restoreHeadLooks();scene.app.off('update',scene.update,scene);
+    const results=[];
+    for(const avatar of scene.actors.values()){
+      const pose={t:0,dt:1/60,walking:true,running:false,seated:0,dancing:false,drinking:false,waving:false};
+      avatar.actor={...avatar.actor,animation:'walk',smokingSince:0,drunk:0};
+      // Cross the former Jog threshold in both directions, as movement snapshots can do.
+      for(const speed of [1,2.6,3.5,2.3,3.5]){
+        avatar.speed=speed;
+        for(let frame=0;frame<90;frame++){
+          scene.poseSkin(avatar,avatar.skin,pose);
+          avatar.skin.model.anim.update(pose.dt);
+        }
+        const anim=avatar.skin.model.anim;
+        results.push({skin:avatar.skinId,speed,clip:anim.baseLayer.activeState,rate:anim.speed,expected:'Walk'});
+      }
+      avatar.speed=6;avatar.actor.animation='run';pose.running=true;
+      scene.poseSkin(avatar,avatar.skin,pose);avatar.skin.model.anim.update(.5);
+      results.push({skin:avatar.skinId,speed:6,clip:avatar.skin.model.anim.baseLayer.activeState,expected:'Run'});
+    }
+    return results;
+  });
+  expect(results).toHaveLength(60);
+  for(const result of results){
+    expect(result.clip,`${result.skin} at ${result.speed} m/s`).toBe(result.expected);
+    if(result.rate!==undefined)expect(result.rate).toBeLessThanOrEqual(1.35);
+  }
+});
+
+test('late animation banks and chair clips never flash a different pose through drink or guard layers',async({page})=>{
+  test.setTimeout(120000);
+  await page.goto('/@fs/'+fileURLToPath(new URL('../fixtures/smoking.html',import.meta.url)).replaceAll('\\','/'));
+  await page.evaluate(()=>(window as any).fixture.ready);
+  await expect.poll(()=>page.evaluate(()=>{
+    const s=(window as any).fixture.scene,a=s.actors.get('a');
+    return !!a?.skin?.tracks.has('Heavy')&&s.danceBanks.has('nathan');
+  }),{timeout:60000}).toBe(true);
+  const setup=await page.evaluate(()=>{
+    const s=(window as any).fixture.scene,a=s.actors.get('a');
+    // Step the real animation components ourselves so comparisons do not depend on GPU frame rate.
+    s.restoreHeadLooks();s.app.off('update',s.update,s);
+    const body=s.group('Reference rig',[0,0,0]),skin=s.makeSkin(body,s.skinModels.get('nathan'));
+    body.enabled=false;
+    const reference={...a,body,skin,actor:{...a.actor}};
+    (window as any).stability={s,a,reference};
+    a.skin.model.anim.enabled=false;skin.model.anim.enabled=false;
+    // Match the safe, freshly bound pose independently of late registrations on the tested rig.
+    skin.model.anim.rebind();
+    return a.skin.tracks.has('Heavy');
+  });
+  expect(setup).toBe(true);
+  const compare=(clip:string)=>page.evaluate(clip=>{
+    const {a,reference}=(window as any).stability;
+    for(const actor of [a,reference]){
+      const {skin}=actor,anim=skin.model.anim;anim.speed=0;
+      anim.baseLayer.transition(clip,0);anim.baseLayer.activeStateCurrentTime=.4;
+      skin.handLayer.weight=.00001;skin.guardLayer.weight=.00001;skin.orderLayer.weight=0;
+    }
+    let worst=0;
+    for(let frame=0;frame<120;frame++){
+      a.skin.model.anim.update(0);reference.skin.model.anim.update(0);
+      for(const name of ['upperarm_l','lowerarm_l','hand_l','upperarm_r','hand_r','head']){
+        const q=a.skin.bones[name].getLocalRotation(),clean=reference.skin.bones[name].getLocalRotation();
+        worst=Math.max(worst,2*Math.acos(Math.min(1,Math.abs(q.dot(clean))))*180/Math.PI);
+      }
+    }
+    return worst;
+  },clip);
+  // A bank arriving after playback has begun used to corrupt the shared layer targets.
+  await page.evaluate(()=>{
+    const {s,a}=(window as any).stability;
+    a.skin.model.anim.update(0);s.assignClips(a.skin,s.danceBanks.get('nathan'));
+  });
+  expect(await compare('Heavy')).toBeLessThan(.01);
+  // The same failure also occurred when a chair animation was first registered while holding a drink.
+  await expect.poll(()=>page.evaluate(()=>{
+    const {s,a}=(window as any).stability;
+    a.actor={...a.actor,animation:'sit',animationState:'sit',interactionState:'seat-9',animationStartedAt:Date.now(),smokingSince:0};
+    return !!s.barAction(a,Date.now());
+  })).toBe(true);
+  await page.evaluate(()=>{
+    const {s,a,reference}=(window as any).stability;
+    reference.actor={...a.actor};s.barAction(reference,Date.now());reference.skin.model.anim.rebind();
+  });
+  expect(await compare('Bar sentar')).toBeLessThan(.01);
+});
+
 test('polished cigarette: upper body lighting, persistent lip contact on every skin, puffs and free legs; counter greeting once',async({page})=>{
   test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/@fs/'+fileURLToPath(new URL('../fixtures/smoking.html',import.meta.url)).replaceAll('\\','/'));

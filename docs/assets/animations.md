@@ -7,8 +7,7 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Ação no jogo | Fonte | Comportamento |
 | --- | --- | --- |
 | Parado | `misc/Idle (1).fbx` | `Idle` do banco Mixamo: primeiros 4 s, com os últimos 0,5 s misturados à pose inicial para fechar o loop. |
-| Andar no ritmo de sempre (3,5 m/s) | `misc/Jogging.fbx` | `Jog`, nas skins de jogador: um trote, porque a caminhada só acompanha até ~2,4 m/s e patinava acima disso. O BarScene troca para ele a partir de 2,6 m/s (volta abaixo de 2,2). `even`: o pé apoiado acelerava e freava no original; o clipe é reamostrado em 60 Hz com o tempo ajustado (`evenStance`) para esse pé ir para trás numa velocidade só, e uma velocidade de reprodução o mantém parado no chão. |
-| Caminhar | `misc/Standard Walk.fbx` | Ciclo de 1,4 s (20% mais longo), com 85 poses a 60 Hz. Interpolação cúbica esférica das rotações e Hermite monotônica do quadril suavizam o movimento e a emenda do loop. A cadência acompanha a velocidade com aceleração de 0,18 s e desaceleração de 0,24 s; entrar e sair da caminhada mistura as poses por 0,32 s e 0,28 s. |
+| Caminhar | `misc/Standard Walk.fbx` | `Walk` também no ritmo normal de 3,5 m/s, sem trocar automaticamente para `Jog`. Ciclo de 1,4 s (20% mais longo), com 85 poses a 60 Hz. Interpolação cúbica esférica das rotações e Hermite monotônica do quadril suavizam o movimento e a emenda do loop. A cadência acompanha a velocidade até 1,35× (cerca de 116 passos/min), com aceleração de 0,18 s e desaceleração de 0,24 s; entrar e sair da caminhada mistura as poses por 0,32 s e 0,28 s. A velocidade de deslocamento permanece em 3,5 m/s, mesmo acima da passada original do clipe. |
 | Correr | `Standard Run.fbx` | Loop de corrida de todas as skins. O arquivo avança cerca de 3 m por ciclo (root motion); o conversor (`inPlace`) remove esse avanço constante e mantém o balanço do quadril, porque quem move o avatar é o servidor. O avanço medido dá o ritmo do clipe a 1× (`MIXAMO_PACE.Run`, 4 m/s no Nathan): a 6 m/s a cadência fica em 1,5×. |
 | Embriagado parado / andando | `misc/Drunk Idle Variation.fbx` / `misc/Drunk Walk.fbx` | Entra nos estágios altos de embriaguez; substitui a inclinação procedural nos modelos completos. |
 | Tropeçar | `misc/Drunk Idle Variation.fbx` | Cambaleio temporário; não reutiliza mais a queda de desmaio. |
@@ -63,3 +62,11 @@ Os objetos não fazem parte dos FBXs. Garrafa, copo, bengala e cartas são entid
 O servidor sincroniza o início de ações únicas e encerra aceno/uso/recuperação sem sobrescrever uma caminhada que tenha começado no meio do gesto. Ações que ocupam um lugar ou objeto continuam bloqueando movimento conforme a regra do jogo. Os efeitos visuais das cartas não modificam distribuição, privacidade ou resultados do blackjack.
 
 `npm run assets:skins` reimporta as [skins Mixamo](skins-mixamo.md) e regenera os bancos. `npm run assets:retarget` recalibra os modelos existentes. O conversor usa `FBXLoader.parse`; os testes conferem os nomes exigidos, durações, alvos de osso, quaternions normalizados e emendas dos loops.
+
+## Oscilação entre poses ao carregar clipes
+
+No PlayCanvas 2.23.3, registrar animações depois que o componente já começou a tocar pode deixar os contadores dos alvos compartilhados das camadas inconsistentes. A pose voltava ao repouso por um quadro, periodicamente, mesmo com o mesmo clipe e um relógio crescente. Camadas de bebida ou guarda com peso quase zero ainda participavam da mistura: por isso o defeito aparecia tanto nos socos quanto ao sentar com uma bebida.
+
+`assignAnimationClips`, em `apps/web/src/engine/animation-tracks.ts`, registra cada lote e chama o `rebind()` público do componente inteiro ao terminar. Bancos de ações e danças, camadas de mão/guarda/pedido, cadeiras e músicos usam esse caminho. O rebinding acontece ao registrar clipes, sem acrescentar trabalho a cada quadro.
+
+`tests/tools/animation-layers.test.mjs` reproduz o problema com componentes reais do motor e compara todos os quadros com uma pose de referência. O teste de estabilidade em `tests/e2e/bar-animations.spec.ts` faz a mesma comparação no navegador com o esqueleto e os clipes reais, incluindo soco forte e sentar.

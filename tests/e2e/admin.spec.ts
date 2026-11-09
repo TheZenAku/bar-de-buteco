@@ -22,6 +22,39 @@ async function ready(page:Page){
 const section=(page:Page,id:string)=>page.locator(`[data-admin-nav="${id}"]`).click();
 const fileTab=(page:Page,name:RegExp|string)=>page.getByRole('tab',{name}).click();
 
+test('god: administrator restores attributes through chat and the player menu',async({page})=>{
+  test.setTimeout(120000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
+  await page.keyboard.press('t');
+  await page.locator('#chat-input').fill('/god');
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#messages')).toContainText('God recebido: vida, energia, fome, sede e reservas recuperadas');
+  await menuItem(page,'Você','Administração');await section(page,'players');
+  await page.getByLabel('Buscar jogador',{exact:true}).fill('rafaelrodrigues-2017@hotmail.com');
+  await page.getByRole('button',{name:'Buscar',exact:true}).click();
+  await expect(page.locator('.admin-player-detail h3')).toHaveText('primary_admin');
+  await fileTab(page,'Resumo');
+  const god=page.getByRole('button',{name:'Dar god',exact:true});
+  await expect(god).toBeEnabled();await god.click();
+  const form=page.locator('[data-admin-form="god"]');
+  await form.getByLabel('Motivo da ação',{exact:true}).fill('Recuperar atributos pelo painel de administração');
+  const [response]=await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/admin/player')&&response.request().postDataJSON()?.op==='god'),
+    form.getByRole('button',{name:'Dar god',exact:true}).click(),
+  ]);
+  expect(response.status()).toBe(200);
+  await expect(page.locator('.admin-feedback')).toContainText('God enviado ao bar');
+  await expect(page.locator('#messages .chat-line').filter({hasText:'God recebido: vida, energia, fome, sede e reservas recuperadas'})).toHaveCount(2);
+  await fileTab(page,/Histórico/);
+  await expect(page.locator('.admin-actions-history')).toContainText('Atributos recuperados (god)');
+  await expect.poll(()=>page.evaluate(()=>{
+    const debug=(window as any).barDebug.snapshot(),player=debug.world.players[debug.localId];
+    return ['hp','stamina','hunger','thirst','hpCore','staminaCore','hungerCore','thirstCore'].every(key=>player[key]===100)&&player.drunk===0&&player.bladder===0;
+  })).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('veículos: gerenciar contas offline, reparar todos, transferir a chave e excluir pela administração',async({page,playwright})=>{
   test.setTimeout(150000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));

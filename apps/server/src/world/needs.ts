@@ -54,6 +54,13 @@ export class NeedsDirector {
   /** Back from a death (the Morte's minigame won). */
   revive(player: Player, now: number): void { reviveNeeds(this.state(player.id, now)); this.sync(player, now); }
 
+  /** One-shot administrative recovery; keep active HP bonuses and the monotonically increasing faint counter. */
+  restore(player: Player, now: number): void {
+    const state=this.state(player.id,now),bonuses=state.bonuses.filter(b=>b.until>now),hp=maxHp(state,now),faints=state.faints;
+    Object.assign(state,createNeeds(now),{hp,bonuses,faints,faintCause:undefined});
+    this.sync(player,now);
+  }
+
   /** One roll per faint: with NEEDS.faint.itemLossChance, a random eligible item is removed. */
   loseItemOnFaint(playerId: string): string | undefined {
     if (this.random() >= NEEDS.faint.itemLossChance) return;

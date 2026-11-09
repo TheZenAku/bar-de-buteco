@@ -466,7 +466,7 @@ const network=new BarNetwork({
   broadcast:({text,by})=>notices.show({variant:'admin',title:by,text,duration:12000}),
   itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
   deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
-  deathScreen:screen=>deathUi.screen(screen),
+  deathScreen:screen=>{if(screen.phase==='end'&&scene?.getDeath().victim===user?.id)scene?.stopDeath();deathUi.screen(screen);},
   fight:(seq,stream,self)=>fight.decorate(seq,stream,self),
   fightState:(self,acked)=>fight.reconcile(self,acked),
   fightHit:onFightHit,

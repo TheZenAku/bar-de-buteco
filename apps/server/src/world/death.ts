@@ -90,6 +90,9 @@ export class DeathDirector {
   /** The player left (or was removed): the death ends, and the player comes back alive at the respawn point. */
   disconnected(id:string):void {if(this.deaths.has(id))this.finish(id,'disconnected');}
 
+  /** An administrator restored the player before the death sequence finished. */
+  revive(id:string):void {if(this.deaths.has(id))this.finish(id,'admin');}
+
   /** What a client that (re)connects in the middle needs: nothing is replayed, the screen resumes where it is. */
   resume(id:string):void {
     const death=this.deaths.get(id);if(!death)return;
@@ -117,7 +120,7 @@ export class DeathDirector {
     this.host.screen(id,{id:death.plan.id,phase:'error',until:death.phaseEndsAt,phrase});
   }
 
-  private finish(id:string,reason:'won'|'disconnected'|'timeout'):void {
+  private finish(id:string,reason:'won'|'disconnected'|'timeout'|'admin'):void {
     const death=this.deaths.get(id);if(!death)return;
     this.deaths.delete(id);
     this.host.respawn(id,{x:death.plan.ax,z:death.plan.az});

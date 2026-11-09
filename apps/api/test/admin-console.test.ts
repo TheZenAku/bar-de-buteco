@@ -36,6 +36,21 @@ test('administration console: prices for the whole game, player file and changes
     assert.equal((await internal('GET','/api/internal/prices')).json().prices['item:coxinha'],22);
   });
 
+  await t.test('god requires an administrator and a reason, records the actor and queues a recovery for the chosen player',async()=>{
+    const payload={playerId:player.id,op:'god',reason:'Recuperar atributos para teste'};
+    assert.equal((await inject('POST','/api/admin/player',payload)).statusCode,401);
+    assert.equal((await inject('POST','/api/admin/player',payload,player.cookie)).statusCode,403);
+    assert.equal((await inject('POST','/api/admin/player',{...payload,reason:''},staff.cookie)).statusCode,400);
+    assert.equal((await inject('POST','/api/admin/player',{...payload,playerId:randomUUID()},staff.cookie)).statusCode,404);
+    const restored=await inject('POST','/api/admin/player',payload,staff.cookie);
+    assert.equal(restored.statusCode,200,restored.body);
+    const orders=(await service.db.select().from(controls)).map(row=>row.payload as {action:string;playerId?:string;actorId?:string});
+    assert.ok(orders.some(order=>order.action==='god'&&order.playerId===player.id&&order.actorId===staff.id));
+    const file=(await inject('GET',`/api/admin/players/${player.id}`,undefined,staff.cookie)).json();
+    assert.ok(file.history.some((entry:{action:string;actorId:string;reason:string})=>entry.action==='player-god'&&entry.actorId===staff.id&&entry.reason.includes(payload.reason)));
+    assert.equal(file.wallet.balance,1000,'god does not change the wallet');
+  });
+
   await t.test('a price change applies to purchases at once, is audited, tells the world and can go back to the default',async()=>{
     assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'item:nada',value:1}],reason:'Chave inválida'},staff.cookie)).statusCode,400);
     assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'item:agua',value:10_001}],reason:'Acima do limite'},staff.cookie)).statusCode,400);

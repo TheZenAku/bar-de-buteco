@@ -993,6 +993,18 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
+      const god=/^\/god(?:\s+([\s\S]*))?$/i.exec(text);
+      if(god){
+        if(sender.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');
+        const query=(god[1]??'').trim(),key=query.toLocaleLowerCase('pt-BR');
+        const exact=query?this.state.players.get(query):player;
+        const matches=exact?.connected?[exact]:[...this.state.players.values()].filter(p=>p.connected&&p.displayName.toLocaleLowerCase('pt-BR')===key);
+        if(matches.length!==1)throw new Error(matches.length?'Há jogadores com esse nome. Use /god seguido do ID.':'Jogador não encontrado no bar. Use /god ou /god nome completo ou ID.');
+        const target=matches[0]!;
+        this.restorePlayer(target,player.id,player.displayName);
+        if(target.id!==player.id)client.send('chat.message',{id:randomUUID(),playerId:'system',displayName:'B.A.R.',system:true,sentAt:Date.now(),text:`God aplicado em ${target.displayName}: atributos recuperados.`} satisfies ChatMessage);
+        return;
+      }
       const broadcast = /^\/msg(?:\s+([\s\S]*))?$/i.exec(text);
       if (broadcast) {
         if (sender.ticket.role !== 'admin') throw new Error('Acesso exclusivo da administração.');
@@ -1103,8 +1115,9 @@ export class BarRoom extends Room<{ state: BarState }> {
       const parsed = schema.safeParse(message);
       if (!parsed.success) { rejected('invalid'); client.send('error', { message: 'Comando inválido.' }); return; }
       const subject = this.state.players.get(presence.ticket.userId)!;
-      // A dead player does nothing but press the game's buttons.
-      if (this.deaths.isDead(presence.ticket.userId) && name !== 'death.input' && name !== 'ping') {
+      // A dead administrator can still use /god to recover.
+      const restoring=name==='chat.send'&&presence.ticket.role==='admin'&&/^\/god(?:\s|$)/i.test((parsed.data as {text?:string}).text??'');
+      if (this.deaths.isDead(presence.ticket.userId) && name !== 'death.input' && name !== 'ping' && !restoring) {
         rejected('dead');
         // The body does not move, but the client's queue of unanswered inputs must still drain: with 12 waiting it sends no more, and would stay frozen after the respawn.
         const seq = (parsed.data as { seq?: unknown }).seq;
@@ -2886,6 +2899,22 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.drinkItem = ''; presence.interactionEndsAt = undefined; presence.queue.length = 0;
     player.lastProcessedInput = presence.lastReceived;
   }
+  /** Both the administration panel and /god use this one-shot, authoritative recovery. */
+  private restorePlayer(player:Player,actorId?:string,actorName?:string):void {
+    const now=Date.now(),presence=this.sessions.getByUser(player.id);
+    this.deaths.revive(player.id);
+    this.needs.restore(player,now);
+    if(presence){
+      presence.recoveryMoveAt=undefined;
+      if(['fainted','stumbling'].includes(player.interactionState)||['fallen','stumble','recover'].includes(player.animationState)){
+        player.interactionState='';player.animationState='idle';player.animationStartedAt=now;
+        presence.interactionEndsAt=undefined;presence.gestureEndsAt=undefined;presence.queue.length=0;
+        player.lastProcessedInput=presence.lastReceived;
+      }
+      presence.client.send('chat.message',{id:randomUUID(),playerId:'system',displayName:'B.A.R.',system:true,sentAt:now,text:'God recebido: vida, energia, fome, sede e reservas recuperadas; álcool e bexiga zerados.'} satisfies ChatMessage);
+    }
+    this.log('admin_god',{playerId:player.id,actorId,actorName});
+  }
   private onNeeds(player: Player, presence: Presence, event: NeedsEvent, now: number): void {
     // HP and its heart ran out: the Morte comes for them (and if there is no body to take, life goes on).
     if (event.type === 'died') { if (!this.deaths.kill(player.id, 'vida')) this.needs.revive(player, now); return; }
@@ -3670,6 +3699,11 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     if (control.action === 'prices') { this.pricesLoaded = false; return; }
+    if (control.action === 'god') {
+      const target=control.playerId?this.state.players.get(control.playerId):undefined;
+      if(target?.connected)this.restorePlayer(target,control.actorId);
+      return;
+    }
     if (control.action === 'kill') {
       // The kill really takes the life: HP, ring and heart, to zero, and then the Morte comes.
       if (control.playerId && this.deaths.kill(control.playerId, 'admin')) { const target = this.state.players.get(control.playerId); if (target) this.needs.kill(target, Date.now()); }

@@ -63,7 +63,7 @@ import {CrowdSprites} from './crowd';
 import {MOTO,MOTO_ENGINE,MOTO_LIGHT,NO_MOTO_INTENT,type MotoBody,type MotoIntent,type RagdollStart} from '@bar/shared';
 import {FoosballBalls} from './foosball-balls';
 import {PoolBalls} from './pool-balls';
-import {completeBasePose} from './animation-tracks';
+import {assignAnimationClips,completeBasePose} from './animation-tracks';
 import {walkPlaybackRate,walkTransitionSeconds} from './walk-playback';
 import {CLIP_PACES} from './clip-paces';
 import {shootPortrait} from './skin-portrait';
@@ -271,12 +271,7 @@ const OFFSTAGE_MARGIN = 2;
 const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble', 'punch', 'hit']);
 // Ground pace at 1× (metres/second): how fast a planted foot goes back in each skin's own step clips (clip-paces.ts, npm run assets:paces). These
 // single numbers are only for a skin not measured yet; they were Nathan's before the walk was stretched 20%, and slid on the shorter skins.
-// Walk's cadence eases with ground speed and stays capped at 2.2× so fast players do not spin their legs; the guard's steps go to 2.6×.
-/**
- * The everyday pace (WALK_SPEED, 3.5 m/s) is a jog: the relaxed walk keeps up only to about 2.4 m/s (2.2×) and slid past it. From this speed
- * (m/s) on the body jogs, and walks again below JOG_TO; skins without the clip (the NPCs) keep walking.
- */
-const JOG_FROM = 2.6, JOG_TO = 2.2;
+// Walk keeps a walking cadence at the normal movement speed; running is selected by the actor's run state.
 const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Jog: 1.61, Run: 4, DrunkWalk: .74, FightBack: 1.15, FightLeft: 1.61, FightRight: 1.6 };
 /**
  * The fist fight (docs/sistemas/luta.md). The clips of the guard (FightIdle, then the steps by direction, forward being Walk); the arms' layer that
@@ -1972,10 +1967,10 @@ export class BarScene {
   }
 
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
-    for (const asset of bank.animations) {
-      const track = asset.resource as pc.AnimTrack;
-      const loop = !['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order', 'Jab', 'Cross', 'Hook', 'Heavy', ...Object.keys(HIT_REACTIONS)].includes(track.name);
-      skin.model.anim!.assignAnimation(track.name, track, undefined, 1, loop);
+    const tracks=bank.animations.map(asset=>asset.resource as pc.AnimTrack);
+    assignAnimationClips(skin.model.anim!,tracks.map(track=>({name:track.name,track,
+      loop:!['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order', 'Jab', 'Cross', 'Hook', 'Heavy', ...Object.keys(HIT_REACTIONS)].includes(track.name)})));
+    for (const track of tracks) {
       skin.tracks.add(track.name);
       if (track.name === 'Drink') this.addHandLayer(skin, track);
       if (track.name === 'Order') this.addOrderLayer(skin,track);
@@ -1998,10 +1993,7 @@ export class BarScene {
     if (!Object.keys(mask).length) return;
     // The typings declare an array; the binder reads an object keyed by path.
     skin.handLayer = anim.addLayer(HAND_LAYER, 0, mask as unknown as object[], pc.ANIM_LAYER_OVERWRITE);
-    anim.assignAnimation('Drink', track, HAND_LAYER, 1, true);
-    // Idle/Walk may already have bound these joints before the bank arrived. Their blend targets
-    // still have room for only the base layer; rebuild them so the hand layer can drive them too.
-    anim.rebind();
+    assignAnimationClips(anim,[{name:'Drink',track,layer:HAND_LAYER}]);
   }
 
   /**
@@ -2016,7 +2008,7 @@ export class BarScene {
     }
     if(!Object.keys(mask).length)return;
     skin.guardLayer=anim.addLayer(GUARD_LAYER,0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
-    anim.assignAnimation('FightIdle',track,GUARD_LAYER,1,true);anim.rebind();
+    assignAnimationClips(anim,[{name:'FightIdle',track,layer:GUARD_LAYER}]);
   }
 
   /** Acknowledging once, masked above the shoulders, over the normal planted idle. */
@@ -2028,7 +2020,7 @@ export class BarScene {
     }
     if(!Object.keys(mask).length)return;
     skin.orderLayer=anim.addLayer('Order',0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
-    anim.assignAnimation('Order',track,'Order',1,false);anim.rebind();
+    assignAnimationClips(anim,[{name:'Order',track,layer:'Order',loop:false}]);
   }
   private loadCane(id:string):void{
     if(this.caneRequests.has(id))return;this.caneRequests.add(id);
@@ -2078,10 +2070,10 @@ export class BarScene {
     // Every model carries clips adapted to its own authored skeleton.
     const tracks = model.animations.map(asset => completeBasePose(asset.resource as pc.AnimTrack,entity));
     // The first clip assigned becomes the default state.
-    for (const name of ['Idle', 'Walk', 'Pose']) {
+    assignAnimationClips(entity.anim!,['Idle', 'Walk', 'Pose'].flatMap(name=>{
       const track = tracks.find(candidate => candidate.name === name);
-      if (track) entity.anim!.assignAnimation(name, track);
-    }
+      return track?[{name,track}]:[];
+    }));
     const bones = Object.fromEntries(SKIN_BONES.map(name => [name, entity.findByName(name) ?? entity.findByName(BONE_ALIASES[name] ?? name)])) as Record<SkinBone, pc.Entity>;
     // Measured in the bind pose, before any clip runs; the thighs are level at about 0.56 m when seated.
     const hipHeight = bones.upperleg_l.getPosition().y - entity.getPosition().y;
@@ -2365,7 +2357,7 @@ export class BarScene {
     if (!body) {
       const track = this.barAnimations.bodyTrack(step.clip, avatar.skinId!, skin.model, model.animations.map(asset => asset.resource as pc.AnimTrack));
       if (!track) return;
-      if (!skin.tracks.has(track.name)) { skin.model.anim!.assignAnimation(track.name, track, undefined, 1, BAR_ANIMATIONS.clips[step.clip].loop); skin.tracks.add(track.name); }
+      if (!skin.tracks.has(track.name)) { assignAnimationClips(skin.model.anim!,[{name:track.name,track,loop:BAR_ANIMATIONS.clips[step.clip].loop}]); skin.tracks.add(track.name); }
     } else this.barAnimations.preload(step.clip);
     const place = actor.interactionState ?? '';
     return { step, body, frame: barFrame(actor, npcId), seat: place.startsWith('seat-') ? place : undefined, servedFood: !override && !!meal };
@@ -2624,10 +2616,6 @@ export class BarScene {
    * The clip sets the base pose; gestures are extra joint turns about the body's own axes,
    * which keeps them independent of each bone's local frame. The model faces +Z, its left on +X.
    */
-  /** Walking or jogging by how fast the body goes (JOG_FROM, JOG_TO). */
-  private gait(avatar: Avatar, skin: SkinnedRig): 'Walk' | 'Jog' {
-    return skin.tracks.has('Jog') && (avatar.speed ?? 0) >= (skin.clip === 'Jog' ? JOG_TO : JOG_FROM) ? 'Jog' : 'Walk';
-  }
   private poseSkin(avatar: Avatar, skin: SkinnedRig, pose: Pose, bar?: BarAction): void {
     const { body, cup, actor, skinId } = avatar;
     const { t, seated, dancing, drinking, waving } = pose;
@@ -2647,7 +2635,7 @@ export class BarScene {
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking && !this.selfieOf(avatar)) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
-      : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':this.gait(avatar,skin)) : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
+      : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
     const locomotion = !bar && !show && (['Idle', 'Walk', 'Jog', 'Run', 'DrunkWalk'].includes(requested) || !!fight?.guard);
     const actionImported = !!requested && skin.tracks.has(requested);
     const oldGait=!!actor.oldWalk&&!gesture&&skin.tracks.has('OldCaneWalk')&&skin.tracks.has('OldCaneHold');
@@ -2804,7 +2792,10 @@ export class BarScene {
     if(!current||current.phase==='fim')return;
     const tracks=this.musicians.bodyTracks(spot.id,avatar.skinId!,skin.model,model.animations.map(asset=>asset.resource as pc.AnimTrack));
     if(!tracks)return;
-    if(!skin.tracks.has(tracks[0]!.name))tracks.forEach((track,i)=>{skin.model.anim!.assignAnimation(track.name,track,undefined,1,STAGE_PHASES[i]==='loop');skin.tracks.add(track.name);});
+    if(!skin.tracks.has(tracks[0]!.name)){
+      assignAnimationClips(skin.model.anim!,tracks.map((track,i)=>({name:track.name,track,loop:STAGE_PHASES[i]==='loop'})));
+      tracks.forEach(track=>skin.tracks.add(track.name));
+    }
     const blend=(current.phase==='entrando'||current.phase==='saindo')&&now-current.startedAt<MUSICIANS.blendSeconds*1000?MUSICIANS.blendSeconds:0;
     return {state:musicianState(spot.id,current.phase),spot,...current,now,blend};
   }

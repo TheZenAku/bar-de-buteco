@@ -1,7 +1,7 @@
-/** Cadence eases on top of measured ground speed so network patches and direction changes do not
- * abruptly accelerate the legs. The walk bank itself carries the slower, 1.4-second gait. */
+/** Ease with ground speed, capped at about 116 steps/minute for the 1.4-second walk cycle.
+ * Normal movement must still read as walking, even when its travel speed exceeds the authored stride. */
 export function walkPlaybackRate(previous:number|undefined,speed:number,dt:number,pace=1.38):number {
-  const wanted=Math.max(.5,Math.min(2.2,speed/pace));
+  const wanted=Math.max(.5,Math.min(1.35,speed/pace));
   const current=previous??.5;
   return current+(wanted-current)*(1-Math.exp(-Math.max(0,dt)/(wanted>current?.18:.24)));
 }

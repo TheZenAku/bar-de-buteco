@@ -10,6 +10,10 @@ O código está em `apps/web/src/admin/` (um arquivo por categoria, `console.ts`
 
 ## Categorias
 
+Em **Jogadores → selecione a conta → Resumo**, o botão **Dar god** recupera uma vez vida, energia, fome, sede e suas reservas; zera álcool e bexiga, remove o cansaço e recupera desmaios e mortes. Informe o motivo no formulário. A ação vale para jogadores conectados e fica registrada no histórico e nos logs. Depois da recuperação, o desgaste normal continua.
+
+No chat, administradores podem usar **`/god`** em si mesmos ou **`/god Nome Completo`** / **`/god ID`** em outro jogador conectado. Nomes não diferenciam maiúsculas e minúsculas; se houver nomes repetidos, use o ID. O comando é validado no servidor, responde em particular e registra administrador e jogador no log.
+
 | Categoria | Para quê |
 | --- | --- |
 | Visão geral | Quem está no bar, contas novas, denúncias abertas, moedas em circulação e criadas/retiradas em 24 h, entradas do dia; os eventos (Apagão, O inconveniente, Festa); a saúde do sistema (API, mundo, preços sincronizados, filas); as últimas ações da administração e atalhos para contas banidas, com e-mail pendente e administradores |

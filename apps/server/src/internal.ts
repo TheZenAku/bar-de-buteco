@@ -5,7 +5,7 @@ import { readWorldConfig } from './config.js';
 
 export interface Access { valid: boolean; banned?:boolean; blocked: string[]; role: 'admin' | 'user';equippedSkin?:string;ownedSkins?:string[];ownedSkills?:string[];inventory?:InventoryStack[];balance?:number;vehicles?:OwnedVehicle[] }
 /** `prices`: read the price table again; `kill`: start the Morte's sequence for a player (admin test); `sync`: read a player's items, coins and skins again (the administration changed them). */
-export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event' | 'prices' | 'sync' | 'kill' | 'vehicles'; playerId?: string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string;
+export interface Control { id: string; action: 'kick' | 'ban' | 'unban' | 'event' | 'prices' | 'sync' | 'kill' | 'god' | 'vehicles'; playerId?: string; actorId?:string; eventType?: string; reason?: string;issuedAt?:number;expectedControlId?:string;
   operation?:AdminVehicleOperation;vehicles?:AdminVehicleChange[];playerIds?:string[] }
 
 /** The API answered with an error status (4xx: the request itself was refused; 5xx: try again later). */

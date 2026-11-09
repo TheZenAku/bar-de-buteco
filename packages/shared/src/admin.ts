@@ -61,6 +61,7 @@ export type AdminPlayerOperation=
   |{op:'verify'}
   |{op:'logout'}
   |{op:'kill'}
+  |{op:'god'}
   |{op:'item';itemId:string;quantity:number}
   |{op:'skin';skinId:string;grant:boolean}
   |{op:'skill';skillId:string;grant:boolean}
@@ -166,7 +167,7 @@ export function ledgerText(reason:string,names:Readonly<Record<string,string>>={
 const ACTION_LABELS:Record<string,string>={kick:'Expulsão',unkick:'Expulsão desfeita',ban:'Banimento',unban:'Banimento removido',event:'Evento',
   'admin-grant':'Administrador concedido','admin-revoke':'Administrador removido','owner-bootstrap':'Conta principal habilitada',
   'coins-add':'Moedas adicionadas','coins-remove':'Moedas removidas','coins-set':'Saldo definido','price-set':'Preços alterados','xp-values-set':'Valores de XP alterados',
-  'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas','player-kill':'Jogador morto (teste)',
+  'player-rename':'Nome alterado','player-verify':'E-mail confirmado pela administração','player-logout':'Sessões encerradas','player-kill':'Jogador morto (teste)','player-god':'Atributos recuperados (god)',
   'items-add':'Itens adicionados','items-remove':'Itens removidos','skin-grant':'Skin concedida','skin-revoke':'Skin retirada','skill-grant':'Habilidade concedida','skill-revoke':'Habilidade retirada','xp-add':'XP adicionado','xp-remove':'XP retirado','daily-reset':'Bônus diário liberado de novo','catalog-edit':'Carta da coleção editada',
   'badge-create':'Emblema criado','badge-edit':'Emblema editado','badge-delete':'Emblema apagado','badge-grant':'Emblema concedido','badge-revoke':'Emblema retirado','badge-image-upload':'Imagem de emblema enviada','badge-image-delete':'Imagem de emblema apagada',
   'vehicle-register':'Veículo registrado','vehicle-plate':'Placa personalizada','vehicle-grant':'Moto concedida','vehicle-revoke':'Moto retirada','vehicle-repair':'Veículos reparados','vehicle-refuel':'Veículos abastecidos','vehicle-recall':'Veículos recolhidos','vehicle-transfer':'Veículos transferidos','vehicle-delete':'Veículos excluídos','vehicle-paint':'Pintura de veículos alterada','customer-create':'Cliente do Highfood criado','customer-edit':'Cliente do Highfood editado',
@@ -208,6 +209,7 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_media_off:d=>({title:'Administração: aparelho desligado',detail:text(d.id)}),
   media_refused:d=>({title:'Vídeo pulado: a plataforma não deixou tocar',detail:`${text(d.id)} · ${text(d.videoId)}${d.refunded?' · moedas devolvidas':''}`}),
   admin_broadcast:d=>({title:'Administração: recado para todos',detail:text(d.text)}),
+  admin_god:d=>({title:'Administração: atributos recuperados (god)',detail:`Vida, energia, fome, sede e reservas cheias; álcool e bexiga zerados. Administrador: ${text(d.actorName)||text(d.actorId)}`}),
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
   admin_environment:d=>({title:'Administração: tempo e clima',detail:d.reset?'Ciclo padrão restaurado':[
     d.hour!==undefined?`hora ${text(d.hour)}`:'',d.dayMinutes!==undefined?`dia de ${text(d.dayMinutes)} min`:'',

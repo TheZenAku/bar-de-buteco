@@ -1,5 +1,23 @@
 import * as pc from 'playcanvas';
 
+export interface AnimationClipBinding {
+  name:string;
+  track:pc.AnimTrack;
+  layer?:string;
+  speed?:number;
+  loop?:boolean;
+}
+
+/** Register a batch without leaving existing masked layers bound to an older set of skeletal targets. */
+export function assignAnimationClips(anim:pc.AnimComponent,clips:readonly AnimationClipBinding[]):void {
+  if(!clips.length)return;
+  for(const {name,track,layer,speed=1,loop=true} of clips)anim.assignAnimation(name,track,layer,speed,loop);
+  // In PlayCanvas 2.23 assigning a clip rebinds only its evaluator. Existing targets can then
+  // count obsolete layer bindings and reset to the bind pose midway through a later frame.
+  // Rebuild the component's shared targets once, after the complete batch is registered.
+  anim.rebind();
+}
+
 /** Complete sparse skeletal tracks from a pristine model before its first animation runs.
  * PlayCanvas keeps the previous value when a new track omits a property. */
 export function completeBasePose(track:pc.AnimTrack,model:pc.GraphNode):pc.AnimTrack {

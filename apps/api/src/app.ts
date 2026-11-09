@@ -437,6 +437,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({...base,op:z.literal('verify')}).strict(),
       z.object({...base,op:z.literal('logout')}).strict(),
       z.object({...base,op:z.literal('kill')}).strict(),
+      z.object({...base,op:z.literal('god')}).strict(),
       z.object({...base,op:z.literal('item'),itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(-100).max(100)}).strict(),
       z.object({...base,op:z.literal('skin'),skinId:z.string().max(32),grant:z.boolean()}).strict(),
       z.object({...base,op:z.literal('skill'),skillId:z.string().max(32),grant:z.boolean()}).strict(),

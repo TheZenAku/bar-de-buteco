@@ -153,6 +153,11 @@ export class AdminConsole {
           await record('player-logout',`${ended.length} sessão(ões) encerrada(s).`);
           return {message:ended.length?'Sessões encerradas. Se estiver no bar, o jogador sai em alguns segundos.':'Esta conta não tinha sessões abertas.'};
         }
+        case 'god':{
+          await record('player-god','Recuperação completa dos atributos.');
+          await tx.insert(t.controls).values({id:randomUUID(),payload:{action:'god',playerId:target.id,actorId:actor.id,issuedAt:Date.now(),reason}});
+          return {message:'God enviado: se o jogador estiver no bar, seus atributos serão recuperados.'};
+        }
         case 'kill':{
           // The only cause of death the game has so far (needs.ts has fainting, not dying): this button, to test the whole sequence.
           // The main account is protected from everybody else, but may test the sequence on itself.
