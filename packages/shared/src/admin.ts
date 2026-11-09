@@ -207,6 +207,7 @@ export const WORLD_LOG_EVENTS:Readonly<Record<string,(d:Record<string,unknown>)=
   admin_table_cancel:()=>({title:'Administração: pedido cancelado',detail:'Moedas devolvidas ao cliente.'}),
   admin_media_off:d=>({title:'Administração: aparelho desligado',detail:text(d.id)}),
   media_refused:d=>({title:'Vídeo pulado: a plataforma não deixou tocar',detail:`${text(d.id)} · ${text(d.videoId)}${d.refunded?' · moedas devolvidas':''}`}),
+  admin_broadcast:d=>({title:'Administração: recado para todos',detail:text(d.text)}),
   admin_bots:d=>({title:'Administração: bots de teste',detail:`${text(d.count)} bot(s)`}),
   admin_environment:d=>({title:'Administração: tempo e clima',detail:d.reset?'Ciclo padrão restaurado':[
     d.hour!==undefined?`hora ${text(d.hour)}`:'',d.dayMinutes!==undefined?`dia de ${text(d.dayMinutes)} min`:'',

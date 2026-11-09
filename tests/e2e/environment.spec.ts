@@ -4,6 +4,7 @@ import {DAY_NIGHT,gameHour} from '../../apps/web/src/engine/day-night';
 import type {EnvironmentLighting} from '../../apps/web/src/engine/environment-lighting';
 import {previewPath} from './preview-path';
 import {SHOW_PROGRAMS} from '../../packages/shared/src/stage-show';
+import {menuItem} from './menu';
 type EnvironmentStatus=ReturnType<EnvironmentLighting['telemetry']>;
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
 
@@ -355,7 +356,7 @@ test('the live game follows the server clock and keeps the cycle when returning 
   // The 12.5 MB neighbourhood can briefly delay the first rendered sample behind the latest world packet.
   expect(Math.abs(hour-gameHour(world.serverTime))).toBeLessThan(.06);
   const before=await page.evaluate(()=>({hour:(window as any).barDebug.environment().hour,time:Date.now()}));
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
   await expect(page.locator('#lobby')).toBeVisible();
   const after=await page.evaluate(()=>({hour:(window as any).barDebug.environment().hour,time:Date.now()}));
   const expected=(before.hour+(after.time-before.time)/DAY_NIGHT.durationMs*24)%24,difference=Math.abs(after.hour-expected);

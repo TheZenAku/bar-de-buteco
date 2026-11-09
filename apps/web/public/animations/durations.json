@@ -48,5 +48,8 @@
   "HitBack": 1267,
   "FightBack": 1200,
   "FightLeft": 1033,
-  "FightRight": 1033
+  "FightRight": 1033,
+  "KickHigh": 1391,
+  "KickFront": 1605,
+  "Jog": 2567
 }

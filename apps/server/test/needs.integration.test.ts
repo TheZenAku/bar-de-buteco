@@ -74,17 +74,15 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     // Alcohol faint: taken once to the recovery point, wakes soberer.
     player.assign({x:12,y:.3,z:-6});needs.drunk=95;
     await until(()=>seen()?.condition==='fainted'&&seen()?.faintCause==='alcohol');
-    assert.ok(chat.some(t=>t.includes('bebeu demais')));
     const marker=MAP_MARKERS[NEEDS.faint.alcoholRecoveryMarker as keyof typeof MAP_MARKERS]!;
     await until(()=>distance(player,marker)<3,NEEDS.faint.moveAfterSeconds*1000+2000);
     other.assign({x:marker.x+1.5,y:marker.y,z:marker.z});
     const rescued={x:player.x,z:player.z};await pause(1200);
     assert.deepEqual({x:player.x,z:player.z},rescued,'Moved once, not every tick');
-    assert.equal(chat.filter(t=>t.includes('tomar um ar')).length,1);
     needs.conditionUntil=Date.now();
     await until(()=>seen()?.condition==='recovering');
     assert.ok(needs.drunk<=NEEDS.drunk.soberAfterFaintTo);
-    await pause(400);assert.equal(chat.filter(t=>t.includes('tomar um ar')).length,1,'No second rescue');
+    await pause(400);assert.deepEqual({x:player.x,z:player.z},rescued,'No second rescue');
     for(const key of ['hp','stamina','hunger','thirst','bladder','drunk'] as const)assert.ok(Number.isFinite(seen()![key])&&seen()![key]>=0&&seen()![key]<=100,key);
   } finally {
     await Promise.allSettled(rooms.filter(room=>room.connection?.isOpen).map(room=>room.leave()));await server.gracefullyShutdown(false);await new Promise<void>(r=>api.close(()=>r()));

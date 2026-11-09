@@ -6,11 +6,11 @@ O jogo roda inteiro no navegador, então o VR é **WebXR**: no Quest 2, abra o e
 
 ## Como ligar
 
-1. Configurações → **Realidade virtual (Meta Quest 2)** → *Jogar com óculos VR* (fica salvo no navegador, `bar:vr:v1`). Isso mostra o botão dos óculos na barra de cima, só dentro do bar.
-2. O botão dos óculos (ou *Entrar no VR agora*, nas Configurações) abre a sessão. A sessão só pode começar de um clique: por isso é um botão, e não algo automático.
+1. Menu (Esc) › Ajustes › **Realidade virtual** › *Jogar com óculos VR* (fica salvo no navegador, `bar:vr:v1`). Isso mostra o botão dos óculos na barra de cima, só dentro do bar.
+2. *Entrar no VR*, na mesma página, abre a sessão. A sessão só pode começar de um clique: por isso é um botão, e não algo automático.
 3. Sair: o mesmo botão, ou o menu do sistema do Quest (a sessão acaba e o jogo volta para a janela normal).
 
-Opções (Configurações): giro em **passos** (15°, 30° ou 45°) ou **suave**; **anel de conforto**; **resolução do VR** (50–100 % da resolução nativa do óculos; o padrão 75 % é o que o Quest 2 aguenta melhor).
+Opções (Menu › Ajustes › Realidade virtual): giro em **passos** (15°, 30° ou 45°) ou **suave**; **anel de conforto**; **resolução do VR** (50–100 % da resolução nativa do óculos; o padrão 75 % é o que o Quest 2 aguenta melhor).
 
 ## Controles (Quest 2)
 
@@ -73,7 +73,7 @@ Páginas HTML não aparecem em sessão imersiva, e toda a interface do jogo (jan
 | `apps/web/src/vr/dom-mirror.ts` | A página como textura |
 | `apps/web/src/vr/vr-keyboard.ts`, `vr/vr.css` | O teclado e o CSS do VR |
 | `apps/web/src/engine/BarScene.ts` | `enterVr`, `exitVr`, `recentreVr`, `simulateVr`, a âncora dos olhos em `update`, `pickPlayerRay`, `vrNames` |
-| `apps/web/src/main.ts` | Botão dos óculos, Configurações, `vrWindowOpen` (quando a tela abre sozinha) |
+| `apps/web/src/main.ts`, `apps/web/src/pause-menu/menu-content.ts` | A página Realidade virtual do menu, `vrWindowOpen` (quando a tela abre sozinha; o menu do Esc conta como janela) |
 | `tests/fixtures/vr.html`, `tests/e2e/vr.spec.ts` | Sessão simulada (sem headset) |
 
 ## O que falta verificar (só num Quest 2)

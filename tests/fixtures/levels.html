@@ -28,8 +28,8 @@ window.fetch=async(url,options)=>{
   }
   return new Response('{}',{status:404});
 };
-const fixture=window.levelsFixture={dailyReady:0,coins:0,toasts:[]};
-const hud=createLevelHud(document.querySelector('#level-hud'),{toast:t=>fixture.toasts.push(t),openProfile:()=>{},dailyReady:()=>{fixture.dailyReady++;},coinsChanged:()=>{fixture.coins++;}});
+const fixture=window.levelsFixture={coins:0,toasts:[]};
+const hud=createLevelHud(document.querySelector('#level-hud'),{toast:t=>fixture.toasts.push(t),openProfile:()=>{},coinsChanged:()=>{fixture.coins++;}});
 fixture.hud=hud;fixture.xpAtLevel=xpAtLevel;
 document.querySelector('#wallet-icon').outerHTML=uiIcon('wallet');
 fixture.wallet=createWalletHud(document.querySelector('.hud-wallet'));fixture.wallet.set(1250);

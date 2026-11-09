@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import catalog from '../../apps/web/src/assets/ambient.json' with {type:'json'};
+import {menuItem} from './menu';
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/ambient.html',import.meta.url)).replaceAll('\\','/');
 const state=(page:Page)=>page.evaluate(()=>(window as any).fixture.audio.telemetry());
 
@@ -91,16 +92,16 @@ test('in-game ambience starts on entry, follows settings, leaves voice independe
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
   const ambient=()=>page.evaluate(()=>(window as any).barDebug.ambient());
   await expect.poll(async()=>(await ambient()).decks.some((d:any)=>!d.paused)).toBe(true);
-  await page.locator('[data-action="settings"]').click();
+  await menuItem(page,'Ajustes','Som');
   await page.locator('[data-setting="music"]').fill('35');expect((await ambient()).target).toBeCloseTo(.18*.35);
   await page.locator('[data-setting="master"]').fill('50');expect((await ambient()).target).toBeCloseTo(.18*.35*.5);
   await page.locator('[data-setting="music"]').fill('0');await expect.poll(async()=>(await ambient()).context).toBe('suspended');
   expect(await page.evaluate(()=>(window as any).barDebug.voice().settings.voicesEnabled)).toBe(true);
   await page.locator('[data-setting="music"]').fill('35');await expect.poll(async()=>(await ambient()).decks.some((d:any)=>!d.paused)).toBe(true);
-  await page.keyboard.press('Escape');await page.locator('#audio-button').click();await expect.poll(async()=>(await ambient()).context).toBe('suspended');
-  expect((await ambient()).enabled).toBe(false);await page.locator('#audio-button').click();
+  await page.locator('#pause-menu [data-pm-act="sound"]').click();await expect.poll(async()=>(await ambient()).context).toBe('suspended');
+  expect((await ambient()).enabled).toBe(false);await page.locator('#pause-menu [data-pm-act="sound"]').click();
   await expect.poll(async()=>(await ambient()).decks.some((d:any)=>!d.paused)).toBe(true);
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.locator('#modal [data-action="leave"]').click();
   await expect(page.locator('#lobby')).toBeVisible();await expect.poll(async()=>(await ambient()).context).toBe('suspended');
   expect((await ambient()).decks.every((d:any)=>!d.id&&d.paused)).toBe(true);expect(errors).toEqual([]);
 });

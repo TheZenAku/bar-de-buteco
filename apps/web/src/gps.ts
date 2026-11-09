@@ -33,7 +33,7 @@ function along(way:Way,metres:number):Way {
  * The GPS: one line from the player to where they want to go, in the minimap and on the phone's map. An order under way
  * goes before anything the player marked, and the mark comes back when the order ends.
  */
-export function createGps(hooks:{changed:()=>void;arrived:(target:GpsTarget)=>void}){
+export function createGps(hooks:{changed:()=>void}){
   // `way` is what is left of the planned way, from the point nearest the player; `route` is what is drawn, the player and then the way.
   // How far the player is from the way can only be read on `way`: the line starts at the player, so they are never far from it.
   let delivery:GpsTarget|undefined,waypoint:GpsTarget|undefined,way:Way=[],route:Way=[],routeFor:GpsTarget|undefined,checkedAt=0,routedAt=0,version=0,lastX=NaN,lastZ=NaN;
@@ -62,7 +62,7 @@ export function createGps(hooks:{changed:()=>void;arrived:(target:GpsTarget)=>vo
       checkedAt=now;
       const goal=target();
       if(!goal){if(route.length){way=[];route=[];routeFor=undefined;version++;hooks.changed();}return;}
-      if(goal.source!=='delivery'&&Math.hypot(goal.x-x,goal.z-z)<ARRIVED){waypoint=undefined;if(goal.source==='waypoint')hooks.arrived(goal);routeFor=undefined;draw({x,z},now);return;}
+      if(goal.source!=='delivery'&&Math.hypot(goal.x-x,goal.z-z)<ARRIVED){waypoint=undefined;routeFor=undefined;draw({x,z},now);return;}
       if(!same(routeFor,goal)||way.length<2){draw({x,z},now);return;}
       if(x===lastX&&z===lastZ)return;
       lastX=x;lastZ=z;

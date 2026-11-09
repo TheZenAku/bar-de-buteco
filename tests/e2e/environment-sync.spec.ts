@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {formatWorldDate,worldCalendarDate} from '@bar/shared/environment';
+import {menuItem} from './menu';
 
 const status=(page:Page)=>page.evaluate(()=>(window as any).barDebug.environment());
 async function enter(page:Page):Promise<void> {
@@ -59,7 +60,7 @@ test('two players share day, night, weather and dates despite different computer
     await enter(second);
     await expect.poll(async()=>(await status(second)).hour).toBe(0);
     await expect.poll(async()=>(await status(second)).weather.rain).toBe(1);
-    await second.getByRole('button',{name:'Pessoas no bar',exact:true}).click();
+    await menuItem(second,'Galera','Pessoas no bar');
     await second.getByRole('tab',{name:'Seu lugar no bar'}).click();await second.locator('#modal [data-action="leave"]').click();
     await expect(second.locator('#lobby')).toBeVisible();
     expect((await status(second)).hour).toBe(0);expect((await status(second)).weather.kind).toBe('storm');

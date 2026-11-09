@@ -6,11 +6,11 @@ Cada jogador decide se liga o microfone e se ouve os outros. Quem estiver a até
 
 | Onde | O quê |
 | --- | --- |
-| Botão de microfone no topo, ou **M** | Liga e desliga o microfone. A barrinha sob o ícone mostra o nível; o botão brilha enquanto você transmite. |
-| Botão de fones no topo | Ouvir ou silenciar todas as vozes. Desligado, o servidor deixa de enviar voz para você. |
-| **Configurações** (ícone de controles no topo) | Volumes (geral, música ambiente, jukebox e TV, vozes), microfone, ouvir outras pessoas, modo de transmissão, sensibilidade, volume e dispositivo do microfone, com medidor de nível. |
+| **M**, ou Menu › Galera › Microfone | Liga e desliga o microfone. Ligado, um botão aparece no topo, à direita: o brilho dele acompanha o nível, ele acende enquanto você transmite e um clique desliga. |
+| Menu › Galera › Ouvir vozes | Ouvir ou silenciar todas as vozes. Desligado, o servidor deixa de enviar voz para você. |
+| **Menu › Ajustes › Voz** (e Som, para o volume das vozes) | Volumes (geral, música ambiente, jukebox e TV, vozes), microfone, ouvir outras pessoas, modo de transmissão, sensibilidade, volume e dispositivo do microfone, com medidor de nível. |
 | Ao detectar voz | Transmite quando o nível passa da marca de sensibilidade no medidor e segura 350 ms depois da última palavra. |
-| Segurando **B** | Modo apertar para falar. (T e Enter abrem o chat; V acena.) |
+| Segurando **B** (administradores: **Alt+B**) | Modo apertar para falar. Administradores usam B para voar. (T e Enter abrem o chat; V acena.) |
 | Pessoas por perto | **Silenciar voz** de uma pessoa só para você. **Bloquear** também corta a voz, nos dois sentidos. |
 
 Os rótulos sobre os personagens mostram um microfone para quem o ligou e acendem em verde enquanto a pessoa fala. As preferências ficam salvas no navegador; o microfone volta ligado ao entrar no bar se o navegador já tiver dado a permissão.

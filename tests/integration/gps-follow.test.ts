@@ -7,7 +7,7 @@ const START={x:-3.99,z:-13.97},GOAL={x:-180,z:120,y:0,source:'waypoint' as const
 /** A GPS following someone moved by hand, 10 reads a second. */
 function follower(){
   let now=1000,changes=0;
-  const gps=createGps({changed:()=>{changes++;},arrived:()=>{}});
+  const gps=createGps({changed:()=>{changes++;}});
   gps.setWaypoint(GOAL);gps.update(START.x,START.z,now);
   return {gps,at:(x:number,z:number)=>{now+=100;gps.update(x,z,now);},get changes(){return changes;}};
 }

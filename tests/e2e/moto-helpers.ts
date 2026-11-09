@@ -1,4 +1,5 @@
 import {expect,type Page} from '@playwright/test';
+import {menuItem} from './menu';
 
 const ADMIN_PASSWORD='AdminBrowserTests2026!';
 /** Into the bar on the main account (the one admin.spec uses): the bikes only come from the administration. */
@@ -58,7 +59,7 @@ export async function orbit(page:Page,dx:number,dy=0):Promise<void>{
 }
 /** Opens Veículos in the administration, does `act` and closes the window. */
 export async function inVehicles(page:Page,act:()=>Promise<void>):Promise<void>{
-  await page.getByRole('button',{name:'Administração',exact:true}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="vehicles"]').click();
   await page.getByRole('tab',{name:'Spawn',exact:true}).click();
   await act();

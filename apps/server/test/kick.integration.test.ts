@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {KICK,KICKS} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {KICKS} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean,ms=8000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,10));}}
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -62,14 +62,12 @@ test('a kick throws who it touches, takes some life and lets them get up, over r
     assert.equal(room.state.ragdolls.has('victim'),false);
     assert.equal(victim.player().interactionState,'');
 
-    // Just up: the moment of grace.
+    // Just up, the next kick lands: no grace for kicks.
     at(victim,X,Z+1.15,Math.PI);at(rafa,X,Z);await finished(rafa);
-    const presence=(room as unknown as {sessions:{getByUser:(id:string)=>{kickSafeUntil?:number}}}).sessions.getByUser('victim');
-    assert.ok((presence.kickSafeUntil??0)>0,'It was granted');
-    presence.kickSafeUntil=Date.now()+KICK.graceMs;
-    rafa.kick('karate');await pause(KICKS.karate!.swingMs+600);
-    assert.equal(victim.player().animationState,'idle','Safe for a moment after getting up');
-    await finished(rafa);presence.kickSafeUntil=0;
+    rafa.kick('karate');
+    await until(()=>victim.kicked.length===2,3000);
+    await until(()=>victim.player().animationState==='idle',16000);
+    await finished(rafa);
 
     // Not who is seated, nor busy with something a kick must not cut short.
     for(const busy of ['job','toilet-1']){
@@ -85,8 +83,8 @@ test('a kick throws who it touches, takes some life and lets them get up, over r
     victim.player().currentTableId='';
     await finished(rafa);
 
-    // The aim: facing a little off, the kick turns to who is there and lands.
-    at(victim,X+.7,Z+1,Math.PI);
+    // The aim: facing a little off, the kick turns to who is there and lands (the kicks before carried Rafael forward: back to his spot).
+    at(rafa,X,Z);at(victim,X+.7,Z+1,Math.PI);
     rafa.player().rotation=0;
     rafa.kick('air-kick');
     await until(()=>rafa.player().animationState==='kick');
@@ -95,14 +93,13 @@ test('a kick throws who it touches, takes some life and lets them get up, over r
     const flying=room.state.ragdolls.get('victim')!;
     assert.equal(flying.lift,KICKS['air-kick']!.lift);
     // It takes more, and nobody is hit twice by one kick.
-    await until(()=>victim.kicked.length===2,2000);
-    assert.equal(victim.kicked[1]!.hp,KICKS['air-kick']!.hp);
-    await pause(400);assert.equal(victim.kicked.length,2,'One kick, one blow');
+    await until(()=>victim.kicked.length===3,2000);
+    assert.equal(victim.kicked[2]!.hp,KICKS['air-kick']!.hp);
+    await pause(400);assert.equal(victim.kicked.length,3,'One kick, one blow');
     await until(()=>victim.player().animationState==='idle',16000);
     await finished(rafa);
 
     // A kick never takes the last point of life.
-    presence.kickSafeUntil=0;
     at(rafa,X,Z);at(other,X,Z+1.15,Math.PI);
     other.player().hp=3;
     rafa.kick('karate');

@@ -11,7 +11,7 @@ Esta primeira versão tem só socos, de propósito. A base (dados de cada golpe,
 | R | Levanta ou baixa a guarda. Com ela alta, o corpo olha para onde a câmera olha e o mouse fica preso ao jogo. Esc solta o mouse e baixa a guarda. |
 | Clique | Soco leve. Clicando no ritmo: jab → direto → gancho → jab… |
 | Botão direito | Soco forte. Demora para sair, tira mais e empurra longe. |
-| W A S D | Com a guarda alta: passos curtos (2,2 m/s) para frente, para os lados e para trás, sem correr. |
+| W A S D | Com a guarda alta: passos curtos (2,2 m/s) para frente, para os lados e para trás. Com Shift corre de guarda alta (4,8 m/s), gastando fôlego como a corrida normal. |
 
 No toque: **Mais › Luta (guarda)**; com a guarda alta, **Soco** e **Forte** aparecem no lugar de Freio e Buzina.
 
@@ -63,6 +63,10 @@ Servidor autoritativo a 20 Hz, patches a 10 Hz, como o resto do jogo. O que foi 
 `fight.hit` vai para quem está a até 18 m (o mesmo raio em que os avatares são vistos) e traz quem bateu, quem levou, o golpe, o dano, a vida restante, o ponto do impacto, a direção, a reação, até quando atordoa e se foi nocaute.
 
 ## Animações
+
+> **Passo do golpe é do corpo (root motion, 08/11).** O Direto (Elbow Punch) dá um passo de boxe de 0,62 m e volta, o Jab avança 0,28 m e o Forte 0,18 m. Antes esse passo ficava só no clipe: o corpo (a posição da sala) não andava junto, então quando outro soco ou um passo entrava no meio do clipe o desenho voltava à origem em 0,08 s, e o passo de volta parecia o corpo sendo puxado. Agora o conversor tira o passo do clipe (`anchor:'hip'`, o quadril fica no lugar) e grava o caminho em `extras.root`; `npm run assets:punches` o copia para `FistPath.root` (m, a cada tick). `punchStep` soma esse caminho ao avanço do golpe enquanto os pés estão plantados, e `fightMove` continua com ele depois, enquanto o jogador fica parado (`punchCarries`; a sala lê o mesmo de `animationState === 'punch'`). Golpe completo: o corpo vai e volta exatamente como o clipe. Cortado por outro soco ou por um passo: fica onde o passo tinha chegado, sem salto. O alcance e a mira (`reach`, `aim`) já contam esse caminho, então o acerto não mudou. Para quem assiste, `BarScene.carriedOffset` desenha o passo pelo relógio do clipe a partir do último estado da sala (os patches chegam a cada 100 ms e deslizavam os pés).
+>
+> **Passos sem patinar.** Cada skin anda num ritmo próprio depois do retarget (o Walk do Rafael leva o pé apoiado a 1,10 m/s, o do Nathan a 1,24). `npm run assets:paces` mede isso nos bancos e grava `apps/web/src/engine/clip-paces.ts`; o BarScene toca cada passo na velocidade do corpo dividida pelo ritmo da própria skin (antes, um número só, medido no Nathan antes de o Walk ser esticado 20%). Os passos da guarda vão até 2,6×; o Walk segue limitado a 2,2× (para as pernas não girarem) e, acima de 2,6 m/s (o andar de sempre, 3,5), o corpo troca para o trote `Jog`, que acompanha sem patinar.
 
 > **Flicker ao entrar na guarda (corrigido em 2026-11-08):** a guarda subia e caía sozinha dois quadros depois, e o corpo piscava entre `FightIdle` e `Idle`. Era o mouse: eu pedia o bloqueio do ponteiro duas vezes (em `changed` e em `mouseCapture.sync`), o navegador derrubava o primeiro e o `pointerlockchange` de "perdeu" era lido como Esc, que baixa a guarda. Agora há um pedido só, e só conta como Esc um bloqueio que já durava 400 ms (`STEADY_MS` em `mouse-capture.ts`).
 

@@ -1,5 +1,5 @@
 import {uiIcon} from './ui-icons';
-export type NoticeVariant='mensagem'|'acao'|'aviso'|'conquista';
+export type NoticeVariant='mensagem'|'acao'|'aviso'|'conquista'|'admin';
 export interface Notice {title:string;text?:string;variant?:NoticeVariant;initials?:string;duration?:number;id?:string;tone?:string;
   /** Trusted markup in the icon's place (a badge's medal). */
   art?:string;
@@ -11,7 +11,7 @@ export interface NotificationScheduler {
   clearTimeout:(timer:ReturnType<typeof setTimeout>)=>void;
   queueMicrotask:(callback:()=>void)=>void;
 }
-const meta={mensagem:{label:'Recado no balcão',tone:'var(--vw-cyan)',icon:'chat'},acao:{label:'No bar',tone:'var(--vw-pink)',icon:'sparkles'},aviso:{label:'Fique de olho',tone:'var(--destructive)',icon:'alert'},conquista:{label:'Conquista',tone:'var(--vw-lilac)',icon:'party'}};
+const meta={mensagem:{label:'Recado no balcão',tone:'var(--vw-cyan)',icon:'chat'},acao:{label:'No bar',tone:'var(--vw-pink)',icon:'sparkles'},aviso:{label:'Fique de olho',tone:'var(--destructive)',icon:'alert'},conquista:{label:'Conquista',tone:'var(--vw-lilac)',icon:'party'},admin:{label:'Administração',tone:'var(--vw-peach)',icon:'shield'}};
 const browserScheduler:NotificationScheduler={
   now:()=>performance.now(),
   setTimeout:(callback,delay)=>setTimeout(callback,delay),
@@ -27,7 +27,7 @@ export function createNotifications(host:HTMLElement,scheduler:NotificationSched
     const variant=notice.variant??'acao',appearance=meta[variant],duration=notice.duration??4200;
     const node=document.createElement('article');node.className='toast comanda';node.dataset.variant=variant;
     node.style.setProperty('--comanda',notice.tone??appearance.tone);node.style.setProperty('--comanda-run',`${duration}ms`);
-    node.setAttribute('role',variant==='aviso'?'alert':'status');
+    node.setAttribute('role',variant==='aviso'||variant==='admin'?'alert':'status');
     node.innerHTML=`<span class="comanda__stub" aria-hidden="true"></span><span class="comanda__badge">${uiIcon(appearance.icon)}</span><div class="comanda__body"><p class="comanda__eyebrow"></p><p class="comanda__title"></p><p class="comanda__text"></p>${notice.action?'<button class="comanda__action" type="button"></button>':''}</div><button class="comanda__close" type="button" aria-label="Fechar aviso">${uiIcon('close')}</button><span class="comanda__timer" aria-hidden="true"></span>`;
     node.querySelector('.comanda__eyebrow')!.textContent=appearance.label;
     node.querySelector('.comanda__title')!.textContent=notice.title;

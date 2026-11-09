@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {previewPath} from './preview-path';
+import {menuItem,closeMenu} from './menu';
 
 async function ready(page:Page){await expect(page.locator('#waiting')).toBeHidden({timeout:60000});await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId]?.connected===true;}),{timeout:30000}).toBe(true);}
 async function enter(page:Page,prefix:string){
@@ -59,7 +60,7 @@ test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists p
     expect(hotbar.height).toBeLessThan(60);expect(hotbar.y+hotbar.height).toBeCloseTo(900-12,0);expect(Math.abs(hotbar.x+hotbar.width/2-720)).toBeLessThan(2);
     await page.locator('[data-action="dance"]').hover();await expect(page.locator('[data-action="dance"] .tip')).toHaveCSS('opacity','1');
     await expect(page.locator('#occupancy')).toHaveCount(0);
-    await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await expect(page.locator('#occupancy')).toHaveText(/^\d+ \/ 32$/);await expect(page.locator('#hud-status')).toHaveText('Na área!');
+    await menuItem(page,'Galera','Pessoas no bar');await expect(page.locator('#occupancy')).toHaveText(/^\d+ \/ 32$/);await expect(page.locator('#hud-status')).toHaveText('Na área!');
     await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await expect(page.locator('#hud-name')).toHaveText('Layout');await expect(page.locator('#occupancy')).toHaveCount(0);
     await page.getByRole('button',{name:'Fechar janela'}).click();
     const wardrobe=await(await page.request.get('/api/wardrobe')).json();await expect(page.locator('#hud-balance')).toHaveText(wardrobe.balance.toLocaleString('pt-BR'));
@@ -68,11 +69,12 @@ test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists p
     await drag(-90,70);const moved=(await panel.boundingBox())!;expect(moved.x).toBeCloseTo(before.x-90,0);expect(moved.y).toBeCloseTo(before.y+70,0);
     await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);
     expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);expect((await panel.boundingBox())!.y).toBeCloseTo(moved.y,0);
-    await expect(page.locator('.game-tools [data-hud-lock]')).toHaveCount(0);
-    await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.getByRole('button',{name:'Travar painéis',exact:true}).click();
-    await expect(page.locator('#panel-menu [data-hud-lock]')).toHaveAttribute('aria-pressed','true');await page.keyboard.press('Escape');await drag(40,40);expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
-    await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-visible="chat"]').click();await expect(page.locator('[data-panel="chat"]')).toBeHidden();
-    await page.locator('.boteco-logo').click();await page.getByRole('button',{name:/Resenhar/}).click();await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
+    await expect(page.locator('.game-tools,#panel-menu')).toHaveCount(0);
+    const lock=page.locator('#pause-menu [data-pm-act="lock"]');
+    await menuItem(page,'Ajustes','Interface');await lock.click();
+    await expect(lock).toBeChecked();await closeMenu(page);await drag(40,40);expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
+    await menuItem(page,'Ajustes','Interface');await page.locator('#pause-menu [data-pm-act="chat"]').click();await closeMenu(page);await expect(page.locator('[data-panel="chat"]')).toBeHidden();
+    await page.keyboard.press('t');await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
     // The chat's own header hides it too; T shows it again with the field focused.
     await page.getByRole('button',{name:'Ocultar chat'}).click();await expect(page.locator('[data-panel="chat"]')).toBeHidden();
     await page.keyboard.press('t');await expect(page.locator('#chat-input')).toBeFocused();await page.keyboard.press('Escape');
@@ -89,7 +91,7 @@ test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists p
         expect(clear(box,map),`a panel covers the minimap at ${width}px`).toBe(true);for(const core of cores)expect(clear(box,core),`a panel covers a core at ${width}px`).toBe(true);}
     }
     await page.screenshot({path:previewPath('nova-ui-mobile.png')});
-    await page.getByRole('button',{name:'Painéis',exact:true}).click();await page.locator('[data-hud-reset]').click();await expect(page.locator('#panel-menu [data-hud-lock]')).toHaveAttribute('aria-pressed','false');
+    await menuItem(page,'Ajustes','Interface');await page.locator('#pause-menu [data-pm-act="reset"]').click();await expect(lock).not.toBeChecked();await closeMenu(page);
     await page.evaluate(id=>localStorage.setItem(`bar:nova-ui:hud:v4:${id}:desktop`,'{"panels":{"chat":{"x":"broken"}}'),id);
     await page.setViewportSize({width:1440,height:900});await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);await expect(page.locator('[data-panel="chat"]')).toBeVisible();await expect(page.locator('.status-hud')).toBeVisible();
     expect(errors).toEqual([]);
@@ -98,7 +100,7 @@ test('nova UI lays out logo, wallet, chat, minimap, hotbar and cores, persists p
 
 test('real proximity messages appear safely in the chat only, and blocking hides them',async({page,browser})=>{
   test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-  await enter(page,'Recados');await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await enter(page,'Recados');await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   const context=await browser.newContext({viewport:{width:640,height:480}}),other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));
   try{
     const sender=await enter(other,'Vizinho');
@@ -107,7 +109,7 @@ test('real proximity messages appear safely in the chat only, and blocking hides
     // Chat lives in its panel: a message never becomes a notice.
     await expect(page.locator('#messages')).toContainText(text);await expect(page.locator('#messages img')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).toastInjected)).toBeUndefined();
     await expect(page.locator('.comanda')).toHaveCount(0);
-    await page.getByRole('button',{name:'Fechar janela'}).click();await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.locator(`[data-action="block"][data-id="${sender}"]`).click();
+    await page.getByRole('button',{name:'Fechar janela'}).click();await menuItem(page,'Galera','Pessoas no bar');await page.locator(`[data-action="block"][data-id="${sender}"]`).click();
     await page.getByRole('button',{name:'Fechar janela'}).click();for(const close of await page.locator('.comanda__close').all())await close.click();
     await send('Este recado está bloqueado');await expect(other.locator('#messages')).toContainText('Este recado está bloqueado');await expect(page.locator('#messages')).not.toContainText('Este recado está bloqueado');await expect(page.locator('#toasts')).not.toContainText('Este recado está bloqueado');
     await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('/velho');await page.locator('#chat-form button').click();await expect(page.locator('#messages')).toContainText('Bengala equipada');await expect(page.locator('.comanda')).toHaveCount(0);
@@ -157,26 +159,26 @@ test.describe('full screen',()=>{
   // A screen larger than the window, as in a normal browser window. Playwright's setViewportSize makes the screen the
   // window's size, which is what the browser's own full screen (F11) looks like to the page.
   test.use({viewport:{width:1600,height:860},screen:{width:2560,height:1440}});
-  test('Painéis opens and leaves full screen, and the scene and the panels follow the window into full screen and back',async({page})=>{
+  test('the menu (Ajustes › Interface) opens and leaves full screen, and the scene and the panels follow the window into full screen and back',async({page})=>{
     test.setTimeout(180000);
     const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
     await enter(page,'Telao');
     const box=async(selector:string)=>(await page.locator(selector).boundingBox())!;
     const settle=()=>page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-    // Painéis → Tela cheia puts the whole page in full screen, and the same row leaves it.
-    const menu=page.getByRole('button',{name:'Painéis',exact:true}),row=page.locator('#panel-menu [data-fullscreen]');
-    await menu.click();await expect(row).toHaveAttribute('aria-pressed','false');await expect(row).toHaveText('Tela cheia');
+    // Ajustes › Interface › Tela cheia puts the whole page in full screen, and the same switch leaves it.
+    const row=page.locator('#pause-menu [data-pm-act="fullscreen"]');
+    await menuItem(page,'Ajustes','Interface');await expect(row).not.toBeChecked();
     await row.click();
     await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName)).toBe('HTML');
-    await expect(row).toHaveAttribute('aria-pressed','true');await expect(row).toHaveText('Sair da tela cheia');
-    // The menu closed and the mouse is held (mouse-capture.spec): the scroll button brings the cursor back to reach the row.
-    await expect(row).toBeHidden();
+    await expect(row).toBeChecked();
+    // Closed, the menu gives the mouse to the game (mouse-capture.spec): the scroll button brings the cursor back.
+    await closeMenu(page);
     await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id)).toBe('world');
     await page.mouse.down({button:'middle'});await page.mouse.up({button:'middle'});
     await expect.poll(()=>page.evaluate(()=>document.pointerLockElement)).toBeNull();
-    await menu.click();await row.click();
+    await menuItem(page,'Ajustes','Interface');await row.click();
     await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName??'none')).toBe('none');
-    await expect(row).toHaveAttribute('aria-pressed','false');await page.keyboard.press('Escape');
+    await expect(row).not.toBeChecked();await closeMenu(page);
     // By the right side, halfway down, the chat keeps its distance from that side and stays halfway down.
     const chat=await box('[data-panel="chat"]'),gap=1600-(chat.x+chat.width);
     expect(gap).toBeCloseTo(16,0);expect(Math.abs(chat.y+chat.height/2-430)).toBeLessThan(2);
@@ -190,8 +192,8 @@ test.describe('full screen',()=>{
       expect(hotbar.y+hotbar.height).toBeCloseTo(height-12,0);expect(Math.abs(hotbar.x+hotbar.width/2-width/2)).toBeLessThan(2);
       const moved=await box('[data-panel="chat"]');expect(width-(moved.x+moved.width)).toBeCloseTo(gap,0);expect(Math.abs(moved.y+moved.height/2-height/2)).toBeLessThan(2);
     }
-    // Now the window is the screen, as in the browser's full screen: the row says so, and a page cannot leave it.
-    await menu.click();await expect(row).toHaveAttribute('aria-pressed','true');await expect(row).toHaveText('Sair da tela cheia');
+    // Now the window is the screen, as in the browser's full screen: the switch says so, and a page cannot leave it.
+    await menuItem(page,'Ajustes','Interface');await expect(row).toBeChecked();
     await row.click();await expect(page.locator('.comanda').filter({hasText:'aperte F11'})).toBeVisible();
     expect(await page.evaluate(()=>document.fullscreenElement)).toBeNull();
     expect(errors).toEqual([]);

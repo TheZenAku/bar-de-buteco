@@ -7,6 +7,7 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Ação no jogo | Fonte | Comportamento |
 | --- | --- | --- |
 | Parado | `misc/Idle (1).fbx` | `Idle` do banco Mixamo: primeiros 4 s, com os últimos 0,5 s misturados à pose inicial para fechar o loop. |
+| Andar no ritmo de sempre (3,5 m/s) | `misc/Jogging.fbx` | `Jog`, nas skins de jogador: um trote, porque a caminhada só acompanha até ~2,4 m/s e patinava acima disso. O BarScene troca para ele a partir de 2,6 m/s (volta abaixo de 2,2). `even`: o pé apoiado acelerava e freava no original; o clipe é reamostrado em 60 Hz com o tempo ajustado (`evenStance`) para esse pé ir para trás numa velocidade só, e uma velocidade de reprodução o mantém parado no chão. |
 | Caminhar | `misc/Standard Walk.fbx` | Ciclo de 1,4 s (20% mais longo), com 85 poses a 60 Hz. Interpolação cúbica esférica das rotações e Hermite monotônica do quadril suavizam o movimento e a emenda do loop. A cadência acompanha a velocidade com aceleração de 0,18 s e desaceleração de 0,24 s; entrar e sair da caminhada mistura as poses por 0,32 s e 0,28 s. |
 | Correr | `Standard Run.fbx` | Loop de corrida de todas as skins. O arquivo avança cerca de 3 m por ciclo (root motion); o conversor (`inPlace`) remove esse avanço constante e mantém o balanço do quadril, porque quem move o avatar é o servidor. O avanço medido dá o ritmo do clipe a 1× (`MIXAMO_PACE.Run`, 4 m/s no Nathan): a 6 m/s a cadência fica em 1,5×. |
 | Embriagado parado / andando | `misc/Drunk Idle Variation.fbx` / `misc/Drunk Walk.fbx` | Entra nos estágios altos de embriaguez; substitui a inclinação procedural nos modelos completos. |
@@ -26,12 +27,19 @@ Os FBXs originais ficam em `assets-bar/anim`. `npm run assets:animations` gera b
 | Dealer | `carta-distribui.fbx` / `carta-recomeco.fbx` | Distribui e recolhe/prepara as cartas. |
 | Seu Zé | `Bartending.fbx` | Atendimento atrás do balcão, exclusivo da skin Magrão. |
 | Karatê | `karate-kick.fbx` | Skill de 2 s da skin Rafael, sem deslocamento. [Acerta quem o pé tocar](../sistemas/perfil.md#o-chute-que-acerta), pelo caminho do pé medido do clipe (`npm run assets:kicks`). |
+| Chute alto / frontal | `misc/Mma Kick.fbx` (`rate` 1,15) / `misc/Kicking.fbx` (`rate` 1,35) | `KickHigh` e `KickFront`, só nas skins Rafael: as variantes do karatê de guarda alta. Mesma medição dos pés (`npm run assets:kicks`). |
 | Chute voador | `misc/Drop Kick.fbx` | Skill de 2,9 s da skin Rafael. Salta e cai de costas; `inPlace` traz o quadril de volta, e o avatar fica parado para o servidor. Acerta como o karatê. |
 | Bengala | `A_Male_Walk_OldCane*.fbx` | Caminhada e repouso do comando `/velho`, com a bengala presa à mão direita. |
 
 O runtime dá preferência aos clipes Mixamo do banco para repouso, caminhada, corrida, caminhada e repouso de bêbado, dança, aceno, uso de objetos, espera e permanência sentado. Os clipes `parado_loop`, `andar_loop` e `andar_bebado_loop` do export do mapa não substituem essa locomoção.
 
 As ações com contatos e objetos sincronizados conservam o corpo do export: `sentar` e `levantar` puxam a cadeira; comida, cigarro, vômito, mictório, limpeza de mesa e serviço do Magrão acompanham seus próprios objetos e efeitos. `cair` e `levantar_chao` conservam a continuidade da pose e do deslocamento. Os [músicos do palco](../sistemas/palco.md) mantêm suas animações específicas para os instrumentos.
+
+## Root motion e ritmo dos passos
+
+Golpes que dão passo (`Jab`, `Cross`, `Hook`, `Heavy`, os chutes do Rafael) têm `anchor` em `convert-animations.mjs`: o caminho do osso âncora (o quadril, ou o pé de apoio dos chutes) sai do quadril, o clipe fica no lugar e o caminho vai para `extras.root` (e `rootX` com `sideways`) da animação no GLB. `stays` guarda só o avanço (o corpo não volta: o pé de apoio que deslizava na fonte fica parado). `npm run assets:punches` e `npm run assets:kicks` copiam esses caminhos para as tabelas que a sala usa; a sala move o corpo com eles (veja [luta](../sistemas/luta.md#animações) e [perfil](../sistemas/perfil.md#o-chute-que-acerta)).
+
+Os passos no lugar (`Walk`, `Jog`, `Run`, `DrunkWalk`, `FightBack`, `FightLeft`, `FightRight`) tocam na velocidade do corpo dividida pelo ritmo medido de cada skin: `npm run assets:paces` grava `apps/web/src/engine/clip-paces.ts`. Rode os três depois de qualquer conversão.
 
 ## Danças
 

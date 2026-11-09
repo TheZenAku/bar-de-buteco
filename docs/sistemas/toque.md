@@ -7,7 +7,7 @@ O jogo nasceu para teclado e mouse. No celular e no tablet, os mesmos comandos v
 `apps/web/src/touch/touch-mode.ts` põe a classe `touch-ui` no `<html>`. Todo CSS de toque (`touch/touch.css`) depende dela, então quem joga com mouse não vê nada disso.
 
 - **Automático** (padrão): liga quando o ponteiro principal é um dedo (`pointer: coarse`). Um notebook com tela de toque continua com mouse.
-- **Sempre ligados** ou **Desligados**: Configurações → Controles de toque. A escolha fica no navegador (`bar:touch-ui:v1`).
+- **Sempre ligados** ou **Desligados**: Menu › Ajustes › Controles de toque (o botão de menu fica no canto de cima, à direita). A escolha fica no navegador (`bar:touch-ui:v1`).
 - Os controles aparecem só enquanto o mundo recebe comandos: somem com uma janela, o celular, uma TV, o menu de uma pessoa ou um minijogo na frente, e voltam sozinhos.
 
 ## O que tem na tela
@@ -31,7 +31,7 @@ O jogo nasceu para teclado e mouse. No celular e no tablet, os mesmos comandos v
 - Câmera por dedos: `BarScene.touchDown/touchMove/touchUp`, no mesmo canvas. O mouse continua usando os ouvintes de sempre (os de toque só agem com `pointerType === 'touch'`).
 - `mouse-capture.ts` não prende o ponteiro quando `touch-ui` está ligada (um ponteiro preso pararia o arrastar da câmera).
 - A tela fica acesa enquanto se joga (Wake Lock) e o gesto de pinça da página é bloqueado (`gesturestart`, `user-scalable=no`, `touch-action: none` na cena).
-- `manifest.webmanifest` permite instalar o jogo na tela inicial em tela cheia e paisagem. O botão Tela cheia do menu Painéis tenta travar a orientação em paisagem.
+- `manifest.webmanifest` permite instalar o jogo na tela inicial em tela cheia e paisagem. Menu › Ajustes › Interface › Tela cheia tenta travar a orientação em paisagem.
 - Primeira vez no bar com toque: um aviso diz onde está o direcional (`bar:touch-hint:v1`). A janela de ajuda ganha a seção "No toque".
 
 ## Armadilhas já resolvidas

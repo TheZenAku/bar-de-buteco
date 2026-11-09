@@ -1,6 +1,7 @@
 import {wearCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import {previewPath} from './preview-path';
+import {menuItem} from './menu';
 
 test('chat toggles only the cane and gait, replicates to other players and works with existing skins',async({browser,page,request})=>{
   test.setTimeout(240000);
@@ -23,7 +24,7 @@ test('chat toggles only the cane and gait, replicates to other players and works
   const original=await appearance(page);
   const context=await browser.newContext({viewport:{width:640,height:480}}),other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));
   try{
-    await account(other,'vizinho');await other.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await other.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.bringToFront();
+    await account(other,'vizinho');await menuItem(other,'Galera','Pessoas no bar');await other.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.bringToFront();
     await command();await expect.poll(async()=>(await appearance(other)).oldWalk).toBe(true);
     await expect.poll(async()=>(await animation(other))?.cane).toMatchObject({enabled:true,parent:'hand_r',renders:1});
     await expect.poll(async()=>(await animation(page))?.clip).toBe('OldCaneHold');

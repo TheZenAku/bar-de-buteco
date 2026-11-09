@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {menuItem} from './menu';
 
 /** Touch play (docs/sistemas/toque.md): a phone on its side, the real game, fingers instead of keys. */
 test.afterEach(async({page})=>{await page.request.post('/api/auth/logout').catch(()=>{});});
@@ -107,10 +108,10 @@ test.describe('on a phone',()=>{
     await expect(phone).not.toHaveClass(/open/);
   });
 
-  test('the player can turn the controls off in Configurações',async({page})=>{
+  test('the player can turn the controls off in the menu (Ajustes › Controles de toque)',async({page})=>{
     test.setTimeout(120_000);
     await enter(page);
-    await page.evaluate(()=>(document.querySelector('[data-action="settings"]') as HTMLElement).click());
+    await menuItem(page,'Ajustes','Controles de toque');
     await page.locator('select[data-setting="touchUi"]').selectOption('off');
     await expect(page.locator('html')).not.toHaveClass(/touch-ui/);
     await page.keyboard.press('Escape');

@@ -39,12 +39,16 @@ Para criar uma skill: ponha o clipe no banco das skins do personagem (`clips` e 
 
 ### O chute que acerta
 
-Os dois chutes do Rafael derrubam quem o pé tocar: o corpo voa em ragdoll, cai, rola e a pessoa se levanta sozinha. Quem leva o chute vê o aviso **Chutado**, com a vida perdida.
+Os dois chutes do Rafael derrubam quem o pé tocar: o corpo voa em ragdoll, cai, rola e a pessoa se levanta sozinha. Onde o pé encosta sobe o número da vida perdida, como no soco; não há aviso.
 
 | Skill | Vida | Lançamento | Distância típica |
 | --- | ---: | --- | --- |
-| Golpe de karatê | 6 | 9 m/s, subindo a 3,8 m/s | 8 a 9 m |
-| Chute voador | 10 | 12 m/s, subindo a 4,8 m/s | 11 a 13 m |
+| Golpe de karatê | 12 | 9 m/s, subindo a 3,8 m/s | 8 a 9 m |
+| Chute voador | 20 | 12 m/s, subindo a 4,8 m/s | 11 a 13 m |
+
+**O corpo anda com o chute** (root motion, 08/11): a sala leva o Rafael para onde o clipe vai (`kickRoot`, a cada tick, em `stepKicks`) e julga a perna a partir de onde o chute começou. O pé de apoio fica pregado no chão (`anchor` no pé de apoio, `stays`: o corpo só avança, até 15 cm no karatê); o chute voador vai e volta com o salto, inclusive os 0,66 m para o lado que o clipe tem. Antes o `inPlace` tirava o salto em linha reta ao longo do clipe inteiro, e depois de pousar o corpo deslizava de volta à origem.
+
+**De guarda alta** (R), a tecla do karatê alterna três chutes, cada um um pouco mais forte (`KARATE_ROUND` e `kickVariant` em `kick.ts`; a sala conta os chutes de cada um): o karatê de sempre (12), o **chute alto** de perna direita, na altura do peito (15, clipe `KickHigh`, 1,4 s) e o **chute frontal** de perna esquerda, um empurrão de perto (17, clipe `KickFront`, 1,6 s; o quadril recua e o pé vai a 0,7 m, então só pega até ~1,2 m). Sem guarda é sempre o karatê.
 
 As distâncias são em rua aberta. Dentro do bar, a parede para o corpo antes, e ele bate e volta.
 
@@ -52,7 +56,7 @@ As distâncias são em rua aberta. Dentro do bar, a parede para o corpo antes, e
 
 - A perna só conta enquanto está no ar: de 0,4 a 0,85 s no karatê e de 0,9 a 1,45 s no chute voador. O clipe segue o relógio da sala, para o pé estar onde a sala acha que está.
 - Um chute pode pegar várias pessoas, cada uma uma vez.
-- **Mira:** ao apertar a tecla, o Rafael gira até quem estiver a até 2 m e a até 60° da frente dele. Quem está atrás não é mirado.
+- **Mira:** ao apertar a tecla, o Rafael gira até quem estiver a até 2,4 m e a até 70° da frente dele. Quem está atrás não é mirado.
 - Parede segura o chute e a mira. Poste, árvore e móvel baixo, não.
 
 **Quem pode ser atingido.** Só quem está a pé e livre, fumando ou no meio de outro chute. Quem está sentado, trabalhando, jogando, no banheiro, no palco, na moto, desmaiado, já caído ou ausente não é atingido.
@@ -60,7 +64,7 @@ As distâncias são em rua aberta. Dentro do bar, a parede para o corpo antes, e
 **Para não virar perseguição:**
 
 - Um chute nunca tira o último ponto de vida, então sozinho ele não desmaia ninguém nem faz perder item.
-- Depois de se levantar, a pessoa fica 2,5 s sem poder ser chutada de novo (`KICK.graceMs`).
+- Quem acabou de se levantar pode ser chutado de novo na hora; só o soco espera `FIGHT.graceMs`.
 
 Como em todo ragdoll, cair derruba a bebida da mão e a encomenda do Highfood.
 
@@ -72,7 +76,7 @@ Como em todo ragdoll, cair derruba a bebida da mão e a encomenda do Highfood.
 - O clipe de quem chutou segura 70 ms ao acertar, para o golpe ter peso.
 - Cada batida forte do corpo faz barulho, e no chão levanta poeira. Isso vale também para quem cai da moto.
 
-Os números ficam em `KICKS` e `KICK` (`packages/shared/src/kick.ts`). Para outra skill que acerte: ponha o clipe em `KICKS` de `tools/assets/measure-kicks.mjs`, rode `npm run assets:kicks` e acrescente a entrada em `KICKS`.
+Os números ficam em `KICKS` e `KICK` (`packages/shared/src/kick.ts`). Para outra skill que acerte: ponha o clipe em `KICKS` de `tools/assets/measure-kicks.mjs`, rode `npm run assets:kicks` e acrescente a entrada em `KICKS`. Uma variante que não é skill entra também em `KICK_VARIANTS` (clipe e duração).
 
 ### Animação do chute voador
 

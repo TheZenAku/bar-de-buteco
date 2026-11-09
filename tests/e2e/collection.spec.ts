@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {enterAsAdmin} from './moto-helpers';
 import {showCard,wearCard} from './collection-helpers';
+import {menuItem} from './menu';
 
 const fixture=`/@fs/${path.join(fileURLToPath(new URL('../fixtures/collection.html',import.meta.url))).replace(/\\/g,'/')}`;
 const self=(page:Page)=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world?.players?.[d.localId];});
@@ -124,7 +125,7 @@ test('in the game: a variant is its own purchase, skills are bought and work in 
   await expect.poll(async()=>(await self(page))?.animationState,{timeout:15_000}).not.toBe('kick');
 
   // The administration closes a card and moves its price; the player sees it next time.
-  await page.getByRole('button',{name:'Administração',exact:false}).first().click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="collection"]').click();
   const row=page.locator('.admin-coll-card[data-key="skin:rafael"]');await row.click();
   await expect(page.locator('[data-coll-form]')).toBeVisible();

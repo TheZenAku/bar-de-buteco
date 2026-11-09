@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hitReaction,punchAim,punchAllowed,punchClear,punchContact,punchInReach,
-  punchStep,rewindOf,seenAt,streamOf,throwPunch,type FightPose,type PunchId,type PunchStream} from '@bar/shared';
+import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hitReaction,punchAim,punchAllowed,punchCarries,punchClear,punchContact,punchInReach,
+  punchRoot,punchStep,rewindOf,seenAt,streamOf,throwPunch,type FightPose,type PunchId,type PunchStream} from '@bar/shared';
 // @ts-expect-error The tool is a plain script, with no types.
 import {measurePunches,PUNCHES} from '../../tools/assets/measure-punches.mjs';
 
@@ -18,7 +18,7 @@ function throwAt(skin:string,move:PunchId,away:number,side=0,targetSkin=skin){
   const target={x:OPEN.x+side,y:0,z:OPEN.z+away,rotation:Math.PI};
   const aim=punchAim(skin,move,OPEN,0,[{id:'t',...target,skin:targetSkin}]);
   let stream:PunchStream=throwPunch({m:move,n:1,lunge:aim.lunge},100,aim.yaw),at:{x:number;y:number;z:number}={...OPEN};
-  for(let seq=100;seq<100+FIGHT_MOVES[move].lockSteps;seq++)at=fightMove(at,stream,seq,{dx:0,dz:0},dt,false,[]);
+  for(let seq=100;seq<100+FIGHT_MOVES[move].lockSteps;seq++)at=fightMove(at,stream,seq,{dx:0,dz:0},dt,false,[],skin);
   const puncher={...at,rotation:stream.yaw};
   return {aim,puncher,target,contact:punchContact(skin,move,0,FIGHT_MOVES[move].durationMs,still(puncher),targetSkin,still(target))};
 }
@@ -69,7 +69,7 @@ test('the light punches chain jab, cross, hook and back to the jab; the heavy on
   assert.equal(punchAllowed(heavy,50+FIGHT_MOVES.heavy.lockSteps,'light'),'jab');
 });
 
-test('a punch plants the feet for its inputs and steps in only as far as it allows, the same every time',()=>{
+test('a punch plants the feet for its inputs and steps in only as far as it allows, plus its own step, the same every time',()=>{
   for(const id of PUNCH_IDS){
     const move=FIGHT_MOVES[id];
     for(const asked of [-1,0,.2,5]){
@@ -81,14 +81,34 @@ test('a punch plants the feet for its inputs and steps in only as far as it allo
         at=fightMove(at,stream,seq,{dx:1,dz:0},dt,false,[]);
       }
       assert.equal(punchStep(stream,7+move.lockSteps).locked,false);
-      const travelled=Math.hypot(at.x-OPEN.x,at.z-OPEN.z)*(asked<0?-1:1),expected=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,asked));
-      assert.ok(Math.abs(travelled-expected)<1e-6,`${id} asked ${asked}: stepped ${travelled}`);
-      if(Math.abs(expected)>1e-9){const heading=Math.atan2(at.x-OPEN.x,at.z-OPEN.z);assert.ok(Math.abs(Math.sin(heading-(expected<0?.6+Math.PI:.6)))<1e-6,'along the punch');}
+      // Along the punch: the step in it allows, and the clip's own step (root motion), nothing to the side.
+      const along=(at.x-OPEN.x)*Math.sin(.6)+(at.z-OPEN.z)*Math.cos(.6),aside=(at.x-OPEN.x)*Math.cos(.6)-(at.z-OPEN.z)*Math.sin(.6);
+      const expected=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,asked))+punchRoot(undefined,id,move.lockSteps);
+      assert.ok(Math.abs(along-expected)<1e-6,`${id} asked ${asked}: stepped ${along}, not ${expected}`);
+      assert.ok(Math.abs(aside)<1e-6,'along the punch');
     }
   }
-  // Walking in the guard: FIGHT.speed, whatever the run key says.
+  // Walking in the guard: FIGHT.speed (Shift, once the room has checked the stamina: FIGHT.runSpeed).
   const walked=fightMove(OPEN,NO_PUNCH,1,{dx:0,dz:1},dt,false,[]);
   assert.ok(Math.abs(walked.z-OPEN.z-FIGHT.speed*dt)<1e-9);
+});
+
+test('a punch played through carries the body where its clip goes and back; cut short by a step, the body stays where it had got to',()=>{
+  const move=FIGHT_MOVES.cross,root=fistPath('rafael','cross').root,stream=throwPunch({m:'cross',n:0,lunge:0},10,0);
+  assert.ok(Math.max(...root)>.3,'the cross steps in');assert.ok(Math.abs(root.at(-1)!)<.05,'and back');
+  const play=(steps:number,moveAt?:number)=>{
+    let at={...OPEN,y:0},carry=false;
+    for(let seq=10;seq<10+steps;seq++){
+      const input=seq===moveAt?{dx:1,dz:0}:{dx:0,dz:0};
+      carry=punchCarries(carry,stream,seq,input);at=fightMove(at,stream,seq,input,dt,false,[],'rafael',carry);
+    }
+    return at;
+  };
+  const through=play(root.length+4),cut=play(root.length+4,10+move.lockSteps+1);
+  assert.ok(Math.abs(through.z-OPEN.z-root.at(-1)!)<1e-6,`played through: back where the clip ends (${through.z-OPEN.z})`);
+  assert.ok(Math.abs(cut.z-OPEN.z-punchRoot('rafael','cross',move.lockSteps+1))<1e-6,'cut short: where the step had got to, nothing more after it');
+  assert.equal(punchCarries(false,stream,10,{dx:0,dz:0}),true,'the throw starts it');
+  assert.equal(punchCarries(true,stream,10+move.lockSteps+2,{dx:0,dz:1}),false,'a step of their own ends it');
 });
 
 test('every punch of every skin lands on someone in front at the distance the aim takes it to, on any other skin',()=>{

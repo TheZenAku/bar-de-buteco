@@ -200,13 +200,13 @@ export function createLightDesk(root:HTMLElement,hooks:LightDeskHooks){
   });
   root.addEventListener('submit',event=>{
     const form=event.target as HTMLFormElement;event.preventDefault();event.stopPropagation();
-    if(form.dataset.deskText!==undefined){const text=showText($<HTMLInputElement>('#desk-text').value);send({text});hooks.notify(`Letreiro: ${text}`);return;}
+    if(form.dataset.deskText!==undefined){const text=showText($<HTMLInputElement>('#desk-text').value);send({text});return;}
     if(form.dataset.deskSave!==undefined){
       const input=form.querySelector<HTMLInputElement>('input')!,list=savedScenes(),name=input.value.trim().slice(0,24)||`Cena ${list.length+1}`;
       const at=list.findIndex(s=>s.name===name);
       if(at<0&&list.length>=SCENES_MAX){hooks.notify(`Cabem ${SCENES_MAX} cenas: apague uma para salvar outra.`);return;}
       const scene={name,patch:sceneOf(show)};if(at<0)list.push(scene);else list[at]=scene;
-      storeScenes(list);input.value='';renderMine();hooks.notify(`Cena salva: ${name}`);
+      storeScenes(list);input.value='';renderMine();
     }
   });
   // Space taps and 1–4 fire the cues, unless typing.

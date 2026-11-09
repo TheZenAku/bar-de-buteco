@@ -128,12 +128,12 @@ export class FightDirector {
       player.animationState='punch';player.animationStartedAt=now;
       this.fighter(player.id).active={move:command.m,at:now,rewind:rewindOf(now,command,PATCH_MS),checked:0,skin:player.skin,n:stream.n};
     }
-    const {locked}=punchStep(stream,input.seq),next=fightMove(player,stream,input.seq,input,TICK_MS/1000,stagePass,obstacles);
+    const {locked}=punchStep(stream,input.seq),next=fightMove(player,stream,input.seq,input,TICK_MS/1000,stagePass,obstacles,player.skin,player.animationState==='punch');
     const moving=next.x!==player.x||next.z!==player.z;
     player.x=next.x;player.y=next.y;player.z=next.z;
     player.rotation=locked?stream.yaw:input.rotation;
     if(!locked){
-      if(input.dx||input.dz)player.animationState='walk';
+      if(input.dx||input.dz)player.animationState=input.running?'run':'walk';
       else if(player.animationState==='walk'||player.animationState==='run')player.animationState='idle';
     }
     return moving;

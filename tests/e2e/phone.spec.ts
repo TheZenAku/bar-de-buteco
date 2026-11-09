@@ -1,4 +1,5 @@
 import {test,expect,type Browser,type Page} from '@playwright/test';
+import {menuItem} from './menu';
 // Chromium's fake microphone (launch flags in playwright.config.ts) feeds the call's voice and the voice notes.
 const password='ButecoTeste2026!';
 async function enter(browser:Browser,name:string):Promise<{page:Page;id:string;username:string}>{
@@ -26,7 +27,7 @@ async function openApp(page:Page,app:string):Promise<void>{
 /** Pessoas no bar → Perfil: the other player's contact, saved to the agenda. */
 async function saveFromCard(page:Page,id:string):Promise<string>{
   if(await page.locator('#phone.open').count())await page.keyboard.press('Escape');
-  await page.locator('[data-action="people"]').first().click();
+  await menuItem(page,'Galera','Pessoas no bar');
   await page.locator(`[data-action="profile"][data-id="${id}"]`).click();
   await page.locator('.pf-profile [data-pf="save"]').click({timeout:20000});
   await expect(page.locator('.pf-profile [data-pf="message"]')).toBeVisible({timeout:20000});
@@ -45,7 +46,7 @@ test('the phone: numbers from the player\'s profile, Highzap with photos, voice 
   await expect(a.page.locator('#phone .ph-app-highzap .ph-empty')).toContainText('Perfil');
   // Your own profile shows your number; the other player's saves theirs.
   await a.page.keyboard.press('Escape');
-  await a.page.locator('[data-action="people"]').first().click();
+  await menuItem(a.page,'Galera','Pessoas no bar');
   await a.page.locator('[data-action="people-tab"][data-tab="account"]').click();
   await a.page.locator(`[data-action="profile"][data-id="${a.id}"]`).click();
   await expect(a.page.locator('.pf-profile h2')).toHaveText('Ligadora',{timeout:20000});

@@ -1,5 +1,4 @@
 import {HUD_PANELS,type PanelId} from './game-ui';
-import {uiIcon} from './ui-icons';
 /**
  * Where a panel sits, from the screen's sides it is nearest, so it follows them when the window changes size (F11, full
  * screen, a dragged window): `x` from the left or right side, or its middle from the screen's middle; `y` from the top or
@@ -54,9 +53,6 @@ export function createHudPanels(root:HTMLElement){
   }
   function apply(){
     root.classList.toggle('hud-locked',locked);
-    root.querySelector('[data-hud-lock]')!.setAttribute('aria-pressed',String(locked));
-    root.querySelector('[data-hud-lock]')!.setAttribute('aria-label',locked?'Destravar painéis':'Travar painéis');
-    root.querySelector('[data-hud-lock]')!.innerHTML=`${uiIcon(locked?'lock':'unlock')}<span>${locked?'Destravar painéis':'Travar painéis'}</span>`;
     for(const p of HUD_PANELS){const state=layout[p.id],el=elements[p.id],w=width(p.id);el.style.width=`${w}px`;el.classList.toggle('hidden',state.hidden||!available.has(p.id));el.classList.toggle('is-collapsed',state.collapsed);
       const left=Math.max(8,Math.min(innerWidth-w-8,state.ax==='left'?state.x:state.ax==='right'?innerWidth-w-state.x:innerWidth/2+state.x-w/2));
       const content=el.querySelector<HTMLElement>('.hud-content')!;content.classList.toggle('hidden',state.collapsed);
@@ -74,23 +70,17 @@ export function createHudPanels(root:HTMLElement){
       el.style.maxHeight=`${Math.max(44,innerHeight-y-12)}px`;
       // The chat has no collapse button: its header hides it (data-hud-hide).
       const button=el.querySelector<HTMLButtonElement>('.panel-heading button[aria-expanded]');button?.setAttribute('aria-expanded',String(!state.collapsed));button?.setAttribute('aria-label',`${state.collapsed?'Expandir':'Recolher'} ${p.title}`);
-      root.querySelectorAll(`[data-hud-visible="${p.id}"]`).forEach(toggle=>{toggle.setAttribute('aria-pressed',String(!state.hidden));toggle.classList.toggle('hidden',!available.has(p.id));});
     }
   }
   function patch(id:PanelId,value:Partial<PanelState>){Object.assign(layout[id],value);apply();save();}
   /** Moves a panel to `left`/`top` on screen, anchored to its nearest sides there. */
   function moveTo(id:PanelId,left:number,top:number){Object.assign(layout[id],anchored(left,top,width(id),shown[id].h));}
   function focus(id:PanelId){const ordered=HUD_PANELS.map(p=>p.id).sort((a,b)=>layout[a].z-layout[b].z);ordered.filter(p=>p!==id).concat(id).forEach((p,i)=>layout[p].z=i+1);}
-  function menu(open:boolean){root.querySelector('#panel-menu')!.classList.toggle('hidden',!open);root.querySelector('[data-hud-menu]')!.setAttribute('aria-expanded',String(open));}
   root.addEventListener('click',event=>{
     const button=(event.target as Element).closest<HTMLElement>('button');if(!button)return;
-    if(button.hasAttribute('data-hud-lock')){locked=!locked;apply();save();}
-    if(button.hasAttribute('data-hud-menu'))menu(root.querySelector('#panel-menu')!.classList.contains('hidden'));
-    if(button.hasAttribute('data-hud-reset')){layout=defaults();locked=false;apply();save();menu(false);}
     const id=button.dataset.hudCollapse;if(id&&known(id))patch(id,{collapsed:!layout[id].collapsed});
-    const visible=button.dataset.hudVisible;if(visible&&known(visible)){if(layout[visible].hidden){focus(visible);elements[visible].style.maxHeight='';}patch(visible,{hidden:!layout[visible].hidden});}
-    // Hidden from its own header: keyboard focus goes to the toolbar button that shows it again.
-    const hide=button.dataset.hudHide;if(hide&&known(hide)){patch(hide,{hidden:true});root.querySelector<HTMLElement>(`.game-tools [data-hud-visible="${hide}"]`)?.focus();}
+    // Hidden from its own header; the menu (Ajustes › Interface) shows it again, and T always opens the chat.
+    const hide=button.dataset.hudHide;if(hide&&known(hide))patch(hide,{hidden:true});
   });
   for(const p of HUD_PANELS){const el=elements[p.id],header=el.querySelector<HTMLElement>('.panel-heading')!;
     el.addEventListener('pointerdown',()=>{focus(p.id);for(const panel of HUD_PANELS)elements[panel.id].style.zIndex=String(layout[panel.id].z);});
@@ -103,12 +93,17 @@ export function createHudPanels(root:HTMLElement){
     header.addEventListener('pointerup',end);header.addEventListener('pointercancel',end);header.addEventListener('lostpointercapture',end);
     header.addEventListener('keydown',event=>{if(event.target!==header)return;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){event.preventDefault();event.stopPropagation();if(locked)return;const step=event.shiftKey?30:10;moveTo(p.id,shown[p.id].left+(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0),shown[p.id].top+(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0));apply();save();}});
   }
-  document.addEventListener('pointerdown',event=>{if(!(event.target as Element).closest('#panel-menu,[data-hud-menu]'))menu(false);});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape')menu(false);});
   window.addEventListener('resize',()=>{const next=mode();if(next!==screenMode){save();screenMode=next;load();}apply();});
   load();apply();
   void document.fonts.ready.then(apply);
-  return {closeMenu(){menu(false);},forUser(id:string){owner=id;load();apply();},open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},isHidden(id:PanelId){return layout[id].hidden;},
+  return {forUser(id:string){owner=id;load();apply();},
+    isAvailable(id:PanelId){return available.has(id);},
+    /** The menu's switches: shown again on top of the others, at its natural height. */
+    setHidden(id:PanelId,hidden:boolean){if(!hidden){focus(id);elements[id].style.maxHeight='';}patch(id,{hidden});},
+    get locked(){return locked;},
+    toggleLock(){locked=!locked;apply();save();},
+    reset(){layout=defaults();locked=false;apply();save();},
+    open(id:PanelId){focus(id);patch(id,{hidden:false,collapsed:false});},isHidden(id:PanelId){return layout[id].hidden;},
     // Appearing, the panel is measured at its natural height (not the one it was squeezed to while hidden) and lifted to fit.
     setAvailable(id:PanelId,on:boolean){if(available.has(id)===on)return;if(on){available.add(id);elements[id].style.maxHeight='';}else available.delete(id);apply();}};
 }

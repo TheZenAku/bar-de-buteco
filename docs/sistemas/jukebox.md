@@ -10,7 +10,7 @@ A jukebox e as TVs são **sistemas independentes**. Cada um tem seu próprio obj
 | Som | Pela distância até a jukebox (cheio até 5 m, mudo a partir de 20 m) | Pela distância até a TV do grupo mais próxima (cheio até 3 m, mudo a partir de 14 m) |
 | Estado na sala | `BarState.jukeboxes` | `BarState.televisions`: `tv-main` e `tv-upstairs` |
 | Mensagens | `jukebox.command`, `jukebox.ended`, `jukebox.open`, `jukebox.result` | `tv.command`, `tv.ended`, `tv.open`, `tv.result` |
-| Volume pessoal | Configurações → *Jukebox* (`bar:jukebox:volume`) | Configurações → *TVs* (`bar:tv:volume`) |
+| Volume pessoal | Menu › Ajustes › Som › *Jukebox* (`bar:jukebox:volume`) | Menu › Ajustes › Som › *TVs* (`bar:tv:volume`) |
 
 A jukebox vem do mapa: o importador lê o nó `Jukebox` e o volume `COL_Int_Jukebox`, e `JUKEBOX_PLACEMENT` sai deles (`map-data.json` → `jukebox`). A antiga jukebox de caixas, montada no código, foi removida. Mover a jukebox no Blender e rodar `npm run assets:map` move a interação, o som e a colisão juntos.
 

@@ -92,7 +92,7 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   await expect.poll(async()=>(await self(other)).x).toBeCloseTo(standAt.x,1);
   const before=await self(other);
   expect(Math.hypot(before.x-standAt.x,before.z-standAt.z)).toBeLessThan(1);
-  await other.evaluate(()=>{const w=window as any;w.trackImpact=true;w.sawThrown=false;w.sawImpactNotice=false;const sample=()=>{if(!w.trackImpact)return;const s=w.barDebug.snapshot();w.sawThrown||=s.world.players[s.localId]?.interactionState==='thrown';w.sawImpactNotice||=[...document.querySelectorAll('.notice,.toast,[class*=notice]')].some(el=>el.textContent?.includes('Atropelado'));requestAnimationFrame(sample);};sample();});
+  await other.evaluate(()=>{const w=window as any;w.trackImpact=true;w.sawThrown=false;const sample=()=>{if(!w.trackImpact)return;const s=w.barDebug.snapshot();w.sawThrown||=s.world.players[s.localId]?.interactionState==='thrown';requestAnimationFrame(sample);};sample();});
 
   // Getting on starts the engine: LIGA, then the loops; W answers after it has caught.
   await page.mouse.click(40,300);
@@ -137,7 +137,6 @@ test('the bike\'s sounds, its panel, the view at speed, running someone over and
   await page.keyboard.up('w');
   // The walker first: the body is up again in a few seconds, and a screenshot here can take that long.
   await expect.poll(()=>other.evaluate(()=>(window as any).sawThrown),{timeout:4000,intervals:[60]}).toBe(true);
-  await expect.poll(()=>other.evaluate(()=>(window as any).sawImpactNotice),{timeout:5000}).toBe(true);
   await shot(other,'7-atropelado');
   await shot(page,'6-atropelou');
   await other.evaluate(()=>{(window as any).trackImpact=false;});

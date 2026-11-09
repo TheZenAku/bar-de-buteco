@@ -69,7 +69,7 @@ import {createGps,type GpsTarget} from './gps';
 import {HIGHFOOD,atPickup,floorHeight,motoDistance,type HighfoodState} from '@bar/shared';
 import {JOBS,canInteract as touching,stationInteractable,consumedOverTime,consumeMs,type JobTaskView} from '@bar/shared';
 import type {TableOrderView} from './networking';
-import {graphicsSettingsHtml,jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal} from './economy-ui';
+import {jobPanelHtml,jobPanelTick,jobsHtml,mediaPriceNote,nextGraphics,stageMinutes,stagePanelHtml,tableMenuHtml,tableMenuTotal} from './economy-ui';
 import './economy.css';
 import {createObjectiveBlip} from './objective-blip';
 import {createConsumingHud} from './consuming-hud';
@@ -89,6 +89,10 @@ import {createWalletHud} from './wallet/wallet-hud';
 import {rankIcon} from './levels/rank-icon';
 import {badgeMedal,openBadgeCard} from './profile/badge-card';
 import {BADGE_RARITY_INFO} from '@bar/shared';
+import {createPauseMenu} from './pause-menu/pause-menu';
+import {MenuSounds} from './pause-menu/menu-sounds';
+import {menuHeader,menuTabs,type MenuAct,type MenuContentHost} from './pause-menu/menu-content';
+import './pause-menu/pause-menu.css';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=gameUi();
@@ -117,7 +121,6 @@ const notices=createNotifications($('#toasts'));
 const levelHud=createLevelHud($('#level-hud'),{
   toast:(text,error)=>toast(text,error),
   openProfile:()=>{if(user)void profile.open(user.id);},
-  dailyReady:open=>notices.show({variant:'acao',id:'daily-bonus',title:'Bônus diário liberado',text:'Seu XP do dia está esperando.',duration:9000,action:{label:'Abrir',run:open}}),
   coinsChanged:()=>network.send('inventory.sync'),
 });
 // Every coin in or out rolls the wallet and floats off it (wallet/wallet-hud.ts); renderBalance is its only caller.
@@ -135,7 +138,6 @@ const courier=createCourier();
 const ROUTE_COLOURS={delivery:'#ff3d5a',waypoint:'#17d4f4',bike:'#ff9f0a'} as const;
 const gps=createGps({
   changed:()=>{const target=gps?.target;minimap.setRoute(gps?.route??[],target?ROUTE_COLOURS[target.source]:'',gps?.version??0);},
-  arrived:target=>notices.show({variant:'acao',title:'Você chegou',text:target.label||'Este é o destino que você marcou.'}),
 });
 // Trading between players (docs/sistemas/troca.md): the window is the game's modal; what is on the table is always what the room last said.
 const trade=createTrade({
@@ -145,11 +147,12 @@ const trade=createTrade({
 });
 const foodDialog=createFoodDialog($('#game'),{confirm:orderId=>network.send('food.deliver',{orderId}),leave:()=>network.send('food.leave',{})});
 const lockerPad=createLockerPad($('#game'),{submit:(orderId,code)=>network.send('food.code',{orderId,code}),leave:()=>network.send('food.leave',{}),showCode:()=>phone.open('highfood'),phoneOpen:()=>phone.isOpen,sounds:new PhoneSounds(()=>settings.get().master)});
-// The menu closes on the way in: the mouse is about to be captured, and its row out would be out of reach.
-createFullscreen($<HTMLButtonElement>('[data-fullscreen]'),text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>hud.closeMenu());
-// What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the Painéis menu. The chat is typed.
-const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden');
-const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>fight.guard,()=>fight.lower());
+// Ajustes › Interface › Tela cheia; the row follows the real state (and the F11 one) whenever it changes.
+const fullscreen=createFullscreen(text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>pauseMenu.refresh());
+// What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the pause menu. The chat is typed.
+const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen;
+// The Esc that frees a captured mouse is also the one that pauses: the browser may keep that key to itself.
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,()=>fight.guard,()=>fight.lower(),()=>{if(pauseMenu.isOpen)return true;if(!canOpenMenu())return false;pauseMenu.open();return true;});
 /**
  * The fist fight (docs/sistemas/luta.md): R raises the guard, the buttons punch. The controller decides each punch with the shared rules and draws it
  * ahead of the room; the room's word comes back with each state (reconcile) and each landed punch (fight.hit).
@@ -165,24 +168,18 @@ const fight:FightController=new FightController({
     // The mouse turns the view and the buttons punch: mouse-capture.ts holds it while the guard is up. One request only (here, from R's keystroke,
     // which the browser trusts): a second one made it drop the first and the guard fell by itself.
     mouseCapture.sync();
-    if(guard&&!fightTold){fightTold=true;notices.show({variant:'acao',title:'Guarda alta',text:touchMode()?'Soco e Forte aparecem ao lado do direcional. Mais › Luta baixa a guarda.':'Clique para socar (jab, direto, gancho) e use o botão direito para o soco forte. R ou Esc baixa a guarda.'});}
   },
 });
-let fightTold=false;
 const fightPrompt=document.createElement('div');
 fightPrompt.className='fight-prompt';fightPrompt.hidden=true;fightPrompt.setAttribute('aria-live','polite');
 fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>R</kbd>Baixar</span>`;
 $('#game').append(fightPrompt);
 function renderFightPrompt():void {fightPrompt.hidden=!fight.guard||!inGame;}
-/** A punch landed near: the scene draws it, the controller holds the one hit; a knockout is told to the two involved. */
+/** A punch landed near: the scene draws it, the controller holds the one hit. */
 function onFightHit(hit:FightHit):void {
   scene?.fightHit(hit);
   if(!user)return;
   fight.hit(hit,user.id);
-  if(!hit.ko)return;
-  const name=(id:string)=>world?.players[id]?.displayName??'Alguém';
-  if(hit.to===user.id)notices.show({variant:'aviso',title:'Nocaute',text:`${name(hit.by)} te nocauteou.`});
-  else if(hit.by===user.id)notices.show({variant:'acao',title:'Nocaute',text:`Você nocauteou ${name(hit.to)}.`});
 }
 // On a phone or tablet: a stick, buttons and a sheet that press the keys (docs/sistemas/toque.md). Shown while the world takes input.
 const touchControls=createTouchControls($('#game'),{
@@ -239,6 +236,78 @@ const audio=new BarAudio();
 const settings=createSettings();
 // The Morte (docs/sistemas/morte.md): her sounds and, for the victim alone, the dark and the sequence game.
 const deathAudio=new DeathAudio(()=>settings.get().master);
+// The pause menu (pause-menu/, docs/sistemas/interface.md#menu): Esc, over the running bar. Its sections read the game's state
+// through this host and act through the same functions as the keys; its settings carry the data-setting names applied below.
+const menuSounds=new MenuSounds(()=>settings.get().master*settings.get().ui);
+/** A window opened from the menu: dismissed by the player (Esc, its X, a click beside it), it brings the menu back where it was. */
+let menuLeftAt=-Infinity,modalFromMenu=false;
+const menuPortraits=new Map<string,string>();
+const menuHost:MenuContentHost={
+  settings,
+  user:()=>user,world:()=>world,inventory:()=>inventory,
+  balance:()=>inventory?.balance??wardrobe?.balance,
+  xp:()=>levelHud.xp(),
+  zone:()=>document.querySelector('#minimap-zone')?.textContent?.trim()??'',
+  touch:()=>touchMode(),
+  soundOn:()=>audio.enabled||media.some(m=>m.soundEnabled),
+  toggleSound:()=>{const on=!(audio.enabled||media.some(m=>m.soundEnabled));if(audio.enabled!==on)audio.toggle();media.forEach(m=>m.setMuted(!on));},
+  jukeboxVolume:()=>jukebox.ownVolume,televisionVolume:()=>television.ownVolume,
+  mic:()=>({on:voice.micActive,unavailable:voice.unavailableReason,status:voice.status||(voice.micActive?'Microfone ligado.':'Microfone desligado.')}),
+  toggleMic:()=>void toggleMicrophone(),
+  inputDevices:async()=>(await voice.devices()).flatMap((device,i)=>device.deviceId&&device.deviceId!=='default'?[{id:device.deviceId,label:device.label||`Microfone ${i+1}`}]:[]),
+  fullscreen:()=>fullscreen.state(),toggleFullscreen:()=>void fullscreen.toggle(),
+  panels:{hidden:id=>hud.isHidden(id),available:id=>hud.isAvailable(id),setHidden:(id,hidden)=>hud.setHidden(id,hidden),locked:()=>hud.locked,toggleLock:()=>hud.toggleLock(),reset:()=>hud.reset()},
+  graphicsNow:()=>scene?.getGraphics(),
+  vrActive:()=>!!scene?.vrActive,
+  vrStatus:async()=>await vrSupported()?'Óculos detectados: é só entrar.':vrUnavailableReason(),
+  net:()=>({status:netStatus,ping:netPing}),
+  chatUnread:()=>document.querySelector('[data-action="chat"]')?.hasAttribute('data-unread')??false,
+  guard:()=>fight.guard,
+  skill:()=>{const active=activeSkill();return active?{name:active.skill.name,icon:active.skill.icon,key:keyLabel(active.key)}:undefined;},
+  seated:()=>!!world?.players[user?.id??'']?.interactionState?.startsWith('seat-'),
+  admin:()=>user?.role==='admin',
+  act:name=>menuAct(name),
+  portrait:async skin=>{const cached=menuPortraits.get(skin);if(cached)return cached;const src=await scene?.portrait(skin).catch(()=>undefined);if(src)menuPortraits.set(skin,src);return src;},
+  portraitNow:skin=>menuPortraits.get(skin),
+};
+/** Esc may pause only with nothing of the game's in front of the world: a window, the phone, a TV, a dialog or the chat's box take it first. */
+const canOpenMenu=()=>inGame&&connected&&!activeModal&&!watchingTv&&!phone.isOpen&&!profile.isOpen&&!foodDialog.isOpen&&!lockerPad.isOpen&&!worldMenuOpen()&&!typing()&&!document.body.classList.contains('dead')&&!document.querySelector('.bc-backdrop');
+const pauseMenu=createPauseMenu(app,menuTabs(menuHost),{
+  sounds:menuSounds,header:()=>menuHeader(menuHost),where:()=>menuHost.zone(),canOpen:canOpenMenu,
+  // Death, a call that brings the phone up, or a window the room opens (a trade): the menu steps aside.
+  mustClose:()=>!inGame||!connected||!!activeModal||phone.isOpen||profile.isOpen||document.body.classList.contains('dead'),
+  opened:()=>{menuSounds.unlock();mouseCapture.sync();touchControls.sync();},
+  // Closed by a key: the capture comes back inside that same gesture, which the browser trusts.
+  closed:reason=>{if(reason==='window')menuLeftAt=performance.now();mouseCapture.sync();},
+});
+function menuAct(name:MenuAct):void {
+  const self=world?.players[user?.id??''];
+  switch(name){
+    case 'dance':if(connected&&!performing())network.send('player.emote',{emote:self?.animationState==='dance'?'idle':'dance'});break;
+    case 'wave':if(connected&&!performing())network.send('player.emote',{emote:'wave'});break;
+    case 'smoke':smoke();break;
+    case 'cross-arms':if(connected)network.send('player.emote',{emote:'cross-arms'});break;
+    case 'guard':{const why=fight.toggle(self);if(why)toast(why,true);break;}
+    case 'skill':useSkill();break;
+    case 'table':openTableMenu();break;
+    case 'jobs':openJobs();break;
+    case 'chat':focusChat();break;
+    case 'phone':phone.open();break;
+    case 'map':phone.open('mapas');break;
+    case 'profile':if(user)void profile.open(user.id);break;
+    case 'skins':void skins().catch(error=>toast(errorMessage(error),true));break;
+    case 'inventory':void openInventory().catch(error=>toast(errorMessage(error),true));break;
+    case 'people':people();break;
+    case 'admin':void admin();break;
+    case 'leave':void leaveBar();break;
+    case 'logout':void (async()=>{await leaveBar();await api('/auth/logout',{});user=undefined;renderAuth();})().catch(error=>toast(errorMessage(error),true));break;
+  }
+}
+/** Once per browser, on the first visit after the toolbar left the screen: where everything went. */
+function menuHint():void {
+  try{if(localStorage.getItem('bar:menu:hint'))return;localStorage.setItem('bar:menu:hint','1');}catch{return;}
+  notices.show({variant:'acao',title:'Menu',text:touchMode()?'O botão de menu, no canto de cima, tem ações, pessoas, ajustes e o guia.':'Aperte Esc para abrir o menu: ações, pessoas, ajustes e o guia.'});
+}
 const deathUi=createDeathUi($('#game'),{send:(type,payload)=>network.send(type,payload),now:()=>serverNow(),audio:deathAudio,lite:()=>settings.get().graphics.preset==='low',active:on=>document.body.classList.toggle('dead',on)});
 const voice=new VoiceChat({sendPacket:packet=>network.sendBytes('voice',packet),sendState:state=>network.send('voice.state',state),notice:(text,error)=>toast(text,error),changed:()=>renderVoice()},settings);
 const chatHistory:ChatMessage[]=[];
@@ -315,7 +384,7 @@ function focusChat():void {
   panel.classList.add('chat-open');input.focus();
   if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
 }
-function showModal(title:string,content:string,type:string):void {if(activeModal==='storage'&&type!=='storage')leaveStorage();if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function showModal(title:string,content:string,type:string):void {modalFromMenu=performance.now()-menuLeftAt<1500||(modalFromMenu&&!!activeModal);menuLeftAt=-Infinity;if(activeModal==='storage'&&type!=='storage')leaveStorage();if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
 const measureDesk=()=>{const left=$('.modal').getBoundingClientRect().left;deskCover=innerWidth>760?Math.max(0,1-left/innerWidth):0;};
@@ -332,7 +401,9 @@ function openLightDesk():void {
   document.body.classList.add('at-light-desk');
   measureDesk();addEventListener('resize',measureDesk);scene?.watchStage(()=>deskCover);
 }
-function closeModal():void {if(activeModal==='storage')leaveStorage();if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+/** The player closed the window (Esc, its X, a click beside it). One opened from the menu brings the menu back where it was. */
+function dismissModal():void {const back=modalFromMenu&&!!activeModal;closeModal();if(back&&!activeModal&&inGame)pauseMenu.open({quiet:true});}
+function closeModal():void {if(activeModal==='storage')leaveStorage();if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}modalFromMenu=false;closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
 const profile=createProfileWindow({
   portrait:skin=>scene?.portrait(skin)??Promise.resolve(undefined),
@@ -360,12 +431,10 @@ const network=new BarNetwork({
   foodBase:({owned,out,state})=>{courier.setOwned(owned);showModal('HIGHFOOD',basePanelHtml(owned,out,state,livePrice('vehicle:moto'),livePrice('cap:highfood-daily')),'highfood');},
   foodOwned:owned=>courier.setOwned(owned),
   garage:view=>{if(activeModal==='garage')$('#modal-content').innerHTML=garagePanelHtml(view);else showModal('GARAGEM',garagePanelHtml(view),'garage');garageShown=view.garageId;},
-  garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();notices.show({variant:'acao',title:'Veículo na rua',text:`O veículo ${plate} está esperando, trancado. A chave permite destrancar.`});gps.setWaypoint({x,y:0,z,source:'bike',label:`Veículo ${plate}`});},
-  motoLocked:({plate,locked})=>{keyChirp(settings.get().master,locked);notices.show({variant:'acao',title:locked?'Veículo trancado':'Veículo destrancado',text:locked?`Acesso ao veículo ${plate} fechado.`:`Acesso ao veículo ${plate} liberado.`});if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
-  fuelReceipt:receipt=>notices.show({variant:'acao',title:'Atendimento concluído',text:`${receipt.litres.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} L abastecidos · ${receipt.paid} moedas pagas. ${receipt.message}`,duration:9000}),
+  garageTaken:({plate,x,z})=>{if(activeModal==='garage')closeModal();gps.setWaypoint({x,y:0,z,source:'bike',label:`Veículo ${plate}`});},
+  motoLocked:({locked})=>{keyChirp(settings.get().master,locked);if(activeModal==='moto'){panelDrawn='';renderMotoPanel();}},
   tradeInvite:invite=>trade.invited(invite),
   tradeUninvite:id=>trade.uninvited(id),
-  tradeSent:name=>notices.show({variant:'acao',title:'Negociação',text:`Esperando ${name} responder.`}),
   tradeNotice:text=>notices.show({variant:'aviso',title:'Negociação',text}),
   tradeState:view=>trade.state(view),
   tradeClosed:closed=>trade.closed(closed),
@@ -376,18 +445,16 @@ const network=new BarNetwork({
   foodReceipt:receipt=>{
     courier.receipt(receipt);
     if(receipt.balance!==undefined){if(inventory)inventory={...inventory,balance:receipt.balance};if(wardrobe)wardrobe={...wardrobe,balance:receipt.balance};renderBalance();}
-    notices.show({variant:'acao',title:`Entrega feita: ${receipt.customer}`,text:receipt.paid>0?`+${receipt.paid.toLocaleString('pt-BR')} moedas · ${'★'.repeat(receipt.stars)}${receipt.capped?' · você chegou ao teto de hoje':''}`:`Você já chegou ao teto de hoje: esta não pagou. ${'★'.repeat(receipt.stars)}`});
   },
   foodNotice:notice=>notices.show({variant:'aviso',...notice}),
-  motoReady:(at,towed)=>{
+  motoReady:at=>{
     courier.setOwned(true);
-    notices.show({variant:'acao',title:'A moto chegou',text:towed?'O guincho deixou a moto na rua mais perto.':'Siga o GPS até ela.'});
     gps.setWaypoint({x:at.x,y:0,z:at.z,source:'bike',label:'Sua moto'});
   },
   lights:openLightDesk,
   stage:update=>{
     if(update.open){openStage(update.price??livePrice('stage:pass'));return;}
-    if(update.until>0){if(activeModal==='stage')closeModal();notices.show({variant:'acao',title:'Palco liberado',text:`Seu ingresso vale ${stageMinutes(update.until,serverNow())} minutos. Suba pela escada!`});}
+    if(update.until>0){if(activeModal==='stage')closeModal();}
     else if(update.message)notices.show({variant:'aviso',title:'Palco',text:update.message});
   },
   voice:frame=>voice.receive(frame),
@@ -396,14 +463,13 @@ const network=new BarNetwork({
     notices.show({variant:'conquista',id:`badge-${badge.id}`,title:badge.name,text:badge.description,tone:BADGE_RARITY_INFO[badge.rarity].color,art:badgeMedal(badge),duration:9000,action:{label:'Ver a carta',run:()=>openBadgeCard(badge)}});
     if(profile.ownId)void profile.open(profile.ownId);
   },
+  broadcast:({text,by})=>notices.show({variant:'admin',title:by,text,duration:12000}),
   itemLost:item=>notices.show({variant:'aviso',title:'Sumiu do bolso',text:`Enquanto você estava apagado, levaram: ${itemById(item)?.name??item}.`}),
-  motoStruck:({hp,by})=>notices.show({variant:'aviso',title:'Atropelado',text:`${by||'Uma moto desgovernada'} passou por cima de você: -${hp} de vida.`}),
   deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
   deathScreen:screen=>deathUi.screen(screen),
   fight:(seq,stream,self)=>fight.decorate(seq,stream,self),
   fightState:(self,acked)=>fight.reconcile(self,acked),
   fightHit:onFightHit,
-  kicked:({hp,by})=>notices.show({variant:'aviso',title:'Chutado',text:hp?`${by} acertou um chute em você: -${hp} de vida.`:`${by} acertou um chute em você.`}),
   inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();if(activeModal==='storage')renderStorage();},
   inventoryResult:()=>{},
   storageState:onStorageState,
@@ -412,19 +478,16 @@ const network=new BarNetwork({
   wallet:change=>{
     if(inventory)inventory={...inventory,balance:change.balance};if(wardrobe)wardrobe={...wardrobe,balance:change.balance};
     renderBalance();blackjackUi.refresh();trucoUi.refresh();foosballUi.refresh();poolUi.refresh();trade.refresh();
-    if(change.reason==='job'&&change.delta)notices.show({variant:'acao',title:'Trabalho feito',text:`+${change.delta} moedas na carteira.`});
-    if(change.reason==='refund'&&change.delta)notices.show({variant:'acao',title:'Estorno',text:`${change.delta} moedas voltaram para a carteira.`});
   },
   table:update=>{
     tableOrder=update.status==='ordered'?update.order:undefined;
-    if(update.status==='delivered')notices.show({variant:'acao',title:'Chegou o pedido',text:update.message??'Ficou tudo na mesa. Bom apetite!'});
     if(update.status==='ordered'&&update.message)notices.show({variant:'aviso',title:'Pedido',text:update.message});
     if(update.status==='cancelled'&&update.message)notices.show({variant:'aviso',title:'Pedido cancelado',text:update.message});
     if(activeModal==='table')renderTableMenu();
   },
   job:update=>{
     if(update.task!==undefined)jobTask=update.task;
-    if(update.message)notices.show({variant:update.task?'acao':'aviso',title:'Trabalho',text:update.message});
+    if(update.message&&!update.task)notices.show({variant:'aviso',title:'Trabalho',text:update.message});
     if(activeModal==='jobs')$('#modal-content').innerHTML=jobsHtml(world,jobTask);
     renderJobCard();
   },
@@ -501,7 +564,7 @@ const phone=createPhone($('#game'),{
   food:courier,
 });
 /** VR (docs/sistemas/vr.md): a window, the phone, a table or a menu is open, so the headset shows the screen with the interface. */
-const vrWindowOpen=()=>inGame&&(!!activeModal||atFoosball()||atTruco()||atPool()||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||!$('#panel-menu').classList.contains('hidden')||document.body.classList.contains('watching-tv'));
+const vrWindowOpen=()=>inGame&&(!!activeModal||atFoosball()||atTruco()||atPool()||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen||document.body.classList.contains('watching-tv'));
 /** The VR button on top: only inside the bar, and only for whoever turned the VR on in Configurações. */
 function refreshVrButton():void {
   const button=document.querySelector<HTMLButtonElement>('#vr-button');if(!button)return;
@@ -524,12 +587,6 @@ async function toggleVr():Promise<void> {
   }catch(error){vrLog(`toggleVr falhou: ${errorMessage(error)}`);toast(errorMessage(error),true);refreshVrButton();}
 }
 watchVr(()=>refreshVrButton());
-/** The first time in the bar with the touch controls on: where the stick is, what dragging does. */
-function touchHint():void {
-  if(!touchMode())return;
-  try{if(localStorage.getItem('bar:touch-hint:v1'))return;localStorage.setItem('bar:touch-hint:v1','1');}catch{/* Shown again next time. */}
-  notices.show({variant:'acao',title:'Controles de toque',text:'Direcional à esquerda para andar, arraste a tela para olhar e use “Mais” para o resto.'});
-}
 async function enterBar():Promise<void> {
   if(inGame)return;
   if(!user?.verified){authMessage('Confirme seu e-mail antes de entrar no bar.');return;}
@@ -537,7 +594,7 @@ async function enterBar():Promise<void> {
   const attempt=admission.beginEntry();if(!attempt)return;
   // Entering is a click: the browser lets this page play voices from now on.
   voice.unlock();audio.unlock();
-  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);touchHint();refreshVrButton();$('#admin-button').classList.toggle('hidden',user?.role!=='admin');
+  inGame=true;$('#lobby').classList.add('hidden');$('#game').classList.remove('hidden');hud.forUser(user.id);refreshVrButton();
   performanceMonitor.forUser(user.id);
   try{
     $('#waiting').classList.remove('hidden');$('#waiting-message').textContent='Carregando o mapa do bar…';await scene.ready;
@@ -548,7 +605,7 @@ async function enterBar():Promise<void> {
     if(!admission.isCurrentEntry(attempt))return;
     blocked=new Set(result.blocked);wardrobe=owned;knownSkills=owned.skills.filter(skill=>skill.owned).map(skill=>skill.id);inventory=items;skillLoadouts=own?.loadouts??{};if(own)levelHud.set(own.xp);await network.connect();
     if(!admission.isCurrentEntry(attempt))return;
-    await voice.enter();phone.enter();levelHud.enter();
+    await voice.enter();phone.enter();levelHud.enter();menuHint();
     if(!admission.completeEntry(attempt)&&(admission.phase==='leaving'||admission.phase==='outside'))voice.leave();
   }
   catch(error){const departure=admission.failEntry(attempt);if(!departure)return;await leaveBarWith(departure);toast(errorMessage(error),true);}
@@ -985,14 +1042,14 @@ async function refreshAdministration():Promise<void>{
   try{
     const accountResult=await api<{user:PublicUser}>('/auth/me');if(user?.id!==owner||!inGame)return;
     const changed=user.role!==accountResult.user.role;user={...user,role:accountResult.user.role,isOwner:accountResult.user.isOwner};
-    $('#admin-button').classList.toggle('hidden',user.role!=='admin');
+
     performanceMonitor.refresh();
     if(user.role!=='admin'&&activeModal==='admin')closeModal();
-    if(changed)toast(user.role==='admin'?'Você recebeu acesso à administração.':'Sua permissão administrativa foi removida.');
+    if(changed){voice.setPushToTalk(false);renderVoice();pauseMenu.refresh();toast(user.role==='admin'?'Você recebeu acesso à administração.':'Sua permissão administrativa foi removida.');}
     const [result,inventoryResult]=await Promise.all([api<Wardrobe>('/wardrobe'),api<InventoryView>('/inventory')]);if(user?.id!==owner||!inGame)return;wardrobe=result;inventory=inventoryResult;renderBalance();
     knownSkills=result.skills.filter(skill=>skill.owned).map(skill=>skill.id);
     collection?.update(result);
-  }catch(error){if(error instanceof ApiError&&error.status===401&&user?.id===owner){user={...user,role:'user',isOwner:false};performanceMonitor.refresh();$('#admin-button').classList.add('hidden');if(activeModal==='admin')closeModal();}}
+  }catch(error){if(error instanceof ApiError&&error.status===401&&user?.id===owner){user={...user,role:'user',isOwner:false};performanceMonitor.refresh();if(activeModal==='admin')closeModal();}}
   finally{refreshingAdministration=false;}
 }
 setInterval(()=>{void refreshAdministration();},5000);
@@ -1098,7 +1155,8 @@ async function skins(focusOn?:string):Promise<void> {
     },focusOn);
   }catch(error){if(activeModal==='skins'&&generation===modalGeneration){closeModal();toast(errorMessage(error),true);}}
 }
-function help():void {showModal('Como é que funciona?',`<p class="modal-description">Não tem missão. A ideia é estar aqui.</p>${touchMode()?`<h3>No toque</h3>${keyGrid(TOUCH_KEYS)}`:''}${CONTROLS.map(group=>`<h3>${group.label}</h3>${keyGrid(group.keys)}`).join('')}<h3>Blackjack, do jeito da casa</h3><p>Suba ao salão de jogos, chegue perto da mesa e aperte E. Monte a aposta com as fichas e confirme em Apostar: a primeira aposta abre a rodada para a mesa toda. Chegue o mais perto possível de 21 sem passar. O ás vale 1 ou 11; figuras valem 10. Na sua vez: Pedir (1), Parar (2), Dobrar (3), Dividir (4) ou Desistir (5). Blackjack paga 3 para 2; com um ás do dealer à mostra, dá para fazer seguro. O dealer para em 17. As apostas são em moedas da carteira, de ${livePrice('blackjack:min-bet')} a ${livePrice('blackjack:max-bet')} por mão; sair no meio da rodada para as suas mãos onde estão. O ícone de ajuda da mesa mostra todas as regras.</p><h3>Pebolim</h3><p>As duas mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa cheia ou com partida rolando, você assiste. Quem abre a mesa escolhe 1 × 1 ou 2 × 2, quantos gols, um set ou melhor de 3, e pode chamar o Zé do Totó para as vagas (três níveis: tomou todas, na média ou sóbrio) ou marcar a partida valendo moedas (${livePrice('foosball:min-bet')} a ${livePrice('foosball:max-bet')} por jogador; quem vence leva o dobro). Quando todo mundo marca Pronto, a bola rola. Mexa o mouse (ou o dedo) e os bonecos seguem o ponteiro; clique ou Espaço chuta, segurar carrega a bomba; botão direito ou Shift levanta os bonecos para a bola passar. Vale o tempo de posse oficial: 10 s no meio e 15 s nas outras linhas. Sair no meio de uma partida valendo é W.O.; no amistoso, o Zé assume o lugar.</p><h3>Sinuca (bola 8)</h3><p>As três mesas ficam no salão de jogos, no andar de cima. Encoste numa e aperte E para pegar um lugar; mesa com partida rolando, você assiste. Jogue contra outra pessoa ou chame o Juca da Sinuca (iniciante, na média ou matador). Valem as regras da bola 8 da Noel Snooker: a moeda decide quem escolhe a saída, a branca da saída vai no quadro, e a primeira bola encaçapada define lisas e listradas. Mire com o mouse; segure o botão esquerdo e a força enche, solte e a tacada sai (o botão direito cancela; a roda faz o ajuste fino). O efeito na branca e a inclinação do taco ficam nos controles embaixo da mesa. A linha mostra onde a branca bate e para onde vai a bola. O ícone de ajuda da mesa mostra todas as regras e faltas.</p><h3>Moedas</h3><p>Trabalhe no bar (J) para ganhar moedas. Durante o turno, o painel Turno mostra a tarefa e o marcador verde leva até ela: arraste o painel pelo título, recolha ou esconda; o botão Turno, no topo, mostra de novo. Quem está sentado pode pedir para você: pegue o pedido no balcão e leve até a mesa. As mesas só aparecem para limpar quando têm o que recolher. Gaste com bebidas no balcão, pedidos na mesa, músicas na jukebox e vídeos nas TVs e no telão do palco. Pedido cancelado volta para a carteira.</p><p>A gelada do Magrão e o que você come ou bebe da mochila ficam na mão: dá para andar enquanto isso, e cada coisa dura o mesmo tempo que na mesa. Uma por vez na mão; na mesa, o pedido inteiro ao mesmo tempo. Cada coisa vira um ícone acima dos avisos, com um anel que esvazia e o tempo que falta.</p><h3>Pedido na mesa</h3><p>Sentado, aperte P e escolha até quatro itens. Você fica na mesa até o pedido chegar; dá para cancelar enquanto ele ainda está no balcão. Na mesa, cada coisa dura alguns minutos e faz efeito aos poucos. O que você terminar (ou deixar ao levantar) fica na mesa até alguém recolher: quem estiver trabalhando ou, sem ninguém no turno, o Tonico.</p><h3>Loja da casa</h3><p>No quintal, pise no anel dourado e aperte E para comprar bebidas, comidas e curativos. O que você compra vai para a mochila.</p><h3>Palco do quintal</h3><p>Só sobe no palco quem tem ingresso: 200 moedas, vale 30 minutos. Siga o marcador magenta até o pé da escada do palco e aperte E. O telão é à parte: encoste na frente do palco e aperte E (50 moedas por vídeo). As luzes do palco mudam de cor com o vídeo.</p><p>Lá em cima, chegue perto do violão, do cavaquinho, da bateria ou do microfone e aperte E para tocar. E de novo guarda o instrumento. Cada lugar tem um músico por vez.</p><h3>Celular</h3><p>K tira o celular do bolso (Esc guarda) e dá para andar com ele na mão. No Telefone, ligue para quem está no bar ou para um número da agenda: a ligação usa o seu microfone e a voz chega de qualquer canto do bar. No Highzap você conversa por mensagem, no Highgram publica as fotos da Câmera (tem selfie), e no HighBank manda Pix de moedas para outro jogador. Fotos, notas e ajustes ficam neste navegador.</p><h3>Aqui pode acontecer de tudo</h3><p>Apagões, festa e um frequentador inconveniente aparecem durante a noite. Sua partida continua valendo.</p>`,'help');}
+/** Como jogar: the menu's guide. */
+function help():void {pauseMenu.open({tab:'guia'});}
 
 app.addEventListener('click',event=>{
   const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');if(!button)return;
@@ -1121,6 +1179,7 @@ app.addEventListener('click',event=>{
       case 'people-tab':selectPeopleTab(button.dataset.tab==='account'?'account':'people');break;
       case 'account':people('account');break;
       case 'help':help();break;
+      case 'menu':pauseMenu.open();break;
       case 'interact':interact();break;
       case 'watch-tv':{const system=television.selectedSystem,self=world?.players[user?.id??''],nearest=system&&self?nearestMediaSource(system,self):undefined;if(!system||!nearest||nearest.distance>8){toast('Chegue mais perto desta TV.');break;}closeModal();watchingTv=true;document.body.classList.add('watching-tv');tvBack.hidden=false;scene?.watchTelevision(system.screens[nearest.index]);tvBack.focus();break;}
       case 'drink':{
@@ -1169,7 +1228,7 @@ app.addEventListener('click',event=>{
       case 'vehicle-control':sendVehicleControl(panelMoto,button.dataset.control!);break;
       case 'car-paint':{
         const car=world?.motos?.[panelMoto],color=document.querySelector<HTMLInputElement>('[data-car-color]')?.value;
-        if(car?.vehicleId&&color){await api('/vehicles/paint',{vehicleId:car.vehicleId,color});network.send('inventory.sync');toast('Pintura salva para este carro.');panelDrawn='';}break;
+        if(car?.vehicleId&&color){await api('/vehicles/paint',{vehicleId:car.vehicleId,color});network.send('inventory.sync');panelDrawn='';}break;
       }
       case 'jobs':openJobs();break;
       case 'job-start':network.send('job.start',{jobId:button.dataset.job});closeModal();break;
@@ -1185,11 +1244,11 @@ app.addEventListener('click',event=>{
       case 'voice-mute':{const id=button.dataset.id!;const muted=voice.toggleMute(id);peopleKey='';renderPeopleContent();break;}
       case 'settings':openSettings();break;
       case 'vr':await toggleVr();break;
-      case 'vr-log-copy':{const text=vrLogText();try{await navigator.clipboard.writeText(text);toast('Log do VR copiado: cole aqui na conversa.');}catch{const box=document.querySelector<HTMLTextAreaElement>('#vr-log');box?.select();toast('Selecionei o log: aperte Ctrl+C para copiar.');}break;}
+      case 'vr-log-copy':{const text=vrLogText();try{await navigator.clipboard.writeText(text);toast('Log do VR copiado: cole aqui na conversa.');}catch{toast('O navegador não deixou copiar: use Baixar.',true);}break;}
       case 'vr-log-save':{const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([vrLogText()],{type:'text/plain'}));link.download='vr-log.txt';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);break;}
-      case 'vr-log-clear':clearVrLog();{const box=document.querySelector<HTMLTextAreaElement>('#vr-log');if(box)box.value=vrLogText();}break;
+      case 'vr-log-clear':clearVrLog();toast('Log do VR apagado.');break;
       case 'dance':if(performing())break;network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
-      case 'close-modal':closeModal();break;
+      case 'close-modal':dismissModal();break;
       case 'block':{const id=button.dataset.id!;if(blocked.has(id)){await api(`/blocks/${encodeURIComponent(id)}`,undefined,'DELETE');blocked.delete(id);}else{await api('/blocks',{playerId:id});blocked.add(id);}renderPeopleContent();renderChat();break;}
       case 'report':showModal('Denunciar jogador',`<p class="modal-description">Conte o que aconteceu. Sua denúncia será revisada pela administração.</p><form id="report-form" data-id="${e(button.dataset.id)}"><label>Motivo<textarea name="reason" required minlength="5" maxlength="500" placeholder="Descreva a situação"></textarea></label><button class="button primary" type="submit">Enviar denúncia</button></form>`,'report');break;
       case 'mail':await mailbox();break;
@@ -1230,14 +1289,14 @@ app.addEventListener('submit',event=>{
   })();
 });
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'){if(watchingTv)stopWatchingTv();else if(!activeModal&&profile.closeTop()){}else if(phone.isOpen&&!activeModal)phone.close();else closeModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
+  if(event.key==='Escape'){if(watchingTv)stopWatchingTv();else if(!activeModal&&profile.closeTop()){}else if(phone.isOpen&&!activeModal)phone.close();else dismissModal();document.activeElement instanceof HTMLElement&&document.activeElement.blur();}
   // Closing must not reach the scene's own C handler on window, which would reopen the selector.
   if(event.code==='KeyC'&&!event.repeat&&activeModal==='skins'){event.preventDefault();event.stopPropagation();closeModal();}
   if(event.key==='Tab'&&activeModal){const focusable=Array.from($('#modal').querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea,a[href]'));const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
   if(inGame&&!typing()&&!event.repeat){
     if(event.code==='KeyM'){event.preventDefault();void toggleMicrophone();}
     if(event.code==='KeyI'){event.preventDefault();if(activeModal==='inventory')closeModal();else if(!activeModal)void openInventory().catch(error=>toast(errorMessage(error),true));}
-    if(event.code==='KeyB'&&settings.get().voiceMode==='ptt'){event.preventDefault();voice.setPushToTalk(true);}
+    if(event.code==='KeyB'&&settings.get().voiceMode==='ptt'&&(user?.role!=='admin'||event.altKey)){event.preventDefault();voice.setPushToTalk(true);}
     // P (pedido) orders at the table: T, like Enter, opens the chat (BarScene).
     if(event.code==='KeyP'&&!activeModal){event.preventDefault();openTableMenu();}
     else if(event.code==='KeyP'&&activeModal==='table')closeModal();
@@ -1255,8 +1314,9 @@ document.addEventListener('pointerover',event=>{
   if(slot&&activeModal==='inventory'&&selectedItem!==slot.dataset.item){selectedItem=slot.dataset.item??'';renderInventory();}
 });
 window.addEventListener('blur',()=>voice.setPushToTalk(false));
-$('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))closeModal();});
-$('#modal').addEventListener('input',event=>{
+$('#modal').addEventListener('click',event=>{if(event.target===$('#modal'))dismissModal();});
+/** A setting moved (the menu's Ajustes pages, or a window that still has one): applied at once, as it moves. */
+function settingInput(event:Event):void {
   const input=event.target as HTMLInputElement,key=input.dataset.setting;if(!key||input.type!=='range')return;
   if(key==='vr.resolution'){updateVr({resolution:Number(input.value)/100});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;return;}
   if(key.startsWith('graphics.')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input.value)});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';return;}
@@ -1264,8 +1324,8 @@ $('#modal').addEventListener('input',event=>{
   const value=Number(input.value)/100;
   if(key==='jukebox')jukebox.setVolume(value);else if(key==='television')television.setVolume(value);else settings.update({[key]:value} as Partial<GameSettings>);
   const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${Math.round(key==='mic'?value*200:value*100)}%`;
-});
-$('#modal').addEventListener('change',event=>{
+}
+function settingChange(event:Event):void {
   const target=event.target as HTMLElement;
   if(target instanceof HTMLInputElement&&target.name==='item'&&target.form?.id==='table-order'){tableMenuTotal(target.form);return;}
   const input=event.target as HTMLInputElement|HTMLSelectElement,key=input.dataset.setting;if(!key)return;
@@ -1274,15 +1334,17 @@ $('#modal').addEventListener('change',event=>{
   if(key==='vr.comfort'){updateVr({comfort:(input as HTMLInputElement).checked});return;}
   if(key==='vr.turn'){updateVr({turn:input.value==='smooth'?'smooth':'snap'});return;}
   if(key==='vr.snapDegrees'){updateVr({snapDegrees:Number(input.value) as 15|30|45});return;}
-  if(key.startsWith('graphics.')&&!(input instanceof HTMLInputElement&&input.type==='range')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input instanceof HTMLInputElement&&input.type==='checkbox'?input.checked:input.value)});if(key==='graphics.preset')openSettings();else{const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';}return;}
+  if(key.startsWith('graphics.')&&!(input instanceof HTMLInputElement&&input.type==='range')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input instanceof HTMLInputElement&&input.type==='checkbox'?input.checked:input.value)});if(key==='graphics.preset')pauseMenu.refresh();else{const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';}return;}
   if(key==='touchUi'){setTouchPreference(input.value==='on'||input.value==='off'?input.value:'auto');return;}
   if(key==='micEnabled'){void voice.setMicrophone((input as HTMLInputElement).checked);return;}
   if(key==='voicesEnabled'){voice.unlock();settings.update({voicesEnabled:(input as HTMLInputElement).checked});return;}
-  if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});openSettings();return;}
+  if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});pauseMenu.refresh();return;}
   if(key==='inputDevice')settings.update({inputDevice:input.value});
   if(key==='camera'&&isCameraMode(input.value)){settings.update({camera:input.value});syncCameraSettings();}
   if(key==='cameraDistance'){settings.update({camera:'third',cameraDistance:Number(input.value)});syncCameraSettings();}
-});
+  if(key.startsWith('vr.')||key==='touchUi')pauseMenu.refresh();
+}
+for(const target of [$('#modal'),$('#pause-menu')]){target.addEventListener('input',settingInput);target.addEventListener('change',settingChange);}
 renderAuth();renderChat();
 
 function typing():boolean {const element=document.activeElement as HTMLElement|null;return !!element&&(['INPUT','TEXTAREA','SELECT'].includes(element.tagName)||element.isContentEditable);}
@@ -1299,16 +1361,12 @@ applySound(settings.get());
 /** Microphone level on a −60…0 dB scale, 0–1. */
 const levelScale=(rms:number)=>Math.max(0,Math.min(1,(20*Math.log10(Math.max(rms,1e-6))+60)/60));
 function renderVoice():void {
-  const current=settings.get(),mic=$('#voice-mic'),listen=$('#voice-listen');
+  const current=settings.get(),mic=$('#voice-mic');
   mic.classList.toggle('on',voice.micActive);mic.classList.toggle('transmitting',voice.transmitting);
   mic.setAttribute('aria-pressed',String(voice.micActive));
-  const micLabel=voice.micActive?(current.voiceMode==='ptt'?'Microfone pronto · segure B para falar · M desliga':'Desligar microfone (M)'):'Ligar microfone (M)';
+  const micLabel=voice.micActive?(current.voiceMode==='ptt'?`Microfone pronto · segure ${user?.role==='admin'?'Alt+B':'B'} para falar · M desliga`:'Desligar microfone (M)'):'Ligar microfone (M)';
   mic.title=micLabel;mic.setAttribute('aria-label',micLabel);
-  mic.querySelector('.voice-icon')!.innerHTML=uiIcon(voice.micActive?'mic':'micOff');
-  listen.classList.toggle('off',!current.voicesEnabled);listen.setAttribute('aria-pressed',String(current.voicesEnabled));
-  const listenLabel=current.voicesEnabled?'Silenciar vozes':'Ouvir vozes';listen.title=listenLabel;listen.setAttribute('aria-label',listenLabel);
-  listen.querySelector('.voice-icon')!.innerHTML=uiIcon(current.voicesEnabled?'headphones':'headphonesOff');
-  if(activeModal==='settings'){
+  if(pauseMenu.isOpen){
     const status=document.querySelector('#voice-status');if(status)status.textContent=voice.status||(voice.micActive?'Microfone ligado.':'Microfone desligado.');
     const toggle=document.querySelector<HTMLInputElement>('[data-setting="micEnabled"]');if(toggle)toggle.checked=voice.micActive;
   }
@@ -1317,7 +1375,7 @@ function renderVoice():void {
 function renderVoiceLevel():void {
   const level=voice.micActive?levelScale(voice.level):0;
   $('#voice-mic').style.setProperty('--level',level.toFixed(3));
-  if(activeModal!=='settings')return;
+  if(!pauseMenu.isOpen)return;
   const fill=document.querySelector<HTMLElement>('#mic-meter-fill');if(fill){fill.style.width=`${level*100}%`;fill.classList.toggle('open',voice.transmitting);}
 }
 function syncCameraSettings():void {
@@ -1326,65 +1384,8 @@ function syncCameraSettings():void {
   if(distance)distance.value=String(current.cameraDistance);
 }
 const cameraFeelLabel=(name:keyof CameraFeel,value:number)=>name==='height'?`${value>0?'+':''}${Math.round(value*100)} cm`:`${Math.round(value*100)}%`;
-function openSettings():void {
-  const current=settings.get(),reason=voice.unavailableReason;
-  const feelRange=(name:keyof CameraFeel,label:string,min:number,max:number,step:number)=>`<label class="setting-row"><span>${label}</span><input type="range" min="${Math.round(min*100)}" max="${Math.round(max*100)}" step="${step}" data-setting="cameraFeel.${name}" value="${Math.round(current.cameraFeel[name]*100)}"><output>${cameraFeelLabel(name,current.cameraFeel[name])}</output></label>`;
-  const range=(key:string,label:string,value:number,scale=100,disabled=false)=>`<label class="setting-row"><span>${label}</span><input type="range" min="0" max="100" step="1" data-setting="${key}" value="${Math.round(value*100)}" ${disabled?'disabled':''}><output>${Math.round(value*scale)}%</output></label>`;
-  const toggle=(key:string,label:string,hint:string,checked:boolean,disabled=false)=>`<label class="setting-toggle"><span><b>${label}</b><small>${hint}</small></span><input type="checkbox" role="switch" data-setting="${key}" ${checked?'checked':''} ${disabled?'disabled':''}><i aria-hidden="true"></i></label>`;
-  // −60 dB (whisper) … −20 dB (loud) maps onto the meter's −60…0 dB scale.
-  const threshold=current.sensitivity*40/60*100;
-  showModal('Configurações',`<div class="settings-panel" data-capture-input>
-    <section><h3>${uiIcon('smartphone')} Controles de toque</h3>
-      <label class="setting-row device-row"><span>Controles na tela</span><select data-setting="touchUi">${([['auto','Automático (celular e tablet)'],['on','Sempre ligados'],['off','Desligados (teclado e mouse)']] as const).map(([value,label])=>`<option value="${value}" ${touchPreference()===value?'selected':''}>${label}</option>`).join('')}</select></label>
-      <p class="fine-print">Direcional à esquerda para andar (ou dirigir), botões à direita e “Mais” para o resto. Arraste a tela para girar a câmera, use dois dedos para aproximar ou afastar e toque numa pessoa ou veículo para abrir o menu dele.</p>
-    </section>
-    <section><h3>${uiIcon('glasses')} Realidade virtual (Meta Quest 2)</h3>
-      ${toggle('vr.enabled','Jogar com óculos VR','Mostra o botão de VR no topo, dentro do bar. Abra o jogo no Navegador do próprio Quest 2 (endereço https).',vrSettings().enabled)}
-      <p class="fine-print" id="vr-status">Verificando os óculos…</p>
-      <button type="button" class="button secondary" data-action="vr">${scene?.vrActive?'Sair do VR':'Entrar no VR agora'}</button>
-      <label class="setting-row device-row"><span>Girar com o direcional direito</span><select data-setting="vr.turn"><option value="snap" ${vrSettings().turn==='snap'?'selected':''}>Em passos (mais confortável)</option><option value="smooth" ${vrSettings().turn==='smooth'?'selected':''}>Suave</option></select></label>
-      <label class="setting-row device-row"><span>Tamanho do passo</span><select data-setting="vr.snapDegrees">${[15,30,45].map(degrees=>`<option value="${degrees}" ${vrSettings().snapDegrees===degrees?'selected':''}>${degrees}°</option>`).join('')}</select></label>
-      ${toggle('vr.light','Gráficos leves no VR','Usa o preset Baixo (sem sombras, cidade só por perto) enquanto está de óculos: recomendado, o VR desenha tudo duas vezes.',vrSettings().lightGraphics)}
-      ${toggle('vr.comfort','Anel de conforto','Escurece as bordas da visão quando você anda ou gira, o que ajuda contra o enjoo.',vrSettings().comfort)}
-      <label class="setting-row"><span>Resolução do VR</span><input type="range" min="50" max="100" step="5" data-setting="vr.resolution" value="${Math.round(vrSettings().resolution*100)}"><output>${Math.round(vrSettings().resolution*100)}%</output></label>
-      <div class="setting-row" style="flex-wrap:wrap;gap:8px"><button type="button" class="button secondary" data-action="vr-log-copy">Copiar log do VR</button><button type="button" class="button secondary" data-action="vr-log-save">Baixar log</button><button type="button" class="button secondary" data-action="vr-log-clear">Limpar log</button></div>
-      <textarea id="vr-log" readonly rows="6" style="width:100%;font:11px/1.3 monospace">${e(vrLogText())}</textarea>
-      <p class="fine-print">Quanto menor a resolução, mais fluido fica no Quest 2. A interface (janelas, celular, chat) aparece numa tela à sua frente: aponte com o controle e puxe o gatilho.</p>
-    </section>
-    ${graphicsSettingsHtml(current.graphics,scene?.getGraphics())}
-    <section><h3>${uiIcon('eye')} Câmera</h3>
-      <label class="setting-row device-row"><span>Visão</span><select data-setting="camera">${CAMERA_MODES.map(mode=>`<option value="${mode}" ${current.camera===mode?'selected':''}>${CAMERA_LABELS[mode]}</option>`).join('')}</select></label>
-      <label class="setting-row device-row"><span>Zoom</span><select data-setting="cameraDistance">${CAMERA_ZOOMS.map((zoom,index)=>`<option value="${zoom}" ${current.cameraDistance===zoom?'selected':''}>${CAMERA_ZOOM_LABELS[index]}</option>`).join('')}</select></label>
-      ${feelRange('height','Altura',-CAMERA_HEIGHT_LIMIT,CAMERA_HEIGHT_LIMIT,5)}${feelRange('sensitivity','Sensibilidade do mouse',CAMERA_SENSITIVITY_LIMITS[0],CAMERA_SENSITIVITY_LIMITS[1],5)}${feelRange('smoothing','Suavização',0,1,5)}
-      <p class="fine-print">A rodinha alterna entre perto, médio e longe; Q alterna entre a primeira pessoa e o zoom escolhido. Arraste para girar: a câmera dá a volta inteira em torno do personagem. Paredes e móveis aproximam a câmera, que se afasta de novo quando há espaço. Andando sem mexer o mouse, ela volta aos poucos para trás do personagem.</p>
-    </section>
-    <section><h3>${uiIcon('music')} Volume do jogo</h3>
-      ${range('master','Geral',current.master)}${range('music','Som ambiente',current.music)}${range('jukebox','Jukebox',jukebox.ownVolume)}${range('television','TVs',television.ownVolume)}${range('voice','Vozes',current.voice)}
-      <p class="fine-print">A cidade toca baixinho ao fundo, com transições suaves. O ambiente diminui enquanto a jukebox ou uma TV está em uso.</p>
-    </section>
-    <section><h3>${uiIcon('mic')} Chat de voz por proximidade</h3>
-      <p class="fine-print">Quem estiver a até ${VOICE.maxDistance} metros ouve você, mais alto quanto mais perto e do lado certo. A voz passa pelo servidor do bar e não é gravada.</p>
-      ${reason?`<p class="form-message error" role="alert">${e(reason)}</p>`:''}
-      ${toggle('micEnabled','Microfone','Atalho: M',voice.micActive,!!reason)}
-      ${toggle('voicesEnabled','Ouvir outras pessoas','Também no botão de fones do topo',current.voicesEnabled)}
-      <fieldset class="setting-choice"><legend>Quando transmitir</legend>
-        <label><input type="radio" name="voice-mode" data-setting="voiceMode" value="open" ${current.voiceMode==='open'?'checked':''}><span>Ao detectar voz</span></label>
-        <label><input type="radio" name="voice-mode" data-setting="voiceMode" value="ptt" ${current.voiceMode==='ptt'?'checked':''}><span>Segurando B</span></label>
-      </fieldset>
-      ${range('sensitivity','Sensibilidade',current.sensitivity,100,current.voiceMode==='ptt')}
-      ${range('mic','Volume do microfone',current.mic,200)}
-      <div class="mic-meter" role="presentation"><i id="mic-meter-fill"></i>${current.voiceMode==='open'?`<b style="left:${threshold.toFixed(1)}%" title="Acima desta marca, sua voz é transmitida"></b>`:''}</div>
-      <p id="voice-status" class="fine-print" role="status">${e(voice.status||(voice.micActive?'Microfone ligado.':'Microfone desligado.'))}</p>
-      <label class="setting-row device-row"><span>Dispositivo</span><select data-setting="inputDevice" id="voice-device"><option value="">Padrão do sistema</option></select></label>
-    </section>
-  </div>`,'settings');
-  void vrSupported().then(ok=>{const status=document.querySelector('#vr-status');if(status)status.textContent=ok?'Óculos detectados: é só entrar.':vrUnavailableReason();});
-  void voice.devices().then(devices=>{
-    const select=document.querySelector<HTMLSelectElement>('#voice-device');if(!select||activeModal!=='settings')return;
-    for(const [i,device] of devices.entries())if(device.deviceId&&device.deviceId!=='default'){const option=document.createElement('option');option.value=device.deviceId;option.textContent=device.label||`Microfone ${i+1}`;select.append(option);}
-    select.value=[...select.options].some(o=>o.value===settings.get().inputDevice)?settings.get().inputDevice:'';
-  });
-}
+/** Configurações: the menu's Ajustes. */
+function openSettings():void {pauseMenu.open({tab:'ajustes'});}
 
 async function start():Promise<void>{
   void network.syncEnvironment();
@@ -1408,8 +1409,8 @@ async function start():Promise<void>{
     onChat:()=>{if(inGame&&!activeModal)focusChat();},
     onSkins:()=>{if(inGame&&!activeModal)void skins();},
     onShowNames:showNames,
-    // B is also push-to-talk: with that voice mode the key keeps talking.
-    onFly:()=>{if(inGame&&!activeModal&&user?.role==='admin'&&settings.get().voiceMode!=='ptt')network.send('admin.fly',{on:!world?.players[user.id]?.animationState.startsWith('fly')});},
+    // Administrators always fly with B; their push-to-talk shortcut is Alt+B.
+    onFly:()=>{if(inGame&&!activeModal&&user?.role==='admin')network.send('admin.fly',{on:!world?.players[user.id]?.animationState.startsWith('fly')});},
     onSkillKey:code=>{const active=activeSkill();if(active?.key!==code)return false;useSkill();return true;},
     // The fist fight: R raises or lowers the guard; with it up the mouse buttons (and the touch buttons) punch.
     onGuard:()=>{if(!inGame||activeModal)return;const why=fight.toggle(world?.players[user?.id??'']);if(why)toast(why,true);},
@@ -1439,7 +1440,7 @@ async function start():Promise<void>{
       objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');
       const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');mediaProfiler.mark('blips');
       voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
-      const on=audio.enabled||media.some(m=>m.soundEnabled);if(on!==displayedSound){displayedSound=on;$('#audio-button').classList.toggle('sound-on',on);$('#audio-button').setAttribute('aria-pressed',String(on));$('#audio-button').setAttribute('aria-label',on?'Silenciar som da casa':'Ativar som da casa');}mediaProfiler.mark('audioButton');
+
     },
   });scene.setEnvironment(network.environment);scene.setEnabled(false);scene.setDeathAudio(deathAudio);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
@@ -1456,7 +1457,6 @@ function backdropAllowed():boolean{
   const saving=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection?.saveData;
   return !navigator.webdriver&&!saving&&!touchMode()&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
-let displayedSound:boolean|undefined;
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.

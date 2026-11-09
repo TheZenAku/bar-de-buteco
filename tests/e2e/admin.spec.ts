@@ -2,6 +2,7 @@ import {buyCard,showCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {CAR_MODEL,VEHICLE_CATALOG} from '../../packages/shared/src/vehicle-models';
+import {menuItem,openMenu,closeMenu} from './menu';
 
 const password='AdminBrowserTests2026!';
 test.beforeEach(async({request})=>{
@@ -40,7 +41,7 @@ test('veículos: gerenciar contas offline, reparar todos, transferir a chave e e
     }
     expect((await page.request.post('/api/admin/highfood/vehicle',{data:{playerId:source,owned:true,reason:'Veículo para teste da interface'}})).ok()).toBe(true);
     const vehicle=(await (await page.request.get(`/api/admin/vehicles?ownerId=${source}`)).json()).vehicles[0];
-    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await menuItem(page,'Você','Administração');await section(page,'vehicles');
     await page.getByLabel('Buscar veículos',{exact:true}).fill(vehicle.plate);
     await page.locator('[data-owned-form="search"]').getByRole('button',{name:'Buscar',exact:true}).click();
     await expect(page.locator('[data-owned-vehicles]')).toContainText('vehicle_source_ui');
@@ -81,7 +82,7 @@ test('veículos: registrar para jogador, personalizar placa e spawnar todos os m
     expect(response.ok()).toBe(true);const playerId=(await response.json()).user.id;
     const list=async()=>(await (await page.request.get(`/api/admin/vehicles?ownerId=${playerId}`)).json()).vehicles;
     const old=await list();if(old.length)expect((await page.request.post('/api/admin/vehicles',{data:{operation:'delete',ids:old.map((v:any)=>v.id),reason:'Limpar registro de teste',requestId:crypto.randomUUID()}})).ok()).toBe(true);
-    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await menuItem(page,'Você','Administração');await section(page,'vehicles');
     await expect(page.getByRole('tablist',{name:'Gerenciamento de veículos'}).getByRole('tab')).toHaveCount(3);
     await page.getByRole('tab',{name:'Registrar veículo',exact:true}).click();
     await page.getByLabel('Buscar jogador para registro',{exact:true}).fill(data.username);
@@ -108,7 +109,7 @@ test('veículos: registrar para jogador, personalizar placa e spawnar todos os m
     await page.getByRole('button',{name:'Fechar janela',exact:true}).click();
     await page.evaluate(()=>(window as any).barDebug.send('test.player.place',{x:60,y:0,z:7,rotation:0}));
     await expect.poll(()=>page.evaluate(()=>{const s=(window as any).barDebug.snapshot();return s.world.players[s.localId].x;})).toBeCloseTo(60,1);
-    await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'vehicles');
+    await menuItem(page,'Você','Administração');await section(page,'vehicles');
     await page.getByRole('tab',{name:'Spawn',exact:true}).click();
     await expect(page.getByLabel('Modelo para spawn',{exact:true}).locator('option')).toHaveCount(VEHICLE_CATALOG.length);
     for(const vehicle of VEHICLE_CATALOG){
@@ -126,7 +127,7 @@ test('veículos: registrar para jogador, personalizar placa e spawnar todos os m
 test('tempo e clima: administração altera hora, pausa, velocidade e tempestade para a sala',async({page})=>{
   test.setTimeout(150000);
   await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
-  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'environment');
+  await menuItem(page,'Você','Administração');await section(page,'environment');
   await expect(page.getByLabel('Horário',{exact:true})).toBeVisible();
   await page.getByLabel('Horário',{exact:true}).fill('18:30');
   await page.getByLabel('Duração do dia (minutos reais)',{exact:true}).fill('60');
@@ -149,7 +150,7 @@ test('desempenho: coleta real, HUD fora da administração, pausas, preferência
   test.setTimeout(180000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
-  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'performance');
+  await menuItem(page,'Você','Administração');await section(page,'performance');
   const collect=page.getByRole('checkbox',{name:'Coletar desempenho',exact:true});
   await collect.check();
   await page.getByLabel('Cenário desta análise',{exact:true}).fill('Validação do relatório detalhado');
@@ -176,7 +177,7 @@ test('desempenho: coleta real, HUD fora da administração, pausas, preferência
   // One real main-thread stall must remain measurable above the engine's clamped delta time.
   await page.evaluate(()=>{const start=performance.now();while(performance.now()-start<180){/* deliberate test stall */}});
   await expect(overlay.locator('header')).toContainText('AO VIVO');
-  await page.getByRole('button',{name:'Administração',exact:true}).click();
+  await menuItem(page,'Você','Administração');
   await expect(page.locator('[data-perf-status]')).toContainText('pausada');
   await expect(page.locator('[data-perf-events-count]')).not.toHaveText(/^0 registros/);
   await page.getByRole('button',{name:'Marcar ponto no relatório',exact:true}).click();
@@ -200,7 +201,7 @@ test('desempenho: coleta real, HUD fora da administração, pausas, preferência
   await page.getByRole('button',{name:'Zerar análise',exact:true}).click();await expect(page.locator('[data-perf-status]')).toContainText('0 frames');
   await page.reload();await page.getByRole('button',{name:'Entrar no bar',exact:true}).click();await ready(page);
   await expect(overlay).toBeVisible();await expect(overlay).toHaveAttribute('data-corner','top-left');
-  await page.getByRole('button',{name:'Administração',exact:true}).click();await section(page,'performance');
+  await menuItem(page,'Você','Administração');await section(page,'performance');
   await expect(collect).toBeChecked();await expect(page.getByRole('checkbox',{name:'Memória JS do cliente',exact:true})).toBeChecked();
   await collect.uncheck();await expect(overlay).toBeHidden();
   expect(errors).toEqual([]);
@@ -214,11 +215,11 @@ test('administração ingame: moedas, loja sincronizada, delegação, expulsão 
   await page.addInitScript(()=>Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true}));
   try{
     await enter(page,'primary_admin','rafaelrodrigues-2017@hotmail.com');
-    await page.getByRole('button',{name:'Administração',exact:true}).click();
+    await menuItem(page,'Você','Administração');
     await expect(page.locator('.admin-nav-head')).toContainText('Conta principal');
     // The administrator is using the panel while the other browser joins; avoid rendering
     // two full 3D worlds simultaneously on the test machine's software GPU.
-    await enter(other,name,email);await expect(other.locator('#admin-button')).toBeHidden();
+    await enter(other,name,email);await openMenu(other,'Você');await expect(other.locator('#pause-menu [data-pm-entry="admin"]')).toHaveCount(0);await closeMenu(other);
     await section(page,'players');
     await page.route(/\/api\/admin\/overview\?/,async route=>{if(new URL(route.request().url()).searchParams.get('search')===email)await new Promise(resolve=>setTimeout(resolve,350));await route.continue();});
     await page.getByLabel('Buscar jogador',{exact:true}).fill(email);await page.getByRole('button',{name:'Buscar',exact:true}).click();
@@ -264,15 +265,15 @@ test('administração ingame: moedas, loja sincronizada, delegação, expulsão 
     await page.getByRole('button',{name:'Dar administrador',exact:true}).click();
     await page.getByLabel('Motivo da ação',{exact:true}).fill('Delegar testes de moderação');
     await page.getByRole('button',{name:'Conceder administrador',exact:true}).click();
-    await expect(other.locator('#admin-button')).toBeVisible({timeout:20000});
-    await other.getByRole('button',{name:'Administração',exact:true}).click();
+    await openMenu(other,'Você');await expect(other.locator('#pause-menu [data-pm-entry="admin"]')).toBeVisible({timeout:20000});
+    await other.locator('#pause-menu [data-pm-entry="admin"]').click();
     await expect(other.locator('.admin-nav-head')).toContainText('Administrador');
     await section(other,'players');await expect(other.locator('.admin-player-detail h3')).toBeVisible();await fileTab(other,'Moderação');
     await expect(other.getByRole('button',{name:'Dar administrador',exact:true})).toHaveCount(0);
     await page.getByRole('button',{name:'Remover administrador',exact:true}).click();
     await page.getByLabel('Motivo da ação',{exact:true}).fill('Encerrar permissão de teste');
     await page.locator('.admin-confirmation').getByRole('button',{name:'Remover administrador',exact:true}).click();
-    await expect(other.locator('#admin-button')).toBeHidden({timeout:20000});await expect(other.getByRole('dialog')).toBeHidden();
+    await expect(other.locator('#modal')).toBeHidden({timeout:20000});await openMenu(other,'Você');await expect(other.locator('#pause-menu [data-pm-entry="admin"]')).toHaveCount(0);await closeMenu(other);
     await page.getByRole('button',{name:'Expulsar',exact:true}).click();await page.getByLabel('Motivo da ação',{exact:true}).fill('Testar encerramento da participação');
     await page.getByRole('button',{name:'Expulsar jogador',exact:true}).click();
     await expect(other.locator('#lobby')).toBeVisible({timeout:20000});await expect(other.locator('#auth-message')).toContainText('Sua conta não está banida');

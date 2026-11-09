@@ -2,6 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 import {previewPath} from './preview-path';
 import {wearCard} from './collection-helpers';
 import {aimCamera} from './camera-helpers';
+import {menuItem} from './menu';
 
 interface CameraState {mode:'first'|'third';distance:number;reach:number;boom:number;yaw:number;pitch:number;position:number[]}
 const camera=(page:Page):Promise<CameraState>=>page.evaluate(()=>(window as any).barDebug.camera());
@@ -89,7 +90,7 @@ test('camera steps between three zooms, rotates, restores preferences and change
       new MutationObserver(()=>{for(const notice of document.querySelectorAll('.comanda'))if(notice.textContent?.includes('Câmera'))(window as any).cameraNotices.push(notice.textContent);})
         .observe(document.querySelector('#toasts')!,{childList:true,subtree:true,characterData:true});
     });
-    await page.getByRole('button',{name:'Configurações',exact:true}).click();
+    await menuItem(page,'Ajustes','Câmera');
     const distance=page.locator('[data-setting="cameraDistance"]'),mode=page.locator('[data-setting="camera"]');
     await expect(mode.locator('option')).toHaveCount(2);
     await expect(distance.locator('option')).toHaveText(['Perto','Médio','Longe']);
@@ -135,7 +136,7 @@ test('camera steps between three zooms, rotates, restores preferences and change
     expect(await page.evaluate(()=>(window as any).cameraNotices)).toEqual([]);
     await page.reload();await page.getByRole('button',{name:'Entrar no bar'}).click();await ready(page);
     await expect.poll(()=>camera(page)).toMatchObject({mode:'third',distance:chosen,reach:chosen});
-    await page.getByRole('button',{name:'Configurações',exact:true}).click();
+    await menuItem(page,'Ajustes','Câmera');
     await expect(page.locator('[data-setting="cameraDistance"]')).toHaveValue(String(chosen));
     expect(errors).toEqual([]);
   }finally{await page.request.post('/api/auth/logout',{data:{}});}

@@ -7,7 +7,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import {appendOldCane} from './lib/old-cane.mjs';
 import {createRetarget} from './lib/animation-retarget.mjs';
 import {mixamoBoneName} from './lib/mixamo-names.mjs';
-import {polishWalkCycle} from './lib/walk-cycle.mjs';
+import {evenStance,polishWalkCycle} from './lib/walk-cycle.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const anim = path.join(root, 'assets-bar/anim');
@@ -20,12 +20,19 @@ const clips = {
   // use the polished Mixamo sources, retargeted from their taller reference skeleton.
   Drink: {filename:'bebendo'}, Fallen: {filename:'bebado-caido'}, Deal: {filename:'carta-distribui'},
   Shuffle: {filename:'carta-recomeco'}, CardsSit: {filename:'carta-sentado'}, AngrySit: misc('Sitting Angry.fbx'),
-  Kick: {filename:'karate-kick'}, Bartend: {filename:'Bartending'},
-  // Rafael's jump kick lands away from where it took off: inPlace brings the hip back, the server holds the avatar still.
-  AirKick: {filename:path.join('misc','Drop Kick.fbx'),mixamo:true,inPlace:true},
+  // The kicks stand on one foot, which slides in the sources: pinned (`anchor`), and the body only ever goes forward with it (`stays`).
+  Kick: {filename:'karate-kick',anchor:'foot_l',stays:true}, Bartend: {filename:'Bartending'},
+  // Rafael's jump kick lands away from where it took off: that way forward is root motion (`anchor`), the room carries the body.
+  AirKick: {filename:path.join('misc','Drop Kick.fbx'),mixamo:true,anchor:'hip',sideways:true},
+  // His karate with the guard up goes round two more kicks (KARATE_ROUND in packages/shared/src/kick.ts): high with the right leg, front with the
+  // left. After changing either, run npm run assets:kicks.
+  KickHigh: {...misc('Mma Kick.fbx'),rate:1.15,anchor:'foot_l',stays:true}, KickFront: {...misc('Kicking.fbx'),rate:1.35,anchor:'foot_r',stays:true},
   // Standard Run was exported with root motion: inPlace removes its forward travel (the server moves the avatar).
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
+  // The everyday pace (WALK_SPEED, 3.5 m/s) is a jog: the relaxed walk keeps up only to about 2.4 m/s. BarScene picks it by speed; NPCs keep walking.
+  // `even`: its foot on the floor speeds up and slows down in the source; re-timed to one speed so one playback rate keeps it planted.
+  Jog: {...misc('Jogging.fbx'),even:true},
   Wave: misc('Waving Gesture.fbx'), Use: misc('Button Pushing.fbx'),
   // A restrained nod to the bartender, played once above a planted idle (never a looping wait pose).
   Order: misc('Acknowledging.fbx'),
@@ -36,15 +43,17 @@ const clips = {
   // they start and end on the same guard, so a punch, the next one and a reaction follow each other without a jump. `rate` plays the source faster,
   // baked into the clip: its length here is the length in the game. After changing any of these, run npm run assets:punches.
   FightIdle: misc('Bouncing Fight Idle.fbx'),
-  Jab: {...misc('Lead Jab (1).fbx'),rate:1.3}, Cross: {...misc('Elbow Punch.fbx'),rate:1.5}, Hook: {...misc('Punching.fbx'),rate:1.3},
-  Heavy: {...misc('Hook Punch.fbx'),from:.2,rate:1.25},
+  // Their step in and back is root motion (`anchor`): the room moves the body with it (fight.ts, punchStep), so a punch cut short by the next one
+  // or by walking leaves the body where the step had taken it, instead of snapping it back to where the punch started.
+  Jab: {...misc('Lead Jab (1).fbx'),rate:1.3,anchor:'hip'}, Cross: {...misc('Elbow Punch.fbx'),rate:1.5,anchor:'hip'}, Hook: {...misc('Punching.fbx'),rate:1.3,anchor:'hip'},
+  Heavy: {...misc('Hook Punch.fbx'),from:.2,rate:1.25,anchor:'hip'},
   HitLight: {...misc('Head Hit (2).fbx'),rate:1.1}, HitMedium: misc('Medium Hit To Head.fbx'), HitSide: {...misc('Head Hit (1).fbx'),rate:1.1},
   HitHeavy: misc('Head Hit.fbx'), HitBack: misc('Standing React Small From Back.fbx'),
   // The legs in the guard (the arms stay up by a masked layer): back, and to each side. Forward is Walk.
   FightBack: misc('Standing Walk Back.fbx'), FightLeft: misc('Left Strafe Walking.fbx'), FightRight: misc('Right Strafe Walking.fbx'),
 };
 // Clips that only some skins use: Rafael's skills, in every variant of him (SKILLS in packages/shared), Seu Zé's (Magrão) work behind the counter.
-const exclusive = { Kick: ['rafael', 'rafael-rose'], AirKick: ['rafael', 'rafael-rose'], Bartend: ['magrao'] };
+const exclusive = { Kick: ['rafael', 'rafael-rose'], AirKick: ['rafael', 'rafael-rose'], KickHigh: ['rafael', 'rafael-rose'], KickFront: ['rafael', 'rafael-rose'], Bartend: ['magrao'] };
 const FIGHT_CLIPS = new Set(['FightIdle', 'Jab', 'Cross', 'Hook', 'Heavy', 'HitLight', 'HitMedium', 'HitSide', 'HitHeavy', 'HitBack', 'FightBack', 'FightLeft', 'FightRight']);
 const NPC_ONLY = new Set(['magrao', 'tonico']);
 const seatedClips = new Set(['CardsSit', 'AngrySit', 'Sit']);
@@ -191,11 +200,28 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
       console.log(`${id}: ${name} travels ${(travel.length() * scale / duration).toFixed(2)} m/s at 1x (MIXAMO_PACE)`);
     }
     let firstHip, seatedOffset = 0;
+    // Root motion: the way the anchor (the hips, or the foot a kick stands on) goes forward and back is taken out of the hip, so the anchor stays put
+    // in the clip, and kept as `root` (m, every frame; `sideways`: also to the left, `rootX`) for the room to move the body the same way. Played
+    // through, the body goes exactly where the source went; cut short, it stays where it had got to. `stays`: the most it went forward so far, never
+    // back (a foot that slid back in the source stays put).
+    const anchor = definition.anchor ? sourceBones.get(definition.anchor) : undefined, root = [], rootX = [];
+    if (definition.anchor && (!anchor || !adapted)) throw new Error(`${name}: anchor ${definition.anchor} needs a retargeted clip with that bone`);
+    let anchorFrom, ahead = -Infinity;
+    // `even`: where each foot is (forward, up) every frame, to re-time the clip by the foot on the floor.
+    const feetWay = [];
     for (const time of times) {
       // Avoid AnimationMixer wrapping the final frame back to zero.
       mixer.setTime(Math.min(from + time, clip.duration - 1e-6)); source.updateMatrixWorld(true);
       const sourceHip = sourceBones.get('hip').getWorldPosition(new Vector3()).multiplyScalar(sourceUnit);
       if (travel) sourceHip.addScaledVector(travel, -time / duration);
+      if (definition.even) feetWay.push(['foot_l', 'foot_r'].map(foot => { const p = sourceBones.get(foot).getWorldPosition(new Vector3()).multiplyScalar(sourceUnit); return [p.z, p.y]; }));
+      if (anchor) {
+        const at = anchor.getWorldPosition(new Vector3()).multiplyScalar(sourceUnit);
+        anchorFrom ??= at.clone();
+        ahead = definition.stays ? Math.max(ahead, at.z - anchorFrom.z) : at.z - anchorFrom.z;
+        sourceHip.z -= at.z - anchorFrom.z; root.push(+(ahead * scale).toFixed(4));
+        if (definition.sideways) { sourceHip.x -= at.x - anchorFrom.x; rootX.push(+((at.x - anchorFrom.x) * scale).toFixed(4)); }
+      }
       if (!firstHip) {
         firstHip = sourceHip.clone();
         if (seatedClips.has(name)) seatedOffset = 0.56 - (adapted ? model.byName.get('hip').getWorldPosition(new Vector3()).y + (sourceHip.y - 0.956) * scale : sourceHip.y);
@@ -241,10 +267,13 @@ for (const id of skins.filter(id=>!requested.length||requested.includes(id))) {
     if(name==='Walk'&&rate===1){
       const polished=polishWalkCycle(times,rotations,translations);
       ({times,rotations,translations}=polished);outputDuration=polished.duration;
+    }else if(definition.even&&rate===1){
+      const polished=polishWalkCycle(times,rotations,translations,{stretch:1,warp:evenStance(times,feetWay)});
+      ({times,rotations,translations}=polished);outputDuration=polished.duration;
     }
     if(rate!==1){times=times.map(time=>time/rate);outputDuration/=rate;}
     const input=accessor(times,1);
-    const animation = { name, channels: [], samplers: [] };
+    const animation = { name, channels: [], samplers: [], ...(anchor ? { extras: { root, ...(definition.sideways ? { rootX } : {}) } } : {}) };
     model.nodes.forEach((node, index) => {
       if (model.json.nodes[index].mesh !== undefined) return;
       for (const [property, data, size] of [['rotation', rotations[index], 4], ['translation', translations[index], 3]]) {

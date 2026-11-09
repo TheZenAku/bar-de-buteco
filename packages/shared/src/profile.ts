@@ -26,8 +26,8 @@ export const AIR_KICK_DURATION_MS = 2900;
 export interface Skill {id:string;skin:string;name:string;description:string;clip:string;durationMs:number;icon:string;rarity:Rarity;price:number}
 export const SKILLS:readonly Skill[]=[
   {id:'horse',skin:'tiao',name:'Cavalo do Tião',description:'Chama seu cavalo e monta na sela. WASD para andar, Shift para acelerar. Repita a skill ou E para desmontar. Só ao ar livre.',clip:'Sit',durationMs:0,icon:'horse',rarity:'epic',price:800},
-  {id:'karate',skin:'rafael',name:'Golpe de karatê',description:'Um golpe rápido, com os pés no chão. Quem leva voa longe e perde 6 de vida.',clip:'Kick',durationMs:KICK_DURATION_MS,icon:'kick',rarity:'rare',price:500},
-  {id:'air-kick',skin:'rafael',name:'Chute voador',description:'Salta, acerta com os dois pés e cai de costas no chão. Quem leva voa mais longe ainda e perde 10 de vida.',clip:'AirKick',durationMs:AIR_KICK_DURATION_MS,icon:'bolt',rarity:'epic',price:800},
+  {id:'karate',skin:'rafael',name:'Golpe de karatê',description:'Um golpe rápido, com os pés no chão. Quem leva voa longe e perde 12 de vida.',clip:'Kick',durationMs:KICK_DURATION_MS,icon:'kick',rarity:'rare',price:500},
+  {id:'air-kick',skin:'rafael',name:'Chute voador',description:'Salta, acerta com os dois pés e cai de costas no chão. Quem leva voa mais longe ainda e perde 20 de vida.',clip:'AirKick',durationMs:AIR_KICK_DURATION_MS,icon:'bolt',rarity:'epic',price:800},
 ];
 export const skillById=(id:string|undefined):Skill|undefined=>SKILLS.find(skill=>skill.id===id);
 export const skillsOf=(skin:string|undefined):readonly Skill[]=>{const base=skin?skinBase(skin):undefined;return SKILLS.filter(skill=>skill.skin===base);};

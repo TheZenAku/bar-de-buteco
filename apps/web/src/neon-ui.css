@@ -146,7 +146,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 .returning-user small{display:block;overflow-wrap:anywhere;color:var(--muted-foreground);font-family:var(--font-mono)}
 .avatar,.profile-initial{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;background:var(--secondary);border:1px solid var(--key);font:600 16px var(--font-display);color:var(--foreground);text-transform:uppercase}
 
-/* In-game header: the logo on the left; the toolbar and, at the end, the wallet on the right */
+/* In-game header: the logo on the left; the microphone (only while on), the level and the wallet on the right. The rest is in the pause menu (Esc). */
 .game{position:fixed;inset:0;pointer-events:none;overflow:hidden;isolation:isolate;user-select:none}
 .game .messages,.game input{user-select:text}
 .game-header{position:absolute;inset:12px 16px auto;display:flex;gap:6px;align-items:flex-start;z-index:100;pointer-events:none}
@@ -154,23 +154,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--vw-pink)}
 .boteco-logo{margin:0 auto 0 0;line-height:0}
 .boteco-logo img{display:block;width:56px;height:56px;filter:drop-shadow(0 2px 8px oklch(0 0 0 / 60%))}
 .game-header .hud-wallet{min-height:44px;padding:0 16px;align-content:center;font-size:15px}
-.game-tools{display:flex;gap:1px;align-items:stretch}
-.game-tools .hud-btn,.voice-tools .hud-btn{position:relative;min-width:44px;height:44px;padding:0 12px;color:var(--soft)}
-.game-tools .hud-btn:hover{color:var(--foreground)}
-.game-tools [aria-expanded=true],.game-tools [aria-expanded=true]:hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
-.tool-label{font-size:12px}
-.muted-mark{position:absolute;top:50%;left:50%;width:24px;height:1.5px;background:var(--destructive);transform:translate(-50%,-50%) rotate(-45deg)}
-.sound-on .muted-mark{display:none}
-.panel-menu{position:absolute;top:52px;right:0;width:260px;padding:8px 0;z-index:101;background:oklch(.12 .045 300 / 97%)}
-.panel-menu>.eyebrow{padding:6px 16px 10px;font-size:10px}
-.panel-menu>button:not(.hud-btn){display:flex;gap:12px;align-items:center;width:100%;padding:10px 16px;text-align:left;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft)}
-.panel-menu>button:not(.hud-btn):hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
-.panel-menu>button>span{flex:1}
-.panel-menu>button .ui-icon{width:16px;height:16px}
-.panel-menu [data-hud-visible][aria-pressed=false]{opacity:.45}
-.panel-menu>[data-hud-lock]{margin-bottom:6px;border-bottom:1px solid var(--border)}
-.panel-menu>[data-hud-lock][aria-pressed=true],.panel-menu>[data-fullscreen][aria-pressed=true]{color:var(--hl-magenta)}
-.panel-menu>.hud-btn{margin:8px 16px 4px;width:calc(100% - 32px);background:var(--secondary)}
 
 /* The movable panels: the reference's detail card (the job panel only during a shift) */
 .game>.hud-panel{position:absolute;pointer-events:auto;max-height:calc(100dvh - 94px);display:flex;flex-direction:column;min-width:0}
@@ -415,15 +398,12 @@ button.inventory-slot:hover{background:var(--secondary)}
 @keyframes comanda-run{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 
 @media(max-width:1100px){
-  .game-tools .hud-btn,.voice-tools .hud-btn{padding:0 9px;min-width:40px}
-  .tool-label{font-size:11px}
   .boteco-logo img{width:48px;height:48px}
   .panel-heading{padding:9px 10px 9px 6px;gap:6px}
   .panel-heading h2{font-size:13px}
   .hud-content{padding:10px 12px}
   .panel-foot{margin:10px -12px -10px;padding:8px 12px}
 }
-@media(max-width:1100px) and (min-width:761px){.game-tools .tool-label{display:none}}
 @media(max-width:959px) and (min-width:761px){.prompts{bottom:32px}}
 @media(max-width:760px){
   .menu-header{padding:20px 16px;flex-wrap:wrap;gap:14px}
@@ -450,16 +430,10 @@ button.inventory-slot:hover{background:var(--secondary)}
   .shop-item{grid-template-columns:42px minmax(0,1fr) auto}
   .shop-item .mini-button{grid-column:2/-1}
   .help-grid{grid-template-columns:76px 1fr}
-  /* The header in two rows: title, account and money; the toolbar below. */
-  .game-header{inset:8px 10px auto;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:'logo . wallet' 'tools tools tools';gap:6px 1px;align-items:center}
-  .boteco-logo{grid-area:logo}
+  .game-header{inset:8px 10px auto;gap:4px;align-items:center}
   .boteco-logo img{width:40px;height:40px}
-  .game-header .hud-wallet{grid-area:wallet;min-height:40px;padding:0 12px;font-size:13px}
-  .game-tools{grid-area:tools;justify-content:flex-end;flex-wrap:wrap}
-  .game-tools .hud-btn,.voice-tools .hud-btn{height:36px;min-width:36px;padding:0 8px}
-  .game-tools .ui-icon{width:17px;height:17px}
-  .tool-label{display:none}
-  .game-header .panel-menu{top:96px;width:250px}
+  .game-header .hud-wallet{min-height:40px;padding:0 12px;font-size:13px}
+  .hud-mic,.hud-menu{width:40px;height:40px}
   .game>.hud-panel{max-height:calc(100dvh - 125px)}
   .panel-heading{padding:8px 8px 8px 4px;gap:4px;min-height:42px}
   .panel-heading h2{font-size:12px;letter-spacing:.06em}

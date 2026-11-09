@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FIGHT,FIGHT_MOVES,TICK_MS,fistPath,punchAim,type FightHit,type PlayerInput,type PunchId} from '@bar/shared';
+import {FIGHT,FIGHT_MOVES,TICK_MS,fistPath,punchAim,punchRoot,type FightHit,type PlayerInput,type PunchId} from '@bar/shared';
 import {Player} from '../src/state.js';
 import {FightDirector,type FightHost} from '../src/world/fight.js';
 
@@ -135,19 +135,21 @@ test('a blow cuts short the punch the one hit was throwing: their heavy never la
   assert.equal(r.fights.activeOf('b'),undefined);
 });
 
-test('a punch plants the feet: keys held do nothing until it lets go, and a second punch is not taken meanwhile',()=>{
+test('a punch plants the feet: keys held do nothing until it lets go (the body only goes with the clip\'s own step), and a second punch is not taken meanwhile',()=>{
   const r=room(),a=r.add('a',OPEN.x,OPEN.z,0);
   r.tick(new Map([[a,{...r.punch(a,'jab'),dx:1}]]));
   const start={x:a.x,z:a.z},move=FIGHT_MOVES.jab;
   for(let i=1;i<move.lockSteps;i++){
     assert.ok(r.fights.busy(a,a.lastProcessedInput,r.now));
     r.tick(new Map([[a,{dx:1,...(i===2?r.punch(a,'cross'):{})}]]));
-    assert.deepEqual({x:a.x,z:a.z},start,`planted at step ${i}`);
+    assert.equal(a.x,start.x,`planted at step ${i}`);
+    assert.ok(Math.abs(a.z-start.z-punchRoot('nathan','jab',i+1)+punchRoot('nathan','jab',1))<1e-6,`only the jab's own step at step ${i}`);
   }
   assert.equal(a.fist.punch,'jab','the cross pressed meanwhile was not thrown (the browser keeps it for when the feet are free)');
   r.tick(new Map([[a,{dx:1}]]));
   assert.ok(a.x>start.x,'walks again');
   assert.ok(Math.abs(a.x-start.x-FIGHT.speed*TICK_MS/1000)<1e-6,'at the guard\'s pace');
+  assert.ok(Math.abs(a.z-start.z-punchRoot('nathan','jab',move.lockSteps)+punchRoot('nathan','jab',1))<1e-6,'and the jab\'s step back stops with the player\'s own');
   // Free feet: the chain goes on.
   r.tick(new Map([[a,r.punch(a,'cross')]]));
   assert.equal(a.fist.punch,'cross');
@@ -172,4 +174,13 @@ test('the guard: refused once while the hands are busy, lowered by anything that
   b.interactionState='';// as if the room let the input through
   r.fights.move(b,{seq:999,dx:0,dz:0,running:false,fight:true,...r.punch(b,'jab',a)},r.now,false,[]);
   assert.equal(b.fist.punch,'');
+});
+
+test('the guard walks short steps, and runs with Shift (the room checks the stamina before)',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0);
+  r.tick(new Map([[a,{dz:1}]]));
+  assert.ok(Math.abs(a.z-OPEN.z-FIGHT.speed*TICK_MS/1000)<1e-6);assert.equal(a.animationState,'walk');
+  const from=a.z;r.tick(new Map([[a,{dz:1,running:true}]]));
+  assert.ok(Math.abs(a.z-from-FIGHT.runSpeed*TICK_MS/1000)<1e-6);assert.equal(a.animationState,'run');
+  assert.equal(a.fist.fight,true,'The guard stays up');
 });

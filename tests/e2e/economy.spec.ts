@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {walk} from './walk';
+import {menuItem,closeMenu} from './menu';
 
 const password='EconomiaBrowser2026!';
 test.beforeEach(async({request})=>{
@@ -25,14 +26,15 @@ test('jobs, the table menu and the graphics options are wired to the live room a
   await expect(page.locator('.job-meta')).toContainText('0/2 vagas');
   await page.getByRole('button',{name:'Começar turno'}).click();
   await expect(page.locator('#toasts')).toContainText('balcão');
-  await expect(page.locator('[data-panel="job"]')).toBeHidden();await expect(page.locator('.game-tools [data-hud-visible="job"]')).toBeHidden();
+  await expect(page.locator('[data-panel="job"]')).toBeHidden();
+  await menuItem(page,'Ajustes','Interface');await expect(page.locator('#pause-menu [data-pm-act="job"]')).toHaveCount(0);await closeMenu(page);
   // Standing, P explains how to order from Tonico instead of opening the menu.
   await page.keyboard.press('KeyP');
   await expect(page.locator('#toasts')).toContainText('Sente-se');
   await expect(page.locator('#modal')).toBeHidden();
   await expect(page.locator('#table-cta')).toBeHidden();
   // Graphics: a preset applies all of its values to the scene at once; any change becomes Personalizado.
-  await page.getByRole('button',{name:'Configurações'}).click();
+  await menuItem(page,'Ajustes','Imagem');
   await page.locator('[data-setting="graphics.preset"]').selectOption('low');
   await expect.poll(()=>page.evaluate(()=>(window as any).barDebug.graphics())).toMatchObject({preset:'low',shadows:'off',fpsCap:30,renderScale:.6});
   expect((await page.evaluate(()=>(window as any).barDebug.environment())).sun?.shadows).toBe(false);
@@ -63,20 +65,20 @@ test('a shift: the job panel moves, hides and comes back, and the next task draw
   test.setTimeout(240000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await enter(page);await installPlanner(page);
-  const panel=page.locator('[data-panel="job"]'),toggle=page.locator('.game-tools [data-hud-visible="job"]');
+  const panel=page.locator('[data-panel="job"]'),toggle=page.locator('#pause-menu [data-pm-act="job"]');
   await walk(page,'counter');
   await page.keyboard.press('KeyJ');await page.getByRole('button',{name:'Começar turno'}).click();
-  await expect(panel).toBeVisible();await expect(toggle).toBeVisible();
+  await expect(panel).toBeVisible();
   // Off the middle of the view, whole on screen.
   const viewport=page.viewportSize()!,box=(await panel.boundingBox())!;
   expect(box.x).toBeGreaterThan(viewport.width/2);expect(box.y+box.height).toBeLessThanOrEqual(viewport.height);
-  // Dragged by its title; hidden from its header and shown again from the toolbar, where it was.
+  // Dragged by its title; hidden from its header and shown again from the menu (Ajustes › Interface), where it was.
   const header=(await panel.locator('.panel-heading').boundingBox())!;
   await page.mouse.move(header.x+60,header.y+15);await page.mouse.down();await page.mouse.move(header.x-300,header.y-200,{steps:8});await page.mouse.up();
   const moved=(await panel.boundingBox())!;expect(moved.x).toBeCloseTo(box.x-360,0);
   await panel.locator('[data-hud-hide="job"]').click();await expect(panel).toBeHidden();
-  await expect(toggle).toHaveAttribute('aria-pressed','false');await expect(toggle).toBeFocused();
-  await toggle.click();await expect(panel).toBeVisible();expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
+  await menuItem(page,'Ajustes','Interface');await expect(toggle).not.toBeChecked();
+  await toggle.click();await closeMenu(page);await expect(panel).toBeVisible();expect((await panel.boundingBox())!.x).toBeCloseTo(moved.x,0);
   // Collapsed, the header keeps the countdown.
   await panel.locator('[data-hud-collapse="job"]').click();await expect(page.locator('#job-summary')).toHaveText(/^\d+s$/);
   await panel.locator('[data-hud-collapse="job"]').click();

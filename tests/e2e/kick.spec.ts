@@ -80,8 +80,8 @@ test('Rafael\'s kicks, with real keys: the one touched flies far with sound, sta
   await filming;
   const world=await worldOf(kicker),me=await self(kicker);
   expect(world.ragdolls[start.id].by,'Who did it travels with the body').toBe(me.id);
-  await expect(victim.locator('.comanda',{hasText:'-6 de vida'})).toContainText('Chutado',{timeout:5000});
-  expect((await self(victim)).hp).toBe(hp-6);
+  await expect.poll(async()=>(await self(victim)).hp,{timeout:5000}).toBe(hp-12);
+  await expect(victim.locator('.comanda',{hasText:'Chutado'})).toHaveCount(0);
   // Both hear it and both see the same body.
   for(const page of [kicker,victim])await expect.poll(async()=>(await blows(page)).played.some((clip:string)=>clip.startsWith('chute-')),{timeout:5000}).toBe(true);
   for(const page of [kicker,victim])await expect.poll(async()=>(await blows(page)).played.some((clip:string)=>clip.startsWith('queda-')),{timeout:8000}).toBe(true);
@@ -116,7 +116,7 @@ test('Rafael\'s kicks, with real keys: the one touched flies far with sound, sta
   await kicker.keyboard.press('x');
   await expect.poll(async()=>(await self(victim)).animationState,{timeout:6000}).toBe('ragdoll');
   await air;
-  await expect.poll(async()=>(await self(victim)).hp,{timeout:5000}).toBe(again-10);
+  await expect.poll(async()=>(await self(victim)).hp,{timeout:5000}).toBe(again-20);
   await expect.poll(async()=>(await blows(kicker)).played,{timeout:5000}).toContain('chute-peso');
   expect((await blows(kicker)).played).toContain('ar-longo');
   // The film takes its time: by now the body may have come to rest and be getting up, where it lies.

@@ -69,8 +69,6 @@ html.touch-ui #world{touch-action:none}
 html.touch-ui .game>[data-panel=actions],html.touch-ui .key-hints,html.touch-ui .crosshair{display:none!important}
 html.touch-ui .context kbd{display:none}
 html.touch-ui .context{padding:10px 16px;min-height:44px}
-html.touch-ui .game-tools .hud-btn,html.touch-ui .voice-tools .hud-btn{min-width:42px;height:42px}
-html.touch-ui .game-header .panel-menu button,html.touch-ui .panel-menu .hud-btn{min-height:44px}
 html.touch-ui .hud-btn,html.touch-ui .mini-button,html.touch-ui .button{min-height:40px}
 
 /* Landscape (the way to play): the minimap keeps its corner, smaller, and the stick rests beside it; the chat moves to the top left. */

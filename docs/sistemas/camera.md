@@ -15,7 +15,7 @@ O giro é aplicado depois da animação e removido antes de avaliar o quadro seg
 
 ### No jogo, por jogador
 
-Em **Configurações → Câmera**. Tudo fica salvo no navegador (`bar:settings:v1`).
+Em **Menu (Esc) › Ajustes › Câmera**. Tudo fica salvo no navegador (`bar:settings:v1`).
 
 | Ajuste | O que faz | Faixa | Padrão |
 | --- | --- | --- | --- |
@@ -99,6 +99,6 @@ O recorte é um trecho de shader (`litUserMainStartPS`) aplicado a todos os mate
 | `apps/web/src/engine/camera-xray.ts` | O recorte no shader e seus parâmetros |
 | `apps/web/src/engine/BarScene.ts` | Liga a câmera à cena: Q, rodinha, arrasto, tempo real do quadro, cabeça escondida, nome e anel do jogador |
 | `packages/shared/src/world.ts` | Consultas de geometria (`cameraFraction`) e de visibilidade do jogador (`sightBlocked`) |
-| `apps/web/src/settings.ts`, `apps/web/src/main.ts` | Preferências salvas, migração e controles em Configurações |
+| `apps/web/src/settings.ts`, `apps/web/src/main.ts` | Preferências salvas, migração e controles do menu (Ajustes › Câmera, `pause-menu/menu-content.ts`) |
 
 `tests/integration/camera.test.ts` cobre os três zooms, giro, colisão (inclusive que nenhum quadro de um giro rápido fica atrás de parede, a 60 e a 20 FPS), abertura sem saltos, piso, acompanhamento, alturas diferentes de cabeça, corrida, ajustes e moto. `tests/integration/camera-settings.test.ts` cobre a persistência e a migração das preferências. `tests/integration/map.test.ts` continua verificando as consultas de geometria e visibilidade, além das colisões do jogador.

@@ -13,7 +13,7 @@ export class EventDirector {
   current: WorldEvent = { kind: 'none', title: '', description: '', endsAt: 0 };
   nextAt: number;
   private previous: EventKind | undefined;
-  constructor(private readonly intervalMin = 300_000, private readonly intervalMax = 600_000, now = Date.now()) {
+  constructor(private readonly intervalMin = 2_700_000, private readonly intervalMax = 5_400_000, now = Date.now()) {
     this.nextAt = now + this.interval();
   }
   update(now: number, occupancy: number): boolean {

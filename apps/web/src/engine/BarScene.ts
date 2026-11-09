@@ -44,6 +44,7 @@ import {VrSession,type VrAnchor} from '../vr/vr-session';
 import {vrLog,type VrSettings} from '../vr/vr-mode';
 import {HeadLookPose} from './head-look';
 import {FlyPose} from './fly-pose';
+import {IdlePosture} from './idle-posture';
 import {FlySounds} from './fly-sound';
 import {headLookAt,type HeadLook} from '@bar/shared';
 import {Motos,MotoRig,seatRider,type Bike} from './moto-delivery';
@@ -64,9 +65,10 @@ import {FoosballBalls} from './foosball-balls';
 import {PoolBalls} from './pool-balls';
 import {completeBasePose} from './animation-tracks';
 import {walkPlaybackRate,walkTransitionSeconds} from './walk-playback';
+import {CLIP_PACES} from './clip-paces';
 import {shootPortrait} from './skin-portrait';
-import {KICKS,skillById} from '@bar/shared';
-import {FIGHT_MOVES,HIT_REACTIONS,PUNCH_IDS,punchById,punchContact,type FightHit,type FightTarget} from '@bar/shared';
+import {KICKS,kickClip,kickRoot} from '@bar/shared';
+import {FIGHT_MOVES,HIT_REACTIONS,PUNCH_IDS,fistPath,punchById,punchContact,type FightHit,type FightTarget} from '@bar/shared';
 import {FlinchPose} from './fight-flinch';
 import {DamageNumbers} from '../fight/damage-numbers';
 import {MorteScene} from './morte-scene';
@@ -84,7 +86,7 @@ const BONE_ALIASES: Partial<Record<SkinBone, string>> = { middle_01_l: 'index_01
 // A drink in hand (Player.holding) is raised and sipped by the Drink clip on its own layer, masked to the left arm and the
 // neck, over whatever the body plays: walking, standing, a quick use. Other clips keep the hand (seated, dancing...).
 const HAND_LAYER = 'Hand';
-const HAND_FREE_CLIPS = new Set(['Idle', 'Walk', 'Run', 'DrunkIdle', 'DrunkWalk', 'Use', 'Wait', 'OldCaneWalk', 'OldCaneHold']);
+const HAND_FREE_CLIPS = new Set(['Idle', 'Walk', 'Jog', 'Run', 'DrunkIdle', 'DrunkWalk', 'Use', 'Wait', 'OldCaneWalk', 'OldCaneHold']);
 // Looping clips that sit the hips on a chair (anchored to the 0.56 m seat height).
 const SEATED_CLIPS = ['CardsSit', 'AngrySit', 'Sit'];
 /** How far the bike must have turned (radians) with a blinker on, for it to go off as the bars straighten. */
@@ -134,6 +136,8 @@ interface Avatar {
   headLook?:HeadLookPose;
   /** An administrator in flight: lean, hover and limbs (fly-pose.ts). */
   fly?:FlyPose;
+  /** Shoulders back over the shared Mixamo idle (idle-posture.ts). */
+  posture?:IdlePosture;
   root: pc.Entity;
   body: pc.Entity;
   /** Procedural pivots: NPCs, and players while the player model loads. */
@@ -265,18 +269,21 @@ const AVATAR_SHADOW_MARGIN = 1.5;
 const OFFSTAGE_NEAR = 8;
 const OFFSTAGE_MARGIN = 2;
 const OFFSTAGE_BUSY = new Set(['ride', 'moto-lift', 'ragdoll', 'kick', 'fallen', 'recover', 'stumble', 'punch', 'hit']);
-// Approximate ground pace at 1×, measured from the Mixamo feet's backward travel while planted (metres/second).
-// Run is Standard Run's own root motion, which the converter prints: 4 m/s on Nathan (3.4–4.4 across the skins).
-// Walk's exported cycle is stretched by 20% for a more relaxed gait; its cadence eases with ground speed.
-// Rates remain capped at 2.2× so fast players do not spin their legs.
-// The guard's steps (fight clips), measured the same way: back 1.15, to its left 1.61, to its right 1.6.
-const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Run: 4, DrunkWalk: .74, FightBack: 1.15, FightLeft: 1.61, FightRight: 1.6 };
+// Ground pace at 1× (metres/second): how fast a planted foot goes back in each skin's own step clips (clip-paces.ts, npm run assets:paces). These
+// single numbers are only for a skin not measured yet; they were Nathan's before the walk was stretched 20%, and slid on the shorter skins.
+// Walk's cadence eases with ground speed and stays capped at 2.2× so fast players do not spin their legs; the guard's steps go to 2.6×.
+/**
+ * The everyday pace (WALK_SPEED, 3.5 m/s) is a jog: the relaxed walk keeps up only to about 2.4 m/s (2.2×) and slid past it. From this speed
+ * (m/s) on the body jogs, and walks again below JOG_TO; skins without the clip (the NPCs) keep walking.
+ */
+const JOG_FROM = 2.6, JOG_TO = 2.2;
+const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Jog: 1.61, Run: 4, DrunkWalk: .74, FightBack: 1.15, FightLeft: 1.61, FightRight: 1.6 };
 /**
  * The fist fight (docs/sistemas/luta.md). The clips of the guard (FightIdle, then the steps by direction, forward being Walk); the arms' layer that
  * keeps the guard up over the steps; how long a landed punch holds its clip (ms, light and heavy); how hard a blow jolts the upper body (degrees);
  * how far ahead of the room's clock a late punch seen by others starts (s, so its wind-up shows) and how fast it catches up.
  */
-const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'FightBack', 'FightLeft', 'FightRight']);
+const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'Run', 'FightBack', 'FightLeft', 'FightRight']);
 const GUARD_LAYER = 'Guard';
 const PUNCH_HIT_STOP_MS = { light: 55, heavy: 90 };
 const FLINCH_DEGREES: Readonly<Record<string, number>> = { jab: 8, cross: 12, hook: 14, heavy: 20 };
@@ -388,6 +395,8 @@ export class BarScene {
   private readonly flySounds:FlySounds;
   /** The local flier: how far into the dash (0 to 1), whether the barrier may break again, and when it last did (scene seconds). */
   private flyShare = 0; private boomArmed = true; private boomAt = -99;
+  /** The room's time of the newest state (carriedOffset). */
+  private stateAt = 0;
   /** The local flier's velocity from the keys, as of the last input the room was sent (getInput), and when. */
   private readonly localFlyV = new pc.Vec3(); private localFlyAt = -99;
   private readonly smokeBurst:SmokeBurst;
@@ -1153,14 +1162,16 @@ export class BarScene {
     this.cigarettes.restore();
     this.crossedArms.restore();
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
-    for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();avatar.flinch?.restore();}
+    for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();avatar.flinch?.restore();avatar.posture?.restore();}
   }
 
   /** The animation has already posed the skeleton; distribute the camera offset through neck and head. */
   private applyHeadLooks(dt:number):void {
     for(const [id,avatar] of this.actors){
-      if(avatar.npc||avatar.resting)continue;
-      if(avatar.skin)avatar.fly?.apply(avatar.skin.bones,avatar.body,this.elapsed+avatar.phase);
+      if(avatar.resting)continue;
+      if(avatar.skin)(avatar.posture??=new IdlePosture()).apply(avatar.skin.model,avatar.body,avatar.skin.clip==='Idle'&&!avatar.bar,dt);
+      if(avatar.npc)continue;
+      if(avatar.skin)avatar.fly?.apply(avatar.skin.bones,avatar.body,this.elapsed+avatar.phase,avatar.spine??=(avatar.skin.model.findByName('spine_02') as pc.Entity|null)??null);
       const head=avatar.skin?.bones.head??avatar.limbs?.head;
       if(!head)continue;
       const actor=avatar.actor,local=id===this.localId,bodyYaw=avatar.yaw/RAD_TO_DEG;
@@ -1536,6 +1547,7 @@ export class BarScene {
     if(world.environment)this.environment.setState(world.environment);
     // Empty departure snapshots preserve the shared clock and climate in the entry.
     if(!this.callbacks.serverNow)this.clock.sync(world.serverTime);
+    this.stateAt=world.serverTime;
     this.jukeboxState=world.jukeboxes?.[JUKEBOX_SYSTEMS[0]!.id];
     this.stageState=world.televisions?.telao;
     this.stageSpots=Object.values(world.musicians??{});
@@ -1669,7 +1681,12 @@ export class BarScene {
           const previous = existing.actor;
           // The local position comes from prediction (updateLocal), not from the server snapshot.
           existing.actor = local ? { ...actor, x: existing.actor.x, y: existing.actor.y, z: existing.actor.z } : { ...actor };
-          if (moved && !local) { if ((actor.animation ?? '').startsWith('fly')) this.trackFlight(existing, actor, previous); else this.glideTo(existing, PATCH_GLIDE); }
+          if (!local && (actor.animation ?? '').startsWith('fly')) {
+            // A speed only from one flying patch to the next: the take-off's jump is not one, and a patch that did not move is a flier holding
+            // still (the last speed kept being carried forward, drawing a hovering flier up to 1.8 m off).
+            if (moved && (previous.animation ?? '').startsWith('fly')) this.trackFlight(existing, actor, previous);
+            else { existing.flyV?.set(0, 0, 0); existing.flyAt = this.elapsed; }
+          } else if (moved && !local) this.glideTo(existing, PATCH_GLIDE);
           existing.ring.enabled = false;
           if (this.usesSkin(existing.actor, npc) && this.skinFor(existing.actor, npc) !== existing.skinId) this.replaceAvatar(actor.id, existing);
         } else {
@@ -2169,15 +2186,25 @@ export class BarScene {
       // A flier moves at speeds the ticks and patches (20 and 10 a second) would draw in jumps: from the last position it
       // carries on at its velocity, for at most a tick or a patch, and the body eases towards that point on the frame's time.
       const ownKeys = local && actor.animation !== 'fly-fall', v = ownKeys ? this.localFlyV : avatar.flyV, age = clamp(this.elapsed - (ownKeys ? this.localFlyAt : avatar.flyAt ?? -99), 0, ownKeys ? .06 : .12);
-      const tx = actor.x + (v ? v.x * age : 0), tz = actor.z + (v ? v.z * age : 0), ty = (actor.y ?? 0) + (v ? (v.y > 0 ? v.y * age : Math.max(v.y * age, -.15)) : 0);
+      // Taking off (fly-pose.ts): the feet push from where they stand and the body rises with the push, not with the room's jump.
+      const fly = avatar.fly ??= new FlyPose(true);
+      fly.takeoff(current.y);
+      const tx = actor.x + (v ? v.x * age : 0), tz = actor.z + (v ? v.z * age : 0), ty = fly.liftY((actor.y ?? 0) + (v ? (v.y > 0 ? v.y * age : Math.max(v.y * age, -.15)) : 0));
       if (Math.hypot(tx - current.x, ty - current.y, tz - current.z) > 12) root.setPosition(tx, ty, tz);
       else { const k = 1 - Math.exp(-dt / .05); root.setPosition(current.x + (tx - current.x) * k, current.y + (ty - current.y) * k, current.z + (tz - current.z) * k); }
       glideFrom.copy(root.getPosition()); avatar.glideAt = this.elapsed;
-    } else root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
+    } else {
+      // A punch's or kick's own step (root motion) goes on the clip's clock, from where the newest state put the body: gliding a patch behind slid the feet.
+      const carried = this.carriedOffset(avatar, local);
+      if (carried) { root.setPosition(actor.x + carried.x, actor.y ?? 0, actor.z + carried.z); glideFrom.copy(root.getPosition()); avatar.glideAt = this.elapsed; }
+      else root.setPosition(lerp(glideFrom.x,actor.x,progress),lerp(glideFrom.y,actor.y??0,progress),lerp(glideFrom.z,actor.z,progress));
+    }
     const drawn = root.getPosition(), last = avatar.lastDrawn ??= drawn.clone();
     // The way the body moves, smoothed: the guard's steps are chosen against where it faces (guardStep).
     const velocity = avatar.velocity ??= new pc.Vec3(), smoothing = 1 - Math.exp(-dt / .1), frame = Math.max(dt, 1e-3);
     velocity.x += ((drawn.x - last.x) / frame - velocity.x) * smoothing; velocity.z += ((drawn.z - last.z) / frame - velocity.z) * smoothing;
+    // Up and down too: how hard a flier lands (fly-pose.ts).
+    velocity.y += ((drawn.y - last.y) / frame - velocity.y) * smoothing;
     avatar.speed = lerp(avatar.speed ?? 0, Math.min(isRidingHorse(actor.interactionState)?HORSE.fastSpeed:(actor.animation??'').startsWith('fly')?FLY.boost+4:8, Math.hypot(drawn.x - last.x, drawn.z - last.z) / Math.max(dt, 1e-3)), 1 - Math.exp(-dt / .15));
     last.copy(drawn);
     // A bar animation (sitting at a table, the urinal, a cigarette, Magrão at the counter...): undefined while its clip loads.
@@ -2221,7 +2248,7 @@ export class BarScene {
     else if (avatar.limbs) this.poseLimbs(avatar, avatar.limbs, pose);
     // Flight: the whole body leans about the hips and floats; the limbs follow after the clip (applyHeadLooks).
     const fly = avatar.fly ??= new FlyPose();
-    fly.update(animation.startsWith('fly'), avatar.speed ?? 0, dt);
+    fly.update(animation.startsWith('fly'), avatar.speed ?? 0, dt, animation === 'fly-fall', -velocity.y);
     if (local) {
       this.flyShare = fly.dash; this.flySounds.update(fly.air, fly.dash);
       // The barrier: once per dash, when the speed passes what walking in the air reaches; it re-arms when the flier slows down.
@@ -2232,12 +2259,12 @@ export class BarScene {
         const at = root.getPosition(); this.blowEffects.shock({ x: at.x, y: at.y + 1, z: at.z }, 11);
       }
     }
-    if (fly.air > 0) {
+    if (fly.posed) {
       const lean = fly.lean * Math.PI / 180, hips = .95, bob = Math.sin((this.elapsed + avatar.phase) * 2.2) * .05 * fly.air * (1 - fly.dash);
       // A slow roll and nod, bigger the faster it goes: the body rides the air instead of being carried.
       const sway = (this.elapsed + avatar.phase) * 1.3, roll = Math.sin(sway) * (1.2 + 2.6 * fly.dash) * fly.air, nod = Math.sin(sway * .73 + 1) * (.8 + 1.4 * fly.dash) * fly.air;
       avatar.body.setLocalEulerAngles(fly.lean + nod, 0, roll);
-      avatar.body.setLocalPosition(0, hips * (1 - Math.cos(lean)) + bob, -hips * Math.sin(lean));
+      avatar.body.setLocalPosition(0, hips * (1 - Math.cos(lean)) + bob - fly.drop, -hips * Math.sin(lean));
     }
     if (bar && avatar.skin && avatar.bar) {
       this.barAnimations!.play(actor.id, bar.step, { space: avatar.bar.space, model: avatar.skin.model, skin: avatar.skinId!, servedFood: bar.servedFood, seat: bar.seat }, dt);
@@ -2597,6 +2624,10 @@ export class BarScene {
    * The clip sets the base pose; gestures are extra joint turns about the body's own axes,
    * which keeps them independent of each bone's local frame. The model faces +Z, its left on +X.
    */
+  /** Walking or jogging by how fast the body goes (JOG_FROM, JOG_TO). */
+  private gait(avatar: Avatar, skin: SkinnedRig): 'Walk' | 'Jog' {
+    return skin.tracks.has('Jog') && (avatar.speed ?? 0) >= (skin.clip === 'Jog' ? JOG_TO : JOG_FROM) ? 'Jog' : 'Walk';
+  }
   private poseSkin(avatar: Avatar, skin: SkinnedRig, pose: Pose, bar?: BarAction): void {
     const { body, cup, actor, skinId } = avatar;
     const { t, seated, dancing, drinking, waving } = pose;
@@ -2612,12 +2643,12 @@ export class BarScene {
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     // The fist fight (fightClip): a punch, a blow taken, the guard and its steps; anything else the game draws the usual way.
     const fight = !bar && !show ? this.fightClip(avatar, skin) : undefined;
-    const requested = fight ? fight.clip : bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? skillById(actor.skill)?.clip ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
+    const requested = fight ? fight.clip : bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? kickClip(actor.skill) ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking && !this.selfieOf(avatar)) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
       : action === 'bartend' ? 'Bartend' : drinking ? 'Drink' : seated > 0.5 ? (actor.currentTableId ? (actor.cardResult === 'loss' ? 'AngrySit' : 'CardsSit') : 'Sit')
-      : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':'Walk') : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
-    const locomotion = !bar && !show && (['Idle', 'Walk', 'Run', 'DrunkWalk'].includes(requested) || !!fight?.guard);
+      : dancing ? this.danceClip(actor.dance ?? avatar.phase) : !actor.oldWalk&&pose.walking ? (stage>=3?'DrunkWalk':pose.running?'Run':this.gait(avatar,skin)) : !actor.oldWalk?(stage>=2?'DrunkIdle':'Idle'):'';
+    const locomotion = !bar && !show && (['Idle', 'Walk', 'Jog', 'Run', 'DrunkWalk'].includes(requested) || !!fight?.guard);
     const actionImported = !!requested && skin.tracks.has(requested);
     const oldGait=!!actor.oldWalk&&!gesture&&skin.tracks.has('OldCaneWalk')&&skin.tracks.has('OldCaneHold');
     const imported=actionImported||oldGait;
@@ -2648,10 +2679,10 @@ export class BarScene {
         anim.baseLayer.activeStateCurrentTime = ['Deal', 'Wait', 'Text', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) || clip.startsWith('Dance ') ? age % duration : Math.min(age, duration);
       }
     }
-    const pace = MIXAMO_PACE[clip];
-    if(clip==='Walk')skin.walkRate=walkPlaybackRate(skin.walkRate,avatar.speed??0,pose.dt);
+    const pace = CLIP_PACES[avatar.skinId ?? '']?.[clip] ?? MIXAMO_PACE[clip];
+    if(clip==='Walk')skin.walkRate=walkPlaybackRate(skin.walkRate,avatar.speed??0,pose.dt,pace);
     else skin.walkRate=undefined;
-    anim.speed = clip==='Walk'?skin.walkRate!:pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.2) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
+    anim.speed = clip==='Walk'?skin.walkRate!:pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.6) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
     // A drink in hand: the hand layer fades in over a free body and keeps to the room's clock (sips line up for everyone,
     // whatever pace the walk sets for the clips).
     const now = this.serverNow();
@@ -3027,13 +3058,13 @@ export class BarScene {
       if(actor.animation==='wait'&&actor.drinkItem)counterRequest(skin,(smokingNow-(actor.animationStartedAt??smokingNow))/1000,avatar.body);
       const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&!actor.holding&&
         (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
-        ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Wait','Sit'].includes(skin.clip);
+        ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','Sit'].includes(skin.clip);
       crossedActors.push({id:actor.id,active:!!actor.armsCrossed,available:armsAvailable,rig:skin});
       if(actor.smokingSince)cigaretteActors.push({id:actor.id,skin:avatar.skinId!,state:actor,rig:skin,
         hidden:!!avatar.deathHidden||['ragdoll','fallen','recover','vomit'].includes(actor.animation??''),
         armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&
           (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
-          ['Idle','Walk','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
+          ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
     }
     this.crossedArms.update(crossedActors,dt);
     this.cigarettes.update(cigaretteActors,smokingNow,dt,this.camera,this.app.graphicsDevice.height);
@@ -3176,6 +3207,30 @@ export class BarScene {
     const step = this.guardStep(avatar);
     return { clip: has(step) ? step : 'FightIdle', key: step, age: 0, guard: true, local };
   }
+  /**
+   * How far a punch's or kick's own step (root motion: fight-paths.ts and kick-paths.ts root) has carried the body by the moment its clip is drawn at,
+   * past where the newest state has it (world x, z). The room moves the body a tick at a time; the local player's punches are predicted already.
+   */
+  private carriedOffset(avatar: Avatar, local: boolean): { x: number; z: number } | undefined {
+    const { actor, skin } = avatar, layer = skin?.model.anim?.baseLayer;
+    if (!skin || !layer || this.stateAt <= 0) return undefined;
+    const drawn = layer.activeStateCurrentTime * 1000;
+    if (actor.animation === 'kick' && actor.animationStartedAt && skin.clip === kickClip(actor.skill)) {
+      // The room puts the kicker at kickRoot each tick, in the axes it faced at the start (it does not turn while kicking).
+      const now = kickRoot(actor.skill ?? '', drawn), then = kickRoot(actor.skill ?? '', this.stateAt - actor.animationStartedAt);
+      const side = now[0] - then[0], ahead = now[1] - then[1], s = Math.sin(actor.rotation ?? 0), c = Math.cos(actor.rotation ?? 0);
+      return { x: c * side + s * ahead, z: -s * side + c * ahead };
+    }
+    const fist = actor.fist, move = punchById(fist?.punch);
+    if (local || actor.animation !== 'punch' || !fist || !move || skin.clip !== move.clip) return undefined;
+    // Input k (about k ticks after the throw) puts the body at the root one tick on, plus the step in towards the target over its first inputs.
+    const root = fistPath(actor.skin, move.id).root, way = (ms: number) => {
+      const f = Math.max(0, Math.min(root.length - 1, ms / TICK_MS)), i = Math.min(root.length - 2, Math.floor(f));
+      return (root.length < 2 ? root[0] ?? 0 : root[i]! + (root[i + 1]! - root[i]!) * (f - i)) + (fist.lunge ?? 0) * Math.min(move.lungeSteps, Math.max(0, ms / TICK_MS));
+    };
+    const along = way(drawn) - way(this.stateAt - (fist.at ?? 0) + TICK_MS);
+    return { x: Math.sin(fist.yaw ?? 0) * along, z: Math.cos(fist.yaw ?? 0) * along };
+  }
   /** The guard's step clip from how the body moves against where it faces: still, forward (Walk), back, or to either side; a little stickiness at the edges. */
   private guardStep(avatar: Avatar): string {
     const now = performance.now(), held = avatar.guardStep ?? 'FightIdle';
@@ -3186,8 +3241,9 @@ export class BarScene {
     if (v && speed >= (held === 'FightIdle' ? .6 : .3)) {
       const yaw = avatar.yaw / RAD_TO_DEG, ahead = v.x * Math.sin(yaw) + v.z * Math.cos(yaw), left = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
       const angle = Math.atan2(left, ahead) * RAD_TO_DEG, sticky = held === 'FightIdle' ? 0 : 12;
-      const forward = Math.abs(angle) <= 55 + (held === 'Walk' ? sticky : 0), back = Math.abs(angle) >= 125 - (held === 'FightBack' ? sticky : 0);
-      raw = forward ? 'Walk' : back ? 'FightBack' : angle > 0 ? 'FightLeft' : 'FightRight';
+      const forward = Math.abs(angle) <= 55 + (held === 'Walk' || held === 'Run' ? sticky : 0), back = Math.abs(angle) >= 125 - (held === 'FightBack' ? sticky : 0);
+      // Shift in the guard (FIGHT.runSpeed): past a fast walk, the run.
+      raw = forward ? (speed >= (held === 'Run' ? 3 : 3.6) ? 'Run' : 'Walk') : back ? 'FightBack' : angle > 0 ? 'FightLeft' : 'FightRight';
     }
     if (raw === held) { avatar.guardCand = undefined; return held; }
     // A new step must hold for a moment before the clip changes.
@@ -3318,7 +3374,7 @@ export class BarScene {
   }
   /** The moment a kick lands, for whoever is looking: a star where the foot is drawn, the sound, and the blow felt by the two involved. */
   private kickLanded(id: string, avatar: Avatar, skin: SkinnedRig, by: string): void {
-    const kicker = this.actors.get(by), heavy = !!KICKS[kicker?.actor.skill ?? '']?.heavy;
+    const kicker = this.actors.get(by), blow = KICKS[kicker?.actor.skill ?? ''], heavy = !!blow?.heavy;
     const head = skin.bones.head.getPosition(), feet = avatar.root.getPosition();
     const chest = this.tempPosition.set(feet.x, (feet.y + head.y) / 2 + .25, feet.z);
     const left = kicker?.skin?.bones.foot_l.getPosition(), right = kicker?.skin?.bones.foot_r.getPosition();
@@ -3327,6 +3383,8 @@ export class BarScene {
     const at = foot && foot.distance(chest) < KICK_STAR_NEAR ? foot : chest;
     this.blowSounds.hit(heavy, at);
     this.blowEffects.star(at, heavy ? .85 : .6);
+    // shortcut: the blow's full life, though the room keeps the last point (kick.ts); send the room's number with the body if that ever shows.
+    if (blow) this.damageNumbers.show({ x: at.x, y: at.y + .25, z: at.z }, String(blow.hp), id === this.localId ? 'taken' : heavy ? 'heavy' : 'hit', this.elapsed);
     if (kicker) kicker.hitStopUntil = performance.now() + HIT_STOP_MS;
     const felt = id === this.localId ? (heavy ? .085 : .06) : by === this.localId ? (heavy ? .04 : .026) : 0;
     if (felt && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.rig.shake(felt);
@@ -3370,7 +3428,7 @@ export class BarScene {
       if (event.code === 'Space' && this.chasing && document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
       // Let a focused interface button receive its native keyboard activation.
       if ((event.code === 'Enter' || event.code === 'Space') && document.activeElement?.tagName === 'BUTTON') return;
-      if (!event.repeat && event.code === 'KeyB') { this.callbacks.onFly?.(); }
+      if (!event.repeat && event.code === 'KeyB' && !event.altKey) { this.callbacks.onFly?.(); }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(event.code) || (event.code === 'Space' && (this.chasing || this.flying())) || (event.code === 'ControlLeft' && this.flying())) {
         event.preventDefault(); this.keys.add(event.code);
       }

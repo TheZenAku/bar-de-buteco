@@ -1,8 +1,9 @@
 import {Quaternion,Vector3} from 'three';
 
 /** A slower, periodic 60 Hz walk. Spherical cubic interpolation preserves the joint poses while
- * smoothing angular velocity between the source's 30 Hz keys, including across the loop boundary. */
-export function polishWalkCycle(times,rotations,translations,{stretch=1.2,fps=60}={}){
+ * smoothing angular velocity between the source's 30 Hz keys, including across the loop boundary.
+ * `warp`: the source time each output time shows (default: evenly, `stretch` times slower; see evenStance). */
+export function polishWalkCycle(times,rotations,translations,{stretch=1.2,fps=60,warp}={}){
   const sourceDuration=times.at(-1),duration=sourceDuration*stretch,count=times.length-1;
   if(count<3||!(sourceDuration>0))throw new Error('A walk cycle needs at least three poses and a positive duration');
   const samples=Math.round(duration*fps),outputTimes=Array.from({length:samples+1},(_,i)=>i*duration/samples);
@@ -14,7 +15,7 @@ export function polishWalkCycle(times,rotations,translations,{stretch=1.2,fps=60
   };
   const exp=v=>{const length=v.length(),factor=length>1e-9?Math.sin(length)/length:1;return new Quaternion(v.x*factor,v.y*factor,v.z*factor,Math.cos(length));};
   const intervals=outputTimes.map(time=>{
-    const t=Math.min(time/stretch,sourceDuration-1e-10);let index=0;
+    const t=Math.min(warp?warp(time):time/stretch,sourceDuration-1e-10);let index=0;
     while(index+1<count&&times[index+1]<=t)index++;
     return {index,u:(t-times[index])/(times[index+1]-times[index])};
   });
@@ -53,4 +54,31 @@ export function polishWalkCycle(times,rotations,translations,{stretch=1.2,fps=60
     output.splice(-3,3,...data.slice(0,3));return output;
   });
   return {times:outputTimes,rotations:outputRotations,translations:outputTranslations,duration};
+}
+
+/**
+ * A step clip re-timed so the foot on the floor goes back at one speed (`feet`: each frame's [z, y] of the left and right foot, m): where it went
+ * faster than its average the clip plays slower, and the other way round, so one playback rate keeps it planted. In the air, unchanged. The
+ * length stays the source's. Returns the warp for polishWalkCycle: output time to source time.
+ */
+export function evenStance(times,feet){
+  const count=times.length,floor=[0,1].map(side=>Math.min(...feet.map(frame=>frame[side][1])));
+  const speeds=[];
+  for(let i=0;i<count-1;i++){
+    let speed;
+    for(const side of [0,1])if(feet[i][side][1]<floor[side]+.02&&feet[i+1][side][1]<floor[side]+.02){
+      const back=-(feet[i+1][side][0]-feet[i][side][0])/(times[i+1]-times[i]);
+      if(back>0)speed=Math.max(speed??0,back);
+    }
+    speeds.push(speed);
+  }
+  const planted=speeds.filter(speed=>speed!==undefined),mean=planted.reduce((sum,speed)=>sum+speed,0)/Math.max(1,planted.length);
+  const at=[0];
+  for(let i=0;i<count-1;i++)at.push(at[i]+(times[i+1]-times[i])*(speeds[i]===undefined||!mean?1:Math.min(2,Math.max(.5,speeds[i]/mean))));
+  const scale=times.at(-1)/at.at(-1);for(let i=0;i<count;i++)at[i]*=scale;
+  return time=>{
+    let i=0;while(i<count-2&&at[i+1]<=time)i++;
+    const share=Math.min(1,Math.max(0,(time-at[i])/Math.max(1e-9,at[i+1]-at[i])));
+    return times[i]+(times[i+1]-times[i])*share;
+  };
 }

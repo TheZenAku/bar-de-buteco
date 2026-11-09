@@ -2,6 +2,7 @@ import {nameLabel,seeName} from './names';
 import {test,expect,type Browser,type Page} from '@playwright/test';
 import {achievementOfBadge} from '../../packages/shared/src/achievements';
 import {enterAsAdmin} from './moto-helpers';
+import {menuItem} from './menu';
 
 const shots=process.env.PROFILE_SHOTS;
 const shot=async(page:Page,name:string)=>{if(shots)await page.screenshot({path:`${shots}/${name}.png`});};
@@ -105,7 +106,7 @@ test('the profile: right click, Perfil, badges, status, the window dragged, and 
   expect(await page.locator('[name="status"]').count()).toBe(0);
 
   // Badges: granted in the administration, chosen in the player's own window, described under the mouse.
-  await page.getByRole('button',{name:'Administração'}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="badges"]').click();
   await page.locator('[data-badge="new"]').click();
   await page.locator('[data-badge-form="save"] [name="name"]').fill('Rei do Pebolim');
@@ -267,7 +268,7 @@ test('a badge with a PNG of your own: sent to the server, in the medal and in th
     return canvas.toDataURL('image/png').split(',')[1]!;
   });
   const file=(name:string,mimeType:string)=>({name,mimeType,buffer:Buffer.from(art,'base64')});
-  await page.getByRole('button',{name:'Administração'}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="badges"]').click();
   await page.locator('[data-badge="new"]').click();
   const form=page.locator('[data-badge-form="save"]');
@@ -310,7 +311,7 @@ test('a badge with a PNG of your own: sent to the server, in the medal and in th
   await page.reload();
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await expect(page.locator('#waiting')).toBeHidden({timeout:60000});
-  await page.getByRole('button',{name:'Administração'}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="badges"]').click();
   await page.locator('[name="badge-query"]').fill('Emblema com PNG');
   await expect.poll(()=>page.locator('.admin-badge-cell .pf-art img').evaluate((image:HTMLImageElement)=>image.naturalWidth),{timeout:20000}).toBe(256);

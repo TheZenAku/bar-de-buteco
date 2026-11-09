@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {test,expect,type Browser,type Page} from '@playwright/test';
 import {enterAsAdmin,inVehicles,orbit,selfOf as self,spawnBikeOnStreet,walkTo} from './moto-helpers';
+import {openMenu,closeMenu} from './menu';
 
 const SHOTS=process.env.MOTO_SHOTS||'test-results/moto';
 const PASSWORD=process.env.DEMO_PASSWORD||'ButecoDemo2026!';
@@ -36,7 +37,7 @@ test('the delivery bike with real keys: the administration spawns it, E to get o
   await enterAsAdmin(page);
   await enter(other,'jogador2@bar.local');
   // The other player has no way of bringing a bike (and the room refuses them: apps/server/test/moto.integration.test.ts).
-  await expect(other.locator('#admin-button')).toBeHidden();
+  await openMenu(other,'Você');await expect(other.locator('#pause-menu [data-pm-entry="admin"]')).toHaveCount(0);await closeMenu(other);
   await spawnBikeOnStreet(page);
   const parked=await roomMoto(page);
   expect(parked.x).toBeLessThan(15);

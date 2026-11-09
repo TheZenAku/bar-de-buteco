@@ -1,6 +1,7 @@
 import {buySkill,showCard,wearCard} from './collection-helpers';
 import {test,expect,type Page} from '@playwright/test';
 import map from '../../packages/shared/src/map-data.json' with {type:'json'};
+import {menuItem,openMenu,closeMenu} from './menu';
 // Route validated by tests/integration/map.test.ts: pavement, veranda east opening, counter aisle, both stair flights.
 const TO_UPSTAIRS=[[14.8,1],[14.8,-2.6],[15.3,-4.6],[15.3,-10.2],[14,-10.2],[14,-14.3],[15.85,-14.3],[15.85,-11.2],[15.85,-9]] as const;
 
@@ -10,7 +11,7 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await createAccount(page,`ui_${Date.now().toString(36)}`);
   // Connection and occupancy in the people window; the player's name in its "Seu lugar no bar" tab.
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();
+  await menuItem(page,'Galera','Pessoas no bar');
   await expect(page.locator('#hud-status')).toHaveText('Na área!');await expect(page.locator('#ping')).toHaveText(/\d+ ms|— ms/);await expect(page.locator('#occupancy')).toContainText('/ 32');
   await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await expect(page.locator('#hud-name')).not.toHaveText('Chegando…');
   await page.getByRole('button',{name:'Fechar janela'}).click();
@@ -34,28 +35,28 @@ test('Boteco interface uses live state and its action bar works at desktop and n
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:/Coleção/}).click();
   await wearCard(page,'rafael');
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.locator('#hud-skin')).toContainText('Rafael');await page.getByRole('button',{name:'Fechar janela'}).click();
   // The card alone brings no skill: the button comes with the purchase.
   await expect(page.locator('#skill-button')).toBeHidden();
   await buySkill(page,'rafael','karate');
   await expect(page.locator('#skill-button')).toBeVisible();
   for(let visit=0;visit<2;visit++){
-    await page.getByRole('button',{name:'Pessoas no bar'}).click();
+    await menuItem(page,'Galera','Pessoas no bar');
     await expect(page.locator('#modal-content')).toContainText('Você vê as pessoas próximas');
     await page.getByRole('button',{name:'Fechar janela'}).click();
   }
   for(const width of [1440,960,390]){
     await page.setViewportSize({width,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    for(const selector of ['.game-tools','#skill-button','#dance-button','#chat-input']){
+    for(const selector of ['.hud-wallet','#skill-button','#dance-button','#chat-input']){
       const box=await page.locator(selector).boundingBox();expect(box).not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(width);
     }
   }
   await page.locator('#skill-button').click();
   await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug.snapshot();return d.world.players[d.localId].animationState;})).toBe('kick');
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button',{name:'Voltar à entrada'}).click();
   await expect(page.locator('#lobby')).toBeVisible();
@@ -272,7 +273,7 @@ test('new accounts wear the free default skin; bought skins persist and other pl
     await page.waitForTimeout(600);
     await wearCard(page,'rafael');
     await expect.poll(()=>skin(other),{timeout:60000}).toBe('rafael');
-    await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
+    await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
     await page.getByLabel('E-mail',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByRole('button',{name:'Entrar no bar'}).click();
     await gameReady(page);await expect.poll(()=>skin(page),{timeout:60000}).toBe('rafael');
     expect(errors).toEqual([]);
@@ -290,12 +291,12 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
   try{
     await createAccount(other,name2);
     // The occupancy lives in the people window.
-    const occupancy=async(client:Page)=>{await client.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await expect(client.locator('#occupancy')).toHaveText('2 / 32');await client.getByRole('button',{name:'Fechar janela'}).click();};
+    const occupancy=async(client:Page)=>{await menuItem(client,'Galera','Pessoas no bar');await expect(client.locator('#occupancy')).toHaveText('2 / 32');await client.getByRole('button',{name:'Fechar janela'}).click();};
     await occupancy(page);await occupancy(other);
     await page.getByRole('button',{name:/Resenhar/}).click();await page.getByLabel('Mensagem por proximidade').fill('Boa noite, vizinha!');
     await page.locator('#chat-form').getByRole('button').click();
     await expect(other.locator('#messages')).toContainText('Boa noite, vizinha!');
-    await page.getByRole('button',{name:'Pessoas no bar'}).click();
+    await menuItem(page,'Galera','Pessoas no bar');
     const person=page.locator('.person').filter({hasText:name2});
     await expect(person).toBeVisible();
     await person.getByRole('button',{name:'Bloquear',exact:true}).click();
@@ -320,7 +321,7 @@ test('two independent accounts register, share a 3D bar, chat, block/report and 
 test('password recovery mail changes the password and permits a fresh login',async({page})=>{
   const name=`rec_${Date.now().toString(36)}`;
   const email=await createAccount(page,name);
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
   await page.getByRole('button',{name:'Esqueci minha senha'}).click();
   await page.getByLabel('E-mail da conta').fill(email);
@@ -345,7 +346,7 @@ test('keyboard movement reaches blackjack, a bet round settles in coins and admi
   await page.getByLabel('Senha',{exact:true}).fill(process.env.DEMO_PASSWORD||'ButecoDemo2026!');
   await page.getByRole('button',{name:'Entrar no bar'}).click();
   await gameReady(page);
-  await expect(page.locator('#admin-button')).toBeVisible();
+  await openMenu(page,'Você');await expect(page.locator('#pause-menu [data-pm-entry="admin"]')).toBeVisible();await closeMenu(page);
   for(const [x,z] of [...TO_UPSTAIRS,[15.85,-7.4],[16.28,-7.4]])await walkTo(page,x,z,.12);
   // Movement arrives in fixed ticks; touch the table edge instead of oscillating around a sub-tick target.
   await page.keyboard.press('d',{delay:150});
@@ -373,7 +374,7 @@ test('keyboard movement reaches blackjack, a bet round settles in coins and admi
   await page.screenshot({path:'test-results/blackjack.png'});
   await table.getByRole('button',{name:'Sair da mesa'}).click();
   for(const [button,title] of [['Apagão','Quem esqueceu de pagar a luz?'],['O inconveniente','O Zé acordou inspirado.'],['Festa','Essa rodada é de dança!']]){
-    await page.getByRole('button',{name:'Administração',exact:true}).click();
+    await menuItem(page,'Você','Administração');
     await page.getByRole('button',{name:button}).click();
     await page.getByRole('button',{name:'Fechar janela'}).click();
     await expect(page.locator('#event-banner')).toContainText(title);
@@ -382,6 +383,6 @@ test('keyboard movement reaches blackjack, a bet round settles in coins and admi
   const metrics=await page.evaluate(()=>(window as any).barDebug.performance());
   console.log('Browser rendering sample:',JSON.stringify(metrics));
   expect(errors).toEqual([]);
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await page.getByRole('button',{name:'Sair da conta',exact:true}).click();
 });

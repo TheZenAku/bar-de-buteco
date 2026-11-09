@@ -1,6 +1,6 @@
 # Configurações gráficas
 
-Ficam em **Configurações → Gráficos** e são salvas neste navegador (`bar:settings:v1`). Valem na hora, sem recarregar. O código está em `apps/web/src/graphics.ts`, `BarScene.setGraphics` e `EnvironmentLighting.setQuality`.
+Ficam em **Menu (Esc) › Ajustes › Imagem** e são salvas neste navegador (`bar:settings:v1`). Valem na hora, sem recarregar. O código está em `apps/web/src/graphics.ts`, `BarScene.setGraphics` e `EnvironmentLighting.setQuality`.
 
 | Opção | Efeito |
 | --- | --- |

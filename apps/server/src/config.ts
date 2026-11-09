@@ -78,7 +78,7 @@ export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConf
   // Both processes fail before accepting traffic if production secrets are missing, weak or shared.
   try { authSecret(env); internalSecret(env); }
   catch (error) { throw new WorldConfigError(error instanceof Error ? error.message : 'Segredos inválidos.'); }
-  const e = parsed.data, eventMinMs = Math.max(1000, e.EVENT_MIN_MS || 300_000);
+  const e = parsed.data, eventMinMs = Math.max(1000, e.EVENT_MIN_MS || 2_700_000);
   // Under `node --test` (NODE_TEST_CONTEXT) a room never writes to the development outbox.
   const outboxPath = e.WORLD_OUTBOX_PATH ? resolve(repositoryRoot, e.WORLD_OUTBOX_PATH)
     : env.NODE_TEST_CONTEXT ? join(tmpdir(), `bar-world-outbox-${process.pid}-${randomBytes(4).toString('hex')}.jsonl`)
@@ -92,7 +92,7 @@ export function readWorldConfig(env: NodeJS.ProcessEnv = process.env): WorldConf
     apiInternalUrl: (e.API_INTERNAL_URL ?? 'http://127.0.0.1:3001').replace(/\/+$/, ''),
     capacity: Math.max(2, Math.min(MAX_CAPACITY, e.ROOM_CAPACITY || e.BAR_CAPACITY || 32)),
     blackjackTurnMs: Math.max(5000, e.BLACKJACK_TURN_MS || BLACKJACK.turnMs),
-    eventMinMs, eventMaxMs: Math.max(eventMinMs, e.EVENT_MAX_MS || 600_000),
+    eventMinMs, eventMaxMs: Math.max(eventMinMs, e.EVENT_MAX_MS || 5_400_000),
     outboxPath: worldOutbox, blackjackJournalPath: worldOutbox.replace(/(\.jsonl)?$/, '.blackjack.jsonl'), foosballJournalPath: worldOutbox.replace(/(\.jsonl)?$/, '.foosball.jsonl'), trucoJournalPath: worldOutbox.replace(/(\.jsonl)?$/, '.truco.jsonl'), poolJournalPath: worldOutbox.replace(/(\.jsonl)?$/, '.pool.jsonl'),
     prices: { jukebox: e.PRICE_JUKEBOX ?? MEDIA_PRICES.jukebox, tv: e.PRICE_TV ?? MEDIA_PRICES.tv, telao: e.PRICE_TELAO ?? MEDIA_PRICES.telao, stage: e.PRICE_STAGE ?? STAGE_PASS.price },
     musicianDropMs: e.MUSICIAN_DROP_MS ?? MUSICIANS.dropMs,

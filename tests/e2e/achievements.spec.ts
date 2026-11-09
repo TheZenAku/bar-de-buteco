@@ -2,6 +2,7 @@ import {test,expect,type APIRequestContext,type Browser,type Page} from '@playwr
 import {internalSecret} from '@bar/shared/tickets';
 import {achievementBadges} from '../../packages/shared/src/achievements';
 import {enterAsAdmin} from './moto-helpers';
+import {menuItem} from './menu';
 
 const API='http://127.0.0.1:3111';
 const shots=process.env.PROFILE_SHOTS;
@@ -49,7 +50,7 @@ test('badges earned by playing: the notice, the card, the progress tab and the c
   await page.keyboard.press('Escape');await expect(page.locator('.bc-backdrop')).toHaveCount(0);
 
   // Your own profile: the tab with every series, what was started first.
-  await page.getByRole('button',{name:'Pessoas no bar',exact:true}).click();await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
+  await menuItem(page,'Galera','Pessoas no bar');await page.getByRole('tab',{name:'Seu lugar no bar'}).click();
   await page.getByRole('button',{name:'Seu perfil'}).click();
   await expect(page.locator('.pf-profile h2')).toHaveText('Conquistador',{timeout:20000});
   await page.locator('.pf-tabs [data-tab="achievements"]').click();
@@ -70,13 +71,12 @@ test('badges earned by playing: the notice, the card, the progress tab and the c
   await expect(page.locator('.bc-card h2')).toHaveText('Bebum I');
   await page.keyboard.press('Escape');
 
-  // Arriving with the tab open, it follows; the top of a series is the studded card, told to the whole bar.
+  // Arriving with the tab open, it follows; the top of a series is the studded card.
   await report(request,me,'bebum',990);
   await expect(toast(page,'Bebum IV')).toBeVisible({timeout:15000});
   await expect(toast(page,'Bebum II')).toBeVisible();await expect(toast(page,'Bebum III')).toBeVisible();
   await expect(bebum.locator('small')).toHaveText('1.000 cervejas: série completa');
   await expect(bebum.locator('button.pf-ach-medal')).toHaveCount(4);
-  await expect(page.locator('#messages')).toContainText('emblema lendário Bebum IV');
   await toast(page,'Bebum IV').locator('.comanda__action').click();
   await expect(page.locator('.bc-studs')).toBeVisible();
   await page.waitForTimeout(600);await shot(page,'achievement-legendary');
@@ -105,7 +105,7 @@ test('the administration: what gives a badge by itself, and a manual grant reach
   await page.request.post('/api/admin/badges/grant',{data:{playerId:me,badgeId:'motoboy-3',grant:false,reason:'Volta ao começo'}});
   await page.request.post('/api/admin/badges/grant',{data:{playerId:me,badgeId:'motoboy-3',grant:true,reason:'Teste da conquista'}});
   await expect(toast(page,'Motoboy III')).toBeVisible({timeout:15000});
-  await page.getByRole('button',{name:'Administração'}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="badges"]').click();
   await page.locator('[name="badge-query"]').fill('Bebum IV');
   await expect(page.locator('#admin-section')).toContainText('Automático, ao chegar a 1.000 cervejas');

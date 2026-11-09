@@ -20,7 +20,7 @@ import { TradeDesk, type Trade } from './world/trades.js';
 import { vehicleFuelUse, vehiclePowered, GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
 import { WALK_SPEED, type Position } from '@bar/shared';
 import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, atPickup, foodCodeSchema, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt, type HighfoodState } from '@bar/shared';
-import { KICK, KICKS, kickAim, kickClear, kickLaunch, kickTouches, kickWindow } from '@bar/shared';
+import { FIGHT, KICKS, KICK_VARIANTS, kickAim, kickClear, kickLaunch, kickRoot, kickTouches, kickVariant, kickWindow } from '@bar/shared';
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
 import { BlackjackTable, type Result, type RoundSummary } from './minigames/blackjack.js';
@@ -29,7 +29,7 @@ import { BlackjackBank, GameBank, type BankEntry } from './minigames/blackjack-b
 import { FoosballTable, type FoosballSummary } from './minigames/foosball.js';
 import { PoolTable, type PoolSummary } from './minigames/pool.js';
 import { TRUCO_SEATS, betLimits, blackjackActionSchema, blackjackBetSchema, blackjackInsuranceSchema, trucoAnswerSchema, trucoConfigSchema, trucoElevenSchema, trucoJoinSchema, trucoPlaySchema, trucoReadySchema, trucoSeatSchema, trucoSignalSchema, trucoStakes } from '@bar/shared';
-import { FOOSBALL, FOOSBALL_TABLES, TEAM_NAMES, foosballBetLimits, foosballConfigSchema, foosballCpuSchema, foosballExit, foosballInputSchema, foosballJoinSchema, foosballKickSchema,
+import { FOOSBALL, FOOSBALL_TABLES, foosballBetLimits, foosballConfigSchema, foosballCpuSchema, foosballExit, foosballInputSchema, foosballJoinSchema, foosballKickSchema,
   foosballReadySchema, foosballSlotSchema, foosballSpot, foosballWatchSchema, type FoosballFrame } from '@bar/shared';
 import { POOL_TABLES, poolStakes, poolAimSchema, poolChoiceSchema, poolConfigSchema, poolCpuSchema, poolExit, poolJoinSchema, poolReadySchema, poolSeatSchema, poolShotSchema, poolSpot,
   poolWatchSchema, type PoolShotView } from '@bar/shared';
@@ -123,8 +123,10 @@ interface Presence {
   revoked: boolean;
   rejectReconnect?: () => void;
   interactionEndsAt?: number;
-  /** Just got up: nobody can kick this player again until then. */
-  kickSafeUntil?: number;
+  /** How many kicks this player threw with the guard up: the karate goes round its variants (kickVariant). */
+  kicksInGuard?: number;
+  /** Just got up: no punch lands on this player until then (FIGHT.graceMs). Kicks do. */
+  punchSafeUntil?: number;
   /** A short non-blocking gesture (wave/use/recovery) and the state it may safely restore. */
   gestureEndsAt?:number;
   gestureState?:AnimationState;
@@ -311,7 +313,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** `hurt`: the life a blow still has to take when the body comes to rest (it never knocks anyone out in the air). */
   private readonly thrown = new Map<string, { sim: Ragdoll; upAt?: number; hurt: number }>();
   /** Kicks on their way, by player: when each began, how far into the clip the foot has been checked, and who it already hit. */
-  private readonly kicks = new Map<string, { startedAt: number; checkedMs: number; hit: Set<string> }>();
+  private readonly kicks = new Map<string, { startedAt: number; checkedMs: number; hit: Set<string>; from: { x: number; y: number; z: number; rotation: number } }>();
   /** Each bike's engine: when the try at starting ends, when W may try again, when it last took a light knock. */
   private readonly motoEngines = new Map<string, { crankEnds: number; retryAt: number; knockedAt: number }>();
   /**
@@ -782,7 +784,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       const names=items.map(id=>catalogItem(id)?.name??id).join(', ');
       client.send('table.state',{status:'ordered',order:{...publicOrder(order),waiter:worker?.displayName??'Tonico',stage:'queued'}});
       if(worker){const workerPresence=this.sessions.getByUser(worker.id);if(workerPresence)workerPresence.client.send('job.state',{...this.jobView(worker.id),message:`${player.displayName} pediu para você: ${names}. Pegue no balcão e leve à mesa ${table}.`});}
-      this.systemMessage(`${player.displayName} pediu ${worker?`para ${worker.displayName}`:'ao Tonico'}: ${names}.`,player);
     });
     // The stage pass is bought at its steps: charged first (the API decides), refunded if the buyer left meanwhile.
     this.handle('stage.buy',z.object({}).strict(),2,async client=>{
@@ -800,7 +801,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       }finally{presence.stageBusy=false;}
       player.stageUntil=Date.now()+STAGE_PASS.durationMs;
       client.send('stage.state',{until:player.stageUntil,price});
-      this.systemMessage(`${player.displayName} pegou o ingresso do palco.`,player);
       this.log('stage_pass',{playerId:player.id,price});
     });
     // The stage show, from its light desk: settings and cues are for everyone in the backyard at once (StageShowState).
@@ -827,7 +827,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       const shift=this.jobs.start(player.id,jobId,player,Date.now());
       player.job=jobId;this.syncJobs();this.sendJob(presence);
       this.log('job_start',{playerId:player.id,jobId,shiftId:shift.shiftId});
-      this.systemMessage(`${player.displayName} começou o turno: ${JOBS.find(j=>j.id===jobId)!.name}.`,player);
     });
     this.handle('job.stop',z.object({}).strict(),2,client=>{
       const player=this.player(client);if(!this.jobs.shift(player.id))throw new Error('Você não está trabalhando.');
@@ -942,7 +941,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (p.interactionState) throw new Error('Levante-se primeiro.');
       if(emote==='wave'){
         this.playTemporary(p,this.forClient(client)!,'wave',WAVE_DURATION_MS);
-        this.systemMessage(`${p.displayName} acenou para o pessoal.`, p);
         this.achieved(p.id,'gente-boa');
       }else{
         // Each dance is drawn anew; the clients map the number onto their dance clips (apps/web/public/animations/<skin>-dances.glb).
@@ -967,12 +965,14 @@ export class BarRoom extends Room<{ state: BarState }> {
         presence.queue.length=0;p.lastProcessedInput=presence.lastReceived;
         return;
       }
+      if (p.interactionState === 'kick' || p.interactionState === 'stagger') return;
       if (p.interactionState) throw new Error('Levante-se primeiro.');
-      const aim = kickAim(p, [...this.state.players.values()].filter(target => this.kickable(p, target, Date.now())));
+      const aim = kickAim(p, [...this.state.players.values()].filter(target => this.kickable(p, target)));
       if (aim !== undefined) p.rotation = aim;
-      p.skill = chosen.id; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
-      presence.interactionEndsAt = p.animationStartedAt + chosen.durationMs;
-      if (kickWindow(chosen.id)) this.kicks.set(p.id, { startedAt: p.animationStartedAt, checkedMs: 0, hit: new Set() });
+      const kick = kickVariant(chosen.id, p.fist.fight, p.fist.fight ? presence.kicksInGuard = (presence.kicksInGuard ?? -1) + 1 : 0);
+      p.skill = kick; p.animationState = 'kick'; p.animationStartedAt = Date.now(); p.interactionState = 'kick';
+      presence.interactionEndsAt = p.animationStartedAt + (KICK_VARIANTS[kick]?.durationMs ?? chosen.durationMs);
+      if (kickWindow(kick)) this.kicks.set(p.id, { startedAt: p.animationStartedAt, checkedMs: 0, hit: new Set(), from: { x: p.x, y: p.y, z: p.z, rotation: p.rotation } });
       presence.queue.length = 0;
       p.lastProcessedInput = presence.lastReceived;
     });
@@ -993,6 +993,16 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
+      const broadcast = /^\/msg(?:\s+([\s\S]*))?$/i.exec(text);
+      if (broadcast) {
+        if (sender.ticket.role !== 'admin') throw new Error('Acesso exclusivo da administração.');
+        const notice = (broadcast[1] ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+        if (!notice) throw new Error('Escreva o recado depois de /msg.');
+        // shortcut: reaches this room's players only; a second world shard would need the API to fan it out.
+        for (const target of this.sessions.values()) if (!target.revoked) target.client.send('admin.broadcast', { text: notice, by: player.displayName });
+        this.log('admin_broadcast', { playerId: player.id, text: notice });
+        return;
+      }
       if(text.toLowerCase()==='/velho'){
         player.oldWalk=!player.oldWalk;
         if(player.animationState==='run'&&player.oldWalk)player.animationState='walk';
@@ -1103,7 +1113,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       }
       if (presence.flying && name !== 'phone.call' && (NEEDS_CONSCIOUS.has(name) || name === 'player.skill')) { rejected('flying'); client.send('error', { message: 'Pouse (B) antes.' }); return; }
       if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { rejected('unconscious'); client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
-      if (FIGHT_BUSY.has(name) && this.fights.busy(subject, subject.lastProcessedInput, now)) { rejected('fighting'); client.send('error', { message: 'Espere o golpe terminar.' }); return; }
+      if (FIGHT_BUSY.has(name) && this.fights.busy(subject, subject.lastProcessedInput, now)) { rejected('fighting'); if (name !== 'player.skill') client.send('error', { message: 'Espere o golpe terminar.' }); return; }
       if (FIGHT_GUARDED.has(name) && subject.fist.fight) { rejected('guard'); client.send('error', { message: 'Baixe a guarda (R) antes.' }); return; }
       try { await handler(client, parsed.data); } catch (e) { rejected('refused'); client.send('error', { message: e instanceof Error ? e.message : 'Não foi possível executar essa ação.' }); }
     });
@@ -1173,7 +1183,9 @@ export class BarRoom extends Room<{ state: BarState }> {
         } else if (!player.interactionState && player.fist.fight) {
           // In the guard (world/fight.ts): punches, the feet planted while one holds them, the guard's pace; the browser predicts the same.
           const fromX = player.x, fromZ = player.z;
-          moving = this.fights.move(player, input, now, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle));
+          running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
+          moving = this.fights.move(player, { ...input, running }, now, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle));
+          running &&= moving;
           if (moving) this.achieved(id, 'andarilho', Math.hypot(player.x - fromX, player.z - fromZ));
         } else if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
@@ -1398,7 +1410,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!target.connected || target.currentTableId || !isConscious(target) || this.deaths.isDead(target.id)) return false;
     if (target.interactionState && target.interactionState !== 'stagger' && target.interactionState !== 'kick') return false;
     const presence = this.sessions.getByUser(target.id);
-    return !!presence && !presence.flying && now >= (presence.kickSafeUntil ?? 0);
+    return !!presence && !presence.flying && now >= (presence.punchSafeUntil ?? 0);
   }
   /** A blow lands: a kick or a gesture on its way stops, and the inputs that come until the stun ends move nothing (interactionState). */
   private stagger(target: Player): void {
@@ -1424,26 +1436,31 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   /** Who a kick can throw: someone up and free, or busy with something a blow can cut short. Sitting, working, playing or riding, it passes them by. */
-  private kickable(kicker: Player, target: Player, now: number): boolean {
+  private kickable(kicker: Player, target: Player): boolean {
     if (target === kicker || !target.connected || target.currentTableId || !isConscious(target)) return false;
     if (!KICKABLE.has(target.interactionState)) return false;
-    return now >= (this.sessions.getByUser(target.id)?.kickSafeUntil ?? 0) && kickClear(kicker, target);
+    return kickClear(kicker, target);
   }
 
-  /** Each kick on its way: all the way the foot went since the last tick, against everyone it could touch. It can hit more than one. */
+  /**
+   * Each kick on its way: the body carried where the clip goes (root motion, kickRoot), and, while the leg can land, all the way the foot went since
+   * the last tick against everyone it could touch. It can hit more than one.
+   */
   private stepKicks(now: number): void {
     for (const [id, kick] of this.kicks) {
       const kicker = this.state.players.get(id);
       if (!kicker || kicker.animationState !== 'kick' || kicker.animationStartedAt !== kick.startedAt) { this.kicks.delete(id); continue; }
       const span = kickWindow(kicker.skill), ms = now - kick.startedAt;
       if (!span) { this.kicks.delete(id); continue; }
+      const [side, ahead] = kickRoot(kicker.skill, ms), { from } = kick, s = Math.sin(from.rotation), c = Math.cos(from.rotation);
+      this.pushBody(kicker, from.x + c * side + s * ahead - kicker.x, from.z - s * side + c * ahead - kicker.z);
+      if (ms > span.to) continue;
       for (const target of this.state.players.values()) {
-        if (kick.hit.has(target.id) || !this.kickable(kicker, target, now) || !kickTouches(kicker.skill, kick.checkedMs, ms, kicker, target)) continue;
+        if (kick.hit.has(target.id) || !this.kickable(kicker, target) || !kickTouches(kicker.skill, kick.checkedMs, ms, from, target)) continue;
         kick.hit.add(target.id);
         this.landKick(kicker, target);
       }
       kick.checkedMs = ms;
-      if (ms > span.to) this.kicks.delete(id);
     }
   }
 
@@ -1478,7 +1495,7 @@ export class BarRoom extends Room<{ state: BarState }> {
         player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = now;
         this.thrown.delete(id); this.state.ragdolls.delete(id);
         const presence = this.sessions.getByUser(id);
-        if (presence) presence.kickSafeUntil = now + KICK.graceMs;
+        if (presence) presence.punchSafeUntil = now + FIGHT.graceMs;
         continue;
       }
       body.sim.advance(TICK_MS / 1000);
@@ -2434,7 +2451,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     const item = player.drinkItem || 'garrafa';
     player.interactionState = ''; player.animationState = 'idle'; player.animationStartedAt = now; player.drinkItem = ''; presence.interactionEndsAt = undefined;
     this.startHolding(player, item, now);
-    this.systemMessage(`O Magrão serviu ${player.displayName}. Saúde!`, player);
   }
 
   private async interact(client: Client, objectId: string, item: DrinkItem = 'garrafa'): Promise<void> {
@@ -2504,7 +2520,6 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.animationState = 'wait'; player.animationStartedAt=Date.now();player.interactionState = object.id; presence.interactionEndsAt = undefined;
       player.drinkItem = item;
       this.service.order(player.id, item);
-      this.systemMessage(`${player.displayName} pediu ${item === 'copo' ? 'um copo de chopp' : 'uma long neck'} ao Magrão.`, player);
     } else if (object.type === 'toilet') {
       if ([...this.state.players.values()].some(p => p !== player && p.interactionState === object.id)) throw new Error('Ocupado. Espere a sua vez.');
       player.animationState = 'toilet';player.animationStartedAt=now;player.interactionState = object.id; presence.interactionEndsAt = now + NEEDS.bladder.toiletSeconds * 1000;
@@ -2611,10 +2626,8 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
   /** An order reached its table (its items are there): the customer is told, and starts on it. */
   private tableDelivered(order:TableOrder,by:string,now:number,workerId?:string):void {
-    const player=this.state.players.get(order.playerId);
     this.achieved(order.playerId,'fregues');
     this.sessions.getByUser(order.playerId)?.client.send('table.state',{status:'delivered',order:publicOrder(order),message:`${by} deixou tudo na mesa. Bom apetite!`});
-    if(player)this.systemMessage(`${by} entregou o pedido de ${player.displayName}. Bom apetite!`,player);
     this.log('table_delivered',{playerId:order.playerId,orderId:order.id,total:order.total,waitMs:now-order.placedAt,...workerId?{workerId}:{}});
   }
   private runJobs(now:number):void {
@@ -2845,7 +2858,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     player.interactionState = 'vomit'; player.animationState = 'vomit'; player.animationStartedAt = now; player.drinkItem = '';
     presence.interactionEndsAt = now + barClipMs('vomitar'); presence.gestureEndsAt = undefined;
     presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
-    this.systemMessage(`${player.displayName} bebeu além da conta e passou mal.`, player);
     this.achieved(player.id, 'passou-mal');
     this.log('vomit', { playerId: player.id, drunk: player.drunk });
   }
@@ -2884,9 +2896,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
     if (event.type === 'faint') {
       this.log('faint', { playerId: player.id, cause: event.cause });
-      if (event.cause === 'alcohol') { this.achieved(player.id, 'apagou'); presence.recoveryMoveAt = now + NEEDS.faint.moveAfterSeconds * 1000; this.systemMessage(`${player.displayName} bebeu demais e apagou.`, player); }
+      if (event.cause === 'alcohol') { this.achieved(player.id, 'apagou'); presence.recoveryMoveAt = now + NEEDS.faint.moveAfterSeconds * 1000; }
       else {
-        this.systemMessage(`${player.displayName} desmaiou.`, player);
         // Keep the injectable inventory port useful for isolated modes/tests; the normal room uses the
         // persistent API-backed inventory below.
         const localLost=this.needs.loseItemOnFaint(player.id);
@@ -2922,7 +2933,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!marker || player.condition !== 'fainted') return;
     Object.assign(player, findSpawn([...this.state.players.values()].filter(p => p !== player), marker));
     presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
-    this.systemMessage(`Levaram ${player.displayName} para tomar um ar na calçada.`, player);
   }
 
   /**
@@ -3013,7 +3023,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     Object.assign(player,{x:spot.x,y:spot.y,z:spot.z,rotation:spot.yaw*Math.PI/180});
     player.interactionState=`stage-${spot.id}`;player.animationState='stage';player.animationStartedAt=now;player.drinkItem='';
     presence.gestureEndsAt=undefined;presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;
-    this.systemMessage(`${player.displayName} ${musicianRole(spot.id).taken} no palco.`,player);
     this.log('stage_musician',{playerId:player.id,spot:spot.id});
   }
   /** The stop clip ended: the musician stands where it left them, stepping out of the drum kit when that is where it was. */
@@ -3111,7 +3120,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client)!;
     presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
     this.truco.refresh(player.id);
-    this.systemMessage(`${player.displayName} sentou na mesa de truco.`, player);
   }
   private seatAtTruco(player: Player): void {
     const seat = TRUCO_SEATS[this.truco.seatOf(player.id)]!;
@@ -3170,7 +3178,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
     this.syncFoosball();
     client.send('foosball.open', { tableId, watching: false });
-    if (!here) this.systemMessage(`${player.displayName} chegou na mesa ${FOOSBALL_TABLES.find(t => t.id === tableId)!.number} do pebolim.`, player);
   }
 
   /** Off the table (or stops watching): out on the room's side of it, where it was played. */
@@ -3255,16 +3262,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
   }
 
-  /** A finished match: in the log for each player, and told to the bar around the table. */
+  /** A finished match: in the log for each player. */
   private foosballMatch(summary: FoosballSummary): void {
-    const place = FOOSBALL_TABLES.find(t => t.id === summary.tableId)!, table = this.foosball.get(summary.tableId)!;
+    const place = FOOSBALL_TABLES.find(t => t.id === summary.tableId)!;
     for (const p of summary.players) this.log('foosball_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, team: p.team, result: p.result,
       score: summary.score, forfeit: summary.forfeit, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
     if (!summary.forfeit) for (const p of summary.players) if (p.result === 'win') this.achieved(p.playerId, 'craque-do-pebolim');
-    const origin = this.state.players.get(summary.players[0]?.playerId ?? ''), winner = table.winner;
-    if (!origin || !winner) return;
-    const names = table.slots.filter(s => s.team === winner && (s.playerId || s.cpu)).map(s => s.displayName);
-    this.systemMessage(`Pebolim, mesa ${place.number}: ${names.join(' e ')} (${TEAM_NAMES[winner]}) venceu por ${summary.score}${summary.forfeit ? ', por W.O.' : ''}${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
   }
 
   // ── Sinuca ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -3297,7 +3300,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     presence.gestureEndsAt = undefined; presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
     client.send('pool.open', { tableId, watching: false });
     this.syncPool();
-    if (!here) this.systemMessage(`${player.displayName} chegou na mesa ${POOL_TABLES.find(t => t.id === tableId)!.number} da sinuca.`, player);
   }
 
   /** Off the table (or stops watching): a step back from its side of the table. */
@@ -3384,14 +3386,12 @@ export class BarRoom extends Room<{ state: BarState }> {
     }
   }
 
-  /** A finished rack: in the log for each player, and told to the bar around the table. */
+  /** A finished rack: in the log for each player. */
   private poolMatch(summary: PoolSummary): void {
     const place = POOL_TABLES.find(t => t.id === summary.tableId)!;
     for (const p of summary.players) this.log('pool_match', { playerId: p.playerId, roundId: summary.matchId, table: place.number, seat: p.seat, result: p.result, rack: summary.rack,
       reason: summary.reason, forfeit: summary.forfeit, cpu: summary.cpu, stake: summary.stake, paid: p.paid, net: summary.stake ? p.paid - summary.stake : 0 });
     if (!summary.forfeit) for (const player of summary.players) if (player.result === 'win') this.achieved(player.playerId, 'mestre-da-sinuca');
-    const origin = this.state.players.get(summary.players[0]?.playerId ?? '');
-    if (origin) this.systemMessage(`Sinuca, mesa ${place.number}: ${summary.winner} venceu ${summary.loser} (${summary.reason.charAt(0).toLowerCase()}${summary.reason.slice(1)})${summary.stake ? `, valendo ${summary.stake} moedas` : ''}.`, origin);
   }
 
   private syncEvent(now: number): void {
@@ -3400,7 +3400,6 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.state.event.id = current.kind === 'none' ? '' : randomUUID();
     this.state.event.startedAt = current.kind === 'none' ? 0 : now;
     this.state.event.durationMs = current.kind === 'none' ? 0 : current.endsAt - now;
-    if (current.kind !== 'none') this.systemMessage(`${current.title} ${current.description}`);
     this.log('world_event', { type: this.state.event.type });
   }
 
@@ -3592,16 +3591,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (before === xp && was === level) return;
     player.level = level;
     presence.client.send('xp.state', { xp, gained: before === undefined ? 0 : Math.max(0, xp - before) });
-    if (before !== undefined && was > 0 && rankOf(level).index > rankOf(was).index) this.systemMessage(`${player.displayName} chegou ao posto ${rankOf(level).name}: nível ${level}!`, player);
   }
-  /** The player hears it with the card a click away; the bar hears about the rarer ones, and all of it about the rarest. */
+  /** The player hears it with the card a click away. */
   private celebrate(userId: string, badge: Badge): void {
-    const presence = this.sessions.getByUser(userId), player = this.state.players.get(userId);
-    if (!presence || !player) return;
+    const presence = this.sessions.getByUser(userId);
+    if (!presence) return;
     presence.client.send('achievement.unlocked', { badge });
     this.log('achievement', { playerId: userId, badge: badge.name });
-    if (badge.rarity === 'legendary') this.systemMessage(`${player.displayName} conquistou o emblema lendário ${badge.name}!`);
-    else if (badge.rarity === 'rare' || badge.rarity === 'epic') this.systemMessage(`${player.displayName} conquistou o emblema ${badge.name}.`, player);
   }
 
   /** Reads the price table again and tells everyone in the bar; job pay follows its `job:<id>` price. */
@@ -3817,10 +3813,6 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   private forClient(client: Client): Presence | undefined { return this.sessions.getByClient(client); }
   private player(client: Client): Player { const p = this.forClient(client); if (!p) throw new Error('Sessão não encontrada.'); return this.state.players.get(p.ticket.userId)!; }
-  private systemMessage(text: string, origin?: Player): void {
-    const message: ChatMessage = { id: randomUUID(), playerId: 'system', displayName: 'B.A.R.', text, sentAt: Date.now(), system: true };
-    for (const [id, p] of this.sessions) if (this.state.players.get(id)?.connected && (!origin || distance(origin, this.state.players.get(id)!) <= CHAT_RADIUS)) p.client.send('chat.message', message);
-  }
   /** JSON lines with the room and pseudonymous player ids (apps/server/src/observability.ts). */
   private log(event: string, details: Record<string, unknown>): void {
     console.log(logLine(event, details, this.roomId));

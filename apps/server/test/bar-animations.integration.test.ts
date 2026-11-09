@@ -106,7 +106,6 @@ test('bar animations over real WebSockets: urinal, chair in and out, a cigarette
     // Alcohol applied when the drink entered the hand; finishing only applies sickness relief.
     assert.ok(Math.abs(needs.drunk-(75-NEEDS.drunk.vomit.drunkRelief))<1,`drunk ${needs.drunk}`);
     assert.ok(needs.nextVomitAt>Date.now(),'Not again before the cooldown');
-    await until(()=>a.chat.some(t=>t.includes('passou mal')));
     await until(()=>b.player().animationState==='idle',barClipMs('vomitar')+2000);
   }finally{
     await Promise.allSettled(rooms.filter(joined=>joined.connection?.isOpen).map(joined=>joined.leave()));await server.gracefullyShutdown(false);await new Promise<void>(r=>api.close(()=>r()));

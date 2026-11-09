@@ -1,5 +1,6 @@
 import {expect,test,type Page} from '@playwright/test';
 import {enterAsAdmin,selfOf,walkTo} from './moto-helpers';
+import {menuItem} from './menu';
 
 const shots='test-results/highfood';
 const shot=async(page:Page,name:string)=>{await page.screenshot({path:`${shots}/${name}.png`,timeout:60_000}).catch(()=>{});};
@@ -268,7 +269,6 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   const coins=await wallet(page);
   await page.keyboard.press('e');
   await expect(page.locator('#food-dialog')).toBeHidden({timeout:5000});
-  await expect(page.locator('#toasts')).toContainText('Entrega feita',{timeout:15_000});
   await page.waitForTimeout(700);
   await shot(page,'18-delivered');
   await expect.poll(()=>wallet(page),{timeout:10_000}).toBeGreaterThan(coins);
@@ -286,7 +286,7 @@ test('Highfood: buy the bike, take an order in the app, ride the GPS, hand it ov
   await expect.poll(async()=>(await food(page)).status,{timeout:8000}).toBe('off');
   await page.keyboard.press('k');
   // The customers in the administration, with a picture.
-  await page.getByRole('button',{name:'Administração',exact:true}).click();
+  await menuItem(page,'Você','Administração');
   await page.locator('[data-admin-nav="highfood"]').click();
   await expect(page.locator('.admin-food-table')).toBeVisible({timeout:15_000});
   await page.locator('[data-food="edit"]').first().click();

@@ -4,6 +4,8 @@ import {DEFAULT_CAMERA_DISTANCE,DEFAULT_CAMERA_FEEL,isCameraMode,readCameraDista
 export interface GameSettings {
   /** Volumes 0–1; the microphone gain is mic × 2 (0.5 = unchanged). */
   master:number;music:number;voice:number;mic:number;
+  /** The pause menu's sounds (pause-menu/menu-sounds.ts), under the general volume. */
+  ui:number;
   micEnabled:boolean;voicesEnabled:boolean;voiceMode:'open'|'ptt';
   /** 0 picks up whispers, 1 only loud speech. */
   sensitivity:number;inputDevice:string;
@@ -18,7 +20,7 @@ export interface GameSettings {
 const KEY='bar:settings:v1';
 // The starting distance until 2026-11-02: saved as it was, it means the player never zoomed, so they get the new one.
 const OLD_DEFAULT_DISTANCE=6.4;
-export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE,cameraFeel:{...DEFAULT_CAMERA_FEEL}};
+export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,ui:.8,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE,cameraFeel:{...DEFAULT_CAMERA_FEEL}};
 const unit=(value:unknown,fallback:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 
 export function createSettings(){
@@ -27,7 +29,7 @@ export function createSettings(){
   try{
     const saved=JSON.parse(localStorage.getItem(KEY)??'null');
     if(saved&&typeof saved==='object')current={
-      master:unit(saved.master,current.master),music:unit(saved.music,current.music),voice:unit(saved.voice,current.voice),mic:unit(saved.mic,current.mic),
+      master:unit(saved.master,current.master),music:unit(saved.music,current.music),voice:unit(saved.voice,current.voice),mic:unit(saved.mic,current.mic),ui:unit(saved.ui,current.ui),
       // Restored only if the browser already granted the microphone (see VoiceChat.enter).
       micEnabled:saved.micEnabled===true,voicesEnabled:typeof saved.voicesEnabled==='boolean'?saved.voicesEnabled:current.voicesEnabled,
       voiceMode:saved.voiceMode==='ptt'?'ptt':'open',sensitivity:unit(saved.sensitivity,current.sensitivity),

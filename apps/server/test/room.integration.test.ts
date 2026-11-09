@@ -100,6 +100,20 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(bob.animationState,'idle');
     assert.ok(!received.includes('/velho'),'Slash commands are interpreted by the server, not broadcast as chat text');
     second.send('chat.send',{text:'/velho'});await eventually(()=>first.state.players.get('bob').oldWalk===false);
+    // /msg: the administration's notice to everyone, never chat; anyone else is refused.
+    const notices:Array<{text:string;by:string}>=[];
+    first.onMessage('admin.broadcast',m=>notices.push(m));second.onMessage('admin.broadcast',m=>notices.push(m));
+    second.send('chat.send',{text:'/msg Fechando em 5 minutos'});
+    await eventually(()=>secondErrors.includes('Acesso exclusivo da administração.'));
+    const aliceTicket=(authoritative as unknown as {sessions:{getByUser:(id:string)=>{ticket:{role:string}}}}).sessions.getByUser('alice').ticket;
+    aliceTicket.role='admin';
+    first.send('chat.send',{text:'/msg   '});
+    await eventually(()=>errors.includes('Escreva o recado depois de /msg.'));
+    first.send('chat.send',{text:'/msg Fechando em 5 minutos'});
+    await eventually(()=>notices.length===2);
+    assert.deepEqual(notices,[{text:'Fechando em 5 minutos',by:'alice'},{text:'Fechando em 5 minutos',by:'alice'}]);
+    assert.ok(!received.some(text=>text.includes('Fechando')),'A notice, not chat');
+    aliceTicket.role='user';
     second.send('player.emote',{emote:'wave'});
     await eventually(()=>first.state.players.get('bob').animationState==='wave');
     assert.ok(bob.animationStartedAt>0,'The wave is visible and time-synchronized for other players');

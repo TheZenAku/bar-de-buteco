@@ -8,7 +8,6 @@ export interface LevelHudHooks {
   toast(text:string,error?:boolean):void;
   openProfile():void;
   /** The daily bonus is waiting: the game tells the player once per visit. */
-  dailyReady(open:()=>void):void;
   /** Coins came with the bonus: the wallet reads its new balance. */
   coinsChanged():void;
 }
@@ -28,7 +27,7 @@ export function createLevelHud(root:HTMLElement,hooks:LevelHudHooks){
   const chip=root.querySelector<HTMLElement>('.lv-chip')!,icon=root.querySelector<HTMLElement>('.lv-icon')!,num=root.querySelector<HTMLElement>('.lv-num')!;
   const rankName=root.querySelector<HTMLElement>('.lv-rank')!,fill=root.querySelector<HTMLElement>('.lv-fill')!,xpLabel=root.querySelector<HTMLElement>('.lv-xp')!;
   const pops=root.querySelector<HTMLElement>('.lv-pops')!,spoken=root.querySelector<HTMLElement>('[aria-live]')!,dot=root.querySelector<HTMLElement>('.lv-dot')!;
-  let shown:number|undefined,target:number|undefined,frame=0,drawnLevel=0,daily:DailyView|undefined,dailyWindow:FloatingWindow|undefined,tick=0,told=false;
+  let shown:number|undefined,target:number|undefined,frame=0,drawnLevel=0,daily:DailyView|undefined,dailyWindow:FloatingWindow|undefined,tick=0;
 
   function draw(xp:number):void {
     const p=levelOf(xp),rank=rankOf(p.level);
@@ -94,7 +93,6 @@ export function createLevelHud(root:HTMLElement,hooks:LevelHudHooks){
   async function loadDaily():Promise<void> {
     try{
       setDaily(await api<DailyView>('/daily'));
-      if(!daily!.claimed&&!told){told=true;hooks.dailyReady(openDaily);}
     }catch{/* The button stays; it tries again when opened. */}
   }
   function openDaily():void {
@@ -134,6 +132,8 @@ export function createLevelHud(root:HTMLElement,hooks:LevelHudHooks){
   });
 
   return {
+    /** The XP last reported (the pause menu's header draws the same level). */
+    xp():number|undefined {return target;},
     /** The XP the world reported (`gained` 0: just where it stands, as on arrival). */
     set(xp:number,gained=0):void {
       if(target===xp)return;
@@ -145,7 +145,7 @@ export function createLevelHud(root:HTMLElement,hooks:LevelHudHooks){
     enter():void {void loadDaily();},
     openDaily,
     reset():void {
-      cancelAnimationFrame(frame);shown=undefined;target=undefined;drawnLevel=0;told=false;daily=undefined;
+      cancelAnimationFrame(frame);shown=undefined;target=undefined;drawnLevel=0;daily=undefined;
       dailyWindow?.close();num.textContent='…';rankName.textContent='';icon.innerHTML='';fill.style.width='0%';xpLabel.textContent='';pops.replaceChildren();dot.hidden=true;
     },
   };

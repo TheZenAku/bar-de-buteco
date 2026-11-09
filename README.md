@@ -80,7 +80,7 @@ A **mochila persistente** reúne bebidas, comidas e curativos em pilhas, com his
 
 O comando `/velho` mantém a skin. A bengala acompanha a mão direita e a caminhada usa a animação fornecida, com transição de 0,35 s. Shift mantém a velocidade de 0,475 m/s nesse modo. Outras ações continuam disponíveis; a bengala fica guardada durante dança, bebida, assentos e golpes. O estilo fica no estado da sala e sobrevive à reconexão; não modifica a skin salva na conta. Veja [a importação e a validação da bengala](docs/assets/old-cane.md).
 
-Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 5 e 10 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de escudo. Eventos não alteram as regras nem cancelam rodadas.
+Apagão, frequentador inconveniente e festa são escolhidos pelo servidor entre 45 e 90 minutos, com duração de 30 a 90 segundos e sem repetição automática consecutiva. A administração pode iniciar eventos pelo botão de escudo. Eventos não alteram as regras nem cancelam rodadas.
 
 O painel de pessoas permite bloquear mensagens e denunciar jogadores. A administração consulta denúncias e histórico, expulsa e bane contas. Banimento e redefinição de senha revogam sessões.
 

@@ -100,7 +100,7 @@ A cena não tem mapa de ambiente, então metal não reflete nada e fica preto. O
 
 ### Detalhe por qualidade
 
-Configurações → Gráficos → **Detalhe da cidade** (`CITY_TUNING`):
+Menu › Ajustes › Imagem › **Detalhe da cidade** (`CITY_TUNING`):
 
 | | Setores completos | LOD1 até o anel | Arquivos ao mesmo tempo | `cull_m` × | Luzes reais |
 | --- | --- | --- | --- | --- | --- |

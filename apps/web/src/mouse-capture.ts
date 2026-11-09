@@ -9,10 +9,12 @@ const STEADY_MS=400;
  * The browser may refuse without a click (F11, or after Esc): it is asked again once a second, and by the next click on the view.
  * `wants`: another reason to hold the mouse out of full screen too (the fist fight's guard, where the buttons punch and the mouse turns the view);
  * `escaped`: the player let go of it with Esc while only that reason held it (the guard comes down).
+ * `pause`: the same Esc opens the pause menu (pause-menu.ts); true when it did, so the capture comes back when the menu closes
+ * instead of waiting for the scroll button (the browser may never deliver that Esc as a key).
  */
-export function createMouseCapture(canvas:HTMLCanvasElement,needsCursor:()=>boolean,notice:(text:string)=>void,wants:()=>boolean=()=>false,escaped?:()=>void):{sync():void} {
+export function createMouseCapture(canvas:HTMLCanvasElement,needsCursor:()=>boolean,wants:()=>boolean=()=>false,escaped?:()=>void,pause?:()=>boolean):{sync():void} {
   /** The player asked for the cursor (scroll button, or Esc where the browser takes it). Lasts until they ask otherwise or full screen ends. */
-  let released=false,wasFull=false,told=false,retryAt=0;
+  let released=false,wasFull=false,retryAt=0;
   /** The game let go, and has not captured since: a capture dropped before its own event ran reports twice, and neither is the player's Esc. */
   let letGo=false;
   /** When the lock was last confirmed: a lock lost within STEADY_MS of it was never held, the browser dropped a request (it is not the player's Esc). */
@@ -33,12 +35,11 @@ export function createMouseCapture(canvas:HTMLCanvasElement,needsCursor:()=>bool
   document.addEventListener('pointerlockchange',()=>{
     if(captured()){
       letGo=false;heldAt=performance.now();
-      if(!told){told=true;notice('O mouse está preso ao jogo. Aperte o botão do scroll para mostrar o cursor.');}
       return;
     }
     // Lost to Esc, not to a window of the game or to another program taking the focus. The wait between tries is for refusals.
-    if(!letGo&&inFullscreen()&&document.hasFocus())released=true;
-    else if(!letGo&&!inFullscreen()&&document.hasFocus()&&wants()&&performance.now()-heldAt>STEADY_MS)escaped?.();
+    if(!letGo&&inFullscreen()&&document.hasFocus()){if(!pause?.())released=true;}
+    else if(!letGo&&!inFullscreen()&&document.hasFocus()&&wants()&&performance.now()-heldAt>STEADY_MS){escaped?.();pause?.();}
     retryAt=0;
   });
   // mousedown, not pointerdown: that one does not fire for a second button pressed while another is held.

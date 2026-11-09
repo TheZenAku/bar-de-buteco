@@ -2,7 +2,7 @@
 
 A conta confirmada **rafaelrodrigues-2017@hotmail.com** é a conta principal. A API concede a ela o papel de administrador ao iniciar, ao confirmar o e-mail ou ao concluir o cadastro com a política de ativação automática habilitada. Isso não cria outra conta, não redefine senha e não ignora a confirmação de e-mail quando ela estiver exigida.
 
-Entre no bar e abra **Administração** (escudo) na barra de ferramentas. A janela ocupa quase a tela toda e tem um menu de categorias à esquerda; a categoria aberta fica à direita, com título, uma frase do que ela faz e uma linha de status (`.admin-feedback`) onde aparece o resultado de toda ação. Reabrir a janela volta à última categoria usada. No celular, o menu vira uma faixa rolável no topo.
+Entre no bar e abra **Administração** no menu (Esc › Você). A janela ocupa quase a tela toda e tem um menu de categorias à esquerda; a categoria aberta fica à direita, com título, uma frase do que ela faz e uma linha de status (`.admin-feedback`) onde aparece o resultado de toda ação. Reabrir a janela volta à última categoria usada. No celular, o menu vira uma faixa rolável no topo.
 
 No pé do menu, **Sua posição** mostra onde o seu personagem está (x, y e z em metros e a rotação em graus e radianos), atualizada ao vivo, com **Copiar**. Serve para marcar onde algo deve ficar no mapa, como um blip: pare no lugar, abra a administração e copie. Fora de HTTPS e do localhost o navegador não deixa copiar direto; o texto fica selecionado para Ctrl+C.
 

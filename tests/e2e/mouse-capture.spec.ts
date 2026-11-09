@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {menuItem,closeMenu} from './menu';
 
 async function enter(page:Page):Promise<void>{
   const name=`mouse_${Date.now().toString(36)}`;
@@ -49,9 +50,11 @@ test('full screen holds the mouse: the scroll button lets it go and takes it aga
   expect(await locked(page)).toBe('');
   const still=await yaw(page);await page.mouse.move(700,320);await page.waitForTimeout(200);expect(await yaw(page)).toBe(still);
 
-  await page.getByRole('button',{name:'Painéis',exact:true}).click();
-  await page.locator('#panel-menu [data-fullscreen]').click();
+  await menuItem(page,'Ajustes','Interface');
+  await page.locator('#pause-menu [data-pm-act="fullscreen"]').click();
   await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.tagName)).toBe('HTML');
+  // The menu holds the cursor while it is open; closing it gives the mouse to the game.
+  await closeMenu(page);
   await expect.poll(()=>locked(page),{timeout:10_000}).toBe('world');
   await expect(page.locator('.comanda').filter({hasText:'botão do scroll'}).first()).toBeVisible();
 

@@ -20,8 +20,8 @@ export {FIGHT_BODIES,type FightBody,type FistPath} from './fight-paths.js';
  *   at most FIGHT.rewindMaxMs), so what the fist is drawn touching is what gets hit.
  */
 export const FIGHT={
-  /** Walking in the guard (m/s): shorter steps than a walk, and no running. */
-  speed:2.2,
+  /** Walking in the guard (m/s): shorter steps than a walk; with Shift (and stamina) it runs, guard still up. */
+  speed:2.2,runSpeed:4.8,
   /**
    * The body a fist meets: a standing capsule from a little above the hips to past the head joint, as the skin stands in the guard (fight-paths.ts),
    * this thick. The fist is a ball this thick around the knuckles.
@@ -123,24 +123,42 @@ export function throwPunch(command:Pick<PunchCommand,'m'|'n'|'lunge'>,seq:number
   const move=FIGHT_MOVES[command.m],lunge=Math.max(-FIGHT.backStep,Math.min(move.lungeMax,command.lunge));
   return {move:command.m,seq,yaw:normalizeHeading(yaw),lunge:lunge/move.lungeSteps,n:command.n&255};
 }
-/** Input `seq` while the last punch holds: whether the feet are planted, and its step in along the punch (m). */
-export function punchStep(stream:PunchStream,seq:number):{locked:boolean;step:number} {
-  const move=punchById(stream.move),steps=seq-stream.seq;
-  if(!move||steps<0||steps>=move.lockSteps)return {locked:false,step:0};
-  return {locked:true,step:steps<move.lungeSteps?stream.lunge:0};
+/** How far forward a skin's punch has carried its body after `steps` inputs (fight-paths.ts root: the clip's own step, m). */
+export function punchRoot(skin:string|undefined,move:PunchId,steps:number):number {
+  const root=fistPath(skin,move).root;
+  return root.length?root[Math.max(0,Math.min(root.length-1,steps))]!:0;
 }
 /**
- * Where an input takes a body in the guard, the same in the room and in the browser: planted (and stepping in) while a punch holds it, else
- * walking at FIGHT.speed. `dt`: the input's time (TICK_MS).
+ * Input `seq` while the last punch holds: whether the feet are planted, and how far the body goes along the punch (m): the step in towards the target
+ * over its first inputs, and the clip's own step (punchRoot) all the while the feet are planted.
  */
-export function fightMove(position:Position,stream:PunchStream,seq:number,input:{dx:number;dz:number},dt:number,stagePass:boolean,obstacles:readonly Collider[]):Required<Position> {
-  const {locked,step}=punchStep(stream,seq);
-  if(locked){
-    if(!step)return {x:position.x,y:position.y??0,z:position.z};
-    const sign=Math.sign(step);
-    return movePlayer(position,{dx:Math.sin(stream.yaw)*sign,dz:Math.cos(stream.yaw)*sign,running:false},dt,false,stagePass,obstacles,Math.abs(step)/dt);
+export function punchStep(stream:PunchStream,seq:number,skin?:string):{locked:boolean;step:number} {
+  const move=punchById(stream.move),steps=seq-stream.seq;
+  if(!move||steps<0||steps>=move.lockSteps)return {locked:false,step:0};
+  return {locked:true,step:(steps<move.lungeSteps?stream.lunge:0)+punchRoot(skin,move.id,steps+1)-punchRoot(skin,move.id,steps)};
+}
+/**
+ * Whether the last punch's own way (punchRoot) still carries the body at input `seq`: from the input that threw it, through the planted ones, and then
+ * while the player stands still, as the clip plays on; the player's own step ends it for good. The room reads the same from animationState 'punch'.
+ */
+export function punchCarries(carry:boolean,stream:PunchStream,seq:number,input:{dx:number;dz:number}):boolean {
+  if(stream.seq===seq&&punchById(stream.move))return true;
+  return carry&&(punchStep(stream,seq).locked||(!input.dx&&!input.dz));
+}
+/**
+ * Where an input takes a body in the guard, the same in the room and in the browser: planted (and stepping) while a punch holds it, carried on by
+ * the punch's own way while `carry` (punchCarries) and standing still, else walking at FIGHT.speed, or running at FIGHT.runSpeed (`running`: already
+ * checked against stamina). `dt`: the input's time (TICK_MS).
+ */
+export function fightMove(position:Position,stream:PunchStream,seq:number,input:{dx:number;dz:number;running?:boolean},dt:number,stagePass:boolean,obstacles:readonly Collider[],skin?:string,carry=false):Required<Position> {
+  const {locked,step}=punchStep(stream,seq,skin),move=punchById(stream.move),steps=seq-stream.seq;
+  const along=locked?step:carry&&move&&!input.dx&&!input.dz?punchRoot(skin,move.id,steps+1)-punchRoot(skin,move.id,steps):0;
+  if(locked||along){
+    if(!along)return {x:position.x,y:position.y??0,z:position.z};
+    const sign=Math.sign(along);
+    return movePlayer(position,{dx:Math.sin(stream.yaw)*sign,dz:Math.cos(stream.yaw)*sign,running:false},dt,false,stagePass,obstacles,Math.abs(along)/dt);
   }
-  return movePlayer(position,{dx:input.dx,dz:input.dz,running:false},dt,false,stagePass,obstacles,FIGHT.speed);
+  return movePlayer(position,{dx:input.dx,dz:input.dz,running:false},dt,false,stagePass,obstacles,input.running?FIGHT.runSpeed:FIGHT.speed);
 }
 
 /** The moment of the room a browser draws the others at (ms): its newest state, less the glide towards it (PATCH_GLIDE in BarScene: 120 ms for 100). */
@@ -232,7 +250,7 @@ export function punchClear(puncher:Position,target:Position):boolean {
 }
 /** Whether the target is still within this punch's reach now, give or take FIGHT.slack: past it, a hit seen in the past no longer counts. */
 export function punchInReach(skin:string|undefined,move:PunchId,puncher:Position,target:Position):boolean {
-  const path=fistPath(skin,move),most=Math.max(path.reach,...Array.from({length:path.fist.length/3},(_,i)=>Math.hypot(path.fist[i*3]!,path.fist[i*3+2]!)));
+  const path=fistPath(skin,move),most=Math.max(path.reach,...Array.from({length:path.fist.length/3},(_,i)=>Math.hypot(path.fist[i*3]!,path.fist[i*3+2]!)+Math.max(0,...path.root)));
   return Math.hypot(target.x-puncher.x,target.z-puncher.z)<=most+FIGHT.fistRadius+FIGHT.bodyRadius+FIGHT.slack&&Math.abs((target.y??0)-(puncher.y??0))<1.2;
 }
 

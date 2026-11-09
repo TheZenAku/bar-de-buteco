@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {KICK,KICKS,KICK_PATHS,Ragdoll,SKILLS,kickAim,kickClear,kickLaunch,kickTouches,kickWindow,type RagdollStart} from '@bar/shared';
+import {KARATE_ROUND,KICK,KICKS,KICK_PATHS,KICK_VARIANTS,Ragdoll,SKILLS,kickAim,kickClip,kickVariant,kickClear,kickLaunch,kickTouches,kickWindow,type RagdollStart} from '@bar/shared';
 // @ts-expect-error The tool is a plain script, with no types.
 import {measureKicks} from '../../tools/assets/measure-kicks.mjs';
 
@@ -12,18 +12,26 @@ const ahead=(metres:number,side=0)=>({x:OPEN.x+side,y:0,z:OPEN.z+metres,rotation
 const whole=(skill:string)=>{const span=kickWindow(skill)!;return [span.from,span.to] as const;};
 const landed=(skill:string,target:{x:number;y:number;z:number},kicker=facing(0))=>kickTouches(skill,...whole(skill),kicker,target);
 
-test('every registered kick is a catalog skill with a foot table the clip agrees with',()=>{
+test('every registered kick is a catalog skill or a variant, with a foot table the clip agrees with',()=>{
   for(const id of Object.keys(KICKS)){
-    const skill=SKILLS.find(candidate=>candidate.id===id);
-    assert.ok(skill,`${id} has its catalog skill`);assert.ok(KICK_PATHS[skill.clip],`${skill.clip} has its table`);
+    assert.ok(SKILLS.some(candidate=>candidate.id===id)||KICK_VARIANTS[id],`${id} is a catalog skill or a variant`);
+    assert.ok(KICK_PATHS[kickClip(id)!],`${kickClip(id)} has its table`);
   }
   // Run npm run assets:kicks when this fails: the clip changed and the table with it.
   const table=measureKicks(fs.readFileSync(new URL('../../apps/web/public/animations/rafael.glb',import.meta.url)));
   assert.deepEqual(table,JSON.parse(JSON.stringify(KICK_PATHS)));
 });
 
+test('the karate goes round its variants with the guard up, each harder; anything else is itself',()=>{
+  assert.deepEqual([0,1,2,3].map(round=>kickVariant('karate',true,round)),[...KARATE_ROUND,'karate']);
+  assert.equal(kickVariant('karate',false,1),'karate');
+  assert.equal(kickVariant('air-kick',true,1),'air-kick');
+  const hp=KARATE_ROUND.map(id=>KICKS[id]!.hp);
+  assert.deepEqual(hp,[...hp].sort((a,b)=>a-b));assert.ok(new Set(hp).size===hp.length);
+});
+
 test('a kick hits what its foot reaches, and only that',()=>{
-  for(const skill of ['karate','air-kick']){
+  for(const skill of ['karate','air-kick','karate-alto']){
     assert.ok(landed(skill,ahead(.6)),`${skill}: close in front`);
     assert.ok(landed(skill,ahead(1.3)),`${skill}: at the end of the leg`);
     assert.equal(landed(skill,ahead(2.2)),false,`${skill}: too far`);
@@ -32,6 +40,9 @@ test('a kick hits what its foot reaches, and only that',()=>{
     assert.equal(landed(skill,{...ahead(1),y:2.5}),false,`${skill}: on the floor above`);
     assert.equal(landed(skill,{...ahead(1),y:-2.5}),false,`${skill}: on the floor below`);
   }
+  // The front kick pushes at close range: the hips sit back while the foot goes out.
+  assert.ok(landed('karate-frontal',ahead(.6)));assert.ok(landed('karate-frontal',ahead(1)));
+  assert.equal(landed('karate-frontal',ahead(1.7)),false);assert.equal(landed('karate-frontal',ahead(-1)),false);
   // The karate kick comes round from the right: someone there takes it, someone equally far on the left does not.
   assert.ok(landed('karate',ahead(.7,-.75)));
   assert.equal(landed('karate',ahead(.7,.75)),false);

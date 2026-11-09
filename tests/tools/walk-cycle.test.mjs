@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Quaternion,Vector3} from 'three';
-import {polishWalkCycle} from '../../tools/assets/lib/walk-cycle.mjs';
+import {evenStance,polishWalkCycle} from '../../tools/assets/lib/walk-cycle.mjs';
 import {readGlb} from '../../tools/assets/lib/character-gltf.mjs';
 import {walkPlaybackRate,walkTransitionSeconds} from '../../apps/web/src/engine/walk-playback.ts';
 
@@ -13,6 +13,18 @@ const velocity=(a,b,dt)=>{
   const q=a.clone().invert().multiply(b);if(q.w<0)q.set(-q.x,-q.y,-q.z,-q.w);
   return new Vector3(q.x,q.y,q.z).multiplyScalar(2/dt);
 };
+
+test('a step clip re-timed by its foot on the floor: it goes back at one speed, and the length stays',()=>{
+  // On the floor: 0.4 m back in 0.2 s, then 0.4 m in 0.6 s; then 0.2 s in the air. The other foot never comes down.
+  const times=[0,.1,.2,.4,.6,.8,.9,1],z=[.4,.2,0,-.4/3,-.8/3,-.4,-.2,.4],y=[0,0,0,0,0,0,.2,.2];
+  const warp=evenStance(times,times.map((_,i)=>[[z[i],y[i]],[0,.5]]));
+  assert.equal(warp(0),0);assert.ok(Math.abs(warp(1)-1)<1e-9,'same length');
+  const at=t=>{let i=0;while(i<times.length-2&&times[i+1]<=t)i++;return z[i]+(z[i+1]-z[i])*(t-times[i])/(times[i+1]-times[i]);};
+  const floorEnd=[...Array(1001).keys()].map(i=>i/1000).find(t=>warp(t)>=.8);
+  const speeds=[.1,.3,.5,.7,.9].map(share=>{const a=floorEnd*(share-.05),b=floorEnd*(share+.05);return (at(warp(a))-at(warp(b)))/(b-a);});
+  for(const speed of speeds)assert.ok(Math.abs(speed-speeds[0])<.02*speeds[0],`one speed on the floor: ${speeds.map(s=>s.toFixed(3))}`);
+  assert.equal(walkTransitionSeconds('Walk','Jog'),.32,'walking into the jog blends like walking');assert.equal(walkTransitionSeconds('Jog','Idle'),.28);
+});
 
 test('walk interpolation rounds the angular motion, closes the seam and keeps pelvis height within its authored range',()=>{
   const rotations=[0,.6,0,-.6,0].flatMap((angle,i)=>{
