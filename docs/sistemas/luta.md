@@ -12,9 +12,10 @@ Os golpes se encadeiam em **combos** (veja abaixo): cada golpe oferece os próxi
 | Clique | Soco leve. Clicando no ritmo: jab → direto → gancho → jab… |
 | Botão direito | Soco forte; dentro de um combo, o golpe pesado que a corrente oferece (cotovelada, forte). Demora para sair, tira mais e empurra longe. |
 | Tecla da skill (X por padrão) | **Só skins Rafael que compraram o karatê ou o chute voador:** o chute do combo. Com a guarda alta ela não lança ninguém. |
+| Espaço (segurar) | **Defesa**, só com a guarda alta. Segurar bloqueia o que vem pela frente; apertar no instante do golpe é um **parry**. Ver [Defesa](#defesa). Com ela alta o passo cai para 1,3 m/s e não corre. |
 | W A S D | Com a guarda alta: passos curtos (2,2 m/s) para frente, para os lados e para trás. Com Shift corre de guarda alta (4,8 m/s), gastando fôlego como a corrida normal. |
 
-No toque: **Mais › Luta (guarda)**; com a guarda alta, **Soco** e **Forte** aparecem no lugar de Freio e Buzina.
+No toque: **Mais › Luta (guarda)**; com a guarda alta, **Soco**, **Forte** e **Defesa** (botão que se segura) aparecem no lugar de Freio e Buzina.
 
 Dá para lutar com o cigarro na boca: ele continua aceso e preso aos lábios enquanto os braços ficam na guarda. A guarda não sobe com algo na mão (bebida, bandeja, sacola do Highfood), com fogo de artifício, sentado, montado, trabalhando ou voando; a sala diz o motivo uma vez. Qualquer coisa que tire o jogador dali (sentar, subir na moto, receber a bebida, desmaiar, sair) baixa a guarda. Com a guarda alta, dançar, acenar, acender outro cigarro e usar item pedem para baixá-la antes. Enquanto um soco segura os pés ou um golpe atordoa, as outras ações esperam ("Espere o golpe terminar").
 
@@ -29,9 +30,9 @@ Números em `FIGHT_MOVES` (`packages/shared/src/fight.ts`).
 | Gancho | Punching, 1,3× | 0,34–0,50 s | 11 (0,55 s) | 14 | 0,45 s | 0,3 m |
 | Cotovelada | Illegal Elbow Punch, 1,3× | 0,24–0,47 s | 10 (0,5 s) | 12 | 0,42 s | 0,3 m |
 | Soco forte | Hook Punch, 1,25× | 0,56–0,76 s | 17 (0,85 s) | 24 | 0,65 s | 0,8 m |
-| Chute frontal (Rafael) | Kicking, 1,35× | 0,48–0,68 s | 14 (0,7 s) | 16 | 0,52 s | 0,5 m |
-| Chute no tronco (Rafael) | Mma Kick, 1,15× | 0,34–0,50 s | 11 (0,55 s) | 19 | 0,58 s | 0,6 m |
-| Chute de karatê (Rafael) | o karatê, 1× | 0,48–0,76 s | 17 (0,85 s) | 27 | 0,8 s | 1 m |
+| Chute frontal (Rafael) | Kicking, 1,75× | 0,37–0,53 s | 11 (0,55 s) | 16 | 0,52 s | 0,5 m |
+| Chute no tronco (Rafael) | Mma Kick, 1,4× | 0,28–0,41 s | 9 (0,45 s) | 19 | 0,58 s | 0,6 m |
+| Chute de karatê (Rafael) | o karatê, 1,5× | 0,32–0,51 s | 11 (0,55 s) | 27 | 0,8 s | 1 m |
 
 - **Sequência:** o próximo golpe sai quando os pés soltam (fim de "pés presos"). Até o fim da janela do combo (`chainSteps`) ele é o que o golpe anterior oferece para aquele botão (`then`, tabela abaixo); depois, o botão recomeça pelo seu primeiro golpe (jab, forte, chute frontal).
 - **Buffer:** um clique dado com os pés ainda presos espera até 320 ms para sair (`FIGHT.bufferMs`); no máximo dois esperam. Apertar sem parar não empilha socos para depois.
@@ -94,6 +95,37 @@ Servidor autoritativo a 20 Hz, patches a 10 Hz, como o resto do jogo. O que foi 
 
 `fight.hit` vai para quem está a até 18 m (o mesmo raio em que os avatares são vistos) e traz quem bateu, quem levou, o golpe, o dano, a vida restante, o ponto do impacto, a direção, a reação, até quando atordoa e se foi nocaute.
 
+Para treinar contra um adversário que o servidor controla, com prêmio, veja o [Zeca](zeca.md): a mesma luta (guarda, bloqueio, parry) contra um bot.
+
+## Defesa
+
+Com a guarda alta, **segurar Espaço** (ou o botão Defesa no toque) levanta os braços. É a mesma guarda: tudo abaixo vale só enquanto `Fist.fight` está ligado, e a defesa toma as mãos, então nenhum soco sai com ela alta (o clique é descartado, não fica na fila).
+
+| | Bloqueio | Parry |
+| --- | --- | --- |
+| Quando | Segurando a tecla quando o golpe acerta | Golpe acerta até **180 ms** depois de a tecla descer (`BLOCK.parryMs`) |
+| Dano | Passa 15% da vida do golpe (30% nos fortes e chutes pesados), nunca o último ponto | Nenhum |
+| Fôlego da guarda | Paga 1,4× o dano do golpe de um medidor de 100 | Devolve 30 |
+| Quem bateu | Nada | Cambaleia 800 ms, perde a corrente e é empurrado |
+| Quem defendeu | Empurrado metade do golpe, sem atordoar | Seu **próximo golpe em 1,4 s sai 35% mais forte**, uma vez |
+
+- **Só pela frente.** O arco coberto é ±1,2 rad (`BLOCK.arc`) em torno de para onde o defensor olha, medido nas poses de quando o golpe acertou. De lado ou por trás o golpe entra inteiro e a defesa cai.
+- **Fôlego da guarda** (`Fist.guard`, 0–100, barra azul no prompt: dourada abaixo de 30, vermelha quebrada). Volta 14/s depois de 0,9 s sem apanhar. Chegando a 0 a **guarda quebra**: o golpe que quebrou entra por inteiro como atordoamento de 1,1 s, e a defesa só volta com 40% do medidor. Três socos fortes quebram um medidor cheio; uns dez jabs também.
+- **Anti-spam.** Só o aperto feito 550 ms ou mais depois do aperto anterior abre janela de parry (`BLOCK.parryCooldownMs`). Segurar a tecla ou martelar é bloqueio comum.
+- **Parado de propósito:** a defesa só sobe com os pés livres (não enquanto um soco os prende nem atordoado ou com a guarda quebrada), e qualquer golpe que entra a derruba.
+- **Feedback.** Parry: "PARRY!" branco, anel e estrela, pausa de 90 ms nos dois, quem bateu é sacudido para trás e reage (HitMedium). Bloqueio: "DEFENDIDO" (ou o pouco que passou), baque e estrela pequena. Quem soca vê um bloqueio já no desenho do próprio golpe quando o alvo aparece com a defesa alta (`predictPunch`); a palavra da sala (`fight.hit` com `guard`) confirma ou troca por parry. Os braços sobem por uma camada (`GuardBlock`, clipe `FightBlock`, o primeiro instante do Center Block do Mixamo) por cima da camada da guarda.
+
+### Netcode da defesa
+
+O problema: quem defende aperta a tecla ao ver o soco *na tela dele*, uns 100–200 ms depois de o soco existir para a sala. Julgada pelo relógio em que o input chega, a defesa quase sempre chegaria tarde, e quem tem ping alto nunca defenderia. Resolvido em quatro partes (`world/fight.ts`, `packages/shared/src/fight.ts`):
+
+1. **A defesa viaja no input** (`block`, a cada input enquanto segurada; `blockAt: {seen, ago}` só no input do aperto). É a mesma fila numerada do soco e da caminhada, então a previsão do passo lento (`fightMove`, que lê só o input) bate com a sala sem correção.
+2. **A sala mede o aperto na linha do tempo de quem apertou.** `seen`/`ago` dizem quanto o input demorou: `oneWayOf` = (agora − seen − ago − meio tick) / 2, com teto de 250 ms (`BLOCK.lateMaxMs`), então o aperto é datado em `agora − oneWay`. Um navegador que mente só consegue se atrasar para trás até o teto. Cada jogador guarda os últimos intervalos em que segurou (`BlockSpan`) e `blockVerdict(spans, instanteDoGolpe)` decide parry, bloqueio ou nada.
+3. **O golpe espera o aperto chegar.** Quando o punho encontra alguém com a guarda alta, o acerto fica pendente por `oneWay + meio tick` (entre 25 e 150 ms, `BLOCK.deferMaxMs`) e é decidido só então, com os inputs desse tick já processados. Pula a espera quando a defesa já está segurada há mais que a janela do parry (nenhum aperto novo muda o resultado) e para quem está sem a guarda (nada a esperar). O atraso é invisível para quem apanha, porque os outros avatares já são desenhados 100–120 ms atrás, e para quem soca, porque o som, a estrela e a pausa saem na hora pela previsão local; só o número demora.
+4. **O instante do golpe é o do rewind.** O golpe é julgado no instante em que o punho tocou (`ativo.at + contato.ms`), as poses de defensor e agressor vêm do histórico nesse instante, não nas de agora. O parry nunca "perde" por causa da espera.
+
+Validação: o `block` só é aceito com os pés livres; a janela do parry não pode ser reaberta por repetição; o `blockAt` tem teto; nada do que o navegador diz dá mais vantagem que ~250 ms.
+
 ## Animações
 
 > **Passo do golpe é do corpo (root motion, 08/11).** O Direto (Elbow Punch) dá um passo de boxe de 0,62 m e volta, o Jab avança 0,28 m e o Forte 0,18 m. Antes esse passo ficava só no clipe: o corpo (a posição da sala) não andava junto, então quando outro soco ou um passo entrava no meio do clipe o desenho voltava à origem em 0,08 s, e o passo de volta parecia o corpo sendo puxado. Agora o conversor tira o passo do clipe (`anchor:'hip'`, o quadril fica no lugar) e grava o caminho em `extras.root`; `npm run assets:punches` o copia para `FistPath.root` (m, a cada tick). `punchStep` soma esse caminho ao avanço do golpe enquanto os pés estão plantados, e `fightMove` continua com ele depois, enquanto o jogador fica parado (`punchCarries`; a sala lê o mesmo de `animationState === 'punch'`). Golpe completo: o corpo vai e volta exatamente como o clipe. Cortado por outro soco ou por um passo: fica onde o passo tinha chegado, sem salto. O alcance e a mira (`reach`, `aim`) já contam esse caminho, então o acerto não mudou. Para quem assiste, `BarScene.carriedOffset` desenha o passo pelo relógio do clipe a partir do último estado da sala (os patches chegam a cada 100 ms e deslizavam os pés).
@@ -125,6 +157,7 @@ Sons: os mesmos do chute (`blow-sound.ts`): o ar cortando quando o punho passa (
 - `packages/shared/src/fight-paths.ts`: gerado, não editar.
 - `tools/assets/measure-punches.mjs`: `npm run assets:punches`; `--probe <skin>` imprime o caminho do punho de cada golpe.
 - `apps/server/src/world/fight.ts` (`FightDirector`, com histórico em anel por jogador) e a ligação em `BarRoom.ts` (`fights`, `guardRefusal`, `keepsGuard`, `punchable`, `stagger`, `pushBody`, `sendNear`, `FIGHT_BUSY`, `FIGHT_GUARDED`).
+- Defesa: `BLOCK`, `blockVerdict`, `oneWayOf`, `blockCovers`, `chipOf` em `fight.ts`; `FightDirector.raise/drop/settle/resolve/block/parry`; `Fist.block/guard/breakUntil`; cliente `FightController.setBlock`, `BarScene.addBlockLayer/fightGuarded`, `BlowSounds.block/parry`; teste de regras `tests/integration/fight-block.test.ts`.
 - `apps/server/src/state.ts`: `Fist`, aninhado em `Player.fist`, porque um Schema tem no máximo 63 campos e o `Player` já tinha 55.
 - Cliente: `apps/web/src/fight/fight-controller.ts`, `networking.ts` (fluxo de socos previsto e reconciliado), `engine/BarScene.ts` (`fightClip`, `guardStep`, `fightSync`, `predictPunch`, `fightHit`, `addGuardLayer`), `engine/fight-flinch.ts`, `main.ts` (R, mouse, dica na tela, nocaute), `mouse-capture.ts` (prende o mouse na guarda), `touch/`.
 - Testes: `tests/integration/fight.test.ts` (regras, toda skin acerta e erra onde deve, tabela igual aos bancos), `apps/server/test/fight.test.ts` (diretor: acerto, rewind acerta e sem ele erra, teto do rewind, nocaute, golpe que corta o soco do outro, pés presos, guarda recusada) e `apps/server/test/fight.integration.test.ts` (WebSockets de verdade, do primeiro input até a Morte).
@@ -142,4 +175,5 @@ Sons: os mesmos do chute (`blow-sound.ts`): o ar cortando quando o punho passa (
 - **Os combos novos e os chutes na guarda não foram vistos em quadro:** as janelas de acerto vêm da medição do pé (`--probe`), a emenda entre os clipes de chute e a guarda do boxe não foi conferida por imagem, e o botão de chute no toque também não.
 - Não testado em celular de verdade nem nos óculos VR (no VR não há botão de soco).
 - Os passos laterais e para trás foram conferidos pela telemetria (clipe e camada certos), não por um quadro de perto.
-- Bloqueio, esquiva, estamina por golpe e barra de vida do adversário ficaram para depois, de propósito (só soco nesta versão).
+- Esquiva, estamina por golpe e barra de vida do adversário ficaram para depois, de propósito.
+- **Defesa (2026-11-09) não foi vista nem ouvida:** a pose dos braços (`FightBlock`) foi escolhida por medida das mãos no clipe-fonte e conferida por teste, não em quadro; os sons do bloqueio e do parry são sintetizados no navegador (`BlowSounds.synthesize`) e não foram ouvidos; o botão de toque e o balanceamento (0,15 de dano passando, 1,4× de custo, 180 ms de janela) não foram testados com duas pessoas em rede de verdade. Os números estão todos em `BLOCK`.

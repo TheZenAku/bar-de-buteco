@@ -40,6 +40,7 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 - [Sinuca: bola 8 pelas regras da Noel Snooker, física e Juca da Sinuca](sistemas/sinuca.md)
 - [A Morte: cena, escuro, sequência de botões e a skin só por concessão](sistemas/morte.md)
 - [Luta: guarda (R), socos em sequência, soco forte, números de dano e o netcode](sistemas/luta.md)
+- [Armas: tiro em terceira pessoa em teste (/armas), dez armas, equipamentos, melhorias, luneta, mira assistida no controle e no toque, hitscan com compensação de latência](sistemas/armas.md)
 - [Celular: ligações, Highzap, Highgram, câmera e HighBank](sistemas/celular.md)
 - [Perfil do jogador: janela, emblemas e skills](sistemas/perfil.md)
 - [Sons dos golpes: origem, licença e como tocam](assets/sons-golpes.md)

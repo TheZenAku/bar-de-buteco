@@ -1,0 +1,72 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"><title>Gun HUD fixture</title>
+<style>body{margin:0;width:100vw;height:100vh;background:linear-gradient(180deg,#7a8fa6 0 48%,#5b4a3c 48% 100%)!important}#world{display:none}</style></head>
+<body><div id="app"><main id="game" class="game"></main>
+<div id="modal" class="modal-backdrop hidden"><section class="modal hud-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button aria-label="Fechar janela">×</button></div><div class="menu-line" aria-hidden="true"></div><div id="modal-content"></div></section></div></div>
+<script type="module">
+// The firearms' HUD and interface without a server (weapons/hud.ts, weapons/ui):
+// fixture.show(weapon, parts, viewPatch) draws one HUD state; fixture.hud.hit/hurtFrom/knockout;
+// fixture.wheel(choice, device) opens the weapon wheel on a choice ('' the centre), fixture.closeWheel();
+// fixture.arsenal(weapon, tab, preview) opens the Arsenal window (preview: a selector to hover, e.g. '[data-ar-up="dano"]'); fixture.hint(device).
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/neon-ui.css';
+import {testArsenal,weaponStats,withPart,withUpgrade} from '../../packages/shared/src/index.ts';
+import {WeaponHud} from '../../apps/web/src/weapons/hud.ts';
+import {WeaponsController} from '../../apps/web/src/weapons/controller.ts';
+import {WeaponWheel} from '../../apps/web/src/weapons/ui/wheel.ts';
+import {createArsenal} from '../../apps/web/src/weapons/ui/arsenal.ts';
+import {createArmsHint} from '../../apps/web/src/weapons/ui/hint.ts';
+import {DEFAULT_AIM_CAMERA} from '../../apps/web/src/weapons/aim-settings.ts';
+import {DEFAULT_WEAPON_KEYS} from '../../apps/web/src/weapons/key-bindings.ts';
+import {MenuSounds} from '../../apps/web/src/pause-menu/menu-sounds.ts';
+const game=document.querySelector('#game');
+const hud=new WeaponHud(game);
+const base={on:true,mag:22,reserve:Infinity,modeIndex:0,reloading:undefined,ads:0,scoped:0,zoom:1,sway:{x:0,y:0},breath:{meter:1,holding:false,shaking:false},ready:true,lowered:false,arsenal:undefined};
+const sounds=new MenuSounds(()=>0);
+const weapons=new WeaponsController(game,{me:()=>'me',serverNow:()=>Date.now(),seen:()=>({seen:0,ago:0}),send:()=>{},
+  settings:()=>({aim:{assistPad:'travar',assistTouch:true,autoFire:false,adsSensitivity:1,scopeSensitivity:1},pad:{lookSpeed:1,curve:1.8,invertY:false,vibration:true},shoulder:'right',aimCamera:DEFAULT_AIM_CAMERA,keys:{...DEFAULT_WEAPON_KEYS},lite:false}),
+  saveShoulder:()=>{},notice:()=>{},playable:()=>true,menuOpen:()=>false,captureSync:()=>{},guard:()=>false,name:()=>'alguém'});
+// A test kit with a few parts and upgrades on, the pistol in hand, some magazines spent.
+let kit=testArsenal();
+kit=withPart(kit,'fuzil','mira','holografica');kit=withPart(kit,'fuzil','boca','silenciador');kit=withPart(kit,'fuzil','trilho','empunhadura');
+kit=withUpgrade(withUpgrade(withUpgrade(kit,'fuzil','dano'),'fuzil','dano'),'fuzil','controle');
+weapons.arsenal(kit);
+const gun=weapons.gun;gun.on=true;gun.want=gun.drawn='pistola';
+gun.mags.set('pistola',9);gun.mags.set('submetralhadora',3);gun.mags.set('escopeta',0);
+const wheel=new WeaponWheel(game,weapons,{sounds,arsenal:()=>window.fixture.arsenal(),used:()=>{}});
+let arsenalWindow;
+window.fixture={hud,weapons,
+  show(weapon,parts,patch={},extra={}){
+    const stats=weaponStats(weapon,parts);
+    const view={...base,weapon,stats,mode:stats.modes[0],spread:stats.spread.hip,...patch};
+    hud.update({visible:true,view,fov:57/(view.zoom||1),width:innerWidth,height:innerHeight,locked:false,lite:false,now:performance.now(),...extra});
+  },
+  wheel(choice='',device='mouse'){weapons.device=device;weapons.wheel(false);weapons.wheel(true);if(choice!==undefined)weapons.wheelAim(choice);},
+  closeWheel(){weapons.wheel(false);},
+  arsenal(weapon,tab,preview){
+    arsenalWindow?.destroy();
+    document.querySelector('.modal').classList.add('arsenal-modal');
+    document.querySelector('#modal-title').textContent='ARSENAL';
+    document.querySelector('#modal-content').innerHTML='<div id="arsenal-root" class="ar-root"></div>';
+    document.querySelector('#modal').classList.remove('hidden');
+    arsenalWindow=createArsenal(document.querySelector('#arsenal-root'),weapons,{sounds,balance:()=>800,close:()=>{arsenalWindow?.destroy();arsenalWindow=undefined;document.querySelector('#modal').classList.add('hidden');}});
+    if(tab==='pecas')document.querySelector('[data-ar-tab="pecas"]').click();
+    if(weapon)document.querySelector(`[data-ar-weapon="${weapon}"],[data-ar-pick="${weapon}"]`)?.click();
+    if(preview)document.querySelector(preview)?.dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));
+  },
+  // The Esc menu with /armas on (pause-menu/): its Ações, the Armas e mira page and the guide's keys. menu(tab, entry, touch).
+  async menu(tab='ajustes',entry='armas',touch=false){
+    await import('../../apps/web/src/pause-menu/pause-menu.css');
+    const {createPauseMenu}=await import('../../apps/web/src/pause-menu/pause-menu.ts');
+    const {menuTabs}=await import('../../apps/web/src/pause-menu/menu-content.ts');
+    const {createSettings}=await import('../../apps/web/src/settings.ts');
+    const known={settings:createSettings(),armsOn:()=>true,touch:()=>touch,admin:()=>false,zone:()=>'Bar',user:()=>undefined,world:()=>undefined,
+      mic:()=>({on:false,unavailable:'',status:''}),fullscreen:()=>({on:false,browser:false}),net:()=>({status:'Boa',ping:'40 ms'}),
+      panels:{hidden:()=>false,available:()=>false,setHidden(){},locked:()=>false,toggleLock(){},reset(){}},inputDevices:async()=>[],vrStatus:async()=>'',portrait:async()=>undefined};
+    const host=new Proxy(known,{get:(target,key)=>key in target?target[key]:()=>undefined});
+    window.pauseMenu??=createPauseMenu(document.querySelector('#app'),menuTabs(host),{sounds,header:()=>'',where:()=>'Bar',canOpen:()=>true,mustClose:()=>false,opened(){},closed(){}});
+    window.pauseMenu.open({tab,entry,quiet:true});
+  },
+  closeArsenal(){arsenalWindow?.destroy();arsenalWindow=undefined;document.querySelector('#modal').classList.add('hidden');},
+  hint(device='mouse'){try{localStorage.removeItem('bar:armas:hint');}catch{}weapons.device=device;const h=createArmsHint(game,weapons);gun.drawn='pistola';weapons.emit?.('change');h.show?.();return h;},
+};
+</script></body></html>

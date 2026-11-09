@@ -4,11 +4,34 @@ import {mkdtemp,copyFile,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {PGlite} from '@electric-sql/pglite';
+import {LEGACY_PRESENCE_XP_SERIES,xpOfCounters} from '@bar/shared';
 import {assertLocalMigrationHelperAllowed,connectDatabase,defaultMigrationFolder,migrateDatabase} from '../src/database/index.js';
 import {loadMigrations,MIGRATION_TABLE} from '../src/database/migrations.js';
 import {readMigrationConfig} from '../src/config.js';
 
 const migrationNames=(await loadMigrations(defaultMigrationFolder)).map(migration=>migration.name);
+
+test('retiring presence XP preserves the old total at default, custom and zero rates without rewarding more idle time',async t=>{
+  const database=new PGlite();await database.waitReady;t.after(()=>database.close());
+  const migrations=await loadMigrations(defaultMigrationFolder),retire=migrations.find(m=>m.name==='025_retire_presence_xp.sql')!;
+  for(const migration of migrations.filter(m=>m.name<retire.name))await database.exec(migration.sql);
+  for(const rate of [undefined,120,0]){
+    const id=`presence-${rate??'default'}`;
+    await database.query("INSERT INTO users (id,username,email,password_hash) VALUES ($1,$1,$1||'@test.local','hash')",[id]);
+    await database.query("INSERT INTO user_achievements (user_id,series,value) VALUES ($1,'frequentador',7259),($1,'bebum',3)",[id]);
+    if(rate!==undefined)await database.query("INSERT INTO economy_prices (key,value) VALUES ('xp:frequentador',$1)",[rate]);
+    const historical=Math.floor(7259*(rate??60)/3600),expected=historical+30;
+    await database.exec(retire.sql);
+    const counters=async()=>(await database.query<{series:string;value:number}>('SELECT series,value FROM user_achievements WHERE user_id=$1',[id])).rows;
+    assert.equal((await counters()).find(row=>row.series===LEGACY_PRESENCE_XP_SERIES)?.value,historical);
+    assert.equal(xpOfCounters(await counters()),expected,'already earned XP stays intact');
+    assert.equal((await database.query("SELECT key FROM economy_prices WHERE key='xp:frequentador'")).rows.length,0);
+    await database.query("UPDATE user_achievements SET value=value+3600 WHERE user_id=$1 AND series='frequentador'",[id]);
+    await database.exec(retire.sql);
+    assert.equal(xpOfCounters(await counters()),expected,'more time and a repeated migration cannot grant XP');
+    assert.equal((await counters()).find(row=>row.series==='frequentador')?.value,10859,'time still counts towards badges');
+  }
+});
 
 async function fixture(t:TestContext){
   const root=await mkdtemp(join(tmpdir(),'bar-migrations-')),folder=join(root,'migrations'),path=join(root,'database');

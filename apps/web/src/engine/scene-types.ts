@@ -1,5 +1,5 @@
 import type { CameraMode } from './camera-rig';
-import type {FistState,MusicianState,PunchId} from '@bar/shared';
+import type {FistState,GunState,MusicianState,PunchId} from '@bar/shared';
 
 /** Small presentation-only contracts. All game rules belong to the server. */
 export interface SceneActor {
@@ -61,6 +61,8 @@ export interface SceneActor {
   musician?: MusicianState;
   /** The fist fight as the room has it (packages/shared/src/fight.ts): the guard, the last punch, the last blow taken. */
   fist?: Partial<FistState>;
+  /** The firearm as the room has it (packages/shared/src/weapons/protocol.ts, GunState): the weapon in hand, its parts, aiming, rounds, reload. */
+  gun?: Partial<GunState>;
 }
 
 /**
@@ -69,6 +71,8 @@ export interface SceneActor {
  */
 export interface LocalFightView {
   guard: boolean;
+  /** The block is up here (drawn at once, ahead of the room). */
+  block?: boolean;
   punch?: { move: PunchId; n: number; startedAt: number; landed?: boolean };
   blow?: { reaction: string; yaw: number; startedAt: number; until: number };
 }
@@ -155,5 +159,7 @@ export interface SceneCallbacks {
   /** The fist fight: R (guard up or down), a mouse button or touch button with the guard up (true when it threw, so the click is not the view's), and what this browser draws ahead of the room. */
   onGuard?:()=>void;
   onPunch?:(kind:'light'|'heavy'|'kick')=>boolean;
+  /** The block key (Space, or the touch button) went down or up; true when the guard was up to take it. */
+  onBlock?:(down:boolean)=>boolean;
   fight?:()=>LocalFightView|undefined;
 }

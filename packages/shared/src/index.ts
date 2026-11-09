@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {HEAD_LOOK_YAW,HEAD_LOOK_PITCH,type HeadLook} from './head-look.js';
-import {punchCommandSchema,type FistState,type PunchCommand} from './fight.js';
+import {blockCommandSchema,punchCommandSchema,type BlockCommand,type FistState,type PunchCommand} from './fight.js';
+import {gunInputSchema,type GunInput,type GunState} from './weapons/index.js';
 export * from './head-look.js';
 export * from './day.js';
 export * from './vr-arms.js';
@@ -15,7 +16,7 @@ export * from './doors.js';
 export * from './needs.js';
 export * from './inventory.js';
 export * from './fireworks.js';
-export {solidRayFraction} from './world.js';
+export {solidRayFraction,bulletWorld} from './world.js';
 export * from './economy.js';
 export * from './musicians.js';
 export * from './bar-animations.js';
@@ -45,6 +46,8 @@ export * from './moto-crash.js';
 export * from './ragdoll.js';
 export * from './kick.js';
 export * from './fight.js';
+export * from './weapons/index.js';
+export * from './sparring.js';
 export * from './city.js';
 export * from './gps.js';
 export * from './highfood.js';
@@ -97,8 +100,10 @@ export type HeldDrink = typeof HELD_DRINKS[number];
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
 export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;rear?:boolean;/** Flying only: climb (+1) or sink (-1). */dy?:number;/** Flying only: the vertical part of the camera's aim (see flyPlayer). */aim?:number;
-  /** In the fist fight's guard (fight.ts), on every input while it is up; and a punch thrown with this input. */fight?:boolean;punch?:PunchCommand }
-export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional(),aim:z.number().finite().min(-1).max(1).optional(),fight:z.boolean().optional(),punch:punchCommandSchema.optional()}).strict();
+  /** In the fist fight's guard (fight.ts), on every input while it is up; and a punch thrown with this input. */fight?:boolean;punch?:PunchCommand;
+  /** In the guard: the block key is held (BLOCK, fight.ts), and on the input that first carries it, how late that press is (blockAt). */block?:boolean;blockAt?:BlockCommand;
+  /** The firearm (weapons/protocol.ts): the weapon in hand, aiming, the reload key, the shots fired since the last input. */gun?:GunInput }
+export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional(),aim:z.number().finite().min(-1).max(1).optional(),fight:z.boolean().optional(),punch:punchCommandSchema.optional(),block:z.boolean().optional(),blockAt:blockCommandSchema.optional(),gun:gunInputSchema.optional()}).strict();
 export interface PublicUser { id: string; username: string; displayName: string; email: string; verified: boolean; role: 'user' | 'admin'; color: string; equippedSkin?:string; isOwner?:boolean }
 export interface PlayerState extends Position { id: string; slot?: number; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
@@ -128,7 +133,9 @@ export interface PlayerState extends Position { id: string; slot?: number; displ
   looking?: boolean;
   /** Level 1-100 (levels.ts); 0 until the API has told the world. */ level?: number;
   /** The fist fight (fight.ts): the guard, the last punch thrown and the last blow taken. */
-  fist?: FistState }
+  fist?: FistState;
+  /** The firearm (weapons/protocol.ts, GunState): on with /armas, the weapon in hand, aiming, rounds, reload. */
+  gun?: GunState }
 export interface NpcState extends Position { id: string; displayName: string; color: string; rotation: number; animationState: AnimationState; animationStartedAt: number; behavior: string;
   /** Tonico's tray: the order's items, comma-separated ('' when empty), and that order's id. */
   carrying?: string; carryingOrder?: string;

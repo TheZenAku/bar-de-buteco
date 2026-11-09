@@ -56,10 +56,10 @@ test('the delivery bike over real WebSockets: spawned by an administrator, mount
     assert.ok(Math.abs(moto().x-predicted.x)<1e-3,`Room ${moto().x}, prediction ${predicted.x}`);
     assert.ok(moto().x<spot.x-1,'It went where it points (−X)');
     assert.equal(rider.player().x,moto().x,'The rider goes with it, for chat, voice and the areas of interest');
-    // Too fast to get off; and nobody else gets on.
+    // Too fast to get off; and nobody else gets on, not even behind the rider.
     const other=await join('other');await until(()=>!!other.player());
     other.player().assign({x:moto().x,y:0,z:moto().z+1});await pause(100);
-    other.room.send('moto.mount',{motoId:spot.id});await until(()=>other.errors.some(e=>e.includes('Alguém já está')));
+    other.room.send('moto.mount',{motoId:spot.id});await until(()=>other.errors.some(e=>e.includes('parar')));
     await pause(1100);
     rider.room.send('player.interact',{objectId:'stand'});await until(()=>rider.errors.some(e=>e.includes('Diminua')));
     assert.equal(moto().riderId,'rider');

@@ -3,7 +3,7 @@ import {SMOKING} from '@bar/shared';
 import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity,stepWheelie,HORSE_REAR} from '@bar/shared';
 import { randomInt, randomUUID } from 'node:crypto';
 import {FIREWORK,fireworkFireSchema,fireworkOrigin,fireworkFlightMs,type FireworkShot,type FireworkVector} from '@bar/shared';
-import {CAR_MODEL,CAR_SEATS,defaultVehicleColor,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts,STORAGE,carSpec,hasStorage,isCarModel,isTruck,storageGap,storageLoad,storageMoveSchema,storageOpenSchema,storageRefusal,vehicleSeats,NEW_CAR_PARTS,NEW_MOTO_PARTS,type StorageView} from '@bar/shared';
+import {CAR_MODEL,CAR_SEATS,defaultVehicleColor,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts,STORAGE,carSpec,hasStorage,isCarModel,isTruck,storageGap,storageLoad,storageMoveSchema,storageOpenSchema,storageRefusal,vehicleSeats,vehicleCapacity,isTwoWheeler,NEW_CAR_PARTS,NEW_MOTO_PARTS,type StorageView} from '@bar/shared';
 import {applyCityWeather,applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt,WEATHER_CITY} from '@bar/shared';
 import {CityWeather} from './world/city-weather.js';
 import {HORSE,horseFits,isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
@@ -20,6 +20,7 @@ import { TradeDesk, type Trade } from './world/trades.js';
 import { vehicleFuelUse, vehiclePowered, GARAGE, GARAGES, TRADE, garageById, makePlate, offerIsEmpty, tradeCancelSchema, tradeConfirmSchema, tradeOfferMessageSchema, tradeReadySchema, tradeRequestSchema, tradeRespondSchema, type GarageView, type OwnedVehicle, type TradeOffer, type TradeResult } from '@bar/shared';
 import { WALK_SPEED, type Position } from '@bar/shared';
 import { HIGHFOOD, HIGHFOOD_CUSTOMERS, HIGHFOOD_NPC_PREFIX, atPickup, foodCodeSchema, foodEmptySchema, foodOrderSchema, isCustomerNpc, deliveryStars, mileageWear, motoDistance, sanitizeCustomers, type CustomerProfile, type HighfoodReceipt, type HighfoodState } from '@bar/shared';
+import { SPARRING_NPC, SPARRING_SERIES, SPARRING_TIERS, type SparringClaim, type SparringStatus } from '@bar/shared';
 import { FIGHT, KICKS, kickAim, kickClear, kickLaunch, kickRoot, kickTouches, kickWindow } from '@bar/shared';
 import { MOTO_CRANK_MS, MOTO_ENGINE, MOTO_REPAIR, MOTO_RETRY_MS, MOTO_WEAR_FROM, canRepairMoto, isRepairingMoto, motoCrank, motoHandling, motoHitArea, motoRepairInteraction, motoRepairSchema, motoStallChance, motoStrikeHp, readMotoParts, repairOf, wearMotoParts, writeMotoParts, type MotoHitArea, type MotoPartId } from '@bar/shared';
 import { MOTO, MOTO_LIGHT, NO_MOTO_INTENT, Ragdoll, advanceMoto, blendQuat, canLiftMoto, canMountMoto, isRidingMoto, loosePose, motoDespawnSchema, motoDismountSpot, motoInputSchema, motoInteraction, motoLeanSide, motoLiftSpot, motoMountSchema, motoObstacle, motoSpawnSchema, motoSpawnSpot, motoStrikes, motoUprightSpot, parkedMoto, startWreck, stepLoose, stepWreck, uprightQuat, wreckPose, type LooseBike, type MotoHit, type MotoInput, type MotoIntent, type MotoPose, type MotoWreck, type RagdollStart } from '@bar/shared';
@@ -63,6 +64,10 @@ import { PhoneCalls, type PhoneCall } from './world/phone-calls.js';
 import { AchievementTracker } from './world/achievements.js';
 import { DeathDirector } from './world/death.js';
 import { FightDirector } from './world/fight.js';
+import { SparringDirector } from './world/sparring.js';
+import { WeaponDirector } from './world/weapons.js';
+import { TrainingTargets } from './world/targets.js';
+import { cleanArsenal, fitError, nextUpgrade, testArsenal, upgradeError, weaponConfigureSchema, weaponUpgradeSchema, withPart, withUpgrade, type ArsenalView, type WeaponHitEvent } from '@bar/shared';
 import { DEATH_GONE_STATE, DEATH_STATE, SCENE_AUDIO_RADIUS, SERIES_CATEGORY, deathInputSchema, dominantCategory, type DeathPlan, type MorteCategory } from '@bar/shared';
 import { ACHIEVEMENT_BLADDER_MIN, ACHIEVEMENT_CALL_MS, levelOf, rankOf, seriesOfItem, type Badge } from '@bar/shared';
 import { PHONE, isJpeg, phoneCallIdSchema, phoneCallSchema, phonePingSchema, type PhoneCallEnd, type PhoneCallView, type PhonePing } from '@bar/shared';
@@ -262,10 +267,12 @@ export class BarRoom extends Room<{ state: BarState }> {
   private readonly fights = new FightDirector({
     guardRefusal: player => this.guardRefusal(player),
     keepsGuard: player => this.keepsGuard(player),
-    hittable: (target, now) => this.punchable(target, now),
+    hittable: (target, now) => this.sparring.isFoe(target.id) ? this.sparring.hittable(target, now) : this.targets.isTarget(target.id) ? this.targets.hittable(target) : this.punchable(target, now),
+    spared: target => this.sparring.spares(target),
     kicks: player => !!this.sessions.getByUser(player.id)?.skills.has('karate') || !!this.sessions.getByUser(player.id)?.skills.has('air-kick'),
-    damage: (target, amount, now) => this.needs.damage(target, amount, now),
-    knockout: (target, start, hurt) => this.startThrown(target, start, hurt),
+    // The sparring's ring has its own lives (world/sparring.ts): a blow there never reaches the real ones, and the foe's knockout ends the fight.
+    damage: (target, amount, now) => this.hurt(target, amount, now),
+    knockout: (target, start, hurt) => { if (!this.sparring.knocked(target)) this.startThrown(target, start, hurt); },
     stun: target => this.stagger(target),
     push: (target, dx, dz) => this.pushBody(target, dx, dz),
     broadcast: (hit, near) => this.sendNear(near, 'fight.hit', hit),
@@ -273,6 +280,58 @@ export class BarRoom extends Room<{ state: BarState }> {
     log: (event, details) => this.log(event, details),
     random: () => Math.random(),
   });
+  /** Zeca's sparring (docs/sistemas/zeca.md): a bot made a player of the room fights whoever accepts his challenge, with the whole fist fight. */
+  private readonly sparringNpc = createNpcs().find(npc => npc.id === SPARRING_NPC)!;
+  private readonly sparring: SparringDirector = new SparringDirector({
+    now: () => Date.now(),
+    random: () => Math.random(),
+    addFoe: foe => { this.state.players.set(foe.id, foe); this.refreshViews(); },
+    removeFoe: id => { const foe = this.state.players.get(id); if (foe) this.usedSlots.delete(foe.slot); this.state.players.delete(id); this.refreshViews(); },
+    idleNpc: present => { if (present) this.state.npcs.set(SPARRING_NPC, this.sparringNpc); else this.state.npcs.delete(SPARRING_NPC); },
+    send: (userId, type, message) => this.sessions.getByUser(userId)?.client.send(type, message),
+    guardRefusal: player => this.guardRefusal(player),
+    status: userId => internal<SparringStatus>('sparring/status', { userId }),
+    win: (userId, requestId) => internal<SparringClaim>('sparring/win', { userId, requestId }),
+    paid: (userId, claim) => {
+      const presence = this.sessions.getByUser(userId);
+      if (presence) this.walletChanged(presence, claim.balance, claim.prize, 'sparring:win');
+      this.achieved(userId, SPARRING_SERIES.wins);
+      if (claim.beaten === SPARRING_TIERS.length - 1) this.achieved(userId, SPARRING_SERIES.hard);
+    },
+    obstacles: () => [...this.state.motos.values()].map(motoObstacle),
+    log: (event, details) => this.log(event, details),
+    takeSlot: () => this.takeSlot(),
+    randomId: () => randomUUID(),
+  }, this.fights);
+  /** The /alvos training dummies (world/targets.ts): bodies driven by the room that bullets and fists hit, with lives of their own. */
+  private readonly targets: TrainingTargets = new TrainingTargets({
+    add: body => { this.state.players.set(body.id, body); this.refreshViews(); },
+    remove: id => { const body = this.state.players.get(id); if (body) this.usedSlots.delete(body.slot); this.state.players.delete(id); this.fights.forget(id); this.weapons.forget(id); this.refreshViews(); },
+    takeSlot: () => this.takeSlot(),
+    ragdoll: (id, start) => { if (start) this.state.ragdolls.set(id, new RagdollState().assign(start)); else this.state.ragdolls.delete(id); },
+    present: adminId => { const presence = this.sessions.getByUser(adminId); return !!presence && !presence.revoked && !!this.state.players.get(adminId)?.connected; },
+    obstacles: () => [...this.state.motos.values()].map(motoObstacle),
+    log: (event, details) => this.log(event, details),
+  });
+  /** The firearms (docs/sistemas/armas.md, world/weapons.ts): /armas, the gun in hand and every shot, judged on the inputs. */
+  private readonly weapons: WeaponDirector = new WeaponDirector({
+    players: () => this.state.players.values(),
+    refusal: player => this.gunRefusal(player),
+    // Bullets leave Zeca's ring alone (its foe and whoever fights him): a duel is the fists' only.
+    hittable: (target, now) => this.sparring.isFoe(target.id) || this.sparring.spares(target) ? false : this.targets.isTarget(target.id) ? this.targets.hittable(target) : this.punchable(target, now),
+    damage: (target, amount, now) => this.hurt(target, amount, now),
+    knockout: (target, start, hurt) => this.startThrown(target, start, hurt),
+    drew: player => this.gunDrawn(player),
+    shot: (shooter, event, radius) => this.sendAround(shooter, radius, 'weapon.shot', event, shooter.id),
+    hit: (shooter, target, event) => this.sendHit(shooter, target, event),
+    refuse: (player, message) => this.sessions.getByUser(player.id)?.client.send('error', { message }),
+    log: (event, details) => this.log(event, details),
+    random: () => Math.random(),
+  });
+  /** /armas todos: the firearms open to everyone, not only the administration (in memory: a restart closes them). */
+  private weaponsOpen = false;
+  /** Players whose /armas is waiting for the API's arsenal. */
+  private readonly arming = new Set<string>();
   private achievementsAt = Date.now();
   /** The XP each player here was last told, so the next report tells them only what they gained. */
   private xpSeen = new Map<string, number>();
@@ -496,6 +555,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.cancelCounter(presence.ticket.userId);
     this.cancelTable(presence.ticket.userId);
     this.dropCall(presence.ticket.userId);
+    this.sparring.left(presence.ticket.userId);
     if (player) this.endShift(player, 'Você caiu da conexão e o turno foi encerrado.');
     if (player&&isRidingHorse(player.interactionState)) this.dismountHorse(player);
     if (player) this.stopHighfood(player, '');
@@ -551,9 +611,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.sessions.remove(userId, presence);
     this.xpSeen.delete(userId);
     const player = this.state.players.get(userId);
+    if (player) this.weapons.disable(player);
+    this.weapons.forget(userId); this.targets.clear(userId);
     // Expelled players and development bots (tests/load/bots.ts) are removed; everyone else leaves the avatar standing
     // (or seated) where it was.
-    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); this.fights.forget(userId); if (player) this.usedSlots.delete(player.slot); this.state.players.delete(userId); }
+    if (presence.revoked || presence.ticket.bot) { this.blackjack.leave(userId); this.cancelCounter(userId); this.cancelTable(userId); if (player) this.endShift(player, 'Turno encerrado.'); this.musicians.release(userId); this.needs.forget(userId); this.fights.forget(userId); this.sparring.left(userId); if (player) this.usedSlots.delete(player.slot); this.state.players.delete(userId); }
     else if (player) { this.park(player); player.connected = false; }
     this.state.occupancy = this.sessions.size;
     this.refreshViews();
@@ -564,6 +626,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** Ends what needs a connected player (blackjack seat, orders, drinks, kicks); a chair stays taken. */
   private park(player: Player): void {
     this.fights.lower(player);
+    this.weapons.holster(player);
     if(isRidingHorse(player.interactionState))this.dismountHorse(player);
     player.drinkItem = ''; this.dropHolding(player);this.clearSmoking(player);
     this.blackjack.leave(player.id);
@@ -695,6 +758,54 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('food.cancel', foodEmptySchema, 3, client => this.cancelFoodOrder(client));
     this.handle('food.locker', foodEmptySchema, 4, client => this.openLocker(client));
     this.handle('food.code', foodCodeSchema, 4, (client, payload) => this.typeLockerCode(client, payload.orderId, payload.code));
+    // Zeca's challenge (docs/sistemas/zeca.md): the talk, the answer, giving up.
+    this.handle('sparring.talk', foodEmptySchema, 3, async client => {
+      const player = this.player(client);
+      client.send('sparring.dialog', await this.sparring.talk(player));
+    });
+    this.handle('sparring.accept', foodEmptySchema, 2, async client => {
+      const why = await this.sparring.accept(this.player(client));
+      if (why) client.send('error', { message: why });
+    });
+    this.handle('sparring.quit', foodEmptySchema, 3, client => this.sparring.quit(this.player(client).id));
+    // The firearms' arsenal (world/weapons.ts, apps/api/src/arsenal-service.ts): the view, a part fitted or taken off, an upgrade.
+    this.handle('weapon.arsenal', z.object({}).strict(), 2, client => {
+      const view = this.weapons.arsenalOf(this.player(client).id);
+      if (!view) throw new Error('Digite /armas para pegar as armas.');
+      client.send('weapon.arsenal', view);
+    });
+    this.handle('weapon.configure', weaponConfigureSchema, 4, (client, { weapon, slot, part }) => {
+      const player = this.player(client), view = this.weapons.arsenalOf(player.id);
+      if (!view) throw new Error('Digite /armas para pegar as armas.');
+      const why = fitError(view, weapon, slot, part);
+      if (why) throw new Error(why);
+      const next = withPart(view, weapon, slot, part);
+      this.weapons.setArsenal(player, next);
+      client.send('weapon.arsenal', next);
+      // Kept for next time; the API checks it again against what it stores. The room goes on with it either way.
+      void internal('arsenal/configure', { userId: player.id, weapon, slot, part }).catch((error: unknown) => this.log('arsenal_save_failed', { playerId: player.id, action: 'configure', error: error instanceof Error ? error.message : String(error) }));
+    });
+    this.handle('weapon.upgrade', weaponUpgradeSchema, 2, async (client, { weapon, track }) => {
+      const player = this.player(client), presence = this.forClient(client)!, view = this.weapons.arsenalOf(player.id);
+      if (!view) throw new Error('Digite /armas para pegar as armas.');
+      const why = upgradeError(view, weapon, track);
+      if (why) throw new Error(why);
+      if (view.test) {
+        // The test kit's upgrades are free: here at once, and kept by the API.
+        const next = withUpgrade(view, weapon, track);
+        this.weapons.setArsenal(player, next);
+        client.send('weapon.arsenal', next);
+        void internal('arsenal/upgrade', { userId: player.id, weapon, track, free: true, requestId: randomUUID() }).catch((error: unknown) => this.log('arsenal_save_failed', { playerId: player.id, action: 'upgrade', error: error instanceof Error ? error.message : String(error) }));
+        return;
+      }
+      const cost = nextUpgrade(view, weapon, track)?.cost ?? 0;
+      const paid = await internal<{ view: ArsenalView; balance: number; cost: number }>('arsenal/upgrade', { userId: player.id, weapon, track, free: false, requestId: randomUUID() });
+      if (this.forClient(client) !== presence || !this.weapons.isOn(player.id)) return;
+      const current = this.weapons.arsenalOf(player.id)!, next = { ...cleanArsenal(paid.view), test: current.test, infinite: current.infinite, ammo: current.ammo, ...(current.priceScale ? { priceScale: current.priceScale } : {}) };
+      this.weapons.setArsenal(player, next);
+      client.send('weapon.arsenal', next);
+      this.walletChanged(presence, paid.balance, -(paid.cost ?? cost), 'weapon:upgrade');
+    });
     this.handle('food.unload', foodEmptySchema, 4, client => this.unloadOrder(client));
     this.handle('food.talk', foodEmptySchema, 4, client => this.talkToCustomer(client));
     this.handle('food.leave', foodEmptySchema, 4, client => this.closeDialog(this.player(client), this.forClient(client)!));
@@ -924,6 +1035,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     });
     this.handle('player.emote', z.object({ emote: z.enum(['dance', 'wave', 'idle', 'smoke', 'cigarette', 'cross-arms']) }).strict(), 4, (client, { emote }) => {
       const p = this.player(client);
+      if (p.gun.w && emote !== 'idle' && !((emote === 'smoke' || emote === 'cigarette') && p.smokingSince)) throw new Error('Guarde a arma (X) antes.');
       // F1 is a persistent upper-body toggle. It never owns animationState/interactionState, hence walking remains free.
       if(emote==='cross-arms'){
         if(!isConscious(p)||p.animationState==='kick'||p.fireworkEquipped)throw new Error('Espere a a\u00e7\u00e3o atual terminar.');
@@ -1016,6 +1128,10 @@ export class BarRoom extends Room<{ state: BarState }> {
         this.log('admin_broadcast', { playerId: player.id, text: notice });
         return;
       }
+      const command = text.toLowerCase().replace(/\s+/g, ' ');
+      if (command === '/armas') return this.toggleArms(client, sender, player);
+      if (command === '/armas todos') { this.openArms(sender, player); return; }
+      if (command === '/alvos') { this.toggleTargets(client, sender, player); return; }
       if(text.toLowerCase()==='/velho'){
         player.oldWalk=!player.oldWalk;
         if(player.animationState==='run'&&player.oldWalk)player.animationState='walk';
@@ -1178,6 +1294,8 @@ export class BarRoom extends Room<{ state: BarState }> {
         player.headYaw=input.headYaw??0;player.headPitch=input.headPitch??0;
         // The guard rides on every input (R): up when the room allows it, before this input moves the body at its pace.
         this.fights.guard(player, input);
+        // The firearm rides on every input too (world/weapons.ts): drawing, aiming, the reload key and the shots, before this input moves the body.
+        this.weapons.input(player, input, now);
         if (isRidingHorse(player.interactionState)) {
           if(input.rear&&!presence.horseRearHeld&&(!player.horseRearAt||now-player.horseRearAt>=HORSE_REAR.cooldownMs)){
             player.horseRearAt=now;player.animationStartedAt=now;
@@ -1204,7 +1322,10 @@ export class BarRoom extends Room<{ state: BarState }> {
         } else if (!player.interactionState) {
           // Running needs stamina; a drunk walk drifts. The client predicts both with the same shared rules.
           running = input.running && !player.oldWalk && this.needs.canRun(id) && !!(input.dx || input.dz);
-          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle));
+          // Aiming a gun: its slower pace and never a run (armedPace, the browser predicts the same).
+          const pace = this.weapons.pace(player);
+          if (pace !== undefined) running = false;
+          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle), pace);
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
           if (moving) this.achieved(id, 'andarilho', Math.hypot(position.x - player.x, position.z - player.z));
@@ -1224,7 +1345,10 @@ export class BarRoom extends Room<{ state: BarState }> {
     lap('motos');
     this.syncPassengers(now);
     this.checkStorage(now);
+    this.targets.step(now);
+    this.sparring.step(now);
     this.fights.step(now, this.state.players.values());
+    this.weapons.step(now, this.state.players.values());
     this.stepKicks(now);
     this.stepThrown(now);
     this.stepHighfood(now);
@@ -1410,13 +1534,98 @@ export class BarRoom extends Room<{ state: BarState }> {
     if ((player.interactionState && player.interactionState !== 'stagger') || player.currentTableId) return 'Termine o que está fazendo antes de levantar a guarda.';
     if (player.holding || player.carrying || player.parcel) return 'Largue o que está na mão antes de levantar a guarda.';
     if (player.fireworkEquipped) return 'Guarde o fogo de artifício antes de lutar.';
+    if (player.gun.w) return 'Guarde a arma antes de levantar a guarda.';
     if (this.sessions.getByUser(player.id)?.flying) return 'Pouse (B) antes de lutar.';
     return '';
   }
   /** Whether the guard stays up: anything that takes the player elsewhere (a chair, a bike, a drink in hand, fainting, leaving) lowers it. */
   private keepsGuard(player: Player): boolean {
     return player.connected && isConscious(player) && !this.deaths.isDead(player.id) && (!player.interactionState || player.interactionState === 'stagger' || player.interactionState === 'kick')
-      && !player.currentTableId && !player.holding && !player.carrying && !player.parcel && !player.fireworkEquipped && !this.sessions.getByUser(player.id)?.flying;
+      && !player.currentTableId && !player.holding && !player.carrying && !player.parcel && !player.fireworkEquipped && !player.gun.w && !this.sessions.getByUser(player.id)?.flying;
+  }
+  /** Why a gun cannot be in hand now ('' when it can): out of it, seated, riding, busy, hands full, the guard up, flying. A drawn gun is put away when this stops being ''. */
+  private gunRefusal(player: Player): string {
+    if (!player.connected || !isConscious(player) || this.deaths.isDead(player.id)) return 'Espere recuperar os sentidos.';
+    if (player.currentTableId || player.interactionState.startsWith('seat-')) return 'Levante-se antes de sacar a arma.';
+    if (isRidingMoto(player.interactionState) || isRidingHorse(player.interactionState)) return 'Desça antes de sacar a arma.';
+    if (player.interactionState && player.interactionState !== 'stagger') return 'Termine o que está fazendo antes de sacar a arma.';
+    if (player.holding || player.carrying || player.parcel) return 'Largue o que está na mão antes de sacar a arma.';
+    if (player.fireworkEquipped) return 'Guarde o rojão antes de sacar a arma.';
+    if (player.fist.fight) return 'Baixe a guarda (R) antes de sacar a arma.';
+    if (this.sessions.getByUser(player.id)?.flying) return 'Pouse (B) antes de sacar a arma.';
+    return '';
+  }
+  /** A gun comes out: crossed arms open, a dance or a wave stops, a cigarette goes out (the hands are the gun's). */
+  private gunDrawn(player: Player): void {
+    const now = Date.now(), presence = this.sessions.getByUser(player.id);
+    player.armsCrossed = false;
+    if (player.smokingSince && !player.smokingStopAt) player.smokingStopAt = Math.max(now, player.smokingSince + SMOKING.lightMs);
+    if (!['idle', 'walk', 'run', 'hit'].includes(player.animationState)) { player.animationState = 'idle'; player.animationStartedAt = now; }
+    if (presence) { presence.gestureEndsAt = undefined; presence.gestureState = undefined; }
+  }
+  /** Life off a body: Zeca's ring and the training dummies keep their own lives; anyone else's go through the needs. */
+  private hurt(target: Player, amount: number, now: number): void {
+    if (!this.sparring.damage(target, amount) && !this.targets.damage(target, amount)) this.needs.damage(target, amount, now);
+  }
+  /** A line from B.A.R. in one player's chat. */
+  private tell(client: Client, text: string): void {
+    client.send('chat.message', { id: randomUUID(), playerId: 'system', displayName: 'B.A.R.', system: true, sentAt: Date.now(), text } satisfies ChatMessage);
+  }
+  /**
+   * /armas: the firearms on or off for this player. On: for the administration, or for anyone while /armas todos holds them open; the arsenal comes
+   * from the API (the test kit granted there) or, without it, the test kit in memory; the browser draws the pistol.
+   */
+  private async toggleArms(client: Client, presence: Presence, player: Player): Promise<void> {
+    if (this.weapons.isOn(player.id)) {
+      this.weapons.disable(player);
+      this.tell(client, 'Armas guardadas. Digite /armas para pegar de novo.');
+      this.log('weapons_off', { playerId: player.id });
+      return;
+    }
+    if (presence.ticket.role !== 'admin' && !this.weaponsOpen) throw new Error('As armas ainda estão em teste: só a administração pode usar /armas.');
+    if (this.deaths.isDead(player.id)) throw new Error('Não dá para pegar armas agora.');
+    if (!isConscious(player)) throw new Error('Espere recuperar os sentidos.');
+    if (player.currentTableId || player.interactionState.startsWith('seat-')) throw new Error('Levante-se antes de pegar as armas.');
+    if (isRidingMoto(player.interactionState) || isRidingHorse(player.interactionState)) throw new Error('Desça do veículo antes de pegar as armas.');
+    if (presence.flying) throw new Error('Pouse (B) antes de pegar as armas.');
+    if (this.arming.has(player.id)) return;
+    this.arming.add(player.id);
+    let view: ArsenalView;
+    try {
+      view = cleanArsenal(await internal<ArsenalView>('arsenal/load', { userId: player.id, testKit: true }));
+      if (!view.weapons.length) view = testArsenal();
+    } catch (error) {
+      view = testArsenal();
+      this.log('arsenal_fallback', { playerId: player.id, error: error instanceof Error ? error.message : String(error) });
+    } finally { this.arming.delete(player.id); }
+    if (this.forClient(client) !== presence || !player.connected || this.weapons.isOn(player.id)) return;
+    if (presence.ticket.role !== 'admin' && !this.weaponsOpen) return;
+    this.weapons.enable(player, view);
+    client.send('weapon.arsenal', { ...view, draw: 'pistola' } satisfies ArsenalView);
+    this.tell(client, 'Armas de teste liberadas. Caps Lock: roda de armas · botão direito: mirar · clique: atirar · R: recarregar · V: modo de tiro · X: guardar · H: trocar ombro · U: arsenal. Digite /armas de novo para desligar.');
+    this.log('weapons_on', { playerId: player.id });
+  }
+  /** /armas todos (administration): the firearms open to everyone, or closed again (who is not of the administration loses them). */
+  private openArms(presence: Presence, player: Player): void {
+    if (presence.ticket.role !== 'admin') throw new Error('Acesso exclusivo da administração.');
+    this.weaponsOpen = !this.weaponsOpen;
+    const notice = this.weaponsOpen ? player.displayName + ' liberou as armas de teste para todos (/armas). Digite /armas todos de novo para fechar.'
+      : player.displayName + ' fechou as armas de teste: só a administração pode usar /armas.';
+    for (const [id, target] of this.sessions) {
+      if (target.revoked) continue;
+      if (target.ticket.role === 'admin') { this.tell(target.client, notice); continue; }
+      const other = this.state.players.get(id);
+      if (!this.weaponsOpen && other && this.weapons.isOn(id)) { this.weapons.disable(other); this.tell(target.client, 'As armas de teste foram recolhidas pela administração.'); }
+    }
+    this.log('weapons_open', { playerId: player.id, open: this.weaponsOpen });
+  }
+  /** /alvos (administration): four training dummies in front, or away again. */
+  private toggleTargets(client: Client, presence: Presence, player: Player): void {
+    if (presence.ticket.role !== 'admin') throw new Error('Acesso exclusivo da administração.');
+    if (this.targets.of(player.id).length) { this.targets.clear(player.id); this.tell(client, 'Alvos de treino removidos.'); return; }
+    const count = this.targets.toggle(player, Date.now());
+    if (!count) throw new Error('Não há espaço livre na sua frente para os alvos. Vire para um lugar aberto.');
+    this.tell(client, count + ' alvos de treino na sua frente: parado, andando de lado, correndo e longe. Derrubados, levantam em 4 s. Somem em 20 minutos ou com /alvos de novo.');
   }
   /** Who a punch can hit: anyone up and free on foot, fighting or not (or in the middle of a kick); not seated, riding, working, flying, nor just back on their feet. */
   private punchable(target: Player, now: number): boolean {
@@ -1445,6 +1654,22 @@ export class BarRoom extends Room<{ state: BarState }> {
       const player = this.state.players.get(id);
       if (!player || presence.revoked) continue;
       if (Math.hypot(player.x - near.x, player.z - near.z) <= AOI_RADIUS) presence.client.send(type, message);
+    }
+  }
+  /** A message to everyone whose avatar is within this radius (m, 2D) of a body, but one (a shot: the shooter drew it already). */
+  private sendAround(near: Player, radius: number, type: string, message: unknown, skip?: string): void {
+    for (const [id, presence] of this.sessions) {
+      if (id === skip || presence.revoked) continue;
+      const player = this.state.players.get(id);
+      if (player && Math.hypot(player.x - near.x, player.z - near.z) <= radius) presence.client.send(type, message);
+    }
+  }
+  /** A firearm's hit (weapon.hit): the shooter, the one hit, and everyone who sees the one hit. */
+  private sendHit(shooter: Player, target: Player, hit: WeaponHitEvent): void {
+    for (const [id, presence] of this.sessions) {
+      if (presence.revoked) continue;
+      const player = this.state.players.get(id);
+      if (id === shooter.id || id === target.id || (player && Math.hypot(player.x - target.x, player.z - target.z) <= AOI_RADIUS)) presence.client.send('weapon.hit', hit);
     }
   }
 
@@ -1486,6 +1711,7 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** `hurt`: the life this blow takes. All but the last point go at once; that one waits for the body to land, so nobody faints in the air. */
   private startThrown(player: Player, start: RagdollStart, hurt = 0): void {
+    if (this.targets.knocked(player, start, Date.now())) return;
     const presence = this.sessions.getByUser(player.id), now = Date.now(), atOnce = Math.min(hurt, Math.max(0, player.hp - 1));
     this.dropHolding(player);
     this.closeDialog(player, presence);
@@ -1549,6 +1775,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private letLoose(moto: Moto, rollRate: number): void {
     if(isCar(moto)){moto.assign(STOPPED_VEHICLE);return;}
     const loose = { roll: Math.sign(rollRate) * .02, rollRate };
+    this.throwPassengers(moto, Math.sin(moto.yaw) * moto.speed, Math.cos(moto.yaw) * moto.speed, 0);
     this.fallenMotos.set(moto.id, { loose });
     moto.phase = 'loose'; moto.riderId = '';
     this.showMoto(moto, loosePose(moto, loose));
@@ -1556,6 +1783,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   /** Knocked over: a rider on it comes off, and it goes down with the blow it took. */
   private knockMoto(moto: Moto, vx: number, vz: number, speed = moto.speed): void {
     if(isCar(moto)){this.wearMoto(moto,Math.hypot(vx,vz),'side');moto.assign(STOPPED_VEHICLE);return;}
+    this.throwPassengers(moto, Math.sin(moto.yaw) * moto.speed + vx, Math.cos(moto.yaw) * moto.speed + vz, Math.hypot(vx, vz));
     if (moto.riderId) { const rider = this.state.players.get(moto.riderId); if (rider) this.throwRider(moto, rider, Math.sin(moto.yaw) * moto.speed + vx, Math.cos(moto.yaw) * moto.speed + vz, Math.hypot(vx, vz)); }
     moto.riderId = '';
     this.setEngine(moto, MOTO_ENGINE.OFF, Date.now());
@@ -1652,7 +1880,25 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(chosen===0)this.crankEngine(moto,Date.now());
       return;
     }
-    if(seat!==undefined&&seat!==0)throw new Error('Este veículo tem apenas um lugar.');
+    // The pillion (docs/sistemas/moto.md#garupa): behind a rider, with the bike stopped; never on a Highfood delivery, the rider's or the pillion's.
+    const wanted = seat ?? (moto.riderId ? 1 : 0);
+    if (wanted > 1 || (wanted === 1 && !isTwoWheeler(moto))) throw new Error('Este veículo não tem esse lugar.');
+    if (wanted === 1) {
+      const rider = this.state.players.get(moto.riderId);
+      if (!moto.riderId || !rider) throw new Error('Alguém precisa estar pilotando para você ir na garupa.');
+      if (this.onDelivery(rider)) throw new Error('O piloto está em entrega no Highfood e não leva garupa.');
+      if (this.onDelivery(player)) throw new Error('Você está no Highfood: saia do turno de entrega para ir de garupa.');
+      if (moto.passengers[0]) throw new Error('A garupa já está ocupada.');
+      if (moto.phase) throw new Error('Espere a moto parar.');
+      if (vehicleMotionSpeed(moto) > .5) throw new Error('Espere a moto parar para subir na garupa.');
+      if (!canMountMoto(moto, player, INTERACTION_SLACK, player.id)) throw new Error('Chegue mais perto da moto.');
+      moto.passengers[0] = player.id;
+      this.dropParcel(player);
+      Object.assign(player, seatPosition(moto, 1)); player.rotation = normalizeHeading(moto.yaw);
+      player.interactionState = passengerInteraction(moto.id, 1); player.animationState = 'ride'; player.animationStartedAt = Date.now(); player.drinkItem = '';
+      presence.queue.length = 0; presence.motoQueue.length = 0; presence.motoBudget = 1; presence.motoBudgetAt = Date.now(); player.lastProcessedInput = presence.lastReceived;
+      return;
+    }
     if (moto.riderId) throw new Error('Alguém já está nessa moto.');
     if (this.beingRepaired(moto.id)) throw new Error('Alguém está consertando essa moto.');
     if (moto.phase === 'lifting') throw new Error('Alguém já está levantando essa moto.');
@@ -1663,6 +1909,8 @@ export class BarRoom extends Room<{ state: BarState }> {
       return;
     }
     if (!canMountMoto(moto, player, INTERACTION_SLACK)) throw new Error('Chegue mais perto da moto.');
+    // A delivery starts alone: whoever was left on the bike's back gets off.
+    if (this.onDelivery(player)) this.ejectPassengers(moto, 'O piloto começou uma entrega no Highfood.');
     moto.riderId = player.id; moto.lights = 0;moto.ignition=true;
     this.dropParcel(player);
     const order=this.highfood.orderOf(player.id);
@@ -1678,12 +1926,35 @@ export class BarRoom extends Room<{ state: BarState }> {
     const bit=(vehicleSeats(car.model)[seat]?.side??1)===1?1:2,timer=this.carDoorTimers.get(car.id)??{left:0,right:0};
     car.doors|=bit;if(bit===1)timer.left=Date.now()+1000;else timer.right=Date.now()+1000;this.carDoorTimers.set(car.id,timer);
   }
+  /** In the Highfood shift (online or with an order): such a rider takes nobody on the bike, and such a player does not ride as a pillion. */
+  private onDelivery(player: Player): boolean { return player.courier || !!this.highfood.orderOf(player.id); }
+  /** Everyone on the bike's back steps off beside it (the bike's rider stays), told why. */
+  private ejectPassengers(moto: Moto, why: string): void {
+    for (let seat = 1; seat < vehicleCapacity(moto.model); seat++) {
+      const id = moto.passengers[seat - 1], passenger = id ? this.state.players.get(id) : undefined;
+      if (!passenger) { moto.passengers[seat - 1] = ''; continue; }
+      this.freeMoto(moto, passenger);
+      this.sessions.getByUser(passenger.id)?.client.send('error', { message: why });
+    }
+  }
+  /** The bike goes down: whoever sits behind is thrown off with its speed, as the rider is (throwRider). */
+  private throwPassengers(moto: Moto, vx: number, vz: number, closing: number): void {
+    for (let seat = 1; seat < vehicleCapacity(moto.model); seat++) {
+      const id = moto.passengers[seat - 1], passenger = id ? this.state.players.get(id) : undefined;
+      moto.passengers[seat - 1] = '';
+      if (!passenger) continue;
+      this.startThrown(passenger, { x: moto.x, y: moto.y, z: moto.z, yaw: moto.yaw, vx: vx * .9, vz: vz * .9, closing, seated: true, seed: Math.floor(Math.random() * 0xffffffff) });
+      this.log('moto_crash', { playerId: passenger.id, moto: moto.id, pillion: true, speed: +Math.hypot(vx, vz).toFixed(1), closing: +closing.toFixed(1) });
+    }
+  }
   /** Passengers share the car's authoritative position but never feed its input queue. */
   private syncPassengers(now:number):void {
-    for(const car of this.state.motos.values())if(isCar(car)){
+    for(const car of this.state.motos.values())if(vehicleCapacity(car.model)>1){
+      // A bike lying down (or falling) has nobody on its back.
+      if(!isCar(car)&&car.phase&&car.passengers.some(Boolean)){this.throwPassengers(car,0,0,0);continue;}
       const timer=this.carDoorTimers.get(car.id);
       if(timer){if(timer.left&&now>=timer.left){car.doors&=~1;timer.left=0;}if(timer.right&&now>=timer.right){car.doors&=~2;timer.right=0;}if(!timer.left&&!timer.right)this.carDoorTimers.delete(car.id);}
-      for(let seat=1;seat<carSpec(car.model).SEATS;seat++){
+      for(let seat=1;seat<vehicleCapacity(car.model);seat++){
         const id=car.passengers[seat-1];if(!id)continue;
         const player=this.state.players.get(id),presence=this.sessions.getByUser(id);
         if(!player?.connected||!presence||presence.revoked||player.interactionState!==passengerInteraction(car.id,seat)){
@@ -2134,10 +2405,13 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (player.courier) throw new Error('Você já está no Highfood.');
     if (!presence.vehicles.length && !this.canDeliverByHorse(player)) throw new Error('Você precisa de uma moto do HighMotors ou de Tião com a habilidade Cavalo comprada na coleção (C).');
     if (player.job) throw new Error('Encerre o turno no bar antes de entrar no Highfood.');
+    if (isPassenger(player.interactionState)) throw new Error('Desça da garupa antes de entrar no Highfood.');
     // A horse courier can collect on foot without owning or taking out a bike.
     const now = Date.now();
     this.highfood.start(player.id, null, now);
     player.courier = true;
+    // The bike's back is for rides, not for deliveries.
+    { const ridden = [...this.state.motos.values()].find(moto => moto.riderId === player.id); if (ridden) this.ejectPassengers(ridden, 'O piloto entrou no Highfood e não leva garupa.'); }
     this.sendFood(player.id);
     if (!this.ownMoto(player.id) && !this.canDeliverByHorse(player)) client.send('food.notice', { title: 'Highfood', text: 'Você está online, mas sua moto está na garagem. Tire ela de lá para os pedidos começarem a chegar.' });
     this.log('highfood_online', { playerId: player.id });
@@ -2751,6 +3025,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   private async useInventory(client:Client,itemId:ItemId):Promise<void>{
     const item=itemById(itemId);if(!item)throw new Error('Item inválido.');
     const player=this.player(client),presence=this.forClient(client)!;
+    if(itemId==='rojao'&&!player.fireworkEquipped&&player.gun.w)throw new Error('Guarde a arma (X) antes de equipar o rojão.');
     if(itemId==='rojao'){
       if(player.fireworkEquipped){player.fireworkEquipped=false;return;}
       if(!this.canFirework(player)||presence.inventoryBusy)throw new Error('Fique de pé e libere as mãos para equipar o rojão.');
@@ -2762,6 +3037,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     if(item.category==='peca')throw new Error('Essa peça se usa na moto: botão direito nela, Informações do veículo.');
     const inHand=consumedOverTime(itemId);
     if(inHand&&player.holding)throw new Error(`Ainda na mão: ${holdingName(player.holding)}. Termine antes de pegar outro item.`);
+    // Using an item puts the gun away (the hands are the item's); the browser sees gun.w empty and follows.
+    this.weapons.holster(player);
     const view=await this.removeInventory(presence,itemId,1,'use');
     if(this.forClient(client)!==presence||!player.connected)return;
     if(inHand){
@@ -2777,7 +3054,7 @@ export class BarRoom extends Room<{ state: BarState }> {
   }
 
   private canFirework(player:Player):boolean {
-    return player.connected&&isConscious(player)&&!this.deaths.isDead(player.id)&&!player.interactionState&&!player.currentTableId&&!player.holding&&!player.carrying&&!player.parcel&&!player.looking&&!player.phone&&['idle','walk','run'].includes(player.animationState);
+    return !player.gun.w&&player.connected&&isConscious(player)&&!this.deaths.isDead(player.id)&&!player.interactionState&&!player.currentTableId&&!player.holding&&!player.carrying&&!player.parcel&&!player.looking&&!player.phone&&['idle','walk','run'].includes(player.animationState);
   }
   private async fireFirework(client:Client,direction:FireworkVector):Promise<void> {
     const player=this.player(client),presence=this.forClient(client)!,now=Date.now();

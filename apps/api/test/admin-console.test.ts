@@ -121,14 +121,17 @@ test('administration console: prices for the whole game, player file and changes
     assert.equal((await inject('POST','/api/daily',{},player.cookie)).json().gained.xp,50,'claimed again');
     assert.equal((await change({op:'xp',mode:'set',amount:0})).statusCode,200);
     assert.equal((await levels()).xp,0,'set wins over every counter');
-    // The XP values are prices: an hour worth more raises the XP of everyone who stayed, and the daily days count from the next claim.
+    // Action XP remains editable; daily values count from the next claim and passive XP cannot be re-enabled.
     assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:daily-1',value:80}],reason:'Bônus maior'},staff.cookie)).statusCode,200);
     assert.equal((await inject('GET','/api/daily',undefined,player.cookie)).json().rewards[0],80);
     assert.equal((await levels()).xp,0,'the daily counter keeps the XP already received: new values count from the next claim');
-    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:frequentador',value:600}],reason:'Hora vale mais'},staff.cookie)).statusCode,200);
-    await internal('POST','/api/internal/achievements',{events:[{userId:player.id,series:'frequentador',amount:360}],online:[]});
-    assert.equal((await levels()).xp,60,'six minutes at 600 XP an hour');
-    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:frequentador',value:null}],reason:'Voltar'},staff.cookie)).statusCode,200);
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:frequentador',value:600}],reason:'Hora vale mais'},staff.cookie)).statusCode,400);
+    await internal('POST','/api/internal/achievements',{events:[{userId:player.id,series:'frequentador',amount:3600}],online:[]});
+    assert.equal((await levels()).xp,0,'an hour connected gives no XP');
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:andarilho',value:200}],reason:'Caminhada vale mais'},staff.cookie)).statusCode,200);
+    await internal('POST','/api/internal/achievements',{events:[{userId:player.id,series:'andarilho',amount:300}],online:[]});
+    assert.equal((await levels()).xp,60,'300 metres at 200 XP per km');
+    assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:andarilho',value:null}],reason:'Voltar'},staff.cookie)).statusCode,200);
     assert.equal((await inject('POST','/api/admin/prices',{changes:[{key:'xp:daily-1',value:null}],reason:'Voltar'},staff.cookie)).statusCode,200);
     const history=(await inject('GET',`/api/admin/players/${player.id}`,undefined,staff.cookie)).json().history.map((h:{action:string})=>h.action);
     for(const action of ['player-rename','items-add','items-remove','skin-grant','skin-revoke','player-verify','xp-add','xp-remove','daily-reset'])assert.ok(history.includes(action),action);

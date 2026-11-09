@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import {RUN_SPEED,cameraFraction,sightBlocked} from '@bar/shared';
 import {CameraXray} from './camera-xray';
+import {DEFAULT_AIM_CAMERA,readAimCamera,type AimCamera} from '../weapons/aim-settings';
 
 /** First person, or an orbit at one of the three distances. */
 export type CameraMode='first'|'third';
@@ -91,10 +92,18 @@ const ZOOM_NOTCH=50;
 const CHASE_TURN=3.2,CHASE_PITCH=.3,CHASE_AFTER_DRAG=1.5;
 // At full speed the view falls back this many metres behind the bike.
 const RUSH_BACK=.5;
-// Metres of room the shoulder needs beyond its own offset, and how long that side must stay free before the view goes back to it.
-const SHOULDER_ROOM=.2,SHOULDER_BACK_AFTER=.4;
 // Closer to the head than this the head joint hides, and it shows again only past the second (no flicker on the edge).
 const HEAD_HIDES=.42,HEAD_SHOWS=.55;
+// Weapons (docs/sistemas/armas.md#camera): where the view sits aiming and with a weapon out is AimCamera (tuned live from the Esc menu; the line of
+// sight just over the shoulder, as GTA V frames it, and the view turning nearly in place instead of diving under the shoulder looking up).
+// The shoulder swaps at this rate (per second).
+const SWAP_RATE=10;
+// How fast the framing with the weapon in hand comes in and goes out (per second).
+const ARMED_FRAME_RATE=6;
+// A weapon out (not aiming): the turn this much faster too, and the view may look further up; through a scope the elevation stops at ±this.
+const ARMED_TURN=.6,ARMED_PITCH_UP=-1.2,SCOPE_PITCH=1.45;
+// Recoil: a kick reaches the view at this rate (per second); after this long (s) with no kick, the share given back returns at this rate.
+const KICK_RATE=45,RECOVER_AFTER=.09,RECOVER_RATE=7;
 /** Exponential smoothing: the part of the way covered in `dt` seconds at `rate` per second. */
 const ease=(rate:number,dt:number)=>1-Math.exp(-rate*dt);
 /**
@@ -160,7 +169,6 @@ export class CameraRig {
   private feetBefore?:{x:number;z:number};
   /** How far to the side the view sits now, and how long that side has been free. */
   private shoulder=0;
-  private shoulderFreeFor=SHOULDER_BACK_AFTER;
   /** The part of the way from the body to the wanted place the view really goes (1: all of it), how fast that changes, and how long it has been able to open. */
   private opening=1;
   private openingSpeed=0;
@@ -172,13 +180,41 @@ export class CameraRig {
   private fromHead=DEFAULT_CAMERA_DISTANCE;
   private headClose=false;
   private readonly temp={a:new pc.Vec3(),b:new pc.Vec3(),c:new pc.Vec3(),up:new pc.Vec3(),goal:new pc.Vec3(),centre:new pc.Vec3(),body:new pc.Vec3(),wanted:new pc.Vec3(),probe:new pc.Vec3(),right:new pc.Vec3()};
+  /** Weapons, opt-in (the defaults leave the view as it always was): a weapon is out (no recentre, a quicker turn, a wider look up). */
+  armed=false;
+  private armedBefore=false;
+  /** 0-1 the weapon out, eased (the framing with the weapon in hand comes in and goes out gently). */
+  private armedBlend=0;
+  /** 0-1 aiming down the sights (the gun's eased blend) and its framing; 0-1 through a scope, and the point the scope's eye is at. */
+  private aimBlend=0;
+  private aimProfile:'rifle'|'pistol'='rifle';
+  private scopeBlend=0;
+  private readonly scopePoint=new pc.Vec3();
+  private scopePointSet=false;
+  /** The shoulder the view sits over (1 right, -1 left): the one chosen, and the one used now (always the chosen one: the user asked for it fixed). */
+  side:1|-1=1;
+  private sideChosen:1|-1=1;
+  /** Multiplies the mouse's and the fingers' turn: aiming slows it with the zoom, aim assistance with friction. */
+  lookScale=1;
+  /** Where the view sits with a weapon (AimCamera), and the settings' object it was read from. */
+  private aimTune:AimCamera={...DEFAULT_AIM_CAMERA};
+  private aimTuneSource?:AimCamera;
+  /** A point the view keeps in its middle while it moves between the framings (holdAim). */
+  private readonly focus=new pc.Vec3();
+  private focusSet=false;
+  /** Recoil on its way to the view, and the share to give back (radians: up, right). */
+  private kickPitch=0;
+  private kickYaw=0;
+  private backPitch=0;
+  private backYaw=0;
+  private sinceKick=1;
 
   constructor(private readonly camera:pc.Entity,device:pc.GraphicsDevice) {this.xray=new CameraXray(device);}
 
   /** In the eyes: used to hide the local head, name and ring. */
   get firstPerson():boolean {return this.inside>.7;}
   /** Also when an obstacle has squeezed the view against the head: the head is hidden, as are the name and the ring at the feet. */
-  get headHidden():boolean {return this.firstPerson||this.headClose;}
+  get headHidden():boolean {return this.firstPerson||this.headClose||this.scopeBlend>.5;}
   /** Last third-person distance, retained while looking through the eyes. */
   get reach():number {return this.distanceGoal;}
   get distance():number {return this.mode==='first'?0:this.distanceGoal;}
@@ -224,10 +260,70 @@ export class CameraRig {
   }
   /** Dragging the mouse: sideways turns, up and down looks up and down (the boom rises as the view looks down). */
   drag(dx:number,dy:number):void {
-    this.sinceDrag=0;
-    this.yawGoal-=dx*TURN_PER_PIXEL*this.feel.sensitivity;
-    this.pitchGoal+=dy*LOOK_PER_PIXEL*this.feel.sensitivity;
+    this.sinceDrag=0;if(dx||dy)this.focusSet=false;
+    this.yawGoal-=dx*TURN_PER_PIXEL*this.feel.sensitivity*this.lookScale;
+    const pitch=dy*LOOK_PER_PIXEL*this.feel.sensitivity*this.lookScale;
+    this.pitchGoal+=pitch;this.pulledDown(pitch);
     this.holdPitch();
+  }
+  /** Aiming down the sights: 0-1 (eased by the gun), framed for a long gun or a pistol. The saved view and distance are never touched. */
+  aim(blend:number,profile:'rifle'|'pistol'='rifle'):void {this.aimBlend=clamp(Number.isFinite(blend)?blend:0,0,1);this.aimProfile=profile;}
+  /** Through a scope: 0-1, the view moving into the eyes (or to `point`), still looking along the aim. */
+  scope(blend:number,point?:pc.Vec3):void {
+    this.scopeBlend=clamp(Number.isFinite(blend)?blend:0,0,1);
+    if(point){this.scopePoint.copy(point);this.scopePointSet=true;}else this.scopePointSet=false;
+    if(this.scopeBlend>0)this.holdPitch();
+  }
+  /** A stick's turn (radians, in the rig's angles: yaw up turns left, pitch up looks down), eased like the mouse's. */
+  look(dYaw:number,dPitch:number):void {
+    if(!Number.isFinite(dYaw)||!Number.isFinite(dPitch))return;
+    if(dYaw||dPitch)this.focusSet=false;
+    this.sinceDrag=0;this.yawGoal+=dYaw;this.pitchGoal+=dPitch;this.pulledDown(dPitch);this.holdPitch();
+  }
+  /** Aim assistance: turns the view now, goals and all, so the easing adds no lag behind what it follows. */
+  nudge(dYaw:number,dPitch:number):void {
+    if(!Number.isFinite(dYaw)||!Number.isFinite(dPitch))return;
+    this.yaw+=dYaw;this.yawGoal+=dYaw;this.yawGoalBefore+=dYaw;this.pitch+=dPitch;this.pitchGoal+=dPitch;this.holdPitch();
+  }
+  /** A shot's kick: up and to the right (radians); `recover` of it comes back once the shooting stops (less what the player pulled down). */
+  recoil(up:number,side:number,recover=0):void {
+    if(!Number.isFinite(up)||!Number.isFinite(side))return;
+    this.kickPitch+=up;this.kickYaw+=side;this.backPitch+=up*clamp(recover,0,1);this.backYaw+=side*clamp(recover,0,1);this.sinceKick=0;
+  }
+  /** The weapon framing, as the settings have it (the same object again costs nothing). */
+  tuneAim(tune:AimCamera):void {if(tune!==this.aimTuneSource){this.aimTuneSource=tune;this.aimTune=readAimCamera(tune);}}
+  /**
+   * Going into the aim (or out of it) the view moves (closer, to the side, higher) but its turn stays: the middle of the screen would land somewhere else.
+   * While a point is held the view turns, frame by frame, to keep that point in the middle; undefined lets go. The player's own turn lets go too.
+   */
+  holdAim(point?:{x:number;y:number;z:number}|readonly [number,number,number]):void {
+    if(!point){this.focusSet=false;return;}
+    if(Array.isArray(point))this.focus.set(point[0]!,point[1]!,point[2]!);else {const p=point as {x:number;y:number;z:number};this.focus.set(p.x,p.y,p.z);}
+    this.focusSet=Number.isFinite(this.focus.x)&&Number.isFinite(this.focus.y)&&Number.isFinite(this.focus.z);
+  }
+  get holdingAim():boolean {return this.focusSet;}
+  /** H / R3: the other shoulder. */
+  swapShoulder():void {this.setSide(this.sideChosen===1?-1:1);}
+  setSide(side:1|-1):void {this.sideChosen=this.side=side;}
+  /** Pulling down against the climb counts as recovery already made. */
+  private pulledDown(pitch:number):void {if(pitch>0&&this.backPitch>0)this.backPitch=Math.max(0,this.backPitch-pitch);}
+  /** The kicks reach the view at once (no easing lag); what is given back returns to the goals, gently. */
+  private kick(dt:number):void {
+    if(this.kickPitch||this.kickYaw){
+      const share=ease(KICK_RATE,dt),up=this.kickPitch*share,side=this.kickYaw*share;
+      this.kickPitch-=up;this.kickYaw-=side;
+      if(Math.abs(this.kickPitch)<1e-5)this.kickPitch=0;
+      if(Math.abs(this.kickYaw)<1e-5)this.kickYaw=0;
+      this.nudge(-side,-up);
+    }
+    this.sinceKick+=dt;
+    if(this.sinceKick>RECOVER_AFTER&&(this.backPitch||this.backYaw)){
+      const share=ease(RECOVER_RATE,dt),up=this.backPitch*share,side=this.backYaw*share;
+      this.backPitch-=up;this.backYaw-=side;
+      if(Math.abs(this.backPitch)<1e-5)this.backPitch=0;
+      if(Math.abs(this.backYaw)<1e-5)this.backYaw=0;
+      this.pitchGoal+=up;this.yawGoal+=side;this.holdPitch();
+    }
   }
   /** Turns the view to look along `heading` (the camera goes to the opposite side), by the short way round; the chase does not undo it at once. */
   face(heading:number):void {
@@ -240,9 +336,11 @@ export class CameraRig {
   }
   /** Third person keeps the horizon: back from first person's free turns on the nearest turn, without unwinding them on screen. */
   private holdPitch():void {
-    if(this.mode!=='third')return;
+    const scoped=this.scopeBlend>0;
+    if(this.mode!=='third'&&!scoped)return;
     const turns=Math.round(this.pitchGoal/(Math.PI*2))*Math.PI*2;
-    this.pitchGoal=clamp(this.pitchGoal-turns,PITCH_UP,PITCH_DOWN);this.pitch-=turns;
+    // Through a scope the view never loops over (first person can); a weapon out may look higher.
+    this.pitchGoal=scoped?clamp(this.pitchGoal-turns,-SCOPE_PITCH,this.mode==='third'?PITCH_DOWN:SCOPE_PITCH):clamp(this.pitchGoal-turns,this.armed?ARMED_PITCH_UP:PITCH_UP,PITCH_DOWN);this.pitch-=turns;
   }
 
   /** Getting on a bike: third person, behind it (chase); getting off: the view the player had. */
@@ -314,18 +412,26 @@ export class CameraRig {
     const pace=riding?1:2**(1-2*this.feel.smoothing);
     this.sinceDrag+=dt;
     this.feelStride(dt,feet,riding);
-    if(this.mode==='third'&&!riding)this.recentre(dt,subject.facing,pace);
-    this.yaw=trail(this.yaw,this.yawGoal,this.yawGoalBefore,TURN_RATE*pace,dt);this.yawGoalBefore=this.yawGoal;
-    this.pitch+=(this.pitchGoal-this.pitch)*ease(TURN_RATE*pace,dt);
+    if(this.armed!==this.armedBefore){this.armedBefore=this.armed;this.holdPitch();}
+    // Armed, the view stays where the player put it: no swing behind the body.
+    if(this.mode==='third'&&!riding&&!this.armed&&!this.aimBlend)this.recentre(dt,subject.facing,pace);
+    this.kick(dt);
+    this.armedBlend+=((this.armed&&!riding?1:0)-this.armedBlend)*ease(ARMED_FRAME_RATE,dt);
+    if(Math.abs(this.armedBlend-Math.round(this.armedBlend))<.002)this.armedBlend=Math.round(this.armedBlend);
+    // With the weapon only out, its own height; aiming, the aim's (both measured from the view without a weapon).
+    const tune=this.aimTune,hand=this.armedBlend*(1-this.aimBlend),lift=tune.armedRise*hand+tune.rise*this.aimBlend,turn=TURN_RATE*pace*(1+(this.armed?ARMED_TURN:0)+tune.turn*this.aimBlend);
+    this.yaw=trail(this.yaw,this.yawGoal,this.yawGoalBefore,turn,dt);this.yawGoalBefore=this.yawGoal;
+    this.pitch+=(this.pitchGoal-this.pitch)*ease(turn,dt);
     this.inside+=((this.mode==='first'?1:0)-this.inside)*ease(7,dt);
     if(Math.abs(this.inside-Math.round(this.inside))<.002)this.inside=Math.round(this.inside);
     this.boomLength+=(this.distanceGoal-this.boomLength)*ease(ZOOM_RATE_S*pace,dt);
     // The frame is measured off the head joint, wherever each skeleton has it and whatever the clip does with it (seated, fallen).
     this.stature+=((subject.head?clamp(subject.head.y-feet.y,STATURE_LEAST,STATURE_MOST):STATURE)-this.stature)*ease(STATURE_RATE,dt);
     // Behind the player: the point it looks at trails the body a little; far away (a respawn, a teleport) it jumps.
-    goal.set(feet.x,feet.y+this.stature-HEAD_TO_SHOULDERS+this.feel.height,feet.z);
+    goal.set(feet.x,feet.y+this.stature-HEAD_TO_SHOULDERS+this.feel.height+lift,feet.z);
+    const tight=1+tune.follow*this.aimBlend;
     if(this.target.distance(goal)>8)this.target.copy(goal);
-    else this.target.set(trail(this.target.x,goal.x,this.targetBefore.x,FOLLOW_RATE*pace,dt),trail(this.target.y,goal.y,this.targetBefore.y,(riding?FOLLOW_RATE:FOLLOW_RATE_UP)*pace,dt),trail(this.target.z,goal.z,this.targetBefore.z,FOLLOW_RATE*pace,dt));
+    else this.target.set(trail(this.target.x,goal.x,this.targetBefore.x,FOLLOW_RATE*pace*tight,dt),trail(this.target.y,goal.y,this.targetBefore.y,(riding?FOLLOW_RATE:FOLLOW_RATE_UP)*pace*tight,dt),trail(this.target.z,goal.z,this.targetBefore.z,FOLLOW_RATE*pace*tight,dt));
     this.targetBefore.copy(goal);
     const flat=Math.cos(this.pitch);
     a.set(Math.sin(this.yaw)*flat,Math.sin(this.pitch),Math.cos(this.yaw)*flat);
@@ -335,20 +441,25 @@ export class CameraRig {
     else goal.set(feet.x,feet.y+EYE_HEIGHT,feet.z);
     if(!this.eyeSet||this.eye.distance(goal)>1){this.eye.copy(goal);this.eyeSet=true;}
     else this.eye.lerp(this.eye,goal,ease(25,dt));
-    // Off the shoulder; on a bike straight behind, and straight behind where that side has no room.
-    this.shoulder+=((riding||this.shoulderFreeFor<SHOULDER_BACK_AFTER?0:SHOULDER_SIDE)-this.shoulder)*ease(3,dt);
-    const back=this.rushing*RUSH_BACK+this.stride*this.stride*RUN_BACK;
-    wanted.copy(this.target).add(c.copy(a).mulScalar(this.boomLength+back)).add(c.copy(right).mulScalar(this.shoulder));
+    // Off the chosen shoulder, always (no side change nor fold to the middle by itself); on a bike straight behind.
+    // With a weapon the offset is the tuning's (AimCamera) and the swap is quick.
+    const armed=this.armed||this.aimBlend>0,offset=tune.armedShoulder+(tune.shoulder-tune.armedShoulder)*this.aimBlend;
+    const shoulderGoal=riding?0:this.side*(armed?offset:SHOULDER_SIDE);
+    this.shoulder+=(shoulderGoal-this.shoulder)*ease(armed&&!riding?SWAP_RATE:3,dt);
+    const back=(this.rushing*RUSH_BACK+this.stride*this.stride*RUN_BACK)*(1-this.aimBlend);
+    const held=this.boomLength+(tune.armedBoom-this.boomLength)*this.armedBlend+back;
+    const boom=held+((this.aimProfile==='pistol'?tune.boomPistol:tune.boomRifle)-held)*this.aimBlend;
+    wanted.copy(this.target).add(c.copy(a).mulScalar(boom)).add(c.copy(right).mulScalar(this.shoulder));
+    // Aiming, the view stays near the shoulder's height whatever the elevation: it still looks along `a`, the crosshair is the view's own middle.
+    if(this.aimBlend)wanted.y-=a.y*boom*tune.level*this.aimBlend;
     const w=this.inside*this.inside*(3-2*this.inside);
     // From the body itself, not from the point trailing it: the body is never inside a wall, a point catching up with it can be.
     body.set(feet.x,feet.y+this.stature-HEAD_TO_SHOULDERS,feet.z);
     if(this.inside>=1){this.opening=1;this.openingSpeed=0;this.wantedSet=false;}
     else {
       this.clear(dt,body,wanted,feet.y,pace,riding);
-      if(!riding){
-        const free=cameraFraction(body,probe.copy(wanted).add(c.copy(right).mulScalar(SHOULDER_SIDE+SHOULDER_ROOM-this.shoulder)))>=1;
-        this.shoulderFreeFor=free?this.shoulderFreeFor+dt:0;
-      }
+      // The view stays on the chosen shoulder, armed or not: only the player moves it (H / R3, the settings). A wall at that side shortens the boom.
+      this.side=this.sideChosen;
     }
     const behind=this.opening<1?b.lerp(body,wanted,this.opening):b.copy(wanted);
     this.fromHead=behind.distance(body);
@@ -357,6 +468,18 @@ export class CameraRig {
     a.mulScalar(-1);
     up.set(-Math.sin(this.yaw)*Math.sin(this.pitch),Math.cos(this.pitch),-Math.cos(this.yaw)*Math.sin(this.pitch));
     const position=b.lerp(behind,this.eye,w);
+    // Through a scope: into the eyes, along the same aim.
+    if(this.scopeBlend>0)position.lerp(position,this.scopePointSet?this.scopePoint:this.eye,this.scopeBlend*this.scopeBlend*(3-2*this.scopeBlend));
+    // Holding a point (holdAim): from wherever the view is now, it looks straight at it, and the turn the player has is set to match.
+    if(this.focusSet&&this.mode==='third'){
+      probe.copy(this.focus).sub(position);const length=probe.length();
+      if(length>.5){
+        const dYaw=wrapped(Math.atan2(-probe.x,-probe.z)-this.yaw),dPitch=Math.asin(clamp(-probe.y/length,-1,1))-this.pitch;
+        this.yaw+=dYaw;this.yawGoal+=dYaw;this.yawGoalBefore+=dYaw;this.pitch+=dPitch;this.pitchGoal+=dPitch;
+        a.set(-Math.sin(this.yaw)*Math.cos(this.pitch),-Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch));
+        up.set(-Math.sin(this.yaw)*Math.sin(this.pitch),Math.cos(this.pitch),-Math.cos(this.yaw)*Math.sin(this.pitch));
+      }
+    }
     if(this.shaking>.0005){
       this.shakeTime+=dt;this.shaking*=Math.exp(-SHAKE_FADE*dt);
       position.x+=Math.sin(this.shakeTime*67)*this.shaking;position.y+=Math.sin(this.shakeTime*83+1)*this.shaking;position.z+=Math.sin(this.shakeTime*59+2)*this.shaking;
@@ -366,7 +489,7 @@ export class CameraRig {
     if(subject.roll)this.camera.rotateLocal(Math.sin(subject.elapsed*.7)*subject.roll*.3,0,Math.sin(subject.elapsed*.45)*subject.roll);
     // The x-ray opens while a solid hides part of the body from the camera, and closes once it is clear.
     let hidden=false;
-    if(w<.5)for(const height of SIGHT){
+    if(w<.5&&this.scopeBlend<.5)for(const height of SIGHT){
       centre.set(feet.x,feet.y+height,feet.z);
       if(sightBlocked(position,centre)){hidden=true;break;}
     }
@@ -376,7 +499,7 @@ export class CameraRig {
     if(this.xrayOpen<.002)this.xrayOpen=0;
     centre.set(feet.x,feet.y+BODY_CENTRE,feet.z);
     if(subject.clearance)centre.add(c.copy(position).sub(centre).normalize().mulScalar(subject.clearance));
-    this.xray.set(position,centre,WINDOW_RADIUS,this.xrayOpen*(1-w),feet.y+FLOOR_KEPT);
+    this.xray.set(position,centre,WINDOW_RADIUS,this.xrayOpen*(1-Math.max(w,this.scopeBlend)),feet.y+FLOOR_KEPT);
   }
 
   /** Not following the player (watching a screen, at the door): no window; the next follow starts from where it is. */
@@ -385,6 +508,7 @@ export class CameraRig {
   telemetry() {
     const p=this.camera.getPosition();
     return {mode:this.mode,distance:this.distance,inside:+this.inside.toFixed(3),boom:+this.boomLength.toFixed(3),reach:this.reach,xray:+this.xrayOpen.toFixed(3),yaw:+this.yaw.toFixed(3),pitch:+this.pitch.toFixed(3),position:[+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)],
-      opening:+this.opening.toFixed(3),fromHead:+this.fromHead.toFixed(3),shoulder:+this.shoulder.toFixed(3),stature:+this.stature.toFixed(3),stride:+this.stride.toFixed(3)};
+      opening:+this.opening.toFixed(3),fromHead:+this.fromHead.toFixed(3),shoulder:+this.shoulder.toFixed(3),stature:+this.stature.toFixed(3),stride:+this.stride.toFixed(3),
+      armed:this.armed,aim:+this.aimBlend.toFixed(3),scope:+this.scopeBlend.toFixed(3),side:this.side,lookScale:+this.lookScale.toFixed(3)};
   }
 }

@@ -1,0 +1,132 @@
+/* The firearms' HUD (weapons/hud.ts, docs/sistemas/armas.md#hud). Shown only with a weapon in hand. No transitions and no blur: the HUD writes
+   the few values that change (the crosshair's gap, a marker's place) and the rest is static paint. Classes start with wp-. */
+.wp-hud{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden;contain:strict}
+.wp-hud[hidden],.wp-scope[hidden],.wp-hud [hidden]{display:none!important}
+
+/* The crosshair: four ticks at --gap from the centre, a dot; a ring (--ring) for the shotguns. Dark outlines keep it readable on any wall. */
+.wp-cross{--gap:8px;--ring:24px;--tick:8px;--c:#fff;position:absolute;left:50%;top:50%;width:0;height:0}
+.wp-cross[data-kind=none]{display:none}
+.wp-cross[data-state=low]{--c:oklch(1 0 0 / 35%)}
+.wp-cross[data-state=busy]{--c:oklch(1 0 0 / 60%)}
+.wp-t,.wp-dot,.wp-ring,.wp-lock{position:absolute;left:0;top:0;display:block}
+.wp-t{background:var(--c);box-shadow:0 0 0 1px #000a}
+.wp-up,.wp-down{width:2px;height:var(--tick);margin-left:-1px}
+.wp-left,.wp-right{height:2px;width:var(--tick);margin-top:-1px}
+.wp-up{transform:translateY(calc(-1 * (var(--gap) + var(--tick))))}
+.wp-down{transform:translateY(var(--gap))}
+.wp-left{transform:translateX(calc(-1 * (var(--gap) + var(--tick))))}
+.wp-right{transform:translateX(var(--gap))}
+.wp-dot{width:3px;height:3px;margin:-1.5px 0 0 -1.5px;background:var(--c);box-shadow:0 0 0 1px #000a}
+.wp-ring{display:none;width:calc(var(--ring) * 2);height:calc(var(--ring) * 2);margin:calc(-1 * var(--ring)) 0 0 calc(-1 * var(--ring));border:1.5px solid var(--c);border-radius:50%;
+  box-shadow:0 0 0 1px #0007,inset 0 0 0 1px #0007}
+.wp-cross[data-kind=ring] .wp-ring{display:block}
+.wp-cross[data-kind=ring] .wp-t{display:none}
+/* A gamepad lock: corner marks around the crosshair, magenta. */
+.wp-lock{display:none;width:30px;height:30px;margin:-15px 0 0 -15px;
+  background:linear-gradient(var(--hl-magenta),var(--hl-magenta)) 0 0/8px 2px no-repeat,linear-gradient(var(--hl-magenta),var(--hl-magenta)) 0 0/2px 8px no-repeat,
+    linear-gradient(var(--hl-magenta),var(--hl-magenta)) 100% 0/8px 2px no-repeat,linear-gradient(var(--hl-magenta),var(--hl-magenta)) 100% 0/2px 8px no-repeat,
+    linear-gradient(var(--hl-magenta),var(--hl-magenta)) 0 100%/8px 2px no-repeat,linear-gradient(var(--hl-magenta),var(--hl-magenta)) 0 100%/2px 8px no-repeat,
+    linear-gradient(var(--hl-magenta),var(--hl-magenta)) 100% 100%/8px 2px no-repeat,linear-gradient(var(--hl-magenta),var(--hl-magenta)) 100% 100%/2px 8px no-repeat;
+  filter:drop-shadow(0 0 1px #000)}
+.wp-cross[data-locked=on] .wp-lock{display:block}
+
+/* An optic's own reticle while aimed (red dot, holographic ring); the scopes draw theirs in .wp-scope. */
+.wp-optic{position:absolute;left:50%;top:50%;width:0;height:0}
+.wp-optic::before,.wp-optic::after{content:'';position:absolute;display:block;border-radius:50%}
+.wp-optic[data-reticle=dot]::before{width:5px;height:5px;margin:-2.5px 0 0 -2.5px;background:#ff3b3b;box-shadow:0 0 6px 1px #ff3b3baa}
+.wp-optic[data-reticle=holo]::before{width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #ff4a4acc;box-shadow:0 0 6px #ff3b3b88}
+.wp-optic[data-reticle=holo]::after{width:4px;height:4px;margin:-2px 0 0 -2px;background:#ff4a4a}
+.wp-optic[data-reticle=chevron]::before{width:0;height:0;margin:0 0 0 -6px;border:6px solid transparent;border-bottom:9px solid #ff4a4a;border-top:0;border-radius:0}
+
+/* The hit marker: four diagonal strokes around the crosshair. */
+.wp-hit{--c:#fff;--s:1;position:absolute;left:50%;top:50%;width:0;height:0}
+.wp-hit[data-kind=head]{--c:var(--hl-gold)}
+.wp-hit[data-kind=ko]{--c:var(--hl-magenta);--s:1.45}
+.wp-hit i{position:absolute;left:0;top:0;width:calc(9px * var(--s));height:2.5px;margin:-1.25px 0 0 0;background:var(--c);box-shadow:0 0 0 1px #000b;transform-origin:0 50%}
+.wp-hit i:nth-child(1){transform:rotate(-45deg) translateX(calc(7px * var(--s)))}
+.wp-hit i:nth-child(2){transform:rotate(45deg) translateX(calc(7px * var(--s)))}
+.wp-hit i:nth-child(3){transform:rotate(135deg) translateX(calc(7px * var(--s)))}
+.wp-hit i:nth-child(4){transform:rotate(-135deg) translateX(calc(7px * var(--s)))}
+.wp-hit.wp-pop{animation:wp-pop .22s ease-out both}
+@keyframes wp-pop{from{scale:1.5;opacity:1}to{scale:1;opacity:.85}}
+
+/* Where the bullet would really stop (the muzzle against a wall the crosshair does not see). */
+.wp-block{position:absolute;left:0;top:0;width:0;height:0}
+.wp-block i{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border:2px solid #ff5a5a;border-radius:50%;box-shadow:0 0 0 1px #000a}
+.wp-block i::before,.wp-block i::after{content:'';position:absolute;left:50%;top:50%;width:14px;height:2px;margin:-1px 0 0 -7px;background:#ff5a5a;transform:rotate(45deg)}
+.wp-block i::after{transform:rotate(-45deg)}
+
+/* Hurt: the side the shot came from, and a red edge. */
+.wp-arcs{position:absolute;left:50%;top:50%;width:0;height:0}
+.wp-arc{position:absolute;left:-90px;top:-90px;width:180px;height:180px;border-radius:50%;border:5px solid transparent;border-top-color:#ff3b3b;
+  filter:drop-shadow(0 0 4px #ff3b3b99);display:block}
+.wp-arc.wp-fade{animation:wp-fade 1.4s ease-in both}
+@keyframes wp-fade{0%{opacity:1}60%{opacity:.8}100%{opacity:0}}
+.wp-hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,oklch(.5 .22 25 / 55%) 100%)}
+
+.wp-ko{position:absolute;left:50%;top:calc(50% + 46px);transform:translateX(-50%);padding:4px 12px;white-space:nowrap;
+  font:700 13px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:oklch(.14 .06 320 / 82%);border:1px solid var(--hl-magenta);
+  box-shadow:var(--active-glow)}
+
+/* The ammo chip: bottom-right on a desktop (the minimap has the left), top-right under the header on touch (the thumbs have the bottom). */
+.wp-ammo{position:absolute;right:16px;bottom:16px;display:grid;grid-template-columns:auto auto;grid-template-areas:'pic pic' 'name mode' 'count count';align-items:end;gap:2px 12px;
+  min-width:132px;padding:8px 12px 8px 14px;background:var(--panel);border:1px solid var(--border);font:500 11px var(--font-mono);color:var(--soft);
+  text-transform:uppercase;letter-spacing:.14em}
+.wp-ammo::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.wp-ammo-pic{grid-area:pic;justify-self:end;width:112px;margin-bottom:2px}
+.wp-ammo-pic .wp-pic{width:100%}
+.wp-ammo-pic img{filter:brightness(1.5)}
+.wp-name{grid-area:name;color:var(--hl-magenta);font-weight:700}
+.wp-mode{grid-area:mode;justify-self:end;color:var(--dim)}
+.wp-count{grid-area:count;display:flex;align-items:baseline;gap:6px;justify-content:flex-end;font-variant-numeric:tabular-nums}
+.wp-mag{font:700 30px/1 var(--font-display);color:#fff;letter-spacing:0;min-width:2ch;text-align:right}
+.wp-reserve{font:500 13px var(--font-mono);color:var(--dim);letter-spacing:.04em}
+.wp-ammo[data-ammo=low] .wp-mag{color:var(--hl-gold)}
+.wp-ammo[data-ammo=empty] .wp-mag{color:#ff5a5a}
+.wp-reload{--left:1;position:absolute;left:-30px;bottom:12px;width:22px;height:22px;border-radius:50%;
+  background:conic-gradient(var(--hl-cyan) calc((1 - var(--left)) * 360deg),oklch(1 0 0 / 14%) 0);
+  mask:radial-gradient(circle,transparent 6px,#000 7px);-webkit-mask:radial-gradient(circle,transparent 6px,#000 7px)}
+/* Dry and not reloading: the key to press, pulsing beside the chip; grey when nothing is left. */
+.wp-empty{position:absolute;right:calc(100% + 10px);bottom:9px;display:flex;align-items:center;gap:7px;white-space:nowrap;padding:5px 10px;background:oklch(.18 .09 20 / 88%);
+  border:1px solid #ff5a5a;font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:#fff;animation:wp-pulse .8s ease-in-out infinite alternate}
+.wp-empty kbd{padding:0 5px;border:1px solid oklch(1 0 0 / 55%);font:700 11px var(--font-mono)}
+.wp-empty[data-out=on]{animation:none;border-color:var(--border);background:var(--panel);color:var(--dim)}
+@keyframes wp-pulse{from{opacity:.6}to{opacity:1;box-shadow:0 0 12px oklch(.6 .22 25 / 65%)}}
+html.touch-ui .wp-ammo{bottom:auto;top:calc(58px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));min-width:110px;padding:6px 10px}
+html.touch-ui .wp-mag{font-size:24px}
+html.touch-ui .wp-ammo-pic{width:84px}
+
+/* The scope: a black mask with the lens' circle, the reticle drifting with the sway, the zoom and the breath. Under every other HUD element. */
+.wp-scope{position:absolute;inset:0;pointer-events:none;--lens:min(46vh,46vw)}
+.wp-mask{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 0 calc(var(--lens) - 2px),#050308 calc(var(--lens) + 1px)),
+  radial-gradient(circle at center,transparent 0 calc(var(--lens) - 26px),#0008 var(--lens))}
+.wp-scope[data-lite=on] .wp-mask{background:radial-gradient(circle at center,transparent 0 var(--lens),#050308 calc(var(--lens) + 1px))}
+.wp-scope-reticle{position:absolute;left:50%;top:50%;width:calc(var(--lens) * 2);height:calc(var(--lens) * 2);margin:calc(-1 * var(--lens)) 0 0 calc(-1 * var(--lens))}
+.wp-scope-reticle svg{width:100%;height:100%;overflow:visible;fill:none;stroke:#0b0b0b;stroke-width:.9}
+.wp-scope-reticle .thin{stroke-width:.45}
+.wp-scope-reticle .thick{stroke-width:2.4}
+.wp-scope-reticle .fill{fill:#0b0b0b;stroke:none}
+.wp-scope-reticle .lit{stroke:#ff3b3b;stroke-width:1.1}
+.wp-scope[data-lite=off] .wp-scope-reticle svg{filter:drop-shadow(0 0 .6px #fff8)}
+.wp-scope-info{position:absolute;left:50%;top:calc(50% + var(--lens) - 54px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;
+  font:600 12px var(--font-mono);letter-spacing:.14em;color:oklch(1 0 0 / 80%);text-shadow:0 1px 2px #000}
+.wp-breath{--breath:1;position:relative;width:70px;height:4px;background:oklch(1 0 0 / 18%)}
+.wp-breath i{position:absolute;inset:0;background:var(--hl-cyan);transform-origin:left;transform:scaleX(var(--breath))}
+.wp-breath[data-state=holding] i{background:#fff}
+.wp-breath[data-state=shaking] i{background:#ff5a5a}
+
+@media (prefers-reduced-motion:reduce){.wp-hit.wp-pop,.wp-arc.wp-fade,.wp-empty{animation:none}}
+
+/* Touch (touch-controls.ts), on foot with a weapon in hand: a big fire button left of the run one, aim above it, reload and the weapon up the
+   column the punches use, and through a scope the zoom steps above aim and the breath beside the column. */
+.tp .tp-fire,.tp .tp-aim,.tp .tp-reload,.tp .tp-weapon,.tp .tp-zoomin,.tp .tp-zoomout,.tp .tp-breath{display:none}
+.tp[data-armed=on][data-kind=walk] :is(.tp-fire,.tp-aim,.tp-reload,.tp-weapon){display:grid}
+.tp[data-armed=on][data-scoped=on][data-kind=walk] :is(.tp-zoomin,.tp-zoomout,.tp-breath){display:grid}
+.tp .tp-fire{--w:var(--m);--dx:calc(var(--r) * 1.95);--dy:0px;border-color:oklch(.7 .25 25 / 80%);background:oklch(.32 .14 20 / 72%)}
+.tp .tp-fire .ui-icon{width:calc(30px * var(--s));height:calc(30px * var(--s))}
+.tp .tp-aim{--dx:calc(var(--r) * 1.95);--dy:var(--r)}
+.tp .tp-reload{--w:calc(var(--b) * .92);--dx:0px;--dy:calc(var(--r) + var(--b) * 1.04)}
+.tp .tp-weapon{--w:calc(var(--b) * .92);--dx:0px;--dy:calc(var(--r) + var(--b) * 2.04)}
+.tp .tp-zoomin{--w:calc(var(--b) * .8);--dx:calc(var(--r) * 1.95);--dy:calc(var(--r) + var(--b) * 1.02)}
+.tp .tp-zoomout{--w:calc(var(--b) * .8);--dx:calc(var(--r) * 1.95);--dy:calc(var(--r) + var(--b) * 1.92)}
+.tp .tp-breath{--w:calc(var(--b) * .9);--dx:calc(var(--r) * .98);--dy:calc(var(--r) * 1.55)}

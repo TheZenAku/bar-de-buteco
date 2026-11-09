@@ -1,11 +1,12 @@
 import {vehicleMoving} from '@bar/shared';
 import type {FireworkShot,StorageView} from '@bar/shared';
+import type {ArsenalView,GunInput,WeaponHitEvent,WeaponShotEvent} from '@bar/shared';
 import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
-import {NO_PUNCH,fightMove,punchCarries,punchThrowable,streamOf,throwPunch,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
+import {NO_PUNCH,fightMove,punchCarries,punchThrowable,streamOf,throwPunch,type BlockCommand,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
 import {setDoorStates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
-import type {DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
+import type {SparringDialog,SparringResult,SparringState,DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
 import {ServerClock} from './server-clock';
 import type {EnvironmentState,EnvironmentSnapshot} from '@bar/shared';
@@ -49,6 +50,11 @@ export interface NetworkHooks {
   tradeState?:(view:TradeView)=>void;
   tradeClosed?:(closed:TradeClosed)=>void;
   foodDialog?:(dialog:HighfoodDialog|null)=>void;
+  /** Zeca's challenge (docs/sistemas/zeca.md): his speech, the fight's start, its lives and count, and how it ended. */
+  sparringDialog?:(dialog:SparringDialog)=>void;
+  sparringStart?:()=>void;
+  sparringState?:(state:SparringState)=>void;
+  sparringResult?:(result:SparringResult)=>void;
   foodLocker?:(locker:HighfoodLockerView|null)=>void;
   foodCode?:(right:boolean)=>void;
   foodDelivered?:(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>void;
@@ -74,9 +80,20 @@ export interface NetworkHooks {
    * The fist fight (fight-controller.ts): for each input being built (`seq`), the guard and a punch thrown with it, given the punches as predicted
    * (`stream`); after each state, the room's word on the local fight (`acked`: the last input it ran); and a punch that landed near (fight.hit).
    */
-  fight?:(seq:number,stream:PunchStream,self:PlayerState)=>{fight:boolean;punch?:PunchCommand;rotation?:number};
+  fight?:(seq:number,stream:PunchStream,self:PlayerState)=>{fight:boolean;punch?:PunchCommand;rotation?:number;block?:boolean;blockAt?:BlockCommand};
   fightState?:(self:PlayerState,acked:number)=>void;
   fightHit?:(hit:FightHit)=>void;
+  /**
+   * The firearms (weapons/controller.ts, docs/sistemas/armas.md#rede): the gun field of input `seq` (with whether every input must go and whether
+   * it walks: aiming or firing never runs); after each state, the room's word on the gun (`acked`: the last input it ran); the pace an aimed
+   * input walks at (the room's rule, so prediction matches); the arsenal, someone else's shot, and a hit near.
+   */
+  gun?:(seq:number,self:PlayerState)=>{input:GunInput;active:boolean;walk:boolean}|undefined;
+  gunState?:(self:PlayerState,acked:number)=>void;
+  gunPace?:(input:PlayerInput)=>number|undefined;
+  weaponArsenal?:(view:ArsenalView)=>void;
+  weaponShot?:(event:WeaponShotEvent)=>void;
+  weaponHit?:(event:WeaponHitEvent)=>void;
   /** Rafael's kick landed on this player: the life it took, and who it was. */
   kicked?:(hit:{hp:number;by:string})=>void;
   /** An administrator's /msg, to everyone in the room. */
@@ -204,6 +221,7 @@ export class BarNetwork {
         this.punchStream=stream;this.punchCarry=carry;
         this.hooks.position(this.position);
         this.hooks.fightState?.(self,self.lastProcessedInput);
+        this.hooks.gunState?.(self,self.lastProcessedInput);
         this.reconcileMoto(world,self);
       }
     });
@@ -232,6 +250,10 @@ export class BarNetwork {
     room.onMessage('trade.state',(view:TradeView)=>this.hooks.tradeState?.(view));
     room.onMessage('trade.closed',(closed:TradeClosed)=>this.hooks.tradeClosed?.(closed));
     room.onMessage('food.dialog',(dialog:HighfoodDialog|null)=>this.hooks.foodDialog?.(dialog));
+    room.onMessage('sparring.dialog',(dialog:SparringDialog)=>this.hooks.sparringDialog?.(dialog));
+    room.onMessage('sparring.start',()=>this.hooks.sparringStart?.());
+    room.onMessage('sparring.state',(state:SparringState)=>this.hooks.sparringState?.(state));
+    room.onMessage('sparring.result',(result:SparringResult)=>this.hooks.sparringResult?.(result));
     room.onMessage('food.locker',(locker:HighfoodLockerView|null)=>this.hooks.foodLocker?.(locker));
     room.onMessage('food.code',(answer:{ok:boolean})=>this.hooks.foodCode?.(answer.ok));
     room.onMessage('food.delivered',(facts:{customer:string;onTime:boolean;crashes:number;wornBox:boolean;stars:number})=>this.hooks.foodDelivered?.(facts));
@@ -247,6 +269,9 @@ export class BarNetwork {
     room.onMessage('player.kicked',(hit:{hp:number;by:string})=>this.hooks.kicked?.(hit));
     room.onMessage('admin.broadcast',(notice:{text:string;by:string})=>this.hooks.broadcast?.(notice));
     room.onMessage('fight.hit',(hit:FightHit)=>this.hooks.fightHit?.(hit));
+    room.onMessage('weapon.arsenal',(view:ArsenalView)=>this.hooks.weaponArsenal?.(view));
+    room.onMessage('weapon.shot',(event:WeaponShotEvent)=>this.hooks.weaponShot?.(event));
+    room.onMessage('weapon.hit',(event:WeaponHitEvent)=>this.hooks.weaponHit?.(event));
     room.onMessage('achievement.unlocked',(message:{badge:Badge})=>this.hooks.achievement?.(message.badge));
     room.onMessage('xp.state',(message:{xp:number;gained:number})=>this.hooks.xp?.(message));
     room.onMessage('inventory.state',(view:Partial<InventoryView>&Pick<InventoryView,'stacks'|'capacity'|'usedSlots'>)=>this.hooks.inventory?.(view));
@@ -296,7 +321,10 @@ export class BarNetwork {
     let intention:Omit<PlayerInput,'seq'>=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
     // The fist fight: the guard rides on every input, a punch on the one that throws it (its aim turns the body), a planted punch keeps its facing.
     const fighting=this.hooks.fight?.(this.seq+1,this.punchStream,self);
-    if(fighting?.fight)intention={...intention,fight:true,...(fighting.punch?{punch:fighting.punch}:{}),...(fighting.rotation!==undefined&&!locked?{rotation:fighting.rotation}:{})};
+    if(fighting?.fight)intention={...intention,fight:true,...(fighting.punch?{punch:fighting.punch}:{}),...(fighting.block?{block:true}:{}),...(fighting.blockAt?{blockAt:fighting.blockAt}:{}),...(fighting.rotation!==undefined&&!locked?{rotation:fighting.rotation}:{})};
+    // The firearm rides on every input while /armas is on (the room reads it from each one); its shots too.
+    const gun=this.hooks.gun?.(this.seq+1,self);
+    if(gun)intention={...intention,gun:gun.input,...(gun.walk&&!locked?{running:false}:{})};
     const moving=!!(intention.dx||intention.dz||intention.dy||intention.aim);
     // Head look is independent of body rotation, also while standing or seated.
     const last=this.pending.at(-1)??self;
@@ -304,7 +332,7 @@ export class BarNetwork {
     // Turning in place (to the selfie's phone, a firework's aim) has to reach the room too.
     const turning=this.sentRotation!==undefined&&Math.abs(normalizeHeading(intention.rotation-this.sentRotation))>.001;
     // In the guard every input goes, still or not: the room counts a punch's planted feet in inputs (fight.ts, punchStep).
-    if(!fighting?.fight&&!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
+    if(!fighting?.fight&&!gun?.active&&!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
     this.wasMoving=moving;
     this.sentRear=!!intention.rear;
     this.sentRotation=intention.rotation;
@@ -384,7 +412,7 @@ export class BarNetwork {
     if(input.fight&&!self.animationState?.startsWith('fly')&&!isRidingHorse(self.interactionState))return fightMove(this.position,stream,input.seq,{...input,running:input.running&&!self.oldWalk&&canRun(self)},TICK_MS/1000,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),self.skin,carry);
     if(self.animationState?.startsWith("fly"))return flyPlayer(this.position,input,TICK_MS/1000);
     if(isRidingHorse(self.interactionState))return self.animationState==='horse-rear'?this.position:moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
-    return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle));
+    return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),this.hooks.gunPace?.(input));
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   /** Bytes still waiting in the socket (0 if unknown). */

@@ -1,6 +1,6 @@
 import {adminConsole} from './admin/console';
 import {isRidingHorse,kickClip,vehicleSeat,weatherAt} from '@bar/shared';
-import {CAR_MODEL,isCar,isTruck,hasStorage,storageGap,storageRefusal,vehicleMotionSpeed,vehicleSeats,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts,type MotoState,type StorageView} from '@bar/shared';
+import {CAR_MODEL,isCar,isTruck,isTwoWheeler,hasStorage,storageGap,storageRefusal,vehicleMotionSpeed,vehicleSeats,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts,type MotoState,type StorageView} from '@bar/shared';
 import {storagePanelHtml} from './storage-panel';
 import {PerformanceMonitor} from './performance/monitor';
 import {UpdateProfiler} from './performance/recording';
@@ -18,6 +18,14 @@ import {createFullscreen} from './fullscreen';
 import {DeathAudio} from './death/death-audio';
 import {createDeathUi} from './death/death-ui';
 import {createMouseCapture} from './mouse-capture';
+import {WeaponsController} from './weapons/controller';
+import {WeaponWheel} from './weapons/ui/wheel';
+import {createArsenal} from './weapons/ui/arsenal';
+import {createArmsHint} from './weapons/ui/hint';
+import {aimCameraText,aimSettingPatch} from './weapons/ui/settings-rows';
+import {DEFAULT_AIM_CAMERA} from './weapons/aim-settings';
+import {DEFAULT_WEAPON_KEYS,WEAPON_ACTIONS,withWeaponKey,type WeaponAction} from './weapons/key-bindings';
+import {captureWeaponKey,guardSideButtons} from './weapons/key-capture';
 import './lobby-hero.css';
 import './lobby-entry.css';
 import {createHudPanels} from './hud-panels';
@@ -36,7 +44,7 @@ import {api,ApiError,escape as e} from './api';
 import {BarAudio} from './audio';
 import {JukeboxController,TelevisionController,type MediaController} from './jukebox';
 import {nearestMediaSource,areaMix,hasStagePass,type MediaSystem,type PoolTableView,type Position,type TrucoView} from '@bar/shared';
-import {musicianPhase,musicianRole,onStage,type Interactable,type PlayerState} from '@bar/shared';
+import {musicianPhase,musicianRole,onStage,SPARRING,SPARRING_NPC,nearSparring,type Interactable,type PlayerState} from '@bar/shared';
 import './jukebox.css';
 import {createLightDesk} from './light-desk';
 import './light-desk.css';
@@ -85,6 +93,8 @@ import './levels/levels.css';
 import {createLevelHud} from './levels/level-hud';
 import './wallet/wallet.css';
 import './fight/fight.css';
+import './sparring/sparring.css';
+import {createSparringUi} from './sparring/sparring-ui';
 import {createWalletHud} from './wallet/wallet-hud';
 import {rankIcon} from './levels/rank-icon';
 import {badgeMedal,openBadgeCard} from './profile/badge-card';
@@ -152,7 +162,7 @@ const fullscreen=createFullscreen(text=>notices.show({variant:'acao',title:'Tela
 // What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the pause menu. The chat is typed.
 const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen;
 // The Esc that frees a captured mouse is also the one that pauses: the browser may keep that key to itself.
-const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,()=>fight.guard,()=>fight.lower(),()=>{if(pauseMenu.isOpen)return true;if(!canOpenMenu())return false;pauseMenu.open();return true;});
+const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,()=>fight.guard||weapons.armed(),()=>fight.lower(),()=>{if(pauseMenu.isOpen)return true;if(!canOpenMenu())return false;pauseMenu.open();return true;});
 /**
  * The fist fight (docs/sistemas/luta.md): R raises the guard, the buttons punch. The controller decides each punch with the shared rules and draws it
  * ahead of the room; the room's word comes back with each state (reconcile) and each landed punch (fight.hit).
@@ -170,11 +180,50 @@ const fight:FightController=new FightController({
     mouseCapture.sync();
   },
 });
+/**
+ * The firearms (docs/sistemas/armas.md): /armas in the chat turns them on. The controller gathers the mouse, the keys, a gamepad and the touch
+ * buttons, runs the gun ahead of the room with the camera the scene rendered, applies aim assistance, draws the HUD and rides every input. Esc
+ * never holsters; a window or the pause menu lets go of the trigger and the aim.
+ */
+const weapons:WeaponsController=new WeaponsController($('#game'),{
+  me:()=>user?.id,
+  serverNow:():number=>serverNow(),
+  seen:():{seen:number;ago:number}=>network.seen(),
+  send:(type,payload)=>network.send(type,payload),
+  settings:()=>{const current=settings.get();return {aim:current.aim,pad:current.pad,shoulder:current.shoulder,aimCamera:current.aimCamera,keys:current.weaponKeys,lite:current.graphics.preset==='low'};},
+  saveShoulder:side=>settings.update({shoulder:side}),
+  notice:(text,error)=>toast(text,error),
+  playable:()=>inGame&&connected&&!needsCursor(),
+  menuOpen:()=>needsCursor(),
+  captureSync:()=>mouseCapture.sync(),
+  guard:()=>fight.guard,
+  name:id=>world?.players[id]?.displayName||'alguém',
+});
+/** The Arsenal window while open (weapons/ui/arsenal.ts): destroyed with the window, as the collection is. */
+let arsenalWindow:ReturnType<typeof createArsenal>|undefined;
 const fightPrompt=document.createElement('div');
 fightPrompt.className='fight-prompt';fightPrompt.hidden=true;fightPrompt.setAttribute('aria-live','polite');
-fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>R</kbd>Baixar</span>`;
+fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>Espaço</kbd>Defender (no instante do golpe: parry)</span><span class="fp-meter" title="Fôlego da guarda"><i></i></span><span><kbd>R</kbd>Baixar</span>`;
 $('#game').append(fightPrompt);
 function renderFightPrompt():void {fightPrompt.hidden=!fight.guard||!inGame;}
+/** Zeca's challenge: his speech, and the fight's lives and count (docs/sistemas/zeca.md). The room decides all; E near him talks. */
+const sparringUi=createSparringUi($('#game'),{accept:()=>network.send('sparring.accept',{}),quit:()=>network.send('sparring.quit',{}),now:()=>serverNow()});
+/** What E does near Zeca (not during a fight, nor with the dialog already open). */
+function sparringPrompt(self:PlayerState|undefined):{label:string;send:string}|undefined {
+  if(!self||!world?.npcs[SPARRING_NPC]||sparringUi.fighting||sparringUi.isOpen||self.interactionState||self.currentTableId||!nearSparring(self))return;
+  return {label:`Falar com o ${SPARRING.name}`,send:'sparring.talk'};
+}
+/** The guard meter (the room's number, Fist.guard) under the prompt: cool while it is full, gold when low, red while the guard is broken. */
+const guardMeter=fightPrompt.querySelector<HTMLElement>('.fp-meter')!,guardMeterFill=guardMeter.firstElementChild as HTMLElement;
+let guardShown=-1,guardBroken=false;
+function renderGuardMeter(self:PlayerState):void {
+  if(!fight.guard)return;
+  const value=self.fist?.guard??100,broken=(self.fist?.breakUntil??0)>serverNow();
+  if(value===guardShown&&broken===guardBroken)return;
+  guardShown=value;guardBroken=broken;
+  guardMeterFill.style.transform=`scaleX(${Math.max(0,Math.min(1,value/100)).toFixed(2)})`;
+  guardMeter.classList.toggle('low',value<30);guardMeter.classList.toggle('broken',broken);
+}
 /** A punch landed near: the scene draws it, the controller holds the one hit. */
 function onFightHit(hit:FightHit):void {
   scene?.fightHit(hit);
@@ -189,6 +238,8 @@ const touchControls=createTouchControls($('#game'),{
   sprint:on=>scene?.setTouchSprint(on),
   skillButton:()=>document.querySelector<HTMLButtonElement>('#skill-button'),
   guard:()=>fight.guard,
+  armed:()=>weapons.drawn,aiming:()=>weapons.aiming,scoped:()=>weapons.scoped,
+  look:(dx,dy)=>scene?.touchLook(dx,dy),
 });
 const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
 const minimap=createMinimap($('#game'));
@@ -224,6 +275,8 @@ let user:PublicUser|undefined;
 let world:WorldState|undefined;
 const serverNow=()=>network.serverNow();
 let inGame=false,connected=false,authMode:'login'|'register'|'forgot'|'reset'='login';
+// The mouse's back and forward buttons are weapon keys: in the game they never take the page back.
+guardSideButtons(()=>inGame);
 let emailVerificationRequired=true;
 let checkingSession=true;
 let resetToken='',activeModal='',peopleKey='',blocked=new Set<string>();
@@ -239,6 +292,10 @@ const deathAudio=new DeathAudio(()=>settings.get().master);
 // The pause menu (pause-menu/, docs/sistemas/interface.md#menu): Esc, over the running bar. Its sections read the game's state
 // through this host and act through the same functions as the keys; its settings carry the data-setting names applied below.
 const menuSounds=new MenuSounds(()=>settings.get().master*settings.get().ui);
+// The firearms' interface (weapons/ui): the wheel over the running scene, the first-use hint, and the Arsenal on U, the D-pad's right or the wheel's button.
+const armsHint=createArmsHint($('#game'),weapons);
+new WeaponWheel($('#game'),weapons,{sounds:menuSounds,arsenal:()=>openArsenal(),used:()=>armsHint.used()});
+weapons.on('arsenal',()=>openArsenal());
 /** A window opened from the menu: dismissed by the player (Esc, its X, a click beside it), it brings the menu back where it was. */
 let menuLeftAt=-Infinity,modalFromMenu=false;
 const menuPortraits=new Map<string,string>();
@@ -266,6 +323,7 @@ const menuHost:MenuContentHost={
   skill:()=>{const active=activeSkill();return active?{name:active.skill.name,icon:active.skill.icon,key:keyLabel(active.key)}:undefined;},
   seated:()=>!!world?.players[user?.id??'']?.interactionState?.startsWith('seat-'),
   admin:()=>user?.role==='admin',
+  armsOn:()=>weapons.gun.on,
   act:name=>menuAct(name),
   portrait:async skin=>{const cached=menuPortraits.get(skin);if(cached)return cached;const src=await scene?.portrait(skin).catch(()=>undefined);if(src)menuPortraits.set(skin,src);return src;},
   portraitNow:skin=>menuPortraits.get(skin),
@@ -276,7 +334,7 @@ const pauseMenu=createPauseMenu(app,menuTabs(menuHost),{
   sounds:menuSounds,header:()=>menuHeader(menuHost),where:()=>menuHost.zone(),canOpen:canOpenMenu,
   // Death, a call that brings the phone up, or a window the room opens (a trade): the menu steps aside.
   mustClose:()=>!inGame||!connected||!!activeModal||phone.isOpen||profile.isOpen||document.body.classList.contains('dead'),
-  opened:()=>{menuSounds.unlock();mouseCapture.sync();touchControls.sync();},
+  opened:()=>{menuSounds.unlock();weapons.release();mouseCapture.sync();touchControls.sync();},
   // Closed by a key: the capture comes back inside that same gesture, which the browser trusts.
   closed:reason=>{if(reason==='window')menuLeftAt=performance.now();mouseCapture.sync();},
 });
@@ -300,6 +358,7 @@ function menuAct(name:MenuAct):void {
     case 'people':people();break;
     case 'admin':void admin();break;
     case 'leave':void leaveBar();break;
+    case 'arsenal':openArsenal();break;
     case 'logout':void (async()=>{await leaveBar();await api('/auth/logout',{});user=undefined;renderAuth();})().catch(error=>toast(errorMessage(error),true));break;
   }
 }
@@ -384,7 +443,7 @@ function focusChat():void {
   panel.classList.add('chat-open');input.focus();
   if(document.activeElement===input)$('[data-action="chat"]').removeAttribute('data-unread');else panel.classList.remove('chat-open');
 }
-function showModal(title:string,content:string,type:string):void {modalFromMenu=performance.now()-menuLeftAt<1500||(modalFromMenu&&!!activeModal);menuLeftAt=-Infinity;if(activeModal==='storage'&&type!=='storage')leaveStorage();if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
+function showModal(title:string,content:string,type:string):void {modalFromMenu=performance.now()-menuLeftAt<1500||(modalFromMenu&&!!activeModal);menuLeftAt=-Infinity;if(activeModal==='storage'&&type!=='storage')leaveStorage();if(activeModal==='trade'&&type!=='trade')trade.leave();$('.modal').classList.toggle('trade-modal',type==='trade');closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());if(watchingTv)stopWatchingTv();administration?.destroy();administration=undefined;lastFocus=document.activeElement as HTMLElement;activeModal=type;$('.modal').classList.toggle('admin-modal',type==='admin');$('.modal').classList.toggle('moto-modal',type==='moto');$('.modal').classList.toggle('arsenal-modal',type==='arsenal');$('.modal').classList.toggle('collection-modal',type==='skins');$('#modal').classList.toggle('collection-backdrop',type==='skins');collection?.destroy();collection=undefined;arsenalWindow?.destroy();arsenalWindow=undefined;$('.modal').classList.toggle('desk-modal',type==='lights');$('#modal').classList.toggle('desk-backdrop',type==='lights');$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal').classList.remove('hidden');scene?.setEnabled(false);$('.modal-header button').focus();}
 /** The light desk's panel, while open, and the share of the screen it covers on the right (BarScene.watchStage). */
 let desk:ReturnType<typeof createLightDesk>|undefined,deskCover=0;
 const measureDesk=()=>{const left=$('.modal').getBoundingClientRect().left;deskCover=innerWidth>760?Math.max(0,1-left/innerWidth):0;};
@@ -402,8 +461,15 @@ function openLightDesk():void {
   measureDesk();addEventListener('resize',measureDesk);scene?.watchStage(()=>deskCover);
 }
 /** The player closed the window (Esc, its X, a click beside it). One opened from the menu brings the menu back where it was. */
+/** U (again closes it), the D-pad's right, the wheel's button or the menu's Ações: the weapons, their parts and upgrades (docs/sistemas/armas.md#arsenal). */
+function openArsenal():void {
+  if(activeModal==='arsenal'){closeModal();return;}
+  if(!inGame||!connected||activeModal||!weapons.gun.on)return;
+  showModal('ARSENAL','<div id="arsenal-root" class="ar-root"></div>','arsenal');
+  arsenalWindow=createArsenal($('#arsenal-root'),weapons,{sounds:menuSounds,balance:()=>inventory?.balance??wardrobe?.balance,close:()=>closeModal()});
+}
 function dismissModal():void {const back=modalFromMenu&&!!activeModal;closeModal();if(back&&!activeModal&&inGame)pauseMenu.open({quiet:true});}
-function closeModal():void {if(activeModal==='storage')leaveStorage();if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}modalFromMenu=false;closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
+function closeModal():void {if(activeModal==='storage')leaveStorage();if(activeModal==='trade'){if(!trade.mayClose())return;trade.leave();}modalFromMenu=false;closeDesk();modalGeneration++;media.forEach(m=>m.detachPanel());administration?.destroy();administration=undefined;collection?.destroy();collection=undefined;arsenalWindow?.destroy();arsenalWindow=undefined;activeModal='';$('#modal').classList.add('hidden');scene?.setEnabled(inGame&&connected);lastFocus?.focus();}
 
 const profile=createProfileWindow({
   portrait:skin=>scene?.portrait(skin)??Promise.resolve(undefined),
@@ -439,6 +505,11 @@ const network=new BarNetwork({
   tradeState:view=>trade.state(view),
   tradeClosed:closed=>trade.closed(closed),
   foodDialog:dialog=>foodDialog.show(dialog),
+  sparringDialog:dialog=>sparringUi.show(dialog),
+  // The room puts the fighter in the ring: the guard goes up here as if R had been pressed (it will not fight with it down).
+  sparringStart:()=>{sparringUi.started();const self=world?.players[user?.id??''];if(!fight.guard){const why=fight.toggle(self);if(why)toast(why,true);}},
+  sparringState:state=>sparringUi.update(state),
+  sparringResult:result=>{sparringUi.result(result);toast(result.message,!result.won);},
   foodLocker:locker=>lockerPad.show(locker),
   foodCode:right=>lockerPad.answer(right),
   foodDelivered:()=>foodDialog.show(null),
@@ -468,8 +539,14 @@ const network=new BarNetwork({
   deathScene:plan=>{scene?.playDeath(plan);if(plan.victim===user?.id)deathUi.sceneStarted(plan);},
   deathScreen:screen=>{if(screen.phase==='end'&&scene?.getDeath().victim===user?.id)scene?.stopDeath();deathUi.screen(screen);},
   fight:(seq,stream,self)=>fight.decorate(seq,stream,self),
-  fightState:(self,acked)=>fight.reconcile(self,acked),
+  fightState:(self,acked)=>{fight.reconcile(self,acked);renderGuardMeter(self);},
   fightHit:onFightHit,
+  gun:(seq,self)=>weapons.decorate(seq,self),
+  gunState:(self,acked)=>weapons.reconcile(self,acked),
+  gunPace:input=>weapons.pace(input),
+  weaponArsenal:view=>weapons.arsenal(view),
+  weaponShot:event=>weapons.shot(event),
+  weaponHit:event=>weapons.hit(event),
   inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();if(activeModal==='storage')renderStorage();},
   inventoryResult:()=>{},
   storageState:onStorageState,
@@ -666,7 +743,7 @@ function renderWorld():void {
   // Standing with the phone out, the character looks at it, for everyone.
   if(connected&&!!self?.looking!==phone.isOpen&&lookingSent!==phone.isOpen){lookingSent=phone.isOpen;network.send('phone.look',{on:phone.isOpen});}
   renderMapMarks(self);
-  const food=foodPrompt(self);
+  const food=foodPrompt(self)??sparringPrompt(self);
   const interaction=self?nearestObject(self):undefined;
   // At the back of your own truck E opens its hold: the rear counts before getting on (the doors are on the sides; "Entrar" is in its menu).
   const truckBox=self&&!interaction&&!atStation?truckRearNear(self):undefined;
@@ -678,7 +755,7 @@ function renderWorld():void {
   const seated=!!self?.interactionState?.startsWith('seat-')&&self.animationState==='sit';
   $('#table-cta').classList.toggle('hidden',!seated);$('#table-cta-label').textContent=tableOrder?(tableOrder.stage==='carrying'?'Pedido a caminho':'Pedido no balcão'):workersOnShift().length?'Fazer pedido':'Pedir ao Tonico';
   context.classList.toggle('hidden',!self||self.animationState==='kick'||self.interactionState==='thrown'||(!!self.condition&&self.condition!=='normal'&&self.condition!=='recovering')||(!food&&!self.interactionState&&!self.currentTableId&&!interaction&&!atStation&&!moto&&!fallenMoto&&!truckBox));
-  $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?(courier.state().order?.stage==='collect'?'Retirando o pedido…':courier.state().order?.transport==='horse'?'Pegando o pedido na mochila…':'Tirando o pedido do baú…'):self?.interactionState==='food-locker'?'Digitando o código':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?'para subir':fallenMoto?'para levantar a moto':truckBox?'para abrir o baú do caminhão':'');
+  $('#context-label').textContent=food?food.label:self?.interactionState==='food-unload'?(courier.state().order?.stage==='collect'?'Retirando o pedido…':courier.state().order?.transport==='horse'?'Pegando o pedido na mochila…':'Tirando o pedido do baú…'):self?.interactionState==='food-locker'?'Digitando o código':self?.interactionState==='food-talk'?'Falando com o cliente':isRidingMoto(self?.interactionState)?(self&&garageUnder(self)?'Garagem: guardar a moto':'para descer'):self?.interactionState?.startsWith('moto-lift:')?'Levantando a moto…':isRepairingMoto(self?.interactionState)?'Consertando a moto…':self?.currentTableId?'Levantar da mesa':ordering?'Cancelar pedido':seated&&tableOrder?'Esperando o pedido':self?.interactionState==='job'?'Parar a tarefa':atStation?`Trabalho · ${station!.label}`:self?.interactionState?.startsWith('toilet-')?'Sair do banheiro':self?.interactionState?.startsWith('mictorio-')?'Sair do mictório':self?.animationState==='stand-up'?'Levantando…':self?.interactionState==='smoke'?(self.animationState==='smoke-stop'?'Apagando o cigarro…':'Apagar o cigarro'):self?.interactionState==='cigarette'?'Fumando um cigarro…':self?.interactionState==='vomit'?'Passando mal…':self?.interactionState?.startsWith('stage-')?musicianLabel(self.interactionState):self?.interactionState?'Levantar / encerrar':interaction?.type==='door'?`${world.doors?.[interaction.id]?.open===false?'Abrir':'Fechar'} a porta · ${interaction.label}`:interaction?.type==='stage'?stageLabel(self!):interaction?.label||(moto?(moto.riderId?'para subir na garupa':'para subir'):fallenMoto?'para levantar a moto':truckBox?'para abrir o baú do caminhão':'');
   const event=world.event;
   if(isRidingHorse(self?.interactionState))$('#context-label').textContent='Desmontar do cavalo';
   if(fuel.service)$('#context-label').textContent='Frentista realizando abastecimento';
@@ -914,7 +991,7 @@ function interact():void {
   const fuel=fuelContext(self,world);
   if(fuel.service)return;
   if(fuel.pump&&fuel.vehicle){sendVehicleControl(fuel.vehicle.id,'refuel');return;}
-  const food=foodPrompt(self);
+  const food=foodPrompt(self)??sparringPrompt(self);
   if(food){network.send(food.send,{});return;}
   if(self.currentTableId){blackjackUi.requestLeave();return;}
   if(self.interactionState.startsWith('truco:')){trucoUi.requestLeave();return;}
@@ -1248,6 +1325,19 @@ app.addEventListener('click',event=>{
       case 'vr':await toggleVr();break;
       case 'vr-log-copy':{const text=vrLogText();try{await navigator.clipboard.writeText(text);toast('Log do VR copiado: cole aqui na conversa.');}catch{toast('O navegador não deixou copiar: use Baixar.',true);}break;}
       case 'vr-log-save':{const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([vrLogText()],{type:'text/plain'}));link.download='vr-log.txt';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);break;}
+      case 'aim-camera-copy':{const text=aimCameraText(settings.get().aimCamera);try{await navigator.clipboard.writeText(text);toast('Valores da câmera de mira copiados: cole aqui na conversa.');}catch{toast(text);}break;}
+      case 'weapon-key':{
+        const action=button.dataset.key as WeaponAction;
+        if(!WEAPON_ACTIONS.includes(action)||button.hasAttribute('data-capturing'))break;
+        captureWeaponKey(button,code=>{
+          if(code===undefined)return;
+          settings.update({weaponKeys:withWeaponKey(settings.get().weaponKeys,action,code)});
+          pauseMenu.refresh();
+        },text=>toast(text,true));
+        break;
+      }
+      case 'weapon-keys-reset':settings.update({weaponKeys:{...DEFAULT_WEAPON_KEYS}});pauseMenu.refresh();toast('Teclas das armas de volta ao padrão.');break;
+      case 'aim-camera-reset':settings.update({aimCamera:{...DEFAULT_AIM_CAMERA}});pauseMenu.refresh();toast('Câmera de mira de volta ao padrão.');break;
       case 'vr-log-clear':clearVrLog();toast('Log do VR apagado.');break;
       case 'dance':if(performing())break;network.send('player.emote',{emote:world?.players[user?.id||'']?.animationState==='dance'?'idle':'dance'});break;
       case 'close-modal':dismissModal();break;
@@ -1323,6 +1413,7 @@ function settingInput(event:Event):void {
   if(key==='vr.resolution'){updateVr({resolution:Number(input.value)/100});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;return;}
   if(key.startsWith('graphics.')){settings.update({graphics:nextGraphics(settings.get().graphics,key.slice(9),input.value)});const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${input.value}%`;const preset=document.querySelector<HTMLSelectElement>('[data-setting="graphics.preset"]');if(preset)preset.value='custom';return;}
   if(key.startsWith('cameraFeel.')){const name=key.slice(11) as keyof CameraFeel,value=Number(input.value)/100;settings.update({cameraFeel:{...settings.get().cameraFeel,[name]:value}});const output=input.parentElement?.querySelector('output');if(output)output.textContent=cameraFeelLabel(name,value);return;}
+  {const aim=aimSettingPatch(settings.get(),key,input);if(aim){settings.update(aim.patch);const output=input.parentElement?.querySelector('output');if(output&&aim.label)output.textContent=aim.label;return;}}
   const value=Number(input.value)/100;
   if(key==='jukebox')jukebox.setVolume(value);else if(key==='television')television.setVolume(value);else settings.update({[key]:value} as Partial<GameSettings>);
   const output=input.parentElement?.querySelector('output');if(output)output.textContent=`${Math.round(key==='mic'?value*200:value*100)}%`;
@@ -1341,6 +1432,8 @@ function settingChange(event:Event):void {
   if(key==='micEnabled'){void voice.setMicrophone((input as HTMLInputElement).checked);return;}
   if(key==='voicesEnabled'){voice.unlock();settings.update({voicesEnabled:(input as HTMLInputElement).checked});return;}
   if(key==='voiceMode'){settings.update({voiceMode:input.value==='ptt'?'ptt':'open'});pauseMenu.refresh();return;}
+  // The firearms' page (aim.*, pad.*, shoulder): the nested object is replaced; the help's note changes with its mode.
+  if(!(input instanceof HTMLInputElement&&input.type==='range')){const aim=aimSettingPatch(settings.get(),key,input);if(aim){settings.update(aim.patch);if(key==='aim.assistPad')pauseMenu.refresh();return;}}
   if(key==='inputDevice')settings.update({inputDevice:input.value});
   if(key==='camera'&&isCameraMode(input.value)){settings.update({camera:input.value});syncCameraSettings();}
   if(key==='cameraDistance'){settings.update({camera:'third',cameraDistance:Number(input.value)});syncCameraSettings();}
@@ -1358,7 +1451,7 @@ async function toggleMicrophone():Promise<void> {
 }
 // General × ambience scales the quiet background bus; the jukebox and the TVs retain their own volumes.
 function applySound(current:GameSettings):void {audio.volume=current.master*current.music;media.forEach(m=>m.setMaster(current.master));}
-settings.subscribe((current,previous)=>{applySound(current);renderVoice();if(current.graphics!==previous.graphics)scene?.setGraphics(current.graphics);if(current.camera!==previous.camera||current.cameraDistance!==previous.cameraDistance)scene?.setCamera(current.camera,current.cameraDistance);if(current.cameraFeel!==previous.cameraFeel)scene?.setCameraFeel(current.cameraFeel);});
+settings.subscribe((current,previous)=>{applySound(current);if(current.shoulder!==previous.shoulder)weapons.setShoulder(current.shoulder);renderVoice();if(current.graphics!==previous.graphics)scene?.setGraphics(current.graphics);if(current.camera!==previous.camera||current.cameraDistance!==previous.cameraDistance)scene?.setCamera(current.camera,current.cameraDistance);if(current.cameraFeel!==previous.cameraFeel)scene?.setCameraFeel(current.cameraFeel);});
 applySound(settings.get());
 /** Microphone level on a −60…0 dB scale, 0–1. */
 const levelScale=(rms:number)=>Math.max(0,Math.min(1,(20*Math.log10(Math.max(rms,1e-6))+60)/60));
@@ -1417,7 +1510,9 @@ async function start():Promise<void>{
     // The fist fight: R raises or lowers the guard; with it up the mouse buttons (and the touch buttons) punch.
     onGuard:()=>{if(!inGame||activeModal)return;const why=fight.toggle(world?.players[user?.id??'']);if(why)toast(why,true);},
     onPunch:kind=>inGame&&!activeModal&&fight.press(kind),
-    fight:()=>fight.guard||fight.local||fight.blow?{guard:fight.guard,punch:fight.local,blow:fight.blow}:undefined,
+    // The block key is the guard's while it is up (Space); letting go always counts.
+    onBlock:down=>{if(down&&(!inGame||activeModal||!fight.guard))return false;fight.setBlock(down);return down;},
+    fight:()=>fight.guard||fight.local||fight.blow?{guard:fight.guard,block:fight.blockUp,punch:fight.local,blow:fight.blow}:undefined,
     onWorldMenu:(x,y,{player,moto})=>{
       if(!inGame||activeModal)return;
       const bike=moto?world?.motos?.[moto]:undefined,other=player&&player!==user?.id&&world?.players[player]?.connected!==false;
@@ -1425,6 +1520,8 @@ async function start():Promise<void>{
         ...(player?[{id:'profile',icon:'idCard',label:'Perfil',choose:()=>void profile.open(player)}]:[]),
         ...(other?[{id:'trade',icon:'handshake',label:'Negociar',choose:()=>network.send('trade.request',{playerId:player})}]:[]),
         ...(moto?[{id:'moto',icon:'wrench',label:'Informações do veículo',choose:()=>void openMotoPanel(moto).catch(error=>toast(errorMessage(error),true))}]:[]),
+        // The bikes' back: asked for from the menu too (E on a bike with a rider does the same). The room refuses it on a Highfood delivery, and says why.
+        ...(bike&&isTwoWheeler(bike)&&bike.riderId&&!bike.passengers?.[0]&&bike.riderId!==user?.id?[{id:'moto-pillion',icon:'users',label:'Subir na garupa',choose:()=>network.send('moto.mount',{motoId:bike.id,seat:1})}]:[]),
         ...(bike&&isCar(bike)?vehicleSeats(bike.model).filter((_seat,index)=>!vehicleOccupants(bike)[index]).map(seat=>({id:`car-seat-${vehicleSeats(bike.model).indexOf(seat)}`,icon:'users',label:`Entrar: ${seat.name.toLowerCase()}`,choose:()=>network.send('moto.mount',{motoId:bike.id,seat:vehicleSeats(bike.model).indexOf(seat)})})):[]),
         ...(bike&&isTruck(bike)&&bike.ownerId&&bike.ownerId===user?.id?[{id:'storage',icon:'package',label:'Abrir baú',choose:()=>openStorage(bike.id)}]:[]),
         ...(bike?.ownerId&&bike.ownerId===user?.id?[{id:'lock',icon:bike.locked?'unlock':'lock',label:bike.locked?'Destrancar':'Trancar',choose:()=>lockOwnBike()}]:[]),
@@ -1444,7 +1541,7 @@ async function start():Promise<void>{
       voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
 
     },
-  });scene.setEnvironment(network.environment);scene.setEnabled(false);scene.setDeathAudio(deathAudio);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);}
+  });scene.setEnvironment(network.environment);scene.setEnabled(false);scene.setDeathAudio(deathAudio);scene.setGraphics(settings.get().graphics);scene.setCamera(settings.get().camera,settings.get().cameraDistance);scene.setCameraFeel(settings.get().cameraFeel);weapons.attach(scene.gunPort(),scene.weaponVisuals);scene.weapons=weapons;}
   catch(error){console.error(error);toast('Não foi possível iniciar o 3D. Verifique a aceleração gráfica do navegador.',true);}
   if(scene&&backdropAllowed())void scene.ready.then(()=>{if(inGame)return;scene?.setShowcase(true);$('#lobby').classList.add('has-3d');}).catch(()=>{});
   const params=new URLSearchParams(location.search);
@@ -1462,7 +1559,7 @@ function backdropAllowed():boolean{
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),fight:()=>({...scene?.getFight(),guard:fight.guard,local:fight.local?{...fight.local}:undefined,blow:fight.blow?{...fight.blow}:undefined}),fightPress:(kind:'light'|'heavy')=>fight.press(kind),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),weapons:()=>weapons.view(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),fight:()=>({...scene?.getFight(),guard:fight.guard,local:fight.local?{...fight.local}:undefined,blow:fight.blow?{...fight.blow}:undefined}),fightPress:(kind:'light'|'heavy')=>fight.press(kind),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility

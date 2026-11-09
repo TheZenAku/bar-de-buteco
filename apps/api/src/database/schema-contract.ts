@@ -36,7 +36,11 @@ const columns:Record<string,Record<string,ColumnSpec>>={
   user_achievements:{user_id:['text'],series:['text'],value:['integer',false,'0'],updated_at:['timestamp with time zone',false,'now()']},
   trades:{id:['text'],user_a:['text'],user_b:['text'],offer_a:['jsonb'],offer_b:['jsonb'],fingerprint:['text'],created_at:['timestamp with time zone',false,'now()']},
   player_vehicles:{id:['text'],plate:['text'],user_id:['text'],model:['text'],parts:['text'],mileage:['integer',false,'0'],color:['text',false,"'#ccc9c2'"],fuel:['double precision',false,'100'],revision:['integer',false,'0'],bought_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
+ sparring_progress:{user_id:['text'],tier:['smallint',false,'0'],wins:['integer',false,'0'],last_win_at:['timestamp with time zone',true],updated_at:['timestamp with time zone',false,'now()']},
  vehicle_storage:{vehicle_id:['text'],item_id:['text'],quantity:['integer'],updated_at:['timestamp with time zone',false,'now()']},
+  weapon_arsenal:{user_id:['text'],weapon_id:['text'],parts:['jsonb',false,"'{}'::jsonb"],upgrades:['jsonb',false,"'{}'::jsonb"],source:['text',false,"'teste'::text"],created_at:['timestamp with time zone',false,'now()'],updated_at:['timestamp with time zone',false,'now()']},
+  weapon_parts:{user_id:['text'],part_id:['text'],source:['text',false,"'teste'::text"],created_at:['timestamp with time zone',false,'now()']},
+  weapon_ammo:{user_id:['text'],caliber:['text'],quantity:['integer',false,'0'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_customers:{id:['text'],name:['text'],skin:['text'],look:['jsonb'],image_id:['text',true],lines:['jsonb'],active:['boolean',false,'true'],updated_at:['timestamp with time zone',false,'now()']},
   highfood_deliveries:{id:['text'],user_id:['text'],customer_id:['text'],customer:['text'],restaurant:['text'],items:['jsonb'],address:['text'],length_m:['integer'],duration_ms:['integer'],paid:['integer',false,'0'],stars:['smallint',true],on_time:['boolean',false,'false'],crashes:['smallint',false,'0'],status:['text'],created_at:['timestamp with time zone',false,'now()']},
   gram_follows:{follower_id:['text'],followed_id:['text'],created_at:['timestamp with time zone',false,'now()']},
@@ -52,7 +56,7 @@ const primaryKeys:Record<string,string>={
   blocks:'user_id,blocked_id',reports:'id',moderation_actions:'id',game_statistics:'user_id',game_results:'id',
   game_controls:'id',wallets:'user_id',skin_inventory:'user_id,skin_id',skill_inventory:'user_id,skill_id',skin_catalog:'key',currency_ledger:'id',item_inventory:'user_id,item_id',inventory_ledger:'id',
   phone_lines:'user_id',phone_contacts:'owner_id,contact_id',phone_messages:'id',gram_posts:'id',gram_likes:'post_id,user_id',gram_comments:'id',
-  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',badges:'id',user_badges:'user_id,badge_id',badge_images:'id',user_achievements:'user_id,series',player_vehicles:'id',vehicle_storage:'vehicle_id,item_id',trades:'id',highfood_customers:'id',highfood_deliveries:'id',
+  gram_profiles:'user_id',gram_follows:'follower_id,followed_id',phone_media:'id',economy_prices:'key',game_logs:'id',badges:'id',user_badges:'user_id,badge_id',badge_images:'id',user_achievements:'user_id,series',player_vehicles:'id',vehicle_storage:'vehicle_id,item_id',sparring_progress:'user_id',weapon_arsenal:'user_id,weapon_id',weapon_parts:'user_id,part_id',weapon_ammo:'user_id,caliber',trades:'id',highfood_customers:'id',highfood_deliveries:'id',
 };
 
 const foreignKeys:Array<readonly [table:string,column:string,cascade:boolean]>=[
@@ -65,13 +69,14 @@ const foreignKeys:Array<readonly [table:string,column:string,cascade:boolean]>=[
   ['gram_posts','author_id',true],['gram_likes','user_id',true],['gram_comments','author_id',true],
   ['gram_profiles','user_id',true],['gram_follows','follower_id',true],['gram_follows','followed_id',true],['phone_media','owner_id',true],
   ['reports','resolved_by',false],['economy_prices','updated_by',false],['user_badges','user_id',true],['user_achievements','user_id',true],['player_vehicles','user_id',true],['highfood_deliveries','user_id',true],
+  ['weapon_arsenal','user_id',true],['weapon_parts','user_id',true],['weapon_ammo','user_id',true],
 ];
 
 const uniqueConstraints:Array<readonly [table:string,column:string]>=[['users','username'],['users','email'],['sessions','token_hash'],['phone_lines','number'],['gram_profiles','handle'],['player_vehicles','plate']];
 const checkConstraints:Array<readonly [table:string,fragments:string[]]>=[
   ['bar_schema_migrations',['length(checksum)=64']],['skin_catalog',['availability','sale','closed','hidden']],['skin_catalog',['rarity','legendary']],['user_achievements',['value>=0']],['player_vehicles',['mileage>=0']],['trades',['user_a<>user_b']],['highfood_deliveries',['paid>=0']],['highfood_deliveries',['status','delivered','gave-up']],
   ['users',['role','player','admin']],['blocks',['user_id<>blocked_id']],['wallets',['balance>=0']],
-  ['item_inventory',['quantity>0']],['vehicle_storage',['quantity>0']],['inventory_ledger',['quantity<>0']],
+  ['item_inventory',['quantity>0']],['vehicle_storage',['quantity>0']],['sparring_progress',['tier>=0']],['sparring_progress',['wins>=0']],['weapon_ammo',['quantity>=0']],['inventory_ledger',['quantity<>0']],
   ['phone_contacts',['owner_id<>contact_id']],['phone_messages',['sender_id<>recipient_id']],['phone_lines',['number']],
   ['gram_follows',['follower_id<>followed_id']],['gram_profiles',['handle']],['economy_prices',['value>=0']],['game_logs',['source','api','world']],['phone_media',['kind','photo','audio','video']],['phone_messages',['media_kind','length(body)']],['badge_images',['length(id)=64']],['badges',['rarity','common','legendary']],
 ];

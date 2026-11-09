@@ -38,9 +38,32 @@ export class BlowSounds {
       const limiter=context.createDynamicsCompressor();limiter.threshold.value=-8;limiter.ratio.value=8;limiter.attack.value=.002;
       this.bus=context.createGain();
       this.bus.connect(limiter).connect(context.destination);
+      this.synthesize(context);
       for(const clip of BLOW_CLIPS)void fetch(`${this.base}kick/sound/${clip}.wav`).then(response=>response.arrayBuffer()).then(data=>context.decodeAudioData(data)).then(buffer=>this.buffers.set(clip,buffer)).catch(error=>console.warn(`golpe: som ${clip} indisponível`,error));
       return context;
     }catch{return;}
+  }
+  /**
+   * The two sounds of a defence, made here (no recording of them is in the packs): a block is a dull thud of forearms (low noise burst with a short
+   * body under it), a parry a bright ring (two inharmonic partials decaying over a click). Deterministic, so every browser rings the same.
+   */
+  private synthesize(context:AudioContext):void {
+    const rate=context.sampleRate,make=(seconds:number,sample:(t:number,i:number)=>number)=>{
+      const buffer=context.createBuffer(1,Math.ceil(rate*seconds),rate),data=buffer.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=sample(i/rate,i);
+      return buffer;
+    };
+    let seed=1;
+    const noise=()=>{seed=(seed*16807)%2147483647;return seed/1073741823-1;};
+    let low=0;
+    this.buffers.set('block',make(.16,(t)=>{
+      low+=(noise()-low)*.12;
+      return Math.max(-1,Math.min(1,(low*5.5*Math.exp(-t*38)+Math.sin(2*Math.PI*118*t)*.8*Math.exp(-t*30))*.85));
+    }));
+    this.buffers.set('parry',make(.45,(t)=>{
+      const click=noise()*Math.exp(-t*420)*.9,ring=Math.sin(2*Math.PI*1760*t)*.45*Math.exp(-t*9)+Math.sin(2*Math.PI*2637*t)*.3*Math.exp(-t*13)+Math.sin(2*Math.PI*880*t)*.25*Math.exp(-t*7);
+      return Math.max(-1,Math.min(1,click+ring));
+    }));
   }
   /** One of the set, never the same twice in a row. */
   private pick(set:readonly string[]):string {
@@ -75,6 +98,10 @@ export class BlowSounds {
     this.play(this.pick(HITS),at,1,.94+Math.random()*.12);
     if(heavy)this.play(HIT_WEIGHT,at,.9,.9+Math.random()*.08);
   }
+  /** A blow met a block. */
+  block(at:Place):void {this.play('block',at,.95,.92+Math.random()*.16);}
+  /** A parry: the ring over the thud. */
+  parry(at:Place):void {this.play('block',at,.7,1.1);this.play('parry',at,.85,.97+Math.random()*.06);}
   /** A body landing, or hitting a wall, at `speed` m/s. */
   fall(speed:number,at:Place):void {
     const hard=Math.max(0,Math.min(1,(speed-FALL_QUIET)/(FALL_FULL-FALL_QUIET)));

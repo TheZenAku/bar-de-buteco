@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FIGHT,FIGHT_MOVES,TICK_MS,fistPath,punchAim,punchRoot,type FightHit,type PlayerInput,type PunchId} from '@bar/shared';
+import {BLOCK,FIGHT,FIGHT_MOVES,TICK_MS,fistPath,punchAim,punchRoot,type FightHit,type PlayerInput,type PunchId} from '@bar/shared';
 import {Player} from '../src/state.js';
 import {FightDirector,type FightHost} from '../src/world/fight.js';
 
@@ -230,4 +230,142 @@ test('a combo thrown in rhythm lands whole: jab, cross, then the body kick on so
   }
   assert.deepEqual(order,['jab','cross','bodyKick']);
   assert.deepEqual(r.hits.map(hit=>hit.move),['jab','cross','bodyKick']);
+});
+
+// ---- Defense (docs/sistemas/luta.md#defesa)
+const blocking=(player:Player,extra:Partial<PlayerInput>={})=>({block:true,...extra,rotation:player.rotation});
+type Inside={pending:unknown[];fighters:Map<string,{meter:number;spans:{parry:boolean}[]}>};
+const inside=(r:ReturnType<typeof room>)=>r.fights as unknown as Inside;
+/** Ticks until the room has something pending or a message about a blow (the blow was detected), up to a limit. */
+function untilDetected(r:ReturnType<typeof room>,limit=12):void {
+  for(let i=0;i<limit&&!r.hits.length&&!inside(r).pending.length;i++)r.tick();
+}
+
+test('a held block takes a sliver of the blow: chip damage, the meter pays, no stun, a small push, and the block stays up',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  // Held for far longer than the parry window.
+  for(let i=0;i<8;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(b.fist.block,true);
+  const before={x:b.x,z:b.z};
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)],[b,blocking(b)]]));
+  for(let i=0;i<12;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(r.hits.length,1);
+  const hit=r.hits[0]!;
+  assert.equal(hit.guard,'block');
+  assert.equal(hit.damage,Math.round(FIGHT_MOVES.jab.damage*BLOCK.chip));
+  assert.equal(b.hp,100-hit.damage);
+  assert.equal(b.interactionState,'');assert.equal(b.fist.stunUntil,0);assert.equal(b.fist.block,true);
+  assert.equal(b.fist.guard,Math.round(BLOCK.meter-FIGHT_MOVES.jab.damage*BLOCK.drain));
+  const pushed=Math.hypot(b.x-before.x,b.z-before.z);
+  assert.ok(Math.abs(pushed-FIGHT_MOVES.jab.knockback*BLOCK.push)<1e-6,`pushed ${pushed}`);
+});
+
+test('a block pressed just before the blow is a parry: nothing through, the puncher staggers, the counter hits harder, once',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
+  // 150 ms after the throw: inside the jab's window (200-340 ms), so the block is at most 180 ms old when it lands.
+  r.tick();r.tick();
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  for(let i=0;i<10&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  const hit=r.hits[0]!;
+  assert.equal(hit.guard,'parry');assert.equal(hit.damage,0);assert.equal(b.hp,100);
+  assert.equal(a.interactionState,'stagger');assert.equal(a.animationState,'hit');assert.equal(a.fist.hit,'HitMedium');
+  assert.equal(a.fist.stunUntil,hit.stunUntil);assert.equal(hit.stunUntil,hit.at+BLOCK.parryStunMs);
+  assert.equal(a.fist.punch,'',"the puncher's chain is cut");
+  assert.equal(b.interactionState,'');
+  // The counter: stronger once; the next one is plain again.
+  while(r.now<hit.stunUntil+TICK_MS)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  r.hits.length=0;
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,{...r.punch(b,'jab',a),block:false}]]));
+  for(let i=0;i<12&&!r.hits.length;i++)r.tick();
+  assert.equal(r.hits[0]?.damage,Math.round(FIGHT_MOVES.jab.damage*BLOCK.riposte));
+});
+
+test('netcode: a block pressed before the blow, as its owner saw it, counts even when the input reaches the room after the blow was detected',()=>{
+  for(const [oneWay,verdict] of [[100,'parry'],[0,'none']] as const){
+    const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+    r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
+    untilDetected(r);
+    assert.equal(inside(r).pending.length,1,'a blow on a guard waits for the block to arrive');
+    assert.equal(r.hits.length,0);
+    // The press arrives now, but its owner pressed it `oneWay` ms earlier (their report: seen/ago give the trip, see oneWayOf).
+    const takenAt=r.now+TICK_MS,seen=takenAt-(oneWay*2+TICK_MS/2);
+    r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b,{blockAt:{seen,ago:0}})]]));
+    for(let i=0;i<4&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+    assert.equal(r.hits.length,1);
+    assert.equal(r.hits[0]!.guard??'none',verdict,`one-way ${oneWay} ms`);
+    if(verdict==='none')assert.equal(b.hp,100-FIGHT_MOVES.jab.damage);
+  }
+});
+
+test('the wait is bounded and only for a guard that is up: a blow on someone without the guard lands at once',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,{fight:false}]]));
+  assert.equal(b.fist.fight,false);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
+  for(let i=0;i<12&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,{fight:false}]]));
+  assert.equal(r.hits.length,1);assert.equal(r.hits[0]!.guard,undefined);
+  assert.equal(inside(r).pending.length,0);
+  assert.ok(BLOCK.deferMaxMs<=150);
+});
+
+test('a block covers only the front: from behind the blow gets through whole, and the block comes down',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),0);
+  for(let i=0;i<8;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)],[b,blocking(b)]]));
+  for(let i=0;i<12&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(r.hits[0]?.guard,undefined);assert.equal(b.hp,100-FIGHT_MOVES.jab.damage);
+  assert.equal(b.fist.block,false);assert.equal(b.interactionState,'stagger');
+});
+
+test('the meter pays for blocks: when it is spent the guard breaks (a long stagger), then comes back part full',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('heavy'),Math.PI);
+  for(let i=0;i<8;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  inside(r).fighters.get('b')!.meter=10;
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'heavy',b)],[b,blocking(b)]]));
+  for(let i=0;i<20&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  const hit=r.hits[0]!;
+  assert.equal(hit.guard,'break');assert.equal(hit.stunUntil,hit.at+BLOCK.breakMs);
+  assert.equal(b.fist.block,false);assert.equal(b.interactionState,'stagger');assert.equal(b.fist.breakUntil,hit.stunUntil);
+  assert.equal(b.fist.guard,0);
+  // Held down during the break, nothing goes up.
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(b.fist.block,false);
+  while(r.now<hit.stunUntil+TICK_MS)r.tick();
+  assert.equal(b.fist.breakUntil,0);assert.equal(b.interactionState,'');
+  assert.ok(b.fist.guard>=BLOCK.breakRefill&&b.fist.guard<=BLOCK.breakRefill+2,`meter ${b.fist.guard}`);
+});
+
+test('blocking never takes the last point of life, and the meter refills once left alone',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('heavy'),Math.PI);
+  b.hp=1;b.hpCore=0;
+  for(let i=0;i<8;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'heavy',b)],[b,blocking(b)]]));
+  for(let i=0;i<20&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(r.hits[0]?.guard,'block');assert.equal(b.hp,1);assert.equal(r.kos.length,0);
+  const low=b.fist.guard;
+  // Released, and past the refill delay.
+  for(let i=0;i<Math.ceil((BLOCK.regenDelayMs+2000)/TICK_MS);i++)r.tick();
+  assert.ok(b.fist.guard>low,`meter ${low} -> ${b.fist.guard}`);
+});
+
+test('holding or mashing the key is a plain block: only a press after the cooldown opens a parry window',()=>{
+  const r=room(),b=r.add('b',OPEN.x,OPEN.z,Math.PI);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));r.tick();            // up, down
+  for(let i=0;i<3;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));  // up again 150 ms later
+  assert.deepEqual(inside(r).fighters.get('b')!.spans.map(span=>span.parry),[true,false]);
+  r.tick();
+  for(let i=0;i<Math.ceil(BLOCK.parryCooldownMs/TICK_MS)+1;i++)r.tick();
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.deepEqual(inside(r).fighters.get('b')!.spans.map(span=>span.parry),[true,false,true]);
+});
+
+test('with the block up no punch is thrown, and a block cannot go up while a punch plants the feet',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,{...r.punch(a,'jab',b),block:true}]]));
+  assert.equal(a.fist.punch,'');assert.equal(a.fist.block,true);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,{...r.punch(a,'jab',b)}]]));
+  assert.equal(a.fist.punch,'jab');assert.equal(a.fist.block,false);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,{block:true}]]));
+  assert.equal(a.fist.block,false,'planted by its own punch');
 });

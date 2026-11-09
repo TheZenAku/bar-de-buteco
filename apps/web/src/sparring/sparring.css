@@ -1,0 +1,23 @@
+/* Zeca's sparring (docs/sistemas/zeca.md): the dialog reuses the Highfood customer's (highfood.css); the fight's bars and count over the scene. */
+.sparring-face{display:grid;place-items:center;background:linear-gradient(160deg,oklch(.5 .2 25),oklch(.22 .09 20));color:#fff}
+.sparring-face .ui-icon{width:46px;height:46px}
+.sparring-hud{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:5;display:grid;gap:10px;justify-items:center;width:min(640px,calc(100vw - 24px));pointer-events:none}
+.sparring-hud[hidden]{display:none}
+.sp-bars{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;width:100%;padding:8px 12px;background:var(--panel);border:1px solid var(--border)}
+.sp-side{display:grid;gap:4px}
+.sp-side.foe{text-align:right}
+.sp-name{font:600 12px var(--font-sans);text-transform:uppercase;letter-spacing:.08em;color:var(--soft)}
+.sp-bar{display:block;height:10px;border:1px solid var(--input);background:oklch(.12 .04 300 / 70%);overflow:hidden}
+.sp-bar i{display:block;height:100%;transform-origin:left;transition:transform .18s ease-out}
+.sp-side.you .sp-bar i{background:#5fd86c}
+.sp-side.foe .sp-bar i{background:var(--hl-magenta);transform-origin:right}
+.sp-mid{min-width:84px;text-align:center}
+.sp-count{font:800 34px/1 var(--font-display);color:var(--hl-gold);-webkit-text-stroke:1.5px oklch(.12 .04 300);paint-order:stroke fill}
+.sp-clock{font:600 16px var(--font-mono);color:var(--foreground)}
+.sp-quit{pointer-events:auto;font-size:11px;padding:3px 10px;opacity:.75}
+.sp-banner{display:grid;gap:2px;justify-items:center;padding:12px 26px;background:var(--panel);border:1px solid var(--border);text-align:center}
+.sp-banner b{font:800 30px/1 var(--font-display);letter-spacing:.03em}
+.sp-banner.won b{color:var(--hl-gold)}
+.sp-banner.lost b{color:#ff5a5a}
+.sp-banner span{font-size:13px;color:var(--soft)}
+@media (max-width:560px){.sparring-hud{top:60px}.sp-bars{gap:8px;padding:6px 8px}.sp-count{font-size:26px}}

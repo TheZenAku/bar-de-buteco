@@ -12,9 +12,10 @@ import {price} from '../prices';
 import type {Settings} from '../settings';
 import type {MenuEntry,MenuTab} from './pause-menu';
 import {buttonRow,choiceRow,groupRow,noteRow,rangeRow,switchRow} from './rows';
+import {weaponGuide,aimSettingsPage} from '../weapons/ui/settings-rows';
 
 type Panel='chat'|'job';
-export type MenuAct='dance'|'wave'|'smoke'|'cross-arms'|'guard'|'skill'|'table'|'jobs'|'chat'|'phone'|'map'|'profile'|'skins'|'inventory'|'people'|'admin'|'leave'|'logout';
+export type MenuAct='dance'|'wave'|'smoke'|'cross-arms'|'guard'|'skill'|'table'|'jobs'|'chat'|'phone'|'map'|'profile'|'skins'|'inventory'|'people'|'admin'|'leave'|'logout'|'arsenal';
 /** What the menu reads from the game and asks it to do (main.ts). Only real state: nothing here is made up for show. */
 export interface MenuContentHost {
   settings:Settings;
@@ -40,6 +41,8 @@ export interface MenuContentHost {
   skill():{name:string;icon:string;key:string}|undefined;
   seated():boolean;
   admin():boolean;
+  /** /armas is on for this player (docs/sistemas/armas.md): the Arsenal, the aim settings and the firearm keys show only then. */
+  armsOn():boolean;
   act(name:MenuAct):void;
   /** The skin standing, as the profile window draws it (a transparent picture), and the one already drawn, if any. */
   portrait(skin:string):Promise<string|undefined>;
@@ -86,6 +89,8 @@ function actions(host:MenuContentHost):MenuEntry[] {
       detail:()=>lead('Cruza ou descruza. Dá para caminhar e fumar assim.'),run:()=>host.act('cross-arms')},
     {id:'guard',label:'Guarda de luta',icon:'shield',key:'R',kind:'action',state:()=>host.guard()?'Guarda alta':undefined,
       detail:()=>keyGrid([['Clique','Soco: jab, direto e gancho, no ritmo'],['Botão direito','Soco forte, lento e que empurra longe'],['W A S D','Passos curtos com a guarda alta'],['R','Baixa a guarda']]),run:()=>host.act('guard')},
+    {id:'arsenal',label:'Arsenal',icon:'gun',key:'U',kind:'window',hidden:()=>!host.armsOn(),
+      detail:()=>lead('Suas armas e equipamentos: troque miras, silenciadores e carregadores, veja o que cada peça muda e compre melhorias.'),run:()=>host.act('arsenal')},
     {id:'skill',label:'Habilidade',icon:'sparkles',kind:'action',hidden:()=>!host.skill(),
       state:()=>host.skill()?.name,
       detail:()=>{const skill=host.skill();return skill?`${lead(`${e(skill.name)}: a habilidade da sua skin.`)}${keyGrid([[skill.key,'Usa a habilidade sem abrir o menu']])}`:'';},
@@ -170,6 +175,8 @@ function settingsPages(host:MenuContentHost):MenuEntry[] {
       choiceRow('Visão','data-setting="camera"',CAMERA_MODES.map(mode=>[mode,CAMERA_LABELS[mode]] as const),s().camera)
       +choiceRow('Zoom','data-setting="cameraDistance"',CAMERA_ZOOMS.map((zoom,i)=>[zoom,CAMERA_ZOOM_LABELS[i]!] as const),s().cameraDistance)
       +feel('height','Altura',-CAMERA_HEIGHT_LIMIT,CAMERA_HEIGHT_LIMIT)+feel('sensitivity','Sensibilidade do mouse',CAMERA_SENSITIVITY_LIMITS[0],CAMERA_SENSITIVITY_LIMITS[1])+feel('smoothing','Suavização',0,1)},
+    // Admins see it even with /armas off, to tune the weapon camera before testing.
+    {id:'armas',label:'Armas e mira',icon:'crosshair',kind:'page',hidden:()=>!host.armsOn()&&!host.admin(),detail:()=>aimSettingsPage(s(),host.touch())},
     {id:'voice',label:'Voz',icon:'mic',kind:'page',detail:()=>{
       const current=s(),mic=host.mic(),open=current.voiceMode==='open',threshold=current.sensitivity*40/60*100;
       return switchRow('Microfone','data-setting="micEnabled"',mic.on,{disabled:!!mic.unavailable,note:mic.unavailable||'Atalho: M'})
@@ -255,6 +262,11 @@ function guideEntries(host:MenuContentHost):MenuEntry[] {
   const keys:MenuEntry[]=[
     ...(host.touch()?[{id:'k-touch',label:'Na tela de toque',icon:'smartphone',kind:'info' as const,group:'Teclas',detail:()=>keyGrid(TOUCH_KEYS)}]:[]),
     ...CONTROLS.map((group,i)=>({id:`k-${i}`,label:group.label,icon:group.icon,kind:'info' as const,group:'Teclas',detail:()=>keyGrid(group.keys)})),
+    {id:'k-armas',label:'Controles das armas',icon:'gun',kind:'info',group:'Teclas',hidden:()=>!host.armsOn(),detail:()=>{
+      const guide=weaponGuide(host.settings.get().weaponKeys);
+      const parts=[['Teclado e mouse',guide.teclado],['Controle',guide.controle],['Toque',guide.toque]] as const;
+      return (host.touch()?[parts[2],parts[0],parts[1]]:parts).map(([title,keys])=>groupRow(title)+keyGrid(keys)).join('');
+    }},
   ];
   return [...topics,...keys];
 }

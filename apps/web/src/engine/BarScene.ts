@@ -22,7 +22,7 @@ import {EnvironmentLighting} from './environment-lighting';
 import {ServerClock} from '../server-clock';
 import type {EnvironmentState} from '@bar/shared';
 import {CarRig,seatCar} from './car-rig';
-import {isCar,isHatch,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
+import {isCar,isHatch,isTruck,vehicleSeat,vehiclePhysics,vehiclePowered} from '@bar/shared';
 import {BarSurfaces} from './bar-surfaces';
 import {CityStreaming} from './city-streaming';
 import {Showcase,type ShowcasePose} from './showcase';
@@ -47,7 +47,7 @@ import {FlyPose} from './fly-pose';
 import {IdlePosture} from './idle-posture';
 import {FlySounds} from './fly-sound';
 import {headLookAt,type HeadLook} from '@bar/shared';
-import {Motos,MotoRig,seatRider,type Bike} from './moto-delivery';
+import {Motos,MotoRig,seatPillion,seatRider,type Bike} from './moto-delivery';
 import {MotoBag} from './moto-bag';
 import {HighfoodProps} from './highfood-props';
 import {GARAGES,HIGHFOOD} from '@bar/shared';
@@ -71,6 +71,8 @@ import {KICKS,kickClip,kickRoot} from '@bar/shared';
 import {FIGHT_MOVES,HIT_REACTIONS,PUNCH_IDS,fistPath,punchById,punchContact,type FightHit,type FightTarget} from '@bar/shared';
 import {FlinchPose} from './fight-flinch';
 import {DamageNumbers} from '../fight/damage-numbers';
+import {WeaponVisuals} from './weapons/visuals';
+import type {GunScenePort,WeaponSceneHooks} from '../weapons/scene-hooks';
 import {MorteScene} from './morte-scene';
 import type {DeathAudio} from '../death/death-audio';
 import {DEATH_GONE_STATE,DEATH_STATE,type DeathPlan} from '@bar/shared';
@@ -120,6 +122,8 @@ interface SkinnedRig {
   /** The fist fight's guard: FightIdle on both arms only (GUARD_LAYER), over the legs' steps while moving with the guard up. */
   guardLayer?:pc.AnimComponentLayer;
   guardGone?:number;
+  /** The block: FightBlock on both arms (BLOCK_LAYER), over the guard's, its weight following the block key. */
+  blockLayer?:pc.AnimComponentLayer;
   headBind?:pc.Quat;
   /** The hips, found on first use (the contact shadow follows them during a bar animation). */
   hip?: pc.Entity;
@@ -250,7 +254,7 @@ const MOUSE_JUMP = 500;
 const TOUCH_SLOP = 5, TAP_SLOP = 12, TAP_MS = 450, TOUCH_LOOK = 1.25, TOUCH_PINCH = 1.6;
 const SKIN_VERSIONS: Record<string, string> = { frentista: 'mixamo-20261106', nathan: 'rig-20261029', leandro: 'tripo-20261101', 'rafael-rose': 'tripo-20261101', rafael: 'tripo-20261031', read: 'mixamo-20261027', magrao: 'mixamo-20261027', tonico: 'tripo-20261101', tiao: 'tripo-20261103-v2', primo: 'tripo-20261105' };
 const skinAsset = (folder: string, file: string, id: string): string => {
-  const version = folder === 'animations' ? 'bar-fight-20261108b' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
+  const version = folder === 'animations' ? 'bar-fight-20261109b' : `${SKIN_VERSIONS[id]??'mixamo'}-head-weights-20261106`;
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
@@ -278,8 +282,17 @@ const MIXAMO_PACE: Readonly<Record<string, number>> = { Walk: 1.38, Jog: 1.61, R
  * keeps the guard up over the steps; how long a landed punch holds its clip (ms, light and heavy); how hard a blow jolts the upper body (degrees);
  * how far ahead of the room's clock a late punch seen by others starts (s, so its wind-up shows) and how fast it catches up.
  */
-const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'Run', 'FightBack', 'FightLeft', 'FightRight']);
-const GUARD_LAYER = 'Guard';
+const GUARD_CLIPS = new Set(['FightIdle', 'Walk', 'WalkBack', 'Run', 'FightBack', 'FightLeft', 'FightRight']);
+const GUARD_LAYER = 'Guard', BLOCK_LAYER = 'GuardBlock';
+const BLOCK_FLINCH_DEGREES = 5, PARRY_FLINCH_DEGREES = 20, PARRY_HIT_STOP_MS = 90;
+/**
+ * Where the eyes are in the truck's cab, in the cab's own frame: the authored `ponto_olhos` (the driver's, mirrored for the passenger) lifted 24 cm and
+ * moved back 10 cm. From the authored point the dash top sits at eye level 30 cm ahead and hid more than half the view (measured by projecting the
+ * cab's triangles: 57% opaque, 7% from here, a strip of dash at the bottom).
+ */
+export function truckEyes(rig:CarRig,seat:number):pc.Vec3 {
+  return rig.ponto('ponto_olhos').getWorldTransform().transformPoint(new pc.Vec3(seat===0?0:-1,.24,-.1));
+}
 const PUNCH_HIT_STOP_MS = { light: 55, heavy: 90 };
 const FLINCH_DEGREES: Readonly<Record<string, number>> = { jab: 8, cross: 12, hook: 14, elbow: 13, heavy: 20, frontKick: 15, bodyKick: 19, roundKick: 24 };
 const FIGHT_CATCH_UP_S = .12, FIGHT_CATCH_UP_RATE = 1.8;
@@ -385,6 +398,10 @@ export class BarScene {
   private readonly blowEffects:BlowEffects;
   /** The fist fight: the damage numbers over the scene, the landed punches already drawn (puncher:count), how far each local punch was followed (ms). */
   private readonly damageNumbers:DamageNumbers;
+  /** The firearms on the avatars (engine/weapons/visuals.ts): weapons in hand, poses, flashes, tracers, impacts, sounds. */
+  readonly weaponVisuals:WeaponVisuals;
+  /** The local player's firearm logic (weapons/controller.ts), attached by main.ts; every hook is inert while /armas is off. */
+  weapons?:WeaponSceneHooks;
   private readonly fightShown=new Set<string>();
   private readonly predictedFrom=new Map<number,number>();
   private readonly flySounds:FlySounds;
@@ -640,6 +657,11 @@ export class BarScene {
     });
     this.blowEffects=new BlowEffects(this.app);
     this.damageNumbers=new DamageNumbers(canvas.parentElement??document.body);
+    this.weaponVisuals=new WeaponVisuals(this.app,{
+      localId:()=>this.localId,camera:this.camera,serverNow:()=>this.serverNow(),volume:()=>this.callbacks.motoVolume?.()??1,daylight:()=>this.environment.daylight,
+      avatars:()=>this.actors.values(),avatar:id=>this.actors.get(id),damage:(at,text,kind)=>this.damageNumbers.show(at,text,kind,this.elapsed),
+      flinch:(id,yaw,degrees)=>{const avatar=this.actors.get(id);if(avatar)(avatar.flinch??=new FlinchPose()).hit(this.elapsed,yaw,degrees);},
+    });
     this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.smokeBurst=new SmokeBurst(this.app);
     this.cigarettes=new Cigarettes(this.app);
@@ -1156,6 +1178,8 @@ export class BarScene {
   private restoreHeadLooks():void {
     this.cigarettes.restore();
     this.crossedArms.restore();
+    // The weapons' pose was applied after the head looks: it goes back first.
+    this.weaponVisuals.restore();
     for(const [node,scale] of this.hiddenCarFace)node.setLocalScale(scale);this.hiddenCarFace.clear();
     for(const avatar of this.actors.values()){avatar.headLook?.restore();avatar.fly?.restore();avatar.flinch?.restore();avatar.posture?.restore();}
   }
@@ -1272,7 +1296,11 @@ export class BarScene {
     this.rig.rush(this.rush);
     // A headset's field of view is its own, and a screen blur would be drawn on one eye's glass only.
     if (this.vr.active) { this.speedBlur.set(0); return; }
-    if (this.camera.camera) this.camera.camera.fov = this.lensFov + this.rush * RUSH_FOV + (boom > .02 ? boom * 12 : 0) - this.fovPunch;
+    if (this.camera.camera) {
+      const fov = this.lensFov + this.rush * RUSH_FOV + (boom > .02 ? boom * 12 : 0) - this.fovPunch, zoom = this.weapons?.zoom() ?? 1;
+      // Aiming and scopes magnify after the rest: the rush's and the punch's degrees would be huge at a narrow field.
+      this.camera.camera.fov = zoom > 1.001 ? 2 * Math.atan(Math.tan(fov / 2 / RAD_TO_DEG) / zoom) * RAD_TO_DEG : fov;
+    }
     this.speedBlur.set(this.rush);
   }
   /** A skin standing still, as an image (the profile window); undefined when it could not be drawn. */
@@ -1388,6 +1416,8 @@ export class BarScene {
   /** The touch stick: x right, y down (-1 to 1). It walks, or steers and gives gas on a vehicle, like the keys it adds to. */
   setTouchAxis(x: number, y: number): void { this.touchAxis = { x: clamp(x, -1, 1), y: clamp(y, -1, 1) }; }
   setTouchSprint(on: boolean): void { this.touchSprint = on; }
+  /** A finger dragged on a touch button that also looks (the fire button) turns the view like one on the scene. */
+  touchLook(dx: number, dy: number): void { if (this.enabled) this.rig.drag(dx * TOUCH_LOOK, dy * TOUCH_LOOK); }
   /** What the player's hands are doing, which decides the touch buttons: on foot, driving a bike or a car, or on the horse. */
   touchContext(): 'walk' | 'bike' | 'car' | 'horse' {
     const vehicle = this.motos.ridden(this.localId);
@@ -1525,6 +1555,8 @@ export class BarScene {
     if((dx||dz)&&(!actor?.interactionState||isRidingHorse(actor.interactionState))&&!actor?.currentTableId)this.lastRotation=Math.atan2(dx,dz);
     // With the guard up the body faces where the camera looks, and the keys step that way or aside (the guard's steps).
     if(this.callbacks.fight?.()?.guard&&!actor?.interactionState&&!actor?.currentTableId)this.lastRotation=this.fightView();
+    // A weapon aimed or just fired faces where the camera looks, like the firework.
+    if(this.weapons?.facingAim()&&!actor?.interactionState&&!actor?.currentTableId)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
     if(actor?.fireworkEquipped)this.lastRotation=normalizeHeading(this.rig.yaw+Math.PI);
     // Standing for a selfie, the body turns to the phone once the head alone could not reach it (past ~40°).
     else if(this.selfie&&!dx&&!dz&&!actor?.interactionState&&!actor?.currentTableId&&Math.abs(normalizeHeading(yaw+Math.PI-this.lastRotation))>.7)this.lastRotation=normalizeHeading(yaw+Math.PI);
@@ -1842,6 +1874,7 @@ export class BarScene {
     this.televisions.forEach(tv=>tv.destroy());this.televisions.clear();
     this.morte?.destroy();this.morte=undefined;
     this.damageNumbers.destroy();
+    this.weaponVisuals.destroy();
     this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
@@ -1968,14 +2001,21 @@ export class BarScene {
 
   private assignClips(skin: SkinnedRig, bank: pc.ContainerResource): void {
     const tracks=bank.animations.map(asset=>asset.resource as pc.AnimTrack);
-    assignAnimationClips(skin.model.anim!,tracks.map(track=>({name:track.name,track,
-      loop:!['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order', 'Jab', 'Cross', 'Hook', 'Heavy', ...Object.keys(HIT_REACTIONS)].includes(track.name)})));
+    // WalkBack: the walk played backwards (a state of speed -1), for an armed body backing away while it faces the aim (gunClip).
+    const walk = tracks.find(track => track.name === 'Walk');
+    assignAnimationClips(skin.model.anim!,[...tracks.map(track=>({name:track.name,track,
+      loop:!['Kick', 'Drink', 'Fallen', 'Shuffle', 'Bartend', 'Wave', 'Use', 'Recover', 'Thank', 'Pick','Order', 'Jab', 'Cross', 'Hook', 'Heavy', ...Object.keys(HIT_REACTIONS)].includes(track.name)})),
+      ...walk ? [{ name: 'WalkBack', track: walk, speed: -1 }] : []]);
+    if (walk) skin.tracks.add('WalkBack');
     for (const track of tracks) {
       skin.tracks.add(track.name);
       if (track.name === 'Drink') this.addHandLayer(skin, track);
       if (track.name === 'Order') this.addOrderLayer(skin,track);
       if (track.name === 'FightIdle') this.addGuardLayer(skin,track);
     }
+    // After the guard's layer, so the block's arms are drawn over it.
+    const block = tracks.find(track => track.name === 'FightBlock');
+    if (block) this.addBlockLayer(skin, block);
   }
 
   /**
@@ -2009,6 +2049,18 @@ export class BarScene {
     if(!Object.keys(mask).length)return;
     skin.guardLayer=anim.addLayer(GUARD_LAYER,0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
     assignAnimationClips(anim,[{name:'FightIdle',track,layer:GUARD_LAYER}]);
+  }
+
+  /** The block over the guard: the same arms, FightBlock held (a still pose of the hands up), faded in while the block is up. */
+  private addBlockLayer(skin:SkinnedRig,track:pc.AnimTrack):void {
+    const anim=skin.model.anim!;if(skin.blockLayer||anim.findAnimationLayer(BLOCK_LAYER)||!skin.guardLayer)return;
+    const paths=track.curves.flatMap(c=>c.paths.map(p=>p.entityPath)),mask:Record<string,{children:boolean}>={};
+    for(const node of [skin.bones.upperarm_l.parent,skin.bones.upperarm_r.parent]){
+      const path=paths.find(p=>p.at(-1)===node?.name);if(path)mask[path.join('/')]={children:true};
+    }
+    if(!Object.keys(mask).length)return;
+    skin.blockLayer=anim.addLayer(BLOCK_LAYER,0,mask as unknown as object[],pc.ANIM_LAYER_OVERWRITE);
+    assignAnimationClips(anim,[{name:'FightBlock',track,layer:BLOCK_LAYER}]);
   }
 
   /** Acknowledging once, masked above the shoulders, over the normal planted idle. */
@@ -2210,7 +2262,7 @@ export class BarScene {
     if (local && (seated || actor.musician || animation === 'kick' || (bar && actor.interactionState))) this.lastRotation = actor.rotation ?? this.lastRotation;
     const rotation = (local ? this.lastRotation : actor.rotation ?? 0) * RAD_TO_DEG;
     const turn = ((rotation - avatar.yaw + 540) % 360) - 180;
-    avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-16 * dt)) + 540) % 360) - 180;
+    avatar.yaw = ((avatar.yaw + turn * (1 - Math.exp(-(local && this.weapons?.facingAim() ? 40 : 16) * dt)) + 540) % 360) - 180;
     if (bar) this.enterBarAction(avatar, bar);
     // Skinned avatars have dedicated drunk clips; the procedural sway remains as fallback for box avatars.
     const stage=drunkStage(actor.drunk??0),dedicatedDrunk=!!avatar.skin?.tracks.has('DrunkIdle')&&stage>=2;
@@ -2630,7 +2682,7 @@ export class BarScene {
     const show=bar?undefined:this.musicianClip(avatar,skin);
     // Object-specific bar actions keep their choreography; generic bodies come from the per-skin Mixamo bank.
     // The fist fight (fightClip): a punch, a blow taken, the guard and its steps; anything else the game draws the usual way.
-    const fight = !bar && !show ? this.fightClip(avatar, skin) : undefined;
+    const fight = !bar && !show ? this.fightClip(avatar, skin) ?? this.gunClip(avatar, skin) : undefined;
     const requested = fight ? fight.clip : bar ? bar.body ?? barState(bar.step.clip) : show ? show.state : action === 'kick' ? kickClip(actor.skill) ?? 'Kick' : action === 'fallen' ? 'Fallen' : action === 'stumble' ? 'DrunkIdle'
       : action === 'recover' ? 'Recover' : action === 'wave' ? 'Wave' : action === 'use' ? 'Use' : action === 'text' || (action === 'idle' && actor.looking && !this.selfieOf(avatar)) ? 'Text' : action === 'thank' ? 'Thank' : action === 'pick' ? 'Pick' : action === 'ride' || action === 'ragdoll' ? 'Sit'
       : ordering ? 'Idle' : action === 'wait'||action === 'toilet' ? 'Wait' : action === 'deal' ? 'Deal' : action === 'shuffle' ? 'Shuffle'
@@ -2667,7 +2719,7 @@ export class BarScene {
         anim.baseLayer.activeStateCurrentTime = ['Deal', 'Wait', 'Text', 'DrunkIdle', 'DrunkWalk', ...SEATED_CLIPS].includes(clip) || clip.startsWith('Dance ') ? age % duration : Math.min(age, duration);
       }
     }
-    const pace = CLIP_PACES[avatar.skinId ?? '']?.[clip] ?? MIXAMO_PACE[clip];
+    const paced = clip === 'WalkBack' ? 'Walk' : clip, pace = CLIP_PACES[avatar.skinId ?? '']?.[paced] ?? MIXAMO_PACE[paced];
     if(clip==='Walk')skin.walkRate=walkPlaybackRate(skin.walkRate,avatar.speed??0,pose.dt,pace);
     else skin.walkRate=undefined;
     anim.speed = clip==='Walk'?skin.walkRate!:pace ? clamp((avatar.speed ?? 0) / pace, .5, 2.6) : clip==='OldCaneWalk'?(skin.oldCaneRate??1):(avatar.hitStopUntil ?? 0) > performance.now() ? 0 : 1;
@@ -2681,7 +2733,7 @@ export class BarScene {
       skin.orderLayer.weight=ordering?fade(age/.28)*fade((duration-age)/.35):0;
       if(ordering&&duration>0)skin.orderLayer.activeStateCurrentTime=Math.min(age,duration);
     }
-    const handOn = !!held && !bar && !show && HAND_FREE_CLIPS.has(clip) && !!skin.handLayer && smokingTimeline(actor,now,actor.id).phase!=='lighting';
+    const handOn = !!held && !bar && !show && !this.weaponVisuals.isArmed(actor) && HAND_FREE_CLIPS.has(clip) && !!skin.handLayer && smokingTimeline(actor,now,actor.id).phase!=='lighting';
     if (skin.handLayer) {
       skin.handLayer.weight = lerp(skin.handLayer.weight, handOn ? 1 : 0, 1 - Math.exp(-10 * pose.dt));
       const duration = skin.handLayer.activeStateDuration;
@@ -3011,7 +3063,11 @@ export class BarScene {
       // In real time: the body moved for all of a stalled frame, and a view told a shorter one reads it as a sprint and falls metres behind.
       if (bike) { this.rig.chase(bike.drawn.yaw, realDt); this.cancelSignal(bike); }
       // Drunk view: the camera rolls slowly (more with each stage).
-      const eyes=bike?.rig instanceof CarRig&&vehicleSeat(bike.state,this.localId)===0?bike.rig.ponto('ponto_olhos').getPosition():player.skin?.bones.head.getPosition();
+      const seat=bike?vehicleSeat(bike.state,this.localId):-1;
+      // The truck's eyes sit above the dash (its cowl and the windshield's lower frame filled the lower half of the view from the authored point): see truckEyes.
+      const eyes=bike?.rig instanceof CarRig&&isTruck(bike.state)&&seat>=0?truckEyes(bike.rig,seat):bike?.rig instanceof CarRig&&seat===0?bike.rig.ponto('ponto_olhos').getPosition():player.skin?.bones.head.getPosition();
+      // The weapons first: the pad's look, aim assistance and the body's facing, so this frame's view already has them.
+      this.weapons?.before(realDt);
       this.rig.follow(realDt, { feet: bike ? bike.entity.getPosition() : player.root.getPosition(), head: eyes, facing: player.yaw / RAD_TO_DEG,
         roll: this.vr.active ? 0 : DRUNK_CAMERA_ROLL[drunkStage(player.actor.drunk ?? 0)]!, elapsed: this.elapsed, ...(bike ? {...MOTO_XRAY,clearance:vehiclePhysics(bike.state.model).HALF_LENGTH} : {}) });
       vrFresh = true;
@@ -3040,20 +3096,24 @@ export class BarScene {
       try { if (this.vrAnchored) this.vr.endFrame(realDt, this.vrAnchor); } catch (error) { this.vrFailed(error); }
       if (vrView) this.rig.slave(vrView.yaw, vrView.pitch);
     }
+    // The local gun runs with the camera as rendered; the avatar side draws it (weapons/contract.ts).
+    this.weaponVisuals.local(this.weapons?.frame(realDt));
     this.applyHeadLooks(dt);
+    // The weapons in hand and the bodies holding them, over the head look; then flashes, tracers and the rest (engine/weapons/visuals.ts).
+    this.weaponVisuals.pose(dt);
     if (this.vr.active && vrView) this.vrBody(player, vrView.yaw, vrFoot && !vrSpecial);
     this.vrArms(player, realDt);
     const cigaretteActors=[],crossedActors=[],smokingNow=this.serverNow();
     for(const avatar of this.actors.values()){
       const {actor,skin}=avatar;if(!skin)continue;
       if(actor.animation==='wait'&&actor.drinkItem)counterRequest(skin,(smokingNow-(actor.animationStartedAt??smokingNow))/1000,avatar.body);
-      const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&!actor.holding&&
+      const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&!actor.holding&&
         (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
         ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','Sit'].includes(skin.clip);
       crossedActors.push({id:actor.id,active:!!actor.armsCrossed,available:armsAvailable,rig:skin});
       if(actor.smokingSince)cigaretteActors.push({id:actor.id,skin:avatar.skinId!,state:actor,rig:skin,
         hidden:!!avatar.deathHidden||['ragdoll','fallen','recover','vomit'].includes(actor.animation??''),
-        armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!actor.carrying&&!actor.parcel&&
+        armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&
           (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
           ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
     }
@@ -3253,7 +3313,7 @@ export class BarScene {
       // Up the whole time the guard is up, FightIdle included (same pose, so harmless there): toggling it with the clip dipped the arms on every
       // still↔step change. Short gaps (a frame with no fight clip) keep it; it fades out only once the guard has been gone a moment.
       const duration = skin.guardLayer.activeStateDuration;
-      if (fight?.guard) { skin.guardGone = 0; skin.guardLayer.weight = Math.min(1, skin.guardLayer.weight + dt * 12); }
+      if (fight?.guard && !this.weaponVisuals.isArmed(avatar.actor)) { skin.guardGone = 0; skin.guardLayer.weight = Math.min(1, skin.guardLayer.weight + dt * 12); }
       else {
         skin.guardGone = (skin.guardGone ?? 0) + dt;
         // A punch or a blow (fight set, not guard) owns the arms at once; only a frame with no fight clip at all gets the grace.
@@ -3261,6 +3321,12 @@ export class BarScene {
       }
       // Its own clock: the steps' pace sets the component's speed, the bounce of the guard keeps its own.
       if (skin.guardLayer.weight > .001 && duration > 0) skin.guardLayer.activeStateCurrentTime = (this.elapsed + avatar.phase) % duration;
+    }
+    if (skin.blockLayer) {
+      // Up while the block key is held (the local player's from the key, the others' from the room's state), only in the guard's own clips.
+      const held = avatar.actor.id === this.localId ? !!this.callbacks.fight?.()?.block : !!avatar.actor.fist?.block;
+      const target = fight?.guard && held ? 1 : 0;
+      skin.blockLayer.weight = target ? Math.min(1, skin.blockLayer.weight + dt * 14) : lerp(skin.blockLayer.weight, 0, 1 - Math.exp(-16 * dt));
     }
     if (!fight || fight.guard || !layer || layer.activeState !== skin.clip || skin.clip !== fight.clip) return;
     const duration = layer.activeStateDuration, wanted = Math.min(fight.age, duration), current = layer.activeStateCurrentTime, gap = wanted - current;
@@ -3283,6 +3349,61 @@ export class BarScene {
       targets.push({ id, x: at.x, y: at.y, z: at.z, skin: actor.skin });
     }
     return targets;
+  }
+  /**
+   * An armed body's legs (engine/weapons/visuals.ts): the guard's steps by how it moves against where it faces (strafes and walking back while it
+   * faces the aim, Walk or Run when it faces its way), and the plain Idle standing; the arms are the weapon pose's.
+   */
+  private gunClip(avatar: Avatar, skin: SkinnedRig): { clip: string; key: string; age: number; guard: boolean; local: boolean } | undefined {
+    const { actor } = avatar, action = actor.animation ?? 'idle';
+    if (!this.weaponVisuals.isArmed(actor) || !['idle', 'walk', 'run'].includes(action) || actor.interactionState || actor.currentTableId) return undefined;
+    // Backing away: the walk backwards (the boxer's hop back read wrong under a pistol held out, the owner's report 2026-11-09).
+    const step = this.guardStep(avatar), clip = step === 'FightIdle' ? 'Idle' : step === 'FightBack' && skin.tracks.has('WalkBack') ? 'WalkBack' : step;
+    return skin.tracks.has(clip) ? { clip, key: clip, age: 0, guard: true, local: actor.id === this.localId } : undefined;
+  }
+  /** What the firearms' logic reads from the scene (weapons/scene-hooks.ts). */
+  gunPort(): GunScenePort {
+    const screen = new pc.Vec3(), point = new pc.Vec3();
+    return {
+      rig: this.rig,
+      camera: () => {
+        const at = this.camera.getPosition(), forward = this.camera.forward;
+        return { origin: [at.x, at.y, at.z], forward: [forward.x, forward.y, forward.z], fov: this.camera.camera?.fov ?? 57, width: this.canvas.clientWidth || 1, height: this.canvas.clientHeight || 1 };
+      },
+      local: () => {
+        const avatar = this.actors.get(this.localId);
+        if (!avatar) return undefined;
+        const at = avatar.root.getPosition();
+        return { id: this.localId, feet: [at.x, at.y, at.z], skin: avatar.actor.skin, speed: avatar.speed ?? 0 };
+      },
+      free: () => {
+        const actor = this.actors.get(this.localId)?.actor;
+        return this.enabled && !!actor && !this.selfie && !this.watchingTv && !this.watchingStage && !this.vr.active && !this.chasing && !this.flying() && !actor.currentTableId
+          && (!actor.interactionState || actor.interactionState === 'stagger') && !this.actors.get(this.localId)?.ragdoll;
+      },
+      targets: () => {
+        const out: ReturnType<GunScenePort['targets']> = [];
+        for (const [id, avatar] of this.actors) {
+          const { actor } = avatar;
+          if (avatar.npc || id === this.localId || actor.connected === false || actor.currentTableId || avatar.ragdoll || (actor.interactionState && actor.interactionState !== 'stagger' && actor.interactionState !== 'kick')) continue;
+          const at = avatar.root.getPosition();
+          out.push({ id, skin: actor.skin, pose: { x: at.x, y: at.y, z: at.z, rotation: avatar.yaw / RAD_TO_DEG } });
+        }
+        return out;
+      },
+      face: heading => { this.lastRotation = heading; },
+      sprintHeld: () => this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchSprint,
+      project: ([x, y, z]) => {
+        const camera = this.camera.camera, at = this.camera.getPosition(), forward = this.camera.forward;
+        if (!camera || (x - at.x) * forward.x + (y - at.y) * forward.y + (z - at.z) * forward.z <= .05) return undefined;
+        camera.worldToScreen(point.set(x, y, z), screen);
+        return { x: screen.x, y: screen.y };
+      },
+      position: id => { const at = this.actors.get(id)?.root.getPosition(); return at ? [at.x, at.y, at.z] : undefined; },
+      setTouchAxis: (x, y) => this.setTouchAxis(x, y),
+      setTouchSprint: on => this.setTouchSprint(on),
+      touchLook: (dx, dy) => this.touchLook(dx, dy),
+    };
   }
   /** Where the camera looks, as a heading (the guard faces it). */
   fightView(): number { return normalizeHeading(this.rig.yaw + Math.PI); }
@@ -3308,10 +3429,17 @@ export class BarScene {
     punch.landed = true;
     this.fightShown.add(`${this.localId}:${punch.n}`);
     const at = { x: best.contact.x, y: best.contact.y, z: best.contact.z };
+    const victim = this.actors.get(best.id);
+    // Someone drawn with the block up: what the puncher sees is a block (the room's word, a moment later, says parry or block for sure).
+    if (victim?.actor.fist?.block) {
+      this.blowSounds.block(at);
+      this.blowEffects.star(at, .24);
+      me.hitStopUntil = performance.now() + PUNCH_HIT_STOP_MS.light;
+      return;
+    }
     this.blowSounds.hit(move.heavy, at);
     this.blowEffects.star(at, move.heavy ? .7 : .42);
     me.hitStopUntil = performance.now() + PUNCH_HIT_STOP_MS[move.heavy ? 'heavy' : 'light'];
-    const victim = this.actors.get(best.id);
     if (victim) (victim.flinch ??= new FlinchPose()).hit(this.elapsed, Math.atan2(best.contact.x - feet.x, best.contact.z - feet.z), FLINCH_DEGREES[punch.move] ?? 10);
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) this.rig.shake(move.heavy ? .03 : .016);
   }
@@ -3323,9 +3451,10 @@ export class BarScene {
     const victim = this.actors.get(hit.to), puncher = this.actors.get(hit.by), move = FIGHT_MOVES[hit.move], key = `${hit.by}:${hit.n}`;
     // The room's point, moved with the body as it is drawn now (the room saw it a moment ago).
     const drawn = victim?.root.getPosition(), at = drawn && victim ? { x: hit.x + drawn.x - victim.actor.x, y: hit.y + drawn.y - (victim.actor.y ?? 0), z: hit.z + drawn.z - victim.actor.z } : { x: hit.x, y: hit.y, z: hit.z };
+    const felt = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (hit.guard) { this.fightGuarded(hit, victim, puncher, at, key, felt); return; }
     const kind = hit.ko ? 'ko' : hit.to === this.localId ? 'taken' : move.heavy ? 'heavy' : 'hit';
     this.damageNumbers.show(at, hit.ko ? `${hit.damage} KO` : String(hit.damage), kind, this.elapsed);
-    const felt = !matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!this.fightShown.has(key)) {
       this.fightShown.add(key);
       this.blowSounds.hit(move.heavy || hit.ko, at);
@@ -3335,6 +3464,34 @@ export class BarScene {
       if (felt && hit.by === this.localId) this.rig.shake(move.heavy ? .03 : .016);
     }
     if (felt && hit.to === this.localId) this.rig.shake(hit.ko ? .09 : move.heavy ? .07 : .035);
+    if (this.fightShown.size > 64) this.fightShown.delete(this.fightShown.values().next().value!);
+  }
+  /**
+   * A blow that met a block (the room's fight.hit with `guard`): a parry rings and throws the puncher back (a ring and a star where the arms met, both
+   * held an instant, the puncher jolted), a block thuds and shows what got through, a broken guard shows the full blow.
+   */
+  private fightGuarded(hit: FightHit, victim: Avatar | undefined, puncher: Avatar | undefined, at: { x: number; y: number; z: number }, key: string, felt: boolean): void {
+    const move = FIGHT_MOVES[hit.move], now = performance.now();
+    if (hit.guard === 'parry') {
+      this.damageNumbers.show(at, 'PARRY!', 'parry', this.elapsed);
+      this.blowSounds.parry(at);
+      this.blowEffects.star(at, .6);
+      this.blowEffects.shock({ x: at.x, y: at.y, z: at.z }, 1.1);
+      if (puncher) { puncher.hitStopUntil = now + PARRY_HIT_STOP_MS; (puncher.flinch ??= new FlinchPose()).hit(this.elapsed, hit.yaw + Math.PI, PARRY_FLINCH_DEGREES); }
+      if (victim) victim.hitStopUntil = now + PARRY_HIT_STOP_MS;
+      if (felt && (hit.by === this.localId || hit.to === this.localId)) this.rig.shake(.05);
+    } else {
+      const broken = hit.guard === 'break';
+      this.damageNumbers.show(at, broken ? 'GUARDA QUEBRADA' : hit.damage > 0 ? `${hit.damage}` : 'DEFENDIDO', broken ? 'ko' : 'block', this.elapsed);
+      if (!this.fightShown.has(key) || broken) {
+        this.fightShown.add(key);
+        this.blowSounds.block(at);
+        this.blowEffects.star(at, broken ? .6 : .24);
+        if (puncher) puncher.hitStopUntil = now + PUNCH_HIT_STOP_MS[move.heavy ? 'heavy' : 'light'];
+      }
+      if (victim) (victim.flinch ??= new FlinchPose()).hit(this.elapsed, hit.yaw, broken ? FLINCH_DEGREES[hit.move] ?? 12 : BLOCK_FLINCH_DEGREES);
+      if (felt && hit.to === this.localId) this.rig.shake(broken ? .06 : .02);
+    }
     if (this.fightShown.size > 64) this.fightShown.delete(this.fightShown.values().next().value!);
   }
   /** The damage numbers follow the view: projected each frame, in front of the eye only, drifting along the screen's sideways. */
@@ -3390,7 +3547,13 @@ export class BarScene {
     if (!hip) return;
     avatar.spine ??= (skin.model.findByName('spine_02') as pc.Entity | null) ?? null;
     const rider={ root: avatar.root, hip, spine: avatar.spine, ...skin.bones, handRigL: skin.drinkHand, handRigR: skin.rightHand };
-    if(bike.rig instanceof CarRig)seatCar(bike.rig,rider,vehicleSeat(bike.state,avatar.actor.id),avatar.carScale);else seatRider(bike.rig,rider);
+    const place=vehicleSeat(bike.state,avatar.actor.id);
+    if(bike.rig instanceof CarRig)seatCar(bike.rig,rider,place,avatar.carScale);
+    else if(place>0){
+      // The pillion holds the rider's waist: their hip joint, as drawn this frame.
+      const front=bike.state.riderId?this.actors.get(bike.state.riderId):undefined;
+      seatPillion(bike.rig,rider,front?.skin?.hip??undefined);
+    }else seatRider(bike.rig,rider);
   }
 
   /** Something plays on the stage: a video on the telão, or a musician at a spot. */
@@ -3414,6 +3577,9 @@ export class BarScene {
     };
     listen(window, 'keydown', event => {
       if (!this.enabled || this.inputHasFocus()) return;
+      if (this.weapons?.key(event.code, true, event.repeat)) { event.preventDefault(); return; }
+      // The block key (fist fight): Space held with the guard up; the touch button sends a made-up code. Taken only when the guard is up.
+      if ((event.code === 'Space' || event.code === 'FightBlock') && this.callbacks.onBlock?.(true)) { event.preventDefault(); return; }
       if(!event.repeat&&event.code==='KeyR'&&this.actors.get(this.localId)?.actor.fireworkEquipped){event.preventDefault();this.callbacks.onFireworkStow?.();return;}
       // On a bike Space is the brake, even with the toolbar button last clicked still focused.
       if (event.code === 'Space' && this.chasing && document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
@@ -3433,10 +3599,11 @@ export class BarScene {
       }
       if (this.chasing && vehicle?.state.riderId===this.localId && ['KeyZ', 'KeyX', 'KeyC', 'KeyH'].includes(event.code)) { event.preventDefault(); if (!event.repeat) this.motoSwitch(event.code); return; }
       // R: the fist fight's guard (on a bike R is its engine, handled above). The touch buttons press these made-up codes for the punches.
-      if (!event.repeat && event.code === 'KeyR') { event.preventDefault(); this.callbacks.onGuard?.(); }
+      // (With a weapon out R is only the guard if the player moved the reload elsewhere: the gun is not a fist.)
+      if (!event.repeat && event.code === 'KeyR' && !this.weapons?.armed()) { event.preventDefault(); this.callbacks.onGuard?.(); }
       if (event.code === 'FightLight' || event.code === 'FightHeavy') { this.callbacks.onPunch?.(event.code === 'FightLight' ? 'light' : 'heavy'); return; }
       if (!event.repeat && event.code === 'KeyG') this.callbacks.onEmote?.('dance');
-      if (!event.repeat && event.code === 'KeyV') { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
+      if (!event.repeat && event.code === 'KeyV' && !this.weapons?.armed()) { event.preventDefault(); this.callbacks.onEmote?.('wave'); }
       // F1 toggles an upper-body overlay; the locomotion clip keeps owning the legs.
       if (!event.repeat && event.code === 'F1') { event.preventDefault(); this.callbacks.onEmote?.('cross-arms'); }
       // F lights a persistent cigarette or puts it out; locomotion remains independent.
@@ -3447,14 +3614,16 @@ export class BarScene {
       if (!event.repeat && (event.code === 'Enter' || event.code === 'KeyT')) { event.preventDefault(); this.callbacks.onChat?.(); }
       if (!event.repeat && this.callbacks.onSkillKey?.(event.code)) event.preventDefault();
     });
-    listen(window, 'keyup', event => this.keys.delete(event.code));
-    listen(window, 'blur', () => { this.keys.clear(); this.dragging = false; });
+    listen(window, 'keyup', event => { this.keys.delete(event.code); this.weapons?.key(event.code, false, false); if (event.code === 'Space' || event.code === 'FightBlock') this.callbacks.onBlock?.(false); });
+    listen(window, 'blur', () => { this.keys.clear(); this.dragging = false; this.callbacks.onBlock?.(false); this.weapons?.blur(); });
     listen(this.canvas, 'pointerdown', event => {
       if (event.pointerType === 'touch') { this.touchDown(event); return; }
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (event.button !== 0 && event.button !== 2)) return;
       this.press = { x: event.clientX, y: event.clientY, at: performance.now(), button: event.button,travel:0 };
       // With the guard up the buttons punch: left a light one, right the heavy one (the drag still turns the view when the mouse is free).
       if (this.enabled && this.callbacks.onPunch?.(event.button === 0 ? 'light' : 'heavy')) this.press = undefined;
+      // A weapon in hand: the buttons fire and aim (mousedown below), never a firework or the world menu.
+      if (this.enabled && this.weapons?.armed()) this.press = undefined;
       // A locked pointer cannot be captured, and it looks around anyway.
       if (this.mouseCaptured) return;
       this.dragging = true;
@@ -3466,6 +3635,8 @@ export class BarScene {
       if ((!this.enabled&&!this.watchingTv&&!this.watchingStage) || (!this.dragging&&!this.mouseCaptured)) return;
       if(this.watchingTv||this.watchingStage){this.tvYaw-=event.movementX*.006;this.tvPitch+=event.movementY*.004;return;}
       // A captured pointer now and then reports a jump of thousands of pixels (a browser quirk): no hand moves that far in one event.
+      // The weapon wheel, while open, takes the movement as its pointer.
+      if (this.weapons?.pointer(clamp(event.movementX, -MOUSE_JUMP, MOUSE_JUMP), clamp(event.movementY, -MOUSE_JUMP, MOUSE_JUMP))) return;
       this.rig.drag(clamp(event.movementX, -MOUSE_JUMP, MOUSE_JUMP), clamp(event.movementY, -MOUSE_JUMP, MOUSE_JUMP));
     });
     listen(window, 'pointerup', event => {
@@ -3481,11 +3652,16 @@ export class BarScene {
       if (player || moto) this.callbacks.onWorldMenu?.(rect.left + x, rect.top + y, { ...(player ? { player } : {}), ...(moto ? { moto } : {}) });
     });
     listen(this.canvas, 'pointercancel', event => { this.dragging = false; if (event.pointerType === 'touch') this.touchUp(event); });
+    // Firing while aiming is a second button pressed with one held: pointerdown/pointerup do not report that one, mousedown/mouseup do.
+    listen(this.canvas, 'mousedown', event => { if (this.enabled && this.weapons?.button(event.button, true)) event.preventDefault(); });
+    listen(window, 'mouseup', event => { this.weapons?.button(event.button, false); });
     // The right button is the game's, over the view and over the HUD; a released drag can land on either. Text boxes keep paste and copy.
     listen(window, 'contextmenu', event => { if (!(event.target instanceof Element && event.target.closest('input,textarea,[contenteditable="true"]'))) event.preventDefault(); });
     listen(this.canvas, 'wheel', event => {
       if (!this.enabled) return;
       event.preventDefault();
+      // Through a scope the wheel steps its zoom.
+      if (this.weapons?.scroll(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1))) return;
       // Pages and lines scroll by other units than pixels.
       if(this.rig.wheel(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1)))
         this.callbacks.onCameraChange?.(this.rig.mode,this.rig.reach);
@@ -3526,6 +3702,8 @@ export class BarScene {
     this.fingers.delete(event.pointerId);
     this.pinch = this.fingers.size >= 2 ? this.fingerSpan() : 0;
     if (event.type !== 'pointerup' || this.fingers.size || !this.enabled || this.watchingTv || finger.moved > TAP_SLOP || performance.now() - finger.at > TAP_MS) return;
+    // A weapon in hand: a tap neither fires the firework nor opens a menu (the fire button shoots).
+    if(this.weapons?.armed())return;
     if(this.shootFirework())return;
     const rect = this.canvas.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
     const player = this.pickPlayer(x, y, true), moto = this.pickMoto(x, y);

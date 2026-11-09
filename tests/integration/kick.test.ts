@@ -48,7 +48,7 @@ test('a kick turns with the kicker, and lands only while the leg is out',()=>{
   // A slow tick: the foot passed through the body and out, between one check and the next. It still hit.
   const passing={x:OPEN.x-.75,y:0,z:OPEN.z+.75};
   assert.ok(kickTouches('karate',from,to,facing(0),passing));
-  assert.equal(kickTouches('karate',from+200,from+300,facing(0),passing),false,'Not while the foot is up in front, away from there');
+  assert.equal(kickTouches('karate',from+135,from+200,facing(0),passing),false,'Not while the foot is up in front, away from there');
 });
 
 test('walls stop a kick and the aim',()=>{

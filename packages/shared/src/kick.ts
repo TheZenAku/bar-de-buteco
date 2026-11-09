@@ -19,7 +19,7 @@ export interface KickBlow {
   heavy:boolean;
 }
 export const KICKS:Readonly<Record<string,KickBlow>>={
-  karate:{hp:12,speed:9,lift:3.8,closing:2.5,swingMs:430,heavy:false},
+  karate:{hp:12,speed:9,lift:3.8,closing:2.5,swingMs:290,heavy:false},
   'air-kick':{hp:20,speed:12,lift:4.8,closing:4,swingMs:640,heavy:true},
 };
 /** The leg and the body it can touch (a standing capsule, a little generous so a kick that looks like it touched lands); how far the player turns to a target. */

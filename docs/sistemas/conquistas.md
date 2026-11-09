@@ -1,6 +1,6 @@
 # Conquistas
 
-Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **série de quatro níveis**: ao chegar à quantidade de cada nível, o emblema aparece sozinho na coleção do jogador. São 29 séries, 116 emblemas no total, todos em `ACHIEVEMENT_SERIES` (`packages/shared/src/achievements.ts`).
+Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **série de quatro níveis**: ao chegar à quantidade de cada nível, o emblema aparece sozinho na coleção do jogador. São 31 séries, 124 emblemas no total, todos em `ACHIEVEMENT_SERIES` (`packages/shared/src/achievements.ts`).
 
 ## O que o jogador vê
 
@@ -50,6 +50,8 @@ Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **séri
 | Resenha | Mensagens de chat que alguém ouviu, no máximo uma a cada 10 s | 25, 100, 500, 2.000 | Mundo |
 | Gente Boa | Acenos, no máximo um a cada 10 s | 10, 50, 200, 1.000 | Mundo |
 | Telefonista | Ligações atendidas, de pelo menos 15 s (conta para os dois lados) | 1, 10, 50, 200 | Mundo |
+| Sparring do Zeca | Vitórias contra o Zeca no terraço, em qualquer fase da escada (só as que pagaram prêmio) | 1, 5, 25, 100 | Mundo |
+| Quebra-Queixo | Vitórias sobre o Zeca na fase mais difícil | 1, 5, 15, 50 | Mundo |
 | Fofoqueiro | Mensagens no Highzap | 25, 100, 500, 2.000 | API |
 | Influencer | Fotos publicadas no Highgram | 1, 10, 50, 200 | API |
 | Mão Aberta | Pix enviados | 1, 10, 50, 200 | API |
@@ -79,7 +81,7 @@ Um emblema é dado **só quando o contador cruza o nível**. Assim, um emblema r
 
 ## Na administração
 
-Os 116 emblemas aparecem em **Administração → Emblemas**, com a linha "Automático, ao chegar a…". O administrador pode editar nome, descrição, raridade e arte, inclusive enviando um PNG: o emblema continua sendo dado do mesmo jeito. Apagar faz o emblema deixar de ser dado e sair de quem o tinha. Com imagem enviada, o número do nível não aparece na medalha, porque a arte fica sozinha.
+Os 124 emblemas aparecem em **Administração → Emblemas**, com a linha "Automático, ao chegar a…". O administrador pode editar nome, descrição, raridade e arte, inclusive enviando um PNG: o emblema continua sendo dado do mesmo jeito. Apagar faz o emblema deixar de ser dado e sair de quem o tinha. Com imagem enviada, o número do nível não aparece na medalha, porque a arte fica sozinha.
 
 As quantidades de cada nível ficam no código, não no painel. Texto de emblema editado no painel não muda sozinho se a quantidade mudar depois.
 

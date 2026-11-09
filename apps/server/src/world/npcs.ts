@@ -1,4 +1,4 @@
-import { BLACKJACK_TABLE, MAGRAO_SPOT, movePlayer, type Position } from '@bar/shared';
+import { BLACKJACK_TABLE, MAGRAO_SPOT, SPARRING, SPARRING_NPC, movePlayer, type Position } from '@bar/shared';
 import { Npc } from '../state.js';
 
 const routes: Record<string, Position[]> = {
@@ -11,6 +11,8 @@ export function createNpcs(): Npc[] {
     // At his place behind the L-shaped counter (Balcao_Lugar_Magrao), facing the customers. Orders are run by BarService.
     new Npc().assign({ id: 'bartender', displayName: 'Magrão · bartender', color: '#efe0b5', x:MAGRAO_SPOT.x,y:MAGRAO_SPOT.y,z:MAGRAO_SPOT.z,rotation:MAGRAO_SPOT.rotation,behavior:'idle' }),
     new Npc().assign({ id: 'tonico', displayName: 'Tonico', color: '#b75c46', ...routes.tonico[0] }),
+    // Zeca, on the terrace: talks to whoever comes near and challenges them (world/sparring.ts). He stays where he is.
+    new Npc().assign({ id: SPARRING_NPC, displayName: `${SPARRING.name} · lutador`, color: '#c0392b', skin: SPARRING.skin, x: SPARRING.spot.x, y: SPARRING.spot.y, z: SPARRING.spot.z, rotation: SPARRING.spot.rotation, behavior: 'idle' }),
     new Npc().assign({ id: 'dealer', displayName: 'Dealer', color: '#efe0b5', x: BLACKJACK_TABLE.x,y:BLACKJACK_TABLE.y,z:BLACKJACK_TABLE.z-0.95,behavior:'dealer' }),
   ];
 }
@@ -20,7 +22,7 @@ export class NpcDirector {
   update(npcs: Iterable<Npc>, players: Iterable<Position>, event: string, now: number): void {
     const people = [...players];
     for (const npc of npcs) {
-      if (npc.id === 'dealer' || npc.id.startsWith('attendant-')) continue; // Owned by their services.
+      if (npc.id === 'dealer' || npc.id === SPARRING_NPC || npc.id.startsWith('attendant-')) continue; // Owned by their services.
       if (npc.behavior === 'serving') continue; // Seu Zé finishes an order whatever happens.
       if (event === 'DRUNK_NPC' && npc.id === 'tonico' && npc.animationState === 'fallen') continue;
       if (event === 'PARTY') { npc.animationState = 'dance'; npc.behavior = 'reacting'; continue; }

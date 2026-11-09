@@ -18,6 +18,29 @@ export class Fist extends Schema {
   @type('string') hit = '';
   @type('float32') hitYaw = 0;
   @type('number') stunUntil = 0;
+  /** The block key is held and the room took it (BLOCK in shared/fight.ts); the guard meter (0-100, whole numbers: a patch each point); until when a broken guard staggers. */
+  @type('boolean') block = false;
+  @type('uint8') guard = 100;
+  @type('number') breakUntil = 0;
+}
+/**
+ * A player's firearm (docs/sistemas/armas.md, GunState in packages/shared/src/weapons/protocol.ts): the system on (/armas), the weapon in hand and its
+ * parts, aiming and its elevation, the rounds in it, when it was drawn, the reload (start, end, the rounds it started from), the last shot's count,
+ * the fire mode. Nested like Fist: a Schema holds at most 63 fields.
+ */
+export class Gun extends Schema {
+  @type('boolean') on = false;
+  @type('string') w = '';
+  @type('string') kit = '';
+  @type('boolean') ads = false;
+  @type('float32') pitch = 0;
+  @type('uint8') mag = 0;
+  @type('number') drawAt = 0;
+  @type('number') reloadAt = 0;
+  @type('number') reloadUntil = 0;
+  @type('uint8') reloadFrom = 0;
+  @type('uint16') shots = 0;
+  @type('uint8') mode = 0;
 }
 export class Player extends Schema {
   @type('string') id = '';
@@ -100,6 +123,8 @@ export class Player extends Schema {
   @type('uint8') level = 0;
   /** The fist fight (packages/shared/src/fight.ts, FistState): nested, a Schema holds at most 63 fields. */
   @type(Fist) fist = new Fist();
+  /** The firearm (world/weapons.ts). */
+  @type(Gun) gun = new Gun();
 }
 export class Npc extends Schema {
   @type('string') id = '';

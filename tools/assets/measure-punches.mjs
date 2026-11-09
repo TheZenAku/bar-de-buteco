@@ -26,9 +26,9 @@ export const PUNCHES={
   Heavy:{hand:'r',from:520,to:800,contact:700},
   Elbow:{hand:'r',from:200,to:520,contact:330},
   // Rafael's kicks (his bank only): the ball is the ankle (`foot`), not the knuckles; the leg's thickness is FIGHT_MOVES' `radius`.
-  Kick:{foot:'r',from:420,to:800,contact:620,only:KICKERS},
-  KickHigh:{foot:'r',from:300,to:560,contact:430,only:KICKERS},
-  KickFront:{foot:'l',from:440,to:720,contact:600,only:KICKERS},
+  Kick:{foot:'r',from:280,to:540,contact:415,only:KICKERS},
+  KickHigh:{foot:'r',from:250,to:460,contact:355,only:KICKERS},
+  KickFront:{foot:'l',from:340,to:555,contact:465,only:KICKERS},
 };
 // `contact`: where the punch is meant to land (its sweet spot). The aim turns the body so that this point of the fist's way meets the target, and the
 // step in brings the target to this distance: a hook comes from the side and the haymaker from wide on the right, so neither lands straight ahead.

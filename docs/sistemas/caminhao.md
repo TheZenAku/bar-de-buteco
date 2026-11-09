@@ -71,3 +71,7 @@ pneus somente durante movimento com a barra de espaço pressionada.
 - `apps/api/test/vehicle-storage.test.ts`: compra, depósito, retirada, idempotência, limites, corrida, troca de dono, remoção.
 - `apps/server/test/truck.integration.test.ts`: a sala de verdade: dois lugares, baú só para o dono e só atrás, fechamento sozinho, persistência pela garagem e ao sair do jogo.
 - `tests/e2e/truck.spec.ts` (projeto `truck`): o rig no motor do jogo (`tests/fixtures/truck.html`) e o fluxo completo no jogo, da compra ao baú.
+
+## Primeira pessoa
+
+Os olhos do motorista (e do passageiro, espelhados) ficam 24 cm acima e 10 cm atrás do `ponto_olhos` do modelo (`truckEyes` em `BarScene.ts`). Do ponto original o topo do painel e a moldura baixa do para-brisa ficavam na altura dos olhos, a 30 cm, e tampavam mais da metade da tela (medido projetando os triângulos da cabine: 57% opacos); de onde estão agora sobra só uma faixa do painel embaixo (7%). O GLB não foi alterado.

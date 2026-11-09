@@ -264,3 +264,12 @@ O mesmo comando renderiza `moto/foto-v4.webp` a partir do GLB publicado, usando 
 - Não há som de batida nem de queda (não vieram na pasta). O som sai do centro da moto; `ponto_escapamento` está disponível no rig.
 - A previsão não antecipa a queda: o piloto vê a moto parar e, um instante depois (o tempo de um patch), o corpo voar.
 - O `moto_delivery_colisao.glb` não é carregado: o jogo só colide com caixas, então a moto usa a caixa equivalente.
+
+## Garupa
+
+Toda moto (a de entrega, a Caveira em Chamas, a Clássica Raiada e a Scooter) leva **um passageiro na garupa**. Com um piloto na moto e ela parada (menos de 0,5 m/s), **E** perto dela (ou o menu do botão direito, **Subir na garupa**) senta a pessoa atrás do piloto, de mãos na cintura dele e pés nos apoios (`seatPillion` em `moto-delivery.ts`). O garupa não pilota: os comandos ficam com o piloto, e ele desce pela direita (o piloto desce pela esquerda), parado o bastante, com E.
+
+- **Highfood:** a garupa fica **desligada** para quem está no turno do Highfood (online ou com pedido), nos dois lados: o piloto em entrega não leva ninguém, e quem está em entrega não sobe na garupa de ninguém. Quem já estava na garupa quando o piloto entra no turno ou assume a moto de entrega desce ao lado, com um aviso. Sair da garupa é preciso antes de entrar no Highfood.
+- **Queda:** se a moto cai (batida) ou escapa, o garupa é arremessado junto com o piloto, na mesma velocidade, em ragdoll. Moto caída ou recolhida não tem garupa.
+- **Regras:** `vehicleSeats`/`vehicleCapacity` e `canMountMoto` em `packages/shared`; `mountMoto`, `syncPassengers`, `throwPassengers`, `ejectPassengers` e `onDelivery` em `BarRoom.ts`. Os lugares dos carros seguem como eram.
+- **Não verificado visualmente:** a pose da garupa (posição do quadril 0,5 m atrás do piloto, mãos na cintura, pés atrás dos apoios) foi escrita pelas medidas do piloto, sem conferir quadro a quadro nas quatro motos; ajuste `PILLION_*` e `WAIST_*` em `moto-delivery.ts` se algo atravessar a moto.

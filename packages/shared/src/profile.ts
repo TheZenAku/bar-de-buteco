@@ -20,7 +20,7 @@ export const BADGE_IMAGE_ID=/^[0-9a-f]{64}$/;
 export const BADGE_ICONS=['trophy','shield','heart','bolt','sparkles','party','flame','beer','music','mic','cards','ball','pool','bike','wrench','coins','gift','moon','sun','compass','ghost','hand','flag','key','seat','food','smoke','toilet','dizzy','briefcase','clock','chat','messageCircle','gram','transfer','phone'] as const;
 
 // Durations of the source FBX clips (tools/assets/convert-animations.mjs).
-export const KICK_DURATION_MS = 2000;
+export const KICK_DURATION_MS = 1333;
 export const AIR_KICK_DURATION_MS = 2900;
 /** What a character can do besides what every skin does, in all its variants, once bought. `clip` is only in the animation banks of that character's skins. */
 export interface Skill {id:string;skin:string;name:string;description:string;clip:string;durationMs:number;icon:string;rarity:Rarity;price:number}

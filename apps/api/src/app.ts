@@ -7,7 +7,7 @@ import argon2 from 'argon2';
 import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { signTicket } from '@bar/shared/tickets';
-import {passwordProblem,VEHICLE_MODELS,PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
+import {sparringClaimRequestSchema,sparringStatusRequestSchema,passwordProblem,VEHICLE_MODELS,PLATE,tradeCommitSchema,customerSaveSchema,highfoodCancelSchema,highfoodCompleteSchema,achievementReportSchema,BADGE_IMAGE_ID,badgeSchema,PROFILE,profileBadgesSchema,profileSkillSchema,profileStatusSchema,skinMessageSchema,skillPurchaseSchema,catalogEntrySchema,ADMIN_LOG_CATEGORIES,ADMIN_PLAYER_FILTERS,ADMIN_PLAYER_SORTS,ITEM_IDS,MAX_COIN_BALANCE,PHONE,PHONE_MEDIA_KINDS,PHONE_MEDIA_TYPES,WALLET_REASON,mediaBaseType,type PublicUser} from '@bar/shared';
 import {WardrobeService} from './wardrobe.js';
 import {InventoryService} from './inventory-service.js';
 import {StorageError,VehicleStorageService} from './vehicle-storage-service.js';
@@ -21,6 +21,9 @@ import {AdminConsole} from './admin-console.js';
 import {AdminVehiclesService} from './admin-vehicles.js';
 import {PricingService} from './pricing-service.js';
 import {HighfoodService} from './highfood-service.js';
+import {SparringService} from './sparring-service.js';
+import {ArsenalService} from './arsenal-service.js';
+import {PART_IDS,PART_SLOTS,UPGRADE_TRACKS,WEAPON_IDS} from '@bar/shared';
 import {FuelPayments} from './fuel-service.js';
 import {TradeService} from './trade-service.js';
 import {DevBots} from './dev-bots.js';
@@ -61,6 +64,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const inventory=new InventoryService(db,wardrobe);
   const vehicleStorage=new VehicleStorageService(db);
   const wallet=new WalletService(db,wardrobe);
+  const sparring=new SparringService(db,wardrobe);
+  const arsenal=new ArsenalService(db,wardrobe);
   const fuelPayments=new FuelPayments(db);
   const highfood=new HighfoodService(db,pricing);
   const trade=new TradeService(db,highfood);
@@ -595,6 +600,26 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const body=z.object({userId:uuidSchema,roundId:uuidSchema,payout:z.number().int().min(0).max(10_000_000),
       stakes:z.array(uuidSchema.toLowerCase()).max(16),voids:z.array(uuidSchema.toLowerCase()).max(16)}).strict().parse(request.body);
     return wallet.settlePool(body);
+  });
+  // Zeca's ladder (docs/sistemas/zeca.md): where the player is and the wait left; and the prize of a fight the room says was won.
+  app.post('/api/internal/sparring/status',internalOptions,async request=>sparring.status(sparringStatusRequestSchema.parse(request.body).userId));
+  app.post('/api/internal/sparring/win',internalOptions,async request=>{
+    const body=sparringClaimRequestSchema.parse(request.body);
+    return sparring.win(body.userId,body.requestId.toLowerCase());
+  });
+  // The firearms' arsenal (arsenal-service.ts, docs/sistemas/armas.md): /armas loads it (granting the test kit), a part fitted, an upgrade bought.
+  app.post('/api/internal/arsenal/load',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,testKit:z.boolean().optional()}).strict().parse(request.body);
+    if(body.testKit)await arsenal.grantTestKit(body.userId);
+    return arsenal.load(body.userId,!!body.testKit);
+  });
+  app.post('/api/internal/arsenal/configure',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),slot:z.enum(PART_SLOTS),part:z.enum(PART_IDS).nullable()}).strict().parse(request.body);
+    return arsenal.configure(body.userId,body.weapon,body.slot,body.part);
+  });
+  app.post('/api/internal/arsenal/upgrade',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),track:z.enum(UPGRADE_TRACKS),free:z.boolean(),requestId:uuidSchema}).strict().parse(request.body);
+    return arsenal.upgrade(body.userId,body.weapon,body.track,{free:body.free,requestId:body.requestId.toLowerCase()});
   });
   app.post('/api/internal/equip',internalOptions,async request=>{
     const {sessionId,userId,skin:requestedSkin}=z.object({sessionId:uuidSchema,userId:uuidSchema,skin:z.string().max(32)}).strict().parse(request.body);

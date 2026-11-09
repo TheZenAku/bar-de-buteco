@@ -1,5 +1,5 @@
-import {FIGHT,FIGHT_MOVES,HIT_REACTIONS,isKick,NO_PUNCH,PATCH_MS,TICK_MS,fightMove,hitReaction,punchById,punchClear,punchContact,punchInReach,punchStep,punchThrowable,rewindOf,streamOf,throwPunch,
-  type Collider,type FightHit,type FightPose,type PlayerInput,type PunchId,type RagdollStart} from '@bar/shared';
+import {BLOCK,FIGHT,FIGHT_MOVES,HIT_REACTIONS,blockCovers,blockVerdict,chipOf,isKick,NO_PUNCH,oneWayOf,PATCH_MS,TICK_MS,fightMove,hitReaction,punchById,punchClear,punchContact,punchInReach,punchStep,punchThrowable,rewindOf,streamOf,throwPunch,
+  type BlockSpan,type Collider,type FightHit,type FightPose,type PlayerInput,type PunchId,type RagdollStart} from '@bar/shared';
 import type {Player} from '../state.js';
 
 /** What the fight needs from the room: who may be hit or keep the guard, life, the knockout, the wire. Kept apart so it runs without a room (test/fight.test.ts). */
@@ -8,6 +8,8 @@ export interface FightHost {
   guardRefusal(player:Player):string;
   /** Whether the guard stays up: anything that takes the player (a chair, a bike, a drink in hand, fainting) lowers it. */
   keepsGuard(player:Player):boolean;
+  /** Whether a blow on this player never takes their real life nor knocks them out (the sparring's ring: its lives are the fight's own). */
+  spared?(target:Player):boolean;
   /** Whether this player has bought a kick skill: only then do the kick presses of the guard throw (the skin's clips are checked by the rules). */
   kicks(player:Player):boolean;
   /** Who a punch may hit now: up and free (or fighting), not just back on their feet. */
@@ -27,8 +29,8 @@ export interface FightHost {
   random():number;
 }
 
-/** Where a body was, tick by tick, for the last FIGHT.historyMs: the room turns targets back to where the puncher saw them. */
-class Track {
+/** Where a body was, tick by tick, for the last FIGHT.historyMs: the room turns targets back to where the puncher (or the shooter, world/weapons.ts) saw them. */
+export class Track {
   private static readonly SIZE=Math.ceil(FIGHT.historyMs/TICK_MS)+4;
   private readonly data=new Float64Array(Track.SIZE*5);
   private count=0;private head=0;
@@ -60,11 +62,19 @@ interface Fighter {
   track:Track;
   /** The punch on its way: which, when the room took it, how far back the others are looked for, how far into it the fist has been followed. */
   active?:{move:PunchId;at:number;rewind:number;checked:number;skin:string;n:number};
-  /** A blow's push still to come: per tick, and how many ticks. */
-  knock?:{dx:number;dz:number;left:number};
+  /** A blow's push still to come: per tick, and how many ticks; `free`: the one pushed is on their feet (a blocker), not staggered. */
+  knock?:{dx:number;dz:number;left:number;free?:boolean};
   /** The guard was refused and the player told: not again until the browser stops asking. */
   refused?:boolean;
+  /** The block key's presses on the player's own timeline (BlockSpan), the last few; when the last press was (estimated, ms). */
+  spans:BlockSpan[];lastPress:number;
+  /** The guard meter (fine; the state carries it rounded), when it may start to refill, and until when the counter of a parry hits harder. */
+  meter:number;regenAt:number;riposteUntil:number;
+  /** How long the browser's inputs take to get here, one way (ms), from the last report (oneWayOf). */
+  oneWay:number;
 }
+/** A blow on someone with the guard up, waiting for any block pressed before it to arrive (BLOCK.deferMaxMs). */
+interface Pending {puncher:Player;target:Player;active:NonNullable<Fighter['active']>;contact:{ms:number;x:number;y:number;z:number};due:number}
 
 /**
  * The fist fight in the room (docs/sistemas/luta.md). Inputs throw punches and move fighters (`guard`, `move`, called by BarRoom.step in the inputs'
@@ -73,15 +83,18 @@ interface Fighter {
  */
 export class FightDirector {
   private readonly fighters=new Map<string,Fighter>();
+  private pending:Pending[]=[];
+  /** The room's clock as of the last input or step: where a block released by a lowered guard ends. */
+  private clock=0;
   constructor(private readonly host:FightHost){}
 
   private fighter(id:string):Fighter {
     let fighter=this.fighters.get(id);
-    if(!fighter){fighter={track:new Track()};this.fighters.set(id,fighter);}
+    if(!fighter){fighter={track:new Track(),spans:[],lastPress:-1e9,meter:BLOCK.meter,regenAt:0,riposteUntil:0,oneWay:0};this.fighters.set(id,fighter);}
     return fighter;
   }
   /** The player left the room. */
-  forget(id:string):void {this.fighters.delete(id);}
+  forget(id:string):void {this.fighters.delete(id);this.pending=this.pending.filter(item=>item.puncher.id!==id&&item.target.id!==id);}
   /** Held by a punch or a blow: the room refuses other actions meanwhile (BarRoom.handle). */
   busy(player:Player,seq:number,now:number):boolean {
     return now<player.fist.stunUntil||punchStep(streamOf(player.fist),seq+1,player.skin).locked;
@@ -108,7 +121,7 @@ export class FightDirector {
     player.fist.fight=false;
     this.clearStream(player);
     const fighter=this.fighters.get(player.id);
-    if(fighter)fighter.active=undefined;
+    if(fighter){fighter.active=undefined;this.drop(player,fighter);}
     if(player.animationState==='punch')player.animationState='idle';
   }
   private clearStream(player:Player):void {
@@ -116,19 +129,45 @@ export class FightDirector {
     if(fist.punch||fist.seq!==NO_PUNCH.seq){fist.punch='';fist.seq=NO_PUNCH.seq;fist.yaw=0;fist.lunge=0;}
   }
 
+  /** The block goes up with this input: when the press was, on the blocker's timeline (the input's trip back), and whether it opens a parry window. */
+  private raise(player:Player,fighter:Fighter,input:PlayerInput,now:number):void {
+    if(input.blockAt)fighter.oneWay=oneWayOf(now,input.blockAt);
+    const pressAt=now-fighter.oneWay;
+    fighter.spans.push({from:pressAt,to:Infinity,parry:pressAt-fighter.lastPress>=BLOCK.parryCooldownMs});
+    if(fighter.spans.length>6)fighter.spans.shift();
+    fighter.lastPress=pressAt;
+    player.fist.block=true;
+    // The hands come up: a swing not thrown yet is forgotten, a punch's clip ends.
+    fighter.active=undefined;
+    if(player.animationState==='punch')player.animationState='idle';
+  }
+  /** The block comes down (released, stunned, the guard lowered): its span ends where the release was, on the blocker's timeline. */
+  private drop(player:Player,fighter:Fighter):void {
+    const open=fighter.spans.at(-1);
+    if(open&&open.to===Infinity)open.to=Math.max(open.from,this.clock-fighter.oneWay);
+    player.fist.block=false;
+  }
+
   /**
    * One input with the guard up: a punch thrown with it (when the rules allow it, the same rules the browser predicted with), then the feet planted
    * or stepping in while a punch holds them, else a walk at the guard's pace. Returns whether the body moved.
    */
   move(player:Player,input:PlayerInput,now:number,stagePass:boolean,obstacles:readonly Collider[]):boolean {
-    const fist=player.fist;
+    this.clock=now;
+    const fist=player.fist,fighter=this.fighter(player.id);
     let stream=streamOf(fist);
     const command=input.punch;
-    if(command&&now>=fist.stunUntil&&punchThrowable(stream,input.seq,command.m,player.skin)&&(!isKick(command.m)||this.host.kicks(player))){
+    if(command)fighter.oneWay=oneWayOf(now,command);
+    // The block: held with the feet free (not while a punch plants them, nor stunned or broken); it takes the hands, so no punch goes with it.
+    const free=!punchStep(stream,input.seq,player.skin).locked&&now>=fist.stunUntil&&now>=fist.breakUntil;
+    const blocking=!!input.block&&free;
+    if(blocking&&!fist.block)this.raise(player,fighter,input,now);
+    else if(!blocking&&fist.block)this.drop(player,fighter);
+    if(!blocking&&command&&now>=fist.stunUntil&&punchThrowable(stream,input.seq,command.m,player.skin)&&(!isKick(command.m)||this.host.kicks(player))){
       stream=throwPunch(command,input.seq,input.rotation);
       fist.punch=stream.move;fist.seq=stream.seq;fist.yaw=stream.yaw;fist.lunge=stream.lunge;fist.n=stream.n;fist.at=now;
       player.animationState='punch';player.animationStartedAt=now;
-      this.fighter(player.id).active={move:command.m,at:now,rewind:rewindOf(now,command,PATCH_MS),checked:0,skin:player.skin,n:stream.n};
+      fighter.active={move:command.m,at:now,rewind:rewindOf(now,command,PATCH_MS),checked:0,skin:player.skin,n:stream.n};
     }
     const {locked}=punchStep(stream,input.seq,player.skin),next=fightMove(player,stream,input.seq,input,TICK_MS/1000,stagePass,obstacles,player.skin,player.animationState==='punch');
     const moving=next.x!==player.x||next.z!==player.z;
@@ -143,6 +182,7 @@ export class FightDirector {
 
   /** One tick, after everyone's inputs: where each body is (for the history), the punches on their way, the pushes, and what ends now. */
   step(now:number,players:Iterable<Player>):void {
+    this.clock=now;
     const all=[...players];
     for(const player of all){
       const fighter=this.fighter(player.id);
@@ -150,14 +190,20 @@ export class FightDirector {
       const fist=player.fist;
       if(fist.fight&&!this.host.keepsGuard(player))this.lower(player);
       if(fighter.knock){
-        if(player.interactionState==='stagger')this.host.push(player,fighter.knock.dx,fighter.knock.dz);
+        if(fighter.knock.free||player.interactionState==='stagger')this.host.push(player,fighter.knock.dx,fighter.knock.dz);
         if(--fighter.knock.left<=0)fighter.knock=undefined;
       }
       if(fist.stunUntil&&now>=fist.stunUntil){fist.stunUntil=0;if(player.interactionState==='stagger')player.interactionState='';}
       if(player.animationState==='hit'&&now>=fist.hitAt+(HIT_REACTIONS[fist.hit as keyof typeof HIT_REACTIONS]??1000))player.animationState='idle';
       const move=punchById(fist.punch);
       if(player.animationState==='punch'&&(!move||now>=fist.at+move.durationMs))player.animationState='idle';
+      // The guard meter: refills once the blocker has been left alone a moment, partly back when a broken guard recovers.
+      if(fist.breakUntil&&now>=fist.breakUntil){fist.breakUntil=0;fighter.meter=BLOCK.meter*BLOCK.breakRefill/100;fighter.regenAt=now;}
+      else if(!fist.breakUntil&&!fist.block&&fighter.meter<BLOCK.meter&&now>=fighter.regenAt)fighter.meter=Math.min(BLOCK.meter,fighter.meter+BLOCK.regenPerS*TICK_MS/1000);
+      const shown=Math.round(fighter.meter);
+      if(fist.guard!==shown)fist.guard=shown;
     }
+    this.settle(now);
     for(const puncher of all){
       const fighter=this.fighters.get(puncher.id),active=fighter?.active;
       if(!active)continue;
@@ -182,22 +228,109 @@ export class FightDirector {
     }
     if(!best)return;
     fighter.active=undefined;
-    this.land(puncher,best.target,active,best.contact,now);
+    const victim=this.fighter(best.target.id),hitMs=active.at+best.contact.ms;
+    // Someone with the guard up may have pressed the block before this blow, as they saw it, with the press still on its way here: wait for it.
+    // A block already held past the parry window is settled at once (no press can change it).
+    const held=victim.spans.at(-1);
+    const sure=!!best.target.fist.block&&!!held&&held.to===Infinity&&hitMs-held.from>BLOCK.parryMs;
+    if(best.target.fist.fight&&!sure){
+      this.pending.push({puncher,target:best.target,active,contact:best.contact,due:now+Math.max(TICK_MS/2,Math.min(BLOCK.deferMaxMs,victim.oneWay+TICK_MS/2))});
+      return;
+    }
+    this.resolve(puncher,best.target,active,best.contact,now);
+  }
+
+  /** The blows that waited for a block to arrive, due now: each is settled against the block as the room knows it by this tick. */
+  private settle(now:number):void {
+    if(!this.pending.length)return;
+    const due=this.pending.filter(item=>item.due<=now);
+    if(!due.length)return;
+    this.pending=this.pending.filter(item=>item.due>now);
+    for(const item of due){
+      const {puncher,target}=item;
+      // Gone, or already taken out of the fight by something else in the meantime: the blow is lost.
+      if(!puncher.connected||!target.connected||!this.host.hittable(target,now)||now<target.fist.stunUntil)continue;
+      this.resolve(puncher,target,item.active,item.contact,now);
+    }
+  }
+
+  /** A blow that met a body: the block it ran into, if any, decides what it does. */
+  private resolve(puncher:Player,target:Player,active:NonNullable<Fighter['active']>,contact:{ms:number;x:number;y:number;z:number},now:number):void {
+    const victim=this.fighter(target.id),hitMs=active.at+contact.ms;
+    if(target.fist.fight){
+      const there=victim.track.at(hitMs,target),from=this.fighter(puncher.id).track.at(hitMs,puncher);
+      const verdict=blockCovers(there,from)?blockVerdict(victim.spans,hitMs):'none';
+      if(verdict==='parry')return this.parry(puncher,target,active,contact,now);
+      if(verdict==='block')return this.block(puncher,target,active,contact,now);
+    }
+    this.land(puncher,target,active,contact,now);
+  }
+
+  /** The blow ran into a block: a sliver of its life gets through, the guard meter pays for the rest, and a spent meter breaks the guard. */
+  private block(puncher:Player,target:Player,active:NonNullable<Fighter['active']>,contact:{ms:number;x:number;y:number;z:number},now:number):void {
+    const blow=FIGHT_MOVES[active.move],victim=this.fighter(target.id),fist=target.fist;
+    const away=Math.hypot(target.x-puncher.x,target.z-puncher.z),yaw=away>.05?Math.atan2(target.x-puncher.x,target.z-puncher.z):puncher.rotation;
+    const chip=chipOf(active.move,target.hp+target.hpCore);
+    if(chip>0)this.host.damage(target,chip,now);
+    victim.meter=Math.max(0,victim.meter-blow.damage*BLOCK.drain);victim.regenAt=now+BLOCK.regenDelayMs;fist.guard=Math.round(victim.meter);
+    const broken=victim.meter<=0;
+    let stunUntil=0;
+    if(broken){
+      this.drop(target,victim);
+      fist.breakUntil=stunUntil=now+BLOCK.breakMs;
+      fist.hitAt=now;fist.hit='HitHeavy';fist.hitYaw=yaw;fist.stunUntil=stunUntil;
+      target.animationState='hit';target.animationStartedAt=now;
+      this.host.stun(target);
+    }
+    const ticks=Math.max(1,Math.round(FIGHT.knockbackMs/TICK_MS)),push=blow.knockback*(broken?1:BLOCK.push);
+    if(push>0)victim.knock={dx:Math.sin(yaw)*push/ticks,dz:Math.cos(yaw)*push/ticks,left:ticks,free:!broken};
+    this.say(puncher,target,active,contact,now,{damage:chip,yaw,reaction:broken?'HitHeavy':blow.reaction,stunUntil,ko:false,guard:broken?'break':'block'});
+    this.host.log('fight_block',{playerId:target.id,by:puncher.id,move:active.move,hp:chip,meter:Math.round(victim.meter),broken});
+  }
+
+  /** The blow was parried: nothing gets through, the puncher is thrown off balance, the parrier's meter comes back and their next blow hits harder. */
+  private parry(puncher:Player,target:Player,active:NonNullable<Fighter['active']>,contact:{ms:number;x:number;y:number;z:number},now:number):void {
+    const victim=this.fighter(target.id),thrower=this.fighter(puncher.id),fist=puncher.fist;
+    const away=Math.hypot(puncher.x-target.x,puncher.z-target.z),yaw=away>.05?Math.atan2(puncher.x-target.x,puncher.z-target.z):target.rotation;
+    victim.meter=Math.min(BLOCK.meter,victim.meter+BLOCK.parryRefill);victim.riposteUntil=now+BLOCK.riposteMs;target.fist.guard=Math.round(victim.meter);
+    // The puncher: whatever they had on its way is cut short, and the next chain starts when they can act again.
+    thrower.active=undefined;thrower.knock=undefined;
+    this.clearStream(puncher);
+    const stunUntil=now+BLOCK.parryStunMs;
+    fist.hitAt=now;fist.hit='HitMedium';fist.hitYaw=yaw;fist.stunUntil=stunUntil;
+    puncher.animationState='hit';puncher.animationStartedAt=now;
+    this.host.stun(puncher);
+    const ticks=Math.max(1,Math.round(FIGHT.knockbackMs/TICK_MS));
+    thrower.knock={dx:Math.sin(yaw)*BLOCK.parryPush/ticks,dz:Math.cos(yaw)*BLOCK.parryPush/ticks,left:ticks};
+    this.say(puncher,target,active,contact,now,{damage:0,yaw:Math.atan2(target.x-puncher.x,target.z-puncher.z),reaction:'HitMedium',stunUntil,ko:false,guard:'parry'});
+    this.host.log('fight_parry',{playerId:target.id,by:puncher.id,move:active.move});
+  }
+
+  /** Tells everyone near what a blow did. */
+  private say(puncher:Player,target:Player,active:NonNullable<Fighter['active']>,contact:{x:number;y:number;z:number},now:number,
+    result:Pick<FightHit,'damage'|'yaw'|'reaction'|'stunUntil'|'ko'|'guard'>):void {
+    const hit:FightHit={by:puncher.id,to:target.id,move:active.move,n:active.n,hp:target.hp,x:+contact.x.toFixed(3),y:+contact.y.toFixed(3),z:+contact.z.toFixed(3),at:now,...result,yaw:+result.yaw.toFixed(3)};
+    this.host.broadcast(hit,target);
   }
 
   private land(puncher:Player,target:Player,active:NonNullable<Fighter['active']>,contact:{ms:number;x:number;y:number;z:number},now:number):void {
     const blow=FIGHT_MOVES[active.move],away=Math.hypot(target.x-puncher.x,target.z-puncher.z);
     const yaw=away>.05?Math.atan2(target.x-puncher.x,target.z-puncher.z):puncher.rotation;
-    const reaction=hitReaction(active.move,puncher,target),ko=blow.damage>=target.hp+target.hpCore;
+    // A parry's counter: the first blow within BLOCK.riposteMs hits harder, and spends it.
+    const thrower=this.fighter(puncher.id),dealt=now<thrower.riposteUntil?Math.round(blow.damage*BLOCK.riposte):blow.damage;
+    if(dealt!==blow.damage)thrower.riposteUntil=0;
+    const reaction=hitReaction(active.move,puncher,target),ko=!this.host.spared?.(target)&&dealt>=target.hp+target.hpCore;
     const victim=this.fighter(target.id);
     victim.active=undefined;victim.knock=undefined;
+    // A guard that was up and failed (from behind, or no block yet) is down as the blow lands.
+    this.drop(target,victim);victim.regenAt=now+BLOCK.regenDelayMs;
     let stunUntil=0;
     if(ko){
       this.lower(target);
       this.host.knockout(target,{x:target.x,y:target.y,z:target.z,yaw:target.rotation,vx:Math.sin(yaw)*blow.launch.speed,vz:Math.cos(yaw)*blow.launch.speed,
-        closing:blow.launch.closing,lift:blow.launch.lift,by:puncher.id,seated:false,seed:Math.floor(this.host.random()*0xffffffff)},blow.damage);
+        closing:blow.launch.closing,lift:blow.launch.lift,by:puncher.id,seated:false,seed:Math.floor(this.host.random()*0xffffffff)},dealt);
     }else{
-      this.host.damage(target,blow.damage,now);
+      this.host.damage(target,dealt,now);
       const fist=target.fist;
       // A punch of theirs on its way is cut short, and the next one starts a new chain once they can act.
       this.clearStream(target);
@@ -208,9 +341,9 @@ export class FightDirector {
       const ticks=Math.max(1,Math.round(FIGHT.knockbackMs/TICK_MS));
       if(blow.knockback>0)victim.knock={dx:Math.sin(yaw)*blow.knockback/ticks,dz:Math.cos(yaw)*blow.knockback/ticks,left:ticks};
     }
-    const hit:FightHit={by:puncher.id,to:target.id,move:active.move,n:active.n,damage:blow.damage,hp:target.hp,x:+contact.x.toFixed(3),y:+contact.y.toFixed(3),z:+contact.z.toFixed(3),
+    const hit:FightHit={by:puncher.id,to:target.id,move:active.move,n:active.n,damage:dealt,hp:target.hp,x:+contact.x.toFixed(3),y:+contact.y.toFixed(3),z:+contact.z.toFixed(3),
       yaw:+yaw.toFixed(3),reaction,at:now,stunUntil,ko};
     this.host.broadcast(hit,target);
-    this.host.log(ko?'fight_ko':'fight_hit',{playerId:target.id,by:puncher.id,move:active.move,hp:blow.damage,rewind:Math.round(active.rewind),at:contact.ms});
+    this.host.log(ko?'fight_ko':'fight_hit',{playerId:target.id,by:puncher.id,move:active.move,hp:dealt,rewind:Math.round(active.rewind),at:contact.ms});
   }
 }

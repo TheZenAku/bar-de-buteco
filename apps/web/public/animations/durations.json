@@ -7,7 +7,7 @@
   "AngrySit": 3333,
   "Sit": 1167,
   "OldCaneWalk": 1600,
-  "Kick": 2000,
+  "Kick": 1333,
   "Bartend": 13567,
   "Walk": 1400,
   "Run": 733,
@@ -49,8 +49,9 @@
   "FightBack": 1200,
   "FightLeft": 1033,
   "FightRight": 1033,
-  "KickHigh": 1261,
-  "KickFront": 1309,
+  "KickHigh": 1036,
+  "KickFront": 1010,
   "Jog": 2567,
-  "Elbow": 1000
+  "Elbow": 1000,
+  "FightBlock": 80
 }

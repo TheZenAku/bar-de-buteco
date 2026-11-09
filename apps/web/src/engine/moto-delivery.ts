@@ -396,6 +396,34 @@ export class Motos {
   }
 }
 
+/**
+ * The pillion (garupa): the Sit clip made into a pose behind the rider, drawn after the clip like seatRider: hips on the back of the seat, the body
+ * a little forward, hands on the rider's waist and feet on the pegs, all by two-bone IK in world space (the skin's own bone axes do not matter).
+ * `rider` is the body of the rider in front, when it is drawn: the hands go to the sides of their hips.
+ */
+const PILLION_BACK=.5,PILLION_UP=.07,PILLION_LEAN=8,WAIST_FORWARD=.2,WAIST_UP=.12,WAIST_APART=.2;
+export function seatPillion(moto:MotoRig,pillion:RiderRig,driver?:pc.Entity):void {
+  const {root}=pillion;
+  root.setRotation(moto.ponto('chassi').getRotation());
+  const left=root.right.clone(),up=root.up.clone(),front=root.forward.clone().mulScalar(-1);
+  const hips=moto.ponto('ponto_piloto').getPosition().clone().add(up.clone().mulScalar(HIP_OVER_SEAT+PILLION_UP)).sub(front.clone().mulScalar(PILLION_BACK-HIP_FORWARD));
+  root.setPosition(root.getPosition().clone().add(hips.sub(pillion.hip.getPosition())));
+  if(pillion.spine)pillion.spine.setRotation(leanTurn.setFromAxisAngle(left,PILLION_LEAN).mul(pillion.spine.getRotation()));
+  const waist=driver?.getPosition().clone()??hips.clone().add(front.clone().mulScalar(WAIST_FORWARD+.1));
+  for(const [side,sign] of [['l',1],['r',-1]] as const){
+    const hand=side==='l'?pillion.hand_l:pillion.hand_r,rig=side==='l'?pillion.handRigL:pillion.handRigR;
+    const point=waist.clone().add(up.clone().mulScalar(WAIST_UP)).add(left.clone().mulScalar(sign*WAIST_APART));
+    reach(side==='l'?pillion.upperarm_l:pillion.upperarm_r,side==='l'?pillion.lowerarm_l:pillion.lowerarm_r,hand,point,left.clone().mulScalar(sign*.8).add(up.clone().mulScalar(-.4)).sub(front.clone().mulScalar(.1)));
+    if(rig){palmUp(rig,left.clone().mulScalar(-sign),front);closeHand(rig,GRIP_CURL);}
+  }
+  for(const [side,point,sign] of [['l','ponto_pe_E',1],['r','ponto_pe_D',-1]] as const){
+    const foot=side==='l'?pillion.foot_l:pillion.foot_r,kept=footTurn.copy(foot.getRotation());
+    const ankle=moto.ponto(point).getPosition().clone().add(up.clone().mulScalar(ANKLE_OVER_FLOOR)).sub(front.clone().mulScalar(PILLION_BACK*.55));
+    reach(side==='l'?pillion.upperleg_l:pillion.upperleg_r,side==='l'?pillion.lowerleg_l:pillion.lowerleg_r,foot,ankle,front.clone().add(left.clone().mulScalar(sign*.35)));
+    foot.setRotation(kept);
+  }
+}
+
 /** The body a rider's skin gives seatRider. */
 export interface RiderRig {
   root:pc.Entity;hip:pc.Entity;spine?:pc.Entity|null;head:pc.Entity;

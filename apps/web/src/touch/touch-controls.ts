@@ -15,6 +15,10 @@ export interface TouchHost {
   skillButton():HTMLButtonElement|null;
   /** The fist fight's guard is up: the punch buttons show (docs/sistemas/luta.md). */
   guard?():boolean;
+  /** Firearms (docs/sistemas/armas.md#toque): a weapon is in hand (fire, aim, reload, weapon show), it is aimed (the aim button lit), through a scope (zoom and breath show). */
+  armed?():boolean;aiming?():boolean;scoped?():boolean;
+  /** A finger dragged on the fire button turns the view (BarScene.touchLook). */
+  look?(dx:number,dy:number):void;
 }
 
 interface Tile {id:string;icon:string;label:string;code?:string;shift?:boolean;hold?:boolean;run?:()=>void;kinds:readonly TouchKind[]}
@@ -106,6 +110,14 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
       <button type="button" class="tp-btn tp-horn" data-tp="horn" aria-label="Buzina">${uiIcon('volume')}<b>Buzina</b></button>
       <button type="button" class="tp-btn tp-punch" data-tp="punch" aria-label="Soco">${uiIcon('hand')}<b>Soco</b></button>
       <button type="button" class="tp-btn tp-heavy" data-tp="heavy" aria-label="Soco forte">${uiIcon('bolt')}<b>Forte</b></button>
+      <button type="button" class="tp-btn tp-block" data-tp="block" aria-label="Defender">${uiIcon('shield')}<b>Defesa</b></button>
+      <button type="button" class="tp-btn tp-fire" data-tp="fire" aria-label="Atirar">${uiIcon('crosshair')}<b>Atirar</b></button>
+      <button type="button" class="tp-btn tp-aim" data-tp="aim" aria-label="Mirar" aria-pressed="false">${uiIcon('locate')}<b>Mirar</b></button>
+      <button type="button" class="tp-btn tp-reload" data-tp="reload" aria-label="Recarregar">${uiIcon('reset')}<b>Recarga</b></button>
+      <button type="button" class="tp-btn tp-weapon" data-tp="weapon" aria-label="Trocar de arma">${uiIcon('grid')}<b>Arma</b></button>
+      <button type="button" class="tp-btn tp-zoomin" data-tp="zoom-in" aria-label="Aproximar">${uiIcon('plus')}<b>Zoom</b></button>
+      <button type="button" class="tp-btn tp-zoomout" data-tp="zoom-out" aria-label="Afastar">${uiIcon('minus')}<b>Zoom</b></button>
+      <button type="button" class="tp-btn tp-breath" data-tp="breath" aria-label="Segurar o fôlego">${uiIcon('timer')}<b>Fôlego</b></button>
     </div>
     <div class="tp-sheet hidden" data-tp-sheet role="menu" aria-label="Mais ações"></div>`;
   parent.append(root);
@@ -181,6 +193,27 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
   // The punches press made-up codes the scene reads only with the guard up (BarScene keydown).
   bind($('[data-tp="punch"]'),()=>{closeSheet();press('FightLight');});
   bind($('[data-tp="heavy"]'),()=>{closeSheet();press('FightHeavy');});
+  // The block is held: its button holds the made-up key the scene reads (BarScene keydown).
+  {const block=holdKey('FightBlock');bind($('[data-tp="block"]'),()=>{closeSheet();block.down();},block.up);}
+  // Firearms, only with a weapon in hand: fire held (a finger dragged on it also turns the view), aim a toggle, reload, the weapon (its wheel), and
+  // through a scope the zoom and the held breath. They press made-up codes the weapons read first (WeaponsController.key).
+  const aimButton=$<HTMLButtonElement>('[data-tp="aim"]');
+  {
+    const fire=holdKey('WeaponFire'),button=$('[data-tp="fire"]');
+    let last:{id:number;x:number;y:number}|undefined;
+    bind(button,()=>{closeSheet();fire.down();},()=>{last=undefined;fire.up();});
+    button.addEventListener('pointerdown',event=>{last={id:event.pointerId,x:event.clientX,y:event.clientY};});
+    button.addEventListener('pointermove',event=>{
+      if(!last||event.pointerId!==last.id)return;
+      host.look?.(event.clientX-last.x,event.clientY-last.y);last.x=event.clientX;last.y=event.clientY;
+    });
+  }
+  bind(aimButton,()=>{closeSheet();press('WeaponAim');});
+  bind($('[data-tp="reload"]'),()=>{closeSheet();press('WeaponReload');});
+  bind($('[data-tp="weapon"]'),()=>{closeSheet();press('WeaponWheel');});
+  bind($('[data-tp="zoom-in"]'),()=>press('WeaponZoomIn'));
+  bind($('[data-tp="zoom-out"]'),()=>press('WeaponZoomOut'));
+  {const breath=holdKey('WeaponBreath');bind($('[data-tp="breath"]'),breath.down,breath.up);}
   // The run button: a latch on foot (the stick's edge runs too), and Shift held to rear up on a bike or a horse.
   {
     const shift=holdKey('ShiftLeft');
@@ -217,6 +250,10 @@ export function createTouchControls(parent:HTMLElement,host:TouchHost):{sync():v
     if(visible!==shown){shown=visible;root.classList.toggle('tp-hidden',!visible);if(!visible)release();else keepAwake();}
     if(!visible)return;
     const guard=host.guard?.()?'on':'off';
+    const armed=host.armed?.()?'on':'off',scoped=host.scoped?.()?'on':'off',aiming=!!host.aiming?.();
+    if(root.dataset.armed!==armed)root.dataset.armed=armed;
+    if(root.dataset.scoped!==scoped)root.dataset.scoped=scoped;
+    if(aimButton.classList.contains('tp-on')!==aiming){aimButton.classList.toggle('tp-on',aiming);aimButton.setAttribute('aria-pressed',String(aiming));}
     if(root.dataset.guard!==guard)root.dataset.guard=guard;
     const now=host.context();
     if(now!==kind){

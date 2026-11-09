@@ -66,7 +66,7 @@ A cada quadro, um raio sai do corpo até o lugar onde a câmera quer ficar (`cam
 - **Móveis e objetos** (geladeiras, carrinho de espetinho, carros) aproximam a câmera em 0,08 s, de forma contínua.
 - **Afastar** espera 0,18 s com o caminho livre e leva cerca de meio segundo, começando devagar, para não ficar indo e voltando perto de obstáculos.
 - **Cantos:** um raio extra olha 0,12 s à frente do movimento da câmera, para ela começar a se aproximar antes de chegar ao canto.
-- **Ombro:** sem espaço do lado direito, a câmera volta para trás do personagem até esse lado ficar livre por 0,4 s.
+- **Ombro:** a câmera fica sempre no ombro escolhido (com ou sem arma); só o jogador troca o lado (H / R3 com arma, ou o ajuste). Sem espaço desse lado, ela só chega mais perto do personagem.
 - **Piso:** a câmera fica pelo menos 18 cm acima do chão sob os pés. Olhando para cima, ela se aproxima em vez de entrar no chão.
 - **Cabeça:** a menos de 42 cm dela, a cabeça some, e só volta a mais de 55 cm. Isso não conta como primeira pessoa, então o corpo não passa a girar com a visão.
 - **A distância escolhida nunca muda:** é para ela que a câmera volta quando há espaço.

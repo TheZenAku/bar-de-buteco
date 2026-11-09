@@ -285,6 +285,8 @@ export function createPauseMenu(parent:HTMLElement,tabs:MenuTab[],host:MenuHost)
   // ---- Keys: every one stops here while open, so the world, the chat and the shortcuts never see them.
   function onKey(event:KeyboardEvent):void {
     if(!open||closing)return;
+    // A key being chosen for a weapon (main.ts weapon-key): the capture listener owns every key until it ends.
+    if(root.querySelector('[data-capturing]'))return;
     if(browserKey(event))return;
     event.stopImmediatePropagation();
     const k=event.key,code=event.code;

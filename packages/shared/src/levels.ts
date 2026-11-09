@@ -2,25 +2,28 @@ import {ACHIEVEMENT_SERIES} from './achievements.js';
 
 /**
  * Player levels, 1 to 100 (docs/sistemas/niveis.md). XP is not stored: it is read from the achievement counters, which
- * already count what players do in the bar, so everything that counts towards a badge gives a little XP too.
+ * already count what players do in the bar. Time connected counts towards badges only, without granting XP.
  */
 export const MAX_LEVEL=100;
 
 /** XP for one unit of each series, as the player sees it (one beer, one minute, one km): the defaults of the `xp:<series>` prices. */
 export const XP_PER_UNIT:Readonly<Record<string,number>>={
-  frequentador:60,bebum:10,'boca-nervosa':8,cafeinado:6,fumante:4,'bexiga-solta':5,'passou-mal':5,apagou:10,
+  bebum:10,'boca-nervosa':8,cafeinado:6,fumante:4,'bexiga-solta':5,'passou-mal':5,apagou:10,
   'pe-de-valsa':6,'estrela-do-palco':8,'mesa-de-luz':1,'dj-de-boteco':10,ajudante:15,fregues:10,'rei-do-21':15,
   'craque-do-pebolim':40,'mestre-da-sinuca':40,'rei-do-truco':50,motoboy:15,entregador:30,barbeiro:5,mecanico:15,
+  sparring:50,'quebra-queixo':100,
   andarilho:20,resenha:1,'gente-boa':2,fofoqueiro:1,influencer:15,pix:5,telefonista:10,
 };
 /** The daily bonus keeps its XP in its own counter, one point per XP (claimDaily). */
 export const DAILY_XP_SERIES='diario';
+/** Fixed XP earned from time connected before migration 025; new presence never increases it. */
+export const LEGACY_PRESENCE_XP_SERIES='presenca-xp-legado';
 /** What the administration added and took away, one point per XP each (counters cannot be negative). */
 export const ADMIN_XP_SERIES='ajuste-xp',ADMIN_XP_REMOVED_SERIES='ajuste-xp-menos';
 const PER=new Map(ACHIEVEMENT_SERIES.map(series=>[series.id,series.per??1]));
 /** The panel's values (`xp:<series>` in the price table) over the code's. */
 type XpTable=Readonly<Record<string,number>>;
-const xpPerStored=(series:string,table?:XpTable):number=>series===DAILY_XP_SERIES?1:(table?.[`xp:${series}`]??XP_PER_UNIT[series]??0)/(PER.get(series)??1);
+const xpPerStored=(series:string,table?:XpTable):number=>series==='frequentador'?0:series===DAILY_XP_SERIES||series===LEGACY_PRESENCE_XP_SERIES?1:(table?.[`xp:${series}`]??XP_PER_UNIT[series]??0)/(PER.get(series)??1);
 
 /** A player's XP from their counters (`user_achievements` rows); counters that give none count for nothing. Never below 0. */
 export function xpOfCounters(rows:Iterable<{series:string;value:number}>,table?:XpTable):number {

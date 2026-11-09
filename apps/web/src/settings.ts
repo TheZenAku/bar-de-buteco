@@ -1,5 +1,7 @@
 import {readGraphics,defaultGraphics,type GraphicsSettings} from './graphics';
 import {DEFAULT_CAMERA_DISTANCE,DEFAULT_CAMERA_FEEL,isCameraMode,readCameraDistance,readCameraFeel,type CameraFeel,type CameraMode} from './engine/camera-rig';
+import {DEFAULT_WEAPON_KEYS,readWeaponKeys,type WeaponKeys} from './weapons/key-bindings';
+import {AIM_CAMERA_VERSION,DEFAULT_AIM,DEFAULT_AIM_CAMERA,DEFAULT_PAD,readAim,readAimCamera,readPad,readShoulder,type AimCamera,type AimSettings,type PadSettings,type ShoulderSide} from './weapons/aim-settings';
 /** Per-browser preferences for sound, proximity voice, graphics and the camera. The jukebox keeps its own volume (jukebox.ts). */
 export interface GameSettings {
   /** Volumes 0–1; the microphone gain is mic × 2 (0.5 = unchanged). */
@@ -16,11 +18,19 @@ export interface GameSettings {
   cameraDistance:number;
   /** Height, sensitivity and smoothing of the view. */
   cameraFeel:CameraFeel;
+  /** Firearms (weapons/aim-settings.ts): the aim help per device and the look's speed while aiming; the gamepad's stick; the shoulder the view sits over. */
+  aim:AimSettings;pad:PadSettings;shoulder:ShoulderSide;
+  /** Where the camera sits with a weapon, aiming and not (tuned live to find the defaults). */
+  aimCamera:AimCamera;
+  /** Which defaults aimCamera was saved under: older ones are dropped for the current DEFAULT_AIM_CAMERA. */
+  aimCameraVersion:number;
+  /** The firearms' keys on the keyboard and the mouse's side buttons (weapons/key-bindings.ts). */
+  weaponKeys:WeaponKeys;
 }
 const KEY='bar:settings:v1';
 // The starting distance until 2026-11-02: saved as it was, it means the player never zoomed, so they get the new one.
 const OLD_DEFAULT_DISTANCE=6.4;
-export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,ui:.8,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE,cameraFeel:{...DEFAULT_CAMERA_FEEL}};
+export const DEFAULT_SETTINGS:GameSettings={master:1,music:1,voice:1,mic:.5,ui:.8,micEnabled:false,voicesEnabled:true,voiceMode:'open',sensitivity:.35,inputDevice:'',graphics:defaultGraphics(),camera:'third',cameraDistance:DEFAULT_CAMERA_DISTANCE,cameraFeel:{...DEFAULT_CAMERA_FEEL},aim:{...DEFAULT_AIM},pad:{...DEFAULT_PAD},shoulder:'right',aimCamera:{...DEFAULT_AIM_CAMERA},aimCameraVersion:AIM_CAMERA_VERSION,weaponKeys:{...DEFAULT_WEAPON_KEYS}};
 const unit=(value:unknown,fallback:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 
 export function createSettings(){
@@ -39,6 +49,7 @@ export function createSettings(){
       // Older browsers stored one of three fixed third-person views, with no separate distance.
       cameraDistance:saved.cameraDistance===OLD_DEFAULT_DISTANCE?current.cameraDistance:readCameraDistance(saved.cameraDistance,saved.camera==='near'?3:saved.camera==='far'?10.5:current.cameraDistance),
       cameraFeel:readCameraFeel(saved.cameraFeel),
+      aim:readAim(saved.aim),pad:readPad(saved.pad),shoulder:readShoulder(saved.shoulder),aimCamera:saved.aimCameraVersion===AIM_CAMERA_VERSION?readAimCamera(saved.aimCamera):{...DEFAULT_AIM_CAMERA},aimCameraVersion:AIM_CAMERA_VERSION,weaponKeys:readWeaponKeys(saved.weaponKeys),
     };
   }catch{/* Private mode or malformed: defaults. */}
   return {

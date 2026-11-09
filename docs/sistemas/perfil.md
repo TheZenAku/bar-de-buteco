@@ -27,7 +27,7 @@ Alguns personagens têm habilidades próprias, listadas em `SKILLS` (`packages/s
 
 | Skill | Skin | Clipe | Duração |
 | --- | --- | --- | ---: |
-| Golpe de karatê | Rafael | `Kick` | 2 s |
+| Golpe de karatê | Rafael | `Kick` | 1,3 s |
 | Chute voador | Rafael | `AirKick` | 2,9 s |
 
 - Sem escolha salva, a primeira skill comprada do personagem fica ativa na tecla **X**.

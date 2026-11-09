@@ -53,6 +53,10 @@
     "assets:highfood:logo": "node tools/assets/import-highfood-logo.mjs",
     "assets:ambient": "node tools/assets/import-ambient.mjs",
     "assets:icons": "node tools/assets/import-icons.mjs",
+    "assets:weapons": "node tools/assets/import-weapons.mjs && node tools/assets/render-weapon-icons.mjs",
+    "assets:weapons:icons": "node tools/assets/render-weapon-icons.mjs",
+    "assets:weapons:sound": "node tools/assets/import-weapon-sounds.mjs",
+    "assets:gun-bodies": "node tools/assets/measure-gun-bodies.mjs",
     "ops:backup": "node tools/ops/postgres-backup.mjs",
     "ops:restore-check": "node tools/ops/postgres-restore-check.mjs",
     "assets:mixamo-export": "node tools/assets/export-mixamo.mjs"

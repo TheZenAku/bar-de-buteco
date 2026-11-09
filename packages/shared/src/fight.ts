@@ -48,13 +48,83 @@ export const FIGHT={
   graceMs:1500,
 } as const;
 
+/**
+ * Defense (docs/sistemas/luta.md#defesa): hold the block key in the guard. A block taken in the arc in front lets only a sliver of the blow through and
+ * wears the guard meter down; a press just before the blow lands is a parry (nothing through, the puncher is thrown off balance and the parrier's next
+ * blow hits harder). The room judges it on the blocker's own timeline (blockVerdict), see world/fight.ts.
+ */
+export const BLOCK={
+  /** Walking with the block held (m/s); it cannot run. */
+  speed:1.3,
+  /** A parry: a blow landing up to this long after the block went up (ms). */
+  parryMs:180,
+  /** A press opens a parry window only this long after the previous press (ms): holding or mashing the key is a plain block. */
+  parryCooldownMs:550,
+  /** Half the arc in front that a block covers (radians): from the side or behind the blow gets through whole. */
+  arc:1.2,
+  /** The share of a blow's life that gets through a block (light, heavy), never the last point of life. */
+  chip:.15,chipHeavy:.3,
+  /** The guard meter: its size, how much of a blow's life it costs, what it regains per second once the blocker has been hit-free for `regenDelayMs`. */
+  meter:100,drain:1.4,regenPerS:14,regenDelayMs:900,
+  /** A parry gives some of the meter back. */
+  parryRefill:30,
+  /** Meter broken: how long the blocker is staggered (ms) and how much of the meter is back after. */
+  breakMs:1100,breakRefill:40,
+  /** How much of a blow's push a block takes. */
+  push:.5,
+  /** What a parry does to the puncher: stun (ms), push (m); and how long the parrier's counter is stronger (ms), and by how much. */
+  parryStunMs:800,parryPush:.35,riposteMs:1400,riposte:1.35,
+  /**
+   * Netcode: a blow on someone with the guard up is settled this much later than it was detected (their one-way trip plus a tick, at most deferMaxMs),
+   * so a block pressed before it, as the blocker saw it, has reached the room. The rest of the browsers have already drawn the blow by then.
+   * `lateMaxMs`: the most one-way delay the room believes a browser's own report of its trip.
+   */
+  deferMaxMs:150,lateMaxMs:250,
+} as const;
+
+/** A press of the block key, reported with the input that carries it (and only that one): the same `seen`/`ago` as a punch, to know how late it is. */
+export interface BlockCommand {seen:number;ago:number}
+export const blockCommandSchema=z.object({seen:z.number().finite().min(0),ago:z.number().finite().min(0).max(10_000)}).strict();
+/**
+ * One-way trip of an input (ms), from what the browser says it saw: the room's clock now (`takenAt`) less the state it had drawn (`seen`) and how long
+ * it had held it (`ago`) is the way down, the wait and the way up. Half of it, less half a tick of waiting for the room's next step.
+ */
+export function oneWayOf(takenAt:number,command:{seen:number;ago:number},tickMs=50):number {
+  if(!Number.isFinite(command.seen)||command.seen>takenAt)return 0;
+  return Math.max(0,Math.min(BLOCK.lateMaxMs,(takenAt-command.seen-Math.max(0,command.ago)-tickMs/2)/2));
+}
+/** A stretch the block key was held, on the room's clock: from its (estimated) press to its release (Infinity while held), and whether this press opened a parry window. */
+export interface BlockSpan {from:number;to:number;parry:boolean}
+/**
+ * What a blow landing at `hitMs` meets: a parry if the block went up at most BLOCK.parryMs before it (and that press opened a window), a plain block if
+ * it was held, else nothing. The blocker's presses are on their own timeline (the press, less its trip), not the room's moment of taking the input.
+ */
+export function blockVerdict(spans:readonly BlockSpan[],hitMs:number):'parry'|'block'|'none' {
+  for(let i=spans.length-1;i>=0;i--){
+    const span=spans[i]!;
+    if(hitMs<span.from||hitMs>span.to)continue;
+    return span.parry&&hitMs-span.from<=BLOCK.parryMs?'parry':'block';
+  }
+  return 'none';
+}
+/** Whether the blow comes from within the arc the block covers, the blocker at `at` facing `at.rotation`, the puncher at `from`. */
+export function blockCovers(at:FightPose,from:Position):boolean {
+  const heading=Math.atan2(from.x-at.x,from.z-at.z);
+  return Math.abs(normalizeHeading(heading-at.rotation))<=BLOCK.arc;
+}
+/** The life that gets through a block, never taking the last point (`left`: life left in all). */
+export function chipOf(move:PunchId,left:number):number {
+  const blow=FIGHT_MOVES[move];
+  return Math.max(0,Math.min(Math.round(blow.damage*(blow.heavy?BLOCK.chipHeavy:BLOCK.chip)),Math.floor(left)-1));
+}
+
 /** The blows: the punches (every skin), and Rafael's kicks (only skins whose bank has them, `hasKicks`). */
 export const PUNCH_IDS=['jab','cross','hook','elbow','heavy','frontKick','bodyKick','roundKick'] as const;
 export type PunchId=typeof PUNCH_IDS[number];
 /** How the one hit reacts: by the punch, or from behind. */
 export const HIT_REACTIONS={HitLight:848,HitMedium:1000,HitSide:1121,HitHeavy:1533,HitBack:1267} as const;
 export type HitReaction=keyof typeof HIT_REACTIONS;
-export const FIGHT_CLIPS=['FightIdle','Jab','Cross','Hook','Elbow','Heavy',...Object.keys(HIT_REACTIONS),'FightBack','FightLeft','FightRight'] as const;
+export const FIGHT_CLIPS=['FightIdle','FightBlock','Jab','Cross','Hook','Elbow','Heavy',...Object.keys(HIT_REACTIONS),'FightBack','FightLeft','FightRight'] as const;
 
 /** What a press asks for: the left button, the right button, the kick key. */
 export type PressKind='light'|'heavy'|'kick';
@@ -100,12 +170,12 @@ export const FIGHT_MOVES:Readonly<Record<PunchId,PunchMove>>={
     damage:24,stunMs:650,knockback:.8,reaction:'HitHeavy',launch:{speed:6,lift:2.6,closing:3},heavy:true},
   // Rafael's kicks (docs/sistemas/luta.md): they hit harder than any punch and stun longer, push but never throw the body (the free kick outside the
   // guard does; here a knockout is the only flight). The leg is thicker than a fist, and the way it goes is the foot's.
-  frontKick:{id:'frontKick',name:'Chute frontal',clip:'KickFront',durationMs:1309,activeFrom:480,activeTo:680,swingMs:460,lockSteps:14,chainSteps:22,then:{light:'cross',heavy:'heavy',kick:'bodyKick'},radius:.17,lungeMax:.45,lungeSteps:5,
+  frontKick:{id:'frontKick',name:'Chute frontal',clip:'KickFront',durationMs:1010,activeFrom:370,activeTo:525,swingMs:355,lockSteps:11,chainSteps:17,then:{light:'cross',heavy:'heavy',kick:'bodyKick'},radius:.17,lungeMax:.45,lungeSteps:5,
     damage:16,stunMs:520,knockback:.5,reaction:'HitMedium',launch:{speed:5,lift:2.4,closing:2.5},heavy:false},
-  bodyKick:{id:'bodyKick',name:'Chute no tronco',clip:'KickHigh',durationMs:1261,activeFrom:340,activeTo:500,swingMs:320,lockSteps:11,chainSteps:20,then:{light:'hook',heavy:'heavy',kick:'roundKick'},radius:.17,lungeMax:.5,lungeSteps:4,
+  bodyKick:{id:'bodyKick',name:'Chute no tronco',clip:'KickHigh',durationMs:1036,activeFrom:280,activeTo:410,swingMs:265,lockSteps:9,chainSteps:16,then:{light:'hook',heavy:'heavy',kick:'roundKick'},radius:.17,lungeMax:.5,lungeSteps:4,
     damage:19,stunMs:580,knockback:.6,reaction:'HitHeavy',launch:{speed:5.5,lift:2.6,closing:3},heavy:true},
   // The karate's round kick, head high with a long wind-up: the finisher, the biggest damage of the guard.
-  roundKick:{id:'roundKick',name:'Chute de karatê',clip:'Kick',durationMs:2000,activeFrom:480,activeTo:760,swingMs:440,lockSteps:17,chainSteps:17,then:{},radius:.17,lungeMax:.6,lungeSteps:6,
+  roundKick:{id:'roundKick',name:'Chute de karatê',clip:'Kick',durationMs:1333,activeFrom:320,activeTo:507,swingMs:293,lockSteps:11,chainSteps:11,then:{},radius:.17,lungeMax:.6,lungeSteps:6,
     damage:27,stunMs:800,knockback:1,reaction:'HitHeavy',launch:{speed:7,lift:3,closing:3.5},heavy:true},
 };
 /** Whether a blow is one of Rafael's kicks (their clips are Kick, KickHigh, KickFront). */
@@ -178,7 +248,7 @@ export function punchCarries(carry:boolean,stream:PunchStream,seq:number,input:{
  * the punch's own way while `carry` (punchCarries) and standing still, else walking at FIGHT.speed, or running at FIGHT.runSpeed (`running`: already
  * checked against stamina). `dt`: the input's time (TICK_MS).
  */
-export function fightMove(position:Position,stream:PunchStream,seq:number,input:{dx:number;dz:number;running?:boolean},dt:number,stagePass:boolean,obstacles:readonly Collider[],skin?:string,carry=false):Required<Position> {
+export function fightMove(position:Position,stream:PunchStream,seq:number,input:{dx:number;dz:number;running?:boolean;block?:boolean},dt:number,stagePass:boolean,obstacles:readonly Collider[],skin?:string,carry=false):Required<Position> {
   const {locked,step}=punchStep(stream,seq,skin),move=punchById(stream.move),steps=seq-stream.seq;
   const along=locked?step:carry&&move&&!input.dx&&!input.dz?punchRoot(skin,move.id,steps+1)-punchRoot(skin,move.id,steps):0;
   if(locked||along){
@@ -186,7 +256,7 @@ export function fightMove(position:Position,stream:PunchStream,seq:number,input:
     const sign=Math.sign(along);
     return movePlayer(position,{dx:Math.sin(stream.yaw)*sign,dz:Math.cos(stream.yaw)*sign,running:false},dt,false,stagePass,obstacles,Math.abs(along)/dt);
   }
-  return movePlayer(position,{dx:input.dx,dz:input.dz,running:false},dt,false,stagePass,obstacles,input.running?FIGHT.runSpeed:FIGHT.speed);
+  return movePlayer(position,{dx:input.dx,dz:input.dz,running:false},dt,false,stagePass,obstacles,input.block?BLOCK.speed:input.running?FIGHT.runSpeed:FIGHT.speed);
 }
 
 /** The moment of the room a browser draws the others at (ms): its newest state, less the glide towards it (PATCH_GLIDE in BarScene: 120 ms for 100). */
@@ -317,7 +387,7 @@ export function hitReaction(move:PunchId,puncher:Position,target:FightPose):HitR
  * A player's fight as the room shares it (Player.fist): the guard up; the last punch thrown as its PunchStream (punch, seq, yaw, lunge, n) and when
  * the room took it (at); the last blow taken: when, the reaction, which way it was going, and until when it stuns.
  */
-export interface FistState {fight:boolean;punch:string;seq:number;yaw:number;lunge:number;n:number;at:number;hitAt:number;hit:string;hitYaw:number;stunUntil:number}
+export interface FistState {fight:boolean;punch:string;seq:number;yaw:number;lunge:number;n:number;at:number;hitAt:number;hit:string;hitYaw:number;stunUntil:number;block:boolean;guard:number;breakUntil:number}
 /** The PunchStream the room has for a player (the browser starts from it and runs its unanswered inputs on top). */
 export function streamOf(fist:Partial<FistState>|undefined):PunchStream {
   return fist?.punch&&punchById(fist.punch)?{move:fist.punch as PunchId,seq:fist.seq??NO_PUNCH.seq,yaw:fist.yaw??0,lunge:fist.lunge??0,n:fist.n??0}:NO_PUNCH;
@@ -336,4 +406,9 @@ export interface FightHit {
   at:number;stunUntil:number;
   /** The blow that knocked them out: they fly (ragdoll) and, out of life, the Morte comes. */
   ko:boolean;
+  /**
+   * Set when the one hit (`to`) defended: 'block' (`damage` is what got through), 'break' (the meter broke: `stunUntil` is theirs) or 'parry' (nothing
+   * got through; `stunUntil` is the puncher's `by`, thrown off balance).
+   */
+  guard?:'block'|'break'|'parry';
 }

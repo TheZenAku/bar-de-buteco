@@ -16,10 +16,10 @@ export const MOTO_SCOOTER_MODEL='moto-scooter';
 export const MOTO_SCOOTER_NAME='Scooter de Entrega';
 /** Register a playable model here once: administration spawn, registration and filters use this catalogue. */
 export const VEHICLE_CATALOG=[
-  {model:'moto-delivery',name:'Highland Bar Delivery',kind:'moto',seats:1,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-v4.webp'},
-  {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,kind:'moto',seats:1,defaultColor:FOGO_DEFAULT_COLOR,paintable:true,photo:'moto/foto-fogo.webp'},
-  {model:MOTO_CLASSICA_MODEL,name:MOTO_CLASSICA_NAME,kind:'moto',seats:1,defaultColor:CLASSICA_DEFAULT_COLOR,paintable:true,photo:'moto/foto-classica.webp'},
-  {model:MOTO_SCOOTER_MODEL,name:MOTO_SCOOTER_NAME,kind:'moto',seats:1,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-scooter.webp'},
+  {model:'moto-delivery',name:'Highland Bar Delivery',kind:'moto',seats:2,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-v4.webp'},
+  {model:MOTO_FOGO_MODEL,name:MOTO_FOGO_NAME,kind:'moto',seats:2,defaultColor:FOGO_DEFAULT_COLOR,paintable:true,photo:'moto/foto-fogo.webp'},
+  {model:MOTO_CLASSICA_MODEL,name:MOTO_CLASSICA_NAME,kind:'moto',seats:2,defaultColor:CLASSICA_DEFAULT_COLOR,paintable:true,photo:'moto/foto-classica.webp'},
+  {model:MOTO_SCOOTER_MODEL,name:MOTO_SCOOTER_NAME,kind:'moto',seats:2,defaultColor:DEFAULT_CAR_COLOR,paintable:false,photo:'moto/foto-scooter.webp'},
   {model:CAR_MODEL,name:CAR_NAME,kind:'carro',seats:4,defaultColor:DEFAULT_CAR_COLOR,paintable:true,photo:'carro/foto.png'},
   {model:TRUCK_MODEL,name:TRUCK_NAME,kind:'carro',seats:2,defaultColor:DEFAULT_TRUCK_COLOR,paintable:true,photo:'caminhao/foto.png'},
 ] as const;
@@ -60,8 +60,17 @@ export const TRUCK_SEATS=[
   {name:'Motorista',node:'ponto_motorista',x:.5,y:1.36,z:1.45,side:1},
   {name:'Passageiro',node:'ponto_passageiro',x:-.5,y:1.36,z:1.45,side:-1},
 ] as const;
+/** The bikes' two places: the rider on `ponto_piloto`, the pillion behind (`z`, m, in the bike's frame: +Z forward). The pillion gets off on the right. */
+export const MOTO_SEATS=[
+  {name:'Piloto',node:'ponto_piloto',x:0,y:0,z:0,side:1},
+  {name:'Garupa',node:'ponto_piloto',x:0,y:0,z:-.5,side:-1},
+] as const;
 /** Seat positions in the vehicle's frame (+Z forward, +X left), whichever model. */
-export const vehicleSeats=(model:string|undefined):ReadonlyArray<{readonly name:string;readonly node:string;readonly x:number;readonly y:number;readonly z:number;readonly side:number}>=>model===TRUCK_MODEL?TRUCK_SEATS:CAR_SEATS;
+export const vehicleSeats=(model:string|undefined):ReadonlyArray<{readonly name:string;readonly node:string;readonly x:number;readonly y:number;readonly z:number;readonly side:number}>=>model===TRUCK_MODEL?TRUCK_SEATS:model===CAR_MODEL||!model||vehicleDefinition(model)?.kind!=='moto'?CAR_SEATS:MOTO_SEATS;
+/** How many people a model carries (the catalogue's `seats`). */
+export const vehicleCapacity=(model:string|undefined):number=>(model?vehicleDefinition(model)?.seats:undefined)??1;
+/** Whether it is one of the bikes (two places: the rider and a pillion). */
+export const isTwoWheeler=(vehicle:{model?:string}|undefined):boolean=>!!vehicle?.model&&vehicleDefinition(vehicle.model)?.kind==='moto';
 export const CAR_SEATS=[
   {name:'Motorista',node:'ponto_motorista',x:.36,y:.542,z:-.02,side:1},
   {name:'Passageiro da frente',node:'ponto_passageiro',x:-.36,y:.542,z:-.02,side:-1},

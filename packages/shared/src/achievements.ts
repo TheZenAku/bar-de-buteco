@@ -48,6 +48,8 @@ export const ACHIEVEMENT_SERIES:readonly AchievementSeries[]=[
   {id:'fofoqueiro',name:'Fofoqueiro',icon:'messageCircle',unit:['mensagem','mensagens'],goals:[25,100,500,2000],text:'Enviou {n} no Highzap.',lines:['Fiquei sabendo de uma coisa.','Conta tudo, mas não fala que fui eu.','Tem print de tudo.','A central de notícias do bairro.']},
   {id:'influencer',name:'Influencer',icon:'gram',unit:['foto','fotos'],goals:[1,10,50,200],text:'Publicou {n} no Highgram.',lines:['Primeiro post.','Já escolhe o filtro de olhos fechados.','Fotografa antes de beber.','Marca o bar e ganha a saideira.']},
   {id:'pix',name:'Mão Aberta',icon:'transfer',unit:['Pix','Pix'],goals:[1,10,50,200],text:'Enviou {n} pelo HighBank.',lines:['Depois você me paga.','Racha a conta certinho.','Banco informal do bairro.','Todo mundo te deve.']},
+  {id:'sparring',name:'Sparring do Zeca',icon:'shield',unit:['vitória','vitórias'],goals:[1,5,25,100],text:'Somou {n} contra o Zeca no terraço.',lines:['Ele disse que ia pegar leve.','Já sabe onde ele baixa a guarda.','O Zeca pede revanche toda vez.','O terraço tem o seu nome.']},
+  {id:'quebra-queixo',name:'Quebra-Queixo',icon:'bolt',unit:['vitória','vitórias'],goals:[1,5,15,50],text:'Somou {n} sobre o Zeca em sua melhor forma.',lines:['Ele não esperava por essa.','Aprendeu a ler a guarda dele.','O Zeca já treina pensando em você.','Ninguém apanha do Zeca como você bate.']},
   {id:'telefonista',name:'Telefonista',icon:'phone',unit:['ligação','ligações'],goals:[1,10,50,200],text:'Falou em {n}, de pelo menos 15 segundos.',lines:['Alô?','Liga em vez de escrever.','Fala até com a bateria no fim.','Nunca dá ocupado. Quase nunca.']},
 ];
 

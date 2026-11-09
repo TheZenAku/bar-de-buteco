@@ -511,3 +511,73 @@ export function sightBlocked(from:Required<Position>,to:Required<Position>,spare
   const length=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z);
   return length>spare&&firstHit(from,to,0,false)<1-spare/length;
 }
+/**
+ * What a bullet meets between two points (weapons/ballistics.ts): the solid it enters first, walking only the grid cells the segment crosses (a
+ * sniper's 400 m would otherwise test thousands of boxes), or the floor it goes into. Unlike the camera's ray, thin posts and trunks stop it; ramps
+ * (the stairs' volumes, which stand above their own steps), the map's invisible limits and a box the segment starts inside do not.
+ * `fraction`: 0-1 of the way; `normal`: the face's outward normal; `ground`: it went into a floor (`id` is the floor's surface).
+ */
+export function bulletWorld(start:Required<Position>,end:Required<Position>):{fraction:number;normal:[number,number,number];id:string;ground:boolean}|undefined {
+  const solid=bulletSolid(start,end),ground=bulletGround(start,end,solid?solid.fraction:1);
+  if(ground)return {fraction:ground.fraction,normal:[0,1,0],id:ground.id,ground:true};
+  return solid?{...solid,ground:false}:undefined;
+}
+function bulletSolid(start:Required<Position>,end:Required<Position>):{fraction:number;normal:[number,number,number];id:string}|undefined {
+  let best:{fraction:number;normal:[number,number,number];id:string}|undefined;
+  const tested=new Set<Collider>();
+  const test=(c:Collider)=>{
+    if(tested.has(c))return;
+    tested.add(c);
+    if(c.ramp||c.id.startsWith('COL_Cid_Limite'))return;
+    const [ax,az]=boxLocal(c,start.x,start.z),[bx,bz]=boxLocal(c,end.x,end.z),[hx,hz]=boxHalf(c);
+    const min=[-hx,c.minY??0,-hz],max=[hx,c.maxY??3,hz],from=[ax,start.y,az],to=[bx,end.y,bz];
+    if(from.every((v,i)=>v>=min[i]!&&v<=max[i]!))return;
+    let enter=0,exit=1,axis=-1,sign=0;
+    for(let i=0;i<3;i++){
+      const d=to[i]!-from[i]!;
+      if(Math.abs(d)<1e-9){if(from[i]!<min[i]!||from[i]!>max[i]!)return;continue;}
+      const a=(min[i]!-from[i]!)/d,b=(max[i]!-from[i]!)/d,near=Math.min(a,b);
+      if(near>enter){enter=near;axis=i;sign=d>0?-1:1;}
+      exit=Math.min(exit,Math.max(a,b));
+    }
+    if(axis<0||enter>exit||enter>1||(best&&enter>=best.fraction))return;
+    const local:[number,number,number]=axis===0?[sign,0,0]:axis===1?[0,sign,0]:[0,0,sign],turn=c.turn;
+    const normal:[number,number,number]=turn?[local[0]*turn.ux-local[2]*turn.uz,local[1],local[0]*turn.uz+local[2]*turn.ux]:local;
+    best={fraction:enter,normal,id:c.id};
+  };
+  for(const c of map.cameraCeilings as Collider[])test(c);
+  // The grid's cells along the segment (Amanatides-Woo), nearest first: once the best hit is before the current cell's far side, none can beat it.
+  const dx=end.x-start.x,dz=end.z-start.z;
+  let cx=cell(start.x),cz=cell(start.z);
+  const stepX=dx>0?1:-1,stepZ=dz>0?1:-1;
+  const deltaX=dx!==0?Math.abs(COLLISION_CELL/dx):Infinity,deltaZ=dz!==0?Math.abs(COLLISION_CELL/dz):Infinity;
+  let maxX=dx!==0?((dx>0?(cx+1)*COLLISION_CELL:cx*COLLISION_CELL)-start.x)/dx:Infinity;
+  let maxZ=dz!==0?((dz>0?(cz+1)*COLLISION_CELL:cz*COLLISION_CELL)-start.z)/dz:Infinity;
+  for(let guard=0;guard<4096;guard++){
+    for(const c of solidGrid.get(cellKey(cx,cz))??[])test(c);
+    const leave=Math.min(maxX,maxZ);
+    if((best&&best.fraction<=leave)||leave>1)break;
+    if(maxX<maxZ){cx+=stepX;maxX+=deltaX;}else{cz+=stepZ;maxZ+=deltaZ;}
+  }
+  return best;
+}
+/** Where a bullet going down crosses the highest floor under it (sampled every half metre, then halved down to a centimetre or so), before `within`. */
+function bulletGround(start:Required<Position>,end:Required<Position>,within:number):{fraction:number;id:string}|undefined {
+  const dy=end.y-start.y;
+  if(dy>=-1e-4)return undefined;
+  const length=Math.hypot(end.x-start.x,dy,end.z-start.z)*within,steps=Math.min(1600,Math.max(1,Math.ceil(length/.5)));
+  const at=(t:number)=>({x:start.x+(end.x-start.x)*t,y:start.y+dy*t,z:start.z+(end.z-start.z)*t});
+  let previous=0,top=start.y;
+  for(let i=1;i<=steps;i++){
+    const t=within*i/steps,p=at(t),floor=groundBelow(p.x,p.z,top+.05,0);
+    if(floor!==undefined&&p.y<floor){
+      let low=previous,high=t;
+      for(let k=0;k<8;k++){const mid=(low+high)/2,m=at(mid),under=groundBelow(m.x,m.z,top+.05,0);if(under!==undefined&&m.y<under)high=mid;else low=mid;}
+      const hit=at(high);
+      return {fraction:high,id:floorSurface(hit.x,hit.z,floor)?.id??'floor'};
+    }
+    previous=t;top=p.y;
+    if(p.y<-5)break;
+  }
+  return undefined;
+}

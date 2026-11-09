@@ -71,6 +71,30 @@ test('the fist fight over real WebSockets: the guard, a jab that lands, the chai
     assert.equal(a.player().fist.n,8,'refused: the room kept the last punch it took');
     assert.equal(a.hits.length,before);
 
+    // The block: held (the press reports how late it is), it takes the next jab. Both are told it was blocked; B pays with chip damage and part of the
+    // meter, stays up and unstunned, and the nested state carries it all to the browsers.
+    await pause(FIGHT_MOVES.cross.chainSteps*TICK_MS);
+    at(b,X,Z+ideal,Math.PI);
+    b.input({fight:true,block:true,blockAt:{seen:room.state.serverTime,ago:0}});
+    for(let left=0;left<600;left+=TICK_MS){await pause(TICK_MS);b.input({fight:true,block:true});}
+    await until(()=>b.player().fist.block===true);
+    const hp=b.player().hp+b.player().hpCore,seen=a.hits.length;
+    a.input({fight:true,...punch(a,b,'jab'),punch:{...punch(a,b,'jab').punch,n:11}});b.input({fight:true,block:true});
+    for(let left=0;left<FIGHT_MOVES.jab.lockSteps*TICK_MS+300;left+=TICK_MS){await pause(TICK_MS);a.input({fight:true});b.input({fight:true,block:true});}
+    await until(()=>a.hits.length>seen&&b.hits.length>seen);
+    const blocked=a.hits.at(-1)!;
+    assert.equal(blocked.guard,'block');assert.equal(blocked.damage,Math.round(FIGHT_MOVES.jab.damage*0.15));
+    assert.equal(b.player().hp+b.player().hpCore,hp-blocked.damage);
+    assert.equal(b.player().fist.block,true);assert.equal(b.player().fist.stunUntil,0);
+    assert.ok(b.player().fist.guard<100,'the meter paid');
+    await until(()=>(b.room.state as {players:Map<string,{fist?:{block?:boolean;guard?:number}}>}).players.get('b')?.fist?.block===true);
+    b.input({fight:true});await pause(200);
+    assert.equal(b.player().fist.block,false,'let go');
+    // Back to the street for what follows (the guard comes down with R).
+    b.input({fight:false});await until(()=>!b.player().fist.fight);
+    // The combo window counts inputs, not time: A lets the jab's chain run out before the haymaker below.
+    await guardFor(a,FIGHT_MOVES.jab.chainSteps*TICK_MS+200);
+
     // The guard does not go up with a drink in hand: refused once, with the reason.
     b.player().assign({holding:'copo',holdingSince:Date.now(),holdingUntil:Date.now()+60_000});
     await guardFor(b,300);

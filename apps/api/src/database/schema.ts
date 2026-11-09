@@ -176,6 +176,24 @@ export const vehicleStorage=pgTable('vehicle_storage',{
   vehicleId:text('vehicle_id').notNull(),itemId:text('item_id').notNull(),
   quantity:integer('quantity').notNull(),updatedAt:date('updated_at').notNull().defaultNow(),
 },t=>[primaryKey({columns:[t.vehicleId,t.itemId]})]);
+/** Where each player is on Zeca's ladder of three fights, and when they last won a prize (sparring-service.ts). No row: the first step, no wait. */
+export const sparringProgress=pgTable('sparring_progress',{
+  userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),tier:smallint('tier').notNull().default(0),wins:integer('wins').notNull().default(0),
+  lastWinAt:date('last_win_at'),updatedAt:date('updated_at').notNull().defaultNow(),
+});
+/** The firearms each player owns (arsenal-service.ts): parts fitted per slot and upgrade levels per track, as JSON; /armas grants them with source 'teste'. */
+export const weaponArsenal=pgTable('weapon_arsenal',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),weaponId:text('weapon_id').notNull(),parts:jsonb('parts').notNull().default({}),
+  upgrades:jsonb('upgrades').notNull().default({}),source:text('source').notNull().default('teste'),createdAt:date('created_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.weaponId]})]);
+/** The weapon parts (equipamentos) each player owns: any fits every weapon that takes it. */
+export const weaponParts=pgTable('weapon_parts',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),partId:text('part_id').notNull(),source:text('source').notNull().default('teste'),createdAt:date('created_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.partId]})]);
+/** Rounds each player has per calibre (the test kit's never run out and are not kept here). */
+export const weaponAmmo=pgTable('weapon_ammo',{
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),caliber:text('caliber').notNull(),quantity:integer('quantity').notNull().default(0),updatedAt:date('updated_at').notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.userId,t.caliber]})]);
 /** Every trade that happened (trade-service.ts), written with what it moved: a retry finds it and changes nothing. */
 export const trades=pgTable('trades',{
   id:text('id').primaryKey(),userA:text('user_a').notNull(),userB:text('user_b').notNull(),offerA:jsonb('offer_a').notNull(),offerB:jsonb('offer_b').notNull(),fingerprint:text('fingerprint').notNull(),createdAt:date('created_at').notNull().defaultNow(),

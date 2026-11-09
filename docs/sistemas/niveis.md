@@ -1,14 +1,18 @@
 # Níveis, XP e bônus diário
 
-Cada jogador tem um **nível de 1 a 100**. O XP vem do que se faz no bar e na cidade: beber, comer, dançar, tocar no palco, trabalhar, jogar, rodar de moto, andar, conversar, postar e o resto do que as [conquistas](conquistas.md) contam. Também entra o tempo na cidade (60 XP por hora).
+Cada jogador tem um **nível de 1 a 100**. O XP vem do que se faz no bar e na cidade: beber, comer, dançar, tocar no palco, trabalhar, jogar, rodar de moto, andar, conversar, postar e o resto do que as [conquistas](conquistas.md) contam. Ficar conectado ou parado não dá XP. O tempo na cidade continua contando somente para os emblemas de Frequentador.
 
 ## De onde vem o XP
 
 O XP **não é gravado à parte**. Ele é calculado a partir dos contadores de `user_achievements`: cada série vale um tanto por unidade (`XP_PER_UNIT` em `packages/shared/src/levels.ts`: 10 por cerveja, 40 por partida de sinuca vencida, 15 por km de moto, 1 por mensagem no chat…). Por isso:
 
-- tudo o que conta para um emblema também dá XP, sem código novo em cada ação;
+As vitórias sobre o Zeca ([zeca.md](zeca.md)) rendem XP pelas séries `sparring` (50 por vitória) e `quebra-queixo` (100 por vitória no degrau mais difícil).
+
+- as ações que contam para emblemas também dão XP, exceto o tempo conectado de Frequentador;
 - quem já jogava antes dos níveis já começa com o XP do seu histórico;
 - mudar um valor em `XP_PER_UNIT` recalcula o nível de todo mundo, para cima ou para baixo.
+
+A migração `025_retire_presence_xp.sql` preserva o XP de presença já acumulado no contador fixo `presenca-xp-legado`, usando a taxa anterior configurada no painel (60 XP/h por padrão). Novos segundos de `frequentador` não dão XP, e a opção de configurar esse ganho foi removida de Níveis e XP. A migração deve ser aplicada antes de iniciar esta versão da API (`npm run migrate -w @bar/api`; `npm run dev` já a executa no `predev`).
 
 O fluxo é o mesmo das conquistas. A cada rodada de manutenção (3 s), o mundo manda os contadores para `POST /api/internal/achievements`, e a resposta traz o XP total de quem fez alguma coisa. O mundo grava `Player.level` no estado da sala, que todos veem, e manda `xp.state {xp, gained}` só para o próprio jogador. O primeiro relatório depois de entrar chega com `gained: 0` e só posiciona a barra. Bots de desenvolvimento não ganham XP.
 

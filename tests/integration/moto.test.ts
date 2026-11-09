@@ -51,7 +51,10 @@ test('the parked spot is free, on the street, and it is reached from the pavemen
   assert.equal(stepMoto(parked,{throttle:0,steer:0,brake:false}).speed,0);
   assert.ok(canMountMoto(parked,{x:spot.x,y:.15,z:2.7}));
   assert.ok(!canMountMoto(parked,{x:spot.x,y:.15,z:1.6}),'From the spawn it takes a few steps');
-  assert.ok(!canMountMoto({...parked,riderId:'someone'},{x:spot.x,y:0,z:spot.z+.8}),'Nobody gets on a ridden bike');
+  // A ridden bike has one place left, the pillion's, while it is stopped and the back is free.
+  assert.ok(canMountMoto({...parked,riderId:'someone'},{x:spot.x,y:0,z:spot.z+.8}),'The pillion gets on a stopped, ridden bike');
+  assert.ok(!canMountMoto({...parked,riderId:'someone',speed:5},{x:spot.x,y:0,z:spot.z+.8}),'Not while it moves');
+  assert.ok(!canMountMoto({...parked,riderId:'someone',passengers:['other']},{x:spot.x,y:0,z:spot.z+.8}),'Nor onto a taken pillion');
   assert.equal(nearestFreeMoto({x:spot.x,y:0,z:spot.z+.8},[parked])?.id,spot.id);
 });
 

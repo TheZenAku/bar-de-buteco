@@ -1,4 +1,4 @@
-import {FIGHT,FIGHT_MOVES,punchAim,punchAllowed,punchStep,type FightHit,type FightTarget,type PlayerState,type PressKind,type PunchCommand,type PunchId,type PunchStream} from '@bar/shared';
+import {FIGHT,FIGHT_MOVES,punchAim,punchAllowed,punchStep,type BlockCommand,type FightHit,type FightTarget,type PlayerState,type PressKind,type PunchCommand,type PunchId,type PunchStream} from '@bar/shared';
 
 /**
  * The fist fight in this browser (docs/sistemas/luta.md): the guard the player asked for (R), the presses waiting for the feet to be free (the
@@ -27,6 +27,10 @@ export class FightController {
   guard=false;
   local?:LocalPunch;
   blow?:LocalBlow;
+  /** The block key is held, and whether the last input built carried the block (the room is told of the press once, with how late it is). */
+  blocking=false;
+  /** The block as sent: up from the input that carried it (drawn at once, ahead of the room). */
+  blockUp=false;
   private presses:{kind:PressKind;at:number}[]=[];
   private n=0;
   /** The first input sent with the guard up since it was raised: once the room has answered it, its state is the truth. */
@@ -41,18 +45,25 @@ export class FightController {
       :self.fireworkEquipped?'Guarde o fogo de artifício antes de lutar.'
       :(self.interactionState&&self.interactionState!=='stagger')||self.currentTableId?'Termine o que está fazendo antes de levantar a guarda.':'';
     if(why)return why;
-    this.guard=true;this.askedAt=undefined;this.presses.length=0;
+    this.guard=true;this.askedAt=undefined;this.presses.length=0;this.blockUp=false;
     this.hooks.changed(true);
     return '';
   }
   lower():void {
     if(!this.guard)return;
-    this.guard=false;this.askedAt=undefined;this.presses.length=0;
+    this.guard=false;this.askedAt=undefined;this.presses.length=0;this.blockUp=false;this.blocking=false;
     this.hooks.changed(false);
+  }
+  /** The block key went down or up (Space; the touch button). Held with the guard up; nothing happens with it down. */
+  setBlock(down:boolean):void {
+    this.blocking=down&&this.guard;
+    if(!down)this.blockUp=false;
   }
   /** Left button: a light punch, right: the heavy one, the skill key: a kick (Rafael's). False when the guard is down (the click is the view's). */
   press(kind:PressKind):boolean {
     if(!this.guard)return false;
+    // Hands up for the block: the click is spent (no punch waits for the key to be let go).
+    if(this.blocking)return true;
     this.presses.push({kind,at:performance.now()});
     // Mashing does not stack up punches for later: two waiting at most.
     if(this.presses.length>2)this.presses.shift();
@@ -60,17 +71,26 @@ export class FightController {
   }
   /** Stunned by a blow, or held by anything else (a kick of Rafael's on its way): nothing is thrown (presses wait out their buffer). */
   private stunned(self:PlayerState):boolean {
-    return (self.fist?.stunUntil??0)>this.hooks.serverNow()||!!self.interactionState||(!!this.blow&&performance.now()<this.blow.until);
+    return (self.fist?.stunUntil??0)>this.hooks.serverNow()||(self.fist?.breakUntil??0)>this.hooks.serverNow()||!!self.interactionState||(!!this.blow&&performance.now()<this.blow.until);
   }
 
   /**
    * For every input the network builds, in order (`seq` is the one being built, `stream` the punches as predicted so far): the guard, and the
    * punch a waiting press throws now, if the rules allow it, facing whom the aim found; while a punch plants the feet, its facing.
    */
-  decorate(seq:number,stream:PunchStream,self:PlayerState):{fight:boolean;punch?:PunchCommand;rotation?:number} {
+  decorate(seq:number,stream:PunchStream,self:PlayerState):{fight:boolean;punch?:PunchCommand;rotation?:number;block?:boolean;blockAt?:BlockCommand} {
     if(!this.guard)return {fight:false};
     this.askedAt??=seq;
     const now=performance.now();
+    // The block, by the same rule as the room (world/fight.ts move): held with the feet free and not stunned. It takes the hands: no punch with it.
+    const planted=punchStep(stream,seq,self.skin).locked;
+    if(this.blocking&&!planted&&!this.stunned(self)){
+      const edge=!this.blockUp;
+      this.blockUp=true;this.presses.length=0;
+      if(edge){const {seen,ago}=this.hooks.seen();return {fight:true,block:true,blockAt:{seen,ago:Math.min(10_000,Math.round(ago))}};}
+      return {fight:true,block:true};
+    }
+    this.blockUp=false;
     this.presses=this.presses.filter(press=>now-press.at<=FIGHT.bufferMs);
     if(this.presses.length&&!this.stunned(self)){
       const move=punchAllowed(stream,seq,this.presses[0]!.kind,self.skin);
@@ -99,10 +119,19 @@ export class FightController {
 
   /** A punch landed near this player (fight.hit): on them, they react and are held from now, before the state says so. */
   hit(hit:FightHit,me:string):void {
-    if(hit.to!==me)return;
-    this.local=undefined;this.presses.length=0;
-    if(hit.ko){this.blow=undefined;this.lower();return;}
     const now=performance.now();
+    if(hit.guard==='parry'){
+      // Parried: the puncher recoils (the room's word, drawn from its message); the one who parried carries on.
+      if(hit.by!==me)return;
+      this.local=undefined;this.presses.length=0;this.blockUp=false;
+      this.blow={reaction:hit.reaction,yaw:hit.yaw,startedAt:now,until:now+Math.max(0,hit.stunUntil-hit.at)};
+      return;
+    }
+    if(hit.to!==me)return;
+    // A block that held leaves the one defending up; one that broke stuns them like a blow.
+    if(hit.guard==='block')return;
+    this.local=undefined;this.presses.length=0;this.blockUp=false;
+    if(hit.ko){this.blow=undefined;this.lower();return;}
     this.blow={reaction:hit.reaction,yaw:hit.yaw,startedAt:now,until:now+Math.max(0,hit.stunUntil-hit.at)};
   }
 }

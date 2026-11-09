@@ -1,0 +1,256 @@
+/* The firearms' windows (weapons/ui): the weapon wheel over the running scene, the Arsenal window, the first-use hint. Classes start with wp- (in the
+   HUD) and ar- (the Arsenal). No backdrop-filter and no transitions: the scene shows through gradients, states are drawn as they are. */
+
+/* ---- The weapon wheel: a ring of sectors, the hub in the middle; on a phone the details sit beside (landscape) or under (portrait) the ring. */
+.wp-wheel{--size:min(640px,86vmin);position:absolute;inset:0;z-index:120;display:grid;place-items:center;pointer-events:none;
+  font:500 12px var(--font-mono);color:var(--soft)}
+.wp-wheel[hidden]{display:none!important}
+.wp-wheel-scrim{position:absolute;inset:0;pointer-events:auto;
+  background:radial-gradient(circle at 50% 50%,oklch(.1 .06 300 / 30%) 0,oklch(.1 .06 300 / 38%) calc(var(--size) * .5),oklch(.07 .05 300 / 64%) calc(var(--size) * 1.05))}
+/* What would sit under the ring (the crosshair, a knockout line) waits while it is open. */
+.wp-wheel-open :is(.wp-cross,.wp-optic,.wp-hit,.wp-ko,.wp-hint){visibility:hidden}
+.wp-wheel-dial{position:relative;width:var(--size);height:var(--size)}
+.wp-wheel-ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wp-sector{fill:oklch(.13 .05 300 / 88%);stroke:oklch(.75 .2 330 / 24%);stroke-width:.45}
+.wp-sector.on{fill:oklch(.38 .19 330 / 82%);stroke:var(--hl-magenta);stroke-width:.9;filter:drop-shadow(0 0 3px oklch(.62 .28 330 / 75%))}
+.wp-wheel-edge{fill:none;stroke-width:.5;opacity:.75}
+.wp-hub-ring{fill:oklch(.1 .045 300 / 94%);stroke:oklch(.75 .2 330 / 24%);stroke-width:.45}
+.wp-hub-on .wp-hub-ring{fill:oklch(.24 .12 330 / 92%);stroke:var(--hl-magenta);stroke-width:.9}
+/* The pointer's direction: a magenta notch on the hub's rim. */
+.wp-wheel-arrow{position:absolute;left:50%;top:50%;width:0;height:0}
+.wp-wheel-arrow::before{content:'';position:absolute;left:calc(var(--size) * .21 - 2px);top:-6px;border:6px solid transparent;border-left:9px solid var(--hl-magenta);
+  filter:drop-shadow(0 0 3px oklch(.62 .28 330 / 80%))}
+.wp-slot{position:absolute;left:calc(50% + var(--x) * var(--size) * .36);top:calc(50% + var(--y) * var(--size) * .36);translate:-50% -50%;
+  display:grid;justify-items:center;gap:3px;width:calc(var(--size) * .19);padding:0;border:0;background:none;color:var(--soft);pointer-events:auto;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.wp-slot:focus-visible{outline:0}
+/* A weapon's picture: its layers (base + fitted parts) stacked in one 2:1 box; each place sizes the box, not the layers. */
+.wp-pic{position:relative;display:grid;aspect-ratio:2/1;min-width:0}
+/* The upgrades' mark on a picture: +total in the tier's colour (cyan, violet, magenta, gold for everything at the top). */
+.wp-tier{position:absolute;right:1%;bottom:2%;padding:2px 5px;border-radius:4px;font:700 10px/1 var(--font-mono);font-style:normal;letter-spacing:.04em;color:#fff;
+  background:oklch(.22 .08 300 / 92%);border:1px solid var(--tier,var(--hl-cyan));pointer-events:none}
+.wp-pic[data-tier="1"]{--tier:var(--hl-cyan)}
+.wp-pic[data-tier="2"]{--tier:oklch(.7 .2 295)}
+.wp-pic[data-tier="3"]{--tier:var(--hl-magenta)}
+.wp-pic[data-tier="4"]{--tier:oklch(.85 .16 85)}
+.wp-pic[data-tier="4"] .wp-tier{color:oklch(.9 .14 85)}
+.ar-figure .wp-tier{font-size:12px;padding:3px 7px}
+.wp-pic img.wp-layer{grid-area:1/1;display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain}
+.wp-slot .wp-pic{width:100%;opacity:.8;filter:brightness(1.35)}
+.wp-slot[data-on] .wp-pic{opacity:1;scale:1.12;filter:brightness(1.7) drop-shadow(0 0 6px oklch(.62 .28 330 / 60%))}
+.wp-slot-foot{display:flex;align-items:center;gap:6px;font:700 calc(var(--size) * .018 + 4px)/1 var(--font-mono);letter-spacing:.08em;text-shadow:0 1px 2px #000}
+.wp-slot[data-on] .wp-slot-foot{color:#fff}
+/* The weapon in hand: a cyan tick before its name. */
+.wp-slot[data-hand] .wp-slot-foot::before{content:'';width:5px;height:5px;background:var(--hl-cyan);box-shadow:0 0 4px var(--hl-cyan)}
+.wp-slot-ammo{--left:1;width:12px;height:12px;border-radius:50%;flex:none;background:conic-gradient(var(--hl-cyan) calc(var(--left) * 360deg),oklch(1 0 0 / 18%) 0);
+  mask:radial-gradient(circle,transparent 2.6px,#000 3.2px);-webkit-mask:radial-gradient(circle,transparent 2.6px,#000 3.2px)}
+.wp-slot[data-ammo=low] .wp-slot-ammo{background:conic-gradient(var(--hl-gold) calc(var(--left) * 360deg),oklch(1 0 0 / 18%) 0)}
+.wp-slot[data-ammo=empty] .wp-slot-ammo{background:#ff5a5a}
+.wp-slot-key{position:absolute;left:-2px;top:-4px;font:500 10px var(--font-mono);color:var(--key)}
+.wp-wheel:not([data-device=mouse]) .wp-slot-key{display:none}
+.wp-wheel-hub{position:absolute;left:50%;top:50%;width:calc(var(--size) * .42);height:calc(var(--size) * .42);translate:-50% -50%;border-radius:50%;padding:0;border:0;
+  background:none;color:var(--dim);pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wp-wheel-hub:focus-visible{outline:0}
+.wp-hub-icon{display:none;place-items:center}
+.wp-hub-icon .ui-icon{width:26px;height:26px;stroke-width:1.25}
+.wp-hub-on .wp-hub-icon{color:var(--hl-magenta)}
+/* The details, in the hub. */
+.wp-wheel-info{position:absolute;left:50%;top:50%;translate:-50% -50%;width:calc(var(--size) * .36);display:grid;justify-items:center;gap:6px;text-align:center;pointer-events:none}
+.wp-eyebrow{font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.wp-wheel-info strong{font:600 19px/1.15 var(--font-display);letter-spacing:.04em;text-transform:uppercase;color:#fff}
+.wp-wheel-facts{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:4px 10px;font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.wp-wheel-rounds{color:var(--soft)}
+.wp-wheel-rounds b{font:700 15px var(--font-display);color:#fff;margin-right:3px}
+.wp-wheel-parts{display:flex;gap:4px;justify-content:center}
+.wp-wheel-parts .wp-part{filter:brightness(1.4);width:30px;height:30px;object-fit:contain;padding:2px;border:1px solid var(--border);background:oklch(.16 .06 300 / 80%)}
+.wp-part-glyph{display:grid;place-items:center;color:var(--soft)}
+.wp-part-glyph .ui-icon{width:60%;height:60%}
+.wp-wheel-hint{display:flex;align-items:center;gap:6px;margin-top:4px;font:500 10px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.wp-wheel-hint kbd,.wp-hint kbd{padding:1px 6px;border:1px solid oklch(1 0 0 / 32%);font:600 10px var(--font-mono);letter-spacing:.06em;color:#fff}
+.wp-wheel-arsenal{display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:8px 14px;border:1px solid var(--hl-magenta);background:oklch(.2 .08 320 / 70%);
+  font:600 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:#fff;pointer-events:auto}
+.wp-wheel-arsenal .ui-icon{width:16px;height:16px}
+
+/* Small screens: the hub keeps only its glyph; the details become a panel beside or under the ring. */
+@media (max-height:560px),(max-width:560px){
+  .wp-hub-icon{display:grid}
+  .wp-wheel-info{position:relative;left:auto;top:auto;translate:none;width:auto;justify-items:start;text-align:left;padding:12px 14px;background:var(--panel);border:1px solid var(--border)}
+  .wp-wheel-info::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+  .wp-wheel-facts{justify-content:flex-start}
+  .wp-wheel-info strong{font-size:16px}
+}
+@media (max-height:560px) and (orientation:landscape){
+  .wp-wheel{--size:min(90vh,calc(100vw - 460px),560px);grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:24px}
+  .wp-wheel-dial{grid-area:1/2}
+  .wp-wheel-info{grid-area:1/1;width:min(210px,calc(50vw - var(--size) / 2 - 24px));z-index:1}
+}
+@media (max-width:560px) and (orientation:portrait){
+  .wp-wheel{--size:min(94vw,520px);grid-template-rows:auto auto;align-content:center;row-gap:18px}
+  .wp-wheel-dial{grid-area:1/1}
+  .wp-wheel-info{grid-area:2/1;width:min(340px,calc(100vw - 32px));z-index:1}
+}
+
+/* ---- The first-use hint, on the ammo chip (above it on a desktop, under it on touch, where the chip is at the top). */
+.wp-hint{position:absolute;right:-1px;bottom:calc(100% + 8px);display:flex;gap:12px;white-space:nowrap;padding:7px 10px;background:var(--panel);border:1px solid var(--border);
+  font:500 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.wp-hint::before{content:'';position:absolute;inset:0 0 auto;height:2px;background:var(--gradient-line)}
+.wp-hint span{display:flex;align-items:center;gap:6px}
+.wp-hint b{color:var(--hl-magenta)}
+.wp-hint[hidden]{display:none!important}
+.wp-hint-run{animation:wp-hint 9s linear both}
+@keyframes wp-hint{0%{opacity:0;translate:0 4px}3%{opacity:1;translate:0 0}88%{opacity:1}100%{opacity:0}}
+html.touch-ui .wp-hint{bottom:auto;top:calc(100% + 8px);white-space:normal;width:max-content;max-width:min(260px,60vw)}
+
+/* ---- The Arsenal window. */
+.modal.arsenal-modal{width:min(1180px,100%);height:min(840px,calc(100dvh - 48px));overflow:hidden}
+.arsenal-modal #modal-content{display:flex;flex:1;min-height:0;padding:0}
+.ar-root{display:flex;flex:1;min-width:0;min-height:0}
+.ar{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0}
+.ar-empty{margin:auto;padding:40px;font:400 12px var(--font-mono);color:var(--muted-foreground)}
+.ar-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;border-bottom:1px solid var(--border)}
+.ar-tabs{display:flex}
+.ar-tabs button{display:flex;align-items:center;gap:8px;margin-bottom:-1px;padding:12px 16px;border-bottom:2px solid transparent;font:600 13px var(--font-display);
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+.ar-tabs button .ui-icon{width:16px;height:16px}
+.ar-tabs button:hover{color:var(--foreground)}
+.ar-tabs button[aria-selected=true]{color:#fff;border-bottom-color:var(--hl-magenta)}
+.ar-tabs button[aria-selected=true] .ui-icon{color:var(--hl-magenta)}
+.ar-tabs small{padding:1px 6px;background:var(--secondary);font:500 10px var(--font-mono);color:var(--soft)}
+.ar-kit{display:flex;align-items:center;gap:6px;font:500 10px var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--money)}
+.ar-kit .ui-icon{width:14px;height:14px}
+.ar-body{display:grid;grid-template-columns:290px minmax(0,1fr);flex:1;min-height:0}
+.ar-list{position:relative;display:flex;flex-direction:column;gap:2px;min-height:0;overflow:auto;padding:10px;border-right:1px solid var(--border)}
+.ar-list-group{padding:10px 6px 4px;font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.ar-list-group:first-child{padding-top:2px}
+.ar-item{position:relative;display:grid;grid-template-columns:92px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:6px 10px 6px 6px;border:1px solid transparent;
+  background:none;color:inherit;text-align:left;cursor:pointer}
+.ar-item img{width:92px;height:46px;object-fit:contain}
+.ar-item .wp-pic{width:92px}
+.ar-item b{display:block;font:600 13px/1.2 var(--font-display);letter-spacing:.04em;text-transform:uppercase}
+.ar-item small{display:block;margin-top:2px;font:400 10px var(--font-mono);letter-spacing:.06em;color:var(--muted-foreground)}
+.ar-item:hover{background:oklch(.2 .07 305 / 60%)}
+.ar-item[aria-current=true]{border-color:var(--hl-magenta);background:var(--active);box-shadow:var(--active-glow);color:#fff}
+.ar-item[aria-current=true] small{color:oklch(1 0 0 / 78%)}
+.ar-item:focus-visible{outline-offset:-2px}
+.ar-hand{font:600 9px var(--font-mono);font-style:normal;letter-spacing:.14em;text-transform:uppercase;color:var(--hl-cyan)}
+.ar-item[aria-current=true] .ar-hand{color:#fff}
+.ar-item-part{grid-template-columns:44px minmax(0,1fr)}
+.ar-item .ar-item-art{width:44px;height:44px;object-fit:contain}
+.ar-detail{min-width:0;min-height:0;overflow:auto;padding:20px 24px 28px}
+.ar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.ar-eyebrow{font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.ar-head h3{margin:4px 0 6px;font:600 26px/1.1 var(--font-display);letter-spacing:.04em;text-transform:uppercase;color:#fff}
+.ar-head p{max-width:62ch;margin:0;font-size:13px;line-height:1.55}
+.ar-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ar-tags span{padding:3px 8px;border:1px solid var(--border);font:500 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+.ar-draw{display:inline-flex;flex:none;align-items:center;gap:8px;padding:11px 20px;background:var(--active);box-shadow:var(--active-glow);
+  font:600 13px var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:#fff}
+.ar-draw .ui-icon{width:18px;height:18px}
+.ar-draw:hover:not(:disabled){background:var(--hl-magenta)}
+.ar-draw:disabled{background:var(--secondary);box-shadow:none;color:var(--dim);cursor:default}
+.ar-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:28px;margin-top:18px}
+.ar-figure{display:grid;place-items:center;height:150px;margin:0;border:1px solid var(--border);
+  background:radial-gradient(ellipse 60% 55% at 50% 58%,oklch(.32 .13 320 / 38%),transparent),linear-gradient(180deg,oklch(.16 .06 300 / 60%),oklch(.1 .04 300 / 60%))}
+.ar-figure img{max-width:90%;max-height:136px;object-fit:contain}
+.ar-figure .wp-pic{height:136px;max-width:90%}
+.ar-figure-art.wp-part-glyph,.ar-figure-part img{width:132px;height:132px}
+.ar-figure-part .wp-part-glyph .ui-icon{stroke-width:1}
+.ar-stats{display:grid;gap:8px;margin-top:16px}
+.ar-stat{display:grid;grid-template-columns:92px minmax(0,1fr) 72px;align-items:center;gap:10px;font:500 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+.ar-stat output{color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;text-align:right;white-space:nowrap}
+/* Twenty segments, as the menu's ranges. */
+.ar-bar{position:relative;height:7px;background:oklch(1 0 0 / 10%);
+  mask:repeating-linear-gradient(90deg,#000 0 calc(5% - 2px),transparent calc(5% - 2px) 5%);-webkit-mask:repeating-linear-gradient(90deg,#000 0 calc(5% - 2px),transparent calc(5% - 2px) 5%)}
+.ar-fill{position:absolute;inset:0 auto 0 0;width:calc(var(--v) * 100%);background:linear-gradient(90deg,var(--hl-magenta),var(--hl-violet))}
+.ar-ghost{position:absolute;top:0;bottom:0;left:calc(var(--from) * 100%);width:calc((var(--to) - var(--from)) * 100%)}
+.ar-stat[data-delta=up] .ar-ghost{background:var(--vw-mint)}
+.ar-stat[data-delta=up] output{color:var(--vw-mint)}
+.ar-stat[data-delta=down] .ar-ghost{background:#ff5a5a}
+.ar-stat[data-delta=down] output{color:#ff7a7a}
+.ar-group{display:flex;align-items:center;gap:10px;margin:0 0 10px;font:400 10px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--hl-magenta)}
+.ar-group::after{content:'';flex:1;height:1px;background:var(--border)}
+.ar-group:not(:first-child){margin-top:20px}
+.ar-slot{margin-bottom:12px}
+.ar-slot-name{display:flex;align-items:center;gap:6px;margin-bottom:6px;font:600 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.ar-slot-name .ui-icon{width:14px;height:14px;color:var(--hl-magenta)}
+.ar-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ar-chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:3px 10px 3px 3px;border:1px solid var(--border);background:oklch(.16 .06 300 / 80%);
+  font:500 12px var(--font-display);letter-spacing:.02em;color:var(--soft);cursor:pointer}
+.ar-chip:hover{border-color:oklch(.75 .2 330 / 55%);color:#fff}
+.ar-chip-art{width:28px;height:28px;object-fit:contain}
+.ar-chip-art.wp-part-glyph{color:var(--dim)}
+.ar-chip[aria-pressed=true]{border-color:var(--hl-magenta);background:var(--active);box-shadow:var(--active-glow);color:#fff}
+.ar-chip[aria-pressed=true] .wp-part-glyph{color:#fff}
+.ar-chip[aria-busy=true],.ar-buy[aria-busy=true]{opacity:.55;cursor:progress}
+.ar-note{display:block;margin-top:6px;font:400 10px var(--font-mono);letter-spacing:.06em;color:var(--muted-foreground)}
+.ar-up{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid oklch(1 0 0 / 6%)}
+.ar-up-name b{display:block;font:600 13px var(--font-display);letter-spacing:.06em;text-transform:uppercase;color:#fff}
+.ar-up-name small{display:block;font:400 10px/1.5 var(--font-mono);color:var(--muted-foreground)}
+.ar-segs{display:flex;gap:3px}
+.ar-segs i{width:14px;height:8px;background:oklch(1 0 0 / 12%);transform:skewX(-16deg)}
+.ar-segs i[data-on]{background:var(--hl-magenta);box-shadow:0 0 6px oklch(.62 .28 330 / 50%)}
+.ar-buy{display:grid;justify-items:end;min-width:120px;padding:5px 10px;border:1px solid var(--hl-magenta);background:oklch(.2 .08 320 / 50%);color:#fff;text-align:right;cursor:pointer}
+.ar-buy span{font:600 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase}
+.ar-buy small{font:500 10px var(--font-mono);color:var(--money);white-space:nowrap}
+.ar-buy small .ui-icon{width:11px;height:11px;vertical-align:-1px}
+.ar-buy:hover:not(:disabled){background:var(--active)}
+.ar-buy:disabled{border-color:var(--border);background:none;color:var(--dim);cursor:default}
+.ar-buy:disabled small{color:var(--dim)}
+.ar-effects{display:grid;gap:6px;margin:14px 0 0;padding:0;list-style:none}
+.ar-effects li{display:flex;align-items:center;gap:8px;font:500 12px var(--font-mono);color:var(--soft)}
+.ar-effects .ui-icon{width:14px;height:14px;flex:none;color:var(--dim)}
+.ar-effects li[data-good=true] .ui-icon{color:var(--vw-mint)}
+.ar-effects li[data-good=false] .ui-icon{color:#ff7a7a}
+.ar-fit{display:grid;grid-template-columns:80px minmax(0,1fr) auto;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid oklch(1 0 0 / 6%)}
+.ar-fit img{width:80px;height:40px;object-fit:contain}
+.ar-fit .wp-pic{width:80px}
+.ar-fit b{display:block;font:600 13px var(--font-display);letter-spacing:.04em;text-transform:uppercase;color:#fff}
+.ar-fit small{font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.ar-fit .ar-buy{min-width:92px}
+.ar-fit .ar-buy[data-ar-on=true]{border-color:var(--border);background:none}
+
+/* A phone held sideways: a narrow list of pictures beside the details. */
+@media (max-height:560px) and (min-width:561px){
+  .modal-backdrop:has(.arsenal-modal){padding:8px}
+  .modal.arsenal-modal{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}
+  .arsenal-modal .modal-header{padding:6px 8px 6px 16px}
+  .arsenal-modal .modal-header h2{font-size:16px}
+  .ar-cols{grid-template-columns:minmax(0,1fr);gap:16px}
+  .ar-figure{display:none}
+  .ar-stats{margin-top:0}
+  .ar-tabs button{padding:8px 12px}
+  .ar-body{grid-template-columns:150px minmax(0,1fr)}
+  .ar-item,.ar-item-part{grid-template-columns:minmax(0,1fr);justify-items:center;gap:2px;padding:4px;text-align:center}
+  .ar-item img{width:100%;height:auto;aspect-ratio:2/1}
+  .ar-item .wp-pic{width:100%}
+  .ar-item small,.ar-list-group{display:none}
+  .ar-item b{font-size:10px}
+  .ar-detail{padding:14px 16px 20px}
+  .ar-head h3{font-size:20px}
+  .ar-figure{height:110px}
+  .ar-figure img{max-height:100px}
+  .ar-figure .wp-pic{height:100px}
+}
+/* A phone upright, or a narrow window: the list becomes a strip of pictures on top, one column below. */
+@media (max-width:760px) and (min-height:561px),(max-width:560px){
+  .modal.arsenal-modal{height:calc(100dvh - 20px)}
+  .ar-top{padding:0 10px}
+  .ar-kit{display:none}
+  .ar-tabs button{padding:10px 12px}
+  .ar-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .ar-list{flex-direction:row;gap:4px;overflow-x:auto;overflow-y:hidden;padding:8px;border-right:0;border-bottom:1px solid var(--border)}
+  .ar-item,.ar-item-part{flex:none;grid-template-columns:auto;justify-items:center;width:auto;padding:4px 6px}
+  .ar-item img{width:76px;height:38px}
+  .ar-item .wp-pic{width:76px}
+  .ar-item .ar-item-art{width:38px;height:38px}
+  .ar-item span,.ar-list-group{display:none}
+  .ar-hand{position:absolute;right:4px;top:4px;width:6px;height:6px;overflow:hidden;background:var(--hl-cyan);font-size:0}
+  .ar-detail{padding:14px 14px 24px}
+  .ar-head{flex-direction:column}
+  .ar-head h3{font-size:21px}
+  .ar-draw{align-self:stretch;justify-content:center}
+  .ar-cols{grid-template-columns:minmax(0,1fr);gap:18px}
+  .ar-up{grid-template-columns:minmax(0,1fr) auto;row-gap:6px}
+  .ar-up .ar-segs{grid-row:2;grid-column:1}
+  .ar-up .ar-buy{grid-row:1/3;grid-column:2}
+}

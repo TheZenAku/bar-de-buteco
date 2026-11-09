@@ -2,10 +2,10 @@
  * The damage of each punch that lands, floating up from where the fist met the body (docs/sistemas/luta.md). Everyone near sees the same number the
  * room took off, so a fight can be measured by eye. A few pooled elements over the canvas, moved with transforms only (no layout per frame).
  */
-export type DamageKind='hit'|'heavy'|'ko'|'taken';
+export type DamageKind='hit'|'heavy'|'ko'|'taken'|'block'|'parry';
 interface Floating {el:HTMLElement;x:number;y:number;z:number;born:number;life:number;drift:number;kind:DamageKind}
 /** Seconds on screen, how high it floats (m), how big at 3 m (px). */
-const LIFE={hit:.95,heavy:1.15,ko:1.6,taken:1.05} as const;
+const LIFE={hit:.95,heavy:1.15,ko:1.6,taken:1.05,block:.9,parry:1.2} as const;
 const RISE=.55,BASE_PX=30,MIN_PX=14,MAX_PX=46,POOL=24;
 
 export class DamageNumbers {

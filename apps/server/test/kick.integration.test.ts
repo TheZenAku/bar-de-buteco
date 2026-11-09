@@ -44,7 +44,7 @@ test('a kick throws who it touches, takes some life and lets them get up, over r
     rafa.kick('karate');
     await until(()=>victim.player().animationState==='ragdoll',3000);
     const started=rafa.player().animationStartedAt,body=room.state.ragdolls.get('victim')!;
-    assert.ok(body.startedAt-started>=400&&body.startedAt-started<=900,`It landed ${body.startedAt-started} ms into the kick, while the leg was out`);
+    assert.ok(body.startedAt-started>=270&&body.startedAt-started<=620,`It landed ${body.startedAt-started} ms into the kick, while the leg was out`);
     assert.equal(body.by,'rafa');
     assert.equal(body.seated,false);
     assert.equal(body.lift,KICKS.karate!.lift);

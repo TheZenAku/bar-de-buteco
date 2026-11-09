@@ -319,7 +319,10 @@ function hullGap(moto:Pick<MotoBody,'x'|'z'|'yaw'|'model'>,position:Position):nu
 }
 /** Close enough to get on (the server allows `slack` more for latency), on its floor, on its wheels, nobody riding it. */
 export function canMountMoto(moto:MotoState,position:Position,slack=0,who?:string):boolean {
-  return (isCarModel(moto.model)?vehicleOccupants(moto).filter(Boolean).length<carSpec(moto.model).SEATS&&vehicleMotionSpeed(moto)<.5:!moto.riderId)&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
+  // A bike with a rider still has the pillion's place; taking it needs the bike to be stopped, as getting into a car does.
+  const room=isCarModel(moto.model)?vehicleOccupants(moto).filter(Boolean).length<carSpec(moto.model).SEATS&&vehicleMotionSpeed(moto)<.5
+    :!moto.riderId||(!(moto.passengers??[]).some(Boolean)&&vehicleMotionSpeed(moto)<.5);
+  return room&&(!moto.locked||who===undefined||moto.ownerId===who)&&!moto.phase&&Math.abs((position.y??moto.y)-moto.y)<.5&&hullGap(moto,position)<=vehiclePhysics(moto.model).REACH+slack;
 }
 /** Close enough to work on it, standing or lying, and nobody on it, nobody lifting it, and it is not moving. */
 export function canRepairMoto(moto:MotoState,position:Position,slack=0):boolean {
@@ -351,7 +354,9 @@ export function motoDismountSpot(moto:MotoBody,seat=0,obstacles:readonly Collide
     for(const sign of [side,-side])for(const back of backs)offsets.push([sign*width,back]);
     offsets.push([0,spec.CENTRE_Z-spec.HALF_LENGTH-PLAYER_RADIUS-.15],[0,spec.CENTRE_Z+spec.HALF_LENGTH+PLAYER_RADIUS+.15]);
   }else{
-    offsets.push([1,0],[-1,0],[1,.8],[1,-.8],[-1,.8],[-1,-.8],[0,-1.5],[0,1.4]);
+    // The pillion gets off on the right, the rider on the left.
+    const first=(vehicleSeats(moto.model)[seat]?.side??1)<0?-1:1;
+    offsets.push([first,0],[-first,0],[first,.8],[first,-.8],[-first,.8],[-first,-.8],[0,-1.5],[0,1.4]);
   }
   for(const [lx,lz] of offsets){
     const x=moto.x+c*lx+s*lz,z=moto.z-s*lx+c*lz,y=floorHeight(x,z,moto.y);

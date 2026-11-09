@@ -12,7 +12,7 @@ const OUTPUT=path.join(root,'packages/shared/src/kick-paths.ts');
 const STEP_MS=50;
 // While the foot is on its way and up (ms): before that it is still on the floor, after that it is coming back.
 const KICKS={
-  Kick:{from:400,to:850,feet:['foot_r']},
+  Kick:{from:270,to:570,feet:['foot_r']},
   AirKick:{from:900,to:1450,feet:['foot_l','foot_r']},
 };
 
