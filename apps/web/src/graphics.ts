@@ -1,4 +1,5 @@
 import type {CityDetail} from './engine/city-plan';
+import type {GrainLevel} from './engine/film-grain';
 
 /** Graphics options of this browser (Configurações → Gráficos), applied by BarScene.setGraphics. */
 export type ShadowQuality='off'|'low'|'medium'|'high'|'ultra';
@@ -18,14 +19,17 @@ export interface GraphicsSettings {
   pixelRatioCap:1|1.5|2;
   /** How much of the city around the player is drawn in full detail (city-plan.ts). */
   city:CityDetail;
+  /** Film grain over the picture (engine/film-grain.ts). */
+  grain:GrainLevel;
 }
 export const GRAPHICS_PRESETS:Record<Exclude<GraphicsPreset,'custom'>,Omit<GraphicsSettings,'preset'>>={
-  low:{renderScale:.6,dynamicResolution:true,shadows:'off',fog:'dense',fpsCap:30,pixelRatioCap:1,city:'low'},
-  medium:{renderScale:.8,dynamicResolution:true,shadows:'low',fog:'normal',fpsCap:60,pixelRatioCap:1,city:'medium'},
+  low:{renderScale:.6,dynamicResolution:true,shadows:'off',fog:'dense',fpsCap:30,pixelRatioCap:1,city:'low',grain:'off'},
+  medium:{renderScale:.8,dynamicResolution:true,shadows:'low',fog:'normal',fpsCap:60,pixelRatioCap:1,city:'medium',grain:'light'},
   // Alto is exactly the previous fixed quality: nothing adapts unless the player turns it on.
-  high:{renderScale:1,dynamicResolution:false,shadows:'high',fog:'normal',fpsCap:0,pixelRatioCap:1.5,city:'high'},
-  ultra:{renderScale:1,dynamicResolution:false,shadows:'ultra',fog:'light',fpsCap:0,pixelRatioCap:2,city:'ultra'},
+  high:{renderScale:1,dynamicResolution:false,shadows:'high',fog:'normal',fpsCap:0,pixelRatioCap:1.5,city:'high',grain:'light'},
+  ultra:{renderScale:1,dynamicResolution:false,shadows:'ultra',fog:'light',fpsCap:0,pixelRatioCap:2,city:'ultra',grain:'light'},
 };
+export const GRAIN_LABELS:Record<GrainLevel,string>={off:'Desligada',light:'Leve',medium:'Média',strong:'Forte'};
 export const PRESET_LABELS:Record<GraphicsPreset,string>={low:'Baixo',medium:'Médio',high:'Alto',ultra:'Ultra',custom:'Personalizado'};
 /** Phones and tablets start on Médio; computers on Alto. */
 export function defaultGraphics():GraphicsSettings {
@@ -48,6 +52,8 @@ export function readGraphics(saved:unknown):GraphicsSettings {
     pixelRatioCap:pick(g.pixelRatioCap,[1,1.5,2] as const,fallback.pixelRatioCap),
     // Saved before the city existed: what its preset would choose.
     city:pick(g.city,['low','medium','high','ultra'] as const,preset==='custom'?fallback.city:GRAPHICS_PRESETS[preset].city),
+    // Saved before the grain existed: the preset's, or the device's own default.
+    grain:pick(g.grain,['off','light','medium','strong'] as const,preset==='custom'?fallback.grain:GRAPHICS_PRESETS[preset].grain),
   };
 }
 /**

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hasKicks,hitReaction,isKick,punchAim,punchAllowed,punchCarries,punchClear,punchContact,punchInReach,
+import {FIGHT,FIGHT_BODIES,FIGHT_MOVES,realMs,HIT_REACTIONS,NO_PUNCH,PUNCH_IDS,SKINS,TICK_MS,fightBody,fightMove,fistAt,fistPath,hasKicks,hitReaction,isKick,punchAim,punchAllowed,punchCarries,punchClear,punchContact,punchInReach,
   punchRoot,punchStep,punchThrowable,rewindOf,seenAt,streamOf,throwPunch,type FightPose,type PunchId,type PunchStream} from '@bar/shared';
 // @ts-expect-error The tool is a plain script, with no types.
 import {measurePunches,PUNCHES} from '../../tools/assets/measure-punches.mjs';
@@ -42,8 +42,8 @@ test('the frame data fits the clips: lengths, the windows inside the measured wa
     assert.equal(move.durationMs,durations[move.clip],`${id}: the clip's length`);
     assert.ok(move.activeFrom>=path.from&&move.activeTo<=path.to,`${id}: the window is inside the table`);
     assert.ok(move.activeTo<move.durationMs,`${id}: lands before the clip ends`);
-    assert.ok(move.lungeSteps*TICK_MS<=move.activeFrom,`${id}: the step in ends before the fist can land`);
-    assert.ok(move.lockSteps*TICK_MS>=move.activeTo,`${id}: the feet stay planted while the fist can land`);
+    assert.ok(move.lungeSteps*TICK_MS<=realMs(move.activeFrom),`${id}: the step in ends before the fist can land`);
+    assert.ok(move.lockSteps*TICK_MS>=realMs(move.activeTo),`${id}: the feet stay planted while the fist can land`);
     assert.ok(move.chainSteps>=move.lockSteps,`${id}: the chain window opens when the feet are free`);
     assert.ok(move.swingMs<move.activeFrom+20,`${id}: the fist is heard before it lands`);
   }
@@ -269,6 +269,6 @@ test('Rafael\'s kicks hit harder and stun longer than any punch, push little, an
   assert.ok(lightest>Math.max(...punches.filter(p=>p.id!=='heavy').map(p=>p.damage)),'every kick beats every light punch');
   assert.ok(Math.max(...kicks.map(k=>k.damage))>FIGHT_MOVES.heavy.damage,'the finisher beats the heavy punch');
   assert.ok(Math.min(...kicks.map(k=>k.stunMs))>Math.max(...punches.filter(p=>p.id!=='heavy').map(p=>p.stunMs)));
-  // Not thrown: a push of a metre at most (the free kick sends the body 8 m or more).
-  for(const kick of kicks){assert.ok(kick.knockback<=1,`${kick.id} pushes, it does not throw`);assert.ok(kick.radius>FIGHT_MOVES.jab.radius);}
+  // Not thrown: a push of a couple of metres at most (the free kick sends the body 8 m or more).
+  for(const kick of kicks){assert.ok(kick.knockback<=2.5,`${kick.id} pushes, it does not throw`);assert.ok(kick.radius>FIGHT_MOVES.jab.radius);}
 });

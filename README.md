@@ -37,7 +37,7 @@ Também é possível criar uma conta pela tela inicial. Em desenvolvimento, novo
 
 O [ciclo de dia e noite](docs/sistemas/day-night.md) completa um dia em **40 minutos reais**, com horário sincronizado pelo servidor, sol e lua móveis, sombras, iluminação externa automática e névoa para ocultar os limites do mapa.
 
-O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md): seis gravações discretas da cidade, em ordem aleatória sem repetição imediata e com transições suaves. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
+O bar tem [som ambiente dinâmico](docs/sistemas/ambient.md), no estilo de GTA V: 52 gravações reais CC0 em camadas contínuas e sons pontuais sorteados e colocados na cidade (cães, galos, motos que cruzam as ruas, sirenes ao longe), que mudam com a hora, o clima, o bairro, a distância das ruas e o teto sobre você. Começa ao entrar; ajuste em **Configurações → Som ambiente** ou use o botão de som do topo. A [granulação](docs/sistemas/graficos.md#granulação) de filme, bem leve, também se ajusta em Gráficos. A jukebox reduz o ambiente automaticamente e o chat de voz mantém seus controles próprios.
 
 Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção de cartas: cada personagem tem suas variantes, com raridade e preço, e as habilidades também são compradas ali. A skin vestida fica salva na conta. O saldo inicial é zero; as moedas vêm do trabalho no bar (J). Veja [skins e coleção](docs/sistemas/skins.md).
 
@@ -45,6 +45,7 @@ Novas contas entram vestindo **Nathan**, a skin gratuita. **C** abre a coleção
 | --- | --- |
 | WASD | Caminhar, em relação à câmera |
 | Shift | Correr |
+| Espaço (a pé, com a guarda baixa) | [Pular](docs/sistemas/pulo.md); solte a tecla e toque o chão antes do próximo pulo |
 | Arrastar o mouse / roda | Girar a câmera e o olhar da cabeça / ajustar distância |
 | E | Usar o objeto próximo; levantar ao estar sentado; subir e descer da moto; levantar a moto caída |
 | W/S, A/D, Espaço (na moto) | Acelerar, frear e dar ré; virar; freio de mão ([moto de entrega](docs/sistemas/moto.md)) |

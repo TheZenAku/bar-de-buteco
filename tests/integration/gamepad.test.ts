@@ -51,16 +51,16 @@ function host(state:{menu?:boolean;drawn?:boolean;scoped?:boolean;guard?:boolean
   const log:string[]=[];
   const h:PadHost={menu:()=>!!state.menu,press:code=>log.push(code),hold:(code,down)=>log.push(`${code}:${down}`),move:(x,y)=>log.push(`move:${x.toFixed(1)},${y.toFixed(1)}`),
     sprint:on=>log.push(`sprint:${on}`),system:()=>state.system??true,drawn:()=>!!state.drawn,scoped:()=>!!state.scoped,guard:()=>!!state.guard,
-    aim:down=>log.push(`aim:${down}`),trigger:down=>log.push(`fire:${down}`),breath:down=>log.push(`breath:${down}`),holster:()=>log.push('holster'),mode:()=>log.push('mode'),
+    aim:down=>log.push(`aim:${down}`),trigger:down=>log.push(`fire:${down}`),breath:down=>log.push(`breath:${down}`),reload:()=>log.push('reload'),holster:()=>log.push('holster'),mode:()=>log.push('mode'),
     step:d=>log.push(`step:${d}`),zoom:d=>log.push(`zoom:${d}`),arsenal:()=>log.push('arsenal'),shoulder:()=>log.push('shoulder'),wheel:open=>log.push(`wheel:${open}`)};
   return {h,log,state};
 }
 const feed=(mapper:PadMapper,reader:PadReader,frames:[number,Partial<Record<number,number>>,number[]?][])=>{for(const [at,down,axes] of frames)mapper.frame(reader.read(pad(down,axes),at),at);};
 
-test('armed: LT aims, RT fires, X reloads through R, Y the mode, B holsters, RB next, an LB tap previous',()=>{
+test('armed: LT aims, RT fires, X reloads (its own call, not the R key), Y the mode, B holsters, RB next, an LB tap previous',()=>{
   const {h,log}=host({drawn:true}),mapper=new PadMapper(h),reader=new PadReader();
   feed(mapper,reader,[[0,{[PAD.LT]:1}],[16,{[PAD.LT]:1,[PAD.RT]:1}],[32,{}],[48,{[PAD.X]:1}],[64,{[PAD.Y]:1}],[80,{[PAD.B]:1}],[96,{[PAD.RB]:1}],[112,{[PAD.LB]:1}],[200,{}]]);
-  assert.deepEqual(log,['aim:true','fire:true','aim:false','fire:false','KeyR','mode','holster','step:1','step:-1']);
+  assert.deepEqual(log,['aim:true','fire:true','aim:false','fire:false','reload','mode','holster','step:1','step:-1']);
 });
 
 test('LB held opens the wheel and letting go chooses; L3 runs until the stick rests, through a scope it holds the breath',()=>{

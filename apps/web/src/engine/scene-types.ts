@@ -10,6 +10,9 @@ export interface SceneActor {
   displayName?: string;
   x: number;
   y?: number;
+  verticalVelocity?: number;
+  grounded?: boolean;
+  landingTime?: number;
   z: number;
   rotation?: number;
   headYaw?:number;
@@ -84,6 +87,7 @@ export interface SceneWorld {
 }
 
 export interface SceneInput {
+  jump?:boolean;
   rear?:boolean;
   /** Flying only: climb (+1, Space) or sink (-1, Ctrl). */
   dy?:number;

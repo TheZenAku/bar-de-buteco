@@ -36,17 +36,19 @@ test('recorded footsteps follow terrain and speed and stop without actual travel
   // Equal simulated time avoids rounding a one-step cadence difference across browser timer jitter.
   const cadence=await page.evaluate(()=>{
     const f=(window as any).fixture;f.manual=true;
-    const count=(animation:string,speed:number)=>{
+    const count=(animation:string,speed:number,contacts?:number)=>{
       f.sounds.setActive(false);f.sounds.setActive(true);
-      Object.assign(f.walker,{x:5,y:.3,z:-4,animation});
+      Object.assign(f.walker,{x:5,y:.3,z:-4,animation,contacts});
       const update=(dt:number)=>f.sounds.update(dt,[f.walker],{x:f.walker.x,y:1.5,z:-3},{x:0,y:0,z:-1},{x:0,y:1,z:0});
       update(0);const before=f.sounds.telemetry().walkers[0].steps;
       for(let i=0;i<180;i++){f.walker.x+=speed/60;update(1/60);}
       return f.sounds.telemetry().walkers[0].steps-before;
     };
-    const walking=count('walk',3.5),running=count('run',6);f.speed=6;f.manual=false;return {walking,running};
+    const walking=count('walk',1.6),running=count('run',6),stuck=count('walk',1.6,0);f.walker.contacts=undefined;f.speed=6;f.manual=false;return {walking,running,stuck};
   });
   expect(cadence.running).toBeGreaterThan(cadence.walking);
+  // Legs that report no touchdown at all must not silence the steps: the distance takes over.
+  expect(cadence.stuck).toBeGreaterThan(0);
   await page.evaluate(()=>(window as any).fixture.volume=0);
   await expect.poll(rms).toBeLessThan(.00001);
   expect((await status()).voices).toBe(0);

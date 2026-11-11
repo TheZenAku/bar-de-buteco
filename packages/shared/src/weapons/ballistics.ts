@@ -79,6 +79,14 @@ export function bodyZones(skin:string|undefined,pose:GunPose,grow=0):BodyZones {
     legs:{a:[pose.x,pose.y+.12,pose.z],b:[pose.x,pose.y+body.hip-.04,pose.z],r:.16+grow},
   };
 }
+/** Whether a point is inside a body's volumes (the head's ball, the trunk's or the legs' capsule). */
+export function insideBody(point:Vec3,zones:BodyZones):boolean {
+  const near=(a:Vec3,b:Vec3,r:number)=>{
+    const ab=sub(b,a),t=Math.max(0,Math.min(1,dot(sub(point,a),ab)/(dot(ab,ab)||1)));
+    return vlength(sub(point,add(a,ab,t)))<r;
+  };
+  return vlength(sub(point,zones.head.c))<zones.head.r||near(zones.torso.a,zones.torso.b,zones.torso.r)||near(zones.legs.a,zones.legs.b,zones.legs.r);
+}
 /** Where a ray (unit `d`) first enters a ball, if it does ahead of `o`. */
 export function raySphere(o:Vec3,d:Vec3,c:Vec3,r:number):number|undefined {
   const oc=sub(o,c),b=dot(oc,d),cc=dot(oc,oc)-r*r,h=b*b-cc;
@@ -179,14 +187,17 @@ export function traceShot(origin:Vec3,dirs:readonly Vec3[],muzzle:Vec3,eye:Vec3,
   const zones=targets.map(target=>({id:target.id,zones:bodyZones(target.skin,target.pose,grow),pose:target.pose}));
   return dirs.map(raw=>{
     const dir=normalize(raw);
-    // Past the shooter: nothing between the camera and the gun can be hit (the camera hangs behind the shoulder).
-    const skip=Math.max(0,dot(sub(eye,origin),dir)-.35),start=add(origin,dir,skip);
+    // Past the shooter: nothing between the camera and the shooter's eye plane can be hit (the camera hangs behind the shoulder), and nobody the ray
+    // starts inside of (someone standing close at the shooter's back: they are behind the aim, whatever the camera sees in front of the crosshair).
+    const skip=Math.max(0,dot(sub(eye,origin),dir)),start=add(origin,dir,skip);
     const far=add(origin,dir,skip+maxRange);
     const wall=world(start,far);
     let reach=maxRange*(wall?wall.fraction:1);
     let body:{t:number;zone:HitZone;id:string}|undefined;
     for(const item of zones){
-      if(Math.abs(item.pose.x-start[0])>maxRange+2||Math.abs(item.pose.z-start[2])>maxRange+2)continue;
+      if(Math.abs(item.pose.x-start[0])>maxRange+2||Math.abs(item.pose.z-start[2])>maxRange+2||insideBody(start,item.zones))continue;
+      // A body whose centre lies behind the shooter's eye plane is not in front of the aim (its capsule may still graze the plane).
+      if(dot(sub([item.pose.x,eye[1],item.pose.z],eye),dir)<-.05)continue;
       const hit=rayBody(start,dir,reach,item.zones);
       if(hit&&(!body||hit.t<body.t))body={...hit,id:item.id};
     }

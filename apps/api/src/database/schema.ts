@@ -1,4 +1,4 @@
-import {index, boolean, customType, doublePrecision, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint } from 'drizzle-orm/pg-core';
+import {index, boolean, customType, doublePrecision, integer, jsonb, pgTable, primaryKey, text, timestamp, smallint,bigserial } from 'drizzle-orm/pg-core';
 import type { BadgeRarity } from '@bar/shared';
 
 const date = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -213,3 +213,27 @@ export const gameLogs=pgTable('game_logs',{
   id:text('id').primaryKey(),source:text('source').notNull(),event:text('event').notNull(),userId:text('user_id'),
   details:jsonb('details').notNull().default({}),createdAt:date('created_at').notNull().defaultNow(),
 });
+
+/** Persistent employment and factory state (migrations 029/030). Deliberately no foreign keys: world recovery must survive account lifecycle changes. */
+export const employments=pgTable('employments',{
+  userId:text('user_id').primaryKey(),jobId:text('job_id').notNull(),status:text('status').notNull().default('hired'),hiredAt:date('hired_at').notNull().defaultNow(),
+  resignedAt:date('resigned_at'),cooldownUntil:date('cooldown_until'),schedule:jsonb('schedule').notNull().default({}),updatedAt:date('updated_at').notNull().defaultNow(),
+});
+export const employmentShifts=pgTable('employment_shifts',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull(),jobId:text('job_id').notNull(),startedAt:date('started_at').notNull().defaultNow(),endedAt:date('ended_at'),
+  earned:integer('earned').notNull().default(0),station:text('station').notNull().default(''),requestId:text('request_id').notNull().unique(),
+});
+export const employmentEvents=pgTable('employment_events',{
+  id:text('id').primaryKey(),userId:text('user_id').notNull(),jobId:text('job_id').notNull(),kind:text('kind').notNull(),details:jsonb('details').notNull().default({}),requestId:text('request_id').unique(),createdAt:date('created_at').notNull().defaultNow(),
+});
+export const factorySlots=pgTable('factory_slots',{
+  marker:text('marker').primaryKey(),material:text('material').notNull(),quantity:integer('quantity').notNull().default(0),capacity:integer('capacity').notNull().default(18),levelM:doublePrecision('level_m').notNull().default(0),
+  palletId:text('pallet_id'),batchId:text('batch_id'),revision:integer('revision').notNull().default(0),updatedAt:date('updated_at').notNull().defaultNow(),
+});
+export const factoryRuntime=pgTable('factory_runtime',{id:text('id').primaryKey(),state:jsonb('state').notNull(),revision:integer('revision').notNull().default(0),updatedAt:date('updated_at').notNull().defaultNow()});
+export const factorySettings=pgTable('factory_settings',{key:text('key').primaryKey(),value:jsonb('value').notNull(),updatedBy:text('updated_by'),updatedAt:date('updated_at').notNull().defaultNow()});
+export const factoryLedger=pgTable('factory_ledger',{requestId:text('request_id').primaryKey(),actorId:text('actor_id').notNull(),action:text('action').notNull(),resource:text('resource').notNull(),delta:jsonb('delta').notNull().default({}),result:jsonb('result').notNull().default({}),createdAt:date('created_at').notNull().defaultNow()});
+export const factoryOrders=pgTable('factory_orders',{id:text('id').primaryKey(),kind:text('kind').notNull(),material:text('material').notNull(),pallets:integer('pallets').notNull(),price:integer('price').notNull(),status:text('status').notNull().default('open'),acceptedBy:text('accepted_by'),dueAt:date('due_at'),requestId:text('request_id').notNull().unique(),createdAt:date('created_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow()});
+export const factoryPallets=pgTable('factory_pallets',{id:text('id').primaryKey(),material:text('material').notNull(),quantity:integer('quantity').notNull(),batchId:text('batch_id'),location:text('location').notNull(),revision:integer('revision').notNull().default(0),createdAt:date('created_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow()});
+export const factoryBatches=pgTable('factory_batches',{id:text('id').primaryKey(),status:text('status').notNull(),tank:integer('tank'),recipe:jsonb('recipe').notNull().default({}),actual:jsonb('actual').notNull().default({}),quality:integer('quality').notNull().default(100),yield:doublePrecision('yield').notNull().default(0),producedBags:integer('produced_bags').notNull().default(0),discardedKg:doublePrecision('discarded_kg').notNull().default(0),operators:jsonb('operators').notNull().default([]),metrics:jsonb('metrics').notNull().default({}),penalties:jsonb('penalties').notNull().default([]),startedAt:date('started_at').notNull().defaultNow(),completedAt:date('completed_at')});
+export const factoryEvents=pgTable('factory_events',{id:bigserial('id',{mode:'number'}).primaryKey(),kind:text('kind').notNull(),severity:text('severity').notNull().default('info'),actorId:text('actor_id'),resource:text('resource'),details:jsonb('details').notNull().default({}),requestId:text('request_id').unique(),createdAt:date('created_at').notNull().defaultNow()});

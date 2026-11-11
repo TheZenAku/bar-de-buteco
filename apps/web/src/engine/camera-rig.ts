@@ -63,6 +63,8 @@ const HEAD_TO_SHOULDERS=.2;
 const SHOULDER_SIDE=.3;
 // Mouse: radians per pixel, sideways and up and down, at sensitivity 1.
 const TURN_PER_PIXEL=.006,LOOK_PER_PIXEL=.004;
+// The most the held aim point may turn the view in one frame (radians); and what the monitor calls a jump: this much turn in one frame, or this many metres for the camera.
+const HOLD_MOST=.5,JUMP_TURN=.6,JUMP_METRES=1.2;
 // Per second, at smoothing .5: the view's turn, the zoom, and the point it looks at following the body, sideways and up and down.
 const TURN_RATE=18,ZOOM_RATE_S=10,FOLLOW_RATE=10,FOLLOW_RATE_UP=6;
 // How fast the height of the frame follows the head, slow enough that no walk or run cycle shakes the view.
@@ -101,6 +103,7 @@ const SWAP_RATE=10;
 // How fast the framing with the weapon in hand comes in and goes out (per second).
 const ARMED_FRAME_RATE=6;
 // A weapon out (not aiming): the turn this much faster too, and the view may look further up; through a scope the elevation stops at ±this.
+const HOLD_STEP=.03,UP_SLIDE=1.2;
 const ARMED_TURN=.6,ARMED_PITCH_UP=-1.2,SCOPE_PITCH=1.45;
 // Recoil: a kick reaches the view at this rate (per second); after this long (s) with no kick, the share given back returns at this rate.
 const KICK_RATE=45,RECOVER_AFTER=.09,RECOVER_RATE=7;
@@ -183,6 +186,8 @@ export class CameraRig {
   /** Weapons, opt-in (the defaults leave the view as it always was): a weapon is out (no recentre, a quicker turn, a wider look up). */
   armed=false;
   private armedBefore=false;
+  /** How far up the third-person view may look now (it slides between the plain limit and the armed one). */
+  private upLimit=PITCH_UP;
   /** 0-1 the weapon out, eased (the framing with the weapon in hand comes in and goes out gently). */
   private armedBlend=0;
   /** 0-1 aiming down the sights (the gun's eased blend) and its framing; 0-1 through a scope, and the point the scope's eye is at. */
@@ -260,7 +265,7 @@ export class CameraRig {
   }
   /** Dragging the mouse: sideways turns, up and down looks up and down (the boom rises as the view looks down). */
   drag(dx:number,dy:number):void {
-    this.sinceDrag=0;if(dx||dy)this.focusSet=false;
+    this.sinceDrag=0;if(dx||dy){this.focusSet=false;this.cause="drag";}
     this.yawGoal-=dx*TURN_PER_PIXEL*this.feel.sensitivity*this.lookScale;
     const pitch=dy*LOOK_PER_PIXEL*this.feel.sensitivity*this.lookScale;
     this.pitchGoal+=pitch;this.pulledDown(pitch);
@@ -277,13 +282,13 @@ export class CameraRig {
   /** A stick's turn (radians, in the rig's angles: yaw up turns left, pitch up looks down), eased like the mouse's. */
   look(dYaw:number,dPitch:number):void {
     if(!Number.isFinite(dYaw)||!Number.isFinite(dPitch))return;
-    if(dYaw||dPitch)this.focusSet=false;
+    if(dYaw||dPitch){this.focusSet=false;this.cause="look";}
     this.sinceDrag=0;this.yawGoal+=dYaw;this.pitchGoal+=dPitch;this.pulledDown(dPitch);this.holdPitch();
   }
   /** Aim assistance: turns the view now, goals and all, so the easing adds no lag behind what it follows. */
   nudge(dYaw:number,dPitch:number):void {
     if(!Number.isFinite(dYaw)||!Number.isFinite(dPitch))return;
-    this.yaw+=dYaw;this.yawGoal+=dYaw;this.yawGoalBefore+=dYaw;this.pitch+=dPitch;this.pitchGoal+=dPitch;this.holdPitch();
+    this.note("nudge",dYaw,dPitch);this.yaw+=dYaw;this.yawGoal+=dYaw;this.yawGoalBefore+=dYaw;this.pitch+=dPitch;this.pitchGoal+=dPitch;this.holdPitch();
   }
   /** A shot's kick: up and to the right (radians); `recover` of it comes back once the shooting stops (less what the player pulled down). */
   recoil(up:number,side:number,recover=0):void {
@@ -327,7 +332,7 @@ export class CameraRig {
   }
   /** Turns the view to look along `heading` (the camera goes to the opposite side), by the short way round; the chase does not undo it at once. */
   face(heading:number):void {
-    this.yawGoal+=wrapped(heading+Math.PI-this.yawGoal);this.sinceDrag=0;
+    this.note("face");this.yawGoal+=wrapped(heading+Math.PI-this.yawGoal);this.sinceDrag=0;
   }
   /** A view someone else places (the selfie): the mouse still turns the heading and elevation that movement follows. */
   turn(dt:number):void {
@@ -340,7 +345,7 @@ export class CameraRig {
     if(this.mode!=='third'&&!scoped)return;
     const turns=Math.round(this.pitchGoal/(Math.PI*2))*Math.PI*2;
     // Through a scope the view never loops over (first person can); a weapon out may look higher.
-    this.pitchGoal=scoped?clamp(this.pitchGoal-turns,-SCOPE_PITCH,this.mode==='third'?PITCH_DOWN:SCOPE_PITCH):clamp(this.pitchGoal-turns,this.armed?ARMED_PITCH_UP:PITCH_UP,PITCH_DOWN);this.pitch-=turns;
+    this.pitchGoal=scoped?clamp(this.pitchGoal-turns,-SCOPE_PITCH,this.mode==='third'?PITCH_DOWN:SCOPE_PITCH):clamp(this.pitchGoal-turns,this.upLimit,PITCH_DOWN);this.pitch-=turns;
   }
 
   /** Getting on a bike: third person, behind it (chase); getting off: the view the player had. */
@@ -376,7 +381,7 @@ export class CameraRig {
   private recentre(dt:number,facing:number,pace:number):void {
     if(this.sinceDrag<FOLLOW_AFTER||!this.stride)return;
     const turn=wrapped(facing+Math.PI-this.yawGoal);
-    if(Math.abs(turn)<FOLLOW_WIDEST)this.yawGoal+=turn*ease(FOLLOW_TURN*this.stride*pace,dt);
+    if(Math.abs(turn)<FOLLOW_WIDEST){this.note("recentre");this.yawGoal+=turn*ease(FOLLOW_TURN*this.stride*pace,dt);}
   }
   /** How far along the way from the body to `wanted` the view goes this frame: every solid there closes it, and walls and floors at once. */
   private clear(dt:number,body:pc.Vec3,wanted:pc.Vec3,feetY:number,pace:number,riding:boolean):void {
@@ -412,7 +417,10 @@ export class CameraRig {
     const pace=riding?1:2**(1-2*this.feel.smoothing);
     this.sinceDrag+=dt;
     this.feelStride(dt,feet,riding);
-    if(this.armed!==this.armedBefore){this.armedBefore=this.armed;this.holdPitch();}
+    // The look-up limit is wider armed; putting the weapon away slides it back (a jump of half a radian in one frame was the camera "teleporting").
+    const upWanted=this.armed?ARMED_PITCH_UP:PITCH_UP;
+    if(this.upLimit!==upWanted){this.upLimit+=clamp(upWanted-this.upLimit,-dt*UP_SLIDE,dt*UP_SLIDE);this.holdPitch();}
+    this.armedBefore=this.armed;
     // Armed, the view stays where the player put it: no swing behind the body.
     if(this.mode==='third'&&!riding&&!this.armed&&!this.aimBlend)this.recentre(dt,subject.facing,pace);
     this.kick(dt);
@@ -474,12 +482,21 @@ export class CameraRig {
     if(this.focusSet&&this.mode==='third'){
       probe.copy(this.focus).sub(position);const length=probe.length();
       if(length>.5){
-        const dYaw=wrapped(Math.atan2(-probe.x,-probe.z)-this.yaw),dPitch=Math.asin(clamp(-probe.y/length,-1,1))-this.pitch;
+        let dYaw=wrapped(Math.atan2(-probe.x,-probe.z)-this.yaw),dPitch=Math.asin(clamp(-probe.y/length,-1,1))-this.pitch;
+        // The held point was picked from the view as it was; as the boom closes in, a near one (a wall just ahead of the old view) ends up beside or
+        // behind the new view, and turning to it is a half turn. No hold asks for more than this: past it, let go and keep the heading.
+        if(Math.abs(dYaw)>HOLD_MOST||Math.abs(dPitch)>HOLD_MOST){this.focusSet=false;this.note('holdAim-released',dYaw,dPitch);}
+        else {
+        this.cause='holdAim';
+        // A few degrees a frame at most: the held point only has to follow the camera's move (a metre or two) and a near one asks for a lot more.
+        dYaw=clamp(dYaw,-HOLD_STEP,HOLD_STEP);dPitch=clamp(dPitch,-HOLD_STEP,HOLD_STEP);
         this.yaw+=dYaw;this.yawGoal+=dYaw;this.yawGoalBefore+=dYaw;this.pitch+=dPitch;this.pitchGoal+=dPitch;
         a.set(-Math.sin(this.yaw)*Math.cos(this.pitch),-Math.sin(this.pitch),-Math.cos(this.yaw)*Math.cos(this.pitch));
         up.set(-Math.sin(this.yaw)*Math.sin(this.pitch),Math.cos(this.pitch),-Math.cos(this.yaw)*Math.sin(this.pitch));
+        }
       }
     }
+    this.watchJumps(dt,position);
     if(this.shaking>.0005){
       this.shakeTime+=dt;this.shaking*=Math.exp(-SHAKE_FADE*dt);
       position.x+=Math.sin(this.shakeTime*67)*this.shaking;position.y+=Math.sin(this.shakeTime*83+1)*this.shaking;position.z+=Math.sin(this.shakeTime*59+2)*this.shaking;
@@ -500,6 +517,32 @@ export class CameraRig {
     centre.set(feet.x,feet.y+BODY_CENTRE,feet.z);
     if(subject.clearance)centre.add(c.copy(position).sub(centre).normalize().mulScalar(subject.clearance));
     this.xray.set(position,centre,WINDOW_RADIUS,this.xrayOpen*(1-Math.max(w,this.scopeBlend)),feet.y+FLOOR_KEPT);
+  }
+
+  // ---- Monitor: every frame the view turns or the camera moves further than a hand or a boom can (see `jumps`, window.__cameraJumps). ----
+  /** The writers that touched the view since the last frame (drag, look, nudge, holdAim, face, recentre, chase, kick), the last frame's view, and the log. */
+  private cause='';
+  private readonly causes=new Set<string>();
+  private seen?:{yaw:number;pitch:number;at:pc.Vec3;boom:number};
+  readonly jumps:Array<Record<string,unknown>>=[];
+  /** Called with each recorded jump (a place to send it from). */
+  onJump?:(event:Record<string,unknown>)=>void;
+  private note(cause:string,dYaw=0,dPitch=0):void {this.causes.add(cause);if(dYaw||dPitch)this.causes.add(`${cause}:${dYaw.toFixed(2)}/${dPitch.toFixed(2)}`);}
+  private watchJumps(dt:number,position:pc.Vec3):void {
+    if(this.cause){this.causes.add(this.cause);this.cause='';}
+    const before=this.seen;
+    this.seen={yaw:this.yaw,pitch:this.pitch,at:position.clone(),boom:this.opening};
+    if(!before||dt<=0||dt>.1)return;
+    const turn=Math.abs(wrapped(this.yaw-before.yaw)),tilt=Math.abs(this.pitch-before.pitch),moved=position.distance(before.at);
+    if(turn>JUMP_TURN||tilt>JUMP_TURN||moved>JUMP_METRES){
+      const event={at:new Date().toISOString(),turn:+turn.toFixed(2),tilt:+tilt.toFixed(2),moved:+moved.toFixed(2),dt:+dt.toFixed(4),
+        causes:[...this.causes],openingBefore:+before.boom.toFixed(3),...this.telemetry()};
+      this.jumps.push(event);if(this.jumps.length>40)this.jumps.shift();
+      try{console.warn('[camera] jump',event);}catch{/* No console. */}
+      try{(globalThis as {__cameraJumps?:unknown}).__cameraJumps=this.jumps;localStorage.setItem('bar.cameraJumps',JSON.stringify(this.jumps));}catch{/* Storage may be blocked. */}
+      try{this.onJump?.(event);}catch{/* A listener never breaks the camera. */}
+    }
+    this.causes.clear();
   }
 
   /** Not following the player (watching a screen, at the door): no window; the next follow starts from where it is. */

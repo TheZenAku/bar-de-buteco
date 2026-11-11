@@ -1,7 +1,6 @@
-/** Ease with ground speed, capped at about 116 steps/minute for the 1.4-second walk cycle.
- * Normal movement must still read as walking, even when its travel speed exceeds the authored stride. */
+/** Ease with ground speed (capped at 1.5×: about 130 steps a minute, the fastest a walk looks like one) so network patches and direction changes do not abruptly accelerate the legs. */
 export function walkPlaybackRate(previous:number|undefined,speed:number,dt:number,pace=1.38):number {
-  const wanted=Math.max(.5,Math.min(1.35,speed/pace));
+  const wanted=Math.max(.5,Math.min(1.5,speed/pace));
   const current=previous??.5;
   return current+(wanted-current)*(1-Math.exp(-Math.max(0,dt)/(wanted>current?.18:.24)));
 }

@@ -102,3 +102,7 @@ O recorte é um trecho de shader (`litUserMainStartPS`) aplicado a todos os mate
 | `apps/web/src/settings.ts`, `apps/web/src/main.ts` | Preferências salvas, migração e controles do menu (Ajustes › Câmera, `pause-menu/menu-content.ts`) |
 
 `tests/integration/camera.test.ts` cobre os três zooms, giro, colisão (inclusive que nenhum quadro de um giro rápido fica atrás de parede, a 60 e a 20 FPS), abertura sem saltos, piso, acompanhamento, alturas diferentes de cabeça, corrida, ajustes e moto. `tests/integration/camera-settings.test.ts` cobre a persistência e a migração das preferências. `tests/integration/map.test.ts` continua verificando as consultas de geometria e visibilidade, além das colisões do jogador.
+
+## Saltos da câmera com arma (2026-11-10)
+
+Simulados com a afinação padrão (boom armado de 6 m): o `holdAim` com ponto próximo (parede ou chão a 1–2 m) girava a vista 24–29° e movia a câmera 2,5–3 m **num frame**, e guardar a arma olhando para cima derrubava o limite de olhar para cima de -1,2 para -0,6 de uma vez (26° num frame). Agora: o ponto preso fica no mínimo a 14 m do raio (`HOLD_MIN`, controller.ts), o `holdAim` gira no máximo `HOLD_STEP` (.03 rad) por frame, e o limite de olhar para cima escorrega (`upLimit`, `UP_SLIDE` 1,2 rad/s). Teste: camera-aim.test.ts (último). Se ainda houver salto, `copy(JSON.stringify(window.__cameraJumps))` no console traz a causa.

@@ -1,0 +1,659 @@
+{
+ "descricao": "Marcadores Ponto_EB_* do setor S07_04 em coordenadas do jogo (as mesmas do glTF do setor, ja convertidas). rot = quaternion glTF quando existe.",
+ "n": 48,
+ "marcadores": {
+  "Ponto_EB_Balanca": {
+   "xyz_jogo": [
+    347.9,
+    0.267,
+    -60
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "balanca de plataforma"
+   }
+  },
+  "Ponto_EB_Bomba_Alta_Pressao": {
+   "xyz_jogo": [
+    349.15,
+    0.17,
+    -67.87
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "bomba de alimentacao do secador"
+   }
+  },
+  "Ponto_EB_Doca": {
+   "xyz_jogo": [
+    348.5,
+    0.17,
+    -52.6
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "vaga do caminhao na baia interna (traseira para oeste ou leste)"
+   }
+  },
+  "Ponto_EB_Empilhadeira": {
+   "xyz_jogo": [
+    339.2,
+    0.17,
+    -59
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "empilhadeira patolada (guarda paletes no porta-paletes)"
+   }
+  },
+  "Ponto_EB_Ensaque": {
+   "xyz_jogo": [
+    357.6,
+    0.17,
+    -64.3
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "operador da ensacadeira"
+   }
+  },
+  "Ponto_EB_Ensaque_Bico": {
+   "xyz_jogo": [
+    357.9,
+    1.45,
+    -65.2
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "bico de enchimento"
+   }
+  },
+  "Ponto_EB_Ensaque_Saida": {
+   "xyz_jogo": [
+    355.05,
+    0.48,
+    -65.2
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "fim da esteira (saco pronto, ao lado do palete)"
+   }
+  },
+  "Ponto_EB_Entrada_Pessoal": {
+   "xyz_jogo": [
+    360.7,
+    0.17,
+    -58.8
+   ],
+   "rot": [
+    0,
+    -1,
+    0,
+    4.371138828673793e-08
+   ],
+   "extras": {
+    "funcao": "porta de pedestre"
+   }
+  },
+  "Ponto_EB_PA_1": {
+   "xyz_jogo": [
+    355.8,
+    0.314,
+    -56.85
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_2": {
+   "xyz_jogo": [
+    357.1,
+    0.314,
+    -56.85
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_3": {
+   "xyz_jogo": [
+    358.4,
+    0.314,
+    -56.85
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_4": {
+   "xyz_jogo": [
+    355.8,
+    0.314,
+    -58.35
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_5": {
+   "xyz_jogo": [
+    357.1,
+    0.314,
+    -58.35
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_6": {
+   "xyz_jogo": [
+    358.4,
+    0.314,
+    -58.35
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_PA_Ensaque": {
+   "xyz_jogo": [
+    354,
+    0.314,
+    -64
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "PRODUTO",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Painel": {
+   "xyz_jogo": [
+    347.5,
+    0.17,
+    -65.95
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "console do secador e dos tanques (cadeira do operador)"
+   }
+  },
+  "Ponto_EB_Paleteira": {
+   "xyz_jogo": [
+    346.3,
+    0.17,
+    -59.1
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "paleteira manual"
+   }
+  },
+  "Ponto_EB_Portao": {
+   "xyz_jogo": [
+    361.6,
+    0.17,
+    -53
+   ],
+   "rot": [
+    0,
+    -1,
+    0,
+    4.371138828673793e-08
+   ],
+   "extras": {
+    "funcao": "portao de veiculos (Rua da Ferrovia)"
+   }
+  },
+  "Ponto_EB_Rack_V1N1P1": {
+   "xyz_jogo": [
+    334.67,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V1N1P2": {
+   "xyz_jogo": [
+    335.91,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V1N2P1": {
+   "xyz_jogo": [
+    334.67,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V1N2P2": {
+   "xyz_jogo": [
+    335.91,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V1N3P1": {
+   "xyz_jogo": [
+    334.67,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Rack_V1N3P2": {
+   "xyz_jogo": [
+    335.91,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Rack_V2N1P1": {
+   "xyz_jogo": [
+    337.46,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V2N1P2": {
+   "xyz_jogo": [
+    338.7,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V2N2P1": {
+   "xyz_jogo": [
+    337.46,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V2N2P2": {
+   "xyz_jogo": [
+    338.7,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V2N3P1": {
+   "xyz_jogo": [
+    337.46,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Rack_V2N3P2": {
+   "xyz_jogo": [
+    338.7,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MALTE",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Rack_V3N1P1": {
+   "xyz_jogo": [
+    340.25,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V3N1P2": {
+   "xyz_jogo": [
+    341.49,
+    0.314,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 0.0
+   }
+  },
+  "Ponto_EB_Rack_V3N2P1": {
+   "xyz_jogo": [
+    340.25,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V3N2P2": {
+   "xyz_jogo": [
+    341.49,
+    1.864,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 1.55
+   }
+  },
+  "Ponto_EB_Rack_V3N3P1": {
+   "xyz_jogo": [
+    340.25,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Rack_V3N3P2": {
+   "xyz_jogo": [
+    341.49,
+    3.414,
+    -61.6
+   ],
+   "rot": null,
+   "extras": {
+    "tipo": "MIX",
+    "capacidade": 18,
+    "nivel_m": 3.1
+   }
+  },
+  "Ponto_EB_Secador_Base": {
+   "xyz_jogo": [
+    352.6,
+    0.17,
+    -72
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "valvula rotativa de descarga"
+   }
+  },
+  "Ponto_EB_Secador_Inspecao_L": {
+   "xyz_jogo": [
+    355.7,
+    4.2,
+    -73.9
+   ],
+   "rot": [
+    0,
+    -1,
+    0,
+    4.371138828673793e-08
+   ],
+   "extras": {
+    "funcao": "visor da camara (5,6 m)"
+   }
+  },
+  "Ponto_EB_Secador_Inspecao_N": {
+   "xyz_jogo": [
+    352.6,
+    4.2,
+    -77
+   ],
+   "rot": [
+    0,
+    -0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "visor da camara (5,6 m)"
+   }
+  },
+  "Ponto_EB_Secador_Inspecao_O": {
+   "xyz_jogo": [
+    349.5,
+    4.2,
+    -73.9
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "visor da camara (5,6 m)"
+   }
+  },
+  "Ponto_EB_Secador_Inspecao_S": {
+   "xyz_jogo": [
+    352.6,
+    4.2,
+    -70.8
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "visor da camara (5,6 m)"
+   }
+  },
+  "Ponto_EB_Secador_Topo": {
+   "xyz_jogo": [
+    352.6,
+    8.6,
+    -71
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "topo do secador / atomizador"
+   }
+  },
+  "Ponto_EB_Tanque_1": {
+   "xyz_jogo": [
+    337,
+    3.065,
+    -69.65
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "abertura de carga do tanque 1 (tampa basculante)"
+   }
+  },
+  "Ponto_EB_Tanque_1_Operador": {
+   "xyz_jogo": [
+    337,
+    2,
+    -68.1
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "onde o jogador fica para despejar o saco"
+   }
+  },
+  "Ponto_EB_Tanque_2": {
+   "xyz_jogo": [
+    340.3,
+    3.065,
+    -69.65
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "abertura de carga do tanque 2 (tampa basculante)"
+   }
+  },
+  "Ponto_EB_Tanque_2_Operador": {
+   "xyz_jogo": [
+    340.3,
+    2,
+    -68.1
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "onde o jogador fica para despejar o saco"
+   }
+  },
+  "Ponto_EB_Tanque_3": {
+   "xyz_jogo": [
+    343.6,
+    3.065,
+    -69.65
+   ],
+   "rot": null,
+   "extras": {
+    "funcao": "abertura de carga do tanque 3 (tampa basculante)"
+   }
+  },
+  "Ponto_EB_Tanque_3_Operador": {
+   "xyz_jogo": [
+    343.6,
+    2,
+    -68.1
+   ],
+   "rot": [
+    0,
+    0.7071068286895752,
+    0,
+    0.7071068286895752
+   ],
+   "extras": {
+    "funcao": "onde o jogador fica para despejar o saco"
+   }
+  }
+ }
+}

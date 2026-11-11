@@ -21,7 +21,8 @@ export interface ProfileHooks {
   toast:(text:string,error?:boolean)=>void;
 }
 export interface ProfilePerson {id:string;name:string;color:string;number:string;photo?:number}
-type Tab='profile'|'achievements'|'skill';
+type Tab='profile'|'achievements'|'skill'|'employment';
+interface EmploymentView {employment:null|{jobId:string;status:'hired'|'resigned'|'dismissed';hiredAt:string;cooldownUntil?:string|null;schedule?:unknown};shift:null|{startedAt:string;earned:number;station:string};config:{contractSlots:number;shiftSlots:number;cooldownMs:number}}
 
 /**
  * The profile window: a right click on a player (or on yourself), then Perfil. Name, Highgram, the skin standing still, the
@@ -32,6 +33,7 @@ export function createProfileWindow(hooks:ProfileHooks){
   let view:ProfileView|undefined,tab:Tab='profile',editing=false,capturing=false,generation=0,keyError='',busy=false;
   /** The Conquistas tab: read each time it opens, and again when a badge arrives while it is open. */
   let achievements:AchievementView[]|undefined;
+  let employment:EmploymentView|undefined;
   /** Pictures already drawn, by skin; they do not change during a session. */
   const portraits=new Map<string,string>();
   const tip=document.createElement('div');tip.className='pf-tip';tip.setAttribute('role','tooltip');tip.hidden=true;document.body.append(tip);
@@ -121,6 +123,14 @@ export function createProfileWindow(hooks:ProfileHooks){
       <div class="pf-keyrow"><span>${uiIcon('keyboard')} Tecla</span><button type="button" class="pf-key${capturing?' listening':''}" data-pf="key" aria-label="Mudar a tecla da skill">${capturing?'Aperte uma tecla…':`<kbd>${e(keyLabel(loadout.key))}</kbd>Mudar`}</button></div>
       <p class="pf-hint${keyError?' error':''}" role="status">${e(keyError||'Letras e números que o jogo ainda não usa. Vale só para esta skin.')}</p>`;
   }
+  function employmentHtml():string {
+    if(!employment)return '<p class="pf-empty"><span class="loader" aria-hidden="true"></span></p>';
+    const job=employment.employment,cooldown=job?.cooldownUntil?new Date(job.cooldownUntil):undefined,waiting=!!cooldown&&cooldown.getTime()>Date.now();
+    if(!job||job.status!=='hired')return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p>Trabalhe na EMPRESA BRASIL. Depois da contratação, entre em expediente no ponto da entrada de pessoal.</p>${waiting?`<p>Nova candidatura disponível em <b>${cooldown!.toLocaleString('pt-BR')}</b>.</p>`:`<button class="button primary" data-pf="employment-hire">Candidatar-se</button>`}</div>`;
+    return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p><b>${employment.shift?'Em serviço':'Contratado'}</b>${employment.shift?` · desde ${new Date(employment.shift.startedAt).toLocaleTimeString('pt-BR')} · estação ${e(employment.shift.station)}`:''}</p><p>Admitido em ${new Date(job.hiredAt).toLocaleDateString('pt-BR')}.</p><button class="button secondary" data-pf="employment-resign">Pedir demissão</button><p class="pf-hint">A demissão encerra o expediente e inicia o cooldown configurado.</p></div>`;
+  }
+  async function loadEmployment():Promise<void>{const opened=generation;try{const next=await api<EmploymentView>('/employment');if(opened===generation&&tab==='employment'){employment=next;render();}}catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível ler o emprego.',true);}}
+  async function employmentAction(action:'hire'|'resign'):Promise<void>{if(busy)return;busy=true;try{employment=await api<EmploymentView|{employment:EmploymentView['employment'] }>(`/employment/${action}`,{requestId:crypto.randomUUID()}).then(()=>api<EmploymentView>('/employment'));render();hooks.toast(action==='hire'?'Contratação concluída.':'Demissão registrada.');}catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível alterar o emprego.',true);}finally{busy=false;}}
   /** Level, rank and the XP bar, for anyone's profile (docs/sistemas/niveis.md). */
   function levelHtml(xp:number):string {
     const p=levelOf(xp),rank=rankOf(p.level),pct=p.need?p.into/p.need*100:100;
@@ -131,7 +141,7 @@ export function createProfileWindow(hooks:ProfileHooks){
     const v=view,photo=v.photo?`<img src="/api/phone/gram/avatars/${encodeURIComponent(v.id)}?v=${e(v.photo)}" alt="">`:e(v.name.slice(0,1).toUpperCase());
     window_.head.innerHTML=`<span class="pf-avatar" style="--avatar:${e(v.color)}">${photo}</span><div class="pf-id"><h2>${e(v.name)}</h2>${levelHtml(v.xp)}<button type="button" class="pf-gram" data-pf="gram" title="Abrir no Highgram">${uiIcon('gram')}<span>@${e(v.handle)}</span>${uiIcon('chevronRight')}</button></div>`;
     window_.setLabel(v.mine?'Seu perfil':`Perfil de ${v.name}`);
-    window_.body.innerHTML=`${v.mine?`<nav class="pf-tabs" role="tablist"><button type="button" role="tab" data-pf="tab" data-tab="profile" aria-selected="${tab==='profile'}">Perfil</button><button type="button" role="tab" data-pf="tab" data-tab="achievements" aria-selected="${tab==='achievements'}">Conquistas</button><button type="button" role="tab" data-pf="tab" data-tab="skill" aria-selected="${tab==='skill'}">Skill</button></nav>`:''}<div class="pf-panel">${tab==='skill'&&v.mine?skillHtml(v):tab==='achievements'&&v.mine?achievementsHtml():profileHtml(v)}</div>`;
+    window_.body.innerHTML=`${v.mine?`<nav class="pf-tabs" role="tablist"><button type="button" role="tab" data-pf="tab" data-tab="profile" aria-selected="${tab==='profile'}">Perfil</button><button type="button" role="tab" data-pf="tab" data-tab="achievements" aria-selected="${tab==='achievements'}">Conquistas</button><button type="button" role="tab" data-pf="tab" data-tab="skill" aria-selected="${tab==='skill'}">Skill</button><button type="button" role="tab" data-pf="tab" data-tab="employment" aria-selected="${tab==='employment'}">Meu emprego</button></nav>`:''}<div class="pf-panel">${tab==='employment'&&v.mine?employmentHtml():tab==='skill'&&v.mine?skillHtml(v):tab==='achievements'&&v.mine?achievementsHtml():profileHtml(v)}</div>`;
     if(tab==='profile'||!v.mine)void showPortrait(v);
     if(editing){const input=window_.body.querySelector<HTMLInputElement>('[name="status"]');input?.focus();input?.setSelectionRange(input.value.length,input.value.length);}
   }
@@ -215,7 +225,9 @@ export function createProfileWindow(hooks:ProfileHooks){
       const v=view;
       switch(button.dataset.pf){
         case 'gram':hooks.highgram(v.id);break;
-        case 'tab':tab=button.dataset.tab==='skill'?'skill':button.dataset.tab==='achievements'?'achievements':'profile';editing=false;keyError='';cancelCapture?.();render();if(tab==='achievements')void loadAchievements();break;
+        case 'tab':tab=button.dataset.tab==='employment'?'employment':button.dataset.tab==='skill'?'skill':button.dataset.tab==='achievements'?'achievements':'profile';editing=false;keyError='';cancelCapture?.();render();if(tab==='achievements')void loadAchievements();if(tab==='employment')void loadEmployment();break;
+        case 'employment-hire':void employmentAction('hire');break;
+        case 'employment-resign':if(confirm('Pedir demissão e iniciar o cooldown?'))void employmentAction('resign');break;
         case 'status-edit':editing=true;render();break;
         case 'status-cancel':editing=false;render();break;
         case 'badges':openPicker();break;

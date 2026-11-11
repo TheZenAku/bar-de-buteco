@@ -7,8 +7,10 @@ import {FOOSBALL_TABLES} from './foosball.js';
 import {POOL_TABLES} from './pool/table.js';
 import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
 import {GARAGE,GARAGES} from './garage.js';
+import {JUMP,type JumpMotion} from './jump.js';
 
-export const WALK_SPEED = 3.5;
+/** A real walk: the Walk clip keeps a foot planted up to about 1.5 m/s (clip-paces.ts). Shift runs (RUN_SPEED). */
+export const WALK_SPEED = 1.6;
 export const RUN_SPEED = 6;
 export const OLD_CANE_SPEED = .475;
 export const PLAYER_RADIUS = 0.34;
@@ -316,29 +318,84 @@ function throughDoorway(fromX:number,fromZ:number,x:number,z:number,y:number,wx:
 /**
  * `stagePass`: may step onto the stage (a paid pass); without one the steps stop the body, as a wall would. `pace` (m/s) replaces the walking,
  * running or cane speed: the fist fight's guard (FIGHT.speed) and a punch's step in (fight.ts, punchStep).
+ * `motion` opts the existing controller into vertical physics and is updated in place. Jump permission is authoritative;
+ * held input is still recorded when jumping is forbidden, so becoming free cannot replay an old press.
  */
-export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'>,dt=.05,oldWalk=false,stagePass=false,obstacles:readonly Collider[]=[],pace?:number):Required<Position> {
+export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'running'|'jump'>,dt=.05,oldWalk=false,stagePass=false,obstacles:readonly Collider[]=[],pace?:number,motion?:JumpMotion,allowJump=true):Required<Position> {
+  const seconds=Math.min(Math.max(dt,0),.1);
   const magnitude=Math.hypot(input.dx,input.dz);
-  const scale=(pace??(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED))*Math.min(Math.max(dt,0),.1)/Math.max(1,magnitude);
-  const steps=Math.max(1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
+  const scale=(pace??(oldWalk?OLD_CANE_SPEED:input.running?RUN_SPEED:WALK_SPEED))*seconds/Math.max(1,magnitude);
+  const steps=Math.max(1,motion?Math.ceil(seconds*120):1,Math.ceil(Math.max(Math.abs(input.dx*scale),Math.abs(input.dz*scale))/.1));
   let x=position.x,z=position.z,y=position.y??floorHeight(x,z)??0;
+  if(motion){
+    const support=characterGround(x,z,y+JUMP.contact,obstacles);
+    motion.grounded=motion.grounded&&support!==undefined&&Math.abs(y-support)<=JUMP.contact;
+    motion.landingTime=Math.max(0,motion.landingTime-seconds);
+    if(seconds>0&&input.jump&&!motion.jumpHeld&&motion.grounded&&allowJump){
+      motion.verticalVelocity=JUMP.impulse;motion.grounded=false;motion.landingTime=0;
+    }
+    motion.jumpHeld=!!input.jump;
+  }
   // A vehicle can stop over someone. Let them leave its hull, then block re-entry.
   const trapped=new Set(obstacles.filter(c=>(c.maxY??Infinity)>y+.26&&(c.minY??-Infinity)<y+PLAYER_HEIGHT-.04&&boxContains(c,x,z,PLAYER_RADIUS-.01)).map(c=>c.id));
   // Whoever is already up there (a pass that ran out) may still move about and come down, never back up.
   const gated=!stagePass&&!onStage({x,y,z});
-  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py,trapped,obstacles)&&!(gated&&onStage({x:px,y:py,z:pz}));
+  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py,trapped,obstacles)&&!(gated&&onStage({x:px,y:motion&&!motion.grounded?STAGE.deck.maxY:py,z:pz}));
   for(let step=0;step<steps;step++){
     const wx=input.dx*scale/steps,wz=input.dz*scale/steps,fromX=x,fromZ=z;
     const nx=x+wx,nz=z+wz;
-    let nextY=floorHeight(nx,z,y);
+    let nextY=motion&&!motion.grounded?y:floorHeight(nx,z,y)??(motion?y:undefined);
     if(nextY!==undefined&&allowed(nx,z,nextY)){x=nx;y=nextY;}
-    nextY=floorHeight(x,nz,y);
+    nextY=motion&&!motion.grounded?y:floorHeight(x,nz,y)??(motion?y:undefined);
     if(nextY!==undefined&&allowed(x,nz,nextY)){z=nz;y=nextY;}
     const guided=throughDoorway(fromX,fromZ,x,z,y,wx,wz);
     if(guided&&allowed(guided.x,guided.z,y)){x=guided.x;z=guided.z;}
     for(const c of obstacles)if(trapped.has(c.id)&&!boxContains(c,x,z,PLAYER_RADIUS))trapped.delete(c.id);
+    if(motion){
+      const support=characterGround(x,z,y+JUMP.contact,obstacles);
+      if(motion.grounded&&(support===undefined||Math.abs(y-support)>JUMP.contact))motion.grounded=false;
+      if(!motion.grounded){
+        const h=seconds/steps,oldY=y,vy=motion.verticalVelocity;
+        motion.verticalVelocity=Math.max(-JUMP.terminalSpeed,vy-JUMP.gravity*h);
+        let next=y+(vy+motion.verticalVelocity)*.5*h;
+        if(next>y){
+          // Sweep the body's head against existing solid volumes; roofs are also floor triangles.
+          let ceiling=Infinity;
+          for(const c of [...solidsAt(x,z),...obstacles])if(!c.ramp&&boxContains(c,x,z,PLAYER_RADIUS-.02)&&
+            (c.minY??-Infinity)>=y+PLAYER_HEIGHT-.001)ceiling=Math.min(ceiling,c.minY!);
+          for(const s of surfaceGrid.get(cellKey(cell(x),cell(z)))??[]){
+            const top=triangleHeight(s.points,x,z);
+            if(top!==undefined&&top>=y+PLAYER_HEIGHT-.001)ceiling=Math.min(ceiling,top);
+          }
+          if(next+PLAYER_HEIGHT>ceiling){next=ceiling-PLAYER_HEIGHT;motion.verticalVelocity=0;}
+        }
+        const floor=characterGround(x,z,oldY+JUMP.contact,obstacles);
+        if(motion.verticalVelocity<=0&&floor!==undefined&&next<=floor&&oldY>=floor-JUMP.contact){
+          y=floor;motion.verticalVelocity=0;motion.grounded=true;motion.landingTime=JUMP.landingSeconds;
+        }else y=next;
+      }else motion.verticalVelocity=0;
+    }
   }
   return {x,y,z};
+}
+
+/** A downward ray on the collision triangles used by both runtimes, including stacked floors.
+ * Small foot probes bridge triangle seams; steep faces cannot count as a floor. */
+function characterGround(x:number,z:number,top:number,obstacles:readonly Collider[]):number|undefined {
+  let highest:number|undefined;
+  for(const [dx,dz] of [[0,0],[.12,0],[-.12,0],[0,.12],[0,-.12]]){
+    for(const s of surfaceGrid.get(cellKey(cell(x+dx!),cell(z+dz!)))??[]){
+      const [a,b,c]=s.points,ux=b![0]!-a![0]!,uy=b![1]!-a![1]!,uz=b![2]!-a![2]!,vx=c![0]!-a![0]!,vy=c![1]!-a![1]!,vz=c![2]!-a![2]!;
+      const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+      if(Math.abs(ny)/Math.hypot(nx,ny,nz)<.64)continue;
+      const y=triangleHeight(s.points,x+dx!,z+dz!);
+      if(y!==undefined&&y<=top&&(highest===undefined||y>highest))highest=y;
+    }
+  }
+  // Furniture and vehicles can support the feet too; their collider tops are authoritative.
+  for(const c of [...solidsAt(x,z),...obstacles])if(!c.ramp&&Number.isFinite(c.maxY)&&c.maxY!<=top&&
+    boxContains(c,x,z,.12)&&(highest===undefined||c.maxY!>highest))highest=c.maxY;
+  return highest;
 }
 
 /** Admin flight: no collisions (a noclip), only the ground below and a ceiling. `running` boosts; `dy` climbs (+1) or sinks (-1). */

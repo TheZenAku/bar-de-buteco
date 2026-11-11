@@ -1,3 +1,4 @@
+import {jumpMotion,jumpAnimation,canJump,type JumpMotion} from '@bar/shared';
 import {vehicleMoving} from '@bar/shared';
 import type {FireworkShot,StorageView} from '@bar/shared';
 import type {ArsenalView,GunInput,WeaponHitEvent,WeaponShotEvent} from '@bar/shared';
@@ -107,6 +108,9 @@ export interface NetworkHooks {
   wallet?:(change:{balance:number;delta?:number;reason?:string})=>void;
   table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
+  factory?:(state:unknown)=>void;
+  employment?:(state:unknown)=>void;
+  factoryPpe?:(state:{on:boolean})=>void;
   adminWorld?:(snapshot:unknown)=>void;
   crowd?:(bytes:ArrayBuffer|Uint8Array)=>void;
   /** The price table (packages/shared/src/prices.ts), on entering and when the administration changes it. */
@@ -167,6 +171,7 @@ export class BarNetwork {
   private motoId='';
   /** What the room last heard of the switches and the brake pedal. */
   private sentLamps=0;
+  private motion:JumpMotion=jumpMotion();
   private position:Position={x:0,z:7};
   private seq=0;
   private world?:WorldState;
@@ -214,12 +219,12 @@ export class BarNetwork {
       if(self){
         this.seq=Math.max(this.seq,self.lastProcessedInput);
         this.pending=this.pending.filter(input=>input.seq>self.lastProcessedInput);
-        this.position={x:self.x,y:self.y,z:self.z};
+        this.position={x:self.x,y:self.y,z:self.z};this.motion=jumpMotion(self);
         // The punches too: the room's stream, then the unanswered inputs through the same rules (a punch the room did not take yet is assumed).
         let stream=streamOf(self.fist),carry=(self.animationState as string)==='punch';
         if((!self.interactionState||isRidingHorse(self.interactionState))&&!self.currentTableId) for(const input of this.pending){stream=this.thrown(stream,input,self.skin);carry=punchCarries(carry,stream,input.seq,input);this.position=this.predict(input,self,stream,carry);}
         this.punchStream=stream;this.punchCarry=carry;
-        this.hooks.position(this.position);
+        this.hooks.position(this.predictedPose(self,this.pending.at(-1)));
         this.hooks.fightState?.(self,self.lastProcessedInput);
         this.hooks.gunState?.(self,self.lastProcessedInput);
         this.reconcileMoto(world,self);
@@ -282,6 +287,9 @@ export class BarNetwork {
     room.onMessage('wallet.state',(change:{balance:number;delta?:number;reason?:string})=>this.hooks.wallet?.(change));
     room.onMessage('table.state',(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>this.hooks.table?.(update));
     room.onMessage('job.state',(update:{task?:JobTaskView|null;message?:string})=>this.hooks.job?.(update));
+    room.onMessage('factory.state',(state:unknown)=>this.hooks.factory?.(state));
+    room.onMessage('employment.state',(state:unknown)=>this.hooks.employment?.(state));
+    room.onMessage('factory.ppe',(state:{on:boolean})=>this.hooks.factoryPpe?.(state));
     room.onMessage('admin.world',(snapshot:unknown)=>this.hooks.adminWorld?.(snapshot));
     // The people beyond the avatars, a few times a second, as bytes (packages/shared/src/crowd.ts).
     room.onMessage('crowd',(bytes:ArrayBuffer|Uint8Array)=>this.hooks.crowd?.(bytes));
@@ -318,7 +326,7 @@ export class BarNetwork {
     if(isRidingMoto(self.interactionState)){this.wasMoving=false;return;}
     const locked=!!((self.interactionState&&!isRidingHorse(self.interactionState))||self.currentTableId);
     const requested=this.hooks.input();
-    let intention:Omit<PlayerInput,'seq'>=locked?{...requested,dx:0,dz:0,running:false,rotation:self.rotation}:requested;
+    let intention:Omit<PlayerInput,'seq'>=locked?{...requested,dx:0,dz:0,running:false,...(requested.jump!==undefined?{jump:false}:{}),rotation:self.rotation}:requested;
     // The fist fight: the guard rides on every input, a punch on the one that throws it (its aim turns the body), a planted punch keeps its facing.
     const fighting=this.hooks.fight?.(this.seq+1,this.punchStream,self);
     if(fighting?.fight)intention={...intention,fight:true,...(fighting.punch?{punch:fighting.punch}:{}),...(fighting.block?{block:true}:{}),...(fighting.blockAt?{blockAt:fighting.blockAt}:{}),...(fighting.rotation!==undefined&&!locked?{rotation:fighting.rotation}:{})};
@@ -332,7 +340,7 @@ export class BarNetwork {
     // Turning in place (to the selfie's phone, a firework's aim) has to reach the room too.
     const turning=this.sentRotation!==undefined&&Math.abs(normalizeHeading(intention.rotation-this.sentRotation))>.001;
     // In the guard every input goes, still or not: the room counts a punch's planted feet in inputs (fight.ts, punchStep).
-    if(!fighting?.fight&&!gun?.active&&!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
+    if(!fighting?.fight&&!gun?.active&&!intention.jump&&!this.motion.jumpHeld&&this.motion.grounded&&this.motion.landingTime<=0&&!moving&&!this.wasMoving&&!looking&&!turning&&!!intention.rear===this.sentRear)return;
     this.wasMoving=moving;
     this.sentRear=!!intention.rear;
     this.sentRotation=intention.rotation;
@@ -341,7 +349,7 @@ export class BarNetwork {
     this.pending.push(input);
     this.punchStream=this.thrown(this.punchStream,input,self.skin);
     this.punchCarry=punchCarries(this.punchCarry,this.punchStream??NO_PUNCH,input.seq,input);
-    if(!locked){this.position=this.predict(input,self,this.punchStream,this.punchCarry);this.hooks.position(input.fight?{...this.position,rotation:input.rotation}:this.position);}
+    if(!locked){this.position=this.predict(input,self,this.punchStream,this.punchCarry);const pose=this.predictedPose(self,input);this.hooks.position(input.fight?{...pose,rotation:input.rotation}:pose);}
     this.send('player.input',input);
   }
   /**
@@ -409,10 +417,17 @@ export class BarNetwork {
   private predict(input:PlayerInput,self:PlayerState,stream:PunchStream=NO_PUNCH,carry=false):Position {
     if(self.animationState==='fly-fall')return this.position;
     // In the guard: planted or stepping in while a punch holds the feet, else the guard's pace.
-    if(input.fight&&!self.animationState?.startsWith('fly')&&!isRidingHorse(self.interactionState))return fightMove(this.position,stream,input.seq,{...input,running:input.running&&!self.oldWalk&&canRun(self)},TICK_MS/1000,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),self.skin,carry);
+    if(input.fight&&this.motion.grounded&&!self.animationState?.startsWith('fly')&&!isRidingHorse(self.interactionState))return fightMove(this.position,stream,input.seq,{...input,running:input.running&&!self.oldWalk&&canRun(self)},TICK_MS/1000,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),self.skin,carry);
     if(self.animationState?.startsWith("fly"))return flyPlayer(this.position,input,TICK_MS/1000);
     if(isRidingHorse(self.interactionState))return self.animationState==='horse-rear'?this.position:moveHorse(this.position,'rotation' in this.position?Number(this.position.rotation):self.rotation,input,TICK_MS/1000);
-    return movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),this.hooks.gunPace?.(input));
+    const position=movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),this.hooks.gunPace?.(input),this.motion,canJump({...self,animationState:jumpAnimation(this.motion)??(['jump','fall','land'].includes(self.animationState)?'idle':self.animationState)},this.clock.now())&&!input.fight);
+    return position;
+  }
+  /** Rendering receives the predicted jump phase; the position contract stays x/y/z for all existing callers. */
+  private predictedPose(self:PlayerState,input?:PlayerInput):Position {
+    if(self.interactionState||self.currentTableId||self.animationState?.startsWith('fly'))return this.position;
+    const phase=jumpAnimation(this.motion),locomotion=input&&(input.dx||input.dz)?input.running?'run':'walk':'idle';
+    return {...this.position,...this.motion,...(phase?{animation:phase}:['jump','fall','land'].includes(self.animationState)?{animation:locomotion}:{})};
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   /** Bytes still waiting in the socket (0 if unknown). */

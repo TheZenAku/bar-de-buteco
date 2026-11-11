@@ -307,7 +307,7 @@ export class EnvironmentLighting {
       sunVisible:state.sunIntensity/1.15,moonVisible:state.moonIntensity/.18,night:state.night,barSkyExposure:state.exposure,
       cloudCover:weather.cloud,cloudTime:(serverTime%3_600_000)/1000*.012*(.2+weather.wind),stormStrength:weather.storm,lightning:flash}))this.skyMaterial.setParameter(name,value);
     const sheltered=this.rain.update(serverTime,weather,this.daylight);
-    this.sounds.update(serverTime,weather,sheltered);
+    this.sounds.update(serverTime,weather,sheltered);this.shelter=sheltered;
     for(const lamp of this.lamps){
       const intensity=lamp.base*(lamp.outside?nowNight:.68+nowNight*.32)*this.electrical;
       const enabled=intensity>.015,light=lamp.entity.light!;
@@ -466,6 +466,9 @@ export class EnvironmentLighting {
   get power():number{return this.electrical;}
   get rainStrength():number{return this.weather.rain;}
   /** How much the sun lights the open air now: 0 at night, 1 in full daylight. */
+  private shelter=false;
+  /** What the city's sound needs of the sky: the hour, how dark it is, the weather, and whether there is a roof overhead. */
+  get ambience(){const w=this.weather;return {hour:this.sampled.hour,night:this.sampled.night,cloud:w.cloud,rain:w.rain,storm:w.storm,wind:w.wind,sheltered:this.shelter};}
   get daylight():number{return Math.min(1,Math.max(0,this.sampled.sunIntensity/.6));}
   telemetry(){
     const light=(entity:pc.Entity|undefined)=>entity?.light?{enabled:entity.light.enabled&&entity.light.intensity>.001,intensity:entity.light.intensity,direction:entity.up.clone().mulScalar(-1).toArray(),shadows:entity.light.castShadows,cascades:entity.light.numCascades}:undefined;

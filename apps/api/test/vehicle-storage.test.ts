@@ -64,7 +64,7 @@ test('the truck is sold with a hold; moves are atomic, idempotent, limited and o
   await api.db.insert(vehicleStorage).values({vehicleId:truck.id,itemId:'torresmo',quantity:2}).onConflictDoUpdate({target:[vehicleStorage.vehicleId,vehicleStorage.itemId],set:{quantity:2}});
   await setBag('rojao',1);await setBag('peca_carro',1);
   const slots=(await api.db.select().from(itemInventory).where(eq(itemInventory.userId,a.userId))).length;
-  if(slots<INVENTORY_CAPACITY)for(const itemId of ITEM_IDS)if(slots+0<INVENTORY_CAPACITY&&itemId!=='torresmo')await setBag(itemId,1);
+  if(slots<INVENTORY_CAPACITY)for(const itemId of ITEM_IDS){const used=(await api.db.select().from(itemInventory).where(eq(itemInventory.userId,a.userId))).length;if(used>=INVENTORY_CAPACITY)break;if(itemId!=='torresmo')await setBag(itemId,1);}
   const full=(await api.db.select().from(itemInventory).where(eq(itemInventory.userId,a.userId))).length;assert.ok(full<=INVENTORY_CAPACITY);
   if(full>=INVENTORY_CAPACITY)assert.equal((await move(a,'withdraw','torresmo',1)).statusCode,409);
 

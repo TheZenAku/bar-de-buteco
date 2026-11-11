@@ -1,3 +1,4 @@
+import type {JumpMotion} from './jump.js';
 import { z } from 'zod';
 import {HEAD_LOOK_YAW,HEAD_LOOK_PITCH,type HeadLook} from './head-look.js';
 import {blockCommandSchema,punchCommandSchema,type BlockCommand,type FistState,type PunchCommand} from './fight.js';
@@ -53,6 +54,7 @@ export * from './gps.js';
 export * from './highfood.js';
 export * from './garage.js';
 export * from './trade.js';
+export * from './factory/index.js';
 export * from './crowd.js';
 import type {JukeboxState} from './jukebox.js';
 import type {JobSlotsView,ServedItemState} from './economy.js';
@@ -69,7 +71,8 @@ export const PATCH_MS = 100;
 export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
 export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,floorSurface,isWalkable,movePlayer,FLY,flyPlayer,fallPlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
-export type AnimationState = 'idle' | 'walk' | 'run' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
+export {JUMP,jumpMotion,canJump,jumpAnimation,type JumpMotion} from './jump.js';
+export type AnimationState = 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'land' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
   | 'horse-idle' | 'horse-walk' | 'horse-gallop' | 'horse-rear'
   /** An administrator flying (B): hovering, and under way. */
   | 'fly-idle' | 'fly' | 'fly-fall'
@@ -99,13 +102,13 @@ export const HELD_DRINKS = [...DRINK_ITEMS, 'agua', 'refrigerante', 'cafe'] as c
 export type HeldDrink = typeof HELD_DRINKS[number];
 export type EventType = 'BLACKOUT' | 'DRUNK_NPC' | 'PARTY';
 export interface Position { x: number; y?: number; z: number }
-export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;rear?:boolean;/** Flying only: climb (+1) or sink (-1). */dy?:number;/** Flying only: the vertical part of the camera's aim (see flyPlayer). */aim?:number;
+export interface PlayerInput extends Partial<HeadLook> { seq: number; dx: number; dz: number; running: boolean; rotation: number;jump?:boolean;rear?:boolean;/** Flying only: climb (+1) or sink (-1). */dy?:number;/** Flying only: the vertical part of the camera's aim (see flyPlayer). */aim?:number;
   /** In the fist fight's guard (fight.ts), on every input while it is up; and a punch thrown with this input. */fight?:boolean;punch?:PunchCommand;
   /** In the guard: the block key is held (BLOCK, fight.ts), and on the input that first carries it, how late that press is (blockAt). */block?:boolean;blockAt?:BlockCommand;
   /** The firearm (weapons/protocol.ts): the weapon in hand, aiming, the reload key, the shots fired since the last input. */gun?:GunInput }
-export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional(),aim:z.number().finite().min(-1).max(1).optional(),fight:z.boolean().optional(),punch:punchCommandSchema.optional(),block:z.boolean().optional(),blockAt:blockCommandSchema.optional(),gun:gunInputSchema.optional()}).strict();
+export const inputSchema = z.object({seq:z.number().int().min(0).max(2147483647),dx:z.number().finite().min(-1).max(1),dz:z.number().finite().min(-1).max(1),running:z.boolean(),rotation:z.number().finite().min(-Math.PI*2).max(Math.PI*2),headYaw:z.number().finite().min(-HEAD_LOOK_YAW).max(HEAD_LOOK_YAW).optional(),headPitch:z.number().finite().min(-HEAD_LOOK_PITCH).max(HEAD_LOOK_PITCH).optional(),jump:z.boolean().optional(),rear:z.boolean().optional(),dy:z.number().finite().min(-1).max(1).optional(),aim:z.number().finite().min(-1).max(1).optional(),fight:z.boolean().optional(),punch:punchCommandSchema.optional(),block:z.boolean().optional(),blockAt:blockCommandSchema.optional(),gun:gunInputSchema.optional()}).strict();
 export interface PublicUser { id: string; username: string; displayName: string; email: string; verified: boolean; role: 'user' | 'admin'; color: string; equippedSkin?:string; isOwner?:boolean }
-export interface PlayerState extends Position { id: string; slot?: number; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
+export interface PlayerState extends Position, Partial<JumpMotion> { id: string; slot?: number; displayName: string; color: string; skin: string; oldWalk?:boolean; rotation: number; animationState: AnimationState; animationStartedAt: number; /** Which dance G plays, drawn at random: the client takes it modulo its dance clips. */ dance?: number; /** The skill being played while animationState is 'kick' (SKILLS). */ skill?: string; interactionState: string; currentTableId: string; lastProcessedInput: number; connected: boolean; /** Microphone switched on (proximity voice). */ voice?: boolean; /** The drink ordered at the counter, until Magrão serves it. */ drinkItem?: string;
   /** What the player has in hand and is having (a drink from the counter, anything eaten or drunk from the backpack), and
    *  since/until when (server clock): the same time as at a table (consumeMs). They walk around meanwhile. */
   holding?: string; holdingSince?: number; holdingUntil?: number;

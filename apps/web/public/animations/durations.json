@@ -53,5 +53,8 @@
   "KickFront": 1010,
   "Jog": 2567,
   "Elbow": 1000,
-  "FightBlock": 80
+  "FightBlock": 80,
+  "Jump": 233,
+  "Fall": 700,
+  "Land": 179
 }

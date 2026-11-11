@@ -28,6 +28,8 @@ Comece pelo [README da raiz](../README.md), que explica como abrir, jogar e test
 
 ## Sistemas do jogo
 
+- [Pulo: física, contato com o chão, animações e sincronização](sistemas/pulo.md)
+
 - [Cavalo do Tião: habilidade, controles e animações](sistemas/cavalo.md)
 - [Administração](sistemas/admin.md)
 - [Análise de desempenho e HUD](sistemas/desempenho.md)

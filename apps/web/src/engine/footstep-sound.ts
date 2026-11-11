@@ -2,8 +2,8 @@ import {placeListener} from './moto-sound';
 import {footstepSurfaceAt,type FootstepSurface} from './footstep-surface';
 
 interface Position {x:number;y:number;z:number}
-export interface FootstepView extends Position {id:string;animation?:string;oldWalk?:boolean;blocked?:boolean}
-interface Stride extends Position {distance:number;lengthScale?:number;lastClip?:number;surface?:FootstepSurface;steps:number}
+export interface FootstepView extends Position {id:string;animation?:string;oldWalk?:boolean;blocked?:boolean;/** Foot touchdowns of the drawn legs so far (foot-contact.ts); steps sound on each. Without it, they follow distance. */contacts?:number}
+interface Stride extends Position {distance:number;contacts?:number;lengthScale?:number;lastClip?:number;surface?:FootstepSurface;steps:number}
 interface Voice {source:AudioBufferSourceNode;gain:GainNode;panner:PannerNode;filter:BiquadFilterNode;id:string}
 const AUDIBLE=18,MAX_WALKERS=8,MAX_VOICES=24;
 // Keep footsteps beneath voices and ambience, with the recordings' original dynamics.
@@ -91,9 +91,20 @@ export class FootstepSounds {
       stride.x=walker.x;stride.y=walker.y;stride.z=walker.z;
       // Discard snaps, paused frames and sub-centimetre network jitter; never catch up a backlog of steps.
       if(dt<=0||dt>.25||travel>Math.max(1,dt*10)||rise>.55){stride.distance=0;continue;}
-      if(travel<.001||travel/dt<.08)continue;
+      if(travel<.001||travel/dt<.08){stride.contacts=walker.contacts;continue;}
       const running=walker.animation==='run'&&!walker.oldWalk;
-      const length=(walker.oldWalk?.3:running?1.55:1.05)*(stride.lengthScale??1);
+      if(walker.contacts!==undefined){
+        // The legs set the beat: a step for each touchdown they drew since last frame (never a backlog).
+        const touched=stride.contacts!==undefined&&walker.contacts>stride.contacts;stride.contacts=walker.contacts;
+        // Safety net: legs that sound nothing for two strides' travel (a gait the detector cannot read) fall back to distance, so steps never go silent.
+        stride.distance=touched?0:stride.distance+travel;
+        if(!touched&&stride.distance<(walker.oldWalk?.3:running?1.55:.8)*2)continue;
+        stride.lengthScale=undefined;stride.distance=0;
+        const surface=footstepSurfaceAt(walker.x,walker.y,walker.z);stride.surface=surface;
+        if(surface&&context?.state==='running')this.step(walker,stride,surface,running,Math.min(1,(AUDIBLE-distance(walker))/4));
+        continue;
+      }
+      const length=(walker.oldWalk?.3:running?1.55:.8)*(stride.lengthScale??1);
       stride.distance+=travel;
       if(stride.distance<length)continue;
       stride.distance%=length;

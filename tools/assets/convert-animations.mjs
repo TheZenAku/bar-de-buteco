@@ -30,6 +30,11 @@ const clips = {
   // Standard Run was exported with root motion: inPlace removes its forward travel (the server moves the avatar).
   Idle: misc('Idle (1).fbx'), Walk: misc('Standard Walk.fbx'), Run: {filename:'Standard Run.fbx',mixamo:true,inPlace:true}, DrunkIdle: misc('Drunk Idle Variation.fbx'),
   DrunkWalk: misc('Drunk Walk.fbx'), Sit: {filename:'Sitting'},
+  // Jump and Fall have tucked legs without vertical root travel; physics owns the altitude.
+  Jump: {...misc('jumping up.fbx'),inPlace:true},
+  Fall: {...misc('falling idle.fbx'),inPlace:true,blend:.1},
+  // Begin on contact, after the source's airborne descent; recover within the landing phase.
+  Land: {...misc('Fall B Land To Standing Idle.fbx'),from:.4,rate:6.5,inPlace:true},
   // Retained as a separate bank clip; normal movement uses Walk regardless of travel speed.
   // `even`: its foot on the floor speeds up and slows down in the source; re-timed to one speed so one playback rate keeps it planted.
   Jog: {...misc('Jogging.fbx'),even:true},

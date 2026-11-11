@@ -3,7 +3,7 @@ import {armedPace,arsenalStats,bodyZones,cleanArsenal,mapRay,normalizeHeading,ow
 import {LocalGun,type GunView} from './local-gun';
 import {AimAssist,wrapped,type InputDevice,type AssistOutput} from './aim-assist';
 import {WeaponHud} from './hud';
-import {PadReader,rumble,stickLook,type PadFrame} from '../gamepad/gamepad';
+import {PAD,PadReader,rumble,stickLook,type PadFrame} from '../gamepad/gamepad';
 import {PadMapper} from '../gamepad/pad-mapper';
 import type {AimCamera,AimSettings,PadSettings,ShoulderSide} from './aim-settings';
 import {actionOf,inputCode,keyLabel,mouseCode,type WeaponAction,type WeaponKeys} from './key-bindings';
@@ -11,12 +11,14 @@ import type {GunScenePort,WeaponSceneHooks} from './scene-hooks';
 import type {LocalGunFrame,WeaponVisualsApi} from './contract';
 
 /** What the crosshair is on: the nearest of the map and the bodies along the camera's ray, or a point far along it. */
-const SIGHT_RANGE=300;
+const SIGHT_RANGE=300,HOLD_MIN=14;
 function sightPoint(origin:Vec3,forward:Vec3,targets:ReturnType<GunScenePort['targets']>):Vec3 {
   const end:Vec3=[origin[0]+forward[0]*SIGHT_RANGE,origin[1]+forward[1]*SIGHT_RANGE,origin[2]+forward[2]*SIGHT_RANGE];
   let t=SIGHT_RANGE;
   const wall=mapRay(origin,end);if(wall)t=wall.fraction*SIGHT_RANGE;
   for(const target of targets){const body=rayBody(origin,forward,t,bodyZones(target.skin,target.pose));if(body&&body.t<t)t=body.t;}
+  // Held by the camera through the change of framing (rig.holdAim): never nearer than this, a wall a metre ahead would ask the view for a half turn.
+  t=Math.max(t,HOLD_MIN);
   return [origin[0]+forward[0]*t,origin[1]+forward[1]*t,origin[2]+forward[2]*t];
 }
 
@@ -82,6 +84,7 @@ export class WeaponsController implements WeaponSceneHooks {
   private adsWas=false;
   private holding=false;
   private polledFrame=-1;
+  private padSample?:number[];
   private ramp=0;
   /** The device of the last real input: the assistance and the hints follow it. */
   device:InputDevice='mouse';
@@ -339,7 +342,11 @@ export class WeaponsController implements WeaponSceneHooks {
     try{pads=navigator.getGamepads?Array.from(navigator.getGamepads()):[];}catch{/* Blocked by a permissions policy. */}
     this.pad=this.reader.read(pads,now);
     this.padObject=this.pad?pads.find(item=>item?.connected&&item.id===this.pad!.id):undefined;
-    if(this.pad?.active)this.device='gamepad';
+    // The pad takes over only when it CHANGES (a press, a stick moved): a pad plugged in with a drifting stick or a stuck axis (also wheels, HOTAS and
+    // some mice or keyboards show up as pads) is "active" every frame and used to override the mouse, switching on the assist and the stick's look.
+    const sample=this.pad?[this.pad.left.x,this.pad.left.y,this.pad.right.x,this.pad.right.y,this.pad.lt,this.pad.rt,...Object.values(PAD).map(button=>this.pad!.down(button as never)?1:0)]:undefined;
+    const before=this.padSample;this.padSample=sample;
+    if(this.pad?.active&&sample&&(!before||before.length!==sample.length||sample.some((v,i)=>Math.abs(v-before[i]!)>.08)))this.device='gamepad';
     if(this.pad&&this.wheelOpen&&this.pad.right.m>.5){this.wheelPoint.x=this.pad.right.x;this.wheelPoint.y=this.pad.right.y;this.wheelMoved=true;}
     this.mapper.frame(this.pad,now);
   }
@@ -364,7 +371,7 @@ export class WeaponsController implements WeaponSceneHooks {
     this.assistOut=out;
     // The right stick: the look, unless a lock walks the reticle with it or the wheel takes it.
     const pad=this.pad;
-    if(pad&&pad.right.m>0&&out.stickLooks&&!this.wheelOpen&&this.host.playable()){
+    if(pad&&this.device==='gamepad'&&pad.right.m>0&&out.stickLooks&&!this.wheelOpen&&this.host.playable()){
       const look=stickLook(pad.right,dt,{yawSpeed:PAD_YAW*settings.pad.lookSpeed,pitchSpeed:PAD_PITCH*settings.pad.lookSpeed,curve:settings.pad.curve,invertY:settings.pad.invertY},
         aimScale*out.lookScale,this.ramp,drawn&&gun.adsWanted);
       this.ramp=look.ramp;rig.look(look.yaw,look.pitch);
@@ -410,7 +417,10 @@ export class WeaponsController implements WeaponSceneHooks {
     // Held until the change is over (or the player turned the view, which lets go in the rig).
     if(this.holding&&(!drawn||!rig.holdingAim||gun.adsBlend<=0||gun.adsBlend>=1)){rig.holdAim(undefined);this.holding=false;}
     rig.tuneAim(settings.aimCamera);
-    rig.armed=drawn;rig.aim(drawn?gun.adsBlend:0,gun.stats&&gun.stats.hold!=='rifle'?'pistol':'rifle');rig.scope(drawn?gun.scopeBlend:0);
+    rig.armed=drawn;rig.aim(drawn?gun.adsBlend:0,gun.stats&&gun.stats.hold!=='rifle'?'pistol':'rifle');// A long gun's optic that is not a scope (red dot, reflex, holographic, ACOG): the view goes into the eyes, along the aim, as the sight's own line does
+    // (GunPose brings the sight onto the eye's line), and the glass is clear: the world is seen through the sight, the dot floating on it.
+    const sightView=!!gun.stats&&gun.stats.reticle!=='iron'&&!gun.stats.scope&&gun.stats.hold==='rifle';
+    rig.scope(drawn?(sightView?gun.adsBlend:gun.scopeBlend):0);
     if(!drawn)rig.lookScale=1;
     const blocked=drawn&&gun.blockedAt?scene.project(gun.blockedAt):undefined;
     this.hud.update({visible:drawn&&playable,view:gun.view(now),fov:camera.fov,width:camera.width,height:camera.height,blocked,locked:!!this.assist.locked,lite:settings.lite,now,device:this.device,reloadKey:keyLabel(settings.keys.reload)});

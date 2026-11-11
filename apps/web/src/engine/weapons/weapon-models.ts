@@ -125,6 +125,18 @@ function throughMount(meta:WeaponModelMeta,slot:PartSlot,point:MetaVec):pc.Vec3 
   return new pc.Vec3(mount.p[0]+pt.x,mount.p[1]+pt.y,mount.p[2]+pt.z);
 }
 
+/**
+ * An optic's glass is clear (the GLBs' lens material is a 32% tint): the world is seen through a red dot, a reflex, a holographic sight or a
+ * combat scope's window; the thin tint and the frame are what is left of it. Idempotent: the container's materials are shared.
+ */
+function clearLens(entity:pc.Entity):void {
+  for(const render of entity.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
+    const material=instance.material as pc.StandardMaterial;
+    if(!/lente|lens/i.test(material.name)||material.opacity<=.1)continue;
+    material.opacity=.1;material.depthWrite=false;material.blendType=pc.BLEND_NORMAL;material.update();
+  }
+}
+
 /** Instantiates a weapon with these parts under `parent` (an avatar's root). The real GLB when loaded, else the box gun (swapped in later). */
 export function makeWeapon(app:pc.AppBase,parent:pc.Entity,id:WeaponId,parts:Partial<Record<PartSlot,PartId>>,kit:string,onReal?:()=>void):WeaponInstance {
   const meta=weaponModel(id,parts);
@@ -144,6 +156,7 @@ export function makeWeapon(app:pc.AppBase,parent:pc.Entity,id:WeaponId,parts:Par
     const partResource=pm?.url?loaded.get(pm.url):undefined;
     if(pm?.url&&!partResource)void container(app,pm.url).then(found=>{if(found)onReal?.();});
     const entity=partResource?partResource.instantiateRenderEntity({castShadows:true,receiveShadows:true}):boxPart(part);
+    if(def.optic)clearLens(entity);
     applyMount(entity,mount);root.addChild(entity);
     if(def.suppressor||slot==='boca'){
       instance.suppressed||=!!def.suppressor;

@@ -3,8 +3,8 @@ import type {VehicleKey} from './garage.js';
 import type {ConsumableEffects} from './needs.js';
 
 export const INVENTORY_CAPACITY=12;
-export type ItemCategory='bebida'|'comida'|'saude'|'peca'|'fogo';
-export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao'] as const;
+export type ItemCategory='bebida'|'comida'|'saude'|'peca'|'fogo'|'industrial';
+export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao','malte_saco','mix_saco','produto_saco','saco_vazio'] as const;
 export type ItemId=typeof ITEM_IDS[number];
 export interface ItemDefinition {
   id:ItemId;name:string;description:string;category:ItemCategory;price:number;stackMax:number;
@@ -29,11 +29,15 @@ export const ITEM_CATALOG=[
   // Placeholder for the real parts: one piece fits anything on the bike (MOTO_REPAIR). Not for using from the backpack: the bike's panel takes it.
   {id:'peca_moto',name:'Peça de moto',description:'Peça genérica para consertar a moto. Clique com o botão direito na moto e abra as informações do veículo.',category:'peca',icon:'ui/items/peca_moto.png',price:40,stackMax:10,effects:{name:'Peça de moto'},loseOnFaint:false},
   {id:'peca_carro',name:'Peça de carro',description:'Conserta uma peça do carro pelo painel Informações do veículo.',category:'peca',icon:'ui/items/peca_moto.png',price:75,stackMax:10,effects:{name:'Peça de carro'},loseOnFaint:false},
+  {id:'malte_saco',name:'Saco de MALTE 25 kg',description:'Matéria-prima da EMPRESA BRASIL. Transporte no caminhão e armazene nas vagas V1/V2.',category:'industrial',icon:'ui/items/malte-saco.svg',price:0,stackMax:18,effects:{name:'Saco de MALTE'},loseOnFaint:false},
+  {id:'mix_saco',name:'Saco de MIX 25 kg',description:'Matéria-prima da EMPRESA BRASIL. Transporte no caminhão e armazene nas vagas V3.',category:'industrial',icon:'ui/items/mix-saco.svg',price:0,stackMax:18,effects:{name:'Saco de MIX'},loseOnFaint:false},
+  {id:'produto_saco',name:'Bebida Maltada em Pó 25 kg',description:'Produto acabado rastreável da EMPRESA BRASIL.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Bebida Maltada em Pó'},loseOnFaint:false},
+  {id:'saco_vazio',name:'Saco vazio industrial',description:'Consumível da ensacadeira da EMPRESA BRASIL.',category:'industrial',icon:'ui/items/saco-vazio.svg',price:0,stackMax:50,effects:{name:'Saco vazio industrial'},loseOnFaint:false},
 ] as const satisfies readonly ItemDefinition[];
 
 export const itemIdSchema:z.ZodType<ItemId>=z.enum(ITEM_IDS);
 export const itemById=(id:string):ItemDefinition|undefined=>ITEM_CATALOG.find(item=>item.id===id);
-export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0};
+export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0,malte_saco:0,mix_saco:0,produto_saco:0,saco_vazio:0};
 
 export interface InventoryStack {itemId:ItemId;quantity:number}
 export interface InventoryEntry extends InventoryStack {item:ItemDefinition}

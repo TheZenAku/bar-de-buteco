@@ -53,6 +53,10 @@ export class Player extends Schema {
   @type('boolean') fireworkEquipped = false;
   @type('float32') x = 0;
   @type('float32') y = 0;
+  @type('float32') verticalVelocity = 0;
+  @type('boolean') grounded = true;
+  @type('boolean') jumpHeld = false;
+  @type('float32') landingTime = 0;
   @type('float32') z = 8;
   @type('float32') rotation = 0;
   @type('float32') headYaw = 0;

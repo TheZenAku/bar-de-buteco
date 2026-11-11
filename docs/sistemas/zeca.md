@@ -59,3 +59,4 @@ Uma vitória no degrau 3 rende 150 XP no total, uma no degrau 1, 50. O XP é lid
 - O equilíbrio dos três degraus foi medido só contra um bot que ataca sem defender (esse bot ganha dos degraus fácil e médio com facilidade e perde para o difícil na maioria das vezes). Contra gente de verdade, os números (`SPARRING_TIERS`) provavelmente precisam de ajuste.
 - O Zeca parado fica em pose de descanso (não de guarda) e cai com o clipe `Fallen`; falas e rosto do diálogo são provisórios (um ícone, sem retrato).
 - Quem luta enquanto outro jogador está por perto vê o Zeca como um jogador qualquer em listas e no mapa (nome "Zeca").
+- **Corpos (2026-11-10):** o Zeca cede espaço (`SparringDirector.separate`, `FIGHT.bodyGap` 0,55 m) em vez de ficar dentro do jogador ou atrás dele, ver [Luta](luta.md#corpos-não-se-atravessam--golpe-que-corta-golpe-2026-11-10-terceira-rodada).

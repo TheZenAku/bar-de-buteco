@@ -2,6 +2,10 @@
 
 Os passos acompanham a distância realmente percorrida pelo personagem. Andar e correr usam ritmos e intensidades diferentes; a caminhada com bengala tem passadas menores. Cada impacto sorteia uma das cinco gravações do material, sem repetir a anterior, com pequenas variações de tom e volume.
 
+Quem tem corpo desenhado (jogadores e NPCs com esqueleto) marca o ritmo pelos próprios pés: `engine/foot-contact.ts` lê a altura dos ossos dos pés acima da raiz e conta um toque no chão cada vez que um pé desce de volta ao ponto de apoio depois de levantar. O som sai nesse instante, qualquer que seja a marcha (andar, trote, corrida) ou a velocidade de reprodução do clipe. Sem esqueleto (multidão distante, teste de áudio) vale a distância percorrida, com os comprimentos abaixo. A altura de apoio é aprendida por clipe: cada troca de clipe (Walk→Run…) recomeça, e fora de Walk/Run/DrunkWalk/WalkBack o corpo conta distância. Rede de segurança: se as pernas não marcarem nenhum toque em duas passadas de deslocamento, o som sai pela distância, então os passos nunca ficam mudos por falha do detector.
+
+**Os passos são parte fixa do jogo: não remover nem desligar sem o usuário pedir.**
+
 A mistura dos passos usa 25% do ganho inicial, com agudos mais suaves e entradas e saídas curtas para evitar estalos. A corrida aumenta a cadência e o peso sem elevar o tom da gravação. Variações discretas no comprimento da passada e na intensidade entre os pés suavizam a repetição.
 
 O piso vem do mesmo índice de superfícies usado pelo movimento: asfalto das ruas, concreto das calçadas, cerâmica do bar e da escada, madeira do palco, grama e terra do campinho. O andar superior usa sua própria superfície. Na cidade, canteiros usam grama; interiores de quadras do Jardim Conceição também. Esses últimos usam o bairro do setor como aproximação do material visual. Asfalto, cerâmica e terra usam filtros e ajustes de tom sobre as gravações de concreto e grama.

@@ -131,9 +131,9 @@ test('lookScale scales the mouse and the fingers, and armed the view may look hi
   rig.lookScale=1;
   rig.drag(0,-250);settle(60);
   assert.ok(Math.abs(rig.pitch+.6)<1e-4,'Unarmed: -0.6');
-  rig.armed=true;rig.drag(0,-250);settle(60);
+  rig.armed=true;settle(60);rig.drag(0,-250);settle(60); // the limit slides open (UP_SLIDE), it does not jump
   assert.ok(Math.abs(rig.pitch+1.2)<1e-4,'Armed: -1.2');
-  rig.armed=false;settle(30);
+  rig.armed=false;settle(90);
   assert.ok(rig.pitch>-.61,'Holstering eases it back in range');
 });
 
@@ -196,4 +196,29 @@ test('going into the aim and out of it keeps the crosshair on the point it was o
   assert.ok(worst<.01,`Out of the aim too (worst ${worst.toFixed(4)} m)`);
   // The player's own turn lets go at once.
   rig.drag(40,0);assert.equal(rig.holdingAim,false);
+});
+
+test('a held point that ends up behind the closing view is let go, not turned to (no half turn); the monitor logs real jumps with a cause',t=>{
+  const {camera,rig,subject,settle}=fixture(t);
+  settle();
+  const yaw=rig.yaw,eye=camera.getPosition().clone();
+  // 1.5 m ahead of the old view: once the boom closes in to the shoulder it is behind the camera.
+  rig.armed=true;rig.aim(1,'rifle');rig.holdAim([eye.x-Math.sin(yaw)*1.5,eye.y,eye.z-Math.cos(yaw)*1.5]);
+  let worst=0,before=rig.yaw;
+  for(let i=0;i<60;i++){rig.follow(1/60,subject);worst=Math.max(worst,Math.abs(rig.yaw-before));before=rig.yaw;}
+  assert.ok(worst<.5,`Worst turn in one frame ${worst}`);
+  rig.nudge(2,0);rig.follow(1/60,subject);
+  assert.ok(rig.jumps.length>0&&(rig.jumps.at(-1)!.causes as string[]).some(c=>c.startsWith('nudge')),'A 2 rad nudge is logged with its cause');
+});
+
+test('a near held point and a holster while looking up never turn the view more than a few degrees a frame',t=>{
+  const {camera,rig,settle}=fixture(t);
+  settle();
+  rig.armed=true;settle(60);
+  const turn=(frames:number,each:(i:number)=>void)=>{let last=camera.forward.clone(),most=0;for(let i=0;i<frames;i++){each(i);settle(1);most=Math.max(most,Math.acos(Math.min(1,camera.forward.dot(last))));last=camera.forward.clone();}return most;};
+  rig.holdAim([-396,0,-394.5]);// the ground 1.5 m ahead: the old hold asked for a 29° turn in one frame
+  assert.ok(turn(20,i=>rig.aim((i+1)/20,'rifle'))<.06,'holdAim steps');
+  rig.holdAim(undefined);rig.aim(0);rig.armed=true;settle(60);
+  for(let i=0;i<60;i++){rig.look(0,-.02);settle(1);}
+  assert.ok(turn(90,i=>{if(!i)rig.armed=false;})<.06,'holstering slides the look-up limit');
 });

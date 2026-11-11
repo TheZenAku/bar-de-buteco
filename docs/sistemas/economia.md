@@ -1,5 +1,7 @@
 # Economia: moedas, balcão, mesa, empregos e mídia
 
+> Fábrica: compras e vendas da EMPRESA BRASIL usam pedidos persistentes, carga real no caminhão e ledger idempotente. O pagamento é aplicado uma única vez quando a etapa logística correspondente termina; retry ou restart não duplica moedas.
+
 As moedas são da conta e ficam na API. O mundo só **pede** mudanças. Cada pedido tem um identificador próprio, então repetir a chamada nunca cobra nem paga duas vezes. Não existe dinheiro real.
 
 ## Onde as moedas entram e saem

@@ -32,7 +32,7 @@ test('every registered vehicle remains for sale before and after purchasing ever
   for(const vehicle of VEHICLE_CATALOG){
     const payload={requestId:randomUUID(),model:vehicle.model};
     const bought=await api.app.inject({method:'POST',url:'/api/vehicles/buy',headers,payload});
-    assert.equal(bought.statusCode,200,bought.body);check(bought.json());
+    assert.equal(bought.statusCode,200,`${vehicle.model}: ${bought.body}`);check(bought.json());
     balance-=prices[vehiclePriceKey(vehicle.model)];assert.equal(bought.json().balance,balance);
     assert.ok(bought.json().vehicles.some((owned:{model:string})=>owned.model===vehicle.model));
     const retry=await api.app.inject({method:'POST',url:'/api/vehicles/buy',headers,payload});

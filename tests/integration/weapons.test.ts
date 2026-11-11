@@ -121,6 +121,27 @@ test('traceShot: the aimed body is hit; one standing behind the camera is not; a
   assert.equal(cut!.kind,'world');assert.equal(cut!.blocked,true);
 });
 
+test('traceShot: nobody at the back of the shooter is hit, however close, even with the camera behind them both',()=>{
+  const skin='rafael',body=gunBody(skin);
+  const shooter={x:OPEN.x,y:0,z:OPEN.z,rotation:0};
+  const eye:Vec3=[shooter.x,body.head+.1,shooter.z];
+  const camera:Vec3=[shooter.x-.3,eye[1]+.2,shooter.z-3.5];
+  const muzzle=muzzleOf(skin,shooter,0,'rifle',.78);
+  const clear=()=>undefined;
+  const d=((): Vec3=>{const v:Vec3=[shooter.x-camera[0],body.chest-camera[1],shooter.z+10-camera[2]],l=Math.hypot(...v);return [v[0]/l,v[1]/l,v[2]/l];})();
+  // From touching (0.35 m behind) to a few metres back, on the camera's line and beside it.
+  for(const back of [.25,.35,.5,.7,1,2])for(const side of [-.3,-.2,0,.2,.3]){
+    const behind:ShotTarget={id:'behind',skin,pose:{x:OPEN.x+side,y:0,z:OPEN.z-back,rotation:0}};
+    const [shot]=traceShot(camera,[d],muzzle,eye,200,[behind],clear);
+    assert.notEqual(shot!.kind,'body',`behind ${back} side ${side}`);
+  }
+  // Someone standing beside, level with the eyes, is still a target.
+  const beside:ShotTarget={id:'beside',skin,pose:{x:OPEN.x-.5,y:0,z:OPEN.z+2,rotation:0}};
+  const aim:Vec3=[-.25,0,1],l=Math.hypot(...aim),a:Vec3=[aim[0]/l,aim[1]/l,aim[2]/l];
+  const [side]=traceShot(eye,[[a[0],(body.chest-eye[1])/2.2,a[2]]],muzzle,eye,200,[beside],clear);
+  assert.equal(side!.kind==='body'||side!.kind==='none',true);
+});
+
 test('the map: a bullet stops in a wall and in the floor, and surfaces are named',()=>{
   const table=CAFE_TABLES[0]!;
   // Down into the open street: its bed (a solid) or its floor, at street level, facing up.

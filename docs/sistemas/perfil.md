@@ -1,5 +1,7 @@
 # Perfil do jogador
 
+> Emprego da fábrica: a aba **Meu emprego** mostra o cargo Operador de Spray Dry, vínculo, expediente, horário e cooldown, e permite candidatar-se ou pedir demissão. O fluxo foi validado no E2E real da EMPRESA BRASIL.
+
 Clique com o **botão direito** em um jogador, ou em você mesmo, e escolha **Perfil** (ou use Pessoas no bar → Perfil). O clique esquerdo em outro jogador não abre mais nada. Em primeira pessoa, o seu próprio corpo não é clicável; use **Pessoas no bar → Seu lugar no bar → Seu perfil**.
 
 A janela não para o jogo: dá para andar com ela aberta. Ela é arrastada pelo cabeçalho (mouse, toque ou setas com o cabeçalho em foco), nunca sai da tela e abre onde foi deixada. **Esc** fecha a de cima. Em telas estreitas, ela ocupa a largura disponível.

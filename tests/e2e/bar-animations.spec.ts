@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {previewPath} from './preview-path';
 import {walk} from './walk';
+import {enterAsAdmin,selfOf} from './moto-helpers';
 
 /**
  * The bar animations (animacoes_bar.js ported to apps/web/src/engine/bar-animations.ts): every action on a different skin
@@ -11,6 +12,81 @@ import {walk} from './walk';
  */
 const map=JSON.parse(readFileSync(new URL('../../packages/shared/src/map-data.json',import.meta.url),'utf8')) as typeof import('../../packages/shared/src/map-data.json');
 const fixture='/@fs/'+fileURLToPath(new URL('../fixtures/environment.html',import.meta.url)).replaceAll('\\','/');
+
+test('jump clips work on every player skeleton and Space preserves focus, defense and flight controls',async({page})=>{
+  test.setTimeout(120000);
+  await page.goto('/@fs/'+fileURLToPath(new URL('../fixtures/smoking.html',import.meta.url)).replaceAll('\\','/'));
+  await page.evaluate(()=>(window as any).fixture.ready);
+  await page.evaluate(()=>(window as any).fixture.all());
+  await expect.poll(()=>page.evaluate(()=>[...(window as any).fixture.scene.actors.values()].every((a:any)=>a.skin?.tracks.has('Land'))),{timeout:60000}).toBe(true);
+  const clips=await page.evaluate(()=>{
+    const scene=(window as any).fixture.scene;scene.restoreHeadLooks();scene.app.off('update',scene.update,scene);
+    const results=[];
+    for(const avatar of scene.actors.values()){
+      const pose={t:0,dt:1/60,walking:false,running:false,seated:0,dancing:false,drinking:false,waving:false};
+      avatar.actor={...avatar.actor,smokingSince:0,drunk:0};
+      for(const [action,clip] of [['jump','Jump'],['fall','Fall'],['land','Land'],['idle','Idle'],['run','Run']]){
+        avatar.actor.animation=action;avatar.actor.animationStartedAt=(window as any).fixture.now();
+        pose.walking=action==='run';pose.running=action==='run';avatar.speed=action==='run'?6:0;
+        scene.poseSkin(avatar,avatar.skin,pose);avatar.skin.model.anim.update(.1);
+        results.push({skin:avatar.skinId,clip:avatar.skin.model.anim.baseLayer.activeState,expected:clip});
+      }
+    }
+    scene.localId='nathan';scene.actors.get('nathan').actor.animation='idle';scene.setEnabled(true);
+    return results;
+  });
+  expect(clips).toHaveLength(50);
+  for(const result of clips)expect(result.clip,result.skin).toBe(result.expected);
+  // Even a complete press between the 50 ms input samples reaches the controller once.
+  await page.keyboard.press('Space');
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getInput().jump)).toBe(true);
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getInput().jump)).toBe(false);
+  await page.evaluate(()=>{const input=document.createElement('input');input.id='jump-focus';document.body.append(input);input.focus();});
+  await page.keyboard.press('Space');
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getInput().jump)).toBeFalsy();
+  await page.evaluate(()=>{document.querySelector('#jump-focus')?.remove();(window as any).fixture.scene.callbacks.onBlock=(down:boolean)=>down;});
+  await page.keyboard.press('Space');
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getInput().jump)).toBe(false);
+  await page.evaluate(()=>{const s=(window as any).fixture.scene;s.callbacks.onBlock=undefined;s.actors.get('nathan').actor.animation='fly-idle';});
+  await page.keyboard.down('Space');
+  const flying=await page.evaluate(()=>(window as any).fixture.scene.getInput());
+  expect(flying.jump).toBe(false);expect(flying.dy).toBe(1);
+  // Landing or leaving another context while Space remains down cannot turn that old press into a jump.
+  await page.evaluate(()=>(window as any).fixture.scene.actors.get('nathan').actor.animation='idle');
+  expect(await page.evaluate(()=>(window as any).fixture.scene.getInput().jump)).toBe(false);
+  await page.keyboard.up('Space');
+});
+
+test('Space jumps through the live predicted controller and returns to running after landing',async({page})=>{
+  test.setTimeout(90000);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await enterAsAdmin(page);
+  await page.evaluate(()=>(window as any).barDebug.send('test.player.place',{x:60,y:0,z:7}));
+  await expect.poll(async()=>(await selfOf(page)).x).toBeCloseTo(60,1);
+  await expect.poll(()=>page.evaluate(()=>{const d=(window as any).barDebug,s=d.snapshot();return d.animations().find((a:any)=>a.id===s.localId)?.tracks.includes('Jump');}),{timeout:60000}).toBe(true);
+  await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+    const w=window as any;w.jumpSamples=[];w.jumpTimer=setInterval(()=>{const d=w.barDebug,s=d.snapshot(),p=s.world.players[s.localId];w.jumpSamples.push({y:p.y,grounded:p.grounded,animation:p.animationState});},16);
+  });
+  await page.keyboard.down('Space');
+  await expect.poll(async()=>(await selfOf(page)).y,{intervals:[20]}).toBeGreaterThan(.1);
+  await expect.poll(async()=>(await selfOf(page)).grounded,{intervals:[20]}).toBe(true);
+  await page.waitForTimeout(300);
+  const samples=await page.evaluate(()=>{clearInterval((window as any).jumpTimer);return (window as any).jumpSamples as Array<{y:number;grounded:boolean;animation:string}>;});
+  expect(Math.max(...samples.map(s=>s.y))).toBeGreaterThan(.85);
+  expect(Math.max(...samples.map(s=>s.y))).toBeLessThan(1.05);
+  expect(samples.some(s=>s.animation==='jump')).toBe(true);
+  expect(samples.some(s=>s.animation==='fall')).toBe(true);
+  expect((await selfOf(page)).y).toBe(0);
+  await page.keyboard.up('Space');
+  await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');
+  const before=await selfOf(page);await page.keyboard.press('Space');
+  await expect.poll(async()=>(await selfOf(page)).y,{intervals:[20]}).toBeGreaterThan(.1);
+  await expect.poll(async()=>(await selfOf(page)).grounded,{intervals:[20]}).toBe(true);
+  await expect.poll(async()=>(await selfOf(page)).animationState).toBe('run');
+  const after=await selfOf(page);expect(Math.hypot(after.x-before.x,after.z-before.z)).toBeGreaterThan(1);
+  await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');
+  expect(errors).toEqual([]);
+});
 
 test('normal movement keeps a walking gait on every player skin and still runs on request',async({page})=>{
   test.setTimeout(120000);
@@ -28,8 +104,8 @@ test('normal movement keeps a walking gait on every player skin and still runs o
     for(const avatar of scene.actors.values()){
       const pose={t:0,dt:1/60,walking:true,running:false,seated:0,dancing:false,drinking:false,waving:false};
       avatar.actor={...avatar.actor,animation:'walk',smokingSince:0,drunk:0};
-      // Cross the former Jog threshold in both directions, as movement snapshots can do.
-      for(const speed of [1,2.6,3.5,2.3,3.5]){
+      // Cross the Jog threshold in both directions, as movement snapshots can do (never a jog: the walk is the only gait below a run).
+      for(const speed of [1,1.6,2.6,1.6]){
         avatar.speed=speed;
         for(let frame=0;frame<90;frame++){
           scene.poseSkin(avatar,avatar.skin,pose);
@@ -47,7 +123,7 @@ test('normal movement keeps a walking gait on every player skin and still runs o
   expect(results).toHaveLength(60);
   for(const result of results){
     expect(result.clip,`${result.skin} at ${result.speed} m/s`).toBe(result.expected);
-    if(result.rate!==undefined)expect(result.rate).toBeLessThanOrEqual(1.35);
+    if(result.rate!==undefined)expect(result.rate).toBeLessThanOrEqual(1.5);
   }
 });
 

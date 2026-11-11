@@ -11,8 +11,11 @@
 .admin-nav-head{display:grid;gap:4px;padding:0 20px}
 .admin-nav-head b{font:600 15px var(--font-display);text-transform:uppercase;letter-spacing:.06em}
 .admin-nav-head small{font:400 11px var(--font-mono);color:var(--muted-foreground);overflow-wrap:anywhere}
-.admin-nav nav{display:flex;flex-direction:column}
-.admin-nav nav button{display:flex;align-items:center;gap:12px;padding:11px 20px;text-align:left;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--soft);transition:background-color .15s,color .15s}
+.admin-nav nav{display:flex;flex-direction:column;gap:14px}
+.admin-nav-group{display:flex;flex-direction:column}
+.admin-nav-title{padding:0 20px 5px;font:500 11px var(--font-body,inherit);letter-spacing:.02em;color:var(--muted-foreground)}
+.admin-crumb{display:block;margin-bottom:2px;font:400 11px var(--font-mono);color:var(--muted-foreground)}
+.admin-nav nav button{display:flex;align-items:center;gap:10px;padding:7px 20px;text-align:left;font-size:13px;font-weight:500;color:var(--soft);transition:background-color .15s,color .15s}
 .admin-nav nav button:hover{background:var(--secondary);color:var(--foreground)}
 .admin-nav nav [aria-current=true],.admin-nav nav [aria-current=true]:hover{background:var(--active);color:var(--active-foreground);box-shadow:var(--active-glow)}
 .admin-nav nav .ui-icon{width:17px;height:17px}
@@ -290,7 +293,9 @@
   .admin-console{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .admin-nav{gap:8px;padding:8px 0 10px;border-right:0;border-bottom:1px solid var(--border);overflow:visible}
   .admin-nav-head{display:none}
-  .admin-nav nav{flex-direction:row;overflow-x:auto}
+  .admin-nav nav{flex-direction:row;gap:0;overflow-x:auto}
+  .admin-nav-group{flex:none;flex-direction:row;align-items:center}
+  .admin-nav-title{display:none}
   .admin-nav nav button{flex:none;gap:8px;padding:9px 12px;font-size:11px;white-space:nowrap}
   .admin-position{grid-template-columns:minmax(0,1fr) auto;align-items:center;margin:0;padding:8px 12px 0}
   .admin-position label{display:none}

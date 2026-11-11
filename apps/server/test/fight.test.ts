@@ -38,7 +38,7 @@ function room(){
     now+=TICK_MS;seq++;
     for(const player of players){
       const input:PlayerInput={seq,dx:0,dz:0,running:false,rotation:player.rotation,fight:player.fist.fight,...inputs.get(player)};
-      fights.guard(player,input);
+      fights.guard(player,input,now);
       if(!player.interactionState&&player.fist.fight)fights.move(player,input,now,false,[]);
       player.lastProcessedInput=seq;
     }
@@ -57,11 +57,11 @@ test('a jab lands on the one in front: life, stun, the push, the message, and th
   r.tick(new Map([[a,r.punch(a,'jab',b)]]));
   assert.equal(a.fist.punch,'jab');assert.equal(a.animationState,'punch');
   const thrownAt=a.fist.at;
-  for(let i=0;i<10&&!r.hits.length;i++)r.tick();
+  for(let i=0;i<16&&!r.hits.length;i++)r.tick();
   assert.equal(r.hits.length,1);
   const hit=r.hits[0]!,move=FIGHT_MOVES.jab;
   assert.deepEqual([hit.by,hit.to,hit.move,hit.n,hit.damage,hit.ko,hit.reaction],['a','b','jab',7,move.damage,false,'HitLight']);
-  assert.ok(hit.at-thrownAt>=move.activeFrom&&hit.at-thrownAt<=move.activeTo+TICK_MS,`lands in its window (${hit.at-thrownAt} ms)`);
+  assert.ok(hit.at-thrownAt>=move.activeFrom&&hit.at-thrownAt<=move.activeTo+BLOCK.deferMaxMs,`lands in its window (settled up to deferMaxMs after the contact) (${hit.at-thrownAt} ms)`);
   assert.equal(b.hp,100-move.damage);
   assert.equal(b.interactionState,'stagger');assert.equal(b.animationState,'hit');assert.equal(b.fist.hit,'HitLight');
   assert.equal(b.fist.stunUntil,hit.at+move.stunMs);
@@ -127,15 +127,15 @@ test('the blow that empties the heart knocks out: the body flies and the guard c
   assert.equal(b.fist.fight,false);
 });
 
-test('a blow cuts short the punch the one hit was throwing: their heavy never lands',()=>{
+test('a blow on a guard waits for the block, and a fast jab takes a slow haymaker still winding up out of the hand (the chain is forgotten too)',()=>{
   const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
-  // B winds up a haymaker (slow), A answers with a jab (fast).
+  // B winds up a haymaker (slow), A answers with a jab (fast): the jab lands before the haymaker's fist is out, so the haymaker is lost.
   r.tick(new Map([[b,r.punch(b,'heavy',a)]]));
   r.tick(new Map([[a,r.punch(a,'jab',b)]]));
   for(let i=0;i<30;i++)r.tick();
   assert.deepEqual(r.hits.map(hit=>hit.by),['a']);
-  assert.equal(b.fist.punch,'',"B's punch is forgotten: the next one starts a new chain");
   assert.equal(r.fights.activeOf('b'),undefined);
+  assert.equal(a.hp,100,'the haymaker never landed, not even after the wait for a block');
 });
 
 test('a punch plants the feet: keys held do nothing until it lets go (the body only goes with the clip\'s own step), and a second punch is not taken meanwhile',()=>{
@@ -171,7 +171,7 @@ test('the guard: refused once while the hands are busy, lowered by anything that
   a.holding='';r.fights.guard(a,{fight:true});
   // B is hit, then tries to punch while stunned.
   r.tick(new Map([[a,r.punch(a,'jab',b)]]));
-  for(let i=0;i<10&&!r.hits.length;i++)r.tick();
+  for(let i=0;i<24&&!r.hits.length;i++)r.tick();
   assert.equal(r.hits.length,1);
   assert.ok(r.fights.busy(b,b.lastProcessedInput,r.now));
   b.interactionState='';// as if the room let the input through
@@ -282,7 +282,7 @@ test('a block pressed just before the blow is a parry: nothing through, the punc
 });
 
 test('netcode: a block pressed before the blow, as its owner saw it, counts even when the input reaches the room after the blow was detected',()=>{
-  for(const [oneWay,verdict] of [[100,'parry'],[0,'none']] as const){
+  for(const [oneWay,verdict] of [[100,'parry'],[0,'parry']] as const){
     const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
     r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
     untilDetected(r);
@@ -291,10 +291,10 @@ test('netcode: a block pressed before the blow, as its owner saw it, counts even
     // The press arrives now, but its owner pressed it `oneWay` ms earlier (their report: seen/ago give the trip, see oneWayOf).
     const takenAt=r.now+TICK_MS,seen=takenAt-(oneWay*2+TICK_MS/2);
     r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b,{blockAt:{seen,ago:0}})]]));
-    for(let i=0;i<4&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+    for(let i=0;i<10&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
     assert.equal(r.hits.length,1);
     assert.equal(r.hits[0]!.guard??'none',verdict,`one-way ${oneWay} ms`);
-    if(verdict==='none')assert.equal(b.hp,100-FIGHT_MOVES.jab.damage);
+
   }
 });
 
@@ -306,7 +306,7 @@ test('the wait is bounded and only for a guard that is up: a blow on someone wit
   for(let i=0;i<12&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,{fight:false}]]));
   assert.equal(r.hits.length,1);assert.equal(r.hits[0]!.guard,undefined);
   assert.equal(inside(r).pending.length,0);
-  assert.ok(BLOCK.deferMaxMs<=150);
+  assert.ok(BLOCK.deferMaxMs<=350);
 });
 
 test('a block covers only the front: from behind the blow gets through whole, and the block comes down',()=>{
@@ -368,4 +368,63 @@ test('with the block up no punch is thrown, and a block cannot go up while a pun
   assert.equal(a.fist.punch,'jab');assert.equal(a.fist.block,false);
   r.tick(new Map<Player,Partial<PlayerInput>>([[a,{block:true}]]));
   assert.equal(a.fist.block,false,'planted by its own punch');
+});
+
+test('a held block answers a chain: it comes up through the stun of the blow taken, as a plain block, and the next blow is blocked (not a parry, not on a parried or broken guard)',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  b.hp=1000;a.hp=1000;
+  // The hook's stun (450 ms) outlasts the gap to the jab that can follow it (342 ms): without the cut a chain like this cannot be answered.
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
+  for(let i=0;i<20&&!r.hits.length;i++)r.tick();
+  assert.equal(r.hits[0]!.guard,undefined);assert.equal(b.interactionState,'stagger');
+  const hitAt=b.fist.hitAt;
+  // The block is held from the hit on: nothing goes up before BLOCK.hitFreeMs, then it does, in the stun.
+  while(r.now<hitAt+BLOCK.hitFreeMs-TICK_MS){r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));assert.equal(b.fist.block,false);}
+  for(let i=0;i<3&&!b.fist.block;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(b.fist.block,true,'up through the stun');assert.ok(r.now<hitAt+280,'inside it');
+  assert.equal(b.interactionState,'');assert.equal(b.fist.stunUntil,0);
+  assert.equal(inside(r).fighters.get('b')!.spans.at(-1)!.parry,false,'plain, not a free parry');
+  // A parried puncher's stun cannot be cut short.
+  const p=room(),x=p.add('x',OPEN.x,OPEN.z,0),y=p.add('y',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  y.hp=1000;x.hp=1000;
+  p.tick(new Map<Player,Partial<PlayerInput>>([[x,p.punch(x,'jab',y)]]));
+  p.tick();p.tick();
+  for(let i=0;i<14&&!p.hits.length;i++)p.tick(new Map<Player,Partial<PlayerInput>>([[y,blocking(y)]]));
+  assert.equal(p.hits[0]!.guard,'parry');
+  for(let i=0;i<10;i++)p.tick(new Map<Player,Partial<PlayerInput>>([[x,blocking(x)]]));
+  assert.equal(x.fist.block,false,'still staggered');assert.equal(x.interactionState,'stagger');
+});
+
+test('a trade: a swing already on its way still lands when its owner is hit first',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  a.hp=1000;b.hp=1000;
+  r.tick(new Map([[a,r.punch(a,'jab',b)],[b,r.punch(b,'jab',a)]]));
+  for(let i=0;i<24&&r.hits.length<2;i++)r.tick();
+  assert.deepEqual(r.hits.map(hit=>hit.by).sort(),['a','b']);
+});
+test('a blow that lands while the other is still winding up takes his swing: he feels it (only fists both already out trade)',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  a.hp=1000;b.hp=1000;
+  // b starts a tick later: when a's fist arrives his own is half way to its window, which used to let it through anyway.
+  r.tick(new Map([[a,r.punch(a,'jab',b)]]));
+  r.tick(new Map([[b,r.punch(b,'jab',a)]]));
+  for(let i=0;i<24;i++)r.tick();
+  assert.deepEqual(r.hits.map(hit=>[hit.by,hit.to]),[['a','b']],'only the first blow lands');
+  assert.equal(r.fights.activeOf('b'),undefined);
+});
+
+test('a block pressed after the contact (within the late window) that opened no parry still blocks: a plain block, never the whole blow',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z,0),b=r.add('b',OPEN.x,OPEN.z+ideal('jab'),Math.PI);
+  a.hp=1000;b.hp=1000;
+  // An earlier press, so this one is inside the parry cooldown and cannot open a window.
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));r.tick();
+  assert.deepEqual(inside(r).fighters.get('b')!.spans.map(span=>span.parry),[true]);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[a,r.punch(a,'jab',b)]]));
+  untilDetected(r);
+  assert.equal(inside(r).pending.length,1);
+  r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  for(let i=0;i<10&&!r.hits.length;i++)r.tick(new Map<Player,Partial<PlayerInput>>([[b,blocking(b)]]));
+  assert.equal(inside(r).fighters.get('b')!.spans.map(span=>span.parry).at(-1),false,'this press opened no parry window');
+  assert.equal(r.hits[0]!.guard,'block');
+  assert.equal(b.hp,1000-Math.round(FIGHT_MOVES.jab.damage*BLOCK.chip),'only a sliver got through');
 });

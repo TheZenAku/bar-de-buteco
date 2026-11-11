@@ -1,5 +1,7 @@
 # Administração dentro do jogo
 
+> Fábrica: a categoria “Fábrica” implementa os grupos A–M para estado, estoque, processo, pedidos, balanceamento, emprego, marcadores, equipamentos, lotes, alarmes, simulação e comandos. Escritas são validadas no servidor, idempotentes por `requestId`, exigem motivo e entram no log. “Mundo ao vivo” inclui o resumo da EMPRESA BRASIL.
+
 A conta confirmada **rafaelrodrigues-2017@hotmail.com** é a conta principal. A API concede a ela o papel de administrador ao iniciar, ao confirmar o e-mail ou ao concluir o cadastro com a política de ativação automática habilitada. Isso não cria outra conta, não redefine senha e não ignora a confirmação de e-mail quando ela estiver exigida.
 
 Entre no bar e abra **Administração** no menu (Esc › Você). A janela ocupa quase a tela toda e tem um menu de categorias à esquerda; a categoria aberta fica à direita, com título, uma frase do que ela faz e uma linha de status (`.admin-feedback`) onde aparece o resultado de toda ação. Reabrir a janela volta à última categoria usada. No celular, o menu vira uma faixa rolável no topo.

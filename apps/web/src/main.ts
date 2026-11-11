@@ -98,6 +98,7 @@ import {createSparringUi} from './sparring/sparring-ui';
 import {createWalletHud} from './wallet/wallet-hud';
 import {rankIcon} from './levels/rank-icon';
 import {badgeMedal,openBadgeCard} from './profile/badge-card';
+import {FactoryController} from './factory/controller';
 import {BADGE_RARITY_INFO} from '@bar/shared';
 import {createPauseMenu} from './pause-menu/pause-menu';
 import {MenuSounds} from './pause-menu/menu-sounds';
@@ -203,7 +204,7 @@ const weapons:WeaponsController=new WeaponsController($('#game'),{
 let arsenalWindow:ReturnType<typeof createArsenal>|undefined;
 const fightPrompt=document.createElement('div');
 fightPrompt.className='fight-prompt';fightPrompt.hidden=true;fightPrompt.setAttribute('aria-live','polite');
-fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>Espaço</kbd>Defender (no instante do golpe: parry)</span><span class="fp-meter" title="Fôlego da guarda"><i></i></span><span><kbd>R</kbd>Baixar</span>`;
+fightPrompt.innerHTML=`<strong>${uiIcon('shield')}Guarda alta</strong><span><kbd>Clique</kbd>Soco</span><span><kbd>Botão dir.</kbd>Forte</span><span><kbd>Espaço</kbd> ou <kbd>Mouse 4/5</kbd>Defender (no instante do golpe: parry)</span><span class="fp-meter" title="Fôlego da guarda"><i></i></span><span><kbd>R</kbd>Baixar</span>`;
 $('#game').append(fightPrompt);
 function renderFightPrompt():void {fightPrompt.hidden=!fight.guard||!inGame;}
 /** Zeca's challenge: his speech, and the fight's lives and count (docs/sistemas/zeca.md). The room decides all; E near him talks. */
@@ -286,6 +287,7 @@ let netStatus='Conectando…',netPing='— ms';
 let scene:BarScene|undefined;
 let lastFocus:HTMLElement|undefined;
 const audio=new BarAudio();
+audio.setSource(()=>scene?.ambienceProbe());
 const settings=createSettings();
 // The Morte (docs/sistemas/morte.md): her sounds and, for the victim alone, the dark and the sequence game.
 const deathAudio=new DeathAudio(()=>settings.get().master);
@@ -380,6 +382,7 @@ let watchingTv=false;
 // Tonico's pending order and the current job task: private, sent by the room (table.state, job.state).
 let tableOrder:TableOrderView|undefined;
 let jobTask:JobTaskView|null=null;
+let factoryUi:FactoryController|undefined;
 const admission=new AdmissionLifecycle();
 let leavingPromise:Promise<void>|undefined;
 // The jukebox and the TVs are independent: separate controllers, players, panels and volumes.
@@ -568,6 +571,9 @@ const network=new BarNetwork({
     if(activeModal==='jobs')$('#modal-content').innerHTML=jobsHtml(world,jobTask);
     renderJobCard();
   },
+  factory:state=>factoryUi?.stateMessage(state as never),
+  employment:state=>factoryUi?.employmentMessage(state as never),
+  factoryPpe:state=>toast(state.on?'EPI colocado.':'EPI retirado.'),
   adminWorld:snapshot=>administration?.world(snapshot),
   serverPerformance:snapshot=>performanceMonitor.receiveServer(snapshot),
   // The room's price table: on entering and whenever the administration changes a price (Preços).
@@ -605,6 +611,7 @@ const network=new BarNetwork({
     if(isConnected)voice.syncState();
   }
 });
+factoryUi=new FactoryController({send:(type,payload)=>network.send(type,payload),toast,app:()=>scene?.app,lowQuality:()=>scene?.getGraphics().preset==='low'});
 
 const mediaProfiler=new UpdateProfiler();
 const performanceMonitor=new PerformanceMonitor({
@@ -988,6 +995,7 @@ function lockOwnBike():void {
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
+  if(factoryUi?.interact(self))return;
   const fuel=fuelContext(self,world);
   if(fuel.service)return;
   if(fuel.pump&&fuel.vehicle){sendVehicleControl(fuel.vehicle.id,'refuel');return;}
@@ -1559,7 +1567,7 @@ function backdropAllowed():boolean{
 void start();
 if(import.meta.env.DEV)void import('./bar-animations-debug').then(({barAnimationsDebug})=>barAnimationsDebug(()=>scene));
 // Development telemetry exposes copies only, never a way to command the server.
-if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),weapons:()=>weapons.view(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),fight:()=>({...scene?.getFight(),guard:fight.guard,local:fight.local?{...fight.local}:undefined,blow:fight.blow?{...fight.blow}:undefined}),fightPress:(kind:'light'|'heavy')=>fight.press(kind),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
+if(import.meta.env.DEV)Object.defineProperty(window,'barDebug',{value:{fireworks:()=>scene?.getFireworks(),weapons:()=>weapons.view(),vr:()=>scene?.getVr(),food:()=>courier.state(),gps:()=>({route:gps.route,target:gps.target,remaining:gps.remaining}),syncWallet:()=>network.send('inventory.sync'),send:(type:string,payload:unknown)=>network.send(type,payload),barAnimation:(action:Parameters<BarScene['debugBarAnimation']>[0])=>scene?.debugBarAnimation(action),barProp:(id:string,name:string)=>scene?.barProp(id,name),showcase:(pose?:Parameters<BarScene['debugShowcase']>[0])=>scene?.debugShowcase(pose),barChair:(seat:string)=>scene?.barChair(seat),snapshot:()=>({world:structuredClone(world),localId:user?.id}),price:(key:string)=>livePrice(key),performance:()=>scene?.getPerformance(),animations:()=>scene?.getAnimations(),smoking:()=>scene?.getSmoking(),horses:()=>scene?.getHorses(),motos:()=>scene?.getMotos(),motoBag:(action:"attach"|"remove"|"open"|"close",id?:string)=>scene?.debugMotoBag(action,id),ragdolls:()=>scene?.getRagdolls(),blows:()=>scene?.getBlows(),fight:()=>({...scene?.getFight(),guard:fight.guard,local:fight.local?{...fight.local}:undefined,blow:fight.blow?{...fight.blow}:undefined}),fightPress:(kind:'light'|'heavy')=>fight.press(kind),served:()=>scene?.getServed(),map:()=>scene?.getMapStatus(),network:()=>network.telemetry(),jukebox:()=>jukebox.telemetry(),television:()=>television.telemetry(),ambient:()=>audio.telemetry(),ambientTrigger:(kind:string)=>audio.trigger(kind),environment:()=>scene?.getEnvironmentStatus(),city:()=>scene?.getMapStatus().city,graphics:()=>scene?.getGraphics(),job:()=>structuredClone(jobTask),tableOrder:()=>structuredClone(tableOrder),listener:()=>scene?.getListener(),camera:()=>scene?.getCamera(),voice:()=>({mic:voice.micActive,transmitting:voice.transmitting,level:voice.level,status:voice.status,settings:{...settings.get()},...voice.telemetry() as object})}});
 /**
  * The names over the avatars: one element per person, kept from tick to tick, its contents rewritten only when they change
  * and its place moved. Rebuilding the whole list ten times a second made new nodes (style, layout and the accessibility

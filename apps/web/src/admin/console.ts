@@ -15,6 +15,7 @@ import {collectionSection} from './collection';
 import {highfoodSection} from './highfood';
 import {serverSection} from './server';
 import {performanceSection} from './performance';
+import {factorySection} from './factory';
 import type {PerformanceMonitor} from '../performance/monitor';
 
 /** The administration's categories, in the menu's order. */
@@ -27,6 +28,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'levels',label:'Níveis e XP',icon:'trophy',description:'Quanto XP cada ação dá e o bônus diário de cada dia. O XP de um jogador, o nível e o bônus dele ficam na ficha, aba Nível.',factory:levelsSection},
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
+  {id:'factory',label:'Fábrica',icon:'factory',description:'EMPRESA BRASIL: estado industrial, estoque, máquinas, alarmes e ferramentas de depuração.',factory:factorySection},
   {id:'vehicles',label:'Veículos',icon:'bike',description:'Gerencie a frota dos jogadores, registre veículos, personalize placas e use o spawn de todos os modelos.',factory:vehiclesSection},
   {id:'environment',label:'Tempo e clima',icon:'sun',description:'Horário do jogo, duração do dia e clima compartilhados por todos nesta sala.',factory:environmentSection},
   {id:'highfood',label:'Highfood',icon:'food',description:'As entregas de agora, o que elas pagam e os clientes: nome, corpo no jogo, falas e foto.',factory:highfoodSection},
@@ -35,6 +37,15 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'server',label:'Servidor',icon:'server',description:'Processos, memória, disco, banco de dados e filas entre a API e o mundo.',factory:serverSection},
   {id:'performance',label:'Desempenho',icon:'activity',description:'FPS, estabilidade dos frames, memória, rede e tick do mundo. Escolha as métricas para acompanhar por cima do jogo.',factory:performanceSection},
 ];
+/** The menu's groups, in order: a section appears under the group that lists it. */
+const GROUPS:ReadonlyArray<{label:string;ids:readonly SectionId[]}>=[
+  {label:'Painel',ids:['overview','world']},
+  {label:'Pessoas',ids:['players','reports','badges','collection']},
+  {label:'Economia',ids:['economy','prices','levels']},
+  {label:'Conteúdo do jogo',ids:['vehicles','highfood','factory','environment']},
+  {label:'Sistema',ids:['logs','server','performance']},
+];
+const groupOf=(id:SectionId)=>GROUPS.find(g=>g.ids.includes(id))!.label;
 // The section the administration was on: reopening the window goes back to it.
 let lastSection:SectionId='overview';
 
@@ -52,11 +63,11 @@ export function adminConsole(container:HTMLElement,hooks:AdminConsoleHooks){
   container.innerHTML=`<div class="admin-console">
     <aside class="admin-nav">
       <div class="admin-nav-head"><span class="eyebrow">Administração</span><b>${user?.isOwner?'Conta principal':'Administrador'}</b><small>${e(user?.displayName??'')}</small></div>
-      <nav aria-label="Categorias da administração">${SECTIONS.map(s=>`<button type="button" data-admin-nav="${s.id}" aria-current="${s.id===current}">${uiIcon(s.icon)}<span>${s.label}</span>${s.id==='reports'?'<i class="admin-count" hidden></i>':''}</button>`).join('')}</nav>
+      <nav aria-label="Categorias da administração">${GROUPS.map(g=>`<div class="admin-nav-group" role="group" aria-label="${g.label}"><span class="admin-nav-title">${g.label}</span>${g.ids.map(id=>{const s=SECTIONS.find(x=>x.id===id)!;return `<button type="button" data-admin-nav="${s.id}" aria-current="${s.id===current}">${uiIcon(s.icon)}<span>${s.label}</span>${s.id==='reports'?'<i class="admin-count" hidden></i>':''}</button>`;}).join('')}</div>`).join('')}</nav>
       <div class="admin-position"><label for="admin-position">${uiIcon('mapPin')}Sua posição</label><input id="admin-position" readonly value="${e(hooks.position())}"><button class="mini-button" data-action="admin-copy-position">${uiIcon('copy')}Copiar</button></div>
     </aside>
     <div class="admin-main">
-      <header class="admin-main-head"><div><h3 id="admin-section-title"></h3><p class="admin-section-description"></p></div><p class="admin-feedback" role="status" aria-live="polite"></p></header>
+      <header class="admin-main-head"><div><span class="admin-crumb"></span><h3 id="admin-section-title"></h3><p class="admin-section-description"></p></div><p class="admin-feedback" role="status" aria-live="polite"></p></header>
       <div class="admin-section" id="admin-section"></div>
     </div>
   </div>`;
@@ -80,6 +91,7 @@ export function adminConsole(container:HTMLElement,hooks:AdminConsoleHooks){
     section?.destroy?.();section=undefined;busy=false;
     current=lastSection=entry.id;root.innerHTML='';root.setAttribute('aria-busy','false');message('');
     container.querySelector('#admin-section-title')!.textContent=entry.label;
+    container.querySelector('.admin-crumb')!.textContent=groupOf(entry.id);
     container.querySelector('.admin-section-description')!.textContent=entry.description;
     for(const button of container.querySelectorAll<HTMLElement>('[data-admin-nav]'))button.setAttribute('aria-current',String(button.dataset.adminNav===entry.id));
     section=entry.factory(root,ctx,params);

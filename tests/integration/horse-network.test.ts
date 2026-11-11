@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {headLookAt,inputSchema,moveHorse,type PlayerInput,type Position} from '@bar/shared';
+import {headLookAt,inputSchema,moveHorse,jumpMotion,type PlayerInput,type Position} from '@bar/shared';
 import {BarNetwork} from '../../apps/web/src/networking';
 
 test('horse prediction, stopping and camera movement keep sending valid commands after repeated turns',()=>{
@@ -10,7 +10,7 @@ test('horse prediction, stopping and camera movement keep sending valid commands
   const errors:PlayerInput[]=[],sent:PlayerInput[]=[];
   const network=Object.assign(Object.create(BarNetwork.prototype),{
     transportReady:true,stopped:false,user:{id:self.id},world:{players:{[self.id]:self}},
-    pending:[] as PlayerInput[],wasMoving:false,seq:0,position:{x:self.x,y:self.y,z:self.z},
+    pending:[] as PlayerInput[],wasMoving:false,seq:0,position:{x:self.x,y:self.y,z:self.z},motion:jumpMotion(),
     hooks:{
       input:()=>({...intention}),
       // BarScene keeps the predicted rotation for the next stop or camera-only input.

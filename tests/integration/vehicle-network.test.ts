@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CAR_MODEL,NEW_CAR_PARTS,NO_MOTO_INTENT,headLookAt,inputSchema,motoDismountSpot,motoObstacle,movePlayer,parkedMoto,stepMoto,type PlayerInput} from '@bar/shared';
+import {CAR_MODEL,NEW_CAR_PARTS,NO_MOTO_INTENT,headLookAt,inputSchema,motoDismountSpot,motoObstacle,movePlayer,parkedMoto,stepMoto,jumpMotion,type PlayerInput} from '@bar/shared';
 import {BarNetwork} from '../../apps/web/src/networking';
 
 test('after leaving a car or motorcycle with accumulated turns, camera and stop inputs stay valid and walking resumes',()=>{
@@ -12,7 +12,7 @@ test('after leaving a car or motorcycle with accumulated turns, camera and stop 
     const sent:PlayerInput[]=[],errors:PlayerInput[]=[];
     const network=Object.assign(Object.create(BarNetwork.prototype),{
       transportReady:true,stopped:false,user:{id:self.id},world:{players:{[self.id]:self},motos:{[vehicle.id]:vehicle}},
-      pending:[] as PlayerInput[],wasMoving:false,seq:0,position:{x:self.x,y:self.y,z:self.z},
+      pending:[] as PlayerInput[],wasMoving:false,seq:0,position:{x:self.x,y:self.y,z:self.z},motion:jumpMotion(),clock:{now:()=>Date.now()},
       hooks:{input:()=>({...intention}),position:()=>{}},
       room:{send:(_type:string,input:PlayerInput)=>{
         sent.push(input);

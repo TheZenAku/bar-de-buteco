@@ -50,6 +50,16 @@ pela ordem da roda, o botão do meio liga/desliga o mouse (por isso não é conf
   (todas as teclas e botões passam por aqui). Dicas (HUD "Recarregar", chip de primeiro uso, roda) e o guia leem as teclas escolhidas. Sem arma na mão, R e V
   voltam a ser a guarda e o aceno; com arma e o recarregar em outra tecla, R não faz nada.
 
+## Mira de verdade, tiro nas costas e passos (2026-11-09, segunda rodada)
+
+- **Mira ótica sem luneta** (red dot, reflex, holográfica, ACOG) em arma longa: ao mirar, a câmera entra nos olhos ao longo da mira (`rig.scope`, a mesma entrada da luneta,
+  sem máscara), com a arma visível; a pose já põe a mira na linha do olho. O vidro é claro (opacidade 0,1, `clearLens` em weapon-models.ts): o mundo se vê por ela e o
+  ponto/anel do HUD flutua no centro. Pistolas, revólveres e submetralhadoras ficam na câmera por cima do ombro (o braço não alcança a linha do olho).
+- **Tiro nas costas:** o raio sai da câmera e começava 0,35 m antes do plano do olho do atirador: quem estava colado atrás (dentro da cápsula) entrava na linha da mira e levava
+  o tiro. Agora (`traceShot`) ele começa no plano do olho, ignora corpos em que o início está dentro (`insideBody`) e corpos com o centro atrás desse plano.
+- **Passos armado:** voltar e andar de lado (`WalkBack`, `FightBack/Left/Right`) tocavam a até 2,6× (velocidade sobre o ritmo do clipe, regra do boxeador); agora usam a mesma taxa
+  suavizada e limitada da caminhada (`stepRate`, máximo 1,35×). Não verificado a olho.
+
 ## Fotos e melhorias (2026-11-09)
 
 A foto da arma (roda, Arsenal, **chip de munição do HUD**) segue as peças encaixadas e as melhorias: as peças trocam camadas; as melhorias (sem modelo) aparecem como

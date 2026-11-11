@@ -20,6 +20,12 @@ export {FIGHT_BODIES,type FightBody,type FistPath} from './fight-paths.js';
  *   at most FIGHT.rewindMaxMs), so what the fist is drawn touching is what gets hit.
  */
 export const FIGHT={
+  /**
+   * How much faster than the clips' own pace a blow is played (2026-11-09: the owner found them slow: the jab's fist came out at 0.2 s, the hay-maker's at
+   * 0.56 s). The clips, their windows (FIGHT_MOVES activeFrom, activeTo, swingMs, durationMs: clip milliseconds) and the fist's way (fight-paths.ts) stay as
+   * measured; a blow plays `tempo` clip milliseconds per real one (clipMs, realMs), and the step counts below are in inputs, shortened to match.
+   */
+  tempo:1.3,
   /** Walking in the guard (m/s): shorter steps than a walk; with Shift (and stamina) it runs, guard still up. */
   speed:2.2,runSpeed:4.8,
   /**
@@ -37,9 +43,11 @@ export const FIGHT={
   /** What the room keeps of where everyone was (ms). */
   historyMs:1000,
   /** Aim assist: how far and how far off the view someone is still aimed at (m, radians); how far back a punch may step when too close (m). */
-  aimRange:2.6,aimCone:.9,backStep:.25,
+  aimRange:2.5,aimCone:.6,backStep:.25,
   /** How far inside the sweet spot's reach the step in brings the target (m): margin for a body still being pushed by the last blow. */
   aimDepth:.12,
+  /** Nobody stands inside anybody: the closest two fighters' feet may come (m). A bot gives way (world/sparring.ts separate); with it a blow's step in cannot carry the body through the other. */
+  bodyGap:.55,
   /** A press waits this long to be thrown while the feet are still planted (ms): the input buffer. */
   bufferMs:320,
   /** The blow pushes the body away over this long (ms). */
@@ -56,8 +64,14 @@ export const FIGHT={
 export const BLOCK={
   /** Walking with the block held (m/s); it cannot run. */
   speed:1.3,
-  /** A parry: a blow landing up to this long after the block went up (ms). */
-  parryMs:180,
+  /**
+   * A parry: a blow landing up to `parryMs` after the block went up, or up to `parryLateMs` BEFORE it (a press that comes after the contact still parries it: the
+   * blocker presses on what they see, which is ~110 ms of avatar interpolation plus the trip behind the room; the blow waits for it, see deferMaxMs). Judged on
+   * the press alone, never on what the blocker's body was playing.
+   */
+  parryMs:450,parryLateMs:360,
+  /** A bot (the sparring foe) has no trip and no interpolation to make up for: its window is the plain one, never late. */
+  botParryMs:180,
   /** A press opens a parry window only this long after the previous press (ms): holding or mashing the key is a plain block. */
   parryCooldownMs:550,
   /** Half the arc in front that a block covers (radians): from the side or behind the blow gets through whole. */
@@ -65,21 +79,28 @@ export const BLOCK={
   /** The share of a blow's life that gets through a block (light, heavy), never the last point of life. */
   chip:.15,chipHeavy:.3,
   /** The guard meter: its size, how much of a blow's life it costs, what it regains per second once the blocker has been hit-free for `regenDelayMs`. */
-  meter:100,drain:1.4,regenPerS:14,regenDelayMs:900,
+  meter:100,drain:1.0,regenPerS:14,regenDelayMs:900,
   /** A parry gives some of the meter back. */
   parryRefill:30,
   /** Meter broken: how long the blocker is staggered (ms) and how much of the meter is back after. */
   breakMs:1100,breakRefill:40,
   /** How much of a blow's push a block takes. */
   push:.5,
+  /**
+   * A held block comes up through the stun of a blow taken (not a parry's, not a broken guard) this long after the hit (ms): without it a chain thrown in
+   * rhythm (the stun outlasts the gap to the next blow, and the browser only learns the stun is over a patch later) cannot be answered at all.
+   */
+  hitFreeMs:150,
+  /** A blow that ran into a block makes the puncher recoil this long (ms): the opening to counter, and the end of a chain on a guard that holds. */
+  recoilMs:420,
   /** What a parry does to the puncher: stun (ms), push (m); and how long the parrier's counter is stronger (ms), and by how much. */
-  parryStunMs:800,parryPush:.35,riposteMs:1400,riposte:1.35,
+  parryStunMs:800,parryPush:.35,riposteMs:2000,riposte:1.35,
   /**
    * Netcode: a blow on someone with the guard up is settled this much later than it was detected (their one-way trip plus a tick, at most deferMaxMs),
    * so a block pressed before it, as the blocker saw it, has reached the room. The rest of the browsers have already drawn the blow by then.
    * `lateMaxMs`: the most one-way delay the room believes a browser's own report of its trip.
    */
-  deferMaxMs:150,lateMaxMs:250,
+  deferMaxMs:320,lateMaxMs:250,
 } as const;
 
 /** A press of the block key, reported with the input that carries it (and only that one): the same `seen`/`ago` as a punch, to know how late it is. */
@@ -94,16 +115,18 @@ export function oneWayOf(takenAt:number,command:{seen:number;ago:number},tickMs=
   return Math.max(0,Math.min(BLOCK.lateMaxMs,(takenAt-command.seen-Math.max(0,command.ago)-tickMs/2)/2));
 }
 /** A stretch the block key was held, on the room's clock: from its (estimated) press to its release (Infinity while held), and whether this press opened a parry window. */
-export interface BlockSpan {from:number;to:number;parry:boolean}
+export interface BlockSpan {from:number;to:number;parry:boolean;/** This press's windows (ms): after / before the press (BLOCK.parryMs, parryLateMs; a bot's are narrower). */early?:number;late?:number}
 /**
  * What a blow landing at `hitMs` meets: a parry if the block went up at most BLOCK.parryMs before it (and that press opened a window), a plain block if
- * it was held, else nothing. The blocker's presses are on their own timeline (the press, less its trip), not the room's moment of taking the input.
+ * it was held (or went up within BLOCK.parryLateMs after it), else nothing. The blocker's presses are on their own timeline (the press, less its trip), not the room's moment of taking the input.
  */
 export function blockVerdict(spans:readonly BlockSpan[],hitMs:number):'parry'|'block'|'none' {
   for(let i=spans.length-1;i>=0;i--){
     const span=spans[i]!;
-    if(hitMs<span.from||hitMs>span.to)continue;
-    return span.parry&&hitMs-span.from<=BLOCK.parryMs?'parry':'block';
+    if(hitMs>span.to)continue;
+    // A press after the contact (up to parryLateMs) still defends it, as the blocker pressed on what they saw: a parry if the press may open one, else a plain block.
+    if(hitMs<span.from)return span.from-hitMs<=(span.late??BLOCK.parryLateMs)?span.parry?'parry':'block':'none';
+    return span.parry&&hitMs-span.from<=(span.early??BLOCK.parryMs)?'parry':'block';
   }
   return 'none';
 }
@@ -156,7 +179,7 @@ export interface PunchMove {
  * 0.2 to 0.34 s, the cross steps in and lands late, the hook sweeps across, the heavy swings wide from the right after a long wind-up.
  * The light ones push little and the hook steps in far, so the chain thrown in rhythm lands whole on someone who stands there (tested).
  */
-export const FIGHT_MOVES:Readonly<Record<PunchId,PunchMove>>={
+const RAW_MOVES:Readonly<Record<PunchId,PunchMove>>={
   jab:{id:'jab',name:'Jab',clip:'Jab',durationMs:1026,activeFrom:200,activeTo:340,swingMs:190,lockSteps:7,chainSteps:16,then:{light:'cross',heavy:'elbow',kick:'frontKick'},radius:.09,lungeMax:.35,lungeSteps:4,
     damage:7,stunMs:280,knockback:.12,reaction:'HitLight',launch:{speed:2.5,lift:1.4,closing:1},heavy:false},
   cross:{id:'cross',name:'Direto',clip:'Cross',durationMs:1156,activeFrom:300,activeTo:560,swingMs:290,lockSteps:12,chainSteps:20,then:{light:'hook',heavy:'heavy',kick:'bodyKick'},radius:.09,lungeMax:.5,lungeSteps:6,
@@ -170,14 +193,22 @@ export const FIGHT_MOVES:Readonly<Record<PunchId,PunchMove>>={
     damage:24,stunMs:650,knockback:.8,reaction:'HitHeavy',launch:{speed:6,lift:2.6,closing:3},heavy:true},
   // Rafael's kicks (docs/sistemas/luta.md): they hit harder than any punch and stun longer, push but never throw the body (the free kick outside the
   // guard does; here a knockout is the only flight). The leg is thicker than a fist, and the way it goes is the foot's.
-  frontKick:{id:'frontKick',name:'Chute frontal',clip:'KickFront',durationMs:1010,activeFrom:370,activeTo:525,swingMs:355,lockSteps:11,chainSteps:17,then:{light:'cross',heavy:'heavy',kick:'bodyKick'},radius:.17,lungeMax:.45,lungeSteps:5,
-    damage:16,stunMs:520,knockback:.5,reaction:'HitMedium',launch:{speed:5,lift:2.4,closing:2.5},heavy:false},
-  bodyKick:{id:'bodyKick',name:'Chute no tronco',clip:'KickHigh',durationMs:1036,activeFrom:280,activeTo:410,swingMs:265,lockSteps:9,chainSteps:16,then:{light:'hook',heavy:'heavy',kick:'roundKick'},radius:.17,lungeMax:.5,lungeSteps:4,
-    damage:19,stunMs:580,knockback:.6,reaction:'HitHeavy',launch:{speed:5.5,lift:2.6,closing:3},heavy:true},
+  frontKick:{id:'frontKick',name:'Chute frontal',clip:'KickFront',durationMs:1010,activeFrom:370,activeTo:525,swingMs:355,lockSteps:11,chainSteps:17,then:{light:'cross',heavy:'heavy',kick:'bodyKick'},radius:.3,lungeMax:.8,lungeSteps:5,
+    damage:24,stunMs:750,knockback:1.2,reaction:'HitMedium',launch:{speed:5,lift:2.4,closing:2.5},heavy:false},
+  bodyKick:{id:'bodyKick',name:'Chute no tronco',clip:'KickHigh',durationMs:1036,activeFrom:280,activeTo:410,swingMs:265,lockSteps:9,chainSteps:16,then:{light:'hook',heavy:'heavy',kick:'roundKick'},radius:.3,lungeMax:.85,lungeSteps:4,
+    damage:28,stunMs:850,knockback:1.5,reaction:'HitHeavy',launch:{speed:5.5,lift:2.6,closing:3},heavy:true},
   // The karate's round kick, head high with a long wind-up: the finisher, the biggest damage of the guard.
-  roundKick:{id:'roundKick',name:'Chute de karatê',clip:'Kick',durationMs:1333,activeFrom:320,activeTo:507,swingMs:293,lockSteps:11,chainSteps:11,then:{},radius:.17,lungeMax:.6,lungeSteps:6,
-    damage:27,stunMs:800,knockback:1,reaction:'HitHeavy',launch:{speed:7,lift:3,closing:3.5},heavy:true},
+  roundKick:{id:'roundKick',name:'Chute de karatê',clip:'Kick',durationMs:1333,activeFrom:320,activeTo:507,swingMs:293,lockSteps:11,chainSteps:11,then:{},radius:.3,lungeMax:.95,lungeSteps:6,
+    damage:38,stunMs:1100,knockback:2.2,reaction:'HitHeavy',launch:{speed:7,lift:3,closing:3.5},heavy:true},
 };
+/** Clip time for real time (ms), and back: the blows play FIGHT.tempo clip milliseconds per real millisecond. */
+export const clipMs=(realMs:number):number=>realMs*FIGHT.tempo;
+export const realMs=(clipTimeMs:number):number=>clipTimeMs/FIGHT.tempo;
+/** The table as the game runs it: the clips' times as measured, the counts of inputs (planted feet, combo window, step in) shortened by the tempo (the feet are free once the fist is done). */
+export const FIGHT_MOVES:Readonly<Record<PunchId,PunchMove>>=Object.fromEntries(PUNCH_IDS.map(id=>{
+  const move=RAW_MOVES[id];
+  return [id,{...move,lockSteps:Math.ceil(move.lockSteps/FIGHT.tempo),chainSteps:Math.ceil(move.chainSteps/FIGHT.tempo),lungeSteps:Math.max(1,Math.floor(move.lungeSteps/FIGHT.tempo))}];
+})) as Record<PunchId,PunchMove>;
 /** Whether a blow is one of Rafael's kicks (their clips are Kick, KickHigh, KickFront). */
 export const isKick=(id:PunchId):boolean=>FIGHT_MOVES[id].clip.startsWith('Kick');
 export const punchById=(id:string|undefined):PunchMove|undefined=>PUNCH_IDS.includes(id as PunchId)?FIGHT_MOVES[id as PunchId]:undefined;
@@ -224,7 +255,10 @@ export function throwPunch(command:Pick<PunchCommand,'m'|'n'|'lunge'>,seq:number
 export function punchRoot(skin:string|undefined,move:PunchId,steps:number):number {
   // A skin without this blow's clip (a kick, for anyone but Rafael) has no step of its own.
   const root=fightBody(skin).moves[FIGHT_MOVES[move].clip]?.root??[];
-  return root.length?root[Math.max(0,Math.min(root.length-1,steps))]!:0;
+  if(!root.length)return 0;
+  // The root has a value per clip input (TICK_MS of clip time): the blow plays `tempo` of them per real input.
+  const at=Math.max(0,Math.min(root.length-1,steps*FIGHT.tempo)),i=Math.min(root.length-2,Math.floor(at));
+  return root.length<2?root[0]!:root[i]!+(root[i+1]!-root[i]!)*(at-i);
 }
 /**
  * Input `seq` while the last punch holds: whether the feet are planted, and how far the body goes along the punch (m): the step in towards the target
@@ -404,6 +438,8 @@ export interface FightHit {
   reaction:HitReaction;
   /** The room's time of the hit, and until when the one hit cannot act. */
   at:number;stunUntil:number;
+  /** On a block: until when the puncher recoils (BLOCK.recoilMs), the opening for the counter. */
+  recoilUntil?:number;
   /** The blow that knocked them out: they fly (ragdoll) and, out of life, the Morte comes. */
   ko:boolean;
   /**

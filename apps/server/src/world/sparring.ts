@@ -1,4 +1,4 @@
-import {SPARRING,SPARRING_FOE_PREFIX,SPARRING_NPC,FIGHT,FIGHT_MOVES,TICK_MS,isWalkable,nearSparring,normalizeHeading,punchAim,punchAllowed,punchById,sparringTier,streamOf,
+import {SPARRING,SPARRING_FOE_PREFIX,SPARRING_NPC,FIGHT,FIGHT_MOVES,realMs,TICK_MS,isWalkable,movePlayer,nearSparring,normalizeHeading,punchAim,punchAllowed,punchById,sparringTier,streamOf,
   type Collider,type PlayerInput,type PressKind,type SparringClaim,type SparringDialog,type SparringResult,type SparringState,type SparringStatus,type SparringTier} from '@bar/shared';
 import {Player} from '../state.js';
 import type {FightDirector} from './fight.js';
@@ -66,14 +66,14 @@ export class SparringAI {
 
     // A blow of the player's on its way: after his reaction time he decides to block it (or to parry it, if he is quick enough).
     const theirs=punchById(player.fist.punch);
-    if(theirs&&player.fist.at!==this.seenBlowAt&&now-player.fist.at<theirs.activeFrom&&away<2.9&&!planted){
+    if(theirs&&player.fist.at!==this.seenBlowAt&&now-player.fist.at<realMs(theirs.activeFrom)&&away<2.9&&!planted){
       this.seenBlowAt=player.fist.at;
       const thrownAt=player.fist.at,sees=thrownAt+this.tier.reactMs;
       if(this.random()<this.tier.block){
         // A parry goes up this long before the blow lands; only if he has seen it coming by then.
-        const parryAt=thrownAt+theirs.activeFrom-110;
+        const parryAt=thrownAt+realMs(theirs.activeFrom)-110;
         const parry=this.random()<this.tier.parry/Math.max(.01,this.tier.block)&&sees<=parryAt;
-        this.plan={startAt:parry?parryAt:Math.max(sees,now),endAt:thrownAt+theirs.activeTo+260};
+        this.plan={startAt:parry?parryAt:Math.max(sees,now),endAt:thrownAt+realMs(theirs.activeTo)+260};
       }
     }
     if(this.plan&&now>this.plan.endAt)this.plan=undefined;
@@ -218,10 +218,33 @@ export class SparringDirector {
     if(duel.phase==='countdown'&&now>=duel.fightAt){duel.phase='fight';this.state(duel);}
     if(duel.phase==='fight'&&now>=duel.endsAt){void this.end(duel,false,'time');return;}
     // The foe's inputs: still through the count, then the bot's.
+    // The player may have walked into him since last tick: he gives way before he thinks, so the bot sees the real distance.
+    this.separate(foe,player);
     const input=duel.phase==='fight'?duel.ai.think(foe,player,now,++duel.seq):{seq:++duel.seq,dx:0,dz:0,running:false,rotation:foe.rotation,fight:true} satisfies PlayerInput;
     this.fights.guard(foe,input);
     if(!foe.interactionState&&foe.fist.fight)this.fights.move(foe,input,now,false,this.host.obstacles() as Collider[]);
+    // And what his own step (a lunge, the clip's way) carried him into.
+    this.separate(foe,player);
     foe.lastProcessedInput=input.seq;
+  }
+
+  /**
+   * Nobody stands inside anybody (FIGHT.bodyGap). The foe is a bot: no browser predicts his body, so he is the one who yields, straight away from the player.
+   * Inside each other the block's arc, the aim and the fist's way all fall apart (the blow comes "from behind", the fist starts past the body), and he could
+   * end up behind the player. A wall at his back leaves him where he is.
+   */
+  private separate(foe:Player,player:Player):void {
+    const dx=foe.x-player.x,dz=foe.z-player.z,away=Math.hypot(dx,dz);
+    if(away>=FIGHT.bodyGap||Math.abs(foe.y-player.y)>1.2)return;
+    // Right on top of him: out through his own front, as he was facing.
+    const x=away>.01?dx/away:Math.sin(foe.rotation),z=away>.01?dz/away:Math.cos(foe.rotation),dt=TICK_MS/1000;
+    // Straight away first; with a wall there, along it to either side.
+    for(const [dx2,dz2] of [[x,z],[-z,x],[z,-x]] as const){
+      const next=movePlayer(foe,{dx:dx2,dz:dz2,running:false},dt,false,false,this.host.obstacles(),(FIGHT.bodyGap-away)/dt);
+      if(Math.hypot(next.x-player.x,next.z-player.z)<=away+1e-3)continue;
+      foe.x=next.x;foe.y=next.y;foe.z=next.z;
+      return;
+    }
   }
 
   private state(duel:Duel):void {

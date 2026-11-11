@@ -1,3 +1,4 @@
+import {canJump,jumpAnimation} from '@bar/shared';
 import {vrArmsSchema,encodeVrArms} from '@bar/shared';
 import {SMOKING} from '@bar/shared';
 import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity,stepWheelie,HORSE_REAR} from '@bar/shared';
@@ -52,6 +53,8 @@ import { SessionRegistry } from './room/session-registry.js';
 import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
 import { ServedItems, type Seated } from './world/served.js';
 import { JobDirector, type Payment, type WorkerOrder } from './world/jobs.js';
+import {FactoryDirector} from './world/factory/index.js';
+import {DEFAULT_FACTORY_BALANCE,emptyBagging,isInsideWorkWindow,type WorkWindow} from '@bar/shared/factory';
 import { changeWallet, WalletRetries, type WalletOwner } from './world/wallet.js';
 import { JOBS, MAX_WORKER_ORDERS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, consumeMs, consumedOverTime, type MediaPriceKind } from '@bar/shared';
 import { STAGE_PASS, hasStagePass, onStage, musicianRole, stageSpot } from '@bar/shared';
@@ -163,6 +166,9 @@ interface Presence {
   poolSeen?:Map<string,{revision:number;shot:number}>;
   /** The vehicles whose key this player holds (the API keeps them); what they were last seen with. */
   vehicles:OwnedVehicle[];
+  /** Virtual helmet, gloves and glasses equipped at EMPRESA BRASIL. */
+  factoryPpe?:boolean;
+  factoryBag?:{material:'MALTE'|'MIX';origin:string};
   /** The customer's dialog is open, and it closes by itself at this time. */
   dialogUntil?:number;
 }
@@ -210,6 +216,14 @@ export class BarRoom extends Room<{ state: BarState }> {
   private phoneCalls = new PhoneCalls();
   private waiter = new WaiterService({ plan: order => this.served.plan(order, this.seated), dirtyTables: () => this.served.dirtyTables(), takeOne: table => this.served.takeOne(table) });
   readonly jobs = new JobDirector({ dirtyTables: () => this.served.dirtyTables(), isDirty: table => this.served.isDirty(table) });
+  /** EMPRESA BRASIL: authoritative live machine and stock state. Asset validation runs in its constructor. */
+  readonly factory = new FactoryDirector();
+  private readonly factoryRequests=new Set<string>();
+  private readonly factoryWorkers=new Set<string>();
+  private factoryPersistedRevision=-1;
+  private factoryPersisting=false;
+  private factoryScheduleBusy=false;
+  private factoryOrders:Array<Record<string,unknown>>=[];
   private walletRetries = new WalletRetries((event, details) => this.log(event, details));
   private refueling=new Refueling({
     vehicles:()=>this.state.motos.values(),connected:id=>!!this.state.players.get(id)?.connected,
@@ -268,6 +282,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     guardRefusal: player => this.guardRefusal(player),
     keepsGuard: player => this.keepsGuard(player),
     hittable: (target, now) => this.sparring.isFoe(target.id) ? this.sparring.hittable(target, now) : this.targets.isTarget(target.id) ? this.targets.hittable(target) : this.punchable(target, now),
+    bot: player => this.sparring.isFoe(player.id) || !!this.sessions.getByUser(player.id)?.ticket.bot,
     spared: target => this.sparring.spares(target),
     kicks: player => !!this.sessions.getByUser(player.id)?.skills.has('karate') || !!this.sessions.getByUser(player.id)?.skills.has('air-kick'),
     // The sparring's ring has its own lives (world/sparring.ts): a blow there never reaches the real ones, and the foe's knockout ends the fight.
@@ -489,6 +504,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.clock.setInterval(() => { void this.maintenance(); }, 3000);
     this.clock.setInterval(() => this.countTime(Date.now()), ACHIEVEMENT_SAMPLE_MS);
     void this.cityWeather.refresh();
+    void this.recoverFactory();
+    this.clock.setInterval(()=>{void this.persistFactory();},5000);
+    this.clock.setInterval(()=>{void this.syncFactorySchedules();},30_000);
     this.clock.setInterval(() => { void this.cityWeather.refresh(); }, WEATHER_CITY.pollMs);
     this.registerMessages();
   }
@@ -543,7 +561,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence || presence.revoked) return;
     const player = this.state.players.get(presence.ticket.userId);
-    if (player) { player.connected = false; player.voice = false; if (!player.interactionState) player.animationState = 'idle'; }
+    if (player) { player.connected = false; player.voice = false; if (!player.interactionState&&player.grounded) player.animationState = 'idle'; }
     if (player && player.animationState !== 'drink') player.drinkItem = '';
     presence.queue.length = 0; presence.motoQueue.length = 0;
     // A pebolim match waits for its player (paused) until they are back or the wait runs out.
@@ -601,6 +619,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
+    if(this.factoryWorkers.delete(userId)){this.factory.setOperators(this.factoryWorkers.size);void internal('employment',{sessionId:presence.ticket.sessionId,userId,action:'stop'}).catch(()=>{});}
+    if(presence.factoryBag){try{this.factory.returnBag(presence.factoryBag.origin,presence.factoryBag.material);}catch{/* A full/reconfigured origin is left for the reservation cleanup report. */}presence.factoryBag=undefined;}
     this.deaths.disconnected(userId);
     this.refueling.cancel(userId,'Atendimento interrompido por desconexão.');
     this.closeStorageOf(userId,'left');
@@ -625,6 +645,8 @@ export class BarRoom extends Room<{ state: BarState }> {
 
   /** Ends what needs a connected player (blackjack seat, orders, drinks, kicks); a chair stays taken. */
   private park(player: Player): void {
+    // A permanently disconnected avatar must be left on its floor, outside the simulation's session list.
+    if(!player.grounded){player.y=groundBelow(player.x,player.z,player.y,0)??player.y;player.verticalVelocity=0;player.grounded=true;player.landingTime=0;player.jumpHeld=false;}
     this.fights.lower(player);
     this.weapons.holster(player);
     if(isRidingHorse(player.interactionState))this.dismountHorse(player);
@@ -733,7 +755,9 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.handle('trade.confirm', tradeConfirmSchema, 6, (client, { tradeId, version }) => this.confirmTrade(client, tradeId, version));
     this.handle('trade.cancel', tradeCancelSchema, 6, (client, { tradeId }) => this.cancelTrade(client, tradeId));
     // Browser tests only (tests/e2e/server.mjs runs the world with NODE_ENV=test): a ride across the city is covered once, not at every step of a test.
-    if (process.env.NODE_ENV === 'test') this.handle('test.player.place', z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite(),rotation:z.number().finite().min(-Math.PI).max(Math.PI).optional() }).strict(), 5, (client, at) => {
+    // E2E scenarios may visit many marker-driven stations in one industrial
+    // cycle. This handler does not exist outside NODE_ENV=test.
+    if (process.env.NODE_ENV === 'test') this.handle('test.player.place', z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite(),rotation:z.number().finite().min(-Math.PI).max(Math.PI).optional() }).strict(), 64, (client, at) => {
       const player = this.player(client), presence = this.forClient(client)!;
       Object.assign(player, at); presence.queue.length = 0; player.lastProcessedInput = presence.lastReceived;
       client.send('test.player.placed',at);
@@ -959,8 +983,91 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.interactionState='job';player.animationState=corner?'clean':'use';player.animationStartedAt=now;
       presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;this.sendJob(presence);
     });
+    // Persistent factory employment. The entrance marker, not a copied coordinate, is the authority for clocking in and PPE.
+    this.handle('employment.view',z.object({}).strict(),2,async client=>{
+      const presence=this.forClient(client)!,player=this.player(client),view=await internal<{shift?:unknown}>('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'view'});
+      // A shift is persistent, so reconnecting must restore the live-world
+      // operator set instead of leaving the API and FactoryDirector divergent.
+      if(view.shift){this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.factory.setOperators(this.factoryWorkers.size);}
+      client.send('employment.state',view);
+    });
+    this.handle('employment.shift',z.object({on:z.boolean(),requestId:z.uuid().optional()}).strict(),2,async(client,{on,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),entry=this.factory.markers.Ponto_EB_Entrada_Pessoal?.xyz_jogo,panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo,near=(point:readonly number[]|undefined)=>!!point&&Math.hypot(player.x-point[0]!,player.z-point[2]!)<=3;
+      if(!near(entry)&&!near(panel))throw new Error('Vá até a entrada de pessoal ou o painel da fábrica.');
+      if(on){await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'start',requestId:requestId??randomUUID(),station:'entrada'});this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.log('factory_shift_start',{playerId:player.id});}
+      else{await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'stop'});this.factoryWorkers.delete(player.id);player.job='';this.log('factory_shift_stop',{playerId:player.id});}
+      this.factory.setOperators(this.factoryWorkers.size);client.send('employment.state',await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'view'}));
+    });
+    this.handle('factory.ppe',z.object({on:z.boolean()}).strict(),3,(client,{on})=>{
+      const presence=this.forClient(client)!,player=this.player(client),point=this.factory.markers.Ponto_EB_Entrada_Pessoal?.xyz_jogo;
+      if(!point||Math.hypot(player.x-point[0],player.z-point[2])>3)throw new Error('Pegue o EPI no armário da entrada.');
+      presence.factoryPpe=on;client.send('factory.ppe',{on});this.log('factory_ppe',{playerId:player.id,on});
+    });
+    this.handle('factory.take',z.object({marker:z.string().max(64),requestId:z.uuid()}).strict(),4,(client,{marker,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),slot=this.factory.slots.find(item=>item.marker===marker),point=this.factory.markers[marker]?.xyz_jogo;
+      if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(presence.factoryBag)throw new Error('Você já está carregando um saco.');if(!slot||!point||Math.hypot(player.x-point[0],player.z-point[2])>2.5)throw new Error('Aproxime-se da vaga.');
+      if(!this.factoryRequests.has(requestId)){presence.factoryBag={material:this.factory.takeBag(marker),origin:marker};this.factoryRequests.add(requestId);}client.send('factory.state',{...this.factory.snapshot(),carrying:presence.factoryBag});
+    });
+    this.handle('factory.pour',z.object({tank:z.number().int().min(1).max(3),requestId:z.uuid()}).strict(),2,(client,{tank,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),point=this.factory.markers[`Ponto_EB_Tanque_${tank}_Operador`]?.xyz_jogo;if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(!presence.factoryBag)throw new Error('Pegue um saco primeiro.');if(!point||Math.hypot(player.x-point[0],player.z-point[2])>2)throw new Error('Suba até a plataforma do tanque.');if(!this.factoryRequests.has(requestId)){this.factory.pourBag(tank as 1|2|3,presence.factoryBag.material);presence.factoryBag=undefined;this.factoryRequests.add(requestId);}client.send('factory.state',{...this.factory.snapshot(),carrying:null});
+    });
+    this.handle('factory.cmd',z.object({action:z.string().min(1).max(48),target:z.string().max(64).optional(),requestId:z.uuid()}).strict(),8,(client,command)=>{
+      const presence=this.forClient(client)!,player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>3)throw new Error('Use o painel da sala de controle.');if(!this.factoryRequests.has(command.requestId)){this.factory.command(command.action,command.target);this.factoryRequests.add(command.requestId);this.log('factory_command',{playerId:player.id,action:command.action,target:command.target??''});}client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});
+    });
+    this.handle('factory.view',z.object({}).strict(),4,client=>{const player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>4)throw new Error('Aproxime-se do painel da fábrica.');client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
+    this.handle('factory.order.accept',z.object({orderId:z.uuid(),requestId:z.uuid()}).strict(),2,async(client,{orderId,requestId})=>{const player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>4)throw new Error('Aceite a ordem no painel da fábrica.');await internal('factory',{action:'order.accept',id:orderId,userId:player.id,requestId});await this.refreshFactoryOrders();this.log('factory_order_accept',{playerId:player.id,orderId,requestId});client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
+    this.handle('factory.order.cargo',z.object({orderId:z.uuid(),stage:z.enum(['load','dock']),requestId:z.uuid()}).strict(),2,async(client,command)=>{const player=this.player(client),truck=this.ownMoto(player.id);if(!truck||!truck.vehicleId||!isTruck(truck))throw new Error('Retire seu caminhão da garagem primeiro.');if(vehicleMotionSpeed(truck)>.1)throw new Error('Pare o caminhão.');if(Math.hypot(player.x-truck.x,player.z-truck.z)>6)throw new Error('Fique perto do caminhão.');const dock=this.factory.markers.Ponto_EB_Doca?.xyz_jogo;if(command.stage==='dock'&&(!dock||Math.hypot(truck.x-dock[0],truck.z-dock[2])>7))throw new Error('Estacione o caminhão na doca da fábrica.');if(command.stage==='load'&&dock&&Math.hypot(truck.x-dock[0],truck.z-dock[2])<20)throw new Error('A etapa externa deve ser feita fora da fábrica.');const result=await internal<{completed?:boolean}>('factory',{action:'order.cargo',orderId:command.orderId,userId:player.id,vehicleId:truck.vehicleId,stage:command.stage,requestId:command.requestId});await this.refreshFactoryOrders();this.log('factory_order_cargo',{playerId:player.id,...command,completed:!!result.completed});client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
     // Administration and debugging (role from the session, refreshed every maintenance round).
     this.handle('admin.world',z.object({}).strict(),2,client=>{this.requireAdmin(client);client.send('admin.world',this.adminSnapshot());});
+    this.handle('admin.factory.stock',z.object({requestId:z.uuid(),marker:z.string().max(64),quantity:z.number().int().min(0).max(18),material:z.enum(['MALTE','MIX','PRODUTO']).optional(),reason:z.string().min(3).max(500)}).strict(),5,(client,command)=>{
+      const admin=this.requireAdmin(client);
+      if(!this.factoryRequests.has(command.requestId)){this.factory.setStock(command.marker,command.quantity,command.material);this.factoryRequests.add(command.requestId);this.log('admin_factory_stock',{playerId:admin,...command});}
+      client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.factory.reset',z.object({requestId:z.uuid(),reason:z.string().min(3).max(500),confirm:z.literal('RESETAR')}).strict(),1,(client,command)=>{
+      const admin=this.requireAdmin(client);
+      if(!this.factoryRequests.has(command.requestId)){this.factory.reset();this.factoryRequests.add(command.requestId);this.log('admin_factory_reset',{playerId:admin,requestId:command.requestId,reason:command.reason});}
+      client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.factory.debug',z.object({requestId:z.uuid(),op:z.string().min(1).max(40),value:z.number().finite().optional(),target:z.string().max(80).optional(),reason:z.string().min(3).max(500)}).strict(),3,(client,command)=>{
+      const admin=this.requireAdmin(client);if(!this.factoryRequests.has(command.requestId)){const id=Math.max(1,Math.min(3,Number(command.target)||1)) as 1|2|3,tank=this.factory.tanks[id-1]!;
+        switch(command.op){
+          case'time':this.factory.balance.timeScale=Math.max(1,Math.min(60,command.value??1));break;
+          case'balance-set':{const value=command.value;if(value===undefined||!Number.isFinite(value))throw new Error('Informe um valor numérico.');switch(command.target){
+            case'recipe.waterL':this.factory.balance.recipe.waterL=Math.max(1,value);break;case'recipe.targetC':this.factory.balance.recipe.targetC=Math.max(1,value);break;
+            case'recipe.malteBags':this.factory.balance.recipe.malteBags=Math.max(0,Math.floor(value));break;case'recipe.mixBags':this.factory.balance.recipe.mixBags=Math.max(0,Math.floor(value));break;
+            case'recipe.litresPerKg':this.factory.balance.recipe.litresPerKg=Math.max(0,value);break;case'recipe.yieldMin':this.factory.balance.recipe.yieldMin=Math.max(0,Math.min(1,value));break;case'recipe.yieldMax':this.factory.balance.recipe.yieldMax=Math.max(this.factory.balance.recipe.yieldMin,Math.min(1,value));break;
+            case'waterFlowLps':this.factory.balance.waterFlowLps=Math.max(.01,value);break;case'agitatorRpm':this.factory.balance.agitatorRpm=Math.max(0,value);break;case'dissolveS':this.factory.balance.dissolveS=Math.max(.1,value);break;case'homogenizeS':this.factory.balance.homogenizeS=Math.max(.1,value);break;
+            case'preheatS':this.factory.balance.preheatS=Math.max(.1,value);break;case'coolS':this.factory.balance.coolS=Math.max(.1,value);break;case'dryerFlowLph':this.factory.balance.dryerFlowLph=Math.max(.1,value);break;case'bagFillS':this.factory.balance.bagFillS=Math.max(.1,value);break;
+            case'bagKg':this.factory.balance.bagKg=Math.max(.1,value);break;case'bagToleranceKg':this.factory.balance.bagToleranceKg=Math.max(0,value);break;case'slotCapacity':this.factory.balance.slotCapacity=Math.max(1,Math.floor(value));break;case'timeScale':this.factory.balance.timeScale=Math.max(1,Math.min(60,value));break;
+            default:throw new Error('Parâmetro de balanceamento desconhecido.');}break;}
+          case'balance-reset':this.factory.balance=structuredClone(DEFAULT_FACTORY_BALANCE);break;
+          case'emergency':this.factory.command('emergency');break;case'rearm':this.factory.command('emergency.reset');break;
+          case'seed-full':for(const slot of this.factory.slots)slot.quantity=slot.capacity;this.factory.bagging.emptyBags=100;break;
+          case'seed-empty':this.factory.reset();break;case'empty-bags':this.factory.bagging.emptyBags=Math.max(0,Math.floor(command.value??100));break;
+          case'silo':this.factory.dryer.powderKg=Math.max(0,command.value??0);break;
+          case'tank-fill':this.factory.tanks[id-1]={...tank,state:'AGUARDANDO_INSUMOS',waterL:this.factory.balance.recipe.waterL,temperatureC:this.factory.balance.recipe.targetC};break;
+          case'tank-ready':this.factory.tanks[id-1]={...tank,state:'PRONTO_PARA_TRANSFERIR',waterL:this.factory.balance.recipe.waterL,temperatureC:this.factory.balance.recipe.targetC,malteBags:this.factory.balance.recipe.malteBags,mixBags:this.factory.balance.recipe.mixBags,quality:100,lidOpen:false};break;
+          case'tank-dirty':this.factory.tanks[id-1]={...tank,state:'SUJO',waterL:0,agitatorRpm:0,lidOpen:false};break;
+          case'tank-grumps':this.factory.tanks[id-1]={...tank,quality:Math.max(0,tank.quality-20),penalties:[...tank.penalties,'grumos_injetados']};break;
+          case'dryer-ready':this.factory.dryer={...this.factory.dryer,state:'PRONTO',inletC:190,outletC:87,fault:'',stepS:0};break;
+          case'dryer-producing':this.factory.dryer={...this.factory.dryer,state:'PRODUZINDO',inletC:190,outletC:87,flowLph:this.factory.balance.dryerFlowLph,sourceTank:1};break;
+          case'fault-dryer':case'fault-burner':case'fault-fan':{const fault=command.op==='fault-dryer'?'bico_entupido':command.op==='fault-burner'?'queimador_apagado':'exaustor_desarmado';this.factory.dryer={...this.factory.dryer,state:'FALHA',fault};this.factory.alarms.push({id:randomUUID(),severity:'alarm',source:'secador',text:fault.replaceAll('_',' '),at:Date.now(),acknowledged:false});break;}
+          case'dryer-resolve':this.factory.dryer={...this.factory.dryer,state:'PARADO',fault:'',flowLph:0,sourceTank:null};break;
+          case'bag-cycle':this.factory.dryer.powderKg=Math.max(0,this.factory.dryer.powderKg-this.factory.balance.bagKg);if(this.factory.bagging.emptyBags<1)this.factory.bagging.emptyBags=1;this.factory.bagging={...this.factory.bagging,state:'AGUARDANDO_EMPILHAR',emptyBags:this.factory.bagging.emptyBags-1,weightKg:this.factory.balance.bagKg};this.factory.command('bag.stack');break;
+          case'bag-reset':this.factory.bagging=emptyBagging();break;
+          case'release-reservations':for(const slot of this.factory.slots)Object.assign(slot,{reservedBy:'',reservedUntil:0});break;
+          case'lot-approve':case'lot-reject':for(const slot of this.factory.slots)if(slot.batchId===command.target&&command.op==='lot-reject'){slot.quantity=0;slot.batchId='';}break;
+          case'teleport':{const point=command.target&&this.factory.markers[command.target]?.xyz_jogo;if(!point)throw new Error('Marcador da fábrica desconhecido.');Object.assign(this.player(client),{x:point[0],y:point[1],z:point[2]});break;}
+          case'markers-toggle':client.send('factory.markers',{markers:Object.entries(this.factory.markers).map(([name,value])=>({name,xyz:value.xyz_jogo}))});break;
+          case'auto-cycle':this.factory.runAutomaticCycle();break;
+          default:throw new Error('Operação administrativa da fábrica desconhecida.');
+        }
+        this.factory.revision++;this.factoryRequests.add(command.requestId);this.log('admin_factory_debug',{playerId:admin,...command});}client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.factory.order',z.object({requestId:z.uuid(),op:z.enum(['create','complete','cancel','expire','ghost']),id:z.uuid().optional(),kind:z.enum(['purchase','sale']).optional(),material:z.enum(['MALTE','MIX','PRODUTO']).optional(),pallets:z.number().int().min(1).max(25).optional(),price:z.number().int().min(0).max(1_000_000).optional(),reason:z.string().min(3).max(500)}).strict(),3,async(client,command)=>{
+      const admin=this.requireAdmin(client);if(command.op==='create')await internal('factory',{action:'order.create',kind:command.kind??'purchase',material:command.material??'MALTE',pallets:command.pallets??1,price:command.price??0,requestId:command.requestId});else if(command.op==='ghost')await internal('factory',{action:'order.ghost',id:command.id,requestId:command.requestId});else await internal('factory',{action:'order.status',id:command.id,status:command.op==='cancel'?'cancelled':command.op==='expire'?'expired':'completed',requestId:command.requestId});await this.refreshFactoryOrders();this.log('admin_factory_order',{playerId:admin,...command});client.send('admin.world',this.adminSnapshot());
+    });
     this.handle('admin.environment',environmentPatchSchema,4,(client,patch)=>{
       const admin=this.requireAdmin(client),now=Date.now();
       this.state.environment.assign(applyEnvironmentPatch(this.state.environment,patch,now));
@@ -1008,7 +1115,10 @@ export class BarRoom extends Room<{ state: BarState }> {
       this.log('admin_media_off',{playerId:admin,kind,id});client.send('admin.world',this.adminSnapshot());
     });
     // The delivery bikes exist only while the administration keeps them on the map.
-    this.handle('admin.moto.spawn',motoSpawnSchema,5,(client,{model='moto-delivery',color})=>{
+    // The catalogue is larger than the old five-message burst limit. An admin
+    // must be able to inspect/spawn every registered model without the last one
+    // being silently rate-limited; the world-wide MOTO.LIMIT remains the cap.
+    this.handle('admin.moto.spawn',motoSpawnSchema,MOTO.LIMIT,(client,{model='moto-delivery',color})=>{
       const admin=this.requireAdmin(client),player=this.player(client);
       if([...this.state.motos.values()].filter(moto=>!moto.ownerId).length>=MOTO.LIMIT)throw new Error(`O mapa já tem ${MOTO.LIMIT} motos/veículos temporários. Remova algum antes.`);
       const spot=motoSpawnSpot(player,player.rotation,[...this.state.motos.values()],[],model);
@@ -1103,9 +1213,25 @@ export class BarRoom extends Room<{ state: BarState }> {
       if(!access.valid){this.expel(presence.ticket.userId,'Sua sessão terminou.');return;}
       this.applyAppearance(this.player(client),access);
     });
-    this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, (client, { text }) => {
+    this.handle('chat.send', z.object({ text: z.string().trim().min(1).max(280) }).strict(), 3, async (client, { text }) => {
       const sender = this.forClient(client)!;
       const player = this.player(client);
+      const privateReply=(reply:string)=>client.send('chat.message',{id:randomUUID(),playerId:'system',displayName:'EMPRESA BRASIL',system:true,sentAt:Date.now(),text:reply} satisfies ChatMessage);
+      const factoryCommand=/^\/fabrica(?:\s+([\s\S]+))?$/i.exec(text);
+      if(factoryCommand){
+        if(sender.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');const args=(factoryCommand[1]??'estado').trim().split(/\s+/),op=args[0]?.toLowerCase();
+        if(op==='estado'){const state=this.factory.snapshot();privateReply(`Revisão ${state.revision}; operadores ${state.activeOperators}; tanques ${state.tanks.map(t=>`TQ-${100+t.id}:${t.state}`).join(', ')}; secador ${state.dryer.state}; silo ${state.dryer.powderKg.toFixed(1)} kg.`);}
+        else if(op==='estoque'){const material=args[1]?.toUpperCase() as 'MALTE'|'MIX'|'PRODUTO',total=Number(args[2]),slots=this.factory.slots.filter(slot=>slot.material===material);if(!slots.length||!Number.isInteger(total)||total<0||total>slots.length*18)throw new Error('Use /fabrica estoque <MALTE|MIX|PRODUTO> <quantidade válida>.');let remaining=total;for(const slot of slots){slot.quantity=Math.min(slot.capacity,remaining);remaining-=slot.quantity;}this.factory.revision++;privateReply(`Estoque ${material} definido para ${total} sacos.`);}
+        else if(op==='falha'){const fault=(args[1]??'bico').toLowerCase(),types:Record<string,string>={bico:'bico_entupido',queimador:'queimador_apagado',exaustor:'exaustor_desarmado'};if(!types[fault])throw new Error('Falhas: bico, queimador ou exaustor.');this.factory.dryer={...this.factory.dryer,state:'FALHA',fault:types[fault]!};this.factory.alarms.push({id:randomUUID(),severity:'alarm',source:'secador',text:types[fault]!.replaceAll('_',' '),at:Date.now(),acknowledged:false});this.factory.revision++;privateReply(`Falha ${types[fault]} injetada.`);}
+        else if(op==='tempo'){const scale=Number(args[1]);if(!Number.isFinite(scale)||scale<1||scale>60)throw new Error('Use /fabrica tempo <1–60>.');this.factory.balance.timeScale=scale;this.factory.revision++;privateReply(`Tempo da fábrica em ${scale}×.`);}
+        else if(op==='reset'){this.factory.reset();privateReply('Fábrica resetada para o estado vazio.');}else throw new Error('Comando: estado, estoque, falha, tempo ou reset.');
+        this.log('admin_factory_chat',{playerId:player.id,command:text});return;
+      }
+      const employmentCommand=/^\/emprego\s+(.+?)\s+(admitir|demitir|cooldown\s+0|expediente\s+on|expediente\s+off)$/i.exec(text);
+      if(employmentCommand){
+        if(sender.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');const query=employmentCommand[1]!.trim().toLocaleLowerCase('pt-BR'),action=employmentCommand[2]!.toLowerCase().replace(/\s+/g,' '),targets=[...this.state.players.values()].filter(p=>p.connected&&(p.id.toLowerCase()===query||p.displayName.toLocaleLowerCase('pt-BR')===query));if(targets.length!==1)throw new Error(targets.length?'Nome ambíguo; use o ID.':'Jogador conectado não encontrado.');const target=targets[0]!,targetPresence=this.sessions.getByUser(target.id);if(!targetPresence)throw new Error('Sessão do jogador indisponível.');
+        if(action==='admitir')await internal('employment',{action:'admin.hire',userId:target.id,requestId:randomUUID()});else if(action==='demitir'){await internal('employment',{action:'admin.dismiss',userId:target.id,requestId:randomUUID()});this.factoryWorkers.delete(target.id);target.job='';}else if(action==='cooldown 0')await internal('employment',{action:'admin.cooldown',userId:target.id,requestId:randomUUID()});else if(action==='expediente on'){await internal('employment',{action:'start',sessionId:targetPresence.ticket.sessionId,userId:target.id,requestId:randomUUID(),station:'admin'});this.factoryWorkers.add(target.id);target.job='spray-dry-operator';}else{try{await internal('employment',{action:'stop',sessionId:targetPresence.ticket.sessionId,userId:target.id});}catch{}this.factoryWorkers.delete(target.id);target.job='';}this.factory.setOperators(this.factoryWorkers.size);this.log('admin_employment_chat',{playerId:player.id,targetId:target.id,action});privateReply(`${action} aplicado a ${target.displayName}.`);return;
+      }
       const god=/^\/god(?:\s+([\s\S]*))?$/i.exec(text);
       if(god){
         if(sender.ticket.role!=='admin')throw new Error('Acesso exclusivo da administração.');
@@ -1241,6 +1367,9 @@ export class BarRoom extends Room<{ state: BarState }> {
         if ((name === 'player.input' || name === 'moto.input') && typeof seq === 'number') { presence.lastReceived = Math.max(presence.lastReceived, seq); subject.lastProcessedInput = presence.lastReceived; }
         return;
       }
+      if(!subject.grounded&&['player.interact','player.emote','player.skill','moto.mount','blackjack.join','truco.join','foosball.join','pool.join','job.start','job.work','inventory.use'].includes(name)){
+        rejected('airborne');client.send('error',{message:'Espere tocar o chão antes.'});return;
+      }
       if (presence.flying && name !== 'phone.call' && (NEEDS_CONSCIOUS.has(name) || name === 'player.skill')) { rejected('flying'); client.send('error', { message: 'Pouse (B) antes.' }); return; }
       if (NEEDS_CONSCIOUS.has(name) && !isConscious(subject)) { rejected('unconscious'); client.send('error', { message: subject.condition === 'fainted' ? 'Você está desacordado.' : 'Espere recuperar o equilíbrio.' }); return; }
       if (FIGHT_BUSY.has(name) && this.fights.busy(subject, subject.lastProcessedInput, now)) { rejected('fighting'); if (name !== 'player.skill') client.send('error', { message: 'Espere o golpe terminar.' }); return; }
@@ -1256,8 +1385,17 @@ export class BarRoom extends Room<{ state: BarState }> {
     finally { const ms = performance.now() - started; this.performanceSampler.recordPatch(ms); worldMetrics.observe('bar_world_patch_ms', 'State patch encode and send in ms', ms); }
   }
 
+  /** Continue a jump on room time when no input is available, including a transport drop. */
+  private stepJumpRest(player:Player,now:number,obstacles:ReturnType<typeof motoObstacle>[]):void {
+    Object.assign(player,movePlayer(player,{dx:0,dz:0,running:false,jump:player.jumpHeld},TICK_MS/1000,
+      player.oldWalk,hasStagePass(player),obstacles,undefined,player,false));
+    const phase=jumpAnimation(player)??'idle';
+    if(player.animationState!==phase){player.animationState=phase;player.animationStartedAt=now;}
+  }
+
   private step(): void {
     const now = Date.now();
+    this.factory.tick(TICK_MS/1000);
     this.state.serverTime = now;
     let lapAt = performance.now();
     const lap = (name: string) => { const t = performance.now(); this.performanceSampler.recordPhase(name, t - lapAt); worldMetrics.observe(`bar_world_phase_${name.replace(/\W/g, '_')}_ms`, `Tick phase ${name} in ms`, t - lapAt, 200); lapAt = t; };
@@ -1268,7 +1406,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     for (const [id, presence] of this.sessions) {
       const player = this.state.players.get(id)!;
       if(player.fireworkEquipped&&!this.canFirework(player))player.fireworkEquipped=false;
-      if (!player.connected || presence.revoked) continue;
+      if (presence.revoked) continue;
+      if (!player.connected) {
+        if(!player.interactionState&&(!player.grounded||player.landingTime>0))this.stepJumpRest(player,now,obstacles??=[...this.state.motos.values()].map(motoObstacle));
+        continue;
+      }
       if(presence.gestureEndsAt&&now>=presence.gestureEndsAt){
         if(player.animationState===presence.gestureState)player.animationState='idle';
         presence.gestureEndsAt=undefined;presence.gestureState=undefined;
@@ -1293,7 +1435,7 @@ export class BarRoom extends Room<{ state: BarState }> {
       if (input) {
         player.headYaw=input.headYaw??0;player.headPitch=input.headPitch??0;
         // The guard rides on every input (R): up when the room allows it, before this input moves the body at its pace.
-        this.fights.guard(player, input);
+        this.fights.guard(player, player.grounded?input:{...input,fight:false}, now);
         // The firearm rides on every input too (world/weapons.ts): drawing, aiming, the reload key and the shots, before this input moves the body.
         this.weapons.input(player, input, now);
         if (isRidingHorse(player.interactionState)) {
@@ -1325,16 +1467,23 @@ export class BarRoom extends Room<{ state: BarState }> {
           // Aiming a gun: its slower pace and never a run (armedPace, the browser predicts the same).
           const pace = this.weapons.pace(player);
           if (pace !== undefined) running = false;
-          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle), pace);
+          const position = movePlayer(player, swayInput({ ...input, running }, input.seq, player.drunk, player.id), TICK_MS/1000, player.oldWalk, hasStagePass(player), obstacles ??= [...this.state.motos.values()].map(motoObstacle), pace, player, canJump(player,now)&&!input.fight);
           moving = position.x !== player.x || position.z !== player.z;
           running &&= moving;
           if (moving) this.achieved(id, 'andarilho', Math.hypot(position.x - player.x, position.z - player.z));
           player.x = position.x; player.y = position.y!; player.z = position.z; player.rotation = input.rotation;
-          if (input.dx || input.dz) player.animationState = running ? 'run' : 'walk';
-          else if (player.animationState === 'walk' || player.animationState === 'run') player.animationState = 'idle';
+          const phase=jumpAnimation(player);
+          if(phase){if(player.animationState!==phase)player.animationStartedAt=now;player.animationState=phase;}
+          else if(input.dx||input.dz)player.animationState=running?'run':'walk';
+          else if(['walk','run','jump','fall','land'].includes(player.animationState))player.animationState='idle';
         }
         player.lastProcessedInput = input.seq;
       } else if (now - presence.lastInputAt > 250 && ['walk', 'run','horse-walk','horse-gallop','fly'].includes(player.animationState)) player.animationState = player.animationState === 'fly' ? 'fly-idle' : isRidingHorse(player.interactionState)?'horse-idle':'idle';
+      // Gravity runs on room ticks even when the client stops sending input or loses focus.
+      if(!input&&!presence.flying&&!player.interactionState&&!player.currentTableId&&(!player.grounded||player.landingTime>0)){
+        this.stepJumpRest(player,now,obstacles??=[...this.state.motos.values()].map(motoObstacle));
+      }
+      if(player.interactionState||presence.flying){player.verticalVelocity=0;player.grounded=true;player.landingTime=0;player.jumpHeld=!!input?.jump;}
       if (!this.deaths.isDead(id)) for (const event of this.needs.tick(player, TICK_MS / 1000, now, { running, moving })) this.onNeeds(player, presence, event, now);
       if (player.stageUntil && now >= player.stageUntil) this.endStagePass(player, presence);
       if (presence.recoveryMoveAt && now >= presence.recoveryMoveAt) this.moveToRecovery(player, presence);
@@ -3000,7 +3149,27 @@ export class BarRoom extends Room<{ state: BarState }> {
       process:{uptimeS:Math.round(process.uptime()),node:process.version,pid:process.pid,rss:process.memoryUsage().rss,heapUsed:process.memoryUsage().heapUsed,
         tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95),apiOkAt:health.apiOkAt,outboxWritable:health.outboxWritable},resultOutbox:this.results.pending,event:this.state.event.type,
       bots:{...this.bots.snapshot(),inBar:[...this.sessions].filter(([,p])=>p.ticket.bot).length,max:this.botRoom(),tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95)},
+      factory:{...this.factory.snapshot(),orders:this.factoryOrders,
+        markers:Object.entries(this.factory.markers).map(([name,marker])=>({name,xyz:marker.xyz_jogo})),
+        operators:[...this.factoryWorkers].map(id=>{const worker=this.state.players.get(id),presence=this.sessions.getByUser(id);return {id,name:worker?.displayName??id,station:worker?.interactionState||'operação',ppe:!!presence?.factoryPpe,carrying:presence?.factoryBag?.material??'',since:presence?.joinedAt??now};}),
+        equipment:{paleteira:{state:'disponível',hours:0,reservedBy:''},empilhadeira:{state:'disponível',hours:0,reservedBy:''},balanca:{state:'operacional',hours:0,reservedBy:''},bombas:{state:this.factory.emergency?'paradas':'operacionais',hours:0,reservedBy:''}}},
     };
+  }
+  private async recoverFactory():Promise<void>{
+    try{const saved=await internal<{state?:unknown;revision?:number;slots?:Array<Record<string,unknown>>}>('factory',{action:'view'}),slots=Array.isArray(saved?.slots)?saved.slots:[];if(saved?.state||slots.length){this.factory.restore(saved.state,slots as never[]);this.factoryPersistedRevision=this.factory.revision;this.log('factory_recovered',{revision:saved.revision??0,slots:slots.length});}await this.refreshFactoryOrders();}
+    catch(error){this.log('factory_recover_error',{error:error instanceof Error?error.message:String(error)});}
+  }
+  private async refreshFactoryOrders():Promise<void>{const result=await internal<{orders?:Array<Record<string,unknown>>}>('factory',{action:'orders'});this.factoryOrders=Array.isArray(result?.orders)?result.orders:[];}
+  private async syncFactorySchedules():Promise<void>{
+    if(this.factoryScheduleBusy)return;this.factoryScheduleBusy=true;const now=new Date();
+    try{await Promise.allSettled([...this.sessions].filter(([,presence])=>!presence.revoked).map(async([userId,presence])=>{const view=await internal<{employment?:{status?:string;schedule?:unknown}|null;shift?:{station?:string}|null}>('employment',{action:'view',sessionId:presence.ticket.sessionId,userId}),raw=view.employment?.schedule;if(!raw||typeof raw!=='object')return;const schedule=raw as Partial<WorkWindow>&{enabled?:boolean};if(!schedule.enabled||!Array.isArray(schedule.days)||!schedule.days.every(day=>Number.isInteger(day)&&day>=0&&day<=6)||!Number.isInteger(schedule.startMinute)||!Number.isInteger(schedule.endMinute)||typeof schedule.timeZone!=='string')return;const inside=isInsideWorkWindow(now,schedule as WorkWindow),player=this.state.players.get(userId);if(!player)return;if(inside&&!view.shift&&view.employment?.status==='hired'){await internal('employment',{action:'start',sessionId:presence.ticket.sessionId,userId,requestId:randomUUID(),station:'programado'});this.factoryWorkers.add(userId);player.job='spray-dry-operator';this.log('factory_shift_scheduled_start',{playerId:userId});}else if(!inside&&view.shift?.station==='programado'){await internal('employment',{action:'stop',sessionId:presence.ticket.sessionId,userId});this.factoryWorkers.delete(userId);player.job='';this.log('factory_shift_scheduled_stop',{playerId:userId});}}));this.factory.setOperators(this.factoryWorkers.size);}finally{this.factoryScheduleBusy=false;}
+  }
+  private async persistFactory():Promise<void>{
+    if(this.factoryPersisting||this.factoryPersistedRevision===this.factory.revision)return;this.factoryPersisting=true;
+    const snapshot=this.factory.snapshot(),revision=snapshot.revision;
+    try{await internal('factory',{action:'save',actorId:'world',requestId:randomUUID(),state:snapshot,slots:snapshot.slots.map(slot=>({marker:slot.marker,material:slot.material,quantity:slot.quantity,capacity:slot.capacity,levelM:slot.levelM,batchId:slot.batchId,revision}))});this.factoryPersistedRevision=revision;}
+    catch(error){this.log('factory_persist_error',{error:error instanceof Error?error.message:String(error)});}
+    finally{this.factoryPersisting=false;}
   }
   /** Places in the bar for bots: the capacity less the people who are not bots. */
   private botRoom():number {return Math.max(0,this.config.capacity-[...this.sessions].filter(([,p])=>!p.ticket.bot).length);}
@@ -3035,6 +3204,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     if(player.fireworkEquipped)throw new Error('Guarde o rojão com R antes de usar outro item.');
     if(player.interactionState||player.currentTableId||player.animationState==='kick')throw new Error('Encerre a ação atual antes de usar um item.');
     if(item.category==='peca')throw new Error('Essa peça se usa na moto: botão direito nela, Informações do veículo.');
+    if(item.category==='industrial')throw new Error('Use este item somente nos pontos de operação da fábrica.');
     const inHand=consumedOverTime(itemId);
     if(inHand&&player.holding)throw new Error(`Ainda na mão: ${holdingName(player.holding)}. Termine antes de pegar outro item.`);
     // Using an item puts the gun away (the hands are the item's); the browser sees gun.w empty and follows.

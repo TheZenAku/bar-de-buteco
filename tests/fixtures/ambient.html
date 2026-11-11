@@ -1,12 +1,16 @@
-<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Ambient streaming fixture</title>
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>City ambience fixture</title>
 <button id="enter">Enter</button><button id="toggle">Toggle</button><button id="leave">Leave</button>
 <script type="module">
 import {BarAudio} from '/src/audio.ts';
+import catalog from '/src/assets/city-sounds.json';
 const audio=new BarAudio();
+// What the scene would report: a bar corner at midday, nothing overhead. Tests change it with fixture.set().
+const input={x:0,z:0,fx:0,fz:1,hour:12,night:0,cloud:0,rain:0,storm:0,wind:.12,enclosed:0};
+audio.setSource(()=>({...input}));
 document.querySelector('#enter').onclick=()=>{audio.unlock();audio.setActive(true);};
 document.querySelector('#toggle').onclick=()=>audio.toggle();
 document.querySelector('#leave').onclick=()=>audio.setActive(false);
-window.fixture={audio,seekEnd:seconds=>{audio.current.media.currentTime=audio.current.media.duration-seconds;audio.tick();},
+window.fixture={audio,input,catalog,set:values=>Object.assign(input,values),
   hidden:value=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>value});document.dispatchEvent(new Event('visibilitychange'));},
-  rms:()=>{const analyser=audio.context.createAnalyser();analyser.fftSize=2048;audio.bus.connect(analyser);return new Promise(resolve=>setTimeout(()=>{const samples=new Float32Array(2048);analyser.getFloatTimeDomainData(samples);audio.bus.disconnect(analyser);resolve(Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length));},100));}};
+  rms:()=>{const analyser=audio.context.createAnalyser();analyser.fftSize=4096;audio.bus.connect(analyser);return new Promise(resolve=>setTimeout(()=>{const samples=new Float32Array(4096);analyser.getFloatTimeDomainData(samples);audio.bus.disconnect(analyser);resolve(Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length));},300));}};
 </script></html>

@@ -23,12 +23,13 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'levels'|'logs'|'world'|'environment'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'levels'|'logs'|'world'|'factory'|'environment'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 
 /** admin.world (apps/server/src/BarRoom.ts adminSnapshot). */
 export interface WorldOrder {id?:string;playerId:string;items:string[];total:number}
+export interface FactoryAdminSnapshot {revision:number;markerCount:number;activeOperators:number;pausedWithoutOperator:boolean;emergency:boolean;slots:Array<{marker:string;material:'MALTE'|'MIX'|'PRODUTO';quantity:number;capacity:number;levelM:number;batchId:string;reservedBy:string;reservedUntil:number}>;tanks:Array<Record<string,unknown>>;dryer:Record<string,unknown>;bagging:Record<string,unknown>;alarms:Array<Record<string,unknown>>;balance:Record<string,unknown>;orders?:Array<Record<string,unknown>>;markers?:Array<{name:string;xyz:[number,number,number]}>;operators?:Array<{id:string;name:string;station:string;ppe:boolean;carrying:string;since:number}>;equipment?:Record<string,{state:string;hours:number;reservedBy:string}>}
 export interface WorldSnapshot {
   environment?:EnvironmentState&{currentHour:number;currentWeather:WeatherSample};
   at:number;occupancy:number;capacity:number;event:string;walletRetries:number;resultOutbox:number;prices:Record<string,number>;pricesLoaded?:boolean;logQueue?:number;
@@ -43,6 +44,7 @@ export interface WorldSnapshot {
   bots?:{available:boolean;running:boolean;target:number;inBar:number;max:number;tickP95?:number;
     status?:{walking:number;doing:Array<[string,number]>;rttP95?:number;loopP95?:number;inputs?:number;refusals?:Array<[string,number]>}};
   process?:{uptimeS:number;node:string;pid:number;rss:number;heapUsed:number;tickP95?:number;apiOkAt:number;outboxWritable:boolean};
+  factory?:FactoryAdminSnapshot;
 }
 
 export const n=(value:number,digits=0)=>value.toLocaleString('pt-BR',{maximumFractionDigits:digits});

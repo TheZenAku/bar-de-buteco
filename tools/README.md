@@ -68,4 +68,4 @@ Para publicar uma nova versão da [moto de entrega](../docs/sistemas/moto.md), e
 
 Para trocar os ícones dos itens ou da moeda, substitua a imagem em `assets-bar/icons` (mesmo nome) e execute `npm run assets:icons`. A tabela no início de `assets/import-icons.mjs` liga cada arquivo ao item. Um item novo precisa de uma linha ali e do caminho `icon` no catálogo (`packages/shared/src/inventory.ts`).
 
-Para atualizar os [sons ambientes](../docs/sistemas/ambient.md), adicione gravações em `assets-bar/sound/ambient` e execute `npm run assets:ambient -- "C:\caminho\ffmpeg.exe"`. O importador normaliza o volume, converte para AAC e elimina duplicatas sem alterar os originais.
+Para atualizar os [sons da cidade](../docs/sistemas/ambient.md), edite `assets-bar/sound/cidade/catalogo.json` (com o original em `fontes/` e sua licença CC0 em `fontes.json`) e execute `npm run assets:cidade-sons -- "C:\caminho\ffmpeg.exe"`. O importador recorta, normaliza o volume, converte para AAC mono e acha os trechos com atividade dos sons pontuais, sem alterar os originais.

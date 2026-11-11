@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as pc from 'playcanvas';
-import {floorHeight,headLookAt,HEAD_LOOK_YAW,HEAD_LOOK_PITCH,inputSchema,type PlayerInput} from '@bar/shared';
+import {floorHeight,headLookAt,HEAD_LOOK_YAW,HEAD_LOOK_PITCH,inputSchema,jumpMotion,type PlayerInput} from '@bar/shared';
 import {HeadLookPose} from '../../apps/web/src/engine/head-look';
 import {BarNetwork} from '../../apps/web/src/networking';
 
@@ -79,7 +79,7 @@ function fixture(){
   const sent:PlayerInput[]=[];
   const network=Object.assign(Object.create(BarNetwork.prototype),{
     transportReady:true,stopped:false,user:{id:self.id},world:{players:{[self.id]:self}},
-    pending:[] as PlayerInput[],wasMoving:false,sentRear:false,seq:0,position:{x:self.x,y:self.y,z:self.z},
+    pending:[] as PlayerInput[],wasMoving:false,sentRear:false,seq:0,position:{x:self.x,y:self.y,z:self.z},motion:jumpMotion(),clock:{now:()=>Date.now()},
     hooks:{input:()=>({...intention}),position:()=>{}},room:{send:(_type:string,input:PlayerInput)=>sent.push(input)},
   });
   return {self,intention,sent,network,tick:()=>network.sendInput()};

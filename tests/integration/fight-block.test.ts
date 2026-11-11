@@ -36,12 +36,16 @@ test('the trip of an input from what its browser reports: half of the way down, 
 
 test('the verdict of a blow is read on the blocker\'s own timeline: parry inside the window after the press, block after it, nothing outside the span',()=>{
   const held:BlockSpan[]=[{from:1000,to:Infinity,parry:true}];
-  assert.equal(blockVerdict(held,999),'none','before the press');
+  // A press up to parryLateMs after the contact still defends it (the blocker pressed on what they saw); past that it is too late.
+  assert.equal(blockVerdict(held,1000-BLOCK.parryLateMs-1),'none','too late');
+  assert.equal(blockVerdict(held,1000-BLOCK.parryLateMs),'parry','a late press that opened a window');
+  assert.equal(blockVerdict([{from:1000,to:Infinity,parry:false}],1000-BLOCK.parryLateMs),'block','a late press that did not: still a block, never nothing');
+  assert.equal(blockVerdict([{from:1000,to:Infinity,parry:true,early:BLOCK.botParryMs,late:0}],999),'none','a bot has no late window');
   assert.equal(blockVerdict(held,1000),'parry');
   assert.equal(blockVerdict(held,1000+BLOCK.parryMs),'parry');
   assert.equal(blockVerdict(held,1000+BLOCK.parryMs+1),'block');
-  assert.equal(blockVerdict([{from:1000,to:1400,parry:true}],1401),'none','after the release');
-  assert.equal(blockVerdict([{from:1000,to:1400,parry:true}],1400),'block');
+  assert.equal(blockVerdict([{from:1000,to:1000+BLOCK.parryMs+100,parry:true}],1000+BLOCK.parryMs+101),'none','after the release');
+  assert.equal(blockVerdict([{from:1000,to:1000+BLOCK.parryMs+100,parry:true}],1000+BLOCK.parryMs+100),'block');
   // A press that did not earn a window (mashing) is a block however fresh.
   assert.equal(blockVerdict([{from:1000,to:Infinity,parry:false}],1010),'block');
   // The newest span that holds the moment decides.
@@ -69,9 +73,9 @@ test('what gets through a block: a share, heavier blows let more, never the last
 });
 
 test('the numbers hold together: three heavy blows break a full meter, the parry window is shorter than its cooldown, the wait is bounded',()=>{
-  assert.ok(FIGHT_MOVES.heavy.damage*BLOCK.drain*3>BLOCK.meter,'three hay-makers break it');
-  assert.ok(FIGHT_MOVES.jab.damage*BLOCK.drain*8<BLOCK.meter*1.2&&FIGHT_MOVES.jab.damage*BLOCK.drain*11>BLOCK.meter,'a dozen jabs do');
+  assert.ok(FIGHT_MOVES.heavy.damage*BLOCK.drain*5>BLOCK.meter&&FIGHT_MOVES.heavy.damage*BLOCK.drain*3<=BLOCK.meter,'five hay-makers break it');
+  assert.ok(FIGHT_MOVES.jab.damage*BLOCK.drain*12<BLOCK.meter&&FIGHT_MOVES.jab.damage*BLOCK.drain*15>BLOCK.meter,'a dozen and a half jabs do');
   assert.ok(BLOCK.parryMs<BLOCK.parryCooldownMs);
-  assert.ok(BLOCK.deferMaxMs>=TICK_MS&&BLOCK.deferMaxMs<=FIGHT.rewindMaxMs/2,'the wait stays well under the rewind the puncher gets');
+  assert.ok(BLOCK.deferMaxMs>=TICK_MS&&BLOCK.deferMaxMs<=BLOCK.parryLateMs,'the wait never outlasts the late window it exists for');
   assert.ok(BLOCK.parryStunMs>FIGHT_MOVES.heavy.activeFrom,'the parried puncher stays down long enough for a counter to land');
 });

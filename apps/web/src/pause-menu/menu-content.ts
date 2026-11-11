@@ -166,6 +166,7 @@ function settingsPages(host:MenuContentHost):MenuEntry[] {
         +choiceRow('Sombras','data-setting="graphics.shadows"',[['off','Desligadas'],['low','Baixas'],['medium','Médias'],['high','Altas'],['ultra','Ultra']],g.shadows)
         +choiceRow('Névoa','data-setting="graphics.fog"',[['light','Leve'],['normal','Normal'],['dense','Densa']],g.fog,{note:'Densa pesa menos; leve vê mais longe'})
         +choiceRow('Detalhe da cidade','data-setting="graphics.city"',[['low','Baixo'],['medium','Médio'],['high','Alto'],['ultra','Ultra']],g.city)
+        +choiceRow('Granulação','data-setting="graphics.grain"',[['off','Desligada'],['light','Leve'],['medium','Média'],['strong','Forte']],g.grain,{note:'Textura de filme sobre a imagem'})
         +choiceRow('Limite de FPS','data-setting="graphics.fpsCap"',[[0,'Sem limite'],[30,'30'],[60,'60'],[120,'120']],g.fpsCap)
         +choiceRow('Nitidez em telas densas','data-setting="graphics.pixelRatioCap"',[[1,'1×'],[1.5,'1,5×'],[2,'2×']],g.pixelRatioCap,{note:'1× é o mais rápido'})
         +switchRow('Resolução dinâmica','data-setting="graphics.dynamicResolution"',g.dynamicResolution,{note:'Baixa a resolução quando o FPS cai'})

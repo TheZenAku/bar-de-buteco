@@ -1,5 +1,7 @@
 # Cidade em torno do bar
 
+> EMPRESA BRASIL: o setor S07_04 contém a fábrica. Seus 48 `Ponto_EB_*` não entram como coordenadas fixas no código; `assets:fabrica` copia e valida o JSON e as 25 vagas para cliente e servidor.
+
 O bar continua em `bar_boteco.glb`, sempre carregado. Em volta dele, o jogo desenha uma cidade de 800 × 800 m, de x e z −400 a +400, com Centro, Parque Olaria, Jardim Conceição e Distrito Industrial. O mapa é dividido em 64 setores de 100 m que entram e saem conforme o jogador anda. A colisão é outra história: os colisores dos 64 setores ficam sempre no servidor e na previsão do cliente, em JSON.
 
 O código fica em:

@@ -1,0 +1,305 @@
+{
+ "descricao": "Estoque dinamico da fabrica EMPRESA BRASIL (setor S07_04). Ver map/relatorios/EMPRESA_BRASIL_2026-11-10.md.",
+ "glb": "empresa_brasil_estoque.glb",
+ "saco_kg": 25,
+ "sacos": {
+  "MALTE": "EB_Saco_Malte",
+  "MIX": "EB_Saco_Mix",
+  "PRODUTO": "EB_Saco_Produto"
+ },
+ "arranjo": "EB_Palete_Arranjo (18 posicoes EB_Arranjo_01..18, 3 por camada, 6 camadas; preencher na ordem)",
+ "medidas_m": {
+  "saco_materia_prima": [
+   0.7,
+   0.45,
+   0.15
+  ],
+  "saco_produto": [
+   0.68,
+   0.44,
+   0.14
+  ],
+  "palete": [
+   1.0,
+   1.2,
+   0.144
+  ]
+ },
+ "vagas": [
+  {
+   "marcador": "Ponto_EB_PA_1",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    355.8,
+    0.314,
+    -56.85
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_2",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    357.1,
+    0.314,
+    -56.85
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_3",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    358.4,
+    0.314,
+    -56.85
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_4",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    355.8,
+    0.314,
+    -58.35
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_5",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    357.1,
+    0.314,
+    -58.35
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_6",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    358.4,
+    0.314,
+    -58.35
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_PA_Ensaque",
+   "tipo": "PRODUTO",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    354.0,
+    0.314,
+    -64.0
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N1P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    334.67,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N1P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    335.91,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N2P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    334.67,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N2P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    335.91,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N3P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    334.67,
+    3.414,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V1N3P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    335.91,
+    3.414,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N1P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    337.46,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N1P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    338.7,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N2P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    337.46,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N2P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    338.7,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N3P1",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    337.46,
+    3.414,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V2N3P2",
+   "tipo": "MALTE",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    338.7,
+    3.414,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N1P1",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    340.25,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N1P2",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 0.0,
+   "jogo_xyz": [
+    341.49,
+    0.314,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N2P1",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    340.25,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N2P2",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 1.55,
+   "jogo_xyz": [
+    341.49,
+    1.864,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N3P1",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    340.25,
+    3.414,
+    -61.6
+   ]
+  },
+  {
+   "marcador": "Ponto_EB_Rack_V3N3P2",
+   "tipo": "MIX",
+   "capacidade": 18,
+   "nivel_m": 3.1,
+   "jogo_xyz": [
+    341.49,
+    3.414,
+    -61.6
+   ]
+  }
+ ]
+}

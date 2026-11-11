@@ -12,7 +12,7 @@ Os golpes se encadeiam em **combos** (veja abaixo): cada golpe oferece os próxi
 | Clique | Soco leve. Clicando no ritmo: jab → direto → gancho → jab… |
 | Botão direito | Soco forte; dentro de um combo, o golpe pesado que a corrente oferece (cotovelada, forte). Demora para sair, tira mais e empurra longe. |
 | Tecla da skill (X por padrão) | **Só skins Rafael que compraram o karatê ou o chute voador:** o chute do combo. Com a guarda alta ela não lança ninguém. |
-| Espaço (segurar) | **Defesa**, só com a guarda alta. Segurar bloqueia o que vem pela frente; apertar no instante do golpe é um **parry**. Ver [Defesa](#defesa). Com ela alta o passo cai para 1,3 m/s e não corre. |
+| Espaço ou botão lateral do mouse (Mouse 4/5), segurar | **Defesa**, só com a guarda alta. Segurar bloqueia o que vem pela frente; apertar no instante do golpe é um **parry**. Ver [Defesa](#defesa). Com ela alta o passo cai para 1,3 m/s e não corre. |
 | W A S D | Com a guarda alta: passos curtos (2,2 m/s) para frente, para os lados e para trás. Com Shift corre de guarda alta (4,8 m/s), gastando fôlego como a corrida normal. |
 
 No toque: **Mais › Luta (guarda)**; com a guarda alta, **Soco**, **Forte** e **Defesa** (botão que se segura) aparecem no lugar de Freio e Buzina.
@@ -71,6 +71,18 @@ Os chutes são golpes como os socos: viajam dentro do input, usam a tabela de tr
 
 Quem está a pé e livre, com ou sem guarda, atordoado, ou no meio de um chute do Rafael. Sentado, montado, trabalhando, jogando, no palco, voando, desmaiado, caído, morto ou ausente, não.
 
+## Ritmo dos golpes (tempo) — 2026-11-09
+
+O dono achou os golpes lentos (o punho do jab saía aos 0,2 s, o do soco forte aos 0,56 s). `FIGHT.tempo` (1,3) faz cada golpe tocar 1,3 ms de clipe por ms real:
+- Os clipes, as janelas (`activeFrom`, `activeTo`, `swingMs`, `durationMs`) e o caminho do punho ficam como medidos, em **milissegundos de clipe**; `clipMs(real)` e
+  `realMs(clipe)` convertem. Os passos (`lockSteps`, `chainSteps`, `lungeSteps`) são em inputs reais e saem da tabela já encurtados (`ceil`, `ceil`, `floor`):
+  os pés soltam quando o punho acabou, e o passo à frente termina antes do punho poder acertar.
+- Sala (`world/fight.ts`): o tempo do golpe é `clipMs(now - at)`; as poses voltam no tempo real (`realMs`); o parry/bloqueio e o rewind seguem em ms reais.
+- Navegador: o clipe toca a `FIGHT.tempo` (`fightSync`), a idade do golpe é em segundos de clipe, o passo do clipe (`punchRoot`) interpola por `passos × tempo`.
+- A pose é desenhada do **clique**, não do próximo input (até um tick de 50 ms antes): `LocalPunch.startedAt`.
+- Mira do golpe mais fiel ao mouse: o cone da mira assistida caiu de 0,9 para 0,6 rad e o alcance de 2,6 para 2,5 m (`FIGHT.aimCone`, `aimRange`).
+Não verificado ao vivo (só testes): se 1,3 é o ritmo certo; se a mira ficou precisa o bastante com o mouse; e a sensação de "lag" contra o bot, que pode ter outras causas.
+
 ## Como o soco acerta (hitbox)
 
 A sala não tem esqueleto. Ela decide pelo **caminho do punho medido dos próprios clipes de cada skin** (`packages/shared/src/fight-paths.ts`, gerado por `npm run assets:punches`): os nós dos dedos a cada 20 ms durante a janela do golpe, nos eixos do avatar. O corpo atingido é uma cápsula em pé, do quadril (+5 cm) até a cabeça (+14 cm) da skin na guarda, com 22 cm de raio; o punho é uma bola de 9 cm.
@@ -103,9 +115,9 @@ Com a guarda alta, **segurar Espaço** (ou o botão Defesa no toque) levanta os 
 
 | | Bloqueio | Parry |
 | --- | --- | --- |
-| Quando | Segurando a tecla quando o golpe acerta | Golpe acerta até **180 ms** depois de a tecla descer (`BLOCK.parryMs`) |
+| Quando | Segurando a tecla quando o golpe acerta (ou apertada até 360 ms **depois** dele) | Aperto novo da tecla até 450 ms antes do golpe ou 360 ms depois (`BLOCK.parryMs`, `parryLateMs`) |
 | Dano | Passa 15% da vida do golpe (30% nos fortes e chutes pesados), nunca o último ponto | Nenhum |
-| Fôlego da guarda | Paga 1,4× o dano do golpe de um medidor de 100 | Devolve 30 |
+| Fôlego da guarda | Paga 1,0× o dano do golpe de um medidor de 100 | Devolve 30 |
 | Quem bateu | Nada | Cambaleia 800 ms, perde a corrente e é empurrado |
 | Quem defendeu | Empurrado metade do golpe, sem atordoar | Seu **próximo golpe em 1,4 s sai 35% mais forte**, uma vez |
 
@@ -114,6 +126,20 @@ Com a guarda alta, **segurar Espaço** (ou o botão Defesa no toque) levanta os 
 - **Anti-spam.** Só o aperto feito 550 ms ou mais depois do aperto anterior abre janela de parry (`BLOCK.parryCooldownMs`). Segurar a tecla ou martelar é bloqueio comum.
 - **Parado de propósito:** a defesa só sobe com os pés livres (não enquanto um soco os prende nem atordoado ou com a guarda quebrada), e qualquer golpe que entra a derruba.
 - **Feedback.** Parry: "PARRY!" branco, anel e estrela, pausa de 90 ms nos dois, quem bateu é sacudido para trás e reage (HitMedium). Bloqueio: "DEFENDIDO" (ou o pouco que passou), baque e estrela pequena. Quem soca vê um bloqueio já no desenho do próprio golpe quando o alvo aparece com a defesa alta (`predictPunch`); a palavra da sala (`fight.hit` com `guard`) confirma ou troca por parry. Os braços sobem por uma camada (`GuardBlock`, clipe `FightBlock`, o primeiro instante do Center Block do Mixamo) por cima da camada da guarda.
+
+### Responder a uma sequência (2026-11-10)
+Com o ritmo 1,3 o atordoamento de um golpe (`stunMs`) passou a ser maior que o intervalo até o golpe seguinte da sequência (gancho→jab 342 ms contra 450 ms de stun, chutes idem): quem levava o primeiro não conseguia mais defender nada, e o navegador só soltava o bloqueio depois que o patch dizia que o stun acabou. Correções: (1) o stun termina pelo relógio, no início do input (`FightDirector.guard(player,input,now)`), não um passo depois; (2) um bloqueio **segurado** sobe através do stun de um golpe levado depois de `BLOCK.hitFreeMs` (150 ms), como bloqueio simples (nunca parry), exceto no stun de um parry (`noCancelUntil`) e na guarda quebrada; (3) o navegador manda o bloqueio durante o stun e já desenha a saída (`FightController.decorate`); o estado `stagger` não segura mais socos/bloqueio, só o relógio (`stunUntil`). O parry só abre num aperto novo da tecla feito com os pés livres. Teste: `test/fight.test.ts` ("a held block answers a chain"). Não testado na tela, nem com ping real.
+
+### Defesa que responde (2026-11-10, segunda rodada)
+Parry: aperto até 300 ms antes do golpe ou 240 ms depois (`BLOCK.parryMs/parryLateMs`; o bot, sem ping nem interpolação, fica com 180/0, `botParryMs`). Golpe bloqueado faz o agressor recuar 420 ms (`BLOCK.recoilMs`): é a abertura para o contra-ataque e quebra a sequência. Soco já a caminho (passou da metade até a janela) ainda acerta quando o dono é atingido: troca, não corte. O medidor de guarda gasta 1,0× o dano (era 1,4×). Teste do degrau do Zeca mede 14 s (com recuo os atacantes morriam antes e o teste saturava em 100).
+
+### Corpos não se atravessam + golpe que corta golpe (2026-11-10, terceira rodada)
+Dono: "o Zeca entra dentro de mim e me acerta, ignora a minha defesa, não sente o golpe". Reproduzido com um jogador simulado andando para cima do Zeca: os dois ficavam **no mesmo ponto em 85% da luta** e o Zeca acabava **atrás** do jogador em até metade dela. Dentro um do outro tudo desanda: o arco do bloqueio (`blockCovers`) lê o golpe como vindo de trás ou de direção aleatória e ele entra inteiro, a mira (`punchAim` descarta menos de 5 cm) e o punho (que nasce além do corpo do alvo) erram, e o soco do jogador "atravessa" o Zeca sem acertar.
+- **Separação (`FIGHT.bodyGap` 0,55 m, `SparringDirector.separate`).** Ninguém prevê o corpo do Zeca, então ele é quem cede, em linha reta para longe do jogador; com parede atrás, de lado. Roda antes do pensamento dele (o jogador pode ter andado para cima dele) e depois do passo (o `lunge` e o passo do clipe o levariam para dentro). Só no Zeca de propósito: entre duas pessoas o corpo é previsto pelos dois navegadores, e separar só na sala daria elástico (ficou como pendência, com a mesma regra no `fightMove`).
+- **Golpe corta golpe.** Quem é atingido **antes de o punho dele estar na janela de acerto** (`activeFrom`) perde o golpe, também o que já tinha encostado em alguém e esperava o bloqueio chegar (`pending`). Antes, passada metade do caminho até a janela o golpe vinha assim mesmo (um "troca" largo demais): o jab do jogador acertava o Zeca e o soco dele entrava do mesmo jeito. Só punhos que já estavam os dois na janela trocam. Consequência de projeto: o jab corta o soco forte em preparo (o forte demora 430 ms para a janela, o jab 154 ms).
+- **Aperto atrasado que não abre parry é bloqueio comum.** Antes, um aperto até 360 ms depois do contato só contava se abrisse janela de parry; num aperto dentro dos 550 ms do anterior (mão pesada, segunda defesa da mesma sequência) o golpe entrava inteiro. Agora é bloqueio (o bot, sem janela atrasada, segue como era).
+- Os testes de defesa desatualizados da rodada anterior (janelas 450/360, desgaste 1,0×, chute com empurrão até 2,2 m) foram acertados aos números atuais.
+**Medido num jogador simulado (`SparringAI` contra um bloqueador com atraso de reação 200 a 500 ms):** com um aperto por golpe, quase toda sequência vira parry; segurando a tecla, o forte do Zeca difícil quebra a guarda em ~4 golpes. **Não visto na tela nem com ping real.** Ponto aberto: a sala espera até 320 ms para julgar um golpe em quem está com a guarda alta (`BLOCK.deferMaxMs`), então todo golpe que o jogador leva na guarda reage ~200 ms depois de o punho encostar na tela; é o preço de poder defender depois de ver o golpe, e a decisão de encurtar é do dono.
 
 ### Netcode da defesa
 

@@ -55,9 +55,9 @@ test('every open door can be crossed both ways, even off-centre: the body turns 
     for(const side of [1,-1]){
       const start={x:door.x+nx*.9*side+ux*.15,y:door.y,z:door.z+nz*.9*side+uz*.15};
       if(!isWalkable(start.x,start.z,start.y))continue; // furniture right by the door on this side
-      const inside=push(start,-nx*side,-nz*side,12);
+      const inside=push(start,-nx*side,-nz*side,27);
       assert.ok(((inside.x-door.x)*nx+(inside.z-door.z)*nz)*side<-.3,`${door.id}: enters from side ${side}`);
-      const back=push(inside,nx*side,nz*side,12);
+      const back=push(inside,nx*side,nz*side,27);
       assert.ok(((back.x-door.x)*nx+(back.z-door.z)*nz)*side>.3,`${door.id}: comes back out`);
       crossings++;
     }

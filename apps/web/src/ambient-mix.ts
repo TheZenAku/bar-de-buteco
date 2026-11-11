@@ -1,23 +1,6 @@
-/** Quiet ambience bus; the slider scales this ceiling, not the source recordings. */
-export const AMBIENT_MIX={gain:.18,duck:.3,crossfade:12,preload:30} as const;
-export interface AmbientTrack {id:string;url:string;duration:number;source?:string;}
-
-/** Every recording once per bag, including no repeat across bag boundaries. */
-export class AmbientQueue {
-  private bag:AmbientTrack[]=[];
-  private last='';
-  constructor(private readonly tracks:readonly AmbientTrack[],private readonly random= Math.random){}
-  next(excluded:ReadonlySet<string>):AmbientTrack|undefined {
-    this.bag=this.bag.filter(track=>!excluded.has(track.id));
-    if(!this.bag.length){
-      this.bag=this.tracks.filter(track=>!excluded.has(track.id));
-      for(let i=this.bag.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[this.bag[i],this.bag[j]]=[this.bag[j],this.bag[i]];}
-      if(this.bag.length>1&&this.bag.at(-1)!.id===this.last)[this.bag[0],this.bag[this.bag.length-1]]=[this.bag.at(-1)!,this.bag[0]];
-    }
-    const track=this.bag.pop();if(track)this.last=track.id;return track;
-  }
-}
-
-export function fadeCurve(incoming:boolean):Float32Array<ArrayBuffer> {
-  return Float32Array.from({length:65},(_,i)=>incoming?Math.sin(i/64*Math.PI/2):Math.cos(i/64*Math.PI/2));
-}
+/**
+ * The ambience bus: quiet by design, and the volume slider scales this ceiling, not the recordings. The layers inside are balanced against
+ * each other in city-ambience/model.ts; this is only how loud the whole city is next to voices, music and effects.
+ * `duck` is the share left while the jukebox or a TV plays; `fadeIn` is the time constant (seconds) of the rise when the sound starts.
+ */
+export const AMBIENT_MIX={gain:.5,duck:.3,fadeIn:1.8} as const;

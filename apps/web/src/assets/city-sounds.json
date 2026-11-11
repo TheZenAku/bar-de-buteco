@@ -1,0 +1,1084 @@
+{
+  "version": 1,
+  "profile": "city-aac-v1-mono-32k-64k",
+  "beds": [
+    {
+      "id": "dia-a",
+      "url": "/audio/cidade/dia-a-0ddd21f7c9.m4a",
+      "duration": 48,
+      "description": "Bairro residencial de dia, trânsito distante",
+      "source": {
+        "id": 149936,
+        "author": "conleec",
+        "title": "AMB_Ext_Residential_Day_Stereo_001.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/149936/"
+      }
+    },
+    {
+      "id": "dia-b",
+      "url": "/audio/cidade/dia-b-f66421b0d8.m4a",
+      "duration": 48,
+      "description": "Bairro residencial de dia, trânsito distante (outra rua)",
+      "source": {
+        "id": 631474,
+        "author": "tferrino",
+        "title": "AMB RESIDENTIAL DISTANT TRAFFIC EXT/DAY (01)",
+        "license": "CC0",
+        "page": "https://freesound.org/s/631474/"
+      }
+    },
+    {
+      "id": "noite-a",
+      "url": "/audio/cidade/noite-a-8b9e590e24.m4a",
+      "duration": 48,
+      "description": "Cidade à noite, zumbido distante",
+      "source": {
+        "id": 425426,
+        "author": "AnthonyRamirez",
+        "title": "AMB_City_Night.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/425426/"
+      }
+    },
+    {
+      "id": "noite-b",
+      "url": "/audio/cidade/noite-b-c17df05aef.m4a",
+      "duration": 48,
+      "description": "Praça tranquila à noite",
+      "source": {
+        "id": 474457,
+        "author": "ecfike",
+        "title": "Quiet City Square, Night",
+        "license": "CC0",
+        "page": "https://freesound.org/s/474457/"
+      }
+    },
+    {
+      "id": "via",
+      "url": "/audio/cidade/via-16fe73d862.m4a",
+      "duration": 36,
+      "description": "Rugido constante de trânsito, para perto de avenidas",
+      "source": {
+        "id": 239066,
+        "author": "cognito perceptu",
+        "title": "steady roar of traffic.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/239066/"
+      }
+    },
+    {
+      "id": "fluxo",
+      "url": "/audio/cidade/fluxo-8abdf8e39a.m4a",
+      "duration": 48,
+      "description": "Carros passando com frequência, noite de verão",
+      "source": {
+        "id": 835897,
+        "author": "Artem_Zaitsev",
+        "title": "Summer Night frequent passing cars",
+        "license": "CC0",
+        "page": "https://freesound.org/s/835897/"
+      }
+    },
+    {
+      "id": "grilos-a",
+      "url": "/audio/cidade/grilos-a-a77f429c73.m4a",
+      "duration": 48,
+      "description": "Grilos calmos",
+      "source": {
+        "id": 637083,
+        "author": "Nox_Sound",
+        "title": "Ambiance_Nature_Night_Cricket_Calm_Loop_Stereo.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/637083/"
+      }
+    },
+    {
+      "id": "grilos-b",
+      "url": "/audio/cidade/grilos-b-f0e988c9ac.m4a",
+      "duration": 48,
+      "description": "Grilos de subúrbio residencial",
+      "source": {
+        "id": 451570,
+        "author": "kyles",
+        "title": "crickets residential night suburbs10 cu nice looped.flac",
+        "license": "CC0",
+        "page": "https://freesound.org/s/451570/"
+      }
+    },
+    {
+      "id": "cigarras-a",
+      "url": "/audio/cidade/cigarras-a-a161396855.m4a",
+      "duration": 45.02,
+      "description": "Cigarras na cidade (Brasil)",
+      "source": {
+        "id": 587154,
+        "author": "fernandohzilio",
+        "title": "Cicadas in the city",
+        "license": "CC0",
+        "page": "https://freesound.org/s/587154/"
+      }
+    },
+    {
+      "id": "cigarras-b",
+      "url": "/audio/cidade/cigarras-b-3cf820bfe5.m4a",
+      "duration": 48,
+      "description": "Cigarras no fim de tarde (Brasil)",
+      "source": {
+        "id": 587155,
+        "author": "fernandohzilio",
+        "title": "Late afternoon cicadas",
+        "license": "CC0",
+        "page": "https://freesound.org/s/587155/"
+      }
+    },
+    {
+      "id": "sapos",
+      "url": "/audio/cidade/sapos-6929a5fa2e.m4a",
+      "duration": 48,
+      "description": "Sapos à noite (Serrinha, Brasil)",
+      "source": {
+        "id": 645705,
+        "author": "MeliaRoger",
+        "title": "AMBRurl_BR Serrinha night frogs continous singing loud with close crickets_Melia Roger_ORTF Schoeps.WAV",
+        "license": "CC0",
+        "page": "https://freesound.org/s/645705/"
+      }
+    },
+    {
+      "id": "passaros-a",
+      "url": "/audio/cidade/passaros-a-cbf53a124b.m4a",
+      "duration": 48,
+      "description": "Pássaros de manhã cedo (Goiás, Brasil)",
+      "source": {
+        "id": 426276,
+        "author": "marc.om",
+        "title": "Early Morning Birds at a Fazenda in Goiás, Brazil",
+        "license": "CC0",
+        "page": "https://freesound.org/s/426276/"
+      }
+    },
+    {
+      "id": "passaros-b",
+      "url": "/audio/cidade/passaros-b-bfdf2dc0b8.m4a",
+      "duration": 48,
+      "description": "Mata atlântica de dia",
+      "source": {
+        "id": 673163,
+        "author": "Fenodyrie",
+        "title": "rainforest mata atlantica.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/673163/"
+      }
+    },
+    {
+      "id": "vento",
+      "url": "/audio/cidade/vento-0e790f4065.m4a",
+      "duration": 48.02,
+      "description": "Vento suave nas árvores",
+      "source": {
+        "id": 858679,
+        "author": "moreliketrees",
+        "title": "Outside gentle wind in trees",
+        "license": "CC0",
+        "page": "https://freesound.org/s/858679/"
+      }
+    },
+    {
+      "id": "industria",
+      "url": "/audio/cidade/industria-4302c674fb.m4a",
+      "duration": 48,
+      "description": "Zumbido de fábrica ao longe",
+      "source": {
+        "id": 450126,
+        "author": "kyles",
+        "title": "General Fusion industrial workshop factory ambience9 heavy machine hum, bg activity, distant warning alarm.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/450126/"
+      }
+    },
+    {
+      "id": "salao",
+      "url": "/audio/cidade/salao-f42eb16e31.m4a",
+      "duration": 48.02,
+      "description": "Som de ambiente fechado",
+      "source": {
+        "id": 671279,
+        "author": "Kinoton",
+        "title": "Room Tone, Kitchen, City Appartment",
+        "license": "CC0",
+        "page": "https://freesound.org/s/671279/"
+      }
+    }
+  ],
+  "spots": [
+    {
+      "id": "cao-1",
+      "url": "/audio/cidade/cao-1-6db5bd29c9.m4a",
+      "duration": 15.58,
+      "description": "Cães distantes",
+      "source": {
+        "id": 820267,
+        "author": "IENBA",
+        "title": "Distant Dogs",
+        "license": "CC0",
+        "page": "https://freesound.org/s/820267/"
+      },
+      "segments": [
+        [
+          0,
+          15.5
+        ]
+      ]
+    },
+    {
+      "id": "cao-2",
+      "url": "/audio/cidade/cao-2-0386978b84.m4a",
+      "duration": 12.35,
+      "description": "Dois cachorros pequenos ao longe",
+      "source": {
+        "id": 846342,
+        "author": "TheKingOfGeeks360",
+        "title": "Dogs - Two Small Dogs Barking, Distant",
+        "license": "CC0",
+        "page": "https://freesound.org/s/846342/"
+      },
+      "segments": [
+        [
+          0,
+          12.35
+        ]
+      ]
+    },
+    {
+      "id": "cao-3",
+      "url": "/audio/cidade/cao-3-6d2e39e9ec.m4a",
+      "duration": 3.49,
+      "description": "Latido distante",
+      "source": {
+        "id": 792440,
+        "author": "Sadiquecat",
+        "title": "Thuir Distant dog bark - 2025 03 14 00h01 - XY H2N",
+        "license": "CC0",
+        "page": "https://freesound.org/s/792440/"
+      },
+      "segments": [
+        [
+          0,
+          3.49
+        ]
+      ]
+    },
+    {
+      "id": "cao-4",
+      "url": "/audio/cidade/cao-4-203cf9273d.m4a",
+      "duration": 44,
+      "description": "Cães da cidade à noite, longe",
+      "source": {
+        "id": 842778,
+        "author": "cesar-gutierrez-99",
+        "title": "Perros de la ciudad ladrando de noche a lo lejos // City dog's barking from a far distance",
+        "license": "CC0",
+        "page": "https://freesound.org/s/842778/"
+      },
+      "segments": [
+        [
+          0.95,
+          3.9
+        ],
+        [
+          39.2,
+          41.9
+        ]
+      ]
+    },
+    {
+      "id": "cao-5",
+      "url": "/audio/cidade/cao-5-61f524c080.m4a",
+      "duration": 16.58,
+      "description": "Cães latindo ao longe",
+      "source": {
+        "id": 662879,
+        "author": "FiretailHorizons",
+        "title": "Dogs Barking in the Distance",
+        "license": "CC0",
+        "page": "https://freesound.org/s/662879/"
+      },
+      "segments": [
+        [
+          0,
+          16.5
+        ]
+      ]
+    },
+    {
+      "id": "cao-6",
+      "url": "/audio/cidade/cao-6-bd33d3c94a.m4a",
+      "duration": 10.14,
+      "description": "Cachorro na vizinhança",
+      "source": {
+        "id": 516904,
+        "author": "Kinoton",
+        "title": "Dog Barking in Neighborhood",
+        "license": "CC0",
+        "page": "https://freesound.org/s/516904/"
+      },
+      "segments": [
+        [
+          0,
+          10.14
+        ]
+      ]
+    },
+    {
+      "id": "galo-1",
+      "url": "/audio/cidade/galo-1-bfe2ea4ce0.m4a",
+      "duration": 4.77,
+      "description": "Galo cantando",
+      "source": {
+        "id": 200339,
+        "author": "jsbarrett",
+        "title": "Rooster crow",
+        "license": "CC0",
+        "page": "https://freesound.org/s/200339/"
+      },
+      "segments": [
+        [
+          0,
+          4.77
+        ]
+      ]
+    },
+    {
+      "id": "galo-2",
+      "url": "/audio/cidade/galo-2-9f2f7e224c.m4a",
+      "duration": 9.02,
+      "description": "Galo cantando",
+      "source": {
+        "id": 200334,
+        "author": "jsbarrett",
+        "title": "Rooster crows",
+        "license": "CC0",
+        "page": "https://freesound.org/s/200334/"
+      },
+      "segments": [
+        [
+          0,
+          9.02
+        ]
+      ]
+    },
+    {
+      "id": "galo-3",
+      "url": "/audio/cidade/galo-3-38008be7f4.m4a",
+      "duration": 16.96,
+      "description": "Galos cantando",
+      "source": {
+        "id": 649270,
+        "author": "BillSchaferJr",
+        "title": "Roosters crowing.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/649270/"
+      },
+      "segments": [
+        [
+          0,
+          16.96
+        ]
+      ]
+    },
+    {
+      "id": "galo-4",
+      "url": "/audio/cidade/galo-4-97aae86045.m4a",
+      "duration": 54.02,
+      "description": "Galos na vila",
+      "source": {
+        "id": 627335,
+        "author": "Garuda1982",
+        "title": "rooster crows in the village",
+        "license": "CC0",
+        "page": "https://freesound.org/s/627335/"
+      },
+      "segments": [
+        [
+          1.45,
+          4.9
+        ],
+        [
+          15.95,
+          19.65
+        ],
+        [
+          21.7,
+          24.4
+        ],
+        [
+          28.95,
+          34.9
+        ],
+        [
+          35.95,
+          49.9
+        ]
+      ]
+    },
+    {
+      "id": "buzina-1",
+      "url": "/audio/cidade/buzina-1-41ce167b59.m4a",
+      "duration": 4.35,
+      "description": "Buzina de carro",
+      "source": {
+        "id": 182474,
+        "author": "keweldog",
+        "title": "car horn.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/182474/"
+      },
+      "segments": [
+        [
+          0,
+          4.35
+        ]
+      ]
+    },
+    {
+      "id": "buzina-2",
+      "url": "/audio/cidade/buzina-2-c5f1ec7e88.m4a",
+      "duration": 4.42,
+      "description": "Buzina simples e distante",
+      "source": {
+        "id": 553150,
+        "author": "Brett+Butter",
+        "title": "Car Horn Honk 01- Single, Distant - EXT Day Brooklyn Street corner ambience.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/553150/"
+      },
+      "segments": [
+        [
+          0,
+          4.42
+        ]
+      ]
+    },
+    {
+      "id": "buzina-3",
+      "url": "/audio/cidade/buzina-3-94c95b5ea3.m4a",
+      "duration": 11.14,
+      "description": "Buzinadas",
+      "source": {
+        "id": 264993,
+        "author": "sethlind",
+        "title": "Car honk.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/264993/"
+      },
+      "segments": [
+        [
+          5.2,
+          7.9
+        ]
+      ]
+    },
+    {
+      "id": "moto-1",
+      "url": "/audio/cidade/moto-1-81ea687720.m4a",
+      "duration": 16.38,
+      "description": "Moto passando",
+      "source": {
+        "id": 484486,
+        "author": "JPBILLINGSLEYJR",
+        "title": "Motorbike Passing By",
+        "license": "CC0",
+        "page": "https://freesound.org/s/484486/"
+      },
+      "segments": [
+        [
+          0,
+          16.38
+        ]
+      ]
+    },
+    {
+      "id": "moto-2",
+      "url": "/audio/cidade/moto-2-a239cb4f5c.m4a",
+      "duration": 12.61,
+      "description": "Moto passando devagar",
+      "source": {
+        "id": 405020,
+        "author": "kyles",
+        "title": "motorcycle real pass by slow Saravena, Colombia 2016.flac",
+        "license": "CC0",
+        "page": "https://freesound.org/s/405020/"
+      },
+      "segments": [
+        [
+          0,
+          12.61
+        ]
+      ]
+    },
+    {
+      "id": "carro-1",
+      "url": "/audio/cidade/carro-1-c73ade039f.m4a",
+      "duration": 5.44,
+      "description": "Carro passando",
+      "source": {
+        "id": 171447,
+        "author": "hinzebeat",
+        "title": "Car passing by.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/171447/"
+      },
+      "segments": [
+        [
+          0,
+          5.44
+        ]
+      ]
+    },
+    {
+      "id": "carro-2",
+      "url": "/audio/cidade/carro-2-3b6fa56cb4.m4a",
+      "duration": 9.95,
+      "description": "Um carro passando",
+      "source": {
+        "id": 465397,
+        "author": "JPBILLINGSLEYJR",
+        "title": "One car passing by",
+        "license": "CC0",
+        "page": "https://freesound.org/s/465397/"
+      },
+      "segments": [
+        [
+          0,
+          9.95
+        ]
+      ]
+    },
+    {
+      "id": "carro-3",
+      "url": "/audio/cidade/carro-3-4ff94ee973.m4a",
+      "duration": 13.15,
+      "description": "Trânsito passando",
+      "source": {
+        "id": 828205,
+        "author": "IENBA",
+        "title": "Traffic Passing By",
+        "license": "CC0",
+        "page": "https://freesound.org/s/828205/"
+      },
+      "segments": [
+        [
+          0,
+          13.15
+        ]
+      ]
+    },
+    {
+      "id": "carro-4",
+      "url": "/audio/cidade/carro-4-9170a9d21a.m4a",
+      "duration": 18.72,
+      "description": "Trânsito passando perto",
+      "source": {
+        "id": 280204,
+        "author": "memuse",
+        "title": "traffic pass by close.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/280204/"
+      },
+      "segments": [
+        [
+          0,
+          18.72
+        ]
+      ]
+    },
+    {
+      "id": "onibus-1",
+      "url": "/audio/cidade/onibus-1-e1c65999b3.m4a",
+      "duration": 43.39,
+      "description": "Ônibus passando",
+      "source": {
+        "id": 110130,
+        "author": "Ryding",
+        "title": "Bus passing by.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/110130/"
+      },
+      "segments": [
+        [
+          0,
+          43.39
+        ]
+      ]
+    },
+    {
+      "id": "sirene-1",
+      "url": "/audio/cidade/sirene-1-3965dbfa8c.m4a",
+      "duration": 40,
+      "description": "Sirenes distantes de manhã",
+      "source": {
+        "id": 568971,
+        "author": "TRP",
+        "title": "200927 Sirens, distant fire trucks mostly, noisy 7am.flac",
+        "license": "CC0",
+        "page": "https://freesound.org/s/568971/"
+      },
+      "segments": [
+        [
+          1.95,
+          4.4
+        ],
+        [
+          9.45,
+          13.65
+        ],
+        [
+          13.7,
+          21.15
+        ],
+        [
+          28.45,
+          31.9
+        ],
+        [
+          34.45,
+          36.9
+        ]
+      ]
+    },
+    {
+      "id": "sirene-2",
+      "url": "/audio/cidade/sirene-2-6eef15f7d3.m4a",
+      "duration": 20.03,
+      "description": "Sirenes distantes no centro",
+      "source": {
+        "id": 732689,
+        "author": "LewisEmmott5",
+        "title": "City Centre_Distant Sirens",
+        "license": "CC0",
+        "page": "https://freesound.org/s/732689/"
+      },
+      "segments": [
+        [
+          0,
+          20.03
+        ]
+      ]
+    },
+    {
+      "id": "sirene-3",
+      "url": "/audio/cidade/sirene-3-91320ee100.m4a",
+      "duration": 53.31,
+      "description": "Sirene de polícia distante com eco",
+      "source": {
+        "id": 635741,
+        "author": "kyles",
+        "title": "siren police north american distant city echo changes behind buildings natural nice +bassy skyline lowcut to taste.flac",
+        "license": "CC0",
+        "page": "https://freesound.org/s/635741/"
+      },
+      "segments": [
+        [
+          14.7,
+          17.15
+        ],
+        [
+          22.2,
+          26.15
+        ]
+      ]
+    },
+    {
+      "id": "criancas-1",
+      "url": "/audio/cidade/criancas-1-32f6d2d8d1.m4a",
+      "duration": 45.02,
+      "description": "Crianças brincando ao longe",
+      "source": {
+        "id": 274988,
+        "author": "myserval",
+        "title": "Distant suburban children playing nature sounds.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/274988/"
+      },
+      "segments": [
+        [
+          15.95,
+          19.9
+        ],
+        [
+          20.45,
+          24.65
+        ],
+        [
+          26.2,
+          31.65
+        ],
+        [
+          32.2,
+          34.65
+        ],
+        [
+          38.2,
+          44.4
+        ]
+      ]
+    },
+    {
+      "id": "criancas-2",
+      "url": "/audio/cidade/criancas-2-90f35aef9b.m4a",
+      "duration": 45.02,
+      "description": "Crianças brincando",
+      "source": {
+        "id": 469613,
+        "author": "brunoboselli",
+        "title": "Kids Playing",
+        "license": "CC0",
+        "page": "https://freesound.org/s/469613/"
+      },
+      "segments": [
+        [
+          3.7,
+          7.4
+        ],
+        [
+          7.95,
+          13.9
+        ],
+        [
+          16.45,
+          20.9
+        ],
+        [
+          21.45,
+          23.9
+        ],
+        [
+          29.2,
+          31.65
+        ],
+        [
+          39.95,
+          45
+        ]
+      ]
+    },
+    {
+      "id": "arara-1",
+      "url": "/audio/cidade/arara-1-598bb7b551.m4a",
+      "duration": 14.14,
+      "description": "Arara gritando num parque",
+      "source": {
+        "id": 504988,
+        "author": "felix.blume",
+        "title": "Macaw Parrot screaming in a park",
+        "license": "CC0",
+        "page": "https://freesound.org/s/504988/"
+      },
+      "segments": [
+        [
+          0.45,
+          10.4
+        ],
+        [
+          11.2,
+          13.9
+        ]
+      ]
+    },
+    {
+      "id": "arara-2",
+      "url": "/audio/cidade/arara-2-6128d9993a.m4a",
+      "duration": 40.38,
+      "description": "Araras ao amanhecer",
+      "source": {
+        "id": 426274,
+        "author": "marc.om",
+        "title": "Macaws at Dawn, Fazenda in Goiás, Brazil",
+        "license": "CC0",
+        "page": "https://freesound.org/s/426274/"
+      },
+      "segments": [
+        [
+          0,
+          1.9
+        ],
+        [
+          1.95,
+          6.4
+        ],
+        [
+          12.2,
+          14.65
+        ],
+        [
+          15.95,
+          18.4
+        ],
+        [
+          24.45,
+          26.9
+        ],
+        [
+          28.2,
+          32.9
+        ],
+        [
+          33.45,
+          36.4
+        ],
+        [
+          37.45,
+          40.25
+        ]
+      ]
+    },
+    {
+      "id": "bemtevi",
+      "url": "/audio/cidade/bemtevi-ff99d538cb.m4a",
+      "duration": 38.08,
+      "description": "Bem-te-vi e corócoró",
+      "source": {
+        "id": 591058,
+        "author": "dtmendes",
+        "title": "Coró-Coró-e-Bem-te-vi.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/591058/"
+      },
+      "segments": [
+        [
+          0,
+          4.15
+        ],
+        [
+          6.95,
+          9.65
+        ],
+        [
+          12.45,
+          14.9
+        ],
+        [
+          20.2,
+          23.9
+        ],
+        [
+          24.2,
+          27.65
+        ],
+        [
+          28.95,
+          31.9
+        ],
+        [
+          32.95,
+          35.9
+        ]
+      ]
+    },
+    {
+      "id": "pombos",
+      "url": "/audio/cidade/pombos-a11d9bfb0f.m4a",
+      "duration": 25.22,
+      "description": "Pombos arrulhando numa praça",
+      "source": {
+        "id": 154865,
+        "author": "pawsound",
+        "title": "pidgeons cooing city park.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/154865/"
+      },
+      "segments": [
+        [
+          12.95,
+          15.4
+        ]
+      ]
+    },
+    {
+      "id": "urutau",
+      "url": "/audio/cidade/urutau-478c538038.m4a",
+      "duration": 45.02,
+      "description": "Urutau cantando à noite (Brasil)",
+      "source": {
+        "id": 532268,
+        "author": "deleted_user_162443",
+        "title": "common potoo nightcall Brazil.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/532268/"
+      },
+      "segments": [
+        [
+          0,
+          3.15
+        ],
+        [
+          8.95,
+          11.65
+        ],
+        [
+          26.45,
+          39.15
+        ]
+      ]
+    },
+    {
+      "id": "aviao",
+      "url": "/audio/cidade/aviao-12728cd643.m4a",
+      "duration": 60,
+      "description": "Avião distante passando",
+      "source": {
+        "id": 348595,
+        "author": "kingsrow",
+        "title": "PlaneFlyoverDistant.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/348595/"
+      },
+      "segments": [
+        [
+          0,
+          60
+        ]
+      ]
+    },
+    {
+      "id": "sino-1",
+      "url": "/audio/cidade/sino-1-1feeb0dc2f.m4a",
+      "duration": 7.52,
+      "description": "Sinos de igreja ao longe",
+      "source": {
+        "id": 703590,
+        "author": "mudflea2",
+        "title": "distant church wedding bells",
+        "license": "CC0",
+        "page": "https://freesound.org/s/703590/"
+      },
+      "segments": [
+        [
+          0,
+          7.52
+        ]
+      ]
+    },
+    {
+      "id": "sino-2",
+      "url": "/audio/cidade/sino-2-c39618967e.m4a",
+      "duration": 30.02,
+      "description": "Sino de igreja distante com trânsito",
+      "source": {
+        "id": 717443,
+        "author": "TRP",
+        "title": "131201 Church bell, quarter to, distant, traffic, Victoria Park, London ON",
+        "license": "CC0",
+        "page": "https://freesound.org/s/717443/"
+      },
+      "segments": [
+        [
+          0.45,
+          2.9
+        ]
+      ]
+    },
+    {
+      "id": "martelo-1",
+      "url": "/audio/cidade/martelo-1-1fedf7cad8.m4a",
+      "duration": 45.02,
+      "description": "Marteladas distantes num telhado",
+      "source": {
+        "id": 616606,
+        "author": "TRP",
+        "title": "120729 Hammering, distant rooftop, single and many, odd reflections, complex rhythms, Toronto.wav",
+        "license": "CC0",
+        "page": "https://freesound.org/s/616606/"
+      },
+      "segments": [
+        [
+          0.45,
+          3.15
+        ],
+        [
+          3.2,
+          5.65
+        ],
+        [
+          11.2,
+          13.9
+        ],
+        [
+          15.2,
+          17.65
+        ],
+        [
+          21.2,
+          23.65
+        ],
+        [
+          23.7,
+          26.15
+        ],
+        [
+          27.95,
+          35.15
+        ],
+        [
+          35.45,
+          39.9
+        ],
+        [
+          40.7,
+          43.15
+        ]
+      ]
+    },
+    {
+      "id": "martelo-2",
+      "url": "/audio/cidade/martelo-2-cb7d91a4de.m4a",
+      "duration": 40,
+      "description": "Obra com marteladas",
+      "source": {
+        "id": 650696,
+        "author": "khenshom",
+        "title": "Construction site with hammering and banging noises",
+        "license": "CC0",
+        "page": "https://freesound.org/s/650696/"
+      },
+      "segments": [
+        [
+          0,
+          34.65
+        ]
+      ]
+    },
+    {
+      "id": "campainha",
+      "url": "/audio/cidade/campainha-7e95a316e3.m4a",
+      "duration": 22.5,
+      "description": "Campainha de bicicleta",
+      "source": {
+        "id": 405572,
+        "author": "lechufly",
+        "title": "Bicycle ring bell",
+        "license": "CC0",
+        "page": "https://freesound.org/s/405572/"
+      },
+      "segments": [
+        [
+          1.7,
+          7.4
+        ],
+        [
+          8.2,
+          11.65
+        ],
+        [
+          12.45,
+          15.4
+        ],
+        [
+          16.95,
+          20.65
+        ]
+      ]
+    }
+  ]
+}

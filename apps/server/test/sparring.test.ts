@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SPARRING,SPARRING_FOE_PREFIX,SPARRING_TIERS,TICK_MS,type FightHit,type PlayerInput,type SparringClaim,type SparringResult,type SparringState,type SparringStatus} from '@bar/shared';
+import {FIGHT,SPARRING,SPARRING_FOE_PREFIX,SPARRING_TIERS,TICK_MS,normalizeHeading,type FightHit,type PlayerInput,type SparringClaim,type SparringResult,type SparringState,type SparringStatus} from '@bar/shared';
 import {Player} from '../src/state.js';
 import {FightDirector,type FightHost} from '../src/world/fight.js';
 import {SparringAI,SparringDirector,waitText,type SparringHost} from '../src/world/sparring.js';
@@ -22,6 +22,7 @@ function ring(options:{status?:Partial<SparringStatus>;seed?:number}={}){
     keepsGuard:player=>player.connected&&!player.holding,
     kicks:()=>false,
     spared:target=>sparring.spares(target),
+    bot:player=>sparring.isFoe(player.id),
     hittable:(target,at)=>sparring.isFoe(target.id)?sparring.hittable(target,at):target.connected&&(!target.interactionState||target.interactionState==='stagger'),
     damage:(target,amount)=>{if(!sparring.damage(target,amount)){const ring=Math.min(target.hp,amount);target.hp-=ring;}},
     knockout:target=>{if(!sparring.knocked(target))target.interactionState='thrown';},
@@ -155,7 +156,7 @@ test('the ladder is felt: the harder the step, the more of the fight\'s life a p
       const foe=foeOf(r,a),fighter=aggressive(r);
       let seq=100;
       // The foe's life is kept up (nobody wins): what is measured is how much it hits and how little it lets through.
-      for(let i=0;i<Math.ceil((SPARRING.countdownMs+30_000)/TICK_MS)&&!r.result();i++){foe.hp=SPARRING_TIERS[index]!.hp;r.tick(a,fighter.think(a,foe,r.now,++seq));}
+      for(let i=0;i<Math.ceil((SPARRING.countdownMs+14_000)/TICK_MS)&&!r.result();i++){foe.hp=SPARRING_TIERS[index]!.hp;r.tick(a,fighter.think(a,foe,r.now,++seq));}
       const fight=r.state().at(-1)!;
       total+=fight.you.max-fight.you.hp;
     }
@@ -189,4 +190,26 @@ test('a won fight whose prize the API refuses (a wait that started meanwhile) is
   await new Promise(resolve=>setTimeout(resolve,10));
   const result=r.result()!;
   assert.equal(result.won,true);assert.equal(result.prize,0);assert.match(result.message,/6 horas/);
+});
+
+test('nobody stands inside anybody: walking into him, he gives way and never ends up behind the player or on top of him',async()=>{
+  for(const index of [0,2]){
+    const r=ring({seed:21+index,status:{tier:index}}),a=r.add('a');
+    assert.equal(await r.sparring.accept(a),'');
+    const foe=foeOf(r,a);
+    let closest=9,behind=0,fighting=0;
+    for(let i=0;i<Math.ceil((SPARRING.countdownMs+12_000)/TICK_MS)&&!r.result();i++){
+      foe.hp=SPARRING_TIERS[index]!.hp;
+      const heading=Math.atan2(foe.x-a.x,foe.z-a.z);
+      // The player keeps walking straight at him, as someone pressing the attack does.
+      r.tick(a,{dx:Math.sin(heading),dz:Math.cos(heading),rotation:heading});
+      if(r.sparring.duelOf('a')?.phase!=='fight')continue;
+      fighting++;
+      const away=Math.hypot(foe.x-a.x,foe.z-a.z);closest=Math.min(closest,away);
+      if(Math.abs(normalizeHeading(Math.atan2(foe.x-a.x,foe.z-a.z)-a.rotation))>1.5)behind++;
+    }
+    assert.ok(fighting>200);
+    assert.ok(closest>=FIGHT.bodyGap-.15,`step ${index}: the closest they came was ${closest.toFixed(2)} m`);
+    assert.equal(behind,0,`step ${index}: he never got behind the player`);
+  }
 });

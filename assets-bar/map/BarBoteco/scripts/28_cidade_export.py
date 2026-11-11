@@ -156,10 +156,10 @@ try:
             nome = C.nome_setor(ix, iy)
             vis = []
             for sub in ("VISUAL", "ROADS", "PROPS", "VEGETATION"):
-                vis += [o for o in bpy.data.collections[nome + "_" + sub].objects]
+                vis += [o for o in bpy.data.collections[nome + "_" + sub].all_objects]   # all_objects: subcolecoes (ex.: EB_Empresa_Brasil_* do 81)
             vis += originais.get(s, [])
             meshes = [o for o in vis if o.type == 'MESH' and o.data.polygons]
-            outros = [o for o in vis if o.type in ('LIGHT',)] + list(bpy.data.collections[nome + "_MARKERS"].objects)
+            outros = [o for o in vis if o.type in ('LIGHT',)] + list(bpy.data.collections[nome + "_MARKERS"].all_objects)
             usos = {}
             for o in meshes:
                 usos[o.data.name] = usos.get(o.data.name, 0) + 1
@@ -195,7 +195,7 @@ try:
             gltf(arq, **SEP)
             limpar(exp)
             # LOD
-            lods = [o for o in bpy.data.collections[nome + "_LOD"].objects if o.type == 'MESH']
+            lods = [o for o in bpy.data.collections[nome + "_LOD"].all_objects if o.type == 'MESH']
             for o in lods:
                 exp.objects.link(o)
             set_active(exp)
@@ -204,7 +204,7 @@ try:
             tri_lod = {o.name: tris(o.data) for o in lods}
             limpar(exp)
             # colisao
-            colz = list(bpy.data.collections[nome + "_COLLISION"].objects)
+            colz = list(bpy.data.collections[nome + "_COLLISION"].all_objects)
             for o in colz:
                 exp.objects.link(o)
             set_active(exp)
