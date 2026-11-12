@@ -3,11 +3,16 @@ import {sectorDistance,type SectorCell} from '@bar/shared';
 import {CityPlanner,CITY_TUNING,type CityBackend,type CityDetail,type LodMode,type SlotKind} from './city-plan';
 import type {EnvironmentLighting} from './environment-lighting';
 import {pointAtFirstTexture} from './gltf-textures';
+import {FarmGates} from './farm-gates';
 
 const CITY_URL=`${import.meta.env.BASE_URL}maps/cidade/`;
 /** Beyond this distance a sector's buildings and trees cast no sun shadow (the sun's cascades reach 55 m). */
 const SHADOW_REACH=70;
 const UPDATE_SECONDS=.2;
+/** The factory's ceiling fixtures (instanced in its sector): each gets a light, FACTORY_LAMP_DROP metres below its origin. */
+const FACTORY_LAMP='INST_P_EB_Luminaria',FACTORY_LAMP_DROP=.7,FACTORY_LAMP_INTENSITY=2.4;
+/** The farm's (S07_00) ceiling fixtures: the hall's bells and the offices' LED tubes light the inside the same way. */
+const INDOOR_LAMPS=new Set([FACTORY_LAMP,'INST_P_FA_Luminaria','INST_P_FA_Tubo_LED','INST_P_FA_Tubo_LED_Pendurado']);
 const MANIFEST_ATTEMPTS=3;
 /** Pushes the city's flat far grounds back in the depth buffer: seen from afar they lie too close to the streets to tell apart. */
 const FAR_GROUND_BIAS=6,LOD_GROUND_BIAS=3;
@@ -46,9 +51,11 @@ export class CityStreaming implements CityBackend<LoadedFile> {
   private clock=UPDATE_SECONDS;
   private shadows=true;
   private failedBackdrops=0;
+  private readonly farm:FarmGates;
   private loaded={x:0,z:0};
   constructor(private readonly app:pc.AppBase,private readonly environment:EnvironmentLighting){
     app.root.addChild(this.root);
+    this.farm=new FarmGates(app,this.root,environment);
     void this.readManifest();
     void this.loadBackdrop('cidade_distante.gltf',file=>this.dressFarBackdrop(file));
     void this.loadBackdrop('cidade_anel.gltf');
@@ -61,6 +68,7 @@ export class CityStreaming implements CityBackend<LoadedFile> {
   }
   /** Each frame, with where the player (or the camera, at the door) is. */
   update(dt:number,x:number,z:number):void {
+    this.farm.update(dt,x,z);
     this.clock+=dt;
     if(this.clock<UPDATE_SECONDS)return;
     this.clock=0;this.loaded={x,z};
@@ -86,6 +94,7 @@ export class CityStreaming implements CityBackend<LoadedFile> {
   }
   destroy():void {
     this.destroyed=true;
+    this.farm.destroy();
     this.planner.destroy();
     for(const file of this.backdrop.splice(0))this.dispose('','lod',file);
     // Right now, while the app stands: the scene destroys it next, and a load still on its way has nowhere to go (discard).
@@ -106,7 +115,8 @@ export class CityStreaming implements CityBackend<LoadedFile> {
     });
   }
   dispose(_sector:string,_kind:SlotKind,file:LoadedFile):void {
-    for(const light of file.lights)this.environment.removeCityLight(light);
+    for(const light of file.lights){this.environment.removeCityLight(light);this.environment.removeIndoorLight(light);}
+    for(const render of file.entity.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances)this.environment.releaseMetal(instance.material as pc.StandardMaterial);
     file.entity.destroy();
     // The container frees the rest, its unused clones of textures among them (see pointAtFirstTexture); the textures themselves are the city's.
     const resource=file.asset.resource as unknown as {textures:pc.Asset[]};
@@ -233,10 +243,24 @@ export class CityStreaming implements CityBackend<LoadedFile> {
       for(const instance of render.meshInstances){
         const material=instance.material;
         if(material?.name==='Lampada')instance.material=this.environment.cityLamp(material as pc.StandardMaterial);
+        else if(material instanceof pc.StandardMaterial)this.environment.dressMetal(material);
+        if(INDOOR_LAMPS.has(render.entity.name)&&instance.instancingData)this.indoorLamps(file,render.entity,instance);
         if(instance.instancingData)file.props.push(this.instancedProp(instance,Number(file.extras.get(render.entity.name)?.cull_m??0)));
       }
     }
     file.props=file.props.filter(prop=>prop.cullAt>0);
+  }
+  /** One light under each of the factory's fixtures (INST_P_EB_Luminaria): the sector has no lights of its own, and its inside was lit by the ambient alone. */
+  private indoorLamps(file:LoadedFile,parent:pc.Entity,instance:pc.MeshInstance):void {
+    const matrices=new Float32Array(instance.instancingData!.vertexBuffer!.lock() as ArrayBuffer);
+    for(let i=0;i+14<matrices.length;i+=16){
+      const entity=new pc.Entity('Luz_Interna_EB');
+      entity.setPosition(matrices[i+12]!,matrices[i+13]!-FACTORY_LAMP_DROP,matrices[i+14]!);
+      entity.addComponent('light',{type:'omni',color:new pc.Color(1,.96,.88),range:15,castShadows:false});
+      parent.addChild(entity);
+      this.environment.addIndoorLight(entity.light!,FACTORY_LAMP_INTENSITY);
+      file.lights.push(entity.light!);
+    }
   }
   private instancedProp(instance:pc.MeshInstance,cullAt:number):CullingProp {
     const matrices=new Float32Array(instance.instancingData!.vertexBuffer!.lock() as ArrayBuffer),mesh=instance.mesh!.aabb;

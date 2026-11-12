@@ -4,7 +4,7 @@ import type {ConsumableEffects} from './needs.js';
 
 export const INVENTORY_CAPACITY=12;
 export type ItemCategory='bebida'|'comida'|'saude'|'peca'|'fogo'|'industrial';
-export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao','malte_saco','mix_saco','produto_saco','saco_vazio'] as const;
+export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao','malte_saco','mix_saco','produto_saco','saco_vazio','aco_lote','aluminio_lote','polimero_lote','molas_caixa'] as const;
 export type ItemId=typeof ITEM_IDS[number];
 export interface ItemDefinition {
   id:ItemId;name:string;description:string;category:ItemCategory;price:number;stackMax:number;
@@ -33,11 +33,15 @@ export const ITEM_CATALOG=[
   {id:'mix_saco',name:'Saco de MIX 25 kg',description:'Matéria-prima da EMPRESA BRASIL. Transporte no caminhão e armazene nas vagas V3.',category:'industrial',icon:'ui/items/mix-saco.svg',price:0,stackMax:18,effects:{name:'Saco de MIX'},loseOnFaint:false},
   {id:'produto_saco',name:'Bebida Maltada em Pó 25 kg',description:'Produto acabado rastreável da EMPRESA BRASIL.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Bebida Maltada em Pó'},loseOnFaint:false},
   {id:'saco_vazio',name:'Saco vazio industrial',description:'Consumível da ensacadeira da EMPRESA BRASIL.',category:'industrial',icon:'ui/items/saco-vazio.svg',price:0,stackMax:50,effects:{name:'Saco vazio industrial'},loseOnFaint:false},
+  {id:'aco_lote',name:'Lote de aço 4140',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Lote de aço 4140'},loseOnFaint:false},
+  {id:'aluminio_lote',name:'Lote de alumínio 7075',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Lote de alumínio 7075'},loseOnFaint:false},
+  {id:'polimero_lote',name:'Lote de polímero técnico',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Lote de polímero técnico'},loseOnFaint:false},
+  {id:'molas_caixa',name:'Caixa de conjuntos de mola',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Caixa de conjuntos de mola'},loseOnFaint:false},
 ] as const satisfies readonly ItemDefinition[];
 
 export const itemIdSchema:z.ZodType<ItemId>=z.enum(ITEM_IDS);
 export const itemById=(id:string):ItemDefinition|undefined=>ITEM_CATALOG.find(item=>item.id===id);
-export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0,malte_saco:0,mix_saco:0,produto_saco:0,saco_vazio:0};
+export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0,malte_saco:0,mix_saco:0,produto_saco:0,saco_vazio:0,aco_lote:0,aluminio_lote:0,polimero_lote:0,molas_caixa:0};
 
 export interface InventoryStack {itemId:ItemId;quantity:number}
 export interface InventoryEntry extends InventoryStack {item:ItemDefinition}

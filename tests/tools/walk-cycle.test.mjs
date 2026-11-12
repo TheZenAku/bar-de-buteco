@@ -46,7 +46,7 @@ test('walk interpolation rounds the angular motion, closes the seam and keeps pe
   }
 });
 
-for(const skin of ['nathan','leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo']){
+for(const skin of ['nathan','leandro','rafael','rafael-rose','read','magrao','tonico','gilmar-gordo','gabriel','flavio-hipotetico','tiao','primo','funcionario-empresa-brasil']){
   test(`${skin}: walk has 85 poses at 60 Hz, a 1.4-second cycle and smooth rotation across its loop`,()=>{
     const g=readGlb(new URL(`../../apps/web/public/animations/${skin}.glb`,import.meta.url));
     const raw=g.json.animations.find(a=>a.name==='Walk');assert.ok(raw);

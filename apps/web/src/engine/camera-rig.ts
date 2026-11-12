@@ -153,6 +153,8 @@ export class CameraRig {
   private hiddenFor=0;
   private readonly eye=new pc.Vec3();
   private eyeSet=false;
+  /** Feet used to carry the eye with locomotion before smoothing the small skeletal offset (so first person never trails behind a running body). */
+  private eyeFeetBefore?:{x:number;y:number;z:number};
   private xrayOpen=0;
   private readonly xray:CameraXray;
   /** Riding a bike: the view and the elevation to give back getting off, and how long ago the mouse last turned the view. */
@@ -444,11 +446,20 @@ export class CameraRig {
     const flat=Math.cos(this.pitch);
     a.set(Math.sin(this.yaw)*flat,Math.sin(this.pitch),Math.cos(this.yaw)*flat);
     right.set(Math.cos(this.yaw),0,-Math.sin(this.yaw));
-    // The eyes: just above and in front of the head joint, steadied a little (the clips bob the head).
-    if(subject.head)goal.set(subject.head.x+Math.sin(subject.facing)*.1,subject.head.y+.09,subject.head.z+Math.cos(subject.facing)*.1);
+    // The eyes: while aiming from inside the head, use the already-filtered stature instead of the animated head joint. This removes the walk/run
+    // bob from the sight without detaching the camera from the moving feet. Outside an armed first-person/sight view, authored poses still decide it.
+    const steadyArmedEye=this.armed&&(this.mode==='first'||this.scopeBlend>0);
+    if(steadyArmedEye)goal.set(feet.x+Math.sin(subject.facing)*.1,feet.y+this.stature+.09,feet.z+Math.cos(subject.facing)*.1);
+    else if(subject.head)goal.set(subject.head.x+Math.sin(subject.facing)*.1,subject.head.y+.09,subject.head.z+Math.cos(subject.facing)*.1);
     else goal.set(feet.x,feet.y+EYE_HEIGHT,feet.z);
     if(!this.eyeSet||this.eye.distance(goal)>1){this.eye.copy(goal);this.eyeSet=true;}
-    else this.eye.lerp(this.eye,goal,ease(25,dt));
+    else {
+      // Carry the established eye by the body's translation first; smoothing is then only for animation/pose offsets, not movement latency.
+      const before=this.eyeFeetBefore;
+      if(before){this.eye.x+=feet.x-before.x;this.eye.y+=feet.y-before.y;this.eye.z+=feet.z-before.z;}
+      this.eye.lerp(this.eye,goal,ease(25,dt));
+    }
+    this.eyeFeetBefore={x:feet.x,y:feet.y,z:feet.z};
     // Off the chosen shoulder, always (no side change nor fold to the middle by itself); on a bike straight behind.
     // With a weapon the offset is the tuning's (AimCamera) and the swap is quick.
     const armed=this.armed||this.aimBlend>0,offset=tune.armedShoulder+(tune.shoulder-tune.armedShoulder)*this.aimBlend;

@@ -25,6 +25,32 @@ export class EmploymentService {
       await tx.insert(employmentEvents).values({id:randomUUID(),userId,jobId,kind:'hired',requestId,details:{}}).onConflictDoNothing();return {employment,applied:true};
     });
   }
+  /** A player asks for the job: they stay 'applied' until an owner or manager of the firm admits them (hire) or turns them down (reject). */
+  async apply(userId:string,requestId:string,jobId=FACTORY_JOB_ID){
+    return this.db.transaction(async tx=>{
+      const [replay]=await tx.select().from(employmentEvents).where(eq(employmentEvents.requestId,requestId));if(replay){const [employment]=await tx.select().from(employments).where(eq(employments.userId,userId));return {employment,applied:false};}
+      const [previous]=await tx.select().from(employments).where(eq(employments.userId,userId)).for('update');
+      if(previous?.status==='hired'||previous?.status==='applied')return {employment:previous,applied:false};
+      if(previous?.cooldownUntil&&previous.cooldownUntil.getTime()>Date.now())throw new EmploymentError(409,`Aguarde até ${previous.cooldownUntil.toLocaleString('pt-BR')} para se candidatar novamente.`);
+      const now=new Date();let employment;
+      if(previous)[employment]=await tx.update(employments).set({jobId,status:'applied',hiredAt:now,resignedAt:null,cooldownUntil:null,updatedAt:now}).where(eq(employments.userId,userId)).returning();
+      else [employment]=await tx.insert(employments).values({userId,jobId,status:'applied'}).returning();
+      await tx.insert(employmentEvents).values({id:randomUUID(),userId,jobId,kind:'applied',requestId,details:{}}).onConflictDoNothing();return {employment,applied:true};
+    });
+  }
+  /** The candidate gives up (or the firm turns them down): the application disappears and they may apply again at once. */
+  async withdraw(userId:string,requestId:string,kind:'withdrawn'|'rejected'='withdrawn'){
+    return this.db.transaction(async tx=>{
+      const [replay]=await tx.select().from(employmentEvents).where(eq(employmentEvents.requestId,requestId));if(replay)return {applied:false};
+      const [row]=await tx.delete(employments).where(and(eq(employments.userId,userId),eq(employments.status,'applied'))).returning();
+      if(!row)throw new EmploymentError(409,'Não há candidatura em aberto.');
+      await tx.insert(employmentEvents).values({id:randomUUID(),userId,jobId:row.jobId,kind,requestId,details:{}}).onConflictDoNothing();return {applied:true};
+    });
+  }
+  /** Candidates waiting for an answer, oldest first. */
+  async applicants(jobId=FACTORY_JOB_ID){return this.db.select().from(employments).where(and(eq(employments.jobId,jobId),eq(employments.status,'applied'))).orderBy(employments.hiredAt);}
+  /** Everyone hired for the job. */
+  async hired(jobId=FACTORY_JOB_ID){return this.db.select().from(employments).where(and(eq(employments.jobId,jobId),eq(employments.status,'hired')));}
   async resign(userId:string,requestId:string){return this.db.transaction(async tx=>{
     const [replay]=await tx.select().from(employmentEvents).where(eq(employmentEvents.requestId,requestId));if(replay){const [employment]=await tx.select().from(employments).where(eq(employments.userId,userId));return {employment};}
     const [row]=await tx.select().from(employments).where(eq(employments.userId,userId)).for('update');if(!row||row.status!=='hired')throw new EmploymentError(409,'Você não possui emprego ativo.');
@@ -40,6 +66,10 @@ export class EmploymentService {
     const [{count=0}={}]=await tx.select({count:sql<number>`count(*)`.mapWith(Number)}).from(employmentShifts).where(and(eq(employmentShifts.jobId,employment.jobId),sql`${employmentShifts.endedAt} is null`));if(count>=this.config.shiftSlots)throw new EmploymentError(409,'Todas as vagas de expediente estão ocupadas.');
     const [shift]=await tx.insert(employmentShifts).values({id:randomUUID(),userId,jobId:employment.jobId,requestId,station}).returning();return shift!;
   });}
+  /** The world restarted: nobody is at a station, so shifts left open (they hold the six slots) are closed. */
+  async closeAllShifts(){const closed=await this.db.update(employmentShifts).set({endedAt:new Date()}).where(sql`${employmentShifts.endedAt} is null`).returning({id:employmentShifts.id});return {closed:closed.length};}
+  /** Wage paid during the open shift, shown in the profile. */
+  async addEarned(userId:string,amount:number){await this.db.update(employmentShifts).set({earned:sql`${employmentShifts.earned}+${amount}`}).where(and(eq(employmentShifts.userId,userId),sql`${employmentShifts.endedAt} is null`));return {ok:true};}
   async stopShift(userId:string){const [shift]=await this.db.update(employmentShifts).set({endedAt:new Date()}).where(and(eq(employmentShifts.userId,userId),sql`${employmentShifts.endedAt} is null`)).returning();if(!shift)throw new EmploymentError(409,'Você não está em expediente.');return shift;}
   async list(){return {employments:await this.db.select().from(employments),shifts:await this.db.select().from(employmentShifts).where(sql`${employmentShifts.endedAt} is null`),config:this.config};}
   async dismiss(userId:string,requestId:string,cooldownMs=this.config.cooldownMs){return this.db.transaction(async tx=>{

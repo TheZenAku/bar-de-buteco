@@ -4,7 +4,7 @@ import {SMOKING} from '@bar/shared';
 import {STOPPED_VEHICLE,vehicleSpeed,vehicleMotionSpeed,vehicleMoving,vehicleVelocity,stepWheelie,HORSE_REAR} from '@bar/shared';
 import { randomInt, randomUUID } from 'node:crypto';
 import {FIREWORK,fireworkFireSchema,fireworkOrigin,fireworkFlightMs,type FireworkShot,type FireworkVector} from '@bar/shared';
-import {CAR_MODEL,CAR_SEATS,defaultVehicleColor,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts,STORAGE,carSpec,hasStorage,isCarModel,isTruck,storageGap,storageLoad,storageMoveSchema,storageOpenSchema,storageRefusal,vehicleSeats,vehicleCapacity,isTwoWheeler,NEW_CAR_PARTS,NEW_MOTO_PARTS,type StorageView} from '@bar/shared';
+import {CAR_MODEL,CAR_SEATS,defaultVehicleColor,isCar,isPassenger,passengerInteraction,readDriveParts,readVehicleParts,seatPosition,vehicleMileageWear,vehicleName,vehicleOccupants,vehicleOfInteraction,vehicleParts,vehiclePhysics,vehicleRepair,vehicleSeat,wearVehicleParts,writeVehicleParts,STORAGE,carSpec,hasStorage,isCarModel,isTruck,TRUCK_MODEL,storageGap,storageLoad,storageMoveSchema,storageOpenSchema,storageRefusal,vehicleSeats,vehicleCapacity,isTwoWheeler,NEW_CAR_PARTS,NEW_MOTO_PARTS,type StorageView} from '@bar/shared';
 import {applyCityWeather,applyEnvironmentPatch,environmentPatchSchema,gameHour,weatherAt,WEATHER_CITY} from '@bar/shared';
 import {CityWeather} from './world/city-weather.js';
 import {HORSE,horseFits,isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
@@ -12,7 +12,7 @@ import {ServerPerformanceSampler} from './performance.js';
 import { Client, Room, ServerError } from '@colyseus/core';
 import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
-import { AOI_RADIUS, crowdSkinIndex, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, flyPlayer, fallPlayer, groundBelow, floorHeight, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
+import { AOI_RADIUS, crowdSkinIndex, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, FACTORY_UNIFORM, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, flyPlayer, fallPlayer, groundBelow, floorHeight, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
 import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
 import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
@@ -53,8 +53,20 @@ import { SessionRegistry } from './room/session-registry.js';
 import { TABLE_QUEUE_MAX, WaiterService, publicOrder, type TableOrder } from './world/waiter.js';
 import { ServedItems, type Seated } from './world/served.js';
 import { JobDirector, type Payment, type WorkerOrder } from './world/jobs.js';
-import {FactoryDirector} from './world/factory/index.js';
-import {DEFAULT_FACTORY_BALANCE,emptyBagging,isInsideWorkWindow,type WorkWindow} from '@bar/shared/factory';
+import {FactoryDirector,type FactorySnapshot} from './world/factory/index.js';
+import {pickDeliveryTarget} from './world/factory/route.js';
+import {CompanyDesk} from './company-desk.js';
+import {MachineShop,type RibeiroCarry} from './world/machine-shop.js';
+import {createMachineGame,machineGameCorrect} from './world/machine-games.js';
+import {RIBEIRO_COMPUTER,RIBEIRO_DOCK,RIBEIRO_MATERIALS,RIBEIRO_NAME,RIBEIRO_SPOTS,WEAPONS,WEAPON_IDS,isRibeiroMaterial,type RibeiroGameChallenge,type RibeiroMaterial,type RibeiroSpotId,type WeaponId} from '@bar/shared';
+import {FACTORY_GATE,DIRT_PENDING,cleanTaskOf,type CleanTask,type CleanTaskId,DEFAULT_FACTORY_BALANCE,DEFAULT_FACTORY_FINANCE,FACTORY_DOCK,FACTORY_NPC_DELIVERY_MIN,FACTORY_ORDER,FACTORY_PAY,FACTORY_REACH,SHIPMENT_ACTIVE,emptyBagging,factoryFinancePatchSchema,isInsideWorkWindow,type FactoryFinance,type FactoryShipmentView,type FreightOffer,type FreightState,type WorkWindow} from '@bar/shared/factory';
+
+/** What the API paid someone (see FactoryLogistics). */
+interface Payout {userId:string;amount:number;balance:number}
+/** A player's truck parked at the dock. */
+interface DockTruck {vehicleId:string;ownerId:string;ownerName:string;plate:string;/** Whoever sits at the wheel now ('' when nobody). */driverId:string}
+/** How the plant names a truck: its garage id when a player owns it, else 'moto:<id>' (one the administration spawned has no garage row). */
+const truckKeyOf=(moto:{vehicleId:string;id:string})=>moto.vehicleId||`moto:${moto.id}`;
 import { changeWallet, WalletRetries, type WalletOwner } from './world/wallet.js';
 import { JOBS, MAX_WORKER_ORDERS, USE_DURATION_MS as TASK_GESTURE_MS, itemById as catalogItem, orderTotal, tableOrderSchema, consumeMs, consumedOverTime, type MediaPriceKind } from '@bar/shared';
 import { STAGE_PASS, hasStagePass, onStage, musicianRole, stageSpot } from '@bar/shared';
@@ -168,13 +180,32 @@ interface Presence {
   vehicles:OwnedVehicle[];
   /** Virtual helmet, gloves and glasses equipped at EMPRESA BRASIL. */
   factoryPpe?:boolean;
+  /** The skin the account itself wears (the API's, as last answered): what the avatar goes back to when the work uniform comes off. */
+  civilSkin?:string;
+  /** When this player last rang the plant's intercom (ms). */
+  ringAt?:number;
   factoryBag?:{material:'MALTE'|'MIX';origin:string};
+  /** Workpiece carried through Ribeiro's cutting, machining, drilling and assembly flow. */
+  ribeiroCarry?:RibeiroCarry;
+  /** Interactive machine operation currently open on this player's screen. */
+  ribeiroGame?:RibeiroGameChallenge;
+  /** A timed cleaning task in progress (the room finishes it when the time is up, and drops it when the player leaves the spot). */
+  factoryClean?:{task:CleanTaskId;startedAt:number;endsAt:number};
+  /** Milliseconds on shift with the PPE inside the plant while no production runs (every FACTORY_IDLE_PAY.everyS the presence pay comes). */
+  idleMs?:number;
+  /** What the plant's state sent to this player last looked like, and when (factory.state is pushed only on a change). */
+  factorySig?:string;
+  /** The driver's trip as last sent (factory.route), so only changes go out. */
+  routeSig?:string;
+  /** The freight app's state as last sent (freight.state), so only changes go out. */
+  freightSig?:string;
+  factorySentAt?:number;
   /** The customer's dialog is open, and it closes by itself at this time. */
   dialogUntil?:number;
 }
 // Actions that need a conscious character; chat, voice and movement input stay available (input is ignored).
 const holdingName = (item: string) => catalogItem(item)?.name ?? item;
-const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'inventory.use', 'inventory.discard', 'storage.open', 'storage.move', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'truco.join', 'truco.seat', 'truco.config', 'truco.ready', 'truco.again', 'truco.play', 'truco.call', 'truco.answer', 'truco.eleven', 'truco.signal', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'pool.join', 'pool.seat', 'pool.config', 'pool.cpu', 'pool.ready', 'pool.shot', 'pool.choice', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
+const NEEDS_CONSCIOUS = new Set(['food.start', 'garage.take', 'garage.store', 'moto.lock', 'trade.request', 'trade.respond', 'trade.ready', 'trade.confirm', 'moto.repair', 'table.order', 'job.start', 'job.work', 'player.interact', 'player.emote', 'player.skin', 'player.appearance', 'factory.ppe', 'inventory.use', 'inventory.discard', 'storage.open', 'storage.move', 'blackjack.join', 'blackjack.bet', 'blackjack.action', 'blackjack.insurance', 'truco.join', 'truco.seat', 'truco.config', 'truco.ready', 'truco.again', 'truco.play', 'truco.call', 'truco.answer', 'truco.eleven', 'truco.signal', 'foosball.join', 'foosball.slot', 'foosball.config', 'foosball.cpu', 'foosball.ready', 'pool.join', 'pool.seat', 'pool.config', 'pool.cpu', 'pool.ready', 'pool.shot', 'pool.choice', 'jukebox.command', 'tv.command', 'stage.buy', 'phone.call', 'show.set', 'show.cue']);
 const eventTypes: Record<EventKind, string> = { blackout: 'BLACKOUT', troublemaker: 'DRUNK_NPC', party: 'PARTY' };
 const centre = (spots: readonly { x: number; z: number }[]) => ({ x: spots.reduce((sum, s) => sum + s.x, 0) / spots.length, z: spots.reduce((sum, s) => sum + s.z, 0) / spots.length });
 const eventKinds: Record<string, EventKind> = { BLACKOUT: 'blackout', DRUNK_NPC: 'troublemaker', PARTY: 'party' };
@@ -218,8 +249,34 @@ export class BarRoom extends Room<{ state: BarState }> {
   readonly jobs = new JobDirector({ dirtyTables: () => this.served.dirtyTables(), isDirty: table => this.served.isDirty(table) });
   /** EMPRESA BRASIL: authoritative live machine and stock state. Asset validation runs in its constructor. */
   readonly factory = new FactoryDirector();
+  readonly machineShop=new MachineShop();
+  private readonly machineWatchers=new Set<string>();
+  private readonly machineGames=new Map<string,string>();
+  private machineRecovered=false;
+  private machinePersistedRevision=-1;
+  private machinePersisting=false;
   private readonly factoryRequests=new Set<string>();
+  /** Players whose screens follow the plant (near it, or with its panel open); they are sent its state as it changes. */
+  private readonly factoryWatchers=new Set<string>();
+  private companyDesk?:CompanyDesk;
+  /** The firm as the administration sees it (owners, balance, ledger), refreshed with the logistics. */
+  private factoryCompany:unknown=null;
+  private factoryOrdersVersion=0;
+  /** The trucks' trips in progress and the latest finished, the plant's money settings, the city's vault and the books' totals (all read from the API). */
+  private factoryShipments:FactoryShipmentView[]=[];
+  private factoryFinance:FactoryFinance=DEFAULT_FACTORY_FINANCE;
+  private factoryTreasury:{balance:number;ledger:unknown[]}={balance:0,ledger:[]};
+  private factorySummary:Record<string,number>={};
+  private shipmentBusy=false;
+  private shipmentNotified=new Set<string>();
+  private truckGoneSince=new Map<string,number>();
+  private dockSince=new Map<string,number>();
+  private routeTick=0;
+  /** False until the saved plant was read, so a failed read can never be saved over (and erase) it. */
+  private factoryRecovered=false;
   private readonly factoryWorkers=new Set<string>();
+  /** Whoever's avatar wears the work uniform now (the reconciliation in step() visits these and the operators, never every player). */
+  private readonly uniformed=new Set<string>();
   private factoryPersistedRevision=-1;
   private factoryPersisting=false;
   private factoryScheduleBusy=false;
@@ -474,6 +531,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     // Doors start open, as authored in the map; the shared physics mirrors this room's door states.
     setDoorStates(DOORS.map(door => [door.id, true] as const));
     for (const door of DOORS) this.state.doors.set(door.id, new DoorState().assign({ id: door.id, open: true }));
+    this.state.doors.set(FACTORY_GATE.id, new DoorState().assign({ id: FACTORY_GATE.id, open: false }));
     for(const system of JUKEBOX_SYSTEMS)this.state.jukeboxes.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for(const system of TV_SYSTEMS)this.state.televisions.set(system.id,new Jukebox().assign(initialJukebox(system.id)));
     for (const npc of createNpcs()) this.state.npcs.set(npc.id, npc);
@@ -505,8 +563,15 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.clock.setInterval(() => this.countTime(Date.now()), ACHIEVEMENT_SAMPLE_MS);
     void this.cityWeather.refresh();
     void this.recoverFactory();
+    void this.recoverMachineShop();
     this.clock.setInterval(()=>{void this.persistFactory();},5000);
+    this.clock.setInterval(()=>{void this.persistMachineShop();},5000);
+    this.clock.setInterval(()=>this.machineShopTick(),500);
     this.clock.setInterval(()=>{void this.syncFactorySchedules();},30_000);
+    this.clock.setInterval(()=>{void this.monitorShipments();},1000);
+    this.clock.setInterval(()=>this.gateTick(),500);
+    this.clock.setInterval(()=>this.factoryTaskTick(),500);
+    this.clock.setInterval(()=>this.factoryIdleTick(),1000);
     this.clock.setInterval(() => { void this.cityWeather.refresh(); }, WEATHER_CITY.pollMs);
     this.registerMessages();
   }
@@ -534,14 +599,14 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (player) {
       this.park(player);
       player.assign({ displayName: auth.displayName, color: auth.color, connected: true, lastProcessedInput: -1 });
-      player.skin=skin;
+      this.setSkin(player,skin);
     } else {
       player = new Player().assign({ id: auth.userId, slot: this.takeSlot(), displayName: auth.displayName, color: auth.color, skin,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
       this.state.players.set(auth.userId, player);
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
-    const presence:Presence={skills:new Set(auth.ownedSkills),vehicles:auth.vehicles??[],joinedAt:Date.now(),ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
+    const presence:Presence={skills:new Set(auth.ownedSkills),vehicles:auth.vehicles??[],joinedAt:Date.now(),civilSkin:skin,ticket: auth, client, blocked: new Set(auth.blocked), queue: [], motoQueue: [], motoInputAt: 0, motoBudget: 0, motoBudgetAt: 0, lastReceived: -1, lastInputAt: Date.now(), seen: new Set(), revoked: false, rates: new Map(), listening: true, voicePackets: 0, voiceWindowAt: 0,inventory:new Map((auth.inventory??[]).map(stack=>[stack.itemId,stack.quantity])),balance:auth.balance??0};
     this.sessions.bind(auth.userId,presence);
     // A flight does not outlive its connection: the avatar left in the air comes down.
     const left=this.state.players.get(auth.userId);if(left?.animationState.startsWith('fly')){presence.flying=true;this.land(left,presence);}
@@ -619,8 +684,11 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
+    this.factoryWatchers.delete(userId);this.companyDesk?.forget(userId);presence.factoryClean=undefined;
+    this.machineWatchers.delete(userId);this.clearMachineGame(presence);this.machineShop.release(presence.ribeiroCarry??null);presence.ribeiroCarry=undefined;
+    this.dropFactoryBag(presence);presence.factoryPpe=false;
+    {const leaving=this.state.players.get(userId);if(leaving)this.setSkin(leaving,presence.civilSkin??DEFAULT_SKIN);}
     if(this.factoryWorkers.delete(userId)){this.factory.setOperators(this.factoryWorkers.size);void internal('employment',{sessionId:presence.ticket.sessionId,userId,action:'stop'}).catch(()=>{});}
-    if(presence.factoryBag){try{this.factory.returnBag(presence.factoryBag.origin,presence.factoryBag.material);}catch{/* A full/reconfigured origin is left for the reservation cleanup report. */}presence.factoryBag=undefined;}
     this.deaths.disconnected(userId);
     this.refueling.cancel(userId,'Atendimento interrompido por desconexão.');
     this.closeStorageOf(userId,'left');
@@ -983,40 +1051,287 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.interactionState='job';player.animationState=corner?'clean':'use';player.animationStartedAt=now;
       presence.queue.length=0;player.lastProcessedInput=presence.lastReceived;this.sendJob(presence);
     });
-    // Persistent factory employment. The entrance marker, not a copied coordinate, is the authority for clocking in and PPE.
+    // Persistent factory employment and operation. The stations' markers, not copied coordinates, say where each action works,
+    // and every answer is a `factory.result` that says what happened (or why not) so the panel can show it.
+    // The firm's desk: what owners and managers do from the profile's "Gerenciar empresa" tab (apps/server/src/company-desk.ts).
+    this.companyDesk=new CompanyDesk({
+      handle:(name,schema,limit,handler)=>this.handle(name,schema,limit,handler),
+      who:client=>{const presence=this.forClient(client),player=presence?this.state.players.get(presence.ticket.userId):undefined;return presence&&player?{userId:presence.ticket.userId,name:player.displayName}:undefined;},
+      factory:this.factory,finance:()=>this.factoryFinance,orders:()=>this.factoryOrders,refreshOrders:()=>this.refreshFactoryOrders(),
+      changed:()=>{this.pushFactory(true);this.pushFreight(true);},
+      send:(userId,type,payload)=>{this.sessions.getByUser(userId)?.client.send(type,payload);},
+      dismissed:async userId=>{const presence=this.sessions.getByUser(userId),player=this.state.players.get(userId);presence&&(presence.factoryClean=undefined);if(presence&&player&&this.factoryWorkers.has(userId)){await this.endFactoryShift(presence,player);this.pushFactory(true);}},
+      walletMoved:(userId,balance)=>{const presence=this.sessions.getByUser(userId);if(presence)this.walletChanged(presence,balance,balance-presence.balance,'company');},
+      log:(event,details)=>this.log(event,details),
+    });
+    // Cleaning is timed work done on foot at the place that is dirty: start it, stay there, and the room finishes it (see factoryTaskTick).
+    this.handle('factory.clean',z.object({task:z.string().min(1).max(32),requestId:z.uuid()}).strict(),3,(client,{task,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'clean',ok,message,{requestId});
+      const def=cleanTaskOf(task);if(!def)return reply(false,'Tarefa de limpeza desconhecida.');
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(presence.factoryClean)return reply(false,'Você já está limpando: espere terminar (ou se afaste para parar).');
+      if(presence.factoryBag)return reply(false,'Largue o saco antes de limpar.');
+      if(player.interactionState)return reply(false,'Fique em pé e com as mãos livres para limpar.');
+      if(def.kind==='dryer')return reply(false,'O secador se lava pelo painel do secador ("Lavar o secador"), com ele parado.');
+      if(!this.cleanNear(player,def))return reply(false,`Chegue perto de: ${def.label}.`);
+      const problem=this.factory.cleanProblem(def.id);if(problem)return reply(false,problem);
+      if(this.factorySeen(requestId))return reply(true,'Já está limpando.');
+      const now=Date.now();presence.factoryClean={task:def.id,startedAt:now,endsAt:now+def.durationS*1000};
+      reply(true,`${def.verb}: ${def.label} (${def.durationS} s). Fique no lugar.`);this.pushFactory(true);
+    });
+    this.handle('factory.clean.cancel',z.object({}).strict(),3,client=>{
+      const presence=this.forClient(client)!;if(!presence.factoryClean)return;presence.factoryClean=undefined;
+      this.factoryReply(client,'clean',false,'Limpeza interrompida.');this.pushFactory(true);
+    });
+    // The administration's tools over the production board and the plant's dirt (Fábrica → Ordens e equipe).
+    this.handle('admin.factory.board',z.object({requestId:z.uuid(),op:z.enum(['cancel','close','clean']),reason:z.string().min(3).max(500)}).strict(),3,(client,command)=>{
+      const admin=this.requireAdmin(client),who=this.state.players.get(admin)?.displayName??'administração';
+      if(command.op==='cancel')this.factory.cancelApproved(who);else if(command.op==='close')this.factory.forceClose(who);else this.factory.forceClean(who);
+      this.log('admin_factory_board',{playerId:admin,op:command.op,reason:command.reason});this.pushFactory(true);client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.company',z.object({requestId:z.uuid(),op:z.enum(['role','password.clear','password.set','adjust']),userId:z.uuid().optional(),role:z.enum(['owner','manager']).nullable().optional(),password:z.string().max(80).optional(),amount:z.number().int().min(-1_000_000_000).max(1_000_000_000).optional(),reason:z.string().min(3).max(500)}).strict(),3,async(client,command)=>{
+      const admin=this.requireAdmin(client);
+      if(command.op==='role'){if(!command.userId)throw new Error('Escolha o jogador.');await internal('company',{action:'admin.role',userId:command.userId,role:command.role??null,actorId:admin,requestId:command.requestId});}
+      else if(command.op==='password.clear'){if(!command.userId)throw new Error('Escolha o dono.');await internal('company',{action:'admin.password.clear',userId:command.userId});}
+      else if(command.op==='password.set'){if(!command.userId||!command.password)throw new Error('Escolha o dono e a senha.');await internal('company',{action:'admin.password.set',userId:command.userId,password:command.password});}
+      else{if(!command.amount)throw new Error('Informe o valor.');await internal('company',{action:'admin.adjust',amount:command.amount,reason:command.reason,actorId:admin,requestId:command.requestId});}
+      await this.refreshFactoryLogistics();this.log('admin_company',{playerId:admin,op:command.op,target:command.userId??'',reason:command.reason});client.send('admin.world',this.adminSnapshot());
+    });
     this.handle('employment.view',z.object({}).strict(),2,async client=>{
       const presence=this.forClient(client)!,player=this.player(client),view=await internal<{shift?:unknown}>('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'view'});
-      // A shift is persistent, so reconnecting must restore the live-world
-      // operator set instead of leaving the API and FactoryDirector divergent.
-      if(view.shift){this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.factory.setOperators(this.factoryWorkers.size);}
+      // A shift is persistent, so reconnecting must restore the live-world operator set instead of leaving the API and FactoryDirector divergent.
+      if(view.shift&&!this.factoryWorkers.has(player.id)){this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.factory.setOperators(this.factoryWorkers.size);}
       client.send('employment.state',view);
     });
     this.handle('employment.shift',z.object({on:z.boolean(),requestId:z.uuid().optional()}).strict(),2,async(client,{on,requestId})=>{
-      const presence=this.forClient(client)!,player=this.player(client),entry=this.factory.markers.Ponto_EB_Entrada_Pessoal?.xyz_jogo,panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo,near=(point:readonly number[]|undefined)=>!!point&&Math.hypot(player.x-point[0]!,player.z-point[2]!)<=3;
-      if(!near(entry)&&!near(panel))throw new Error('Vá até a entrada de pessoal ou o painel da fábrica.');
-      if(on){await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'start',requestId:requestId??randomUUID(),station:'entrada'});this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.log('factory_shift_start',{playerId:player.id});}
-      else{await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'stop'});this.factoryWorkers.delete(player.id);player.job='';this.log('factory_shift_stop',{playerId:player.id});}
-      this.factory.setOperators(this.factoryWorkers.size);client.send('employment.state',await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'view'}));
+      const presence=this.forClient(client)!,player=this.player(client),ids={sessionId:presence.ticket.sessionId,userId:presence.ticket.userId};
+      if(!this.factoryNear(player,{Ponto_EB_Entrada_Pessoal:FACTORY_REACH.entrance,Ponto_EB_Painel:FACTORY_REACH.panel}))return this.factoryReply(client,'shift',false,'Vá até a entrada de pessoal ou o painel da fábrica.');
+      if(on){
+        try{await internal('employment',{...ids,action:'start',requestId:requestId??randomUUID(),station:'entrada'});}
+        catch(error){return this.factoryReply(client,'shift',false,error instanceof Error?error.message:'Não foi possível entrar em expediente.');}
+        this.factoryWorkers.add(player.id);player.job='spray-dry-operator';this.log('factory_shift_start',{playerId:player.id});
+        this.factory.note('ok',`${player.displayName} entrou em expediente.`);
+        this.factoryReply(client,'shift',true,presence.factoryPpe?'Expediente iniciado. Bom trabalho!':'Expediente iniciado. Agora coloque o EPI no armário da entrada.');
+      }else{
+        await this.endFactoryShift(presence,player);
+        this.factoryReply(client,'shift',true,'Expediente encerrado. Até a próxima!');
+      }
+      this.factory.setOperators(this.factoryWorkers.size);
+      client.send('employment.state',await internal('employment',{...ids,action:'view'}));
+      this.pushFactory(true);
     });
     this.handle('factory.ppe',z.object({on:z.boolean()}).strict(),3,(client,{on})=>{
-      const presence=this.forClient(client)!,player=this.player(client),point=this.factory.markers.Ponto_EB_Entrada_Pessoal?.xyz_jogo;
-      if(!point||Math.hypot(player.x-point[0],player.z-point[2])>3)throw new Error('Pegue o EPI no armário da entrada.');
-      presence.factoryPpe=on;client.send('factory.ppe',{on});this.log('factory_ppe',{playerId:player.id,on});
+      const presence=this.forClient(client)!,player=this.player(client);
+      if(!this.factoryNear(player,{Ponto_EB_Entrada_Pessoal:FACTORY_REACH.entrance}))return this.factoryReply(client,'ppe',false,'Pegue o EPI no armário da entrada de pessoal.');
+      if(!on&&presence.factoryBag)return this.factoryReply(client,'ppe',false,'Largue o saco antes de tirar o EPI.');
+      // The uniform goes on with the PPE, so the PPE is only for someone working: it never walks out of the plant on a player who is off shift.
+      if(on&&!this.factoryWorkers.has(player.id))return this.factoryReply(client,'ppe',false,'Entre em expediente antes de pegar o EPI.');
+      // Changing clothes needs the body free: seated, riding, kicking or in a game keeps its own pose and model.
+      if(player.interactionState)return this.factoryReply(client,'ppe',false,'Fique em pé, livre e parado para trocar de roupa.');
+      presence.factoryPpe=on;this.dressFactory(presence,player);
+      // The two always agree: a PPE that could not change the clothes is not put on.
+      if(on&&player.skin!==FACTORY_UNIFORM){presence.factoryPpe=false;return this.factoryReply(client,'ppe',false,'Não foi possível vestir o uniforme agora. Tente de novo.');}
+      client.send('factory.ppe',{on});this.log('factory_ppe',{playerId:player.id,on});
+      this.factoryReply(client,'ppe',true,on?'EPI colocado: capacete, luvas e óculos.':'EPI guardado no armário.');this.pushFactory(true);
     });
     this.handle('factory.take',z.object({marker:z.string().max(64),requestId:z.uuid()}).strict(),4,(client,{marker,requestId})=>{
-      const presence=this.forClient(client)!,player=this.player(client),slot=this.factory.slots.find(item=>item.marker===marker),point=this.factory.markers[marker]?.xyz_jogo;
-      if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(presence.factoryBag)throw new Error('Você já está carregando um saco.');if(!slot||!point||Math.hypot(player.x-point[0],player.z-point[2])>2.5)throw new Error('Aproxime-se da vaga.');
-      if(!this.factoryRequests.has(requestId)){presence.factoryBag={material:this.factory.takeBag(marker),origin:marker};this.factoryRequests.add(requestId);}client.send('factory.state',{...this.factory.snapshot(),carrying:presence.factoryBag});
+      const presence=this.forClient(client)!,player=this.player(client),point=this.factory.markers[marker]?.xyz_jogo,reply=(ok:boolean,message:string,extra?:Record<string,unknown>)=>this.factoryReply(client,'take',ok,message,extra);
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(presence.factoryBag)return reply(false,'Você já está com um saco nas mãos: despeje-o num tanque ou devolva-o à prateleira.');
+      if(!point||!/^Ponto_EB_Rack_/.test(marker)||Math.hypot(player.x-point[0],player.z-point[2])>FACTORY_REACH.rack)return reply(false,'Chegue mais perto da prateleira.');
+      if(this.factorySeen(requestId))return reply(true,'Saco já pego.');
+      try{presence.factoryBag=this.factory.takeFromColumn(marker);}catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível pegar o saco.');}
+      this.syncFactoryBag(presence);
+      this.log('factory_take',{playerId:player.id,marker:presence.factoryBag.origin,material:presence.factoryBag.material});
+      reply(true,`Você pegou um saco de ${presence.factoryBag.material}. Leve-o à plataforma de um tanque.`,{material:presence.factoryBag.material});this.pushFactory(true);
+    });
+    this.handle('factory.drop',z.object({requestId:z.uuid()}).strict(),3,(client,{requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'drop',ok,message);
+      if(!presence.factoryBag)return reply(false,'Você não está carregando nenhum saco.');
+      const racks=Object.entries(this.factory.markers).filter(([name])=>name.startsWith('Ponto_EB_Rack_'));
+      if(!racks.some(([,value])=>Math.hypot(player.x-value.xyz_jogo[0],player.z-value.xyz_jogo[2])<=FACTORY_REACH.rack+1))return reply(false,'Devolva o saco numa prateleira.');
+      if(this.factorySeen(requestId))return reply(true,'Saco já devolvido.');
+      if(!this.dropFactoryBag(presence))return reply(false,'A prateleira de origem está cheia.');
+      reply(true,'Saco devolvido à prateleira.');this.pushFactory(true);
     });
     this.handle('factory.pour',z.object({tank:z.number().int().min(1).max(3),requestId:z.uuid()}).strict(),2,(client,{tank,requestId})=>{
-      const presence=this.forClient(client)!,player=this.player(client),point=this.factory.markers[`Ponto_EB_Tanque_${tank}_Operador`]?.xyz_jogo;if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(!presence.factoryBag)throw new Error('Pegue um saco primeiro.');if(!point||Math.hypot(player.x-point[0],player.z-point[2])>2)throw new Error('Suba até a plataforma do tanque.');if(!this.factoryRequests.has(requestId)){this.factory.pourBag(tank as 1|2|3,presence.factoryBag.material);presence.factoryBag=undefined;this.factoryRequests.add(requestId);}client.send('factory.state',{...this.factory.snapshot(),carrying:null});
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'pour',ok,message);
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(!presence.factoryBag)return reply(false,'Pegue um saco na prateleira primeiro.');
+      if(!this.factoryNear(player,{[`Ponto_EB_Tanque_${tank}_Operador`]:FACTORY_REACH.tank}))return reply(false,`Suba até a plataforma do TQ-${100+tank}.`);
+      if(this.factorySeen(requestId))return reply(true,'Saco já despejado.');
+      const bag=presence.factoryBag;let did:string[]=[];
+      try{did=this.factory.pourBag(tank as 1|2|3,bag.material);}catch(error){return reply(false,error instanceof Error?error.message:'O tanque não aceitou o saco.');}
+      presence.factoryBag=undefined;this.syncFactoryBag(presence);this.log('factory_pour',{playerId:player.id,tank,material:bag.material});
+      reply(true,`${bag.material} despejado no TQ-${100+tank}${did.length?` (você ${did.join(' e ')} antes)`:''}.`);this.pushFactory(true);
     });
     this.handle('factory.cmd',z.object({action:z.string().min(1).max(48),target:z.string().max(64).optional(),requestId:z.uuid()}).strict(),8,(client,command)=>{
-      const presence=this.forClient(client)!,player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!this.factoryWorkers.has(player.id)||!presence.factoryPpe)throw new Error('Entre em expediente e coloque o EPI.');if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>3)throw new Error('Use o painel da sala de controle.');if(!this.factoryRequests.has(command.requestId)){this.factory.command(command.action,command.target);this.factoryRequests.add(command.requestId);this.log('factory_command',{playerId:player.id,action:command.action,target:command.target??''});}client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string,extra?:Record<string,unknown>)=>this.factoryReply(client,command.action,ok,message,{requestId:command.requestId,...extra});
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(/^tank[1-3]\.wash$/.test(command.action))return reply(false,'Os tanques são lavados na plataforma de cada um: chegue perto e use "Lavar o tanque" (E).');
+      const station=this.factoryStation(command.action);
+      if(!this.factoryNear(player,station.near))return reply(false,station.hint);
+      if(this.factorySeen(command.requestId))return reply(true,'Comando já executado.');
+      if(command.action==='op.start'){
+        try{this.factory.startProduction(player.displayName,player.id);}catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível iniciar a ordem.');}
+        this.log('factory_op_start',{playerId:player.id});reply(true,'Produção iniciada: já dá para encher os tanques de água.');this.pushFactory(true);return;
+      }
+      const dryerDirt=this.factory.dirt.levels.dryer;
+      const produced=this.factory.bagging.producedBags,tank=/^tank([1-3])\.approve$/.exec(command.action);
+      let message='';
+      try{message=this.factory.command(command.action,command.target,player.displayName);}catch(error){return reply(false,error instanceof Error?error.message:'A fábrica recusou o comando.');}
+      this.log('factory_command',{playerId:player.id,action:command.action,target:command.target??''});
+      // Wages for finished work: each bag stacked, a completed pallet, an approved batch (by its quality).
+      let pay=0;
+      if(this.factory.bagging.producedBags>produced){const bagKg=this.factory.balance.bagKg,kg=this.factory.bagging.lastBagKg??bagKg;pay+=Math.max(1,Math.round(FACTORY_PAY.bag*Math.min(1,kg/bagKg)));if(this.factory.bagging.producedBags%18===0)pay+=FACTORY_PAY.pallet;}
+      if(tank)pay+=Math.round(FACTORY_PAY.batch*(this.factory.tanks[Number(tank[1])-1]?.quality??100)/100);
+      if(command.action==='dryer.clean'&&dryerDirt>=DIRT_PENDING)pay+=cleanTaskOf('dryer')!.pay;
+      if(pay)this.factoryPay(presence,pay,command.action.replace(/[^a-z0-9]+/g,'-'),message);
+      reply(true,message,{pay});this.pushFactory(true);
     });
-    this.handle('factory.view',z.object({}).strict(),4,client=>{const player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>4)throw new Error('Aproxime-se do painel da fábrica.');client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
-    this.handle('factory.order.accept',z.object({orderId:z.uuid(),requestId:z.uuid()}).strict(),2,async(client,{orderId,requestId})=>{const player=this.player(client),panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;if(!panel||Math.hypot(player.x-panel[0],player.z-panel[2])>4)throw new Error('Aceite a ordem no painel da fábrica.');await internal('factory',{action:'order.accept',id:orderId,userId:player.id,requestId});await this.refreshFactoryOrders();this.log('factory_order_accept',{playerId:player.id,orderId,requestId});client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
-    this.handle('factory.order.cargo',z.object({orderId:z.uuid(),stage:z.enum(['load','dock']),requestId:z.uuid()}).strict(),2,async(client,command)=>{const player=this.player(client),truck=this.ownMoto(player.id);if(!truck||!truck.vehicleId||!isTruck(truck))throw new Error('Retire seu caminhão da garagem primeiro.');if(vehicleMotionSpeed(truck)>.1)throw new Error('Pare o caminhão.');if(Math.hypot(player.x-truck.x,player.z-truck.z)>6)throw new Error('Fique perto do caminhão.');const dock=this.factory.markers.Ponto_EB_Doca?.xyz_jogo;if(command.stage==='dock'&&(!dock||Math.hypot(truck.x-dock[0],truck.z-dock[2])>7))throw new Error('Estacione o caminhão na doca da fábrica.');if(command.stage==='load'&&dock&&Math.hypot(truck.x-dock[0],truck.z-dock[2])<20)throw new Error('A etapa externa deve ser feita fora da fábrica.');const result=await internal<{completed?:boolean}>('factory',{action:'order.cargo',orderId:command.orderId,userId:player.id,vehicleId:truck.vehicleId,stage:command.stage,requestId:command.requestId});await this.refreshFactoryOrders();this.log('factory_order_cargo',{playerId:player.id,...command,completed:!!result.completed});client.send('factory.state',{...this.factory.snapshot(),orders:this.factoryOrders});});
+    this.handle('factory.ring',z.object({}).strict(),2,client=>{
+      const presence=this.forClient(client)!,player=this.player(client);
+      if(player.interactionState||player.currentTableId)return this.factoryReply(client,'ring.sent',false,'Desça do veículo ou levante-se para tocar o interfone.');
+      const answer=this.gateRingBy(presence,player);this.factoryReply(client,'ring.sent',answer.ok,answer.message);
+    });
+    this.handle('factory.gate',z.object({action:z.enum(['open','close','dismiss'])}).strict(),4,(client,{action})=>{
+      const presence=this.forClient(client)!,player=this.player(client),answer=this.gateControl(presence,player,action);
+      this.factoryReply(client,'gate',answer.ok,answer.message);
+    });
+    this.handle('factory.watch',z.object({on:z.boolean()}).strict(),4,(client,{on})=>{
+      const presence=this.forClient(client)!,player=this.player(client);
+      if(!on){this.factoryWatchers.delete(player.id);return;}
+      if(!this.factoryWithinView(player))return;
+      this.factoryWatchers.add(player.id);presence.factorySig='';this.pushFactory(true);
+    });
+    this.handle('factory.view',z.object({}).strict(),4,client=>{
+      const presence=this.forClient(client)!,player=this.player(client);
+      if(!this.factoryWithinView(player))throw new Error('Você está longe demais da fábrica.');
+      presence.factorySig='';this.factoryWatchers.add(player.id);this.pushFactory(true);
+    });
+    // Ribeiro Usinagem: physical production stations and the employee computer.
+    this.handle('machine.watch',z.object({on:z.boolean()}).strict(),4,(client,{on})=>{
+      const presence=this.forClient(client)!,player=this.player(client);if(!on){this.machineWatchers.delete(player.id);return;}
+      if(Math.hypot(player.x-RIBEIRO_COMPUTER.x,player.z-RIBEIRO_COMPUTER.z)>80)return;
+      this.machineWatchers.add(player.id);this.sendMachineState(presence);
+    });
+    this.handle('machine.order.start',z.object({weapon:z.enum(WEAPON_IDS),requestId:z.uuid()}).strict(),4,(client,{weapon,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>client.send('machine.result',{action:'order.start',ok,message,requestId});
+      if(!this.machineNear(player,'computer'))return reply(false,'Use o computador da Ribeiro para abrir a OP.');
+      if(this.factoryRequests.has(requestId))return reply(true,'Ordem já registrada.');
+      const result=this.machineShop.start(weapon as WeaponId,player.id,player.displayName);if(result.ok)this.factorySeen(requestId);reply(result.ok,result.message);this.pushMachine();
+    });
+    this.handle('machine.order.cancel',z.object({id:z.uuid()}).strict(),4,(client,{id})=>{const player=this.player(client),reply=(ok:boolean,message:string)=>client.send('machine.result',{action:'order.cancel',ok,message});if(!this.machineNear(player,'computer'))return reply(false,'Use o computador da Ribeiro.');const result=this.machineShop.cancel(id);reply(result.ok,result.message);this.pushMachine();});
+    this.handle('machine.material.request',z.object({material:z.enum(RIBEIRO_MATERIALS),pallets:z.number().int().min(1).max(10),requestId:z.uuid()}).strict(),4,async(client,{material,pallets,requestId})=>{
+      const player=this.player(client),reply=(ok:boolean,message:string)=>client.send('machine.result',{action:'material.request',ok,message,requestId});if(!this.machineNear(player,'computer'))return reply(false,'Faça o pedido pelo computador da Ribeiro.');
+      if(this.factoryOrders.some(order=>order.kind==='ribeiro-purchase'&&order.material===material&&(order.status==='open'||order.status==='accepted')))return reply(false,`Já existe um pedido ativo de ${material} no HighCargo.`);
+      try{await internal('factory',{action:'order.create',kind:'ribeiro-purchase',material,pallets,price:0,requestId});await this.refreshFactoryOrders();this.pushFreight(true);this.pushMachine();reply(true,`Pedido de ${pallets} palete(s) de ${material} publicado no HighCargo.`);}catch(error){reply(false,error instanceof Error?error.message:'Não foi possível publicar o pedido.');}
+    });
+    this.handle('machine.stock.take',z.object({weapon:z.enum(WEAPON_IDS),requestId:z.uuid()}).strict(),3,async(client,{weapon,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>client.send('machine.result',{action:'stock.take',ok,message,requestId});
+      if(!this.machineNear(player,'stock'))return reply(false,'A retirada é feita no estoque físico da Ribeiro.');
+      if(player.interactionState||player.currentTableId)return reply(false,'Fique de pé e com as mãos livres para retirar a arma.');
+      if(this.factoryRequests.has(requestId))return reply(true,'Retirada já registrada.');
+      if(!this.machineShop.takeStock(weapon as WeaponId))return reply(false,`Não há ${WEAPONS[weapon as WeaponId].name} disponível no estoque.`);
+      try{
+        const granted=await internal<{view:ArsenalView;applied:boolean}>('arsenal/grant',{userId:player.id,weapon,requestId});
+        if(!granted.applied){this.machineShop.returnStock(weapon as WeaponId);reply(false,'Você já possui essa arma no arsenal.');this.pushMachine();return;}
+        this.factorySeen(requestId);const view=cleanArsenal(granted.view);this.weapons.setArsenal(player,view);client.send('weapon.arsenal',view);
+        reply(true,`${WEAPONS[weapon as WeaponId].name} retirada e registrada no seu arsenal.`);this.log('machine_shop_withdraw',{playerId:player.id,weapon});this.pushMachine();
+      }catch(error){this.machineShop.returnStock(weapon as WeaponId);reply(false,error instanceof Error?error.message:'Não foi possível registrar a retirada.');this.pushMachine();}
+    });
+    this.handle('machine.interact',z.object({stationId:z.enum(RIBEIRO_SPOTS.map(spot=>spot.id) as [RibeiroSpotId,...RibeiroSpotId[]])}).strict(),6,(client,{stationId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>client.send('machine.result',{action:'interact',ok,message});if(!this.machineNear(player,stationId))return reply(false,'Chegue mais perto da estação.');
+      if(player.interactionState||player.currentTableId)return reply(false,'Fique de pé e com as mãos livres para operar a estação.');
+      const gameKind=this.machineShop.challengeFor(stationId,presence.ribeiroCarry??null);
+      if(gameKind){const reserved=this.machineGames.get(stationId);if(reserved&&reserved!==player.id)return reply(false,'Outro operador está usando os controles desta máquina.');this.clearMachineGame(presence);const challenge=createMachineGame(gameKind,stationId);presence.ribeiroGame=challenge;this.machineGames.set(stationId,player.id);client.send('machine.game',{action:'start',challenge});reply(true,`${challenge.title} aberta. Conclua a operação para iniciar a máquina.`);return;}
+      const result=this.machineShop.interact(player.id,player.displayName,stationId,presence.ribeiroCarry??null);if(result.carry!==undefined)presence.ribeiroCarry=result.carry??undefined;reply(result.ok,result.message);this.pushMachine();
+    });
+    this.handle('machine.game.answer',z.object({id:z.uuid(),answer:z.union([z.number().finite().min(0).max(100),z.string().max(80)])}).strict(),8,(client,{id,answer})=>{
+      const presence=this.forClient(client)!,player=this.player(client),game=presence.ribeiroGame;
+      if(!game||game.id!==id)return client.send('machine.game',{action:'end',ok:false,message:'Esse desafio não está mais ativo.'});
+      if(Date.now()>game.expiresAt||!this.machineNear(player,game.stationId)){this.clearMachineGame(presence);return client.send('machine.game',{action:'end',ok:false,message:'Operação cancelada: você saiu da máquina ou o tempo acabou.'});}
+      if(!machineGameCorrect(game,answer))return client.send('machine.game',{action:'feedback',ok:false,message:game.kind==='cut'||game.kind==='finish'?'A regulagem ficou fora da tolerância. Ajuste e tente novamente.':'Sequência incorreta. Reinicie os comandos e tente novamente.'});
+      this.clearMachineGame(presence);const result=this.machineShop.interact(player.id,player.displayName,game.stationId,presence.ribeiroCarry??null);if(result.carry!==undefined)presence.ribeiroCarry=result.carry??undefined;
+      client.send('machine.game',{action:'end',ok:result.ok,message:result.ok?'Operação concluída dentro da especificação.':result.message});client.send('machine.result',{action:'interact',ok:result.ok,message:result.message});this.pushMachine();
+    });
+    this.handle('machine.game.cancel',z.object({id:z.uuid()}).strict(),4,(client,{id})=>{const presence=this.forClient(client)!;if(presence.ribeiroGame?.id===id)this.clearMachineGame(presence);client.send('machine.game',{action:'end',ok:false,message:'Operação cancelada.'});});
+    // Raw material is bought by the firm's owners (Perfil → Gerenciar empresa, company.purchase): it costs the firm's wallet. The plant's computer only says so.
+    for(const name of ['factory.order.request','factory.order.cancel'])this.handle(name,z.object({}).passthrough(),3,client=>this.factoryReply(client,name.slice(8),false,'A compra de matéria-prima agora é feita pelo dono da empresa: Perfil → Gerenciar empresa. O saldo da empresa paga.'));
+    // The freight app (the phone of whoever owns or drives a truck): the plant's open requests, accepted from anywhere while at the wheel of a truck.
+    this.handle('freight.view',z.object({}).strict(),2,client=>{const presence=this.forClient(client)!;presence.freightSig='';this.pushFreight(true,presence);});
+    this.handle('freight.accept',z.object({orderId:z.uuid(),requestId:z.uuid()}).strict(),3,async(client,{orderId,requestId})=>{
+      const player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'freight.accept',ok,message,{requestId});
+      const truck=this.drivenTruck(player.id);
+      if(!truck)return reply(false,'Aceite estando ao volante do seu caminhão: entre nele e tente de novo.');
+      if(this.factoryShipments.some(trip=>trip.driverId===player.id&&SHIPMENT_ACTIVE.includes(trip.status)))return reply(false,'Você já tem uma viagem em andamento: termine ou desista dela primeiro.');
+      const order=this.factoryOrders.find(each=>each.id===orderId);if(!order||(order.kind!=='purchase'&&order.kind!=='ribeiro-purchase')||order.status!=='open')return reply(false,'Esse pedido não está mais aberto: outro motorista ou o fornecedor já o pegou.');
+      if(this.factorySeen(requestId))return reply(true,'Entrega já aceita.');
+      const factoryDock=this.factory.markers.Ponto_EB_Doca!.xyz_jogo,dock=order.kind==='ribeiro-purchase'?[RIBEIRO_DOCK.x,RIBEIRO_DOCK.y,RIBEIRO_DOCK.z] as const:factoryDock;
+      try{
+        const result=await internal<{shipment:FactoryShipmentView}>('factory',{action:'shipment.accept',orderId,vehicleId:truckKeyOf(truck),plate:truck.plate,driverId:player.id,dest:pickDeliveryTarget({x:dock[0],z:dock[2]}),requestId});
+        this.log('factory_ship_accept',{playerId:player.id,shipment:result.shipment.id,via:'app'});
+        this.factory.note('info',`${player.displayName} pegou a entrega de ${result.shipment.pallets} palete(s) de ${result.shipment.material}.`);
+        reply(true,`Entrega aceita: ${result.shipment.pallets} palete(s) de ${result.shipment.material} em ${result.shipment.destLabel}. O GPS marca o fornecedor e depois o recebimento de ${order.kind==='ribeiro-purchase'?RIBEIRO_NAME:'EMPRESA BRASIL'}.`);
+      }catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível aceitar a entrega.');}
+      await this.refreshFactoryLogistics();await this.refreshFactoryOrders();this.pushFactory(true);this.pushFreight(true);
+    });
+    // The dock: a truck belongs to its driver. Parked at the dock it is loaded (or unloaded) by the operator; the sale is settled when it leaves the
+    // plant, and the driver is paid when the cargo arrives. Nobody on shift ever takes a truck out.
+    this.handle('factory.dock.load',z.object({vehicleId:z.string().min(1).max(64),pallets:z.number().int().min(1).max(10),requestId:z.uuid()}).strict(),4,async(client,{vehicleId,pallets,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'dock.load',ok,message);
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(!this.factoryNear(player,{Ponto_EB_Painel:FACTORY_REACH.panel,Ponto_EB_Doca:FACTORY_REACH.dock+1}))return reply(false,'Use o painel da sala de controle ou chegue perto da doca.');
+      const truck=this.dockTrucks().find(each=>each.vehicleId===vehicleId);if(!truck)return reply(false,'Esse caminhão não está estacionado na doca (parado, perto do portão de carga).');
+      if(pallets>this.factoryFinance.maxPalletsPerTruck)return reply(false,`Um caminhão leva no máximo ${this.factoryFinance.maxPalletsPerTruck} paletes.`);
+      if(this.factorySeen(requestId))return reply(true,'Carga já registrada.');
+      let taken:Record<string,number>;
+      try{taken=this.factory.takeProduct(pallets);}catch(error){return reply(false,error instanceof Error?error.message:'Não há produto para carregar.');}
+      const dock=this.factory.markers.Ponto_EB_Doca!.xyz_jogo;
+      try{
+        const result=await internal<{shipment:FactoryShipmentView}>('factory',{action:'shipment.load',vehicleId,plate:truck.plate,driverId:truck.driverId,loaderId:player.id,pallets,dest:pickDeliveryTarget({x:dock[0],z:dock[2]}),requestId});
+        this.log('factory_ship_load',{playerId:player.id,vehicleId,pallets,shipment:result.shipment.id});
+        this.factory.soil('floor-doca',.12);
+        this.factory.note('ok',`${player.displayName} carregou ${pallets} palete(s) num caminhão (${truck.plate||'sem placa'}).`);
+        reply(true,`${truck.plate?`Caminhão ${truck.plate}`:'Caminhão'} carregado com ${pallets} palete(s). Quem estiver dirigindo recebe a rota (${result.shipment.destLabel}); quando ele sair da fábrica a venda é paga.`);
+      }catch(error){this.factory.returnProduct(taken);return reply(false,error instanceof Error?error.message:'Não foi possível carregar o caminhão.');}
+      await this.refreshFactoryLogistics();
+    });
+    this.handle('factory.dock.unload',z.object({vehicleId:z.string().min(1).max(64),requestId:z.uuid()}).strict(),4,async(client,{vehicleId,requestId})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'dock.unload',ok,message);
+      const gate=this.factoryGate(presence,player);if(gate)return reply(false,gate);
+      if(!this.factoryNear(player,{Ponto_EB_Painel:FACTORY_REACH.panel,Ponto_EB_Doca:FACTORY_REACH.dock+1}))return reply(false,'Use o painel da sala de controle ou chegue perto da doca.');
+      const truck=this.dockTrucks().find(each=>each.vehicleId===vehicleId),trip=this.factoryShipments.find(each=>each.vehicleId===vehicleId&&each.kind==='purchase'&&each.status==='returning');
+      if(!truck)return reply(false,'Esse caminhão não está estacionado na doca.');if(!trip)return reply(false,'Esse caminhão não traz matéria-prima para descarregar.');
+      if(this.factory.roomFor(trip.material)<trip.bags)return reply(false,`As prateleiras de ${trip.material} não têm vaga para ${trip.bags} sacos.`);
+      if(this.factorySeen(requestId))return reply(true,'Descarga já registrada.');
+      try{await this.unloadPurchase(trip,player.id,reply);}catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível descarregar.');}
+      await this.refreshFactoryLogistics();
+    });
+    this.handle('factory.dock.accept',z.object({orderId:z.uuid(),vehicleId:z.string().min(1).max(64),requestId:z.uuid()}).strict(),4,async(client,{orderId,vehicleId,requestId})=>{
+      const player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'dock.accept',ok,message);
+      const truck=this.dockTrucks().find(each=>each.vehicleId===vehicleId);
+      if(!truck)return reply(false,'Esse caminhão não está estacionado na doca (parado, perto do portão de carga).');
+      if(!this.factoryNear(player,{Ponto_EB_Doca:FACTORY_REACH.dock+6})&&truck.driverId!==player.id)return reply(false,'Chegue perto da doca para pegar a coleta.');
+      if(this.factorySeen(requestId))return reply(true,'Coleta já aceita.');
+      const dock=this.factory.markers.Ponto_EB_Doca!.xyz_jogo;
+      try{
+        const result=await internal<{shipment:FactoryShipmentView}>('factory',{action:'shipment.accept',orderId,vehicleId,plate:truck.plate,driverId:player.id,dest:pickDeliveryTarget({x:dock[0],z:dock[2]}),requestId});
+        this.log('factory_ship_accept',{playerId:player.id,shipment:result.shipment.id});
+        reply(true,`Coleta aceita: ${result.shipment.pallets} palete(s) de ${result.shipment.material} em ${result.shipment.destLabel}. Dirija o caminhão pelo GPS, volte à doca e o operador descarrega.`);
+      }catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível aceitar a coleta.');}
+      await this.refreshFactoryLogistics();await this.refreshFactoryOrders();this.pushFactory(true);
+    });
+    this.handle('factory.shipment.cancel',z.object({id:z.uuid()}).strict(),4,async(client,{id})=>{
+      const presence=this.forClient(client)!,player=this.player(client),reply=(ok:boolean,message:string)=>this.factoryReply(client,'shipment.cancel',ok,message);
+      const trip=this.factoryShipments.find(each=>each.id===id);if(!trip)return reply(false,'Carga não encontrada.');
+      // The driver gives up a purchase trip; the operator takes back a sale that has not left the plant.
+      const driverQuits=trip.driverId===player.id&&trip.kind==='purchase'&&(trip.status==='to_supplier'||trip.status==='returning');
+      const operatorTakesBack=trip.kind==='sale'&&trip.status==='loaded'&&!this.factoryGate(presence,player)&&this.factoryNear(player,{Ponto_EB_Painel:FACTORY_REACH.panel,Ponto_EB_Doca:FACTORY_REACH.dock+1});
+      if(!driverQuits&&!operatorTakesBack)return reply(false,trip.status==='in_transit'?'Essa carga já saiu da fábrica e foi paga: entregue-a.':'Você não pode cancelar essa carga agora.');
+      try{await this.cancelShipment(id,player.id);}catch(error){return reply(false,error instanceof Error?error.message:'Não foi possível cancelar.');}
+      reply(true,trip.kind==='sale'?'Carga devolvida ao estoque.':'Coleta cancelada: a ordem voltou a ficar aberta.');
+    });
     // Administration and debugging (role from the session, refreshed every maintenance round).
     this.handle('admin.world',z.object({}).strict(),2,client=>{this.requireAdmin(client);client.send('admin.world',this.adminSnapshot());});
     this.handle('admin.factory.stock',z.object({requestId:z.uuid(),marker:z.string().max(64),quantity:z.number().int().min(0).max(18),material:z.enum(['MALTE','MIX','PRODUTO']).optional(),reason:z.string().min(3).max(500)}).strict(),5,(client,command)=>{
@@ -1066,7 +1381,26 @@ export class BarRoom extends Room<{ state: BarState }> {
         this.factory.revision++;this.factoryRequests.add(command.requestId);this.log('admin_factory_debug',{playerId:admin,...command});}client.send('admin.world',this.adminSnapshot());
     });
     this.handle('admin.factory.order',z.object({requestId:z.uuid(),op:z.enum(['create','complete','cancel','expire','ghost']),id:z.uuid().optional(),kind:z.enum(['purchase','sale']).optional(),material:z.enum(['MALTE','MIX','PRODUTO']).optional(),pallets:z.number().int().min(1).max(25).optional(),price:z.number().int().min(0).max(1_000_000).optional(),reason:z.string().min(3).max(500)}).strict(),3,async(client,command)=>{
-      const admin=this.requireAdmin(client);if(command.op==='create')await internal('factory',{action:'order.create',kind:command.kind??'purchase',material:command.material??'MALTE',pallets:command.pallets??1,price:command.price??0,requestId:command.requestId});else if(command.op==='ghost')await internal('factory',{action:'order.ghost',id:command.id,requestId:command.requestId});else await internal('factory',{action:'order.status',id:command.id,status:command.op==='cancel'?'cancelled':command.op==='expire'?'expired':'completed',requestId:command.requestId});await this.refreshFactoryOrders();this.log('admin_factory_order',{playerId:admin,...command});client.send('admin.world',this.adminSnapshot());
+      const admin=this.requireAdmin(client);if(command.op==='create')await internal('factory',{action:'order.create',kind:command.kind??'purchase',material:command.material??'MALTE',pallets:command.pallets??1,price:command.price??0,requestId:command.requestId});else if(command.op==='ghost'){const order=this.factoryOrders.find(each=>each.id===command.id);if(!order||order.kind!=='purchase'||(order.status!=='open'&&order.status!=='accepted'))throw new Error('Só uma ordem de compra aberta pode ser entregue por aqui.');this.factory.addBags(order.material as 'MALTE'|'MIX'|'PRODUTO',Number(order.pallets)*18);await internal('factory',{action:'order.status',id:command.id,status:'completed',requestId:command.requestId});}else await internal('factory',{action:'order.status',id:command.id,status:command.op==='cancel'?'cancelled':command.op==='expire'?'expired':'completed',requestId:command.requestId});await this.refreshFactoryOrders();this.log('admin_factory_order',{playerId:admin,...command});client.send('admin.world',this.adminSnapshot());
+    });
+
+    // The plant's money, the city's vault and the trips, from the administration (docs/sistemas/fabrica.md, "Logística e finanças").
+    this.handle('admin.factory.finance',z.object({requestId:z.uuid(),reason:z.string().min(3).max(500),patch:factoryFinancePatchSchema}).strict(),3,async(client,command)=>{
+      const admin=this.requireAdmin(client);
+      await internal('factory',{action:'finance.set',patch:command.patch,actorId:admin,requestId:command.requestId});
+      await this.refreshFactoryLogistics();this.log('admin_factory_finance',{playerId:admin,reason:command.reason,patch:command.patch});client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.factory.treasury',z.object({requestId:z.uuid(),reason:z.string().min(3).max(200),amount:z.number().int().min(-1_000_000_000).max(1_000_000_000).refine(value=>value!==0)}).strict(),3,async(client,command)=>{
+      const admin=this.requireAdmin(client);
+      await internal('factory',{action:'treasury.adjust',amount:command.amount,reason:command.reason,actorId:admin,requestId:command.requestId});
+      await this.refreshFactoryLogistics();this.log('admin_factory_treasury',{playerId:admin,reason:command.reason,amount:command.amount});client.send('admin.world',this.adminSnapshot());
+    });
+    this.handle('admin.factory.shipment',z.object({requestId:z.uuid(),reason:z.string().min(3).max(500),id:z.uuid(),op:z.enum(['cancel','depart','deliver'])}).strict(),3,async(client,command)=>{
+      const admin=this.requireAdmin(client),trip=this.factoryShipments.find(each=>each.id===command.id);if(!trip)throw new Error('Carga não encontrada (talvez já encerrada).');
+      if(command.op==='cancel')await this.cancelShipment(trip.id,admin);
+      else if(command.op==='depart'){if(trip.status!=='loaded')throw new Error('Só uma carga ainda na doca pode ser liberada.');await this.settleDeparture(trip);}
+      else{if(trip.status!=='in_transit'&&trip.status!=='to_supplier')throw new Error('A carga não está a caminho.');await this.settleArrival(trip);}
+      await this.refreshFactoryLogistics();this.log('admin_factory_shipment',{playerId:admin,reason:command.reason,id:command.id,op:command.op});client.send('admin.world',this.adminSnapshot());
     });
     this.handle('admin.environment',environmentPatchSchema,4,(client,patch)=>{
       const admin=this.requireAdmin(client),now=Date.now();
@@ -1396,6 +1730,8 @@ export class BarRoom extends Room<{ state: BarState }> {
   private step(): void {
     const now = Date.now();
     this.factory.tick(TICK_MS/1000);
+    this.reconcileFactoryUniforms();
+    this.pushFactory();
     this.state.serverTime = now;
     let lapAt = performance.now();
     const lap = (name: string) => { const t = performance.now(); this.performanceSampler.recordPhase(name, t - lapAt); worldMetrics.observe(`bar_world_phase_${name.replace(/\W/g, '_')}_ms`, `Tick phase ${name} in ms`, t - lapAt, 200); lapAt = t; };
@@ -3149,23 +3485,423 @@ export class BarRoom extends Room<{ state: BarState }> {
       process:{uptimeS:Math.round(process.uptime()),node:process.version,pid:process.pid,rss:process.memoryUsage().rss,heapUsed:process.memoryUsage().heapUsed,
         tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95),apiOkAt:health.apiOkAt,outboxWritable:health.outboxWritable},resultOutbox:this.results.pending,event:this.state.event.type,
       bots:{...this.bots.snapshot(),inBar:[...this.sessions].filter(([,p])=>p.ticket.bot).length,max:this.botRoom(),tickP95:worldMetrics.window('bar_world_tick_ms')?.percentile(95)},
-      factory:{...this.factory.snapshot(),orders:this.factoryOrders,
+      factory:{...this.factory.snapshot(),orders:this.factoryOrders,finance:this.factoryFinance,treasury:this.factoryTreasury,company:this.factoryCompany,shipments:this.factoryShipments,summary:this.factorySummary,dock:this.dockTrucks(),
         markers:Object.entries(this.factory.markers).map(([name,marker])=>({name,xyz:marker.xyz_jogo})),
         operators:[...this.factoryWorkers].map(id=>{const worker=this.state.players.get(id),presence=this.sessions.getByUser(id);return {id,name:worker?.displayName??id,station:worker?.interactionState||'operação',ppe:!!presence?.factoryPpe,carrying:presence?.factoryBag?.material??'',since:presence?.joinedAt??now};}),
         equipment:{paleteira:{state:'disponível',hours:0,reservedBy:''},empilhadeira:{state:'disponível',hours:0,reservedBy:''},balanca:{state:'operacional',hours:0,reservedBy:''},bombas:{state:this.factory.emergency?'paradas':'operacionais',hours:0,reservedBy:''}}},
     };
   }
-  private async recoverFactory():Promise<void>{
-    try{const saved=await internal<{state?:unknown;revision?:number;slots?:Array<Record<string,unknown>>}>('factory',{action:'view'}),slots=Array.isArray(saved?.slots)?saved.slots:[];if(saved?.state||slots.length){this.factory.restore(saved.state,slots as never[]);this.factoryPersistedRevision=this.factory.revision;this.log('factory_recovered',{revision:saved.revision??0,slots:slots.length});}await this.refreshFactoryOrders();}
-    catch(error){this.log('factory_recover_error',{error:error instanceof Error?error.message:String(error)});}
+  /** Reads the saved plant and the orders; the API may still be starting, so it tries again until it can. */
+  private machineNear(player:Player,id:RibeiroSpotId):boolean {const spot=RIBEIRO_SPOTS.find(item=>item.id===id);return !!spot&&Math.hypot(player.x-spot.x,player.z-spot.z)<=spot.reach&&Math.abs(player.y-spot.y)<=1.6;}
+  private machineView(presence:Presence){return {...this.machineShop.snapshot(),purchaseOrders:this.factoryOrders.filter(order=>order.kind==='ribeiro-purchase').map(order=>({id:String(order.id),material:String(order.material),pallets:Number(order.pallets),status:String(order.status),createdAt:String(order.createdAt)})),me:{carrying:presence.ribeiroCarry??null}};}
+  private sendMachineState(presence:Presence):void {presence.client.send('machine.state',this.machineView(presence));}
+  private pushMachine():void {for(const id of [...this.machineWatchers]){const presence=this.sessions.getByUser(id),player=this.state.players.get(id);if(!presence||!player||Math.hypot(player.x-RIBEIRO_COMPUTER.x,player.z-RIBEIRO_COMPUTER.z)>85){this.machineWatchers.delete(id);continue;}this.sendMachineState(presence);}}
+  private clearMachineGame(presence:Presence):void {const game=presence.ribeiroGame;if(game&&this.machineGames.get(game.stationId)===presence.ticket.userId)this.machineGames.delete(game.stationId);presence.ribeiroGame=undefined;}
+  private machineShopTick():void {for(const [,presence] of this.sessions){const game=presence.ribeiroGame,player=this.state.players.get(presence.ticket.userId);if(game&&(Date.now()>game.expiresAt||!player||!this.machineNear(player,game.stationId))){this.clearMachineGame(presence);presence.client.send('machine.game',{action:'end',ok:false,message:'Operação encerrada: permaneça junto à máquina.'});}}const notices=this.machineShop.tick();for(const notice of notices)this.sessions.getByUser(notice.operatorId)?.client.send('machine.result',{action:'complete',ok:true,message:notice.message});if(notices.length)this.pushMachine();}
+  private async recoverMachineShop(attempt=0):Promise<void>{try{const loaded=await internal<{state:unknown}>('machine-shop',{action:'load'});if(loaded.state)this.machineShop.restore(loaded.state);this.machineRecovered=true;this.machinePersistedRevision=-1;this.pushMachine();}catch(error){this.log('machine_shop_recover_error',{attempt,error:error instanceof Error?error.message:String(error)});if(attempt<40)this.clock.setTimeout(()=>void this.recoverMachineShop(attempt+1),4000);}}
+  private async persistMachineShop():Promise<void>{if(!this.machineRecovered||this.machinePersisting||this.machinePersistedRevision===this.machineShop.state.revision)return;this.machinePersisting=true;const revision=this.machineShop.state.revision;try{await internal('machine-shop',{action:'save',state:this.machineShop.snapshot(),actorId:'world'});this.machinePersistedRevision=revision;}catch(error){this.log('machine_shop_persist_error',{error:error instanceof Error?error.message:String(error)});}finally{this.machinePersisting=false;}}
+
+  private async recoverFactory(attempt=0):Promise<void>{
+    try{
+      const saved=await internal<{state?:unknown;revision?:number;slots?:Array<Record<string,unknown>>}>('factory',{action:'view'}),slots=Array.isArray(saved?.slots)?saved.slots:[];
+      if(saved?.state||slots.length){this.factory.restore(saved.state,slots as never[]);this.log('factory_recovered',{revision:saved.revision??0,slots:slots.length});}
+      // Nobody is at a station after a restart: shifts the API still holds open would keep the slots taken.
+      await internal('employment',{action:'shifts.reset'}).catch(()=>undefined);
+      if(!this.factory.seeded&&this.factory.pristine())this.factory.seedStarterStock();
+      this.factoryPersistedRevision=-1;this.factoryRecovered=true;
+      await this.refreshFactoryOrders();await this.refreshFactoryLogistics();await this.dispatchFactoryOrders();
+    }catch(error){
+      this.log('factory_recover_error',{attempt,error:error instanceof Error?error.message:String(error)});
+      if(attempt<40)this.clock.setTimeout(()=>{void this.recoverFactory(attempt+1);},4000);
+    }
   }
-  private async refreshFactoryOrders():Promise<void>{const result=await internal<{orders?:Array<Record<string,unknown>>}>('factory',{action:'orders'});this.factoryOrders=Array.isArray(result?.orders)?result.orders:[];}
+
+  // ---- EMPRESA BRASIL: the freight app (phone), the dock crew and the supplier's own driver ----
+  /** The truck this player is at the wheel of right now (a player's or one the administration spawned). */
+  private drivenTruck(userId:string):Moto|undefined {let found:Moto|undefined;this.state.motos.forEach(moto=>{if(isTruck(moto)&&moto.riderId===userId&&!moto.phase)found=moto;});return found;}
+  /** When the supplier's own driver brings an order nobody took: its dueAt, or half an hour after it was made (older orders have none). */
+  private npcAtOf(order:Record<string,unknown>):number {
+    const due=Date.parse(String(order.dueAt??''));if(Number.isFinite(due))return due;
+    const made=Date.parse(String(order.createdAt??''));return (Number.isFinite(made)?made:Date.now())+FACTORY_NPC_DELIVERY_MIN*60_000;
+  }
+  private freightOffers():FreightOffer[] {
+    return this.factoryOrders.filter(order=>(order.kind==='purchase'||order.kind==='ribeiro-purchase')&&order.status==='open').map(order=>({id:String(order.id),material:order.material as FreightOffer['material'],pallets:Number(order.pallets),bags:Number(order.pallets)*18,createdAt:Date.parse(String(order.createdAt))||Date.now(),npcAt:this.npcAtOf(order),requestedBy:order.kind==='ribeiro-purchase'?RIBEIRO_NAME:'EMPRESA BRASIL'}))
+      .sort((a,b)=>a.npcAt-b.npcAt);
+  }
+  /** Whoever owns a truck key (or is at the wheel of any truck) has the app. */
+  private freightState(presence:Presence,offers:FreightOffer[]):FreightState {
+    const userId=presence.ticket.userId,driven=this.drivenTruck(userId),eligible=!!driven||presence.vehicles.some(vehicle=>vehicle.model===TRUCK_MODEL);
+    const f=this.factoryFinance,empty:FreightState={eligible:false,driving:null,offers:[],trip:null,recent:[],pay:{purchaseFreight:f.purchaseFreight,freightPerKm:f.freightPerKm,freightPerPallet:f.freightPerPallet}};
+    if(!eligible)return empty;
+    const mine=this.factoryShipments.filter(trip=>trip.driverId===userId),trip=mine.find(each=>SHIPMENT_ACTIVE.includes(each.status));
+    return {...empty,eligible:true,driving:driven?{plate:driven.plate,vehicleId:truckKeyOf(driven)}:null,offers,
+      trip:trip?{id:trip.id,kind:trip.kind,status:trip.status,material:trip.material,pallets:trip.pallets,plate:trip.plate,freight:trip.freight,destLabel:trip.destLabel,destX:trip.destX,destZ:trip.destZ}:null,
+      recent:mine.filter(each=>each.status==='delivered').slice(0,8).map(each=>({id:each.id,kind:each.kind,material:each.material,pallets:each.pallets,freight:each.freight,status:each.status,at:each.deliveredAt}))};
+  }
+  /** Sends the app's state to whoever it changed for (all of them with `force`, or just `only`). */
+  private pushFreight(force=false,only?:Presence):void {
+    const offers=this.freightOffers();
+    for(const [,presence] of this.sessions){
+      if(only&&presence!==only)continue;if(presence.ticket.bot)continue;
+      const state=this.freightState(presence,offers),signature=JSON.stringify(state);
+      if(signature===presence.freightSig&&!(force&&only))continue;presence.freightSig=signature;presence.client.send('freight.state',state);
+    }
+  }
+  /** Raw material comes off a truck parked at the dock onto the racks: the driver is paid. Used by the operator and, after a while, by the dock crew. */
+  private async unloadPurchase(trip:FactoryShipmentView,loaderId:string,reply?:(ok:boolean,message:string)=>void):Promise<void> {
+    const ribeiro=isRibeiroMaterial(trip.material);
+    if(!ribeiro&&this.factory.roomFor(trip.material)<trip.bags)throw new Error(`As prateleiras de ${trip.material} não têm vaga para ${trip.bags} sacos.`);
+    const result=await internal<{applied:boolean;payouts:Payout[]}>('factory',{action:'shipment.unload',id:trip.id,loaderId});
+    if(result.applied){
+      if(isRibeiroMaterial(trip.material))this.machineShop.addMaterial(trip.material,trip.bags);
+      else{this.factory.addBags(trip.material,trip.bags);this.factory.soil('floor-doca',.12);}
+      for(const payout of result.payouts)this.notifyPayout(payout,'Frete da coleta');
+    }
+    this.log('factory_ship_unload',{playerId:loaderId,shipment:trip.id});
+    reply?.(true,`${trip.bags} volumes de ${trip.material} recebidos por ${ribeiro?RIBEIRO_NAME:'EMPRESA BRASIL'}. O motorista foi pago.`);
+    await this.refreshFactoryLogistics();
+    if(ribeiro)this.pushMachine();
+  }
+  /** A truck back from a collection waits at the dock; an operator unloads it, and with none (or none who comes) the dock crew does after a while. */
+  private async dockCrew():Promise<boolean> {
+    let changed=false;
+    for(const trip of this.factoryShipments){
+      const docked=isRibeiroMaterial(trip.material)?this.dockTrucksAt(RIBEIRO_DOCK,5):this.dockTrucks();
+      if(trip.kind!=='purchase'||trip.status!=='returning'||!docked.some(truck=>truck.vehicleId===trip.vehicleId)){this.dockSince.delete(trip.id);continue;}
+      const since=this.dockSince.get(trip.id)??Date.now();this.dockSince.set(trip.id,since);
+      if(Date.now()-since<(isRibeiroMaterial(trip.material)?8_000:(this.factoryWorkers.size?45_000:8_000)))continue;
+      try{await this.unloadPurchase(trip,trip.driverId);this.dockSince.delete(trip.id);changed=true;
+        this.sessions.getByUser(trip.driverId)?.client.send('factory.result',{action:'notice',ok:true,message:`A equipe da doca descarregou ${trip.bags} sacos de ${trip.material}. Frete pago.`});}
+      catch(error){if(!this.shipmentNotified.has(trip.id)){this.shipmentNotified.add(trip.id);this.sessions.getByUser(trip.driverId)?.client.send('factory.result',{action:'notice',ok:false,message:error instanceof Error?error.message:'A doca não conseguiu descarregar.'});}}
+    }
+    return changed;
+  }
+
+  // ---- EMPRESA BRASIL: the dock, the trucks' trips and the money ----
+  /** The truck (out on the street) that belongs to `vehicleId`. */
+  private motoOfVehicle(key:string):Moto|undefined {let found:Moto|undefined;this.state.motos.forEach(moto=>{if(truckKeyOf(moto)===key)found=moto;});return found;}
+  /** Any truck (a player's or one the administration spawned), parked and whole at the dock: what the operator may load and what a coleta starts from. */
+  private dockTrucks():DockTruck[] {
+    const dock=this.factory.markers.Ponto_EB_Doca?.xyz_jogo;if(!dock)return [];
+    return this.dockTrucksAt({x:dock[0],y:dock[1],z:dock[2]},FACTORY_REACH.dock);
+  }
+  private dockTrucksAt(dock:{x:number;y?:number;z:number},reach:number):DockTruck[] {
+    const out:DockTruck[]=[];
+    this.state.motos.forEach(moto=>{
+      if(!isTruck(moto)||moto.phase)return;
+      if(Math.hypot(moto.x-dock.x,moto.z-dock.z)>reach||vehicleMotionSpeed(moto)>FACTORY_DOCK.parkSpeed)return;
+      out.push({vehicleId:truckKeyOf(moto),ownerId:moto.ownerId,ownerName:moto.ownerName,plate:moto.plate,driverId:moto.riderId});
+    });
+    return out;
+  }
+  /** Tells a player they were paid (their balance moves on their screen and a floating amount shows). */
+  private notifyPayout(payout:{userId:string;amount:number;balance:number},label:string):void {
+    const presence=this.sessions.getByUser(payout.userId);if(!presence)return;
+    this.walletChanged(presence,payout.balance,payout.amount,'factory');
+    presence.client.send('factory.paid',{amount:payout.amount,label,capped:false});
+  }
+  /** Reads the trips, the settings and the vault again (the administration's books and the panel's dock), then tells the drivers where to go. */
+  private async refreshFactoryLogistics():Promise<void> {
+    try{
+      this.factoryCompany=await internal('company',{action:'admin.state'}).catch(()=>this.factoryCompany);
+      const [list,finance,treasury,summary]=await Promise.all([
+        internal<{shipments:FactoryShipmentView[]}>('factory',{action:'shipment.list',finished:12}),
+        internal<{finance:FactoryFinance}>('factory',{action:'finance.get'}),
+        internal<{balance:number;ledger:unknown[]}>('factory',{action:'treasury.get'}),
+        internal<{summary:Record<string,number>}>('factory',{action:'shipment.summary'}),
+      ]);
+      this.factoryShipments=Array.isArray(list?.shipments)?list.shipments:[];this.factoryFinance=finance?.finance?{...DEFAULT_FACTORY_FINANCE,...finance.finance}:DEFAULT_FACTORY_FINANCE;this.factoryTreasury={balance:Number(treasury?.balance)||0,ledger:Array.isArray(treasury?.ledger)?treasury.ledger:[]};this.factorySummary=summary?.summary??{};this.factoryOrdersVersion++;
+    }catch(error){this.log('factory_logistics_error',{error:error instanceof Error?error.message:String(error)});return;}
+    this.pushRoutes();this.pushFactory(true);
+  }
+  /** Where a driver's current trip goes (null: no trip). A purchase coming back goes to the dock. */
+  private routeOf(userId:string):Record<string,unknown>|null {
+    const trip=this.factoryShipments.find(each=>each.driverId===userId&&SHIPMENT_ACTIVE.includes(each.status));if(!trip)return null;
+    const factoryDock=this.factory.markers.Ponto_EB_Doca?.xyz_jogo,back=trip.status==='returning',ribeiro=isRibeiroMaterial(trip.material);
+    const dock=ribeiro?[RIBEIRO_DOCK.x,RIBEIRO_DOCK.y,RIBEIRO_DOCK.z]:factoryDock;
+    return {id:trip.id,kind:trip.kind,status:trip.status,material:trip.material,pallets:trip.pallets,plate:trip.plate,freight:trip.freight,
+      x:back&&dock?dock[0]:trip.destX,z:back&&dock?dock[2]:trip.destZ,y:back&&dock?dock[1]:0,label:trip.status==='loaded'?'Aguardando a saída da fábrica':back?(ribeiro?`${RIBEIRO_NAME} · recebimento`:'Doca da EMPRESA BRASIL'):trip.destLabel,
+      title:trip.kind==='sale'?(trip.status==='loaded'?'Carga pronta: saia da fábrica':'Entrega de produto'):back?'Volte à doca':'Coleta de matéria-prima'};
+  }
+  private pushRoutes():void {
+    for(const [userId,presence] of this.sessions){
+      const route=this.routeOf(userId),signature=route?JSON.stringify(route):'';
+      if(signature===(presence.routeSig??''))continue;presence.routeSig=signature;presence.client.send('factory.route',route);
+    }
+  }
+  /** Every second: a loaded truck that left the plant is settled; one that reached its stop delivers or collects. */
+  /** The gate as the operators set it (the doorway may hold it open a little longer), and who is ringing the intercom. */
+  private gateWanted=false;
+  private gateRing:null|{playerId:string;name:string;at:number}=null;
+  /** Applies the wanted state to the world: open while wanted or while a body stands in the doorway; an unanswered ring lapses. */
+  private gateTick():void {
+    const G=FACTORY_GATE,state=this.state.doors.get(G.id);if(!state)return;
+    const now=Date.now();let blocked=false,changed=false;
+    this.state.players.forEach(player=>{if(Math.abs(player.x-G.x)<=G.keepClear.x&&Math.abs(player.z-G.z)<=G.keepClear.z)blocked=true;});
+    if(!blocked)this.state.motos.forEach(moto=>{if(Math.abs(moto.x-G.x)<=G.keepClear.x+2&&Math.abs(moto.z-G.z)<=G.keepClear.z+2)blocked=true;});
+    // Nobody left on shift: the gate shuts (once the doorway is clear).
+    if(this.gateWanted&&!this.factoryWorkers.size){this.gateWanted=false;this.factory.note('info','Sem operador em serviço: o portão foi fechado.');changed=true;}
+    if(this.gateRing&&now-this.gateRing.at>G.ringTtlS*1000){this.gateRing=null;changed=true;}
+    const open=this.gateWanted||blocked;
+    if(open!==state.open){state.open=open;state.changedAt=now;setDoorStates([[G.id,open]]);changed=true;}
+    if(changed)this.pushFactory(true);
+  }
+  /** Someone outside presses the intercom: the operators on shift hear it. */
+  private gateRingBy(presence:Presence,player:Player):{ok:boolean;message:string} {
+    const G=FACTORY_GATE,now=Date.now();
+    if(Math.hypot(player.x-G.intercom.x,player.z-G.intercom.z)>G.intercom.reach)return {ok:false,message:'Chegue perto do interfone, ao lado do portão.'};
+    if(this.gateWanted)return {ok:false,message:'O portão já está aberto.'};
+    if(now-(presence.ringAt??0)<G.ringCooldownS*1000)return {ok:false,message:'Você acabou de tocar: espere alguém atender.'};
+    presence.ringAt=now;
+    if(!this.factoryWorkers.size)return {ok:false,message:'Ninguém atendeu: não há operador em serviço na fábrica agora.'};
+    this.gateRing={playerId:player.id,name:player.displayName,at:now};
+    for(const id of this.factoryWorkers)this.sessions.getByUser(id)?.client.send('factory.result',{action:'ring',ok:true,message:`Interfone: ${player.displayName} está no portão. Abra pelo painel da sala de controle.`});
+    this.factory.note('info',`${player.displayName} tocou o interfone no portão.`);this.log('factory_gate_ring',{playerId:player.id});this.pushFactory(true);
+    return {ok:true,message:'Você tocou o interfone. Aguarde um operador atender.'};
+  }
+  /** An operator at the control room's computer: open, shut or dismiss the ring. */
+  private gateControl(presence:Presence,player:Player,action:'open'|'close'|'dismiss'):{ok:boolean;message:string} {
+    const gate=this.factoryGate(presence,player);if(gate)return {ok:false,message:gate};
+    if(!this.factoryNear(player,{Ponto_EB_Painel:FACTORY_REACH.panel}))return {ok:false,message:'O portão se controla no computador da sala de controle.'};
+    const ring=this.gateRing,tell=(message:string,ok=true)=>{if(ring)this.sessions.getByUser(ring.playerId)?.client.send('factory.result',{action:'ring.sent',ok,message});};
+    if(action==='open'){
+      if(this.gateWanted)return {ok:true,message:'O portão já está aberto.'};
+      this.gateWanted=true;this.gateRing=null;tell('Um operador abriu o portão. Pode entrar.');
+      this.factory.note('info',`${player.displayName} abriu o portão${ring?` para ${ring.name}`:''}.`);this.log('factory_gate',{playerId:player.id,action});
+      this.gateTick();return {ok:true,message:'Portão abrindo.'};
+    }
+    if(action==='close'){
+      if(!this.gateWanted)return {ok:true,message:'O portão já está fechado.'};
+      this.gateWanted=false;this.factory.note('info',`${player.displayName} fechou o portão.`);this.log('factory_gate',{playerId:player.id,action});
+      this.gateTick();
+      const held=this.state.doors.get(FACTORY_GATE.id)?.open;
+      return {ok:true,message:held?'Há alguém no vão: o portão fecha assim que ele estiver livre.':'Portão fechando.'};
+    }
+    if(!ring)return {ok:true,message:'Ninguém está no interfone.'};
+    this.gateRing=null;tell('O operador não vai abrir o portão agora.',false);this.pushFactory(true);
+    return {ok:true,message:'Chamada do interfone dispensada.'};
+  }
+  private async monitorShipments():Promise<void> {
+    if(++this.routeTick%5===0)this.pushRoutes();
+    if(this.routeTick%2===0)this.pushFreight();
+    if(this.shipmentBusy||!this.factoryRecovered||!this.factoryShipments.length)return;
+    const dock=this.factory.markers.Ponto_EB_Doca?.xyz_jogo;if(!dock)return;
+    this.shipmentBusy=true;let changed=false;
+    try{
+      for(const trip of this.factoryShipments){
+        const moto=this.motoOfVehicle(trip.vehicleId);
+        // Whoever drives the truck now has its route (and gets the freight): a new person at the wheel takes the trip over, as often as needed.
+        if(moto&&moto.riderId&&moto.riderId!==trip.driverId&&!moto.phase){
+          const result=await internal<{applied:boolean}>('factory',{action:'shipment.driver',id:trip.id,driverId:moto.riderId});
+          if(result.applied){trip.driverId=moto.riderId;this.pushRoutes();changed=true;}
+        }
+        // A truck the administration removed cannot finish its trip: the cargo is dropped and the trip closed.
+        if(!moto&&trip.vehicleId.startsWith('moto:')&&trip.status!=='loaded'){
+          const gone=(this.truckGoneSince.get(trip.id)??Date.now());this.truckGoneSince.set(trip.id,gone);
+          if(Date.now()-gone>45_000){this.truckGoneSince.delete(trip.id);await this.cancelShipment(trip.id,'world');continue;}
+        }else this.truckGoneSince.delete(trip.id);
+        try{
+          if(trip.status==='loaded'&&(!moto||Math.hypot(moto.x-dock[0],moto.z-dock[2])>FACTORY_DOCK.exitDistance)){changed=await this.settleDeparture(trip)||changed;}
+          else if((trip.status==='in_transit'||trip.status==='to_supplier')&&moto&&!moto.phase&&vehicleMotionSpeed(moto)<=FACTORY_DOCK.parkSpeed&&Math.hypot(moto.x-trip.destX,moto.z-trip.destZ)<=this.factoryFinance.deliveryRadius){changed=await this.settleArrival(trip)||changed;}
+        }catch(error){
+          // Said to the driver once; the trip stays (the administration can cancel it).
+          if(!this.shipmentNotified.has(trip.id)){this.shipmentNotified.add(trip.id);const driver=this.sessions.getByUser(trip.driverId);driver?.client.send('factory.result',{action:'notice',ok:false,message:error instanceof Error?error.message:'A carga não pôde ser concluída.'});}
+          this.log('factory_ship_error',{shipment:trip.id,error:error instanceof Error?error.message:String(error)});
+        }
+      }
+      changed=await this.dockCrew()||changed;
+    }finally{this.shipmentBusy=false;}
+    if(changed)await this.refreshFactoryLogistics();
+  }
+  /** The truck left: the API divides the sale; the room says it to everyone concerned. */
+  private async settleDeparture(trip:FactoryShipmentView):Promise<boolean> {
+    const result=await internal<{applied:boolean;shipment:FactoryShipmentView;payouts:Payout[];tax:number}>('factory',{action:'shipment.depart',id:trip.id});
+    if(!result.applied)return true;
+    const s=result.shipment;
+    for(const payout of result.payouts)this.notifyPayout(payout,payout.userId===s.loaderId?'Taxa de carga':'Venda da firma');
+    this.factory.note('ok',`Caminhão ${s.plate} saiu com ${s.pallets} palete(s): venda de ${s.gross} moedas (imposto ${s.tax}, funcionário ${s.staff}, firma ${s.owner}).`);
+    this.log('factory_ship_depart',{shipment:s.id,gross:s.gross,tax:s.tax,staff:s.staff,owner:s.owner});
+    this.sessions.getByUser(s.driverId)?.client.send('factory.result',{action:'notice',ok:true,message:`Carga de ${s.pallets} palete(s) a caminho de ${s.destLabel}. Entregue para receber ${s.freight} moedas.`});
+    return true;
+  }
+  private async settleArrival(trip:FactoryShipmentView):Promise<boolean> {
+    const driver=this.sessions.getByUser(trip.driverId);
+    if(trip.kind==='sale'){
+      const result=await internal<{applied:boolean;shipment:FactoryShipmentView;payouts:Payout[]}>('factory',{action:'shipment.deliver',id:trip.id});
+      if(!result.applied)return true;
+      for(const payout of result.payouts)this.notifyPayout(payout,'Frete da entrega');
+      driver?.client.send('factory.result',{action:'notice',ok:true,message:`Entrega concluída em ${trip.destLabel}.`});this.factory.note('ok',`Entrega do caminhão ${trip.plate} concluída.`);
+    }else{
+      const result=await internal<{applied:boolean}>('factory',{action:'shipment.collect',id:trip.id});
+      if(!result.applied)return true;
+      driver?.client.send('factory.result',{action:'notice',ok:true,message:`${trip.pallets} palete(s) de ${trip.material} no baú. Volte ao recebimento de ${isRibeiroMaterial(trip.material)?RIBEIRO_NAME:'EMPRESA BRASIL'} para descarregar.`});
+    }
+    return true;
+  }
+  /** Ends a trip; product that never left the plant goes back to the racks. */
+  private async cancelShipment(id:string,actorId:string):Promise<void> {
+    const result=await internal<{applied:boolean;cargo:{material:'PRODUTO'|'MALTE'|'MIX';bags:number}|null}>('factory',{action:'shipment.cancel',id,actorId});
+    if(result.applied&&result.cargo?.material==='PRODUTO')this.factory.returnProduct(result.cargo.bags);
+    await this.refreshFactoryLogistics();await this.refreshFactoryOrders();
+  }
+  /** The open orders and the last few finished ones (the whole history would ride in every state message). */
+  private async refreshFactoryOrders():Promise<void>{
+    const result=await internal<{orders?:Array<Record<string,unknown>>}>('factory',{action:'orders'}),all=Array.isArray(result?.orders)?result.orders:[];
+    const relevant=(order:Record<string,unknown>)=>order.kind==='purchase'||order.kind==='ribeiro-purchase';
+    const live=all.filter(order=>relevant(order)&&(order.status==='open'||order.status==='accepted')),done=all.filter(order=>relevant(order)&&order.status!=='open'&&order.status!=='accepted').sort((a,b)=>Date.parse(String(b.updatedAt))-Date.parse(String(a.updatedAt))).slice(0,12);
+    this.factoryOrders=[...live,...done];this.factoryOrdersVersion++;
+  }
+  // ---- EMPRESA BRASIL: stations, answers, pay and the state pushed to whoever watches the plant ----
+  /** Whether the player stands at any of the markers, within its reach on the ground (xz) and on its floor (y). */
+  private factoryNear(player:Player,reaches:Record<string,number>):boolean {
+    return Object.entries(reaches).some(([name,reach])=>{const at=this.factory.markers[name]?.xyz_jogo;return !!at&&Math.hypot(player.x-at[0],player.z-at[2])<=reach&&Math.abs((player.y??0)-at[1])<=1.6;});
+  }
+  private factoryWithinView(player:Player,extra=0):boolean {
+    const panel=this.factory.markers.Ponto_EB_Painel?.xyz_jogo;return !!panel&&Math.hypot(player.x-panel[0],player.z-panel[2])<=FACTORY_REACH.view+extra;
+  }
+  /** Working needs a shift and the PPE; the sentence says which is missing. */
+  private factoryGate(presence:Presence,player:Player):string {
+    return !this.factoryWorkers.has(player.id)?'Entre em expediente na entrada de pessoal primeiro.':!presence.factoryPpe?'Coloque o EPI no armário da entrada de pessoal.':'';
+  }
+  /** Where each kind of command can be given: the control room's panel, or the machine itself. */
+  private factoryStation(action:string):{near:Record<string,number>;hint:string} {
+    const panel={Ponto_EB_Painel:FACTORY_REACH.panel},dryer={Ponto_EB_Secador_Base:FACTORY_REACH.dryer,Ponto_EB_Secador_Inspecao_N:FACTORY_REACH.dryer,Ponto_EB_Secador_Inspecao_S:FACTORY_REACH.dryer,Ponto_EB_Secador_Inspecao_L:FACTORY_REACH.dryer,Ponto_EB_Secador_Inspecao_O:FACTORY_REACH.dryer};
+    const bagging={Ponto_EB_Ensaque:FACTORY_REACH.bagging,Ponto_EB_Ensaque_Bico:FACTORY_REACH.bagging,Ponto_EB_Ensaque_Saida:FACTORY_REACH.bagging,Ponto_EB_PA_Ensaque:FACTORY_REACH.pallet,Ponto_EB_Paleteira:FACTORY_REACH.pallet};
+    const tanks=Object.fromEntries([1,2,3].map(id=>[`Ponto_EB_Tanque_${id}_Operador`,FACTORY_REACH.tank]));
+    const tank=/^tank([1-3])\./.exec(action);
+    if(tank)return {near:{...panel,[`Ponto_EB_Tanque_${tank[1]}_Operador`]:FACTORY_REACH.tank},hint:`Use o painel da sala de controle ou a plataforma do TQ-${100+Number(tank[1])}.`};
+    if(action.startsWith('dryer.'))return {near:{...panel,...dryer},hint:'Use o painel da sala de controle ou chegue perto do secador.'};
+    // The bagging controls are at the bagging station only (not on the control room's computer).
+    if(action==='op.start')return {near:panel,hint:'A ordem de produção é iniciada no computador da sala de controle.'};
+    if(action.startsWith('bag.')||action.startsWith('pallet.'))return {near:bagging,hint:'Os controles do ensaque ficam na estação de ensaque: chegue perto da ensacadeira.'};
+    if(action==='emergency.reset')return {near:panel,hint:'A emergência só é rearmada no painel da sala de controle.'};
+    return {near:{...panel,...tanks,...dryer,...bagging},hint:'Chegue perto do painel ou de uma máquina da fábrica.'};
+  }
+  /** Whether the player stands at one of the task's spots (ground distance and floor). */
+  private cleanNear(player:Player,task:CleanTask):boolean {
+    return task.spots.some(spot=>Math.hypot(player.x-spot.x,player.z-spot.z)<=task.reach&&Math.abs((player.y??0)-spot.y)<=1.6);
+  }
+  /** Finishes the timed cleaning tasks whose time is up; drops the ones whose worker walked away, took the PPE off or left the shift. */
+  private factoryTaskTick():void {
+    for(const [userId,presence] of this.sessions){
+      const clean=presence.factoryClean;if(!clean)continue;
+      const player=this.state.players.get(userId),def=cleanTaskOf(clean.task),say=(ok:boolean,message:string)=>presence.client.send('factory.result',{action:'clean',ok,message});
+      if(!player||!def||!this.factoryWorkers.has(userId)||!presence.factoryPpe||presence.factoryBag||player.interactionState||!this.cleanNear(player,def)){presence.factoryClean=undefined;say(false,'Limpeza interrompida: você saiu do lugar.');this.pushFactory(true);continue;}
+      if(Date.now()<clean.endsAt)continue;
+      presence.factoryClean=undefined;
+      try{this.factory.completeClean(def.id,player.displayName);}catch(error){say(false,error instanceof Error?error.message:'A limpeza não pôde ser concluída.');this.pushFactory(true);continue;}
+      this.factoryPay(presence,def.pay,`clean-${def.id}`,`Limpeza: ${def.label}`);
+      this.log('factory_clean',{playerId:userId,task:def.id});say(true,`${def.label} limpo.${this.factory.dirt.required?'':' A fábrica está limpa.'}`);this.pushFactory(true);
+    }
+  }
+  /** Employees on shift with the PPE inside the plant, while no production runs, earn a presence pay (`idlePay` every `idleEveryMin` minutes of the finance, set in the administration). */
+  private factoryIdleTick():void {
+    if(this.factory.board.active?.status==='running'||this.factory.emergency)return;
+    for(const userId of this.factoryWorkers){
+      const presence=this.sessions.getByUser(userId),player=this.state.players.get(userId);
+      if(!presence||!player||!presence.factoryPpe||!this.factoryWithinView(player))continue;
+      presence.idleMs=(presence.idleMs??0)+1000;
+      const {idlePay,idleEveryMin}=this.factoryFinance;
+      if(presence.idleMs<idleEveryMin*60_000)continue;
+      presence.idleMs=0;if(idlePay>0)this.factoryPay(presence,idlePay,'presenca','Salário por presença');
+    }
+  }
+  private factoryReply(client:Client,action:string,ok:boolean,message:string,extra?:Record<string,unknown>):void {client.send('factory.result',{action,ok,message,...extra});}
+  /** Request ids already applied (a retry does nothing twice); only the latest few thousand are kept. */
+  private factorySeen(requestId:string):boolean {
+    if(this.factoryRequests.has(requestId))return true;
+    this.factoryRequests.add(requestId);if(this.factoryRequests.size>4000)this.factoryRequests.delete(this.factoryRequests.values().next().value!);
+    return false;
+  }
+  /** What the player carries is on the synced state too, so the others see the sack in their arms. */
+  private syncFactoryBag(presence:Presence):void {const player=this.state.players.get(presence.ticket.userId);if(player)player.factoryBag=presence.factoryBag?.material??'';}
+  /** Puts the carried bag back on a shelf. False when no shelf of its kind has room. */
+  private dropFactoryBag(presence:Presence):boolean {
+    if(!presence.factoryBag)return true;
+    try{this.factory.returnBag(presence.factoryBag.origin,presence.factoryBag.material);}catch{return false;}
+    presence.factoryBag=undefined;this.syncFactoryBag(presence);return true;
+  }
+  /** Ends the shift: the bag goes back, the PPE comes off, the API closes the shift. */
+  private async endFactoryShift(presence:Presence,player:Player):Promise<void> {
+    this.dropFactoryBag(presence);presence.factoryPpe=false;
+    this.factoryWorkers.delete(player.id);if(player.job==='spray-dry-operator')player.job='';
+    this.dressFactory(presence,player);
+    try{await internal('employment',{sessionId:presence.ticket.sessionId,userId:presence.ticket.userId,action:'stop'});}catch{/* the shift was already closed */}
+    this.factory.setOperators(this.factoryWorkers.size);this.factory.note('info',`${player.displayName} encerrou o expediente.`);
+    this.log('factory_shift_stop',{playerId:player.id});presence.client.send('factory.ppe',{on:false});
+  }
+  /** Coins for work done. They are job pay (so the daily job cap applies); `factory.paid` tells the screen what came in. */
+  private factoryPay(presence:Presence,amount:number,slug:string,label:string):void {
+    if(amount<=0)return;const requestId=randomUUID();
+    void this.walletRetries.credit(presence.ticket,amount,`job:factory-${slug}:${requestId}`.slice(0,90),requestId,change=>{
+      this.walletChanged(presence,change.balance,change.applied,'job');
+      if(change.applied>0)void internal('employment',{action:'shift.earn',userId:presence.ticket.userId,amount:change.applied}).catch(()=>{});
+      if(this.sessions.getByUser(presence.ticket.userId)===presence)presence.client.send('factory.paid',{amount:change.applied,label,capped:change.applied===0});
+    });
+  }
+  private factoryView(presence:Presence,snapshot:FactorySnapshot,dock:DockTruck[]){
+    const f=this.factoryFinance;
+    const {board,baseRecipe,...plant}=snapshot;
+    return {...plant,production:{active:board.active,history:board.history.slice(-5)},gate:{open:this.gateWanted,ringing:this.gateRing?{name:this.gateRing.name,at:this.gateRing.at}:null},orders:this.factoryOrders.filter(order=>order.kind==='purchase'),shipments:this.factoryShipments,dock:{trucks:dock},finance:{palletPrice:f.palletPrice,taxPercent:f.taxPercent,employeeFee:f.employeeFee,maxPalletsPerTruck:f.maxPalletsPerTruck,freightBase:f.freightBase,freightPerKm:f.freightPerKm,freightPerPallet:f.freightPerPallet,purchaseFreight:f.purchaseFreight,idlePay:f.idlePay,idleEveryMin:f.idleEveryMin},me:{ppe:!!presence.factoryPpe,onShift:this.factoryWorkers.has(presence.ticket.userId),carrying:presence.factoryBag?.material??null,clean:presence.factoryClean?{task:presence.factoryClean.task,startedAt:presence.factoryClean.startedAt,endsAt:presence.factoryClean.endsAt,now:Date.now()}:null}};
+  }
+  /** Sends the plant's state to those watching it when something changed (at most four times a second each, or at once when forced). */
+  private pushFactory(force=false):void {
+    if(!this.factoryWatchers.size)return;
+    const now=Date.now(),dock=this.dockTrucks(),dockKey=dock.map(truck=>truck.vehicleId).join();let snapshot:FactorySnapshot|undefined;
+    for(const userId of [...this.factoryWatchers]){
+      const presence=this.sessions.getByUser(userId),player=this.state.players.get(userId);
+      if(!presence||!player||!this.factoryWithinView(player,25)){this.factoryWatchers.delete(userId);continue;}
+      const signature=`${this.gateWanted?1:0}${this.gateRing?.at??0}|${this.factory.revision}|${this.factoryOrdersVersion}|${dockKey}|${presence.factoryPpe?1:0}|${presence.factoryBag?.material??''}|${this.factoryWorkers.has(userId)?1:0}|${presence.factoryClean?.endsAt??0}`;
+      if(signature===presence.factorySig||(!force&&now-(presence.factorySentAt??0)<250))continue;
+      snapshot??=this.factory.snapshot();presence.factorySig=signature;presence.factorySentAt=now;
+      presence.client.send('factory.state',this.factoryView(presence,snapshot,dock));
+    }
+  }
+  /** Keeps the plant supplied and shipping: a purchase order when a raw material runs low, a sale order when a pallet of product waits. */
+  private async dispatchFactoryOrders():Promise<void> {
+    if(!this.factoryRecovered)return;
+    const orders=this.factoryOrders,live=orders.filter(order=>order.status==='open'||order.status==='accepted'),total=(material:string)=>this.factory.slots.filter(slot=>slot.material===material).reduce((sum,slot)=>sum+slot.quantity,0);
+    let changed=false;
+    // A driver took an order and half an hour went by without the cargo reaching the dock: the trip ends and the order opens again (then the supplier's driver brings it).
+    for(const order of live)if(order.status==='accepted'&&Date.now()-Date.parse(String(order.updatedAt))>FACTORY_NPC_DELIVERY_MIN*60_000){
+      const trip=this.factoryShipments.find(each=>each.orderId===order.id&&SHIPMENT_ACTIVE.includes(each.status));
+      try{
+        if(trip){await this.cancelShipment(trip.id,'world');this.sessions.getByUser(trip.driverId)?.client.send('factory.result',{action:'notice',ok:false,message:'O prazo da entrega acabou: a carga voltou para o fornecedor.'});}
+        else await internal('factory',{action:'order.status',id:order.id,status:'expired',requestId:randomUUID()});
+        this.factory.note('warn','Uma entrega aceita passou do prazo sem chegar: o pedido reabriu.');changed=true;
+      }catch(error){this.log('factory_order_expire_error',{error:error instanceof Error?error.message:String(error)});}
+    }
+    // Nobody took an open request in time: the supplier's own driver (an NPC) brings it to the dock and the racks get the bags.
+    for(const order of this.factoryOrders.filter(each=>(each.kind==='purchase'||each.kind==='ribeiro-purchase')&&each.status==='open')){
+      if(this.npcAtOf(order)>Date.now())continue;
+      const material=order.material as FreightOffer['material'],bags=Number(order.pallets)*18,ribeiro=isRibeiroMaterial(material);
+      if(!ribeiro&&this.factory.roomFor(material)<bags)continue;
+      try{
+        await internal('factory',{action:'order.status',id:order.id,status:'completed',requestId:randomUUID()});
+        if(isRibeiroMaterial(material))this.machineShop.addMaterial(material,bags);
+        else this.factory.addBags(material,bags);
+        this.factory.note('ok',`O motorista do fornecedor chegou: ${order.pallets} palete(s) de ${material} descarregados (ninguém pegou o pedido a tempo).`);
+        this.log('factory_order_npc',{order:order.id,material,bags});changed=true;
+      }catch(error){this.log('factory_order_npc_error',{error:error instanceof Error?error.message:String(error)});}
+    }
+    const live2=this.factoryOrders.filter(order=>order.status==='open'||order.status==='accepted');
+    const open=(kind:string,material:string)=>live2.some(order=>order.kind===kind&&order.material===material);
+    const wanted:Array<{kind:'purchase'|'sale';material:'MALTE'|'MIX'|'PRODUTO';price:number}>=[];
+    // The plant no longer opens raw-material orders by itself: the owners buy (company.purchase), which costs the firm's wallet.
+    void total;void open;
+    for(const order of wanted){
+      try{await internal('factory',{action:'order.create',kind:order.kind,material:order.material,pallets:1,price:order.price,dueAt:new Date(Date.now()+FACTORY_NPC_DELIVERY_MIN*60_000).toISOString(),requestId:randomUUID()});this.factory.note('info',`Nova coleta para motoristas: um palete de ${order.material}.`);changed=true;}
+      catch(error){this.log('factory_order_dispatch_error',{error:error instanceof Error?error.message:String(error)});}
+    }
+    if(changed){await this.refreshFactoryOrders();this.pushFactory(true);this.pushFreight();this.pushMachine();}
+  }
   private async syncFactorySchedules():Promise<void>{
+    void this.refreshFactoryOrders().then(()=>this.refreshFactoryLogistics()).then(()=>this.dispatchFactoryOrders()).catch(()=>undefined);
     if(this.factoryScheduleBusy)return;this.factoryScheduleBusy=true;const now=new Date();
     try{await Promise.allSettled([...this.sessions].filter(([,presence])=>!presence.revoked).map(async([userId,presence])=>{const view=await internal<{employment?:{status?:string;schedule?:unknown}|null;shift?:{station?:string}|null}>('employment',{action:'view',sessionId:presence.ticket.sessionId,userId}),raw=view.employment?.schedule;if(!raw||typeof raw!=='object')return;const schedule=raw as Partial<WorkWindow>&{enabled?:boolean};if(!schedule.enabled||!Array.isArray(schedule.days)||!schedule.days.every(day=>Number.isInteger(day)&&day>=0&&day<=6)||!Number.isInteger(schedule.startMinute)||!Number.isInteger(schedule.endMinute)||typeof schedule.timeZone!=='string')return;const inside=isInsideWorkWindow(now,schedule as WorkWindow),player=this.state.players.get(userId);if(!player)return;if(inside&&!view.shift&&view.employment?.status==='hired'){await internal('employment',{action:'start',sessionId:presence.ticket.sessionId,userId,requestId:randomUUID(),station:'programado'});this.factoryWorkers.add(userId);player.job='spray-dry-operator';this.log('factory_shift_scheduled_start',{playerId:userId});}else if(!inside&&view.shift?.station==='programado'){await internal('employment',{action:'stop',sessionId:presence.ticket.sessionId,userId});this.factoryWorkers.delete(userId);player.job='';this.log('factory_shift_scheduled_stop',{playerId:userId});}}));this.factory.setOperators(this.factoryWorkers.size);}finally{this.factoryScheduleBusy=false;}
   }
   private async persistFactory():Promise<void>{
-    if(this.factoryPersisting||this.factoryPersistedRevision===this.factory.revision)return;this.factoryPersisting=true;
+    if(!this.factoryRecovered||this.factoryPersisting||this.factoryPersistedRevision===this.factory.revision)return;this.factoryPersisting=true;
     const snapshot=this.factory.snapshot(),revision=snapshot.revision;
     try{await internal('factory',{action:'save',actorId:'world',requestId:randomUUID(),state:snapshot,slots:snapshot.slots.map(slot=>({marker:slot.marker,material:slot.material,quantity:slot.quantity,capacity:slot.capacity,levelM:slot.levelM,batchId:slot.batchId,revision}))});this.factoryPersistedRevision=revision;}
     catch(error){this.log('factory_persist_error',{error:error instanceof Error?error.message:String(error)});}
@@ -4180,13 +4916,50 @@ export class BarRoom extends Room<{ state: BarState }> {
     if(presence)presence.skills=new Set(access.ownedSkills);
     // A response without the collection (invalid session) leaves the avatar as it is.
     if(player.animationState==='kick'||!access.ownedSkins)return;
-    const requested=access.equippedSkin??DEFAULT_SKIN,next=access.ownedSkins.includes(requested)?requested:DEFAULT_SKIN;
+    const requested=access.equippedSkin??DEFAULT_SKIN,civil=access.ownedSkins.includes(requested)?requested:DEFAULT_SKIN,own=this.sessions.getByUser(player.id);
+    // What the account wears is remembered for when the uniform comes off; while it is on, the uniform stays whatever was equipped.
+    if(own)own.civilSkin=civil;
+    const next=own&&this.wearsUniform(own)?FACTORY_UNIFORM:civil;
     if(isRidingHorse(player.interactionState)&&(skinBase(next)!=='tiao'||!access.ownedSkills?.includes(HORSE.skill)))this.dismountHorse(player);
-    player.skin=next;
+    this.setSkin(player,next);
     if(hadHorse!==this.canDeliverByHorse(player)){
       const vehicles=access.vehicles??this.sessions.getByUser(player.id)?.vehicles;
       if(!this.canDeliverByHorse(player)&&!vehicles?.length)this.stopHighfood(player,'Equipe Tião com a habilidade Cavalo ou tenha uma moto para continuar no Highfood.');
       this.sendFood(player.id);
+    }
+  }
+
+  /** The only place an avatar's skin is written after it exists: the uniform set follows it, so the reconciliation never misses a worn one. */
+  private setSkin(player:Player,skin:string):void {
+    player.skin=skin;
+    if(skin===FACTORY_UNIFORM)this.uniformed.add(player.id);else this.uniformed.delete(player.id);
+  }
+  /** The uniform is worn exactly while the PPE is on during a shift. */
+  private wearsUniform(presence:Presence):boolean {return !!presence.factoryPpe&&this.factoryWorkers.has(presence.ticket.userId);}
+  /**
+   * Makes the avatar wear what the plant's state says (the uniform, or the account's own skin) and nothing else. The PPE does not outlive the shift.
+   * Called when the PPE changes or a shift ends, and every tick for those who wear it (reconcileFactoryUniforms), so a shift that ends any way
+   * (the administration, the schedule, a takeover) cannot leave the uniform on.
+   */
+  private dressFactory(presence:Presence,player:Player):void {
+    const uniform=this.wearsUniform(presence);
+    if(presence.factoryPpe&&!uniform)presence.factoryPpe=false;
+    const shown=uniform?FACTORY_UNIFORM:presence.civilSkin??DEFAULT_SKIN;
+    // A kick in the air keeps its model until it lands (the next tick tries again).
+    if(player.skin===shown||player.animationState==='kick')return;
+    const hadHorse=this.canDeliverByHorse(player);
+    if(isRidingHorse(player.interactionState)&&(skinBase(shown)!=='tiao'||!presence.skills.has(HORSE.skill)))this.dismountHorse(player);
+    this.setSkin(player,shown);
+    if(hadHorse!==this.canDeliverByHorse(player)){
+      if(!this.canDeliverByHorse(player)&&!presence.vehicles.length)this.stopHighfood(player,uniform?'Tire o EPI para seguir no Highfood a cavalo.':'Equipe Tião com a habilidade Cavalo ou tenha uma moto para continuar no Highfood.');
+      this.sendFood(player.id);
+    }
+  }
+  private reconcileFactoryUniforms():void {
+    if(!this.uniformed.size&&!this.factoryWorkers.size)return;
+    for(const id of new Set([...this.uniformed,...this.factoryWorkers])){
+      const presence=this.sessions.getByUser(id),player=this.state.players.get(id);
+      if(player&&presence)this.dressFactory(presence,player);else if(player&&this.uniformed.has(id))this.setSkin(player,DEFAULT_SKIN);else this.uniformed.delete(id);
     }
   }
 

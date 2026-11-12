@@ -1,5 +1,7 @@
 import {NEEDS,drunkStage,type PlayerState} from '@bar/shared';
 import type {Notice} from './notifications';
+import {createStrain,strainsOf} from './needs-strain';
+import {NO_STRAIN} from './needs-strain-sound';
 
 /**
  * The cores around the minimap (.status-hud), in this order along its rim. `low` meters are critical when low, the bladder
@@ -57,8 +59,10 @@ export function faintMarkup():string{
 }
 
 /** The corner cores, threshold alerts, the faint overlay and the screen effects of drunkenness. */
-export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,serverNow:()=>number){
+export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,serverNow:()=>number,volume:()=>number=()=>1){
   let warned=false,shownKey='',timer:ReturnType<typeof setInterval>|undefined,last:PlayerState|undefined;
+  // Living on the reserve: the border, the sway and the sounds of each need (needs-strain.ts).
+  const strain=createStrain(volume);
   const overlay=root.querySelector<HTMLElement>('#faint-overlay')!;
   // The last value drawn per core: a better one (eating, drinking, resting, the toilet) flashes it for a moment.
   const shown=new Map<string,number>(),flashes=new Map<string,ReturnType<typeof setTimeout>>();
@@ -83,11 +87,12 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
   }
   function update(self:PlayerState|undefined):void{
     last=self;
+    const strains=strainsOf(self);strain.set(strains);
     if(!self){countdown();return;}
     const values:Record<string,number>={hp:self.hp??100,stamina:self.stamina??100,hunger:self.hunger??100,thirst:self.thirst??100,bladder:self.bladder??0,drunk:self.drunk??0};
     const cores:Record<string,number>={hp:self.hpCore??100,stamina:self.staminaCore??100,hunger:self.hungerCore??100,thirst:self.thirstCore??100};
     const hpMax=Math.max(1,self.hpMax??100),stage=drunkStage(values.drunk!);
-    const key=JSON.stringify([values,cores,hpMax,self.exhausted,self.condition,self.faintCause]);
+    const key=JSON.stringify([values,cores,hpMax,self.exhausted,self.condition,self.faintCause,strains]);
     if(key!==shownKey){shownKey=key;
       for(const meter of [...METERS,DRUNK]){
         const node=root.querySelector<HTMLElement>(`[data-need="${meter.id}"]`)!,value=values[meter.id]!,max=meter.id==='hp'?hpMax:100;
@@ -95,6 +100,8 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
         const core=CORED.has(meter.id)?cores[meter.id]!:undefined,weakest=core===undefined?value:Math.min(value,core);
         const critical=meter.low?weakest<=meter.alertAt:value>=meter.alertAt,text=meter.id==='drunk'?STAGES[stage]!:core===undefined?String(value):`${value} · reserva ${core}`;
         node.classList.toggle('critical',critical||(meter.id==='stamina'&&!!self.exhausted));
+        // On the reserve: the core's halo in its own colour (the screen's border is needs-strain.ts).
+        node.classList.toggle('strained',meter.id in strains&&strains[meter.id as keyof typeof strains]>.05);
         node.style.setProperty('--level',String(Math.max(0,Math.min(1,value/max))));
         node.style.setProperty('--heart',String(core===undefined?Math.max(0,Math.min(1,value/max)):Math.max(0,Math.min(1,core/100))));
         node.querySelector('.need-tip b')!.textContent=text;
@@ -109,6 +116,6 @@ export function createNeedsHud(root:HTMLElement,notify:(notice:Notice)=>void,ser
     alert(cores.hp!<=NEEDS.hp.alertAt&&self.condition!=='fainted',cores.hp!>NEEDS.hp.alertAt+15);
     countdown();
   }
-  function reset():void{warned=false;shownKey='';last=undefined;shown.clear();countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}
+  function reset():void{warned=false;shownKey='';last=undefined;shown.clear();strain.set({...NO_STRAIN});countdown();for(let s=1;s<=4;s++)document.body.classList.remove(`drunk-${s}`);}
   return {update,reset};
 }

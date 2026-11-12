@@ -90,6 +90,23 @@ body.drunk-2 .vignette,body.drunk-3 .vignette,body.drunk-4 .vignette{box-shadow:
 @media(prefers-reduced-motion:reduce){body[class*=drunk-] #world{animation:none}}
 /* A filter on the whole game canvas is one more full-screen pass every frame: phones keep the sway and the warm vignette. */
 @media(pointer:coarse){body.drunk-3 #world,body.drunk-4 #world{filter:none}}
+/* Living on the reserve (needs-strain.ts): a soft border per need that eases in with its --st, --hp, --hu and --th (0–1, set
+   every frame while it shows), each in its own colour: dark green for stamina, dark red for life, ochre for hunger, pale dry
+   blue for thirst. Inset shadows only (no filter on the canvas): cheap on any screen. */
+.reserve-fx{position:fixed;inset:0;z-index:2;pointer-events:none;--st:0;--hp:0;--hu:0;--th:0;
+  box-shadow:
+    inset 0 0 calc(80px + var(--st) * 110px) calc(var(--st) * 26px) oklch(.3 .085 152 / calc(var(--st) * .78)),
+    inset 0 0 calc(70px + var(--hp) * 90px) calc(var(--hp) * 20px) oklch(.3 .14 24 / calc(var(--hp) * .72)),
+    inset 0 0 calc(120px + var(--hu) * 120px) calc(var(--hu) * 34px) oklch(.4 .09 72 / calc(var(--hu) * .62)),
+    inset 0 0 calc(100px + var(--th) * 80px) calc(var(--th) * 14px) oklch(.8 .045 215 / calc(var(--th) * .42))}
+/* The cores: a halo in the need's colour and a slow breath while it lives on the reserve (critical keeps its own red). */
+.need[data-need=hp]{--strain:oklch(.5 .17 25)}
+.need[data-need=stamina]{--strain:oklch(.5 .12 152)}
+.need[data-need=hunger]{--strain:oklch(.62 .12 72)}
+.need[data-need=thirst]{--strain:oklch(.84 .06 215)}
+.need.strained .need-ring{filter:drop-shadow(0 0 7px var(--strain))}
+.need.strained:not(.critical) .need-core{animation:need-alarm 1.7s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.need.strained:not(.critical) .need-core{animation:none}}
 /* Phones: the cores follow the smaller map (minimap.css); thicker rings and less inset keep them readable. */
 @media(max-width:760px){
   .need-core{inset:3px}

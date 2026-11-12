@@ -329,16 +329,16 @@ test('administração ingame: moedas, loja sincronizada, delegação, expulsão 
     await fileTab(page,/Histórico/);await expect(page.locator('.admin-actions-history')).toContainText('Moedas adicionadas');
 
     // Preços: a new price reaches the API, the world and the other player's browser; then back to the default.
-    await section(page,'prices');
+    await section(page,'economy');await page.locator('[data-eco-tab="prices"]').click();
     await page.getByLabel('Novo valor de Água mineral').fill('13');
-    await page.getByLabel('Motivo da alteração de preços').fill('Teste de preço ponta a ponta');
-    await page.getByRole('button',{name:'Salvar preços',exact:true}).click();
+    await page.getByLabel('Motivo da alteração').fill('Teste de preço ponta a ponta');
+    await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();
     await expect(page.locator('.admin-feedback')).toContainText('Preços atualizados');
     expect((await (await page.request.get('/api/prices')).json()).prices['item:agua']).toBe(13);
     await expect.poll(()=>other.evaluate(()=>(window as any).barDebug.price('item:agua')),{timeout:20000}).toBe(13);
     await page.locator('[data-price-reset="item:agua"]').click();
-    await page.getByLabel('Motivo da alteração de preços').fill('Voltar ao padrão depois do teste');
-    await page.getByRole('button',{name:'Salvar preços',exact:true}).click();
+    await page.getByLabel('Motivo da alteração').fill('Voltar ao padrão depois do teste');
+    await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();
     await expect.poll(()=>other.evaluate(()=>(window as any).barDebug.price('item:agua')),{timeout:20000}).toBe(12);
     // Logs: the price change and the ban, filtered by type and by text.
     await section(page,'logs');

@@ -41,6 +41,7 @@
     "assets:carro": "node tools/assets/import-car.mjs",
     "assets:caminhao": "node tools/assets/import-truck.mjs",
     "assets:fabrica": "node tools/assets/import-factory.mjs",
+    "assets:farm": "node tools/assets/import-farm.mjs",
     "assets:horse": "node tools/assets/import-horse.mjs",
     "assets:horse:sound": "node tools/assets/import-horse-sounds.mjs",
     "assets:caminhao:sound": "node tools/assets/import-truck-sounds.mjs",

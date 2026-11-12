@@ -4,6 +4,7 @@ import type {GunBody} from './bodies.js';
 /** Each skin standing in Idle: see GunBody. */
 export const GUN_BODY_TABLE:Readonly<Record<string,GunBody>>={
   'flavio-hipotetico':{hip:0.965,chest:1.252,neck:1.502,head:1.585,top:1.803,shoulder:1.37,shoulderWidth:0.408},
+  'funcionario-empresa-brasil':{hip:0.937,chest:1.259,neck:1.439,head:1.541,top:1.792,shoulder:1.372,shoulderWidth:0.372},
   'gabriel':{hip:0.928,chest:1.292,neck:1.449,head:1.547,top:1.765,shoulder:1.387,shoulderWidth:0.388},
   'gilmar-gordo':{hip:0.904,chest:1.281,neck:1.442,head:1.491,top:1.775,shoulder:1.373,shoulderWidth:0.462},
   'leandro':{hip:0.94,chest:1.373,neck:1.553,head:1.6,top:1.79,shoulder:1.477,shoulderWidth:0.409},

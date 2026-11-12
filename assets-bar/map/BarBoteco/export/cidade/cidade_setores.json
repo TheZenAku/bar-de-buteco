@@ -23,9 +23,9 @@
     "colisao": "cidade_S00_00_colisao.glb"
    },
    "kb": {
-    "visual": 1920,
-    "lod": 216,
-    "colisao": 132
+    "visual": 1924,
+    "lod": 219,
+    "colisao": 142
    },
    "tris_estatico": 25555,
    "tris_instancias": 32780,
@@ -60,9 +60,9 @@
     "colisao": "cidade_S00_01_colisao.glb"
    },
    "kb": {
-    "visual": 2382,
-    "lod": 193,
-    "colisao": 138
+    "visual": 2386,
+    "lod": 196,
+    "colisao": 148
    },
    "tris_estatico": 31804,
    "tris_instancias": 24218,
@@ -99,9 +99,9 @@
     "colisao": "cidade_S00_02_colisao.glb"
    },
    "kb": {
-    "visual": 1745,
-    "lod": 183,
-    "colisao": 124
+    "visual": 1749,
+    "lod": 186,
+    "colisao": 133
    },
    "tris_estatico": 22425,
    "tris_instancias": 21276,
@@ -138,9 +138,9 @@
     "colisao": "cidade_S00_03_colisao.glb"
    },
    "kb": {
-    "visual": 1402,
-    "lod": 170,
-    "colisao": 113
+    "visual": 1406,
+    "lod": 173,
+    "colisao": 120
    },
    "tris_estatico": 17877,
    "tris_instancias": 20590,
@@ -177,9 +177,9 @@
     "colisao": "cidade_S00_04_colisao.glb"
    },
    "kb": {
-    "visual": 1948,
-    "lod": 181,
-    "colisao": 118
+    "visual": 1952,
+    "lod": 183,
+    "colisao": 126
    },
    "tris_estatico": 25680,
    "tris_instancias": 24558,
@@ -216,9 +216,9 @@
     "colisao": "cidade_S00_05_colisao.glb"
    },
    "kb": {
-    "visual": 2078,
-    "lod": 175,
-    "colisao": 118
+    "visual": 2082,
+    "lod": 178,
+    "colisao": 127
    },
    "tris_estatico": 27714,
    "tris_instancias": 23686,
@@ -255,9 +255,9 @@
     "colisao": "cidade_S00_06_colisao.glb"
    },
    "kb": {
-    "visual": 1728,
-    "lod": 176,
-    "colisao": 116
+    "visual": 1732,
+    "lod": 178,
+    "colisao": 124
    },
    "tris_estatico": 23006,
    "tris_instancias": 22652,
@@ -294,9 +294,9 @@
     "colisao": "cidade_S00_07_colisao.glb"
    },
    "kb": {
-    "visual": 1598,
-    "lod": 208,
-    "colisao": 120
+    "visual": 1602,
+    "lod": 210,
+    "colisao": 130
    },
    "tris_estatico": 20733,
    "tris_instancias": 47964,
@@ -331,9 +331,9 @@
     "colisao": "cidade_S01_00_colisao.glb"
    },
    "kb": {
-    "visual": 2355,
-    "lod": 198,
-    "colisao": 134
+    "visual": 2358,
+    "lod": 200,
+    "colisao": 144
    },
    "tris_estatico": 32071,
    "tris_instancias": 20766,
@@ -370,9 +370,9 @@
     "colisao": "cidade_S01_01_colisao.glb"
    },
    "kb": {
-    "visual": 3004,
-    "lod": 177,
-    "colisao": 135
+    "visual": 3009,
+    "lod": 179,
+    "colisao": 144
    },
    "tris_estatico": 43591,
    "tris_instancias": 11770,
@@ -412,9 +412,9 @@
     "colisao": "cidade_S01_02_colisao.glb"
    },
    "kb": {
-    "visual": 1587,
-    "lod": 151,
-    "colisao": 124
+    "visual": 1592,
+    "lod": 154,
+    "colisao": 132
    },
    "tris_estatico": 19777,
    "tris_instancias": 16434,
@@ -454,9 +454,9 @@
     "colisao": "cidade_S01_03_colisao.glb"
    },
    "kb": {
-    "visual": 1508,
-    "lod": 137,
-    "colisao": 108
+    "visual": 1513,
+    "lod": 140,
+    "colisao": 115
    },
    "tris_estatico": 20417,
    "tris_instancias": 17054,
@@ -496,9 +496,9 @@
     "colisao": "cidade_S01_04_colisao.glb"
    },
    "kb": {
-    "visual": 1621,
-    "lod": 149,
-    "colisao": 107
+    "visual": 1625,
+    "lod": 151,
+    "colisao": 114
    },
    "tris_estatico": 22028,
    "tris_instancias": 22138,
@@ -538,9 +538,9 @@
     "colisao": "cidade_S01_05_colisao.glb"
    },
    "kb": {
-    "visual": 900,
-    "lod": 127,
-    "colisao": 101
+    "visual": 904,
+    "lod": 129,
+    "colisao": 108
    },
    "tris_estatico": 11460,
    "tris_instancias": 25234,
@@ -580,9 +580,9 @@
     "colisao": "cidade_S01_06_colisao.glb"
    },
    "kb": {
-    "visual": 1657,
-    "lod": 137,
-    "colisao": 109
+    "visual": 1662,
+    "lod": 139,
+    "colisao": 115
    },
    "tris_estatico": 21944,
    "tris_instancias": 16006,
@@ -622,9 +622,9 @@
     "colisao": "cidade_S01_07_colisao.glb"
    },
    "kb": {
-    "visual": 1903,
-    "lod": 184,
-    "colisao": 116
+    "visual": 1907,
+    "lod": 186,
+    "colisao": 125
    },
    "tris_estatico": 25617,
    "tris_instancias": 35790,
@@ -661,9 +661,9 @@
     "colisao": "cidade_S02_00_colisao.glb"
    },
    "kb": {
-    "visual": 2282,
-    "lod": 200,
-    "colisao": 136
+    "visual": 2286,
+    "lod": 203,
+    "colisao": 146
    },
    "tris_estatico": 30261,
    "tris_instancias": 24448,
@@ -700,9 +700,9 @@
     "colisao": "cidade_S02_01_colisao.glb"
    },
    "kb": {
-    "visual": 2016,
-    "lod": 161,
-    "colisao": 123
+    "visual": 2020,
+    "lod": 164,
+    "colisao": 131
    },
    "tris_estatico": 26973,
    "tris_instancias": 11800,
@@ -742,9 +742,9 @@
     "colisao": "cidade_S02_02_colisao.glb"
    },
    "kb": {
-    "visual": 1759,
-    "lod": 149,
-    "colisao": 112
+    "visual": 1764,
+    "lod": 152,
+    "colisao": 119
    },
    "tris_estatico": 23740,
    "tris_instancias": 21334,
@@ -784,9 +784,9 @@
     "colisao": "cidade_S02_03_colisao.glb"
    },
    "kb": {
-    "visual": 1415,
-    "lod": 128,
-    "colisao": 102
+    "visual": 1420,
+    "lod": 131,
+    "colisao": 107
    },
    "tris_estatico": 19459,
    "tris_instancias": 9700,
@@ -826,9 +826,9 @@
     "colisao": "cidade_S02_04_colisao.glb"
    },
    "kb": {
-    "visual": 1169,
-    "lod": 116,
-    "colisao": 96
+    "visual": 1174,
+    "lod": 118,
+    "colisao": 101
    },
    "tris_estatico": 17468,
    "tris_instancias": 5060,
@@ -868,9 +868,9 @@
     "colisao": "cidade_S02_05_colisao.glb"
    },
    "kb": {
-    "visual": 1283,
-    "lod": 121,
-    "colisao": 98
+    "visual": 1287,
+    "lod": 123,
+    "colisao": 103
    },
    "tris_estatico": 16370,
    "tris_instancias": 12520,
@@ -910,9 +910,9 @@
     "colisao": "cidade_S02_06_colisao.glb"
    },
    "kb": {
-    "visual": 1817,
-    "lod": 151,
-    "colisao": 108
+    "visual": 1822,
+    "lod": 153,
+    "colisao": 115
    },
    "tris_estatico": 24853,
    "tris_instancias": 23660,
@@ -952,9 +952,9 @@
     "colisao": "cidade_S02_07_colisao.glb"
    },
    "kb": {
-    "visual": 1356,
-    "lod": 192,
-    "colisao": 112
+    "visual": 1360,
+    "lod": 195,
+    "colisao": 122
    },
    "tris_estatico": 16969,
    "tris_instancias": 45504,
@@ -991,9 +991,9 @@
     "colisao": "cidade_S03_00_colisao.glb"
    },
    "kb": {
-    "visual": 2196,
-    "lod": 191,
-    "colisao": 132
+    "visual": 2201,
+    "lod": 194,
+    "colisao": 142
    },
    "tris_estatico": 28507,
    "tris_instancias": 23886,
@@ -1030,9 +1030,9 @@
     "colisao": "cidade_S03_01_colisao.glb"
    },
    "kb": {
-    "visual": 1750,
-    "lod": 158,
-    "colisao": 120
+    "visual": 1755,
+    "lod": 161,
+    "colisao": 128
    },
    "tris_estatico": 23424,
    "tris_instancias": 24266,
@@ -1072,9 +1072,9 @@
     "colisao": "cidade_S03_02_colisao.glb"
    },
    "kb": {
-    "visual": 1039,
-    "lod": 130,
-    "colisao": 105
+    "visual": 1043,
+    "lod": 132,
+    "colisao": 111
    },
    "tris_estatico": 12259,
    "tris_instancias": 17274,
@@ -1114,9 +1114,9 @@
     "colisao": "cidade_S03_03_colisao.glb"
    },
    "kb": {
-    "visual": 92,
-    "lod": 112,
-    "colisao": 76
+    "visual": 76,
+    "lod": 77,
+    "colisao": 77
    },
    "tris_estatico": 0,
    "tris_instancias": 0,
@@ -1154,9 +1154,9 @@
     "colisao": "cidade_S03_04_colisao.glb"
    },
    "kb": {
-    "visual": 79,
-    "lod": 115,
-    "colisao": 76
+    "visual": 80,
+    "lod": 77,
+    "colisao": 77
    },
    "tris_estatico": 10,
    "tris_instancias": 0,
@@ -1194,9 +1194,9 @@
     "colisao": "cidade_S03_05_colisao.glb"
    },
    "kb": {
-    "visual": 1201,
-    "lod": 122,
-    "colisao": 93
+    "visual": 1205,
+    "lod": 124,
+    "colisao": 98
    },
    "tris_estatico": 15547,
    "tris_instancias": 7716,
@@ -1236,9 +1236,9 @@
     "colisao": "cidade_S03_06_colisao.glb"
    },
    "kb": {
-    "visual": 2011,
-    "lod": 158,
-    "colisao": 112
+    "visual": 2016,
+    "lod": 160,
+    "colisao": 119
    },
    "tris_estatico": 25142,
    "tris_instancias": 29665,
@@ -1278,9 +1278,9 @@
     "colisao": "cidade_S03_07_colisao.glb"
    },
    "kb": {
-    "visual": 1224,
-    "lod": 197,
-    "colisao": 115
+    "visual": 1228,
+    "lod": 200,
+    "colisao": 125
    },
    "tris_estatico": 14856,
    "tris_instancias": 48536,
@@ -1317,9 +1317,9 @@
     "colisao": "cidade_S04_00_colisao.glb"
    },
    "kb": {
-    "visual": 2172,
-    "lod": 193,
-    "colisao": 134
+    "visual": 2176,
+    "lod": 195,
+    "colisao": 144
    },
    "tris_estatico": 28343,
    "tris_instancias": 24976,
@@ -1356,9 +1356,9 @@
     "colisao": "cidade_S04_01_colisao.glb"
    },
    "kb": {
-    "visual": 1689,
-    "lod": 150,
-    "colisao": 119
+    "visual": 1693,
+    "lod": 153,
+    "colisao": 127
    },
    "tris_estatico": 21587,
    "tris_instancias": 13106,
@@ -1398,9 +1398,9 @@
     "colisao": "cidade_S04_02_colisao.glb"
    },
    "kb": {
-    "visual": 1657,
-    "lod": 136,
-    "colisao": 113
+    "visual": 1662,
+    "lod": 139,
+    "colisao": 120
    },
    "tris_estatico": 23477,
    "tris_instancias": 14104,
@@ -1440,9 +1440,9 @@
     "colisao": "cidade_S04_03_colisao.glb"
    },
    "kb": {
-    "visual": 91,
-    "lod": 119,
-    "colisao": 76
+    "visual": 76,
+    "lod": 77,
+    "colisao": 77
    },
    "tris_estatico": 0,
    "tris_instancias": 0,
@@ -1480,9 +1480,9 @@
     "colisao": "cidade_S04_04_colisao.glb"
    },
    "kb": {
-    "visual": 81,
-    "lod": 119,
-    "colisao": 76
+    "visual": 82,
+    "lod": 77,
+    "colisao": 77
    },
    "tris_estatico": 30,
    "tris_instancias": 0,
@@ -1520,9 +1520,9 @@
     "colisao": "cidade_S04_05_colisao.glb"
    },
    "kb": {
-    "visual": 1127,
-    "lod": 117,
-    "colisao": 95
+    "visual": 1132,
+    "lod": 119,
+    "colisao": 101
    },
    "tris_estatico": 16381,
    "tris_instancias": 8534,
@@ -1562,9 +1562,9 @@
     "colisao": "cidade_S04_06_colisao.glb"
    },
    "kb": {
-    "visual": 2588,
-    "lod": 158,
-    "colisao": 112
+    "visual": 2593,
+    "lod": 161,
+    "colisao": 119
    },
    "tris_estatico": 36596,
    "tris_instancias": 20844,
@@ -1604,9 +1604,9 @@
     "colisao": "cidade_S04_07_colisao.glb"
    },
    "kb": {
-    "visual": 1587,
-    "lod": 180,
-    "colisao": 111
+    "visual": 1591,
+    "lod": 183,
+    "colisao": 119
    },
    "tris_estatico": 20807,
    "tris_instancias": 33270,
@@ -1643,9 +1643,9 @@
     "colisao": "cidade_S05_00_colisao.glb"
    },
    "kb": {
-    "visual": 2003,
-    "lod": 187,
-    "colisao": 125
+    "visual": 2007,
+    "lod": 190,
+    "colisao": 134
    },
    "tris_estatico": 26144,
    "tris_instancias": 24180,
@@ -1682,9 +1682,9 @@
     "colisao": "cidade_S05_01_colisao.glb"
    },
    "kb": {
-    "visual": 2297,
-    "lod": 163,
-    "colisao": 122
+    "visual": 2302,
+    "lod": 165,
+    "colisao": 129
    },
    "tris_estatico": 32925,
    "tris_instancias": 10362,
@@ -1724,9 +1724,9 @@
     "colisao": "cidade_S05_02_colisao.glb"
    },
    "kb": {
-    "visual": 962,
-    "lod": 128,
-    "colisao": 104
+    "visual": 966,
+    "lod": 131,
+    "colisao": 110
    },
    "tris_estatico": 10569,
    "tris_instancias": 16704,
@@ -1766,9 +1766,9 @@
     "colisao": "cidade_S05_03_colisao.glb"
    },
    "kb": {
-    "visual": 424,
-    "lod": 86,
-    "colisao": 83
+    "visual": 426,
+    "lod": 87,
+    "colisao": 85
    },
    "tris_estatico": 5521,
    "tris_instancias": 1208,
@@ -1806,9 +1806,9 @@
     "colisao": "cidade_S05_04_colisao.glb"
    },
    "kb": {
-    "visual": 320,
-    "lod": 84,
-    "colisao": 84
+    "visual": 322,
+    "lod": 85,
+    "colisao": 87
    },
    "tris_estatico": 2804,
    "tris_instancias": 3352,
@@ -1846,9 +1846,9 @@
     "colisao": "cidade_S05_05_colisao.glb"
    },
    "kb": {
-    "visual": 1227,
-    "lod": 120,
-    "colisao": 95
+    "visual": 1231,
+    "lod": 122,
+    "colisao": 99
    },
    "tris_estatico": 15203,
    "tris_instancias": 11148,
@@ -1888,9 +1888,9 @@
     "colisao": "cidade_S05_06_colisao.glb"
    },
    "kb": {
-    "visual": 2230,
-    "lod": 151,
-    "colisao": 110
+    "visual": 2235,
+    "lod": 153,
+    "colisao": 117
    },
    "tris_estatico": 31770,
    "tris_instancias": 20370,
@@ -1930,9 +1930,9 @@
     "colisao": "cidade_S05_07_colisao.glb"
    },
    "kb": {
-    "visual": 1829,
-    "lod": 184,
-    "colisao": 113
+    "visual": 1833,
+    "lod": 186,
+    "colisao": 123
    },
    "tris_estatico": 25116,
    "tris_instancias": 39248,
@@ -1969,9 +1969,9 @@
     "colisao": "cidade_S06_00_colisao.glb"
    },
    "kb": {
-    "visual": 866,
-    "lod": 142,
-    "colisao": 99
+    "visual": 869,
+    "lod": 144,
+    "colisao": 106
    },
    "tris_estatico": 10468,
    "tris_instancias": 18708,
@@ -2008,9 +2008,9 @@
     "colisao": "cidade_S06_01_colisao.glb"
    },
    "kb": {
-    "visual": 750,
-    "lod": 113,
-    "colisao": 91
+    "visual": 753,
+    "lod": 115,
+    "colisao": 95
    },
    "tris_estatico": 8841,
    "tris_instancias": 6182,
@@ -2050,9 +2050,9 @@
     "colisao": "cidade_S06_02_colisao.glb"
    },
    "kb": {
-    "visual": 1070,
-    "lod": 122,
-    "colisao": 94
+    "visual": 1074,
+    "lod": 124,
+    "colisao": 100
    },
    "tris_estatico": 14467,
    "tris_instancias": 16468,
@@ -2092,9 +2092,9 @@
     "colisao": "cidade_S06_03_colisao.glb"
    },
    "kb": {
-    "visual": 1399,
-    "lod": 123,
-    "colisao": 97
+    "visual": 1403,
+    "lod": 125,
+    "colisao": 103
    },
    "tris_estatico": 20695,
    "tris_instancias": 4726,
@@ -2134,9 +2134,9 @@
     "colisao": "cidade_S06_04_colisao.glb"
    },
    "kb": {
-    "visual": 638,
-    "lod": 103,
-    "colisao": 87
+    "visual": 641,
+    "lod": 105,
+    "colisao": 91
    },
    "tris_estatico": 6851,
    "tris_instancias": 6884,
@@ -2176,9 +2176,9 @@
     "colisao": "cidade_S06_05_colisao.glb"
    },
    "kb": {
-    "visual": 502,
-    "lod": 92,
-    "colisao": 83
+    "visual": 505,
+    "lod": 93,
+    "colisao": 86
    },
    "tris_estatico": 5652,
    "tris_instancias": 4464,
@@ -2217,9 +2217,9 @@
     "colisao": "cidade_S06_06_colisao.glb"
    },
    "kb": {
-    "visual": 649,
-    "lod": 108,
-    "colisao": 89
+    "visual": 652,
+    "lod": 110,
+    "colisao": 93
    },
    "tris_estatico": 7387,
    "tris_instancias": 7974,
@@ -2259,9 +2259,9 @@
     "colisao": "cidade_S06_07_colisao.glb"
    },
    "kb": {
-    "visual": 1009,
-    "lod": 150,
-    "colisao": 105
+    "visual": 1012,
+    "lod": 152,
+    "colisao": 114
    },
    "tris_estatico": 12179,
    "tris_instancias": 32692,
@@ -2298,23 +2298,23 @@
     "colisao": "cidade_S07_00_colisao.glb"
    },
    "kb": {
-    "visual": 972,
-    "lod": 138,
-    "colisao": 100
+    "visual": 13148,
+    "lod": 137,
+    "colisao": 287
    },
-   "tris_estatico": 12946,
-   "tris_instancias": 15712,
-   "instancias": 41,
-   "malhas_instanciadas": 2,
-   "primitivas": 31,
-   "materiais": 25,
+   "tris_estatico": 254824,
+   "tris_instancias": 572702,
+   "instancias": 195,
+   "malhas_instanciadas": 19,
+   "primitivas": 175,
+   "materiais": 84,
    "tris_lod": {
-    "S07_00_Edificios_LOD1": 78,
-    "S07_00_Silhueta_LOD2": 60,
+    "S07_00_Edificios_LOD1": 68,
+    "S07_00_Silhueta_LOD2": 56,
     "S07_00_Vegetacao_LOD2": 336,
     "S07_00_Chao_LOD2": 7
    },
-   "colisores": 100,
+   "colisores": 886,
    "vizinhos": [
     "S06_00",
     "S06_01",
@@ -2335,9 +2335,9 @@
     "colisao": "cidade_S07_01_colisao.glb"
    },
    "kb": {
-    "visual": 1172,
-    "lod": 112,
-    "colisao": 93
+    "visual": 1176,
+    "lod": 114,
+    "colisao": 98
    },
    "tris_estatico": 16363,
    "tris_instancias": 5974,
@@ -2374,9 +2374,9 @@
     "colisao": "cidade_S07_02_colisao.glb"
    },
    "kb": {
-    "visual": 778,
-    "lod": 113,
-    "colisao": 93
+    "visual": 781,
+    "lod": 115,
+    "colisao": 98
    },
    "tris_estatico": 8955,
    "tris_instancias": 10940,
@@ -2413,9 +2413,9 @@
     "colisao": "cidade_S07_03_colisao.glb"
    },
    "kb": {
-    "visual": 1235,
-    "lod": 118,
-    "colisao": 96
+    "visual": 1239,
+    "lod": 120,
+    "colisao": 102
    },
    "tris_estatico": 18265,
    "tris_instancias": 3956,
@@ -2491,9 +2491,9 @@
     "colisao": "cidade_S07_05_colisao.glb"
    },
    "kb": {
-    "visual": 608,
-    "lod": 102,
-    "colisao": 87
+    "visual": 611,
+    "lod": 103,
+    "colisao": 90
    },
    "tris_estatico": 6355,
    "tris_instancias": 6136,
@@ -2530,9 +2530,9 @@
     "colisao": "cidade_S07_06_colisao.glb"
    },
    "kb": {
-    "visual": 1151,
-    "lod": 109,
-    "colisao": 91
+    "visual": 1155,
+    "lod": 111,
+    "colisao": 96
    },
    "tris_estatico": 16597,
    "tris_instancias": 4536,
@@ -2569,9 +2569,9 @@
     "colisao": "cidade_S07_07_colisao.glb"
    },
    "kb": {
-    "visual": 1046,
-    "lod": 159,
-    "colisao": 105
+    "visual": 1049,
+    "lod": 161,
+    "colisao": 114
    },
    "tris_estatico": 13817,
    "tris_instancias": 30408,
@@ -2594,13 +2594,13 @@
   }
  },
  "cidade_anel.gltf": {
-  "kb": 2470,
+  "kb": 2475,
   "tris": 38510
  },
  "cidade_distante.gltf": {
-  "kb": 236,
+  "kb": 237,
   "tris": 4558
  },
- "texturas_kb": 4673,
- "texturas_arquivos": 60
+ "texturas_kb": 7415,
+ "texturas_arquivos": 100
 }

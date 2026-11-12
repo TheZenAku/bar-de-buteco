@@ -23,6 +23,8 @@ const CITY_LIGHT_INTENSITY=2.4,CITY_LIGHT_RANGE=30;
 const SMALL_CASTER=.6;
 /** Farther than this from the camera a city lamp is off: the fog hides it, and it would stretch the light clusters over the city. */
 const CITY_LIGHT_NEAR=110;
+/** Street lamps lit at once (the nearest ones): each light costs every pixel it reaches, and a lit street shows no more than this around the player. */
+const CITY_LIGHT_MAX=12;
 /** Map lights driven by their own prop: the jukebox and the stage colour their lights (jukebox-lights.ts, stage-lights.ts). */
 const PROP_LIGHT=/^(Jukebox_FX_|Luz_Palco_Cor$)/;
 /**
@@ -43,6 +45,12 @@ const LAMP_KINDS:Array<[RegExp,LampKind]>=[
 ];
 const OUTSIDE_LAMP=/Varanda|Varal|Quintal|Palco|Terraco/;
 const HALO_RANGE=1.7;
+/** Lamps inside buildings of the city (the factory's): how far they shine, and how far from the camera they are on at all. */
+const INDOOR_LIGHT_RANGE=11,INDOOR_LIGHT_NEAR=90;
+/** How fast the whole set of indoor lamps fades in or out (per second) as the camera comes to the building or leaves it. */
+const INDOOR_FADE_PER_S=3;
+/** The city's metals (steel, chrome, galvanised): with no room to reflect they drew black. How much of the sky they mirror by night, against by day. */
+const METAL_NIGHT_REFLECTION=.3;
 /**
  * The lamps' shadow maps share one atlas (clustered lighting). A fixed split keeps every lamp in its tile: with the
  * engine's default the split followed the number of lamps in view, and turning the camera redrew them all.
@@ -122,6 +130,14 @@ export class EnvironmentLighting {
   private refreshAll=false;
   private cityLights=new Set<pc.LightComponent>();
   private cityLightsOn=true;
+  private indoorLights=new Map<pc.LightComponent,number>();
+  /** How lit each indoor lamp is now (0..1): the lamps outside the nearest few fade rather than pop. */
+  private indoorFade=new Map<pc.LightComponent,number>();
+  private metals=new Set<pc.StandardMaterial>();
+  private metalAtlas?:pc.Texture;
+  private metalLuminance=.3;
+  private metalLevel=-1;
+  private metalReflection=-1;
   /** One copy of the city's glowing lamp material, shared by every sector: sectors come and go, the glow stays in step. */
   private cityLampMaterial?:pc.StandardMaterial;
   private panorama?:pc.StandardMaterial;
@@ -204,6 +220,8 @@ export class EnvironmentLighting {
         light.numCascades=2;light.cascadeBlend=.12;light.cascadeDistribution=.65;light.shadowType=pc.SHADOW_PCF3_32F;
         light.shadowBias=.12;light.normalOffsetBias=.025;
       }else{
+        // Street lamps of the bar's neighbourhood (map lights named Luz_Poste_*): the city's night lamps, near and capped.
+        if(/^Luz_Poste_/.test(name)){this.addCityLight(light);continue;}
         const outside=OUTSIDE_LAMP.test(name),kind=LAMP_KINDS.find(([test])=>test.test(name))?.[1];
         const relative=light.luminance/median||1;
         // A fixture of 49_luzes_bar.py shines as its kind; any other map light (the stage, the terrace) as a ceiling lamp
@@ -327,10 +345,30 @@ export class EnvironmentLighting {
       sign.material.update();
     }
     const cityLight=CITY_LIGHT_INTENSITY*nowNight*this.electrical;
-    for(const light of this.cityLights){
-      const p=light.entity.getPosition();
-      light.intensity=cityLight;light.enabled=this.cityLightsOn&&cityLight>.015&&Math.hypot(p.x-eye.x,p.z-eye.z)<CITY_LIGHT_NEAR;
+    const lit=new Set<pc.LightComponent>();
+    if(this.cityLightsOn&&cityLight>.015){
+      const near:Array<[number,pc.LightComponent]>=[];
+      for(const light of this.cityLights){
+        const p=light.entity.getPosition(),away=Math.hypot(p.x-eye.x,p.z-eye.z);
+        if(away<CITY_LIGHT_NEAR)near.push([away,light]);
+      }
+      near.sort((a,b)=>a[0]-b[0]);
+      for(let i=0;i<near.length&&i<CITY_LIGHT_MAX;i++)lit.add(near[i]![1]);
     }
+    for(const light of this.cityLights){light.intensity=cityLight;light.enabled=lit.has(light);}
+    if(this.indoorLights.size){
+      // The building is lit as a whole: every lamp is on while the camera is anywhere near it, so the plant looks the same wherever you stand
+      // in it (choosing the nearest few made lamps switch on and off as you walked). Far away, where the fog hides it, all fade out together.
+      let nearest=Infinity;
+      for(const light of this.indoorLights.keys()){const p=light.entity.getPosition();nearest=Math.min(nearest,Math.hypot(p.x-eye.x,p.y-eye.y,p.z-eye.z));}
+      const toward=nearest<INDOOR_LIGHT_NEAR?1:-1;
+      for(const [light,base] of this.indoorLights){
+        const fade=Math.max(0,Math.min(1,(this.indoorFade.get(light)??0)+toward*Math.min(dt,.1)*INDOOR_FADE_PER_S));
+        this.indoorFade.set(light,fade);
+        light.intensity=base*this.electrical*fade;light.enabled=light.intensity>.015;
+      }
+    }
+    this.updateMetals(state.night);
     // The panorama is painted in daylight and draws over the sky near the horizon: it takes the colour of the hour.
     if(this.panorama){
       const day=1-state.night,weatherShade=1-weather.cloud*.42-weather.storm*.18;
@@ -418,6 +456,62 @@ export class EnvironmentLighting {
     light.intensity=0;light.enabled=false;this.cityLights.add(light);
   }
   removeCityLight(light:pc.LightComponent):void {this.cityLights.delete(light);}
+  /** A lamp inside a building: on at every hour while the power is on (it follows the blackouts), and only near the camera. */
+  addIndoorLight(light:pc.LightComponent,intensity:number):void {
+    light.type='omni';light.castShadows=false;light.falloffMode=pc.LIGHTFALLOFF_LINEAR;light.range=INDOOR_LIGHT_RANGE;
+    light.intensity=0;light.enabled=false;this.indoorLights.set(light,intensity);
+  }
+  removeIndoorLight(light:pc.LightComponent):void {this.indoorLights.delete(light);this.indoorFade.delete(light);}
+  /**
+   * A metal of the city (metalness from half up) mirrors a sky and a ground drawn here, shared by all of them: a metal only shows
+   * what it reflects, and the city has no room map, so chrome, steel and galvanised sheet came out black. Its ambient is kept at
+   * the hour's level, as the bar's surfaces do (bar-surfaces.ts).
+   */
+  dressMetal(material:pc.StandardMaterial):void {
+    if(!material.useLighting||material.metalness<.5||material.envAtlas||this.metals.has(material))return;
+    const e=material.emissive;
+    if(e.r>0||e.g>0||e.b>0)return;
+    const atlas=this.metalAtlas??this.buildMetalAtlas();
+    if(!atlas)return;
+    material.envAtlas=atlas;material.update();this.metals.add(material);this.metalLevel=-1;
+  }
+  releaseMetal(material:pc.StandardMaterial):void {this.metals.delete(material);}
+  private buildMetalAtlas():pc.Texture|undefined {
+    const width=256,height=128,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const context=canvas.getContext('2d',{willReadFrequently:true});
+    if(!context)return undefined;
+    // Top to bottom: pale sky, a bright horizon, then dark ground. Soft panels and a window keep the reflections from being flat.
+    const sky=context.createLinearGradient(0,0,0,height);
+    sky.addColorStop(0,'#a4b6d0');sky.addColorStop(.34,'#dfe6ee');sky.addColorStop(.5,'#f4f4f0');sky.addColorStop(.52,'#8c8a86');sky.addColorStop(1,'#4a4947');
+    context.fillStyle=sky;context.fillRect(0,0,width,height);
+    context.fillStyle='rgba(255,255,255,.85)';
+    for(const [x,w] of [[20,34],[88,22],[150,40],[214,26]] as const)context.fillRect(x,18,w,12);
+    context.fillStyle='rgba(20,24,30,.55)';
+    for(const [x,w] of [[60,18],[120,30],[188,16]] as const)context.fillRect(x,56,w,16);
+    const data=context.getImageData(0,0,width,height).data;let sum=0;
+    const linear=(v:number)=>Math.pow(v/255,2.2);
+    for(let i=0;i<data.length;i+=4)sum+=.2126*linear(data[i]!)+.7152*linear(data[i+1]!)+.0722*linear(data[i+2]!);
+    this.metalLuminance=Math.max(.02,sum/(data.length/4));
+    const device=this.app.graphicsDevice;
+    const source=new pc.Texture(device,{name:'City metal sky',format:pc.PIXELFORMAT_SRGBA8,mipmaps:false,projection:pc.TEXTUREPROJECTION_EQUIRECT,
+      addressU:pc.ADDRESS_REPEAT,addressV:pc.ADDRESS_CLAMP_TO_EDGE});
+    source.setSource(canvas);
+    const lighting=pc.EnvLighting.generateLightingSource(source,{size:128});
+    this.metalAtlas=pc.EnvLighting.generateAtlas(lighting,{size:256});
+    source.destroy();lighting.destroy();
+    return this.metalAtlas;
+  }
+  /** Every frame: the metals' ambient follows the hour's (scene.ambientLight) and their reflections the daylight. */
+  private updateMetals(night:number):void {
+    if(!this.metals.size)return;
+    const a=this.app.scene.ambientLight,linear=(v:number)=>Math.pow(v,2.2);
+    const hour=.2126*linear(a.r)+.7152*linear(a.g)+.0722*linear(a.b);
+    const level=hour/this.metalLuminance,reflection=METAL_NIGHT_REFLECTION+(1-METAL_NIGHT_REFLECTION)*(1-night);
+    if(Math.abs(level-this.metalLevel)<.004&&Math.abs(reflection-this.metalReflection)<.01)return;
+    this.metalLevel=level;this.metalReflection=reflection;
+    const tint=Math.pow(level,1/2.2);
+    for(const material of this.metals){material.ambient.set(tint,tint,tint);material.reflectivity=reflection;material.update();}
+  }
   setCityLights(on:boolean):void {this.cityLightsOn=on;}
   /** The material for a sector's glowing lamps (`Lampada`): they follow the night like the rest of the street's. */
   cityLamp(source:pc.StandardMaterial):pc.StandardMaterial {
@@ -486,6 +580,7 @@ export class EnvironmentLighting {
     this.app.scene.off('cull:end',this.onCullEnd);
     for(const lamp of this.lamps)if(lamp.street)lamp.entity.destroy();
     this.moon.destroy();this.sky.destroy();this.skirt.destroy();this.skyMaterial.destroy();this.skirtMaterial.destroy();
+    this.metalAtlas?.destroy();this.metalAtlas=undefined;this.metals.clear();this.indoorLights.clear();this.indoorFade.clear();
     this.clones.forEach(material=>material.destroy());this.lamps=[];this.glows=[];this.signs=[];this.signLight=undefined;this.cityLights.clear();this.moving=[];
   }
 }

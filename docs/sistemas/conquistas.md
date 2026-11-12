@@ -7,7 +7,7 @@ Os emblemas que o jogador ganha jogando. Cada atividade da cidade é uma **séri
 - **Um aviso** no alto da tela, com a medalha e o botão **Ver a carta**. Ele chega em até 3 segundos, ou na próxima vez que o jogador entrar, se ele não estava no bar.
 - **A aba Conquistas** no próprio perfil (botão direito em si mesmo → Perfil): todas as séries, com o progresso até o próximo nível e as quatro medalhas. O que já foi começado vem primeiro. Medalha ainda não ganha fica apagada, e passar o mouse mostra o que ela pede; a ganha abre a carta.
 - **Editar emblemas**, como qualquer outro: entrar na coleção não coloca o emblema em exibição, quem escolhe é o jogador. Nada de "Bexiga Solta" aparecendo no perfil sem ele querer.
-- **Os outros ficam sabendo** no chat: quem está perto vê os níveis III; o bar inteiro vê os níveis IV.
+- **Só o dono é avisado.** Desde 2026-11-08 o chat não recebe mais mensagens de sistema (`2b3b0d1`), então os níveis III e IV não são anunciados aos outros.
 
 ## Níveis
 

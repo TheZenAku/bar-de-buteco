@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Client as BrowserClient, type Room as ClientRoom } from '@colyseus/sdk';
-import { BLACKJACK_TABLE,SKINS,OLD_CANE_SPEED,TICK_MS } from '@bar/shared';
+import { BLACKJACK_TABLE,SKINS,OLD_CANE_SPEED,TICK_MS,WALK_SPEED,skillById } from '@bar/shared';
 import { signTicket } from '@bar/shared/tickets';
 import { BarRoom } from '../src/BarRoom.js';
 
@@ -66,10 +66,10 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(first.roomId, second.roomId);
     await assert.rejects(() => browser.joinOrCreate('bar', { ticket: ticket('carol') }), /BAR_FULL/);
     const player = authoritative!.state.players.get('alice')!;
-    const startX = player.x;
+    const startX = player.x, step = WALK_SPEED * TICK_MS / 1000;
     first.send('player.input', { seq: 0, dx: 1, dz: 0, running: false, rotation: 0, headYaw:.4, headPitch:-.2 });
     await eventually(() => first.state.players.get('alice').lastProcessedInput === 0);
-    assert.ok(Math.abs(player.x - startX - 0.175) < 0.001);
+    assert.ok(Math.abs(player.x - startX - step) < 0.001,`one tick walks ${step} m, moved ${player.x - startX}`);
     assert.equal(player.rotation,0,'Head look does not change body rotation');
     assert.equal(player.headYaw,.4);assert.equal(player.headPitch,-.2);
     await eventually(()=>Math.abs(second.state.players.get('alice').headYaw-.4)<1e-5&&Math.abs(second.state.players.get('alice').headPitch+.2)<1e-5);
@@ -79,7 +79,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     const beforeBurst=player.x;
     for(let seq=2;seq<=32;seq++)first.send('player.input',{seq,dx:1,dz:0,running:false,rotation:0});
     await eventually(()=>player.lastProcessedInput===32);
-    assert.ok(player.x-beforeBurst<=0.175*7+0.001,'Packet bursts cannot increase per-tick movement or replay a long backlog');
+    assert.ok(player.x-beforeBurst<=step*7+0.001,'Packet bursts cannot increase per-tick movement or replay a long backlog');
     assert.equal(errors.length,1,'Congestion should not flood the UI with errors');
     first.send('chat.send', { text: 'Olá do teste real' });
     await eventually(() => received.includes('Olá do teste real'));
@@ -148,7 +148,7 @@ test('real WebSocket clients: auth, authority, AOI, chat, table privacy, reconne
     assert.equal(player.animationState, 'kick', 'Other emotes cannot interrupt the kick');
     await eventually(() => player.animationState === 'idle');
     assert.equal(player.interactionState, '');
-    assert.ok(Date.now() - player.animationStartedAt >= 2000);
+    assert.ok(Date.now() - player.animationStartedAt >= skillById('karate')!.durationMs - 100, 'The kick lasts its clip');
     // G draws a new dance each time, and the others receive the draw to play the same clip.
     // Three emotes: with the kick below, four within the per-second limit.
     const draws: number[] = [];

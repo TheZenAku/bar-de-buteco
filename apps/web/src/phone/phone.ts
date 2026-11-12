@@ -11,6 +11,7 @@ import {mapas} from './apps/maps';
 import {highbank} from './apps/bank';
 import {highfood} from './apps/highfood';
 import {highmotors} from './apps/motors';
+import {highcargo} from './apps/cargo';
 import {notas,calendario,relogio,calculadora,ajustes} from './apps/tools';
 import {WALLPAPERS} from './wallpapers';
 import {createFrameEncoder} from './frame-encoder';
@@ -18,7 +19,7 @@ import {createFrameReceiver} from './frame-receiver';
 import './phone.css';
 
 /** Dock first (Telefone, Highzap, Highgram, Câmera), then the home screen's grid. */
-const APPS:PhoneApp[]=[telefone,highzap,highgram,camera,fotos,mapas,highfood,highmotors,highbank,contatos,notas,calendario,relogio,calculadora,ajustes];
+const APPS:PhoneApp[]=[telefone,highzap,highgram,camera,fotos,mapas,highfood,highcargo,highmotors,highbank,contatos,notas,calendario,relogio,calculadora,ajustes];
 const SCALE={s:.6,m:.74,l:.9} as const;
 const GAME_PHASES:Array<[number,string]>=[[5,'Madrugada'],[7,'Amanhecer'],[12,'Manhã'],[17.5,'Tarde'],[19,'Entardecer'],[24,'Noite']];
 const statusIcons=`<span class="ph-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span><small>5G</small><svg class="ph-wifi" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 4a10 10 0 0 1 14 0M3.5 6.8a6.5 6.5 0 0 1 9 0M6 9.5a3 3 0 0 1 4 0" stroke="currentColor" fill="none" stroke-width="1.7" stroke-linecap="round"/></svg><span class="ph-battery" aria-hidden="true"><b></b></span>`;
@@ -118,6 +119,22 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
     buzz();buzzing=setInterval(buzz,HIGHFOOD.BUZZ_EVERY_MS);
     if(open)quietBanner('highfood','Highfood','Chegou um pedido novo.');
   }
+  // The plant's requests for truck drivers (HighCargo): the icon exists for them only, a badge counts the open ones, and a new one is announced.
+  const cargoSeen=new Set<string>();let cargoFirst=true,cargoEligible=false;
+  host.freight.listen(state=>{
+    if(state.eligible!==cargoEligible){cargoEligible=state.eligible;if(!current)renderHome();}
+    const free=state.eligible&&!state.trip?state.offers:[];
+    const fresh=free.filter(offer=>!cargoSeen.has(offer.id));
+    for(const offer of state.offers)cargoSeen.add(offer.id);
+    const watching=open&&current?.app.id==='highcargo';
+    setBadge('highcargo',watching?0:free.length);
+    if(!cargoFirst&&fresh.length&&!watching){
+      const first=fresh[0]!,text=`${first.pallets} palete(s) de ${first.material} para a EMPRESA BRASIL.`;
+      if(!settings.dnd)sounds.ding();
+      if(open)quietBanner('highcargo','HighCargo',text);else host.notice('HighCargo',text);
+    }
+    cargoFirst=false;
+  });
   host.food.listen(onFood);
   host.food.receipts(receipt=>{if(!settings.dnd&&receipt.paid>0)sounds.cash();});
 
@@ -164,7 +181,7 @@ export function createPhone(root:HTMLElement,host:PhoneHost):Phone {
       <button class="ph-widget ph-w-clock" type="button" data-app="relogio" data-widget="clock"><small>${uiIcon(clock.night?'moon':'sun')} Hora no bar</small><b>${clock.text}</b><span>${clock.phase} · ${formatWorldDate(host.serverNow(),{weekday:'short',day:'numeric',month:'short'})}</span></button>
       <div class="ph-widget-stack"><button class="ph-widget ph-w-bank" type="button" data-app="highbank"><small>${uiIcon('landmark')} HighBank</small><b>${balance===undefined?'—':balance.toLocaleString('pt-BR')}</b><span>moedas</span></button>
       <button class="ph-widget ph-w-zap" type="button" data-app="highzap"><small>${uiIcon('messageCircle')} Highzap</small><b>${unread}</b><span>${unread===1?'mensagem nova':'mensagens novas'}</span></button></div></div>
-      <div class="ph-grid">${APPS.filter(app=>!app.dock).map(app=>icon(app)).join('')}</div>
+      <div class="ph-grid">${APPS.filter(app=>!app.dock&&(app.visible?.(host)??true)).map(app=>icon(app)).join('')}</div>
       <div class="ph-dock">${APPS.filter(app=>app.dock).map(app=>icon(app,false)).join('')}</div>`;
   }
   function setBadge(app:string,count:number):void {

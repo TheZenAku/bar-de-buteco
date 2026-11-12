@@ -1,0 +1,119 @@
+/* Economia: the hub's tabs (apps/web/src/admin/economy*.ts), on admin.css's tiles, cards and tables. */
+.eco{display:flex;flex-direction:column;gap:16px}
+.eco-tabs{position:sticky;top:-20px;z-index:4;align-self:flex-start;max-width:100%;padding:0;background:var(--background,oklch(.1 .04 300))}
+.eco-tabs button .ui-icon{width:14px;height:14px}
+.eco-panel{position:relative;min-width:0}
+.eco-heading{margin:20px 0 10px;font:600 11px var(--font-mono);text-transform:uppercase;letter-spacing:.16em;color:var(--hl-magenta)}
+.eco-heading:first-child{margin-top:0}
+.eco-dot{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;background:var(--hl-gold);color:oklch(.18 .05 80);font:700 10px var(--font-mono);letter-spacing:0}
+
+/* Stat tiles that open another tab */
+.eco-tile{display:grid;align-content:start;gap:4px;padding:14px 16px;text-align:left;background:oklch(1 0 0 / 3.5%);transition:background-color .15s}
+.eco-tile:hover{background:oklch(1 0 0 / 7%)}
+.eco-tile small{display:flex;align-items:center;gap:4px}
+.eco-tile small .ui-icon{width:11px;height:11px;margin-left:auto;opacity:.6}
+.eco-today{margin-bottom:16px}
+.eco-recent li{display:flex;align-items:center;gap:12px;padding:7px 0}
+.eco-recent li p{flex:1;min-width:0}
+.eco-recent li .text-button{padding:0}
+
+/* Cofre */
+.eco-hero{display:grid;grid-template-columns:minmax(220px,auto) minmax(0,1fr);gap:1px;align-items:stretch;margin-bottom:0;background:oklch(1 0 0 / 3.5%)}
+.eco-hero-main{display:flex;align-items:center;gap:14px;padding:18px 22px;border-left:3px solid var(--hl-gold)}
+.eco-hero-main .ui-icon{width:34px;height:34px;color:var(--hl-gold)}
+.eco-hero-main small{display:block;font:400 10px var(--font-mono);text-transform:uppercase;letter-spacing:.14em;color:var(--muted-foreground)}
+.eco-hero-main b{display:block;margin-top:2px;font:600 30px/1.1 var(--font-display);color:var(--foreground)}
+.eco-hero-main b small{display:inline;font-size:12px;letter-spacing:.04em;text-transform:none}
+.eco-hero .admin-stats{grid-template-columns:repeat(4,minmax(0,1fr));background:oklch(1 0 0 / 3.5%)}
+.eco-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:6px}
+.eco-pager span{font:400 11px var(--font-mono);color:var(--muted-foreground)}
+.eco-pager .mini-button{gap:6px}
+.eco-pager .mini-button .ui-icon{width:12px;height:12px}
+
+/* Forms in the tabs */
+.eco-form{display:grid;gap:12px}
+.eco-form label{margin:0}
+.eco-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.eco-row label{display:grid;gap:4px;min-width:0}
+.eco-group{display:grid;align-content:start;gap:0;min-width:0;margin:0;padding:14px 16px 6px;border:1px solid var(--border);background:oklch(1 0 0 / 3%)}
+.eco-group-head{display:grid;gap:4px;align-content:start;padding:0 0 10px;margin-bottom:2px;border-bottom:1px solid var(--border)}
+.eco-group-head b{font:600 11px var(--font-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--soft)}
+.eco-group-head small{font:400 11px/1.45 var(--font-body,inherit);color:var(--muted-foreground)}
+.eco-field{display:grid;grid-template-columns:minmax(0,1fr) 190px;align-items:center;gap:14px;padding:8px 8px;border-bottom:1px solid oklch(1 0 0 / 6%);border-left:2px solid transparent;font-size:12px;color:var(--soft)}
+.eco-field>span:first-child{display:grid;gap:1px;min-width:0}
+.eco-field b{font-weight:600;color:var(--foreground)}
+.eco-field small{font-weight:400;color:var(--muted-foreground)}
+.eco-field.changed{border-left-color:var(--hl-magenta);background:oklch(.62 .28 330 / 9%)}
+.eco-input{display:flex;align-items:center;gap:6px}
+.eco-input input{flex:1;min-width:0;height:34px;min-height:0;margin:0;padding:5px 8px;font-family:var(--font-mono)}
+.eco-input em{flex:none;width:62px;font-style:normal;font-size:11px;color:var(--muted-foreground)}
+.eco-books td:first-child{color:var(--soft)}
+
+/* Tables that scroll inside their card instead of growing the page */
+.eco-scroll{max-height:max(360px,calc(100dvh - 440px));overflow:auto}
+.eco-scroll thead th{position:sticky;top:0;z-index:1;background:oklch(.13 .045 300)}
+.eco-price-tools{align-items:flex-end}
+.eco-search{display:flex;align-items:center;gap:8px;margin:0;padding:0 10px;min-width:320px;background:var(--secondary)}
+.eco-search .ui-icon{width:14px;height:14px;color:var(--muted-foreground)}
+.eco-search input{flex:1;min-height:32px;margin:0;padding:4px 0;border:0;background:transparent}
+.admin-percent select{min-height:32px;padding:4px 8px}
+
+@container (max-width:860px){.eco-hero{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  .eco-hero{grid-template-columns:minmax(0,1fr)}
+  .eco-row{grid-template-columns:minmax(0,1fr)}
+  .eco-tabs{top:-14px}
+}
+.eco-sim td,.eco-sim th{padding:5px 8px}
+
+/* Values form: groups side by side, labels in plain text (the global label style is mono caps) */
+.eco-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+.eco-group.wide{grid-column:1/-1}
+.eco-group.wide .eco-field{grid-template-columns:minmax(0,1fr) 420px}
+/* Every row of a group is as tall as the others, so the two groups of a line match row by row */
+.eco-values .eco-field{box-sizing:border-box;height:92px;gap:14px;padding:8px}
+.eco-values .eco-label small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.eco-values .eco-group-head{box-sizing:border-box;min-height:72px}
+.eco-values .eco-group.wide .eco-group-head{min-height:0}
+.eco-field.is-static .eco-input output{display:flex;align-items:center;flex:1;min-width:0;height:34px;padding:5px 8px;border:1px dashed var(--border);font-family:var(--font-mono);color:var(--soft)}
+.eco-intro{margin:0;font-size:12px;line-height:1.5;color:var(--soft)}
+.eco-profit{display:grid;gap:10px;padding:14px 16px;border:1px solid var(--border);background:oklch(1 0 0 / 3%)}
+.eco-profit .admin-confirm-buttons{margin:0}
+.eco-verdict{padding:10px 12px;border-left:3px solid var(--hl-gold);background:oklch(1 0 0 / 4%);font-size:12px;line-height:1.5;color:var(--soft)}
+.eco-verdict b{color:var(--foreground)}
+.eco-verdict.warn{border-left-color:var(--hl-magenta);background:oklch(.62 .28 330 / 9%)}
+.eco-verdict.ok{border-left-color:var(--vw-mint)}
+.eco-profit-table td:first-child small{display:block;margin-top:2px;font:400 10px var(--font-mono);color:var(--muted-foreground)}
+.eco-field,.eco-field b,.eco-field small{font-family:var(--font-body,inherit);text-transform:none;letter-spacing:0}
+.eco-field b{font-size:13px}
+.eco-field small{font-size:11px;line-height:1.4}
+.eco-values .admin-confirm-buttons{align-items:center}
+.eco-trips td{white-space:nowrap}
+
+/* Economia › Empresa */
+.eco-company{display:grid;gap:14px}
+.co-members{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.co-member{display:grid;grid-template-columns:minmax(200px,1fr) 150px minmax(0,2fr);align-items:center;gap:10px 16px;min-height:92px;padding:10px 12px;background:oklch(1 0 0 / 3.5%);border-left:3px solid var(--hl-gold)}
+.co-who b{display:block}
+.co-who small,.co-tags small{display:block;font:400 10px var(--font-mono);color:var(--muted-foreground);overflow-wrap:anywhere}
+.co-tags{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.co-tags .admin-badge{width:max-content}
+.co-actions{display:grid;gap:8px;justify-items:end}
+.co-btns{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px}
+.co-actions .mini-button{gap:6px}
+.co-actions .mini-button .ui-icon{width:12px;height:12px}
+.co-pass{display:inline-flex;align-items:center;gap:6px}
+.co-pass input{width:130px;height:30px;min-height:0;margin:0;padding:4px 8px}
+.co-pass .mini-button{white-space:nowrap}
+@media(max-width:900px){.co-member{grid-template-columns:minmax(0,1fr);min-height:0}.co-actions{justify-items:start}.co-btns{justify-content:flex-start}.co-pass input{width:110px}.eco-hero .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Values form on narrow screens: one column, rows as tall as their text (placed last so it wins over the grid rules above) */
+@media (max-width:860px){
+  .eco-groups{grid-template-columns:minmax(0,1fr)}
+  .eco-values .eco-field,.eco-values .eco-group.wide .eco-field{grid-template-columns:minmax(0,1fr);height:auto;min-height:0;gap:8px}
+  .eco-values .eco-label small{display:block;-webkit-line-clamp:unset;overflow:visible}
+  .eco-values .eco-group-head{min-height:0}
+  .eco-profit-table td,.eco-profit-table th{padding:6px 6px}
+  .eco-books td,.eco-books th{padding:7px 6px}
+  .eco-books td:first-child{min-width:104px;overflow-wrap:normal;word-break:normal}
+}

@@ -15,8 +15,13 @@ test('emprego da fábrica: admissão e demissão são idempotentes, expediente e
     const userId=response.json().user.id as string,cookie=`${response.cookies[0]!.name}=${response.cookies[0]!.value}`,[session]=await api.db.select().from(sessions).where(eq(sessions.userId,userId));return {userId,cookie,sessionId:session!.id};
   }
   const worker=await account('factory_worker'),visitor=await account('factory_visitor');
+  const shiftOf=(person:typeof worker,action:string)=>api.app.inject({method:'POST',url:'/api/internal/employment',headers:internal,payload:{sessionId:person.sessionId,userId:person.userId,action,requestId:randomUUID(),station:'painel'}});
   const hireId=randomUUID(),hire=()=>api.app.inject({method:'POST',url:'/api/employment/hire',headers:{cookie:worker.cookie},payload:{requestId:hireId}});
+  // Applying only asks for the job (2026-11-12): an owner or manager (here the administration's hire) admits.
   assert.equal((await hire()).statusCode,200);assert.equal((await hire()).statusCode,200);
+  assert.equal((await api.db.select().from(employments).where(eq(employments.userId,worker.userId)))[0]?.status,'applied');
+  assert.equal((await shiftOf(visitor,'start')).statusCode,403);
+  assert.equal((await api.app.inject({method:'POST',url:'/api/internal/employment',headers:internal,payload:{action:'admin.hire',userId:worker.userId,requestId:randomUUID()}})).statusCode,200);
   const [employment]=await api.db.select().from(employments).where(eq(employments.userId,worker.userId));assert.equal(employment?.jobId,'spray-dry-operator');assert.equal(employment?.status,'hired');
   assert.equal((await api.db.select().from(employmentEvents).where(eq(employmentEvents.requestId,hireId))).length,1);
 
@@ -36,7 +41,7 @@ test('emprego da fábrica: admissão e demissão são idempotentes, expediente e
 test('expediente limita seis operadores mesmo com entradas simultâneas',{timeout:120000},async t=>{
   const api=await createApi({config:{...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true},rateLimit:false,migrate:true});t.after(()=>api.app.close());const internal={'x-internal-secret':internalSecret()};
   const people=[];
-  for(let i=0;i<7;i++){const name=`shift_${i}`,response=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{username:name,displayName:name,email:`${name}@employment.test`,password:'SenhaBoaDeTeste2026!'}}),userId=response.json().user.id as string,[session]=await api.db.select().from(sessions).where(eq(sessions.userId,userId));await api.app.inject({method:'POST',url:'/api/employment/hire',headers:{cookie:`${response.cookies[0]!.name}=${response.cookies[0]!.value}`},payload:{requestId:randomUUID()}});people.push({userId,sessionId:session!.id});}
+  for(let i=0;i<7;i++){const name=`shift_${i}`,response=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{username:name,displayName:name,email:`${name}@employment.test`,password:'SenhaBoaDeTeste2026!'}}),userId=response.json().user.id as string,[session]=await api.db.select().from(sessions).where(eq(sessions.userId,userId));await api.app.inject({method:'POST',url:'/api/employment/hire',headers:{cookie:`${response.cookies[0]!.name}=${response.cookies[0]!.value}`},payload:{requestId:randomUUID()}});await api.app.inject({method:'POST',url:'/api/internal/employment',headers:internal,payload:{action:'admin.hire',userId,requestId:randomUUID()}});people.push({userId,sessionId:session!.id});}
   const starts=await Promise.all(people.map(person=>api.app.inject({method:'POST',url:'/api/internal/employment',headers:internal,payload:{...person,action:'start',requestId:randomUUID(),station:'entrada'}})));
   assert.deepEqual(starts.map(r=>r.statusCode).sort(),[200,200,200,200,200,200,409]);
 });

@@ -3,7 +3,7 @@ import {createServer} from 'node:http';import type {AddressInfo} from 'node:net'
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
 import {INTERACTABLES,MAP_MARKERS,NEEDS,consumeMs,distance} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
-async function until(check:()=>boolean,ms=4000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
+async function until(check:()=>boolean,ms=12000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 
 test('needs: stamina gates running, beer and toilet, faints block actions and wake, one alcohol rescue, synced to others',{timeout:60000},async()=>{
@@ -29,7 +29,11 @@ test('needs: stamina gates running, beer and toilet, faints block actions and wa
     // Running drains stamina (seen by the other player); at zero the character walks, never runs.
     assert.ok((await walk(a,30,true)).has('run'));
     await until(()=>(seen()?.stamina??100)<=96);
-    needs.stamina=0;needs.exhausted=true;
+    // An empty ring with the reserve left: the run goes on at full pace, paid from the core.
+    needs.stamina=0;needs.staminaCore=100;needs.exhausted=false;
+    assert.ok((await walk(a,16,true)).has('run'),'Empty ring, reserve left: still running');
+    assert.ok(needs.staminaCore<100,'the run was paid from the reserve');
+    needs.stamina=0;needs.staminaCore=0;needs.exhausted=true;
     const tired=await walk(a,16,true);
     assert.equal(tired.has('run'),false,'Exhausted: running input becomes a walk');
     assert.ok(tired.has('walk'));

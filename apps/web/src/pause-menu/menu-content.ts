@@ -1,4 +1,4 @@
-import {CHAT_RADIUS,SKINS,VOICE,levelOf,rankOf,type InventoryView,type PublicUser,type WorldState} from '@bar/shared';
+import {CHAT_RADIUS,FACTORY_UNIFORM,FACTORY_UNIFORM_NAME,SKINS,VOICE,levelOf,rankOf,type InventoryView,type PublicUser,type WorldState} from '@bar/shared';
 import {escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
 import {rankIcon} from '../levels/rank-icon';
@@ -104,7 +104,7 @@ function actions(host:MenuContentHost):MenuEntry[] {
 // ---- Você: the player's own things, and the way out.
 function you(host:MenuContentHost):MenuEntry[] {
   const skinId=()=>host.world()?.players[host.user()?.id??'']?.skin;
-  const skinName=()=>SKINS.find(skin=>skin.id===skinId())?.name;
+  const skinName=()=>skinId()===FACTORY_UNIFORM?FACTORY_UNIFORM_NAME:SKINS.find(skin=>skin.id===skinId())?.name;
   const items=()=>host.inventory()?.stacks.reduce((sum,stack)=>sum+stack.quantity,0);
   return [
     {id:'profile',label:'Perfil',icon:'idCard',kind:'action',verb:'Abrir',mark:false,live:drawSkin(host),detail:()=>{

@@ -12,7 +12,7 @@ import {FootstepSounds} from './footstep-sound';
 import type {RenderPerformance} from '../performance/monitor';
 import {UpdateProfiler} from '../performance/recording';
 import {collectSceneInventory} from '../performance/inventory';
-import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
+import {CITY_FAR_CLIP, CITY_FOG, SHOP_SPOT, DEFAULT_SKIN, FACTORY_UNIFORM, INTERACTABLES, MAP_COLLIDERS, MAP_SURFACES, PATCH_MS, SKINS, TICK_MS, cameraFraction, drunkStage, type Position, type WorldState } from '@bar/shared';
 import {DOOR_LEAVES,DOOR_SWING_SECONDS,doorSwing,HELD_DRINKS,SERVED_PROPS,SERVE_ITEM_MS,SERVE_LEAD_MS,type DoorLeaf,type HeldDrink,type ItemId,type ServedItemState} from '@bar/shared';
 import {DRINK_PROPS,RIG_GRIP,findHand,handFrame,holdDrink,closeHand,type HandRig} from './drink-props';
 import {PLATE_HEIGHT,TRAY_HEIGHT,TRAY_RADIUS,aim,openHand,palmUp,reach,smoothstep,trayCentre,traySlots} from './serving-props';
@@ -79,6 +79,9 @@ import {WeaponVisuals} from './weapons/visuals';
 import type {GunScenePort,WeaponSceneHooks} from '../weapons/scene-hooks';
 import {MorteScene} from './morte-scene';
 import type {DeathAudio} from '../death/death-audio';
+import {FACTORY_COLOR,FACTORY_SPOTS,distanceToFactory} from '../factory/spots';
+import {RIBEIRO_COLOR,RIBEIRO_SPOTS} from '../machine-shop/config';
+import {FactoryCarry,localFactoryBag} from '../factory/carry';
 import {DEATH_GONE_STATE,DEATH_STATE,type DeathPlan} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
@@ -118,6 +121,8 @@ interface SkinnedRig {
   tracks: Set<string>;
   /** How far the body lowers to sit: from this skin's hip-joint height to just above a 0.47 m seat. */
   sitDrop: number;
+  /** The chest bone the plant's sack rides on, found on first use. */
+  chest?: pc.Entity;
   /** The drinking hand (the Drink clip lifts with the left), found in the bind pose. */
   drinkHand?: HandRig;
   /** The other hand, on a bike's right grip. */
@@ -267,7 +272,8 @@ const skinAsset = (folder: string, file: string, id: string): string => {
   return `${import.meta.env.BASE_URL}${folder}/${file}.glb${version ? `?v=${version}` : ''}`;
 };
 const skinUrl = (id: string): string => skinAsset('models', id, id);
-const SKIN_IDS = new Set<string>(SKINS.map(skin => skin.id));
+// The plant's work uniform is a model the room puts on a player (never a card of the collection, see FACTORY_UNIFORM).
+const SKIN_IDS = new Set<string>([...SKINS.map(skin => skin.id), FACTORY_UNIFORM]);
 // The bar is built in real-world metres around this model at its natural 1.86 m.
 const PLAYER_MODEL_SCALE = 1;
 // The box avatars (NPCs, and players while the model loads) are drawn about 2 m tall and stocky;
@@ -321,6 +327,8 @@ const LIVE_PHASES = new Set<StagePhase>(['comecando','loop']);
 const FOOD_COLOR='#ff3d5a',FOOD_BASE_RANGE=70;
 /** The garages' rings, in the colour of everything about vehicles. */
 const GARAGE_COLOR='#17d4f4';
+/** EMPRESA BRASIL: its stations' rings show within this many metres, and the next step's ring (the job's green) from further away. */
+const FACTORY_RING_RANGE=40,FACTORY_GUIDE_COLOR='#5fd86c';
 const STAGE_BLIPS = {entry:{at:STAGE_ENTRY,color:'#ff47c2'},telao:{at:TV_SPOTS.telao!,color:'#3adfd7'},shop:{at:SHOP_SPOT,color:'#fac416'},desk:{at:LIGHT_DESK,color:'#a77bff'}} as const;
 export type StageBlip = keyof typeof STAGE_BLIPS;
 /** The radius of a blip's floor ring, in metres: standing within it is standing on the blip. */
@@ -353,6 +361,8 @@ const DUST_FROM = 2.5;
 export class BarScene {
   readonly app: pc.Application;
   readonly fuelProps:FuelProps;
+  /** The sack a plant operator carries (factory/carry.ts), hugged in both arms over the body's clip. */
+  private readonly factoryCarry:FactoryCarry;
   readonly ready: Promise<void>;
   private televisions=new Map<string,TelevisionSurface>();
   private watchingTv='';
@@ -452,6 +462,10 @@ export class BarScene {
   /** Highfood's base: its ring and its sign, near the bar. */
   private foodBase?: Marker;
   private garageRings?: Marker[];
+  /** EMPRESA BRASIL: one ring per station (see factory/spots.ts), and the ring of the step the guide points at. */
+  private factoryRings?: Map<string,Marker>;
+  private factoryGuide?: Marker;
+  private ribeiroRings?:Map<string,Marker>;
   private highfoodProps?: HighfoodProps;
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
@@ -657,7 +671,7 @@ export class BarScene {
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
     this.poolBalls=new PoolBalls(this.app);
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
-    this.fuelProps=new FuelProps(this.app);
+    this.fuelProps=new FuelProps(this.app);this.factoryCarry=new FactoryCarry(this.app);
     this.horseSounds=new HorseSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.footstepSounds=new FootstepSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
@@ -877,6 +891,45 @@ export class BarScene {
       }
       blip.marker.enabled=true;this.animateMarker(blip);
     }
+  }
+
+  /** The local avatar's root (the plant hangs the bag it carries on it). */
+  localActorRoot():pc.Entity|undefined {return this.actors.get(this.localId)?.root;}
+  /** Rings on the floor at the plant's stations, shown to whoever is near; the guide's ring marks the next step wherever it is in the plant. */
+  private updateFactory():void {
+    const p=this.actors.get(this.localId)?.root.getPosition();
+    if(!p||!this.enabled||this.watchingTv||distanceToFactory(p.x,p.z)>FACTORY_RING_RANGE+60){
+      for(const ring of this.factoryRings?.values()??[])ring.marker.enabled=false;
+      if(this.factoryGuide)this.factoryGuide.marker.enabled=false;
+      return;
+    }
+    this.factoryRings??=new Map(FACTORY_SPOTS.map(spot=>{
+      const ring=this.buildMarker(`Fábrica ${spot.id}`,FACTORY_COLOR);ring.target={x:spot.x,y:spot.y,z:spot.z};ring.marker.setPosition(spot.x,spot.y,spot.z);ring.marker.enabled=false;return [spot.id,ring];
+    }));
+    for(const [id,ring] of this.factoryRings){
+      const shown=Math.hypot(p.x-ring.target.x,p.z-ring.target.z)<FACTORY_RING_RANGE&&Math.abs(p.y-ring.target.y)<(id.startsWith('rack')?4:2.5);
+      ring.marker.enabled=shown;if(shown)this.animateMarker(ring);
+    }
+    if(this.factoryGuide?.marker.enabled)this.animateMarker(this.factoryGuide);
+  }
+  /** The next step's ring (null: none). */
+  setFactoryGuide(target:{x:number;y:number;z:number}|null):void {
+    if(!target){if(this.factoryGuide)this.factoryGuide.marker.enabled=false;return;}
+    const ring=this.factoryGuide??=this.buildMarker('Fábrica próximo passo',FACTORY_GUIDE_COLOR,true);
+    ring.target={x:target.x,y:target.y,z:target.z};ring.marker.setPosition(target.x,target.y,target.z);ring.marker.enabled=true;
+  }
+  projectFactoryGuide():{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.factoryGuide);}
+  /** Where a station's ring is on screen, while it shows. */
+  projectFactorySpot(id:string):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.factoryRings?.get(id));}
+
+  /** One green floor ring for each Ribeiro production station. */
+  projectRibeiroSpot(id:string):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.ribeiroRings?.get(id));}
+  private updateRibeiroComputer():void {
+    const p=this.actors.get(this.localId)?.root.getPosition();
+    const area=!!p&&this.enabled&&!this.watchingTv&&Math.hypot(p.x-RIBEIRO_SPOTS[0].x,p.z-RIBEIRO_SPOTS[0].z)<70;
+    if(!area){for(const ring of this.ribeiroRings?.values()??[])ring.marker.enabled=false;return;}
+    this.ribeiroRings??=new Map(RIBEIRO_SPOTS.map(at=>{const ring=this.buildMarker(`Ribeiro · ${at.id}`,RIBEIRO_COLOR);ring.target={x:at.x,y:at.y,z:at.z};ring.marker.setPosition(at.x,at.y,at.z);ring.marker.enabled=false;return [at.id,ring];}));
+    for(const ring of this.ribeiroRings.values()){const shown=Math.hypot(p.x-ring.target.x,p.z-ring.target.z)<30&&Math.abs(p.y-ring.target.y)<2.5;ring.marker.enabled=shown;if(shown)this.animateMarker(ring);}
   }
 
   /** Where the nearest garage is on screen, while its ring shows. */
@@ -1774,7 +1827,7 @@ export class BarScene {
       if (!seen.has(id)) {
         avatar.root.destroy();
         this.actors.delete(id);
-        this.barAnimations?.forget(id);this.barOverrides.delete(id);
+        this.barAnimations?.forget(id);this.barOverrides.delete(id);this.factoryCarry.forget(id);
       }
     }
   }
@@ -1929,12 +1982,13 @@ export class BarScene {
     this.morte?.destroy();this.morte=undefined;
     this.damageNumbers.destroy();
     this.weaponVisuals.destroy();
-    this.fuelProps.destroy();this.motos.destroy();this.speedBlur.destroy();this.filmGrain.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
+    this.fuelProps.destroy();this.factoryCarry.destroy();this.motos.destroy();this.speedBlur.destroy();this.filmGrain.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
     this.stageBlips.forEach(blip=>blip.marker.destroy());this.stageBlips.clear();
     this.foodBase?.marker.destroy();this.foodBase=undefined;
+    this.ribeiroRings?.forEach(ring=>ring.marker.destroy());this.ribeiroRings=undefined;
     for(const ring of this.garageRings??[])ring.marker.destroy();this.garageRings=undefined;
     this.musicians?.destroy();this.musicians=undefined;
     this.barAnimations?.destroy();this.barAnimations=undefined;
@@ -2375,7 +2429,7 @@ export class BarScene {
     if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, this.serverNow());
     else if (avatar.tray) avatar.tray.entity.enabled = false;
     if (avatar.skin) this.dressCourier(avatar, avatar.skin, !!bar); else if (avatar.parcelProp || avatar.packProp) this.dressCourier(avatar, undefined, true);
-    this.dressFirework(avatar);
+    this.dressFirework(avatar);this.dressFactoryBag(avatar,dt);
     if(actor.id.startsWith('attendant-')){
       const bones=avatar.skin?.bones,hand=bones?.hand_r??avatar.limbs?.rightArm.findByName('Hand') as pc.Entity|undefined;
       const upper=bones?.upperarm_r??avatar.limbs?.rightArm;
@@ -2416,6 +2470,14 @@ export class BarScene {
       const at = (avatar.spine ?? skin!.bones.upperarm_r).getPosition().clone().sub(front.clone().mulScalar(.12)).add(up.clone().mulScalar(.08));
       pack.setPosition(at); pack.setEulerAngles(0, avatar.yaw, 0); pack.enabled = true;
     }
+  }
+
+  /** A sack from the plant in both arms: the local player's (from the plant's panel) or another player's (synced `factoryBag`). */
+  private dressFactoryBag(avatar:Avatar,dt:number):void {
+    const actor=avatar.actor,skin=avatar.skin,raw=actor.id===this.localId?localFactoryBag():(actor as {factoryBag?:string}).factoryBag;
+    const material=raw==='MALTE'||raw==='MIX'?raw:null,busy=!skin||!!avatar.bar||!!avatar.ragdoll||['ragdoll','ride','sit'].includes(actor.animation??'');
+    const chest=skin&&material&&!busy?(skin.chest??=(skin.model.findByName('spine_02') as pc.Entity|null)??skin.bones.upperarm_r):undefined;
+    this.factoryCarry.pose(actor.id,busy?null:material,skin&&chest?{bones:skin.bones,chest,body:avatar.body}:undefined,dt);
   }
 
   private dressFirework(avatar:Avatar):void {
@@ -3208,6 +3270,8 @@ export class BarScene {
     this.updateStageBlips();
     this.updateFoodBase();
     this.updateGarages();
+    this.updateFactory();
+    this.updateRibeiroComputer();
     const party = this.environment.partyStrength;
     for (let i = 0; i < this.partyLights.length; i++) {
       const light = this.partyLights[i]!.light;

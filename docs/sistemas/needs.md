@@ -116,4 +116,22 @@ Vida, fôlego, fome e sede têm **dois valores**: o **anel** (o nível: `hp`, `s
 - **Matar pela administração** (painel e menu de contexto) zera os dois (`NeedsDirector.kill`) e chama a Morte.
 - **HUD** (`needs-hud.ts`, `needs.css`): o anel de cada medidor mostra o nível e o símbolo no meio, o coração. A dica mostra "92 · reserva 64". O que fica crítico é o menor dos dois; o aviso de vida baixa vem do coração.
 
+## Vivendo da reserva (2026-11-12)
+
+Zerar o anel não trava mais o personagem: ele **passa a gastar a reserva**.
+
+- **Fôlego.** Com o anel em 0 e reserva sobrando, a corrida continua **na mesma velocidade** (`canRun` aceita `staminaCore > 0`). O gasto que passa do anel sai da reserva a `reserve.staminaCoreCost` (0,27 de reserva por ponto: ~2,4 por segundo, uma reserva cheia dura ~40 s correndo). Só quando anel **e** reserva zeram vem o travamento de antes (`exhausted`, volta a correr com `exhaustedUntil`). A lentidão, portanto, só chega no fim da reserva, nunca de imediato.
+- **Tensão (`reserveStrain`, 0 a 1).** Função pura em `needs.ts`, lida igual pelo teste, pela tela e pelo som. É o maior entre a rampa do anel (abaixo de `ringBelow`) e a da reserva (abaixo de `coreBelow`), em `NEEDS.reserve.strain`. Fome e sede têm o anel recarregado da reserva na hora, então nelas o que aparece é o **fim da reserva** (abaixo de 30). Vida: anel baixo depois de dano ou reserva abaixo de 25. Fôlego: só o anel vazio.
+- **Tela** (`apps/web/src/needs-strain.ts`, `.reserve-fx` em `needs.css`): borda suave por necessidade, que entra rápido e sai devagar, mais um balanço do `#world` (propriedades `rotate`/`translate`/`scale`, que não brigam com o `transform` da embriaguez). Com `prefers-reduced-motion` a borda fica e a imagem não mexe. O loop só roda enquanto há algo a mostrar.
+
+  | Necessidade | Borda | Balanço | Som (`needs-strain-sound.ts`, sintetizado) |
+  | --- | --- | --- | --- |
+  | Fôlego | verde escuro, respirando | rolagem e sobe-e-desce cansados | zumbido grave de máquina que perde força (tom e filtro caem a cada ~1,8 s), tremor e chiado |
+  | Vida | vermelho escuro, pulsa no batimento | a imagem dá um solavanco a cada batida | coração abafado "tum-tum" (mais rápido quanto pior), zumbido agudo fino e fluxo de sangue |
+  | Fome | ocre | deriva lenta, cabeça leve | ronco de estômago de tempos em tempos, com gorgolejo |
+  | Sede | azul pálido e seco | tremor rápido e fraco | vento fino e seco e estalinhos |
+
+  O batimento da vida é disparado pelo mesmo quadro que desenha o pulso, então som e imagem andam juntos. Os medidores ganham o halo da cor de cada um (`.strained`). Desmaiado, morto ou fora do mundo, tudo zera.
+- **Não ouvido por uma pessoa.** Os sons foram desenhados no papel e nunca tocados num alto-falante: ajustar `peak`s e frequências em `needs-strain-sound.ts` de ouvido.
+
 Valores escolhidos à mão, para os medidores se mexerem de verdade: ajustar em `NEEDS` (`drainPerMinute`, `cores.*`). Não testado num jogo de verdade com jogadores.

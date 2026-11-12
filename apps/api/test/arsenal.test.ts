@@ -18,6 +18,8 @@ test('the firearms arsenal: the test kit granted once and never reset, parts che
   // Nothing owned until /armas; then everything, with the scopes that come fitted.
   const empty=(await post('load',{userId})).json();
   assert.deepEqual([empty.weapons.length,empty.parts.length,empty.test],[0,0,false]);
+  const manufactured=await post('grant',{userId,weapon:'fuzil',requestId:randomUUID()});assert.equal(manufactured.statusCode,200,manufactured.body);assert.equal(manufactured.json().applied,true);assert.equal(manufactured.json().view.weapons[0]?.id,'fuzil');
+  const repeated=await post('grant',{userId,weapon:'fuzil',requestId:randomUUID()});assert.equal(repeated.statusCode,200,repeated.body);assert.equal(repeated.json().applied,false);assert.equal(repeated.json().view.weapons.length,1);
   const kit=(await post('load',{userId,testKit:true})).json();
   assert.equal(kit.weapons.length,WEAPON_IDS.length);assert.equal(kit.parts.length,PART_IDS.length);
   assert.deepEqual([kit.test,kit.infinite],[true,true]);

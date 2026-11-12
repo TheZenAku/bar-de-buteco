@@ -3,6 +3,7 @@ import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } f
 import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
 import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
+import {FACTORY_GATE} from './factory/index.js';
 import {FOOSBALL_TABLES} from './foosball.js';
 import {POOL_TABLES} from './pool/table.js';
 import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
@@ -50,6 +51,9 @@ export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLID
 // Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
 // Doors start open, as authored in the map.
 const openDoors=new Map(DOORS.map(door=>[door.id,true]));
+// The plant's gate is not a door of the map: it is a synced door state of its own, and it starts shut (until the room says otherwise).
+openDoors.set(FACTORY_GATE.id,false);
+const gateBox=():Collider=>({id:FACTORY_GATE.id,x:FACTORY_GATE.x,z:FACTORY_GATE.z,hx:FACTORY_GATE.halfThick,hz:FACTORY_GATE.halfWidth,minY:FACTORY_GATE.minY,maxY:FACTORY_GATE.maxY});
 let solids:readonly Collider[]=[];
 const COLLISION_CELL=8;
 const solidGrid=new Map<string,Collider[]>();
@@ -81,6 +85,7 @@ function rebuildSolids():void {
     if(items)solidGrid.set(cellKey(x,z),items.filter(item=>item!==box));
   }
   doorBoxes=DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw));
+  if(!openDoors.get(FACTORY_GATE.id))doorBoxes.push(gateBox());
   doorBoxes.forEach(indexSolid);
   solids=[...COLLIDERS,...CITY_SOLIDS,...doorBoxes];
 }

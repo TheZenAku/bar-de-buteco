@@ -2,8 +2,8 @@ import * as pc from 'playcanvas';
 import {groundBelow,type Surface} from '@bar/shared';
 
 /**
- * What a shot looks like (docs/sistemas/armas.md#cliente): the muzzle flash (crossed glows with a short light that holds through a burst instead of
- * strobing), smoke, tracers, sparks, dust, chips, splinters and shards by surface, bullet holes on the map, blood, shell casings and dropped
+ * What a shot looks like (docs/sistemas/armas.md#cliente): the muzzle flash at the barrel, smoke, tracers, sparks, dust, chips, splinters and shards
+ * by surface, bullet holes on the map, blood, shell casings and dropped
  * magazines, the laser's beam and dot, the flashlight. Particles are quads written into one dynamic mesh per blend (two draw calls), no entity
  * each; holes and blood stains live in a ring of quads; casings and magazines are a few pooled entities. Nothing is allocated per frame.
  * The canvas is transparent: every blend keeps the framebuffer's alpha (rendering pitfalls).
@@ -187,7 +187,6 @@ export class WeaponFx {
   private readonly texture:pc.Texture;
   private readonly materials:pc.Material[]=[];
   private readonly debris:Debris[]=[];
-  private readonly flashLights:{entity:pc.Entity;until:number;strength:number}[]=[];
   private readonly torches:{entity:pc.Entity;owner:string}[]=[];
   private readonly brass:pc.StandardMaterial;private readonly shellMat:pc.StandardMaterial;private readonly magMat:pc.StandardMaterial;
   private clock=0;
@@ -219,8 +218,8 @@ export class WeaponFx {
     return p;
   }
 
-  /** The flash at a muzzle going `dir` (unit), `size` the weapon's flash (1 normal; a suppressor ~.15), the light held at least `holdMs`. */
-  flash(at:pc.Vec3,dir:pc.Vec3,size:number,holdMs=60):void {
+  /** The flash at a muzzle going `dir` (unit), `size` the weapon's flash (1 normal; a suppressor ~.15). */
+  flash(at:pc.Vec3,dir:pc.Vec3,size:number,_holdMs=60):void {
     this.stats.flashes++;
     const s=Math.max(.12,size);
     const warm=size<.4?[.9,.8,.6]:[1,.78,.42];
@@ -230,14 +229,7 @@ export class WeaponFx {
       this.spark(this.glow,at.x+dir.x*.03,at.y+dir.y*.03,at.z+dir.z*.03,0,0,0,.045,.2*s,.26*s,warm[0]!,warm[1]!,warm[2]!,1,0,Cell.Star);
       this.spark(this.glow,at.x,at.y,at.z,0,0,0,.035,.09*s,.12*s,1,.95,.85,1,0,Cell.Glow);
       for(let i=0;i<3;i++){const a=Math.random()*6.28;this.spark(this.glow,at.x,at.y,at.z,dir.x*3+Math.cos(a)*1.5,dir.y*3+Math.sin(a)*1.5,dir.z*3+Math.cos(a+1)*1.5,.06+Math.random()*.05,.012,.006,1,.7,.3,1,0,Cell.Spark,{stretch:.02});}
-      // The light: held through a burst (a steady glow, not a strobe).
-      const now=this.clock*1000;
-      let light=this.flashLights.find(item=>item.until>now&&item.entity.getPosition().distance(at)<1.5)??this.flashLights.find(item=>item.until<=now);
-      if(!light&&this.flashLights.length<3){
-        const entity=new pc.Entity('Armas clarão');entity.addComponent('light',{type:'omni',color:new pc.Color(1,.72,.38),range:5,intensity:0,castShadows:false,falloffMode:pc.LIGHTFALLOFF_LINEAR});
-        entity.enabled=false;this.app.root.addChild(entity);light={entity,until:0,strength:0};this.flashLights.push(light);
-      }
-      if(light){light.entity.enabled=true;light.entity.setPosition(at.x+dir.x*.15,at.y+dir.y*.15,at.z+dir.z*.15);light.until=now+Math.max(60,holdMs);light.strength=Math.min(3,1.4+1.2*s);light.entity.light!.range=3.5+2.5*s;}
+      // Deliberately no scene light: the additive particles are the whole flash. A point light here produced a visible circle on floors and walls.
     }else{
       // Suppressed: a faint glow and a puff.
       this.spark(this.glow,at.x,at.y,at.z,0,0,0,.03,.05,.07,.9,.75,.5,.5,0,Cell.Glow);
@@ -364,14 +356,6 @@ export class WeaponFx {
 
   update(dt:number,camera:pc.Entity):void {
     this.clock+=dt;
-    const now=this.clock*1000;
-    for(const light of this.flashLights){
-      if(!light.entity.enabled)continue;
-      const left=light.until-now;
-      if(left<=0){light.entity.enabled=false;continue;}
-      // A little flicker while held, never off and on.
-      light.entity.light!.intensity=light.strength*(.75+.25*Math.random())*Math.min(1,left/40);
-    }
     for(const item of this.debris){
       if(!item.entity.enabled)continue;
       item.age+=dt;
@@ -406,7 +390,6 @@ export class WeaponFx {
   destroy():void {
     this.glow.destroy();this.soft.destroy();this.decals.destroy();
     for(const item of this.debris)item.entity.destroy();
-    for(const light of this.flashLights)light.entity.destroy();
     for(const torch of this.torches)torch.entity.destroy();
     for(const m of this.materials)m.destroy();
     this.texture.destroy();this.brass.destroy();this.shellMat.destroy();this.magMat.destroy();

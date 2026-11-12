@@ -7,6 +7,7 @@ import type {WardrobeService} from './wardrobe.js';
 
 /** An upgrade bought: the arsenal after it, the balance, and what it cost (0 in the test kit). */
 export interface ArsenalUpgrade {view:ArsenalView;balance:number;cost:number}
+export interface ArsenalGrant {view:ArsenalView;applied:boolean}
 
 /**
  * The firearms' arsenal (docs/sistemas/armas.md): the weapons each player owns with their parts and upgrades, the parts owned, the rounds per
@@ -38,6 +39,13 @@ export class ArsenalService {
     await this.user(userId);
     await this.db.insert(weaponArsenal).values(WHEEL_ORDER.map(id=>({userId,weaponId:id,parts:{...(WEAPONS[id].defaults??{})},upgrades:{},source:'teste'}))).onConflictDoNothing();
     await this.db.insert(weaponParts).values(PART_IDS.map(partId=>({userId,partId,source:'teste'}))).onConflictDoNothing();
+  }
+
+  /** Transfers one finished Ribeiro weapon to a player. The primary key makes repeated grants harmless. */
+  async grantWeapon(userId:string,weapon:WeaponId):Promise<ArsenalGrant> {
+    await this.user(userId);
+    const inserted=await this.db.insert(weaponArsenal).values({userId,weaponId:weapon,parts:{...(WEAPONS[weapon].defaults??{})},upgrades:{},source:'ribeiro'}).onConflictDoNothing().returning({weaponId:weaponArsenal.weaponId});
+    return {view:await this.load(userId),applied:inserted.length===1};
   }
 
   /** A part fitted in a slot (or taken off: `part` null). Refused (409) when the stored arsenal does not allow it. */

@@ -13,6 +13,8 @@ import {InventoryService} from './inventory-service.js';
 import {StorageError,VehicleStorageService} from './vehicle-storage-service.js';
 import {EmploymentError,EmploymentService} from './employment-service.js';
 import {FactoryError,FactoryService} from './factory-service.js';
+import {FactoryLogistics,LogisticsError} from './factory-logistics.js';
+import {CompanyError,CompanyService} from './company-service.js';
 import {WalletService} from './wallet-service.js';
 import {PhoneService} from './phone-service.js';
 import {zapLocationSchema,STORAGE} from '@bar/shared';
@@ -20,6 +22,7 @@ import {ProfileService} from './profile-service.js';
 import {AchievementService} from './achievement-service.js';
 import {AdminService} from './admin-service.js';
 import {AdminConsole} from './admin-console.js';
+import {cityEconomy} from './admin-city-economy.js';
 import {AdminVehiclesService} from './admin-vehicles.js';
 import {PricingService} from './pricing-service.js';
 import {HighfoodService} from './highfood-service.js';
@@ -42,6 +45,10 @@ const emailSchema = z.string().trim().toLowerCase().email().max(254);
 const passwordSchema = z.string().superRefine((value, ctx) => { const problem = passwordProblem(value); if (problem) ctx.addIssue({ code: 'custom', message: problem }); });
 const tokenSchema = z.string().min(20).max(256);
 const uuidSchema = z.string().uuid();
+/** A truck as the plant names it: the garage's vehicle id, or 'moto:<id>' for one the administration spawned. */
+const truckKeySchema = z.string().min(1).max(64);
+/** Where a truck's trip ends (picked by the world from the city's roads). */
+const destinationSchema = z.object({x:z.number().finite(),z:z.number().finite(),label:z.string().max(120),distanceM:z.number().int().min(0).max(100_000)}).strict();
 const reasonSchema = z.string().trim().min(3).max(500);
 type Auth = { user: PublicUser; session: typeof tables.sessions.$inferSelect };
 declare module 'fastify' { interface FastifyRequest { auth: Auth | null } }
@@ -67,6 +74,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   const vehicleStorage=new VehicleStorageService(db);
   const employment=new EmploymentService(db);
   const factory=new FactoryService(db);
+  const logistics=new FactoryLogistics(db);
+  const company=new CompanyService(db,logistics,employment);
   const wallet=new WalletService(db,wardrobe);
   const sparring=new SparringService(db,wardrobe);
   const arsenal=new ArsenalService(db,wardrobe);
@@ -113,6 +122,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     if (error instanceof HttpError) return reply.code(error.statusCode).send({ error: error.message });
     if (error instanceof EmploymentError) return reply.code(error.statusCode).send({error:error.message});
     if (error instanceof FactoryError) return reply.code(error.statusCode).send({error:error.message});
+    if (error instanceof LogisticsError) return reply.code(error.statusCode).send({error:error.message});
+    if (error instanceof CompanyError) return reply.code(error.statusCode).send({error:error.message});
     const status = error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500;
     if (status >= 500) request.log.error({ err: error }, 'Falha na API');
     return reply.code(status).send({ error: status >= 500 ? 'Não foi possível concluir. Tente novamente.' : error instanceof Error ? error.message : 'Dados inválidos.' });
@@ -273,7 +284,9 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/daily',{preHandler:authenticated},request=>wardrobe.claimDaily(request.auth!.user));
   app.get('/api/inventory',{preHandler:authenticated},request=>inventory.view(request.auth!.user.id));
   app.get('/api/employment',{preHandler:authenticated},request=>employment.view(request.auth!.user.id));
-  app.post('/api/employment/hire',{preHandler:authenticated,config:{rateLimit:{max:10,timeWindow:'1 minute'}}},request=>employment.hire(request.auth!.user.id,z.object({requestId:uuidSchema.toLowerCase()}).strict().parse(request.body).requestId));
+  // A candidate waits ('applied') until an owner or manager of the firm admits them (company.admit); nobody hires themselves any more.
+  app.post('/api/employment/hire',{preHandler:authenticated,config:{rateLimit:{max:10,timeWindow:'1 minute'}}},request=>employment.apply(request.auth!.user.id,z.object({requestId:uuidSchema.toLowerCase()}).strict().parse(request.body).requestId));
+  app.post('/api/employment/withdraw',{preHandler:authenticated,config:{rateLimit:{max:10,timeWindow:'1 minute'}}},request=>employment.withdraw(request.auth!.user.id,z.object({requestId:uuidSchema.toLowerCase()}).strict().parse(request.body).requestId));
   app.post('/api/employment/resign',{preHandler:authenticated,config:{rateLimit:{max:5,timeWindow:'1 minute'}}},request=>employment.resign(request.auth!.user.id,z.object({requestId:uuidSchema.toLowerCase()}).strict().parse(request.body).requestId));
   app.post('/api/inventory/buy',{preHandler:authenticated},request=>{
     const body=z.object({itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
@@ -475,6 +488,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     return adminConsole.logs({categories,playerId:query.player,q:query.q,since:query.since?new Date(query.since):undefined,before:query.before?new Date(query.before):undefined,limit:query.limit});
   });
   app.get('/api/admin/economy',{preHandler:administrator},request=>adminConsole.economy(Number(z.object({days:z.enum(['7','30','90']).default('30')}).strict().parse(request.query).days)));
+  app.get('/api/admin/economy/city',{preHandler:administrator},request=>{
+    const query=z.object({days:z.enum(['7','30','90']).default('30'),page:z.coerce.number().int().min(0).max(10_000).default(0),flow:z.enum(['all','in','out']).default('all')}).strict().parse(request.query);
+    return cityEconomy(db,logistics,{days:Number(query.days),page:query.page,flow:query.flow});
+  });
   app.get('/api/admin/prices',{preHandler:administrator},async request=>({rows:await pricing.rows(),changes:await administration.audits(request.auth!.user,inArray(tables.moderationActions.action,['price-set','xp-values-set']),20)}));
   app.get('/api/admin/collection',{preHandler:administrator},async()=>({entries:await wardrobe.adminCatalog()}));
   app.post('/api/admin/collection',{preHandler:administrator},async request=>({entries:await wardrobe.saveCatalogEntry(request.auth!.user.id,catalogEntrySchema.parse(request.body))}));
@@ -573,12 +590,16 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({...base,action:z.literal('view')}).strict(),
       z.object({...base,action:z.literal('start'),requestId:uuidSchema.toLowerCase(),station:z.string().max(64).default('entrada')}).strict(),
       z.object({...base,action:z.literal('stop')}).strict(),
+      z.object({action:z.literal('shifts.reset')}).strict(),
+      z.object({action:z.literal('shift.earn'),userId:uuidSchema,amount:z.number().int().min(1).max(10_000)}).strict(),
       z.object({action:z.literal('admin.list')}).strict(),
       z.object({action:z.literal('admin.hire'),userId:uuidSchema,requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('admin.dismiss'),userId:uuidSchema,requestId:uuidSchema.toLowerCase(),cooldownMs:z.number().int().min(0).max(30*86_400_000).optional()}).strict(),
       z.object({action:z.literal('admin.cooldown'),userId:uuidSchema,requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('admin.schedule'),userId:uuidSchema,requestId:uuidSchema.toLowerCase(),schedule:z.record(z.string(),z.unknown())}).strict(),
     ]).parse(request.body);
+    if(body.action==='shifts.reset')return employment.closeAllShifts();
+    if(body.action==='shift.earn')return employment.addEarned(body.userId,body.amount);
     if(body.action==='admin.list')return employment.list();
     if(body.action==='admin.hire')return employment.hire(body.userId,body.requestId);
     if(body.action==='admin.dismiss')return employment.dismiss(body.userId,body.requestId,body.cooldownMs);
@@ -595,14 +616,98 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({action:z.literal('view')}).strict(),
       z.object({action:z.literal('save'),actorId:z.string().min(1).max(64),requestId:uuidSchema.toLowerCase(),state:z.record(z.string(),z.unknown()),slots:z.array(z.object({marker:z.string().max(64),material:z.enum(['MALTE','MIX','PRODUTO']),quantity:z.number().int().min(0).max(18),capacity:z.number().int().min(1).max(18),levelM:z.number().finite(),batchId:z.string().max(64).optional(),revision:z.number().int().min(0).optional()}).strict()).length(25)}).strict(),
       z.object({action:z.literal('orders')}).strict(),
-      z.object({action:z.literal('order.create'),kind:z.enum(['purchase','sale']),material:z.enum(['MALTE','MIX','PRODUTO']),pallets:z.number().int().min(1).max(25),price:z.number().int().min(0).max(1_000_000),dueAt:z.coerce.date().optional(),requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('order.create'),kind:z.enum(['purchase','ribeiro-purchase','sale']),material:z.enum(['MALTE','MIX','PRODUTO','ACO','ALUMINIO','POLIMERO','MOLAS']),pallets:z.number().int().min(1).max(25),price:z.number().int().min(0).max(1_000_000),dueAt:z.coerce.date().optional(),requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('order.accept'),id:uuidSchema,userId:uuidSchema,requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('order.status'),id:uuidSchema,status:z.enum(['completed','cancelled','expired']),requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('order.ghost'),id:uuidSchema,requestId:uuidSchema.toLowerCase()}).strict(),
-      z.object({action:z.literal('order.cargo'),orderId:uuidSchema,userId:uuidSchema,vehicleId:uuidSchema,stage:z.enum(['load','dock']),requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('finance.get')}).strict(),
+      z.object({action:z.literal('finance.set'),patch:z.record(z.string(),z.unknown()),actorId:z.string().min(1).max(64),requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('treasury.get')}).strict(),
+      z.object({action:z.literal('treasury.adjust'),amount:z.number().int().min(-1_000_000_000).max(1_000_000_000),reason:z.string().min(3).max(200),actorId:z.string().min(1).max(64),requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('shipment.list'),finished:z.number().int().min(0).max(100).optional()}).strict(),
+      z.object({action:z.literal('shipment.summary')}).strict(),
+      z.object({action:z.literal('shipment.load'),vehicleId:truckKeySchema,plate:z.string().max(16).optional(),driverId:z.string().max(64).optional(),loaderId:uuidSchema,pallets:z.number().int().min(1).max(10),dest:destinationSchema,requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('shipment.accept'),orderId:uuidSchema,vehicleId:truckKeySchema,plate:z.string().max(16).optional(),driverId:uuidSchema,dest:destinationSchema,requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('shipment.driver'),id:uuidSchema,driverId:z.string().max(64)}).strict(),
+      z.object({action:z.literal('shipment.depart'),id:uuidSchema}).strict(),
+      z.object({action:z.literal('shipment.deliver'),id:uuidSchema}).strict(),
+      z.object({action:z.literal('shipment.collect'),id:uuidSchema}).strict(),
+      z.object({action:z.literal('shipment.unload'),id:uuidSchema,loaderId:uuidSchema}).strict(),
+      z.object({action:z.literal('shipment.cancel'),id:uuidSchema,actorId:z.string().min(1).max(64)}).strict(),
     ]).parse(request.body);
     if(body.action==='view')return factory.view();if(body.action==='save')return factory.save(body.actorId,body.requestId,body.state,body.slots);if(body.action==='orders')return {orders:await factory.orders()};
-    if(body.action==='order.create')return {order:await factory.createOrder(body)};if(body.action==='order.accept')return {order:await factory.acceptOrder(body.id,body.userId,body.requestId)};if(body.action==='order.status')return {order:await factory.orderStatus(body.id,body.status,body.requestId)};if(body.action==='order.ghost')return factory.ghost(body.id,body.requestId);return factory.cargo(body);
+    if(body.action==='order.create')return {order:await factory.createOrder(body)};if(body.action==='order.accept')return {order:await factory.acceptOrder(body.id,body.userId,body.requestId)};if(body.action==='order.status')return {order:await factory.orderStatus(body.id,body.status,body.requestId)};if(body.action==='order.ghost')return factory.ghost(body.id,body.requestId);
+    switch(body.action){
+      case 'finance.get':return {finance:await logistics.finance()};
+      case 'finance.set':return {finance:await logistics.setFinance(body.patch,body.actorId,body.requestId)};
+      case 'treasury.get':return logistics.treasury();
+      case 'treasury.adjust':return logistics.adjustTreasury(body.amount,body.reason,body.actorId,body.requestId);
+      case 'shipment.list':return {shipments:await logistics.list(body.finished)};
+      case 'shipment.summary':return {summary:await logistics.summary()};
+      case 'shipment.load':return {shipment:await logistics.loadSale(body)};
+      case 'shipment.accept':return {shipment:await logistics.acceptPurchase(body)};
+      case 'shipment.driver':return logistics.setDriver(body.id,body.driverId);
+      case 'shipment.depart':return logistics.depart(body.id);
+      case 'shipment.deliver':return logistics.deliver(body.id);
+      case 'shipment.collect':return logistics.collect(body.id);
+      case 'shipment.unload':return logistics.unload(body.id,body.loaderId);
+      default:return logistics.cancel(body.id,body.actorId);
+    }
+  });
+  // The firm (apps/api/src/company-service.ts): what the owners and managers do from the profile's "Gerenciar empresa" tab and the administration's console. The world checks nothing about
+  // who may do what: every step re-reads the role here.
+  app.post('/api/internal/company',internalOptions,async request=>{
+    const user=uuidSchema,req=uuidSchema.toLowerCase();
+    const body=z.discriminatedUnion('action',[
+      z.object({action:z.literal('role'),userId:user}).strict(),
+      z.object({action:z.literal('view'),userId:user}).strict(),
+      z.object({action:z.literal('search'),userId:user,text:z.string().max(40)}).strict(),
+      z.object({action:z.literal('transfer'),userId:user,amount:z.number().int(),password:z.string().max(80).optional(),requestId:req}).strict(),
+      z.object({action:z.literal('deposit'),userId:user,amount:z.number().int(),requestId:req}).strict(),
+      z.object({action:z.literal('purchase'),userId:user,material:z.enum(['MALTE','MIX']),pallets:z.number().int().min(1).max(10),password:z.string().max(80).optional(),dueAt:z.string().max(40),requestId:req}).strict(),
+      z.object({action:z.literal('cancel'),userId:user,orderId:uuidSchema}).strict(),
+      z.object({action:z.literal('admit'),actorId:user,userId:user,requestId:req}).strict(),
+      z.object({action:z.literal('reject'),actorId:user,userId:user,requestId:req}).strict(),
+      z.object({action:z.literal('dismiss'),actorId:user,userId:user,requestId:req}).strict(),
+      z.object({action:z.literal('manager'),actorId:user,userId:user,manager:z.boolean()}).strict(),
+      z.object({action:z.literal('password'),userId:user,password:z.string().max(80).nullable(),current:z.string().max(80).optional()}).strict(),
+      z.object({action:z.literal('admin.state')}).strict(),
+      z.object({action:z.literal('admin.role'),userId:user,role:z.enum(['owner','manager']).nullable(),actorId:z.string().min(1).max(64),requestId:req}).strict(),
+      z.object({action:z.literal('admin.password.clear'),userId:user}).strict(),
+      z.object({action:z.literal('admin.password.set'),userId:user,password:z.string().max(80)}).strict(),
+      z.object({action:z.literal('admin.adjust'),amount:z.number().int().min(-1_000_000_000).max(1_000_000_000),reason:z.string().min(3).max(200),actorId:z.string().min(1).max(64),requestId:req}).strict(),
+    ]).parse(request.body);
+    switch(body.action){
+      case 'role':return {role:await company.roleOf(body.userId)};
+      case 'view':return company.view(body.userId);
+      case 'search':return {players:await company.search(body.userId,body.text)};
+      case 'transfer':return company.transfer(body.userId,body.amount,body.password,body.requestId);
+      case 'deposit':return company.deposit(body.userId,body.amount,body.requestId);
+      case 'purchase':{const due=new Date(body.dueAt);if(Number.isNaN(due.getTime()))throw new CompanyError(400,'Prazo inválido.');return company.purchase({userId:body.userId,material:body.material,pallets:body.pallets,password:body.password,requestId:body.requestId,dueAt:due});}
+      case 'cancel':return company.cancelPurchase(body.userId,body.orderId);
+      case 'admit':return company.admit(body.actorId,body.userId,body.requestId);
+      case 'reject':return company.reject(body.actorId,body.userId,body.requestId);
+      case 'dismiss':return company.dismiss(body.actorId,body.userId,body.requestId);
+      case 'manager':return company.setManager(body.actorId,body.userId,body.manager);
+      case 'password':return company.setPassword(body.userId,body.password,body.current);
+      case 'admin.state':return company.adminState();
+      case 'admin.role':return company.adminSetRole(body.userId,body.role,body.actorId,body.requestId);
+      case 'admin.password.clear':return company.adminClearPassword(body.userId);
+      case 'admin.password.set':return company.adminSetPassword(body.userId,body.password);
+      default:return company.adminAdjust(body.amount,body.reason,body.actorId,body.requestId);
+    }
+  });
+  // Ribeiro Usinagem: the room owns the live workflow; this durable JSON survives world restarts.
+  app.post('/api/internal/machine-shop',internalOptions,async request=>{
+    const body=z.discriminatedUnion('action',[
+      z.object({action:z.literal('load')}).strict(),
+      z.object({action:z.literal('save'),state:z.record(z.string(),z.unknown()),actorId:z.string().min(1).max(64)}).strict(),
+    ]).parse(request.body),key='ribeiro-state';
+    if(body.action==='load'){
+      const [row]=await db.select().from(tables.factorySettings).where(eq(tables.factorySettings.key,key));return {state:row?.value??null};
+    }
+    await db.insert(tables.factorySettings).values({key,value:body.state,updatedBy:body.actorId}).onConflictDoUpdate({target:tables.factorySettings.key,set:{value:body.state,updatedBy:body.actorId,updatedAt:new Date()}});
+    return {saved:true};
   });
   // Coins spent or earned in the room (apps/api/src/wallet-service.ts); only the live session's player.
   app.post('/api/internal/wallet',internalOptions,async request=>{
@@ -658,6 +763,11 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const body=z.object({userId:uuidSchema,testKit:z.boolean().optional()}).strict().parse(request.body);
     if(body.testKit)await arsenal.grantTestKit(body.userId);
     return arsenal.load(body.userId,!!body.testKit);
+  });
+  app.post('/api/internal/arsenal/grant',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),requestId:uuidSchema}).strict().parse(request.body);
+    void body.requestId;
+    return arsenal.grantWeapon(body.userId,body.weapon);
   });
   app.post('/api/internal/arsenal/configure',internalOptions,async request=>{
     const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),slot:z.enum(PART_SLOTS),part:z.enum(PART_IDS).nullable()}).strict().parse(request.body);

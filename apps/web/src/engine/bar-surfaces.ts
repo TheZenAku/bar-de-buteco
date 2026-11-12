@@ -110,6 +110,26 @@ export class BarSurfaces {
     return Math.max(.02,sum/(data.length/4));
   }
   /**
+   * Whether the whole piece stands inside the bar. Its centre alone is not enough: the surrounding blocks (Mapa_Bairro) and their
+   * trees and tree pits spread over hundreds of metres around the bar, their centre falls on it, and taking the room's ambient they
+   * lit that district warm and bright against the blue night of the city sectors, with a straight edge where the two met. For a
+   * piece drawn in copies (instancing) every copy has to be inside.
+   */
+  private standsInBar(instance:pc.MeshInstance):boolean {
+    const data=instance.instancingData?.vertexBuffer;
+    if(!data){
+      const box=instance.aabb,half=BAR_BOX.halfExtents;
+      return BAR_BOX.containsPoint(box.center)&&box.halfExtents.x<=half.x+2&&box.halfExtents.y<=half.y+2&&box.halfExtents.z<=half.z+2;
+    }
+    const matrices=new Float32Array(data.lock() as ArrayBuffer);
+    const low=new pc.Vec3(Infinity,Infinity,Infinity),high=new pc.Vec3(-Infinity,-Infinity,-Infinity);
+    for(let i=0;i+14<matrices.length;i+=16){
+      low.set(Math.min(low.x,matrices[i+12]!),Math.min(low.y,matrices[i+13]!),Math.min(low.z,matrices[i+14]!));
+      high.set(Math.max(high.x,matrices[i+12]!),Math.max(high.y,matrices[i+13]!),Math.max(high.z,matrices[i+14]!));
+    }
+    return Number.isFinite(low.x)&&BAR_BOX.containsPoint(low)&&BAR_BOX.containsPoint(high);
+  }
+  /**
    * Each material of the bar gets its own copy here (the city and the street keep theirs): with the occlusion of its
    * mesh when it is one of the merged meshes and has the second UV, and the room's reflections when it stands in the bar.
    * What glows (signs, bulbs, screens) and what is drawn unlit stays as it is.
@@ -125,7 +145,7 @@ export class BarSurfaces {
         if(e.r>0||e.g>0||e.b>0)continue;
         const baked=!!occlusion&&material.blendType===pc.BLEND_NONE&&!instance.instancingData&&
           !!instance.mesh?.vertexBuffer.format.elements.some(element=>element.name===pc.SEMANTIC_TEXCOORD1);
-        const inside=baked||BAR_BOX.containsPoint(instance.aabb.center);
+        const inside=baked||this.standsInBar(instance);
         if(!inside||(!baked&&!this.atlas))continue;
         const key=`${material.id}|${baked?render.entity.name:''}`;
         let copy=copies.get(key);

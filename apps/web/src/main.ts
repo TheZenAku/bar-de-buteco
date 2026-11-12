@@ -1,4 +1,4 @@
-import {adminConsole} from './admin/console';
+import type {adminConsole} from './admin/console';
 import {isRidingHorse,kickClip,vehicleSeat,weatherAt} from '@bar/shared';
 import {CAR_MODEL,isCar,isTruck,isTwoWheeler,hasStorage,storageGap,storageRefusal,vehicleMotionSpeed,vehicleSeats,vehicleName,vehicleOccupants,vehicleParts,vehicleRepair,readVehicleParts,type MotoState,type StorageView} from '@bar/shared';
 import {storagePanelHtml} from './storage-panel';
@@ -33,7 +33,7 @@ import {createVehicleHud} from './vehicle-hud';
 import {createFuelHud,fuelContext} from './fuel-hud';
 import {createNotifications} from './notifications';
 import {createCollection} from './collection/collection';
-import {GARAGE,VEHICLE_KEY,keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
+import {GARAGE,VEHICLE_KEY,keyLabel,loadoutOf,skillById,type ProfileView,type SkillLoadouts,nearestInteraction,INTERACTABLES,canInteract,DEFAULT_SKIN,SKINS,FACTORY_UNIFORM,FACTORY_UNIFORM_NAME,ITEM_CATALOG,itemById,type Wardrobe,type WorldState,type PublicUser,type ChatMessage,type InventoryView,type ItemId} from '@bar/shared';
 import './admin.css';
 import {BarScene,BLIP_RADIUS} from './engine/BarScene';
 import {CAMERA_HEIGHT_LIMIT,CAMERA_LABELS,CAMERA_MODES,CAMERA_SENSITIVITY_LIMITS,CAMERA_ZOOMS,CAMERA_ZOOM_LABELS,isCameraMode,type CameraFeel} from './engine/camera-rig';
@@ -99,6 +99,11 @@ import {createWalletHud} from './wallet/wallet-hud';
 import {rankIcon} from './levels/rank-icon';
 import {badgeMedal,openBadgeCard} from './profile/badge-card';
 import {FactoryController} from './factory/controller';
+import {createFreightFeed} from './factory/freight-feed';
+import {MachineShopController} from './machine-shop/controller';
+import {RIBEIRO_COLOR,RIBEIRO_COMPUTER,RIBEIRO_SPOTS} from './machine-shop/config';
+import {FACTORY_GATE} from '@bar/shared/factory';
+import {FACTORY_COLOR,FACTORY_SPOTS} from './factory/spots';
 import {BADGE_RARITY_INFO} from '@bar/shared';
 import {createPauseMenu} from './pause-menu/pause-menu';
 import {MenuSounds} from './pause-menu/menu-sounds';
@@ -161,7 +166,8 @@ const lockerPad=createLockerPad($('#game'),{submit:(orderId,code)=>network.send(
 // Ajustes › Interface › Tela cheia; the row follows the real state (and the F11 one) whenever it changes.
 const fullscreen=createFullscreen(text=>notices.show({variant:'acao',title:'Tela cheia',text}),()=>pauseMenu.refresh());
 // What takes the mouse back on its own: a window, the phone, a TV, the bike's menu, the pause menu. The chat is typed.
-const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen;
+const machineGameOpen=()=>!!document.querySelector('.rb-game-layer');
+const needsCursor=()=>!sceneActive()||watchingTv||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen||machineGameOpen();
 // The Esc that frees a captured mouse is also the one that pauses: the browser may keep that key to itself.
 const mouseCapture=createMouseCapture($<HTMLCanvasElement>('#world'),needsCursor,()=>fight.guard||weapons.armed(),()=>fight.lower(),()=>{if(pauseMenu.isOpen)return true;if(!canOpenMenu())return false;pauseMenu.open();return true;});
 /**
@@ -242,7 +248,7 @@ const touchControls=createTouchControls($('#game'),{
   armed:()=>weapons.drawn,aiming:()=>weapons.aiming,scoped:()=>weapons.scoped,
   look:(dx,dy)=>scene?.touchLook(dx,dy),
 });
-const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow());
+const needsHud=createNeedsHud($('#game'),notice=>notices.show(notice),()=>serverNow(),()=>settings.get().master);
 const minimap=createMinimap($('#game'));
 const consumingHud=createConsumingHud($('#consuming'));
 // The blackjack table's panel (blackjack/table.ts): it draws the room's table and sends bets and decisions.
@@ -331,7 +337,7 @@ const menuHost:MenuContentHost={
   portraitNow:skin=>menuPortraits.get(skin),
 };
 /** Esc may pause only with nothing of the game's in front of the world: a window, the phone, a TV, a dialog or the chat's box take it first. */
-const canOpenMenu=()=>inGame&&connected&&!activeModal&&!watchingTv&&!phone.isOpen&&!profile.isOpen&&!foodDialog.isOpen&&!lockerPad.isOpen&&!worldMenuOpen()&&!typing()&&!document.body.classList.contains('dead')&&!document.querySelector('.bc-backdrop');
+const canOpenMenu=()=>inGame&&connected&&!activeModal&&!watchingTv&&!phone.isOpen&&!profile.isOpen&&!foodDialog.isOpen&&!lockerPad.isOpen&&!worldMenuOpen()&&!machineGameOpen()&&!typing()&&!document.body.classList.contains('dead')&&!document.querySelector('.bc-backdrop');
 const pauseMenu=createPauseMenu(app,menuTabs(menuHost),{
   sounds:menuSounds,header:()=>menuHeader(menuHost),where:()=>menuHost.zone(),canOpen:canOpenMenu,
   // Death, a call that brings the phone up, or a window the room opens (a trade): the menu steps aside.
@@ -383,6 +389,8 @@ let watchingTv=false;
 let tableOrder:TableOrderView|undefined;
 let jobTask:JobTaskView|null=null;
 let factoryUi:FactoryController|undefined;
+/** What the room tells a truck driver about the plant's requests: HighCargo (the phone) reads it. */
+const freightFeed=createFreightFeed();
 const admission=new AdmissionLifecycle();
 let leavingPromise:Promise<void>|undefined;
 // The jukebox and the TVs are independent: separate controllers, players, panels and volumes.
@@ -483,6 +491,7 @@ const profile=createProfileWindow({
   loadouts:next=>{skillLoadouts=next;renderSkillButton();},
   collection:skin=>{if(inGame&&!activeModal)void skins(skin);},
   toast,
+  send:(type,payload)=>network.send(type,payload),
 });
 const network=new BarNetwork({
   environment:environment=>scene?.setEnvironment(environment),
@@ -573,7 +582,13 @@ const network=new BarNetwork({
   },
   factory:state=>factoryUi?.stateMessage(state as never),
   employment:state=>factoryUi?.employmentMessage(state as never),
-  factoryPpe:state=>toast(state.on?'EPI colocado.':'EPI retirado.'),
+  company:(kind,payload)=>profile.companyMessage(kind,payload),
+  employmentRefresh:()=>{network.send('employment.view');profile.employmentChanged();},
+  factoryResult:result=>{factoryUi?.resultMessage(result as never);const answer=result as {action:string};if(answer.action.startsWith('freight.')||answer.action==='shipment.cancel')freightFeed.result(result as never);},
+  freight:state=>freightFeed.push(state as never),
+  machine:(kind,payload)=>kind==='state'?machineShop.stateMessage(payload):kind==='game'?machineShop.gameMessage(payload):machineShop.resultMessage(payload),
+  factoryPaid:paid=>factoryUi?.paidMessage(paid as never),
+  factoryRoute:route=>{factoryUi?.routeMessage(route as never);if(!courier.state().order)gps.setDelivery(factoryTarget());},
   adminWorld:snapshot=>administration?.world(snapshot),
   serverPerformance:snapshot=>performanceMonitor.receiveServer(snapshot),
   // The room's price table: on entering and whenever the administration changes a price (Preços).
@@ -611,7 +626,9 @@ const network=new BarNetwork({
     if(isConnected)voice.syncState();
   }
 });
-factoryUi=new FactoryController({send:(type,payload)=>network.send(type,payload),toast,app:()=>scene?.app,lowQuality:()=>scene?.getGraphics().preset==='low'});
+factoryUi=new FactoryController({send:(type,payload)=>network.send(type,payload),notify:(title,text,warning,id)=>notices.show({variant:warning?'aviso':'acao',title,text,id}),app:()=>scene?.app,localRoot:()=>scene?.localActorRoot(),lowQuality:()=>scene?.getGraphics().preset==='low',volume:()=>settings.get().master,userId:()=>user?.id});
+const machineShop=new MachineShopController({userName:()=>user?.displayName??'',send:(type,payload)=>network.send(type,payload),notify:(title,text,warning)=>notices.show({variant:warning?'aviso':'acao',title,text,id:`ribeiro-${title}`})});
+minimap.setPois([...FACTORY_SPOTS.filter(spot=>spot.map).map(spot=>({icon:spot.icon,colour:FACTORY_COLOR,x:spot.x,y:spot.y,z:spot.z})),...RIBEIRO_SPOTS.map(spot=>({icon:spot.id==='receiving'?'truck':spot.id==='stock'?'package':spot.id==='computer'?'wrench':'settings',colour:RIBEIRO_COLOR,x:spot.x,y:spot.y,z:spot.z}))]);
 
 const mediaProfiler=new UpdateProfiler();
 const performanceMonitor=new PerformanceMonitor({
@@ -646,9 +663,10 @@ const phone=createPhone($('#game'),{
   volume:()=>settings.get().master,
   gps,
   food:courier,
+  freight:freightFeed,
 });
 /** VR (docs/sistemas/vr.md): a window, the phone, a table or a menu is open, so the headset shows the screen with the interface. */
-const vrWindowOpen=()=>inGame&&(!!activeModal||atFoosball()||atTruco()||atPool()||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||trade.inviteOpen||pauseMenu.isOpen||document.body.classList.contains('watching-tv'));
+const vrWindowOpen=()=>inGame&&(!!activeModal||atFoosball()||atTruco()||atPool()||phone.isOpen||foodDialog.isOpen||lockerPad.isOpen||profile.isOpen||worldMenuOpen()||machineGameOpen()||trade.inviteOpen||pauseMenu.isOpen||document.body.classList.contains('watching-tv'));
 /** The VR button on top: only inside the bar, and only for whoever turned the VR on in Configurações. */
 function refreshVrButton():void {
   const button=document.querySelector<HTMLButtonElement>('#vr-button');if(!button)return;
@@ -706,7 +724,7 @@ function leaveBarWith(departure:AdmissionDeparture):Promise<void> {
   phone.leave();stopWatchingTv();media.forEach(m=>m.reset());voice.leave();audio.setActive(false);
   vehicleHud.reset();$('#game').classList.remove('vehicle-mounted');hud.setAvailable('actions',true);
   gps.reset();foodDialog.reset();lockerPad.reset();trade.reset();courier.update({status:'off',since:0,done:0,earned:0});
-  deathUi.reset();scene?.stopDeath();scene?.exitVr();inGame=false;connected=false;refreshVrButton();tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);notices.clear();needsHud.reset();levelHud.reset();namesUntil=0;$('#labels').classList.remove('names-on');minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
+  factoryUi?.reset();machineShop.reset();freightFeed.reset();scene?.setFactoryGuide(null);deathUi.reset();scene?.stopDeath();scene?.exitVr();inGame=false;connected=false;refreshVrButton();tableOrder=undefined;jobTask=null;renderJobCard();objectiveBlip.render(null);foodBlip.render(null);garageBlip.render(null);stageBlip.render(null);telaoBlip.render(null);shopBlip.render(null);deskBlip.render(null);ribeiroBlip.render(null);notices.clear();needsHud.reset();levelHud.reset();namesUntil=0;$('#labels').classList.remove('names-on');minimap.reset();$('[data-action="chat"]').removeAttribute('data-unread');wardrobe=undefined;inventory=undefined;accountStats=undefined;netPing='— ms';usedItem='';consumingHud.clear();renderBalance();await network.disconnect();world=undefined;chatHistory.length=0;renderChat();scene?.setEnabled(false);scene?.setWorld({players:{},npcs:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:0},'');
   $('#labels').replaceChildren();$('#game').classList.add('hidden');$('#lobby').classList.remove('hidden');$('#blackjack').classList.add('hidden');blackjackUi.reset();$('#truco').classList.add('hidden');trucoUi.reset();trucoView=undefined;$('#foosball').classList.add('hidden');foosballUi.reset();foosballWatching='';$('#pool').classList.add('hidden');poolUi.reset();poolWatching='';poolViews.clear();closeModal();renderAuth();
   })();
   const tracked=task.finally(()=>{admission.completeExit(departure);if(leavingPromise===tracked)leavingPromise=undefined;});
@@ -750,7 +768,9 @@ function renderWorld():void {
   // Standing with the phone out, the character looks at it, for everyone.
   if(connected&&!!self?.looking!==phone.isOpen&&lookingSent!==phone.isOpen){lookingSent=phone.isOpen;network.send('phone.look',{on:phone.isOpen});}
   renderMapMarks(self);
-  const food=foodPrompt(self)??sparringPrompt(self);
+  const factoryLabel=self&&inGame&&connected&&!self.interactionState&&!self.currentTableId?factoryUi?.prompt(self,!!truckRearNear(self)):undefined;
+  const ribeiroLabel=self&&inGame&&connected&&!self.interactionState&&!self.currentTableId?machineShop.prompt(self):undefined;
+  const food=foodPrompt(self)??sparringPrompt(self)??(ribeiroLabel?{label:ribeiroLabel,send:''}:factoryLabel?{label:factoryLabel,send:''}:undefined);
   const interaction=self?nearestObject(self):undefined;
   // At the back of your own truck E opens its hold: the rear counts before getting on (the doors are on the sides; "Entrar" is in its menu).
   const truckBox=self&&!interaction&&!atStation?truckRearNear(self):undefined;
@@ -850,6 +870,11 @@ const stageBlip=createObjectiveBlip($<HTMLCanvasElement>('#stage-blip'),{accent:
 // Both rings show only in the backyard.
 const telaoBlip=createObjectiveBlip($<HTMLCanvasElement>('#telao-blip'),{accent:['--blip-telao','#3adfd7'],edge:false,within:BLIP_RADIUS});
 // The house's shop: its gold ring in the backyard (--blip-shop), named to the player standing on it.
+// EMPRESA BRASIL: the station the player stands near by name (amber), and the next step wherever it is (the job's green, with an arrow on the edge).
+const factoryBlip=createObjectiveBlip($<HTMLCanvasElement>('#factory-blip'),{accent:['--blip-factory','#ffb020'],edge:false,within:12});
+const factoryGuideBlip=createObjectiveBlip($<HTMLCanvasElement>('#factory-guide-blip'));
+const ribeiroBlip=createObjectiveBlip($<HTMLCanvasElement>('#ribeiro-blip'),{accent:['--blip-ribeiro',RIBEIRO_COLOR],edge:false,within:RIBEIRO_COMPUTER.reach});
+let factoryFrameAt=performance.now();
 const shopBlip=createObjectiveBlip($<HTMLCanvasElement>('#shop-blip'),{accent:['--blip-shop','#fac416'],edge:false,within:BLIP_RADIUS});
 // The light desk up on the stage, in the logo's violet (--blip-desk): its ring shows in the backyard, on the deck too.
 const deskBlip=createObjectiveBlip($<HTMLCanvasElement>('#desk-blip'),{accent:['--blip-desk','#a77bff'],edge:false,within:BLIP_RADIUS});
@@ -891,12 +916,17 @@ function freeMotoNear(self:PlayerState){
   return self.interactionState||self.currentTableId?undefined:nearestFreeMoto(self,Object.values(world?.motos??{}),self.id);
 }
 /** The shift's news: the GPS follows the order. */
+/** A truck driver's trip for EMPRESA BRASIL as the GPS's target (the courier's own order comes first). */
+function factoryTarget():GpsTarget|null {
+  const route=factoryUi?.route();
+  return route?{x:route.x,y:route.y,z:route.z,source:'delivery',label:`${route.title} · ${route.label}`}:null;
+}
 function onFoodState(state:HighfoodState):void {
   courier.update(state);
   const order=state.order;
   // First the kerb at the pickup point; then to the kerb in front of them while riding; on foot, to the customer.
   if(order?.stage==='pickup')gps.setDelivery({x:order.pickup.parkX,y:0,z:order.pickup.parkZ,source:'delivery',label:`Ponto de retirada · ${order.pickup.address}`});
-  else gps.setDelivery(order?{x:order.stage==='going'?order.parkX:order.x,y:order.y,z:order.stage==='going'?order.parkZ:order.z,source:'delivery',label:`${order.customer.name} · ${order.address}`}:null);
+  else gps.setDelivery(order?{x:order.stage==='going'?order.parkX:order.x,y:order.y,z:order.stage==='going'?order.parkZ:order.z,source:'delivery',label:`${order.customer.name} · ${order.address}`}:factoryTarget());
   if(world)renderWorld();
 }
 /** What E does for the courier here, if anything; beats everything else in reach. */
@@ -995,7 +1025,9 @@ function lockOwnBike():void {
 function interact():void {
   if(!connected||!world||!user||activeModal)return;
   const self=world.players[user.id];if(!self)return;
-  if(factoryUi?.interact(self))return;
+  if(!self.interactionState&&!self.currentTableId&&machineShop.interact(self))return;
+  // Seated, riding or at a table, E is that activity's own (getting off, leaving); the plant's stations are for someone on foot.
+  if(!self.interactionState&&!self.currentTableId&&factoryUi?.interact(self,!!truckRearNear(self)))return;
   const fuel=fuelContext(self,world);
   if(fuel.service)return;
   if(fuel.pump&&fuel.vehicle){sendVehicleControl(fuel.vehicle.id,'refuel');return;}
@@ -1083,7 +1115,7 @@ function renderNet():void {
 function renderPeopleContent():void {
   const panel=document.querySelector<HTMLElement>('#people-panel');if(activeModal!=='people'||!panel)return;
   if(peopleTab==='account'){
-    const skin=SKINS.find(skin=>skin.id===world?.players[user?.id??'']?.skin)?.name||'Carregando';
+    const worn=world?.players[user?.id??'']?.skin,skin=(worn===FACTORY_UNIFORM?FACTORY_UNIFORM_NAME:SKINS.find(skin=>skin.id===worn)?.name)||'Carregando';
     const key=JSON.stringify(['account',user?.displayName,user?.email,user?.color,skin,accountStats]);
     if(key===peopleKey)return;peopleKey=key;
     const stats=accountStats?`<div><b>${accountStats.gamesPlayed}</b><span>rodadas</span></div><div><b>${accountStats.wins}</b><span>vitórias</span></div><div><b>${accountStats.draws}</b><span>empates</span></div><div><b>${accountStats.losses}</b><span>derrotas</span></div>`:'Carregando suas rodadas…';
@@ -1119,6 +1151,8 @@ function renderAdminPosition():void {const input=document.querySelector<HTMLInpu
 async function admin():Promise<void> {
   if(user?.role!=='admin'){toast('Acesso exclusivo da administração.',true);return;}
   // The administration's console (apps/web/src/admin): categories on the left, the chosen one on the right.
+  // Loaded on first use (the console is a chunk of its own); the window opens only once it is here, so closing it cannot land between the two.
+  const {adminConsole}=await import('./admin/console');
   showModal('Administração do bar','<div id="admin-console"></div>','admin');
   administration=adminConsole($('#admin-console'),{performance:performanceMonitor,user:()=>user,send:(type,payload)=>network.send(type,payload),position:positionText,
     changedWallet:()=>{wardrobe=undefined;void refreshAdministration();},denied:()=>{void refreshAdministration();}});
@@ -1545,7 +1579,7 @@ async function start():Promise<void>{
       media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));mediaProfiler.mark('video');
       minimap.render(inGame?()=>scene?.mapView():null);mediaProfiler.mark('minimap');
       objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');
-      const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');mediaProfiler.mark('blips');
+      const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');{const factoryNow=performance.now(),factorySelf=inGame?self:undefined,guide=factorySelf?factoryUi?.guide()??null:null;factoryUi?.frame(factorySelf,(factoryNow-factoryFrameAt)/1000,world?.doors?.[FACTORY_GATE.id]?.open);factoryFrameAt=factoryNow;scene?.setFactoryGuide(guide);factoryGuideBlip.render(guide?scene?.projectFactoryGuide()??null:null,guide?.title??'');const spot=factoryUi?.blipSpot(factorySelf);factoryBlip.render(spot?scene?.projectFactorySpot(spot.id)??null:null,spot?.label??'');}{const machineSelf=inGame?self:undefined;machineShop.frame(machineSelf);const spot=machineShop.blipSpot(machineSelf);ribeiroBlip.render(machineSelf?scene?.projectRibeiroSpot(spot.id)??null:null,spot.label);}mediaProfiler.mark('blips');
       voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
 
     },

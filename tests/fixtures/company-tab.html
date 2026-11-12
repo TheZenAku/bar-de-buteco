@@ -1,0 +1,47 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#12062a;margin:0">
+<!-- The profile's "Gerenciar empresa" tab (apps/web/src/profile/company-tab.ts) with a made-up firm and no server. fixture.sent lists what it sent, fixture.section(id) switches
+     the section, fixture.state(patch) pushes a change, fixture.result(r) plays the room's answer, fixture.role('manager'|'owner') switches who is looking. -->
+<div id="host" class="pf-profile pf-wide" style="margin:12px auto;width:min(calc(100vw - 16px),600px);background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden"><div class="pf-panel" id="panel"></div></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/profile/profile.css';
+import {drawProductionOffers,estimateProduction} from '../../packages/shared/src/factory/company.ts';
+import {createCompanyTab} from '../../apps/web/src/profile/company-tab.ts';
+
+const sent=[],toasts=[];
+const panel=document.querySelector('#panel');
+const redraw=()=>{
+  const typed=new Map();panel.querySelectorAll('input').forEach(input=>typed.set(input.name,input.value));
+  panel.innerHTML=tab.html();panel.querySelectorAll('input').forEach(input=>{const value=typed.get(input.name);if(value!==undefined)input.value=value;});
+};
+const tab=createCompanyTab({send:(type,payload)=>sent.push({type,payload}),toast:(text,error)=>toasts.push({text,error}),redraw});
+panel.addEventListener('click',event=>{const button=event.target.closest('[data-co]');if(button)tab.click(button,panel);});
+panel.addEventListener('input',event=>{if(event.target.name?.startsWith('co-'))tab.input(event.target);});
+
+let seed=3;const random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+const offers=drawProductionOffers(random,()=>crypto.randomUUID(),Date.now());
+const rules={palletPrice:60000,taxPercent:15,employeeFee:2000,maxPalletsPerTruck:10,bagKg:25,yieldMin:.8,yieldMax:.97};
+const estimates=Object.fromEntries(offers.map(order=>[order.id,estimateProduction(order,rules)]));
+const ago=minutes=>new Date(Date.now()-minutes*60000).toISOString();
+let state={
+  name:'EMPRESA BRASIL',role:'owner',balance:87500,hasPassword:true,
+  members:[{userId:'u1',name:'rafael',role:'owner',onShift:true,since:ago(5000),hasPassword:true},{userId:'u2',name:'Socio da Silva',role:'owner',onShift:false,since:ago(4000),hasPassword:false},{userId:'u3',name:'Marta',role:'manager',onShift:true,since:ago(3000)},{userId:'u4',name:'Ana',role:'employee',onShift:true,since:ago(900)},{userId:'u5',name:'Bia',role:'employee',onShift:false,since:ago(300)}],
+  applicants:[{userId:'u6',name:'Caio',appliedAt:ago(12)},{userId:'u7',name:'Duda',appliedAt:ago(45)}],
+  ledger:[{id:'l1',amount:38250,balanceAfter:87500,reason:'Venda de 2 palete(s) de produto (carga 1a2b3c4d)',at:ago(30),actorName:'Sistema'},{id:'l2',amount:-34500,balanceAfter:49250,reason:'Compra de 1 palete(s) de MALTE (imposto 4.500)',at:ago(200),actorName:'rafael'},{id:'l3',amount:-10000,balanceAfter:83750,reason:'Transferência para rafael',at:ago(400),actorName:'rafael'}],
+  orders:[{id:'o1',material:'MALTE',pallets:1,status:'open',base:30000,tax:4500,createdAt:ago(5),cancellable:true},{id:'o2',material:'MIX',pallets:2,status:'accepted',base:40000,tax:6000,createdAt:ago(14),cancellable:false},{id:'o3',material:'MALTE',pallets:1,status:'completed',base:30000,tax:4500,createdAt:ago(120),cancellable:false}],
+  totals:{sales:4,gross:480000,income:408000,spent:164000},
+  stock:{MALTE:54,MIX:30,PRODUTO:41,roomMALTE:162,roomMIX:78},prices:{MALTE:30000,MIX:20000,taxPercent:15,palletPrice:60000},
+  production:{offers,offersBy:'rafael',offersAt:Date.now(),active:null,history:[{id:'h1',name:'Leite em pó integral',batches:3,batchesDone:3,bags:34,result:'completed',at:Date.now()-3600000,by:'a fábrica'}],estimates,canDraw:true,canApprove:true},
+  plant:{operators:2,dirtRequired:true,pendingCleaning:['tank1','dryer','floor-doca'],running:false},idlePay:{amount:500,everyS:1800},
+};
+tab.setState(state);redraw();
+window.fixture={sent,toasts,tab,
+  state(patch){state={...state,...patch};tab.setState(state);},
+  section(id){panel.querySelector(`[data-section="${id}"]`)?.click();},
+  result(r){tab.setResult(r);},
+  role(role){state={...state,role,production:{...state.production,canDraw:role==='owner'}};tab.setState(state);},
+  approve(){const order=offers[0];state={...state,production:{...state.production,offers:[],active:{...order,status:'running',approvedBy:'u1',approvedByName:'rafael',approvedAt:Date.now(),startedBy:'u4',startedAt:Date.now(),batchesStarted:1,batchesDone:0,bags:0},canDraw:false,canApprove:false}};tab.setState(state);},
+};
+window.fixtureReady=true;
+</script></body></html>

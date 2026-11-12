@@ -48,28 +48,24 @@ test('the world reports what players do, and tells them about their badges',{tim
   /** A whole round trip with the API after what was just done. */
   const reported=async()=>{const seen=reports.length;await until(()=>reports.length>=seen+2);};
   try {
-    const a=await join('ach-a'),b=await join('ach-b'),got:Badge[]=[],chatA:string[]=[],chatB:string[]=[];
+    const a=await join('ach-a'),b=await join('ach-b'),got:Badge[]=[],chatB:string[]=[];
     a.onMessage('achievement.unlocked',(message:{badge:Badge})=>got.push(message.badge));
-    a.onMessage('chat.message',m=>chatA.push(m.text));b.onMessage('chat.message',m=>chatB.push(m.text));
+    b.onMessage('chat.message',m=>chatB.push(m.text));
     const player=authoritative.state.players.get('ach-a')!,other=authoritative.state.players.get('ach-b')!;
     player.assign({x:12,y:.3,z:-6});other.assign({x:12,y:.3,z:-4});
     await reported();
     assert.ok(reports.at(-1)!.online.includes('ach-a'),'who is here goes in the report');
 
-    // A beer in hand, had whole: one beer. Half of a second one that got spilled waits for the other half.
-    const since=Date.now()-consumeMs('garrafa');
-    player.assign({holding:'garrafa',holdingSince:since,holdingUntil:since+consumeMs('garrafa')});
-    await until(()=>!player.holding);
-    const half=Date.now()-consumeMs('copo')/2;
-    player.assign({holding:'copo',holdingSince:half,holdingUntil:half+consumeMs('copo')});
-    await until(()=>authoritative.needs.state('ach-a').drunk>0);await pause(100);(authoritative as unknown as {dropHolding(p:unknown):void}).dropHolding(player);
+    // Having something counts at the start, in full (startHolding applies the effects); spilling it later takes nothing back.
+    const have=(item:string)=>(authoritative as unknown as {startHolding(p:unknown,i:string,now:number):void}).startHolding(player,item,Date.now());
+    const finish=async()=>{player.holdingUntil=Date.now();await until(()=>!player.holding);};
+    have('garrafa');await finish();
+    have('copo');await until(()=>authoritative.needs.state('ach-a').drunk>0);await pause(100);(authoritative as unknown as {dropHolding(p:unknown):void}).dropHolding(player);
     await reported();
-    assert.equal(total('ach-a','bebum'),1,'one and a half beers report as one');
+    assert.equal(total('ach-a','bebum'),2,'a beer and a spilled glass: both were had');
     // Other things in hand count where they belong.
-    const coffee=Date.now()-consumeMs('cafe');
-    player.assign({holding:'cafe',holdingSince:coffee,holdingUntil:coffee+consumeMs('cafe')});
-    await until(()=>!player.holding);await reported();
-    assert.equal(total('ach-a','cafeinado'),1);assert.equal(total('ach-a','bebum'),1);
+    have('cafe');await finish();await reported();
+    assert.equal(total('ach-a','cafeinado'),1);assert.equal(total('ach-a','bebum'),2);
 
     // A wave counts once, however many are sent; chat only with someone to hear it.
     a.send('player.emote',{emote:'wave'});a.send('player.emote',{emote:'wave'});
@@ -111,22 +107,17 @@ test('the world reports what players do, and tells them about their badges',{tim
 
     // The API out for a while: nothing is lost.
     const before=total('ach-a','gente-boa');down=true;await pause(3500);
-    const sinceDown=Date.now()-consumeMs('garrafa');
-    player.assign({holding:'garrafa',holdingSince:sinceDown,holdingUntil:sinceDown+consumeMs('garrafa')});
-    await until(()=>!player.holding);await pause(3500);down=false;
-    await reported();assert.equal(total('ach-a','bebum'),2);assert.equal(total('ach-a','gente-boa'),before);
+    have('garrafa');await finish();await pause(3500);down=false;
+    await reported();assert.equal(total('ach-a','bebum'),3);assert.equal(total('ach-a','gente-boa'),before);
 
     // A badge: the player hears it, the common one stays between them.
     unlocked=[{userId:'ach-a',badge:BADGE}];
     await until(()=>got.length===1);assert.deepEqual(got[0],BADGE);
     assert.equal(chatB.some(text=>text.includes('Bebum I')),false);
-    // A rare one is told around them, the rarest to the whole bar.
-    other.assign({x:80,y:.3,z:80});await pause(100);
+    // The room no longer announces badges in the chat (system messages were removed): rare and legendary ones reach only their owner.
     unlocked=[{userId:'ach-a',badge:{...BADGE,name:'Bebum III',rarity:'rare'}}];await until(()=>got.length===2);
-    await pause(200);assert.equal(chatB.some(text=>text.includes('Bebum III')),false,'too far to hear about a rare one');
-    assert.ok(chatA.some(text=>text.includes('Bebum III')));
     unlocked=[{userId:'ach-a',badge:{...BADGE,name:'Bebum IV',rarity:'legendary'}}];await until(()=>got.length===3);
-    await until(()=>chatB.some(text=>text.includes('emblema lendário Bebum IV')));
+    await pause(200);assert.equal(chatB.some(text=>text.includes('Bebum')),false);
 
     // Development bots earn nothing and are never asked about.
     const bot=await join('ach-bot',{bot:true});const botPlayer=authoritative.state.players.get('ach-bot')!;

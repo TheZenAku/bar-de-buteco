@@ -122,6 +122,22 @@ test('through a scope the view goes into the eyes, the head hides, the x-ray sta
   assert.equal(rig.telemetry().scope,1);
 });
 
+test('an armed first-person sight follows locomotion without copying the walking head bob',t=>{
+  const {camera,rig,subject,settle}=fixture(t);
+  subject.head=new pc.Vec3(subject.feet.x,subject.feet.y+1.62,subject.feet.z);
+  rig.setMode('first');rig.armed=true;settle(180);
+  const heights:number[]=[];
+  for(let frame=0;frame<180;frame++){
+    subject.feet.x+=.05;
+    subject.head.x=subject.feet.x;
+    subject.head.y=subject.feet.y+1.62+Math.sin(frame/60*Math.PI*6)*.06;
+    rig.follow(1/60,subject);
+    heights.push(camera.getPosition().y);
+    assert.ok(Math.abs(camera.getPosition().x-(subject.feet.x+Math.sin(subject.facing)*.1))<.03,'The eyes travel with the feet, without run lag');
+  }
+  assert.ok(Math.max(...heights)-Math.min(...heights)<.025,'The animated head does not shake the sight');
+});
+
 test('lookScale scales the mouse and the fingers, and armed the view may look higher',t=>{
   const {rig,subject,settle}=fixture(t);
   settle();

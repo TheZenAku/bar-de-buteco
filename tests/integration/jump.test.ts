@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {jumpMotion,jumpAnimation,canJump,movePlayer,WALK_SPEED,RUN_SPEED,inputSchema,PLAYER_HEIGHT,STAGE,STAGE_ENTRY,onStage,type Position,type Collider} from '@bar/shared';
+import {BarNetwork} from '../../apps/web/src/networking';
 
 const idle={dx:0,dz:0,running:false},dt=.05;
 function character(start:Required<Position>={x:0,y:0,z:7},obstacles:Collider[]=[]){
@@ -43,6 +44,15 @@ test('walking and running keep their existing pace in the air, and replay gives 
     }
     assert.ok(Math.abs(Math.hypot(predicted.position.x,predicted.position.z-7)-(running?RUN_SPEED:WALK_SPEED)*12*dt)<1e-6);
   }
+});
+
+test('local prediction selects walk and run immediately without replacing authored actions',()=>{
+  const network:any=Object.assign(Object.create(BarNetwork.prototype),{position:{x:1,y:0,z:2},motion:jumpMotion()});
+  const pose=(animationState:string,input?:{dx:number;dz:number;running:boolean})=>network.predictedPose({animationState,interactionState:'',currentTableId:''},input);
+  assert.equal(pose('idle',{dx:0,dz:1,running:false}).animation,'walk');
+  assert.equal(pose('walk',{dx:0,dz:1,running:true}).animation,'run');
+  assert.equal(pose('run',{dx:0,dz:0,running:true}).animation,'idle');
+  assert.equal(pose('kick',{dx:0,dz:1,running:true}).animation,undefined);
 });
 
 test('a ceiling stops upward speed without clipping or preventing the subsequent landing',()=>{

@@ -5,7 +5,6 @@ import {overviewSection} from './overview';
 import {playersSection} from './players';
 import {reportsSection} from './reports';
 import {economySection} from './economy';
-import {levelsSection,pricesSection} from './prices';
 import {logsSection} from './logs';
 import {worldSection} from './world';
 import {environmentSection} from './environment';
@@ -23,12 +22,10 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'overview',label:'Visão geral',icon:'dashboard',description:'O bar agora: quem está, como vai a economia e o que pede atenção.',factory:overviewSection},
   {id:'players',label:'Jogadores',icon:'users',description:'Busque uma conta para ver a ficha completa e ajustar carteira, mochila, skins e acesso.',factory:playersSection},
   {id:'reports',label:'Denúncias',icon:'flag',description:'O que os jogadores denunciaram, para analisar e marcar como resolvido.',factory:reportsSection},
-  {id:'economy',label:'Economia',icon:'trendingUp',description:'Moedas em circulação, inflação, de onde as moedas vêm e para onde vão.',factory:economySection},
-  {id:'prices',label:'Preços',icon:'tag',description:'Quanto custa cada coisa e quanto o bar paga. As mudanças valem para todos em poucos segundos.',factory:pricesSection},
-  {id:'levels',label:'Níveis e XP',icon:'trophy',description:'Quanto XP cada ação dá e o bônus diário de cada dia. O XP de um jogador, o nível e o bônus dele ficam na ficha, aba Nível.',factory:levelsSection},
+  {id:'economy',label:'Economia',icon:'trendingUp',description:'O dinheiro da cidade e tudo o que o move: resumo do dia, cofre público, Empresa Brasil, preços e XP. Todo ajuste de valor fica aqui.',factory:economySection},
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
-  {id:'factory',label:'Fábrica',icon:'factory',description:'EMPRESA BRASIL: estado industrial, estoque, máquinas, alarmes e ferramentas de depuração.',factory:factorySection},
+  {id:'factory',label:'Fábrica',icon:'warehouse',description:'EMPRESA BRASIL: estado industrial, estoque, máquinas, alarmes e ferramentas de depuração.',factory:factorySection},
   {id:'vehicles',label:'Veículos',icon:'bike',description:'Gerencie a frota dos jogadores, registre veículos, personalize placas e use o spawn de todos os modelos.',factory:vehiclesSection},
   {id:'environment',label:'Tempo e clima',icon:'sun',description:'Horário do jogo, duração do dia e clima compartilhados por todos nesta sala.',factory:environmentSection},
   {id:'highfood',label:'Highfood',icon:'food',description:'As entregas de agora, o que elas pagam e os clientes: nome, corpo no jogo, falas e foto.',factory:highfoodSection},
@@ -41,7 +38,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
 const GROUPS:ReadonlyArray<{label:string;ids:readonly SectionId[]}>=[
   {label:'Painel',ids:['overview','world']},
   {label:'Pessoas',ids:['players','reports','badges','collection']},
-  {label:'Economia',ids:['economy','prices','levels']},
+  {label:'Dinheiro',ids:['economy']},
   {label:'Conteúdo do jogo',ids:['vehicles','highfood','factory','environment']},
   {label:'Sistema',ids:['logs','server','performance']},
 ];
@@ -86,7 +83,9 @@ export function adminConsole(container:HTMLElement,hooks:AdminConsoleHooks){
       finally{busy=false;unlock();}
     },
   };
-  function open(id:SectionId,params:Record<string,string>={}):void {
+  function open(requested:SectionId,requestedParams:Record<string,string>={}):void {
+    // Prices and XP are tabs of Economia now; links that still say "prices" or "levels" land on the right tab.
+    const [id,params]=requested==='prices'?['economy' as SectionId,{...requestedParams,tab:'prices'}]:requested==='levels'?['economy' as SectionId,{...requestedParams,tab:'xp'}]:[requested,requestedParams] as const;
     const entry=SECTIONS.find(s=>s.id===id)??SECTIONS[0]!;
     section?.destroy?.();section=undefined;busy=false;
     current=lastSection=entry.id;root.innerHTML='';root.setAttribute('aria-busy','false');message('');

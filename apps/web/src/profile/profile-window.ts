@@ -5,6 +5,8 @@ import {uiIcon} from '../ui-icons';
 import {rankIcon} from '../levels/rank-icon';
 import {badgeMedal,openBadgeCard,rarityAttributes} from './badge-card';
 import {floatingWindow,type FloatingWindow} from './floating-window';
+import {createCompanyTab} from './company-tab';
+import type {CompanyResult} from '@bar/shared/factory';
 import './profile.css';
 
 export interface ProfileHooks {
@@ -19,10 +21,12 @@ export interface ProfileHooks {
   /** Opens the collection on this skin's card, where its skills are sold. */
   collection:(skin:string)=>void;
   toast:(text:string,error?:boolean)=>void;
+  /** Sends a message to the room (the company tab talks to it). */
+  send:(type:string,payload:unknown)=>void;
 }
 export interface ProfilePerson {id:string;name:string;color:string;number:string;photo?:number}
-type Tab='profile'|'achievements'|'skill'|'employment';
-interface EmploymentView {employment:null|{jobId:string;status:'hired'|'resigned'|'dismissed';hiredAt:string;cooldownUntil?:string|null;schedule?:unknown};shift:null|{startedAt:string;earned:number;station:string};config:{contractSlots:number;shiftSlots:number;cooldownMs:number}}
+type Tab='profile'|'achievements'|'skill'|'employment'|'company';
+interface EmploymentView {employment:null|{jobId:string;status:'hired'|'resigned'|'dismissed'|'applied';hiredAt:string;cooldownUntil?:string|null;schedule?:unknown};shift:null|{startedAt:string;earned:number;station:string};config:{contractSlots:number;shiftSlots:number;cooldownMs:number}}
 
 /**
  * The profile window: a right click on a player (or on yourself), then Perfil. Name, Highgram, the skin standing still, the
@@ -34,6 +38,10 @@ export function createProfileWindow(hooks:ProfileHooks){
   /** The Conquistas tab: read each time it opens, and again when a badge arrives while it is open. */
   let achievements:AchievementView[]|undefined;
   let employment:EmploymentView|undefined;
+  /** "Gerenciar empresa": only for owners and managers; the room tells who is one when the own profile opens. */
+  const company=createCompanyTab({send:hooks.send,toast:hooks.toast,redraw:()=>{if(tab==='company'||company.role!==shownRole)render();}});
+  /** The company role the tab bar was last drawn for (the "Gerenciar empresa" tab appears when the room says so). */
+  let shownRole:string|null=null;
   /** Pictures already drawn, by skin; they do not change during a session. */
   const portraits=new Map<string,string>();
   const tip=document.createElement('div');tip.className='pf-tip';tip.setAttribute('role','tooltip');tip.hidden=true;document.body.append(tip);
@@ -126,11 +134,12 @@ export function createProfileWindow(hooks:ProfileHooks){
   function employmentHtml():string {
     if(!employment)return '<p class="pf-empty"><span class="loader" aria-hidden="true"></span></p>';
     const job=employment.employment,cooldown=job?.cooldownUntil?new Date(job.cooldownUntil):undefined,waiting=!!cooldown&&cooldown.getTime()>Date.now();
-    if(!job||job.status!=='hired')return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p>Trabalhe na EMPRESA BRASIL. Depois da contratação, entre em expediente no ponto da entrada de pessoal.</p>${waiting?`<p>Nova candidatura disponível em <b>${cooldown!.toLocaleString('pt-BR')}</b>.</p>`:`<button class="button primary" data-pf="employment-hire">Candidatar-se</button>`}</div>`;
+    if(job?.status==='applied')return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p><b>Candidatura enviada.</b> Os donos e gerentes da EMPRESA BRASIL vão avaliar; quando você for admitido, entre em expediente na entrada de pessoal.</p><button class="button secondary" data-pf="employment-withdraw">Cancelar candidatura</button></div>`;
+    if(!job||job.status!=='hired')return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p>Trabalhe na EMPRESA BRASIL. Candidate-se: um dono ou gerente da empresa precisa admitir você; depois, entre em expediente no ponto da entrada de pessoal.</p>${waiting?`<p>Nova candidatura disponível em <b>${cooldown!.toLocaleString('pt-BR')}</b>.</p>`:`<button class="button primary" data-pf="employment-hire">Candidatar-se</button>`}</div>`;
     return `<div class="pf-lead"><h3>Operador de Spray Dry</h3><p><b>${employment.shift?'Em serviço':'Contratado'}</b>${employment.shift?` · desde ${new Date(employment.shift.startedAt).toLocaleTimeString('pt-BR')} · estação ${e(employment.shift.station)}`:''}</p><p>Admitido em ${new Date(job.hiredAt).toLocaleDateString('pt-BR')}.</p><button class="button secondary" data-pf="employment-resign">Pedir demissão</button><p class="pf-hint">A demissão encerra o expediente e inicia o cooldown configurado.</p></div>`;
   }
   async function loadEmployment():Promise<void>{const opened=generation;try{const next=await api<EmploymentView>('/employment');if(opened===generation&&tab==='employment'){employment=next;render();}}catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível ler o emprego.',true);}}
-  async function employmentAction(action:'hire'|'resign'):Promise<void>{if(busy)return;busy=true;try{employment=await api<EmploymentView|{employment:EmploymentView['employment'] }>(`/employment/${action}`,{requestId:crypto.randomUUID()}).then(()=>api<EmploymentView>('/employment'));render();hooks.toast(action==='hire'?'Contratação concluída.':'Demissão registrada.');}catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível alterar o emprego.',true);}finally{busy=false;}}
+  async function employmentAction(action:'hire'|'resign'|'withdraw'):Promise<void>{if(busy)return;busy=true;try{employment=await api<EmploymentView|{employment:EmploymentView['employment'] }>(`/employment/${action}`,{requestId:crypto.randomUUID()}).then(()=>api<EmploymentView>('/employment'));render();hooks.toast(action==='hire'?'Candidatura enviada. Um dono ou gerente vai avaliar.':action==='withdraw'?'Candidatura cancelada.':'Demissão registrada.');}catch(error){hooks.toast(error instanceof Error?error.message:'Não foi possível alterar o emprego.',true);}finally{busy=false;}}
   /** Level, rank and the XP bar, for anyone's profile (docs/sistemas/niveis.md). */
   function levelHtml(xp:number):string {
     const p=levelOf(xp),rank=rankOf(p.level),pct=p.need?p.into/p.need*100:100;
@@ -141,7 +150,15 @@ export function createProfileWindow(hooks:ProfileHooks){
     const v=view,photo=v.photo?`<img src="/api/phone/gram/avatars/${encodeURIComponent(v.id)}?v=${e(v.photo)}" alt="">`:e(v.name.slice(0,1).toUpperCase());
     window_.head.innerHTML=`<span class="pf-avatar" style="--avatar:${e(v.color)}">${photo}</span><div class="pf-id"><h2>${e(v.name)}</h2>${levelHtml(v.xp)}<button type="button" class="pf-gram" data-pf="gram" title="Abrir no Highgram">${uiIcon('gram')}<span>@${e(v.handle)}</span>${uiIcon('chevronRight')}</button></div>`;
     window_.setLabel(v.mine?'Seu perfil':`Perfil de ${v.name}`);
-    window_.body.innerHTML=`${v.mine?`<nav class="pf-tabs" role="tablist"><button type="button" role="tab" data-pf="tab" data-tab="profile" aria-selected="${tab==='profile'}">Perfil</button><button type="button" role="tab" data-pf="tab" data-tab="achievements" aria-selected="${tab==='achievements'}">Conquistas</button><button type="button" role="tab" data-pf="tab" data-tab="skill" aria-selected="${tab==='skill'}">Skill</button><button type="button" role="tab" data-pf="tab" data-tab="employment" aria-selected="${tab==='employment'}">Meu emprego</button></nav>`:''}<div class="pf-panel">${tab==='employment'&&v.mine?employmentHtml():tab==='skill'&&v.mine?skillHtml(v):tab==='achievements'&&v.mine?achievementsHtml():profileHtml(v)}</div>`;
+    // The company tab redraws on every push from the room: what is being typed (and the focus) must survive it.
+    const typed=new Map<string,string>();let focusName='',caret:number|null=null;
+    if(tab==='company')window_.body.querySelectorAll<HTMLInputElement>('input[name^="co-"]').forEach(input=>{typed.set(input.name,input.value);if(document.activeElement===input){focusName=input.name;caret=input.selectionStart;}});
+    shownRole=company.role;
+    const tabsScroll=window_.body.querySelector<HTMLElement>('.pf-tabs')?.scrollLeft??0;
+    window_.element.classList.toggle('pf-wide',tab==='company'&&!!company.role);
+    window_.body.innerHTML=`${v.mine?`<nav class="pf-tabs" role="tablist"><button type="button" role="tab" data-pf="tab" data-tab="profile" aria-selected="${tab==='profile'}">Perfil</button><button type="button" role="tab" data-pf="tab" data-tab="achievements" aria-selected="${tab==='achievements'}">Conquistas</button><button type="button" role="tab" data-pf="tab" data-tab="skill" aria-selected="${tab==='skill'}">Skill</button><button type="button" role="tab" data-pf="tab" data-tab="employment" aria-selected="${tab==='employment'}">Meu emprego</button>${company.role?`<button type="button" role="tab" data-pf="tab" data-tab="company" aria-selected="${tab==='company'}">Gerenciar empresa</button>`:''}</nav>`:''}<div class="pf-panel">${tab==='company'&&v.mine&&company.role?company.html():tab==='employment'&&v.mine?employmentHtml():tab==='skill'&&v.mine?skillHtml(v):tab==='achievements'&&v.mine?achievementsHtml():profileHtml(v)}</div>`;
+    {const nav=window_.body.querySelector<HTMLElement>('.pf-tabs');if(nav){nav.scrollLeft=tabsScroll;nav.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});}}
+    if(typed.size)window_.body.querySelectorAll<HTMLInputElement>('input[name^="co-"]').forEach(input=>{const value=typed.get(input.name);if(value!==undefined)input.value=value;if(input.name===focusName){input.focus();if(caret!==null)input.setSelectionRange(caret,caret);}});
     if(tab==='profile'||!v.mine)void showPortrait(v);
     if(editing){const input=window_.body.querySelector<HTMLInputElement>('[name="status"]');input?.focus();input?.setSelectionRange(input.value.length,input.value.length);}
   }
@@ -217,16 +234,18 @@ export function createProfileWindow(hooks:ProfileHooks){
   let cancelCapture:(()=>void)|undefined;
   function ensureWindow():FloatingWindow {
     if(window_){window_.front();return window_;}
-    const win=floatingWindow({className:'pf-profile',label:'Perfil',onClose:()=>{window_=undefined;view=undefined;generation++;cancelCapture?.();closePicker();}});
+    const win=floatingWindow({className:'pf-profile',label:'Perfil',onClose:()=>{window_=undefined;view=undefined;generation++;cancelCapture?.();closePicker();company.watch(false);company.reset();}});
     window_=win;
     wireTips(win.body);
     win.element.addEventListener('click',event=>{
+      const co=(event.target as HTMLElement).closest<HTMLElement>('[data-co]');if(co&&view?.mine){company.click(co,win.element);return;}
       const button=(event.target as HTMLElement).closest<HTMLElement>('[data-pf]');if(!button||!view)return;
       const v=view;
       switch(button.dataset.pf){
         case 'gram':hooks.highgram(v.id);break;
-        case 'tab':tab=button.dataset.tab==='employment'?'employment':button.dataset.tab==='skill'?'skill':button.dataset.tab==='achievements'?'achievements':'profile';editing=false;keyError='';cancelCapture?.();render();if(tab==='achievements')void loadAchievements();if(tab==='employment')void loadEmployment();break;
+        case 'tab':tab=button.dataset.tab==='company'?'company':button.dataset.tab==='employment'?'employment':button.dataset.tab==='skill'?'skill':button.dataset.tab==='achievements'?'achievements':'profile';editing=false;keyError='';cancelCapture?.();render();if(tab==='achievements')void loadAchievements();if(tab==='employment')void loadEmployment();break;
         case 'employment-hire':void employmentAction('hire');break;
+        case 'employment-withdraw':void employmentAction('withdraw');break;
         case 'employment-resign':if(confirm('Pedir demissão e iniciar o cooldown?'))void employmentAction('resign');break;
         case 'status-edit':editing=true;render();break;
         case 'status-cancel':editing=false;render();break;
@@ -252,7 +271,8 @@ export function createProfileWindow(hooks:ProfileHooks){
       void change(()=>api<ProfileView>('/profile/status',{status:input.value})).then(ok=>{if(ok){editing=false;render();}});
     });
     win.element.addEventListener('input',event=>{
-      const input=event.target as HTMLInputElement;if(input.name!=='status')return;
+      const input=event.target as HTMLInputElement;if(input.name?.startsWith('co-')){company.input(input);return;}
+      if(input.name!=='status')return;
       const count=win.element.querySelector('[data-pf-count]');if(count)count.textContent=`${input.value.length}/${PROFILE.statusMax}`;
     });
     // Esc leaves the box being edited, not the window.
@@ -272,10 +292,16 @@ export function createProfileWindow(hooks:ProfileHooks){
       try{
         const next=await api<ProfileView>(`/profile/${encodeURIComponent(id)}`);
         if(opened!==generation)return;
-        view=next;render();win.settle();
+        view=next;if(next.mine&&!company.known)company.watch(true);render();win.settle();
         if(tab==='achievements'&&next.mine)void loadAchievements();
       }catch(error){if(opened===generation)win.body.innerHTML=`<p class="pf-empty">${e(error instanceof Error?error.message:'Não foi possível abrir o perfil.')}</p>`;}
     },
+    /** The room's answers to the company tab (state, result of an action, name search). */
+    companyMessage(kind:'state'|'result'|'search',payload:unknown):void {
+      if(kind==='state')company.setState(payload);else if(kind==='result')company.setResult(payload as CompanyResult);else company.setSearch((payload as {players?:Array<{userId:string;name:string}>}).players??[]);
+    },
+    /** An owner or manager changed this player's job (admitted, dismissed, turned down): the employment tab reads it again. */
+    employmentChanged():void {if(window_&&tab==='employment')void loadEmployment();},
     /** Esc: the topmost of the two windows. */
     closeTop():boolean {
       if(picker){closePicker();return true;}

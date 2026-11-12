@@ -1,5 +1,5 @@
 import {LEDGER_SOURCES,type AdminEconomy} from '@bar/shared';
-import {card,chips,compact,e,empty,n,pct,stat,type SectionFactory} from './kit';
+import {SHIPMENT_LABEL,ago,badge,card,chips,compact,e,empty,n,pct,stat,uiIcon,type AdminCityEconomy,type SectionFactory} from './kit';
 import {chartHover,flowChart,lineChart} from './charts';
 import {followGo,goButton} from './overview';
 
@@ -17,16 +17,37 @@ function diagnosis(d:AdminEconomy):string {
   return `${head} A economia está estável.`;
 }
 
-/** Economia: coins in circulation over time, what creates and destroys them, how they are spread and the price level. */
-export const economySection:SectionFactory=(root,ctx)=>{
-  let days=lastDays,data:AdminEconomy|undefined,disposed=false,generation=0;
+/** A stat tile that opens another tab of the Economia hub. */
+const tile=(tab:string,label:string,value:string,sub:string,tone:''|'up'|'down'|'warn'='')=>`<button type="button" class="admin-stat eco-tile" data-admin-go="economy" data-go-tab="${tab}"><small>${label}${uiIcon('chevronRight')}</small><b>${value}</b><span class="${tone}">${sub}</span></button>`;
+/** What happened lately in the city's money: the vault's movements and the plant's trips, newest first. */
+function recent(c:AdminCityEconomy):string {
+  const items=[
+    ...c.vault.ledger.rows.slice(0,6).map(r=>({at:Date.parse(r.at),tone:r.amount>=0?'mint' as const:'red' as const,tab:'vault',what:'Cofre',text:`${r.amount>=0?'Recebeu':'Perdeu'} ${n(Math.abs(r.amount))} moedas · ${r.reason}`})),
+    ...[...c.firm.trips.active,...c.firm.trips.latest].slice(0,6).map(t=>({at:Date.parse(t.deliveredAt??t.departedAt??t.createdAt),tone:'cyan' as const,tab:'firm',what:'Empresa',text:`${t.kind==='sale'?'Venda':'Coleta'} de ${t.pallets} palete(s) · ${SHIPMENT_LABEL[t.status]??t.status}${t.gross?` · ${n(t.gross)} moedas`:''}`})),
+  ].sort((a,b)=>b.at-a.at).slice(0,8);
+  return items.length?`<ul class="admin-feed eco-recent">${items.map(i=>`<li><button type="button" class="text-button" data-admin-go="economy" data-go-tab="${i.tab}">${badge(i.what,i.tone)}</button><p>${e(i.text)}</p><span>${ago(i.at)}</span></li>`).join('')}</ul>`:empty('Nada aconteceu no cofre nem na empresa ainda.');
+}
+
+/** Resumo: what is happening today in the vault and the company, then the coins in circulation over time, what creates and destroys them, how they are spread and the price level. */
+export const summaryTab:SectionFactory=(root,ctx)=>{
+  let days=lastDays,data:AdminEconomy|undefined,city:AdminCityEconomy|undefined,disposed=false,generation=0;
   const unhover=chartHover(root);
   function render():void {
     if(disposed)return;
     if(!data){root.querySelector('.admin-economy')?.classList.add('refreshing');if(!root.querySelector('.admin-economy'))root.insertAdjacentHTML('afterbegin','<p class="admin-loading">Calculando a economia…</p>');return;}
     const d=data,s=d.supply,maxSource=Math.max(1,...d.sources.map(x=>Math.max(x.created,x.destroyed)));
     root.querySelector('.admin-loading')?.remove();root.querySelector('.admin-economy')?.remove();
+    const today=d.series[d.series.length-1],c=city;
     root.insertAdjacentHTML('afterbegin',`<div class="admin-economy">
+      ${c?`<h4 class="eco-heading">Hoje</h4>
+      <div class="admin-stats eco-today">
+        ${tile('vault','Cofre da cidade',n(c.vault.balance),`entrou ${n(c.vault.today.in)} · saiu ${n(c.vault.today.out)} hoje`)}
+        ${tile('firm','Empresa Brasil hoje',`${n(c.firm.today.sales)} venda(s)`,`Receita ${n(c.firm.today.gross)} · imposto ${n(c.firm.today.tax)}`,c.firm.today.sales?'up':'')}
+        ${stat('Moedas criadas hoje',`+${compact(today?.created??0)}`,'Trabalho, bônus, estornos, administração','up')}
+        ${stat('Moedas retiradas hoje',`−${compact(today?.destroyed??0)}`,'Compras no bar, skins, palco, aparelhos','down')}
+      </div>
+      ${card('Últimos acontecimentos',recent(c),{icon:'clock'})}
+      <h4 class="eco-heading">Moedas dos jogadores</h4>`:''}
       <div class="admin-toolbar">${chips('days',PERIODS,days)}<small>Calculado ${new Date(d.generatedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small></div>
       <div class="admin-stats">
         ${stat('Moedas em circulação',compact(s.total),`${n(s.wallets)} carteiras · ${n(s.holders)} com saldo`)}
@@ -63,7 +84,10 @@ export const economySection:SectionFactory=(root,ctx)=>{
   }
   async function load():Promise<void> {
     const version=++generation;root.querySelector('.admin-economy')?.classList.add('refreshing');if(!data)render();
-    try{const result=await ctx.api<AdminEconomy>(`/admin/economy?days=${days}`);if(disposed||version!==generation)return;data=result;render();}
+    try{
+      // The city's vault and the company are a bonus: if they fail the players' economy still shows.
+      const [result,cityResult]=await Promise.all([ctx.api<AdminEconomy>(`/admin/economy?days=${days}`),ctx.api<AdminCityEconomy>('/admin/economy/city?days=7&page=0&flow=all').catch(()=>undefined)]);
+      if(disposed||version!==generation)return;data=result;city=cityResult;render();}
     catch(error){if(!disposed&&version===generation){root.querySelector('.admin-loading')?.remove();ctx.message(error instanceof Error?error.message:'Não foi possível calcular a economia.',true);}}
   }
   const click=(event:MouseEvent)=>{

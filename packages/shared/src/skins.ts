@@ -39,6 +39,13 @@ export const SKINS:readonly Skin[]=[
 ];
 /** Free for every account: new players wear it, and anything not owned falls back to it. The others are sold. */
 export const DEFAULT_SKIN:SkinId='nathan';
+/**
+ * The work uniform of EMPRESA BRASIL (apps/web/public/models/funcionario-empresa-brasil.glb). It is not a card: it is not in SKINS or SKIN_IDS, so it is
+ * never sold, owned, equipped or requested by a client (skinSchema refuses it). Only the room puts it on an avatar, exactly while that player has the PPE
+ * on during a shift; the account's own skin is never touched, so taking it off is just wearing the account's skin again.
+ */
+export const FACTORY_UNIFORM='funcionario-empresa-brasil';
+export const FACTORY_UNIFORM_NAME='Uniforme Empresa Brasil';
 export const skinSchema=z.enum(SKIN_IDS);
 export const skinMessageSchema=z.object({skin:skinSchema}).strict();
 export const skinById=(id:string|undefined):Skin|undefined=>SKINS.find(skin=>skin.id===id);

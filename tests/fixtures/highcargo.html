@@ -1,0 +1,24 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0">
+<!-- HighCargo (apps/web/src/phone/apps/cargo.ts) inside the phone's own shell, with a made-up host: fixture.sent lists what the app sent,
+     fixture.push(patch) changes the state the room would push, fixture.result(r) plays an answer. -->
+<div id="phone" class="phone-shell"><div class="phone-device"><div class="phone-screen dk"><div class="ph-app-host"></div></div></div></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/phone/phone.css';
+import {highcargo} from '../../apps/web/src/phone/apps/cargo.ts';
+import {createFreightFeed} from '../../apps/web/src/factory/freight-feed.ts';
+
+const sent=[],feed=createFreightFeed(),now=Date.now();
+const base={eligible:true,driving:null,offers:[
+  {id:'o1',material:'MALTE',pallets:2,bags:36,createdAt:now-4*60000,npcAt:now+26*60000,requestedBy:'EMPRESA BRASIL'},
+  {id:'o2',material:'MIX',pallets:1,bags:18,createdAt:now-1*60000,npcAt:now+29*60000,requestedBy:'EMPRESA BRASIL'}],
+  trip:null,recent:[{id:'r1',kind:'purchase',material:'MALTE',pallets:1,freight:980,status:'delivered',at:new Date(now-3600000).toISOString()},{id:'r2',kind:'sale',material:'PRODUTO',pallets:3,freight:2150,status:'delivered',at:new Date(now-9000000).toISOString()}],
+  pay:{purchaseFreight:600,freightPerKm:1500,freightPerPallet:200}};
+let state=base;feed.push(state);
+const ctx={host:{freight:feed,send:(type,payload)=>sent.push({type,payload}),user:()=>({id:'me'}),world:()=>undefined},open:app=>sent.push({open:app}),sounds:{}};
+const view=document.createElement('section');view.className='ph-app ph-app-highcargo';document.querySelector('.ph-app-host').append(view);
+highcargo.open(view,ctx);
+window.fixture={sent,feed,get state(){return state;},push(patch){state={...state,...patch};feed.push(structuredClone(state));},result(r){feed.result(r);},tab(name){view.querySelector(`[data-cg-tab="${name}"]`).click();}};
+document.title='ready';
+</script></body></html>

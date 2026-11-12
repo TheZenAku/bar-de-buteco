@@ -1,7 +1,7 @@
-import {and,eq,sql} from 'drizzle-orm';
+import {and,eq,inArray,sql} from 'drizzle-orm';
 import {INVENTORY_CAPACITY,STORAGE,hasStorage,itemById,storageLoad,storageLoadOfUnits,storageStackMax,storageUnits,vehicleName,type InventoryStack,type ItemId,type StorageDirection,type StorageView} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {inventoryLedger,itemInventory,playerVehicles,vehicleStorage} from './database/schema.js';
+import {factoryShipments,inventoryLedger,itemInventory,playerVehicles,vehicleStorage} from './database/schema.js';
 
 export class StorageError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
 
@@ -55,6 +55,11 @@ export class VehicleStorageService {
     const receipt=`storage-${direction}:${requestId}`;
     return this.db.transaction(async tx=>{
       const vehicle=await this.lock(tx,userId,vehicleId);
+      // The plant's cargo is not the driver's to take out: it stays in the hold until it is delivered (or the trip is cancelled).
+      if(direction==='withdraw'&&['produto_saco','malte_saco','mix_saco'].includes(itemId)){
+        const [trip]=await tx.select({id:factoryShipments.id}).from(factoryShipments).where(and(eq(factoryShipments.vehicleId,vehicleId),inArray(factoryShipments.status,['loaded','in_transit','returning'])));
+        if(trip)throw new StorageError(409,'Esta carga é da EMPRESA BRASIL e segue no baú até a entrega.');
+      }
       // The same request again changes nothing (and reports how things are now).
       const claimed=await tx.insert(inventoryLedger).values({id:receipt,userId,itemId,quantity:direction==='deposit'?-quantity:quantity,reason:`storage-${direction}`}).onConflictDoNothing().returning({id:inventoryLedger.id});
       if(!claimed.length)return this.describe(vehicle,await this.stacks(tx,vehicleId));

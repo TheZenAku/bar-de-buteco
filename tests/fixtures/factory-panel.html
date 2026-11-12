@@ -1,0 +1,58 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#12062a">
+<!-- The plant's operator panel (apps/web/src/factory) with a made-up state and no server: fixture.sent lists what it sent, fixture.push(patch) changes the plant,
+     fixture.result(r) / fixture.paid(p) play the room's answers, fixture.at(marker) stands the player at a station, fixture.press(e) opens a station's window. -->
+<div id="app"></div><div id="toasts" style="position:fixed;right:12px;top:12px;color:#fff;font:12px monospace;z-index:999"></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/profile/profile.css';
+import {CITY_MARKERS} from '../../packages/shared/src/index.ts';
+import {FactoryController} from '../../apps/web/src/factory/controller.ts';
+
+const sent=[],notices=[];
+let me={x:0,y:0,z:0};
+const controller=new FactoryController({
+  send:(type,payload)=>sent.push({type,payload}),
+  notify:(title,text,warning,id)=>{notices.push({title,text,warning,id});document.querySelector('#toasts').insertAdjacentHTML('beforeend',`<div>${title}: ${text}</div>`);},
+  app:()=>undefined,localRoot:()=>undefined,lowQuality:()=>false,volume:()=>0,userId:()=>'me',
+});
+const slots=[];
+const layout=[['MALTE',12],['MIX',6],['PRODUTO',7]];
+const names={MALTE:['V1N1P1','V1N1P2','V1N2P1','V1N2P2','V1N3P1','V1N3P2','V2N1P1','V2N1P2','V2N2P1','V2N2P2','V2N3P1','V2N3P2'],MIX:['V3N1P1','V3N1P2','V3N2P1','V3N2P2','V3N3P1','V3N3P2'],PRODUTO:['PA_1','PA_2','PA_3','PA_4','PA_5','PA_6','PA_Ensaque']};
+for(const [material,count] of layout)for(let k=0;k<count;k++)slots.push({marker:material==='PRODUTO'?`Ponto_EB_${names[material][k]}`:`Ponto_EB_Rack_${names[material][k]}`,material,quantity:[18,14,0,6,18,9][k%6],capacity:18,batchId:material==='PRODUTO'&&k<3?`L261111-${k+1}`:''});
+const tank=(id,over)=>({id,state:'VAZIO',waterL:0,malteBags:0,mixBags:0,temperatureC:21,agitatorRpm:0,lidOpen:false,stepS:0,quality:100,penalties:[],...over});
+let view={
+  revision:1,emergency:false,activeOperators:1,pausedWithoutOperator:false,siloCapacityKg:500,
+  balance:{recipe:{waterL:1200,targetC:65,malteBags:8,mixBags:4,litresPerKg:.65},timeScale:1,bagKg:25,dissolveS:90,homogenizeS:60,preheatS:180,coolS:60},
+  tanks:[tank(1,{state:'DISSOLVENDO',waterL:1200,malteBags:8,mixBags:4,temperatureC:65,agitatorRpm:120,stepS:41,quality:96}),tank(2,{state:'AGUARDANDO_INSUMOS',waterL:1200,malteBags:3,mixBags:0,temperatureC:65,agitatorRpm:120,lidOpen:true}),tank(3)],
+  dryer:{state:'PRONTO',inletC:190,outletC:87,flowLph:0,powderKg:340,stepS:0,fault:'',sourceTank:null},
+  bagging:{state:'SACO_POSICIONADO',weightKg:0,emptyBags:57,palletBags:11,producedBags:131,rejectedBags:0,lot:'L261111-4'},
+  alarms:[{id:'a1',key:'qualidade-3',severity:'warning',source:'TQ-102',text:'agitador desligado: o lote não avança. Ligue o agitador.',at:Date.now()-60000,acknowledged:false,active:true}],
+  events:[{id:1,at:Date.now()-120000,kind:'info',text:'TQ-101 cheio de água: aquecendo.'},{id:2,at:Date.now()-90000,kind:'ok',text:'TQ-101 a 65,0 °C: ligue o agitador, abra a tampa e despeje os insumos.'},{id:3,at:Date.now()-30000,kind:'warn',text:'TQ-102: MALTE 3/8.'}],
+  shipments:[{id:'s2',kind:'sale',status:'in_transit',vehicleId:'v9',plate:'KLM4F56',driverId:'x',driverName:'Davi',loaderId:'y',loaderName:'Caio',material:'PRODUTO',pallets:3,bags:54,orderId:null,destX:1,destZ:1,destLabel:'Av. Ferrovia · Distrito Industrial',distanceM:430,gross:15000,tax:2250,staff:2000,owner:10750,freight:1650,ownerId:'o',createdAt:new Date().toISOString(),departedAt:new Date().toISOString(),deliveredAt:null}],
+  dock:{trucks:[{vehicleId:'v1',ownerId:'me',ownerName:'Você',plate:'FBR1A23'},{vehicleId:'v2',ownerId:'x',ownerName:'Davi',plate:'JKL9B87'}]},
+  finance:{palletPrice:5000,taxPercent:15,employeeFee:2000,maxPalletsPerTruck:10,freightBase:400,freightPerKm:1500,freightPerPallet:200,purchaseFreight:600},
+  slots,orders:[
+    {id:'o1',kind:'purchase',material:'MIX',pallets:1,price:0,status:'open'}],
+  me:{ppe:true,onShift:true,carrying:null},
+  gate:{open:false,ringing:null},
+};
+const employment={employment:{jobId:'spray-dry-operator',status:'hired',hiredAt:new Date().toISOString()},shift:{startedAt:new Date(Date.now()-1800000).toISOString(),earned:84,station:'entrada'},config:{}};
+const fixture={
+  controller,sent,notices,
+  get view(){return view;},
+  push(patch){view={...view,...patch,revision:view.revision+1};controller.stateMessage(structuredClone(view));},
+  tankPatch(index,patch){const tanks=view.tanks.map((entry,i)=>i===index?{...entry,...patch}:entry);fixture.push({tanks});},
+  setMe(patch){fixture.push({me:{...view.me,...patch}});},
+  employment(value=employment){controller.employmentMessage(structuredClone(value));},
+  route(r){controller.routeMessage(r);},result(r){controller.resultMessage(r);},paid(p){controller.paidMessage(p);},
+  at(marker){const p=CITY_MARKERS[marker];me={x:p.x,y:p.y,z:p.z};controller.frame(me,.016);return me;},
+  press(marker){fixture.at(marker);return controller.interact(me);},
+  prompt(){return controller.prompt(me);},
+};
+window.fixture=fixture;
+// The game calls frame() every frame; the fixture does it ten times a second.
+setInterval(()=>controller.frame(me,.1),100);
+fixture.at('Ponto_EB_Painel');fixture.employment();controller.stateMessage(structuredClone(view));
+document.title='ready';
+</script></body></html>

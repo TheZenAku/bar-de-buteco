@@ -11,14 +11,14 @@ import type {GunScenePort,WeaponSceneHooks} from './scene-hooks';
 import type {LocalGunFrame,WeaponVisualsApi} from './contract';
 
 /** What the crosshair is on: the nearest of the map and the bodies along the camera's ray, or a point far along it. */
-const SIGHT_RANGE=300,HOLD_MIN=14;
+const SIGHT_RANGE=300;
 function sightPoint(origin:Vec3,forward:Vec3,targets:ReturnType<GunScenePort['targets']>):Vec3 {
   const end:Vec3=[origin[0]+forward[0]*SIGHT_RANGE,origin[1]+forward[1]*SIGHT_RANGE,origin[2]+forward[2]*SIGHT_RANGE];
   let t=SIGHT_RANGE;
   const wall=mapRay(origin,end);if(wall)t=wall.fraction*SIGHT_RANGE;
   for(const target of targets){const body=rayBody(origin,forward,t,bodyZones(target.skin,target.pose));if(body&&body.t<t)t=body.t;}
-  // Held by the camera through the change of framing (rig.holdAim): never nearer than this, a wall a metre ahead would ask the view for a half turn.
-  t=Math.max(t,HOLD_MIN);
+  // Keep the real hit distance. Replacing a nearby wall or body with a farther point introduces shoulder parallax, visibly moving the object that
+  // was under the crosshair. CameraRig releases geometrically impossible near points instead of turning the view around.
   return [origin[0]+forward[0]*t,origin[1]+forward[1]*t,origin[2]+forward[2]*t];
 }
 
@@ -67,6 +67,9 @@ const WHEEL_NOTCH=50,WHEEL_POINTER=1/110;
 const WHEEL_PICK=.35;
 // A CapsLock press shorter than this (ms) with the pointer still is a tap: the wheel stays open until a click or another tap.
 const WHEEL_TAP_MS=200;
+// `adsBlend` reaches its end before the rig's shoulder and follow springs finish settling. Keep the world point under the crosshair through that
+// short tail too; otherwise the last few centimetres of camera travel show up as a small aim jump after RMB has apparently finished zooming.
+const AIM_HOLD_SETTLE=0.3;
 
 export class WeaponsController implements WeaponSceneHooks {
   gun=new LocalGun('');
@@ -83,6 +86,8 @@ export class WeaponsController implements WeaponSceneHooks {
   /** Aiming down the sights asked last frame, and whether the camera is holding the aimed point through the change (holdAim). */
   private adsWas=false;
   private holding=false;
+  /** Seconds spent at the requested ADS endpoint while the held point is still centred. */
+  private holdSettled=0;
   private polledFrame=-1;
   private padSample?:number[];
   private ramp=0;
@@ -213,7 +218,11 @@ export class WeaponsController implements WeaponSceneHooks {
 
   // ---- The scene's hooks.
   armed():boolean {return this.gun.on&&(!!this.gun.drawn||!!this.gun.want);}
-  facingAim():boolean {return this.gun.on&&this.gun.facingAim(performance.now());}
+  facingAim():boolean {
+    // In first person the weapon is the view: leaving the body in its old heading until ADS or the first shot makes the hands and barrel visibly
+    // lag behind the reticle. Keep the armed stance following the camera for the whole time the gun is in hand.
+    return this.gun.on&&(this.gun.facingAim(performance.now())||!!this.gun.drawn&&this.scene?.rig.mode==='first');
+  }
   /** The view's zoom: a scope's as it is; a plain sight's scaled by the tuning (AimCamera.zoom). */
   zoom():number {
     if(!this.gun.on||!this.gun.drawn)return 1;
@@ -330,6 +339,7 @@ export class WeaponsController implements WeaponSceneHooks {
     const held=this.held;
     held.lmb=held.rmb=held.breath=held.padFire=held.padAim=held.padBreath=held.touchFire=held.touchAim=held.touchBreath=false;
     this.mapper.release();this.gun.release();
+    this.scene?.rig.holdAim(undefined);this.holding=false;this.holdSettled=0;
     if(this.wheelOpen){this.wheelOpen=false;this.wheelKey=undefined;this.emit('wheel',false);}
   }
 
@@ -379,7 +389,7 @@ export class WeaponsController implements WeaponSceneHooks {
     // The mouse and the fingers: the zoom's slowing; a finger also gets the friction.
     rig.lookScale=aimScale*(this.device==='touch'?out.lookScale:1);
     // The body faces the aim, frame by frame (inputs go 20 times a second).
-    if(drawn&&gun.facingAim(now))scene.face(normalizeHeading(rig.yaw+Math.PI));
+    if(drawn&&(gun.facingAim(now)||rig.mode==='first'))scene.face(normalizeHeading(rig.yaw+Math.PI));
   }
   private adsHeld():boolean {return this.held.rmb||this.held.padAim||this.held.touchAim;}
   private triggerHeld():boolean {return this.held.lmb||this.held.padFire||this.held.touchFire;}
@@ -394,6 +404,7 @@ export class WeaponsController implements WeaponSceneHooks {
     if(!playable&&(this.triggerHeld()||this.adsHeld()||this.wheelOpen))this.release();
     const local=scene.local();
     if((!gun.on&&!gun.drawn)||!local){
+      if(this.holding){rig.holdAim(undefined);this.holding=false;this.holdSettled=0;}
       if(rig.armed||rig.lookScale!==1){rig.armed=false;rig.aim(0);rig.scope(0);rig.lookScale=1;}
       this.hud.update({visible:false,view:gun.view(now),fov:57,width:1,height:1,locked:false,lite:settings.lite,now});
       this.track();
@@ -405,17 +416,24 @@ export class WeaponsController implements WeaponSceneHooks {
     const adsNow=free&&this.adsHeld();
     if(adsNow!==this.adsWas){
       this.adsWas=adsNow;
-      if(gun.drawn&&scene.free()){rig.holdAim(sightPoint(camera.origin,camera.forward,scene.targets()));this.holding=true;}
+      if(gun.drawn&&scene.free()){rig.holdAim(sightPoint(camera.origin,camera.forward,scene.targets()));this.holding=true;this.holdSettled=0;}
     }
     const frame=gun.update(dt,{trigger:free&&(this.triggerHeld()||autoFire),ads:free&&this.adsHeld(),breath:this.held.breath||this.held.padBreath||this.held.touchBreath},
       {now,origin:camera.origin,forward:camera.forward,feet:local.feet,skin:local.skin,speed:local.speed,sprinting:scene.sprintHeld()&&local.speed>.5,
         targets:()=>scene.targets(),seen:()=>this.host.seen(),free});
+    // The first-person weapon stays shouldered along the view even at hip fire. ADS still controls how far the sight itself comes onto the eye.
+    if(gun.drawn&&rig.mode==='first')frame.facingAim=true;
     for(const kick of gun.takeKicks())rig.recoil(kick.up,kick.side,kick.recover);
     if(frame.shots.length&&this.device==='gamepad'&&settings.pad.vibration)rumble(this.padObject,'shot');
     // The camera's opt-ins follow the gun (the rig reads them on its next follow).
     const drawn=!!gun.drawn&&scene.free();
-    // Held until the change is over (or the player turned the view, which lets go in the rig).
-    if(this.holding&&(!drawn||!rig.holdingAim||gun.adsBlend<=0||gun.adsBlend>=1)){rig.holdAim(undefined);this.holding=false;}
+    // The rig still has a short positional tail after adsBlend reaches its endpoint. Keep the same world point centred through that tail; a real
+    // look input clears rig.holdingAim at once, so this never fights the mouse, stick or touch drag.
+    if(this.holding){
+      const atEndpoint=adsNow?gun.adsBlend>=1:gun.adsBlend<=0;
+      this.holdSettled=atEndpoint?this.holdSettled+Math.max(0,dt):0;
+      if(!drawn||!rig.holdingAim||this.holdSettled>=AIM_HOLD_SETTLE){rig.holdAim(undefined);this.holding=false;this.holdSettled=0;}
+    }
     rig.tuneAim(settings.aimCamera);
     rig.armed=drawn;rig.aim(drawn?gun.adsBlend:0,gun.stats&&gun.stats.hold!=='rifle'?'pistol':'rifle');// A long gun's optic that is not a scope (red dot, reflex, holographic, ACOG): the view goes into the eyes, along the aim, as the sight's own line does
     // (GunPose brings the sight onto the eye's line), and the glass is clear: the world is seen through the sight, the dot floating on it.

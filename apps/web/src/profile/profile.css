@@ -157,3 +157,69 @@ span.pf-ach-medal .pf-medal,span.pf-ach-medal .pf-art{filter:grayscale(1) bright
   .pf-grid{gap:4px}
 }
 @media(prefers-reduced-motion:reduce){.pf-model img,.pf-key.listening{animation:none}.pf-gram .ui-icon:last-child{transition:none}.pf-slot[data-rarity]::before,.pf-slot[data-rarity]::after,.pf-tile[data-rarity]::before,.pf-tile[data-rarity]::after{animation:none}}
+
+/* ---- "Gerenciar empresa" (docs/sistemas/empresa.md) ---- */
+/* The tab bar is a slider when the tabs do not fit. */
+.pf-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scroll-snap-type:x proximity}
+.pf-tabs button{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start}
+.pf-profile.pf-wide{width:min(calc(100vw - 16px),600px)}
+.co-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.co-head h3{margin:0;font:700 15px var(--font-display);letter-spacing:.06em}
+.co-head small{color:var(--dim);font-size:11.5px}
+.co-nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.co-nav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;font:600 11.5px var(--font-display);letter-spacing:.05em;text-transform:uppercase;color:var(--dim);background:var(--secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.co-nav button .ui-icon{width:14px;height:14px}
+.co-nav button:hover{color:var(--foreground)}
+.co-nav button[aria-selected="true"]{color:var(--active-foreground);background:var(--active);border-color:transparent}
+.co-nav button:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.co-body{display:grid;gap:10px}
+.co-body h4{margin:6px 0 0;font:600 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--soft);display:flex;align-items:center;gap:6px}
+.co-body h4 small{color:var(--dim)}
+.co-body h4 .ui-icon{width:15px;height:15px}
+.co-strip{margin:0;padding:8px 10px;border-radius:8px;font-size:12.5px;line-height:1.35;border:1px solid var(--border)}
+.co-strip.ok{color:var(--foreground);background:color-mix(in srgb,var(--hl-cyan) 14%,transparent);border-color:color-mix(in srgb,var(--hl-cyan) 45%,transparent)}
+.co-strip.bad{color:var(--hl-orange);background:color-mix(in srgb,var(--hl-orange) 12%,transparent);border-color:color-mix(in srgb,var(--hl-orange) 45%,transparent)}
+.co-balance{display:grid;gap:2px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,color-mix(in srgb,var(--hl-magenta) 18%,var(--secondary)),var(--secondary));border:1px solid var(--border)}
+.co-balance>span{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--soft);letter-spacing:.06em;text-transform:uppercase}
+.co-balance>span .ui-icon{width:15px;height:15px}
+.co-balance strong{font:700 26px var(--font-display);color:var(--hl-gold);display:flex;align-items:center;gap:6px}
+.co-balance small{font-size:11.5px;color:var(--dim)}
+.co-money{font-variant-numeric:tabular-nums}
+.co-money.up{color:var(--hl-cyan)}.co-money.down{color:var(--hl-orange)}
+.co-money+.ui-icon,.co-balance strong .ui-icon,.co-ledger .ui-icon,.co-est .ui-icon{width:14px;height:14px;color:var(--hl-gold);vertical-align:-2px}
+.co-balance strong .ui-icon{width:20px;height:20px}
+.co-grid,.co-stock{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.co-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.co-ops{display:grid;gap:10px}
+.co-stat{display:grid;gap:1px;padding:9px 11px;border-radius:10px;background:var(--secondary);border:1px solid var(--border)}
+.co-stat small{font-size:11px;color:var(--dim)}
+.co-stat b{font:700 15px var(--font-display);font-variant-numeric:tabular-nums}
+.co-card{display:grid;gap:8px;padding:12px;border-radius:12px;background:var(--secondary);border:1px solid var(--border)}
+.co-card.active{border-color:color-mix(in srgb,var(--hl-magenta) 60%,transparent)}
+.co-card h4{margin:0}
+.co-field{display:grid;gap:4px;font-size:11.5px;color:var(--soft)}
+.co-field>span{display:flex;align-items:center;gap:5px}
+.co-field>span .ui-icon{width:13px;height:13px}
+.co-field input{padding:9px 10px;font:inherit;font-size:13px;color:var(--foreground);background:var(--background);border:1px solid var(--border);border-radius:8px}
+.co-field input:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.co-row{display:flex;flex-wrap:wrap;gap:6px}
+.co-row .button{padding:9px 14px;font-size:12px}
+.co-row .button small{display:block;font-size:10.5px;opacity:.75;letter-spacing:0}
+.co-row .button:disabled{opacity:.45;cursor:not-allowed}
+.co-ledger{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.co-ledger li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;background:var(--secondary);border:1px solid var(--border)}
+.co-ledger li>span{display:grid;gap:1px;min-width:0}
+.co-ledger li>span b{font-size:12.5px;font-weight:600;overflow-wrap:anywhere}
+.co-ledger li>span small{font-size:11px;color:var(--dim)}
+.co-ledger li>i{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;font-style:normal;flex-wrap:wrap;justify-content:flex-end}
+.co-role{font-style:normal;font-weight:600;color:var(--soft)}
+.co-role.owner{color:var(--hl-gold)}.co-role.manager{color:var(--hl-cyan)}
+.co-est{display:grid;gap:5px;margin:0}
+.co-est>div{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:12.5px}
+.co-est dt{color:var(--dim);flex:0 0 auto}
+.co-est dd{margin:0;text-align:right}
+.co-est dd small{display:block;color:var(--dim);font-size:11px}
+.co-est dd.ok{color:var(--hl-cyan)}.co-est dd.warn{color:var(--hl-orange)}
+.co-profit{padding-top:6px;border-top:1px dashed var(--border);font-weight:700}
+.co-profit dd{font-size:15px}
+.co-body .button.full{width:100%}

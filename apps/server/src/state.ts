@@ -115,6 +115,8 @@ export class Player extends Schema {
   /** A worker's tray: the table order picked up for a customer, comma-separated ('' when empty), and its id. */
   @type('string') carrying = '';
   @type('string') carryingOrder = '';
+  /** A sack from the plant in the arms ('MALTE' | 'MIX', '' when none): drawn for everyone (client/factory/carry.ts). */
+  @type('string') factoryBag = '';
   /** 'call' while on an answered phone call ('' otherwise), so everyone sees who is on the line. */
   @type('string') phone = '';
   /** On a Highfood shift, and the bag in hand ('' or 'bag'): both are drawn for everyone. */

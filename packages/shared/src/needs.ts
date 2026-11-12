@@ -27,6 +27,22 @@ export const NEEDS = {
     hunger: { refillPerSecond: 3, cost: 1 },
     thirst: { refillPerSecond: 3, cost: 1 },
   },
+  /**
+   * Living on the reserve. With the stamina ring empty, running goes on and is paid from the core (no slowdown: the run only
+   * locks when the core is empty too). `strain` is how deep into the reserve each need is, 0–1, for the screen and the sound:
+   * the ring under `ringBelow` points ramps it up, and so does the core under `coreBelow` (0 = the core alone never does).
+   * The hunger and thirst rings are refilled from the core at once, so for them it is the last stretch of the core that shows.
+   */
+  reserve: {
+    /** Core points spent per ring point of running past empty: 9 points a second is about 2.4 core a second (a full core lasts ~40 s). */
+    staminaCoreCost: .27,
+    strain: {
+      stamina: { ringBelow: 8, coreBelow: 0 },
+      hp: { ringBelow: 20, coreBelow: 25 },
+      hunger: { ringBelow: 20, coreBelow: 30 },
+      thirst: { ringBelow: 20, coreBelow: 30 },
+    },
+  },
   /** Food and water rebuild the heart's reserve, which still pays for refilling the HP ring. */
   hpCoreRecovery: {
     /** At good nutrition and rest, rebuilding 100 points takes about five minutes. */
@@ -206,9 +222,23 @@ export function staminaRecovery(state: Pick<NeedsState, 'hunger' | 'thirst' | 'b
 export function staminaCost(state: Pick<NeedsState, 'hunger'>): number {
   return 1 + ramp(state.hunger, NEEDS.staminaPenalties.hunger);
 }
-/** Whether the character may run now. Shared by the server and the client's prediction. */
-export function canRun(state: { condition?: string; exhausted?: boolean; stamina?: number; drunk?: number }): boolean {
-  return (state.condition ?? 'normal') === 'normal' && !state.exhausted && (state.stamina ?? NEEDS.stamina.max) > 0 && drunkStage(state.drunk ?? 0) < NEEDS.drunk.noRunFromStage;
+/**
+ * Whether the character may run now. Shared by the server and the client's prediction. An empty ring is not the end while the
+ * stamina core has something left: the run goes on from the reserve.
+ */
+export function canRun(state: { condition?: string; exhausted?: boolean; stamina?: number; staminaCore?: number; drunk?: number }): boolean {
+  const breath = (state.stamina ?? NEEDS.stamina.max) > 0 || (state.staminaCore ?? 0) > 0;
+  return (state.condition ?? 'normal') === 'normal' && !state.exhausted && breath && drunkStage(state.drunk ?? 0) < NEEDS.drunk.noRunFromStage;
+}
+/**
+ * How deep into its reserve a need is, 0 (not at all) to 1 (the ring is empty or the core is spent): the strongest of the ring's
+ * and the core's ramps (NEEDS.reserve.strain). Pure, so the screen and the sound read the same number as the tests.
+ */
+export function reserveStrain(key: CoreKey, ring: number, core: number): number {
+  const rule = NEEDS.reserve.strain[key];
+  const fromRing = 1 - clamp(ring / rule.ringBelow, 0, 1);
+  const fromCore = rule.coreBelow > 0 ? clamp((rule.coreBelow - core) / rule.coreBelow, 0, 1) : 0;
+  return Math.max(fromRing, fromCore);
 }
 /** Whether the character can act (interact, consume, emote). */
 export function isConscious(state: { condition?: string }): boolean {
@@ -332,9 +362,12 @@ export function tickNeeds(state: NeedsState, seconds: number, now: number, activ
   recoverHpCore(state, dt, activity.running);
 
   if (activity.running) {
-    state.stamina = clamp(state.stamina - NEEDS.stamina.runDrainPerSecond * staminaCost(state) * dt, 0, NEEDS.stamina.max);
+    const spent = NEEDS.stamina.runDrainPerSecond * staminaCost(state) * dt, fromRing = Math.min(state.stamina, spent);
+    state.stamina = clamp(state.stamina - fromRing, 0, NEEDS.stamina.max);
+    // Past an empty ring the run goes on, paid from the core: no slowdown until that is gone too.
+    if (spent > fromRing) state.staminaCore = clamp(state.staminaCore - (spent - fromRing) * NEEDS.reserve.staminaCoreCost, 0, NEEDS.cores.start);
     state.restAt = now + NEEDS.stamina.regenDelaySeconds * 1000;
-    if (state.stamina <= 0 && !state.exhausted) { state.exhausted = true; events.push({ type: 'exhausted' }); }
+    if (state.stamina <= 0 && state.staminaCore <= 0 && !state.exhausted) { state.exhausted = true; events.push({ type: 'exhausted' }); }
   } else if (now >= state.restAt) {
     // Rested from the core; with the core empty, only a slow trickle (never stuck for good).
     const pace = NEEDS.stamina.regenPerSecond * staminaRecovery(state), before = state.staminaCore;

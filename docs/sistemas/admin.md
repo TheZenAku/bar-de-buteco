@@ -21,9 +21,7 @@ No chat, administradores podem usar **`/god`** em si mesmos ou **`/god Nome Comp
 | Visão geral | Quem está no bar, contas novas, denúncias abertas, moedas em circulação e criadas/retiradas em 24 h, entradas do dia; os eventos (Apagão, O inconveniente, Festa); a saúde do sistema (API, mundo, preços sincronizados, filas); as últimas ações da administração e atalhos para contas banidas, com e-mail pendente e administradores |
 | Jogadores | Busca e filtros, e a ficha completa de cada conta, com tudo o que dá para alterar nela |
 | Denúncias | A fila de denúncias, para resolver com uma decisão registrada ou reabrir |
-| Economia | Moedas em circulação, inflação, de onde as moedas vêm e para onde vão, distribuição e maiores saldos |
-| Preços | Todos os preços e pagamentos do jogo numa tabela editável |
-| Níveis e XP | Quanto XP cada ação dá e quanto vale cada dia do bônus diário, na mesma tabela editável dos preços ([niveis.md](niveis.md#na-administração)) |
+| Economia | A central do dinheiro, com seis abas: **Resumo** (o dia de hoje no cofre e na Empresa Brasil, últimos acontecimentos, moedas em circulação e inflação), **Cofre da cidade**, **Empresa Brasil** (valores e livros), **Empresa** (donos, senhas e a carteira da firma), **Preços** e **XP e níveis** ([niveis.md](niveis.md#na-administração)). Todo ajuste de valor mora aqui |
 | Logs | Uma linha do tempo de tudo o que ficou registrado, com filtros |
 | Mundo ao vivo | O estado da sala agora: empregos, pedidos, aparelhos, palco, bots, NPCs e jogadores ([economia.md](economia.md#administração-mundo-ao-vivo)) |
 | Veículos | Cadastro de veículos de todos os jogadores, incluindo offline e garagem: reparar, abastecer, recolher, transferir, pintar e excluir. Mantém também spawn/despawn dos veículos do mapa ([moto.md](moto.md#spawnar-e-despawnar)) |
@@ -126,7 +124,11 @@ Filtros **Abertas**, **Resolvidas** e **Todas**. Cada denúncia mostra quem denu
 
 ## Economia
 
-Períodos de **7**, **30** e **90 dias**. Os números vêm do livro de moedas (`currency_ledger`) e das carteiras:
+Uma categoria só, com abas (`apps/web/src/admin/economy.ts` troca entre elas; cada aba é um arquivo: `economy-summary.ts`, `economy-vault.ts`, `economy-firm.ts` e as tabelas de `prices.ts`). Quem ainda apontar para "Preços" ou "Níveis e XP" (a ficha do jogador, o Mundo ao vivo) cai na aba certa: `console.ts` traduz `prices` e `levels` para `economy` + `tab`. Os dados do cofre e da firma vêm de `GET /api/admin/economy/city` (`apps/api/src/admin-city-economy.ts`); gravar continua pela sala (`admin.factory.treasury`, `admin.factory.finance`), que é quem recalcula o que a fábrica usa. Conferir sem servidor: `tests/fixtures/admin-economy.html` (pela Vite em `/@fs/<caminho>`, `?tab=vault|firm|prices|xp|summary`; `fixture.sent`, `fixture.writes`, `fixture.setBalance()`, `fixture.setFinance()`).
+
+### Resumo
+
+Começa por **Hoje** (saldo do cofre e o que entrou/saiu, vendas e receita da Empresa Brasil, moedas criadas e retiradas hoje; os dois primeiros cartões abrem a aba) e **Últimos acontecimentos** (movimentos do cofre e cargas, os mais novos primeiro). Abaixo, **Moedas dos jogadores**, com períodos de **7**, **30** e **90 dias**. Os números vêm do livro de moedas (`currency_ledger`) e das carteiras:
 
 - **Moedas em circulação**: a soma de todas as carteiras, com quantas têm saldo.
 - **Inflação no período**: quanto a quantidade de moedas em circulação mudou do começo ao fim do período, e a taxa equivalente ao dia. A circulação de cada dia é reconstruída a partir do saldo de hoje, desfazendo o que entrou e saiu depois.
@@ -135,6 +137,22 @@ Períodos de **7**, **30** e **90 dias**. Os números vêm do livro de moedas (`
 - **Giro das moedas**: moedas gastas no período sobre a média em circulação, e quantos jogadores movimentaram moedas.
 - Um parágrafo com o diagnóstico em palavras (crescendo, encolhendo ou estável, e o que costuma ajudar).
 - Gráficos de moedas em circulação por dia e de criadas × retiradas por dia (passe o mouse ou o foco para ver os valores), a tabela de origens e destinos, a distribuição (mediana, média, parcela dos 10% mais ricos, Gini e quantos copos de chopp a carteira mediana paga), os maiores saldos e os números de cada dia numa tabela.
+
+### Cofre da cidade
+
+O saldo grande, o que entrou e saiu hoje e no período (7, 30 ou 90 dias), o saldo no fim de cada dia, entradas × saídas por dia, de onde vem (imposto das vendas da Empresa Brasil, ajustes da administração, outros: classificado pelo texto do movimento em `vaultSource`) e os **movimentos**, 15 por página, com filtro Todos/Entradas/Saídas. **Ajustar o cofre** põe ou tira moedas com motivo (fica com o seu nome, nunca deixa o saldo abaixo de zero e a tela recusa de antemão o que passa do saldo). O pedido vai pela sala; a aba avisa quando o saldo muda e, se nada mudar em 4 s, diz que o mundo pode ter recusado.
+
+### Empresa Brasil
+
+Vendas, receita, imposto, funcionários, dono e fretes **hoje**, no período e **desde o início**, e a receita por dia. **Valores da Empresa Brasil** em quatro grupos de duas colunas, com a mesma altura de linha (2026-11-12): *Venda de paletes* (preço do palete, imposto da cidade, taxa do funcionário), *Matéria-prima* (preço do palete de MALTE e de MIX; o imposto é o mesmo da venda e aparece só como leitura), *Frete do motorista* e *Doca e equipe* (paletes por caminhão, raio de chegada, salário de presença e o intervalo dele), mais o *Primeiro dono* em largura inteira. Cada campo traz o que ele faz. Embaixo dos campos, **Lucro por receita** refaz a conta das 8 receitas do catálogo (uma OP de lotes médios) com o que está digitado e diz em palavras se alguma dá prejuízo e a partir de que preço do palete nenhuma dá (`breakEvenPalletPrice`); o botão *Usar o menor preço sem prejuízo* só preenche o campo. Campos alterados ficam destacados, **Aplicar valores** só liga quando algo mudou, **Preencher com o padrão** só preenche (nada é enviado até aplicar, com motivo) e a simulação de 1, 2, 5 e o máximo de paletes muda enquanto se digita. O texto digitado sobrevive aos refrescos (`redraw` em `kit.ts`, formulários marcados com `data-keep`). A operação da planta (tanques, estoque, doca) continua em **Fábrica**; a aba **Doca e cargas** de lá tem só o que age sobre caminhões e cargas.
+
+### Donos e caixa (2026-11-12)
+
+A firma por trás da fábrica ([empresa.md](empresa.md)): a **carteira** (o que sobra das vendas, depois do imposto e da taxa do funcionário, cai aqui, não na carteira de um jogador), vendas pagas, receita, gasto em matéria-prima (com imposto, já sem estornos) e quantos donos e gerentes há. Tudo vem do `admin.world` (`factory.company`, que a sala relê da API) e não há consulta própria: a aba reflete o que o mundo sabe. Um **motivo** único no alto vale para qualquer alteração e vai para o log com o seu nome. **Donos e gerentes** (um cartão por pessoa, com id): *Virar gerente / Virar dono*, *Remover cargo* (a pessoa continua na folha como funcionária; a API recusa tirar o último dono, e a tela avisa se nada mudou em ~4 s), *Remover senha* (a senha é de cada dono e protege as transferências e compras dele) e *Definir senha* (4 a 40 caracteres; o dono pode trocá-la depois com ela). **Adicionar dono ou gerente** escolhe o jogador pelo nome (conectados na lista) ou pelo id completo e já o põe na folha. **Ajustar o saldo** põe ou tira moedas (nunca abaixo de zero; a tela recusa de antemão o que passa do saldo) e fica no extrato como "Ajuste da administração". O **extrato** mostra os últimos 40 movimentos, 12 por página. Mensagens: `admin.company` (`op`: `role`, `password.clear`, `password.set`, `adjust`). Na aba **Empresa Brasil**, o texto do dono passou a "carteira da empresa" (o campo "dono da firma" agora só escolhe o primeiro dono, enquanto a firma não tem nenhum) e há uma tabela só de leitura com o preço da matéria-prima (30.000 MALTE e 20.000 MIX por palete cheio, mais o mesmo % de imposto da venda). Conferir sem servidor: `tests/fixtures/admin-economy.html?tab=company`.
+
+### Preços e XP
+
+Um grupo por vez (chips com a quantidade de alterações pendentes), busca por nome em todos os grupos (até 40 resultados), tabelas que rolam dentro do cartão e reajuste em porcentagem no grupo ou em todos. A aba **XP e níveis** é a mesma tabela só com os valores de XP. Detalhes de cada tabela em [Preços](#preços).
 
 ## Highfood
 
@@ -198,7 +216,8 @@ Rotas administrativas (sessão autenticada, e-mail confirmado e papel `admin`; a
 | `POST /api/admin/wallet` · `/role` · `/action` · `/revert` | Carteira, permissões, moderação e eventos, reversões |
 | `GET /api/admin/reports` · `POST /api/admin/reports/resolve` | Denúncias |
 | `GET /api/admin/logs` | Log (`categories`, `player`, `q`, `since`, `before`, `limit`) |
-| `GET /api/admin/economy?days=7\|30\|90` | Economia |
+| `GET /api/admin/economy?days=7\|30\|90` | Economia: moedas dos jogadores |
+| `GET /api/admin/economy/city?days=7\|30\|90&page=&flow=all\|in\|out` | Economia: cofre da cidade (saldo, séries, origens, movimentos paginados) e livros da Empresa Brasil |
 | `GET` e `POST /api/admin/prices` | Preços e histórico de mudanças |
 | `GET /api/admin/badges` e demais rotas de emblemas | Emblemas ([perfil.md](perfil.md#api)) |
 | `GET` e `POST /api/admin/collection` | Cartas e habilidades ([skins.md](skins.md)) |

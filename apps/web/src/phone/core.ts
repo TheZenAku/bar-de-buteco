@@ -1,5 +1,6 @@
 import type {HighfoodReceipt,HighfoodState,PhoneContact,PhonePing,PhoneProfile,PublicUser,WorldState} from '@bar/shared';
 import type {Gps} from '../gps';
+import type {FreightFeed} from '../factory/freight-feed';
 import {escape as e} from '../api';
 
 /** What the phone needs from the game (main.ts). */
@@ -36,6 +37,8 @@ export interface PhoneHost {
   gps:Gps;
   /** The Highfood shift as the room tells it. */
   food:{state():HighfoodState;owned():boolean;setOwned(value:boolean):void;listen(listener:(state:HighfoodState)=>void):()=>void;receipts(listener:(receipt:HighfoodReceipt)=>void):()=>void};
+  /** The plant's freight requests for truck drivers (HighCargo): the room's `freight.state` and the answers to what the app asked. */
+  freight:FreightFeed;
 }
 
 export interface PhoneSettings {wallpaper:string;dark:boolean;dnd:boolean;ringtone:number;ringVolume:number;keyClicks:boolean;size:'s'|'m'|'l'}
@@ -73,6 +76,8 @@ export interface PhoneApp {
   /** The icon's background (CSS). */
   tint:string;
   dock?:boolean;
+  /** Apps that exist only for some players (a truck driver's): false keeps the icon off the home screen. */
+  visible?(host:PhoneHost):boolean;
   /** Draws the app into `view`; the function it returns runs when the app closes. */
   open(view:HTMLElement,ctx:PhoneContext,arg?:unknown):void|(()=>void);
 }

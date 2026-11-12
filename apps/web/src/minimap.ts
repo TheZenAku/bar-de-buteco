@@ -1,4 +1,4 @@
-import {BLACKJACK_TABLE,TRUCO_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,POOL_TABLES,GARAGES,HIGHFOOD,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
+import {CITY_MARKERS as FACTORY_MARKERS,BLACKJACK_TABLE,TRUCO_TABLE,CITY_FLOORS,CITY_MARKERS,CITY_SOLIDS,FOOSBALL_TABLES,POOL_TABLES,GARAGES,HIGHFOOD,INTERACTABLES,JUKEBOX,MAP_COLLIDERS,MAP_MARKERS,SHOP_SPOT,STAGE,cityZone,type Position} from '@bar/shared';
 import type {MapView} from './engine/scene-types';
 import {uiIconSource} from './ui-icons';
 
@@ -94,7 +94,7 @@ const CITY_PLACES:Record<string,string>={Ponto_Prefeitura:'Prefeitura',Ponto_Ter
   Ponto_Lazer_Olaria:'Área de lazer',Ponto_Campo_Olaria:'Campo do Olaria',Ponto_Supermercado:'Supermercado',Ponto_Posto:'Posto',Ponto_Subestacao:'Subestação',Ponto_Transportes:'Transportadora',Ponto_Metalurgica:'Metalúrgica'};
 /** The city's named places, for the phone's map. */
 export const cityPlaces=()=>Object.entries(CITY_PLACES).map(([id,name])=>({name,x:CITY_MARKERS[id]!.x,z:CITY_MARKERS[id]!.z}));
-const PLACES:ReadonlyArray<readonly [{x:number;z:number},string]>=[[MAP_MARKERS.Ponto_Praca,'Praça'],[MAP_MARKERS.Ponto_Igreja,'Igreja'],[MAP_MARKERS.Ponto_Campinho,'Campinho'],[MAP_MARKERS.Ponto_Escola,'Escola'],[MAP_MARKERS.Ponto_Onibus,'Ponto de ônibus'],
+const PLACES:ReadonlyArray<readonly [{x:number;z:number},string]>=[...(FACTORY_MARKERS.Ponto_EB_Painel?[[FACTORY_MARKERS.Ponto_EB_Painel,'Empresa Brasil'] as const]:[]),[MAP_MARKERS.Ponto_Praca,'Praça'],[MAP_MARKERS.Ponto_Igreja,'Igreja'],[MAP_MARKERS.Ponto_Campinho,'Campinho'],[MAP_MARKERS.Ponto_Escola,'Escola'],[MAP_MARKERS.Ponto_Onibus,'Ponto de ônibus'],
   ...Object.entries(CITY_PLACES).map(([id,place])=>[CITY_MARKERS[id]!,place] as const)];
 /** The name under the map: the part of the bar the player is in, or the nearest landmark outside it. */
 export function zoneName(x:number,y:number,z:number):string {
@@ -139,6 +139,8 @@ export function createMinimap(root:HTMLElement){
   /** The GPS's line and what it is for; other things to keep in sight, on the rim when out of range. */
   let route:ReadonlyArray<readonly [number,number]>=[],routeColour='',routeKey=0;
   let marks:ReadonlyArray<{x:number;z:number;colour:string;icon:string}>=[],marksKey='';
+  /** Places the minimap draws besides the bar's own (EMPRESA BRASIL's stations). */
+  let extraPois:readonly Poi[]=[];
   const icons=new Map<string,HTMLImageElement>();
   const icon=(name:string)=>{
     let image=icons.get(name);
@@ -194,7 +196,7 @@ export function createMinimap(root:HTMLElement){
     ctx.setTransform(ratio,0,0,ratio,0,0);
     const at=(x:number,z:number)=>{const dx=x-v.x,dz=z-v.z;return {x:c+(dx*cos-dz*sin)*scale,y:c+(dx*sin+dz*cos)*scale};};
     const inside=(p:{x:number;y:number},margin:number)=>Math.hypot(p.x-c,p.y-c)<=R-margin;
-    for(const poi of POIS){const p=at(poi.x,poi.z);if(!inside(p,6))continue;ctx.globalAlpha=Math.abs(poi.y-v.y)>1.6?.4:1;badge(ctx,p.x,p.y,poi.colour,poi.icon);}
+    for(const poi of [...POIS,...extraPois]){const p=at(poi.x,poi.z);if(!inside(p,6))continue;ctx.globalAlpha=Math.abs(poi.y-v.y)>1.6?.4:1;badge(ctx,p.x,p.y,poi.colour,poi.icon);}
     for(const o of v.others){
       const p=at(o.x,o.z);if(!inside(p,3))continue;
       ctx.globalAlpha=Math.abs(o.y-v.y)>1.6?.35:1;
@@ -265,6 +267,8 @@ export function createMinimap(root:HTMLElement){
     },
     /** The GPS's line (the first point is the avatar's, drawn from where it is on this frame). */
     setRoute(points:ReadonlyArray<readonly [number,number]>,colour:string,version:number):void {route=points;routeColour=colour;routeKey=version;},
+    /** More blips on the map, drawn like the bar's own. */
+    setPois(next:ReadonlyArray<{x:number;y:number;z:number;colour:string;icon:string}>):void {extraPois=next;signature='';},
     setMarks(next:ReadonlyArray<{x:number;z:number;colour:string;icon:string}>):void {
       const key=next.map(mark=>`${Math.round(mark.x*4)}:${Math.round(mark.z*4)}:${mark.icon}`).join();
       marks=next;if(key!==marksKey){marksKey=key;signature='';}

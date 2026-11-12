@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEEDS,CONSUMABLES,applyConsumable,canRun,createNeeds,damage,killNeeds,reviveNeeds,drunkStage,isConscious,maxHp,relieve,staminaCost,staminaRecovery,swayAngle,swayInput,tickNeeds,type NeedsEvent,type NeedsState} from '@bar/shared';
+import {NEEDS,CONSUMABLES,applyConsumable,canRun,createNeeds,damage,killNeeds,reserveStrain,reviveNeeds,drunkStage,isConscious,maxHp,relieve,staminaCost,staminaRecovery,swayAngle,swayInput,tickNeeds,type NeedsEvent,type NeedsState} from '@bar/shared';
 
 const STEP=.05;
 /** Runs the 20 Hz needs tick for `seconds` from `clock.now`; returns every event. */
@@ -126,9 +126,15 @@ test('4–5. running drains stamina, blocks running at zero until the minimum, r
   const s=createNeeds(0),clock={now:0},running={running:true,moving:true};
   run(s,clock,1,running);
   assert.ok(Math.abs(s.stamina-(100-NEEDS.stamina.runDrainPerSecond))<.01,`drains ${NEEDS.stamina.runDrainPerSecond}/s: ${s.stamina}`);
-  const events=run(s,clock,15,running);
+  // An empty ring is not the end: the run goes on from the reserve (see the reserve tests below).
+  const onReserve=run(s,clock,15,running);
+  assert.equal(s.stamina,0);assert.equal(s.exhausted,false);assert.equal(canRun(s),true);assert.equal(onReserve.length,0);
+  // With the reserve gone too, the run locks, once.
+  s.staminaCore=0;
+  const events=run(s,clock,1,running);
   assert.equal(s.stamina,0);assert.equal(s.exhausted,true);assert.equal(canRun(s),false);
   assert.equal(events.filter(e=>e.type==='exhausted').length,1);
+  s.staminaCore=100;
   // Within the delay nothing comes back.
   run(s,clock,NEEDS.stamina.regenDelaySeconds-.1);assert.equal(s.stamina,0);
   run(s,clock,1);assert.ok(s.stamina>0&&s.stamina<NEEDS.stamina.exhaustedUntil);
@@ -138,6 +144,43 @@ test('4–5. running drains stamina, blocks running at zero until the minimum, r
   run(s,clock,20);assert.equal(s.stamina,100,'Stops at the maximum');
   // Toggling run restarts the delay instead of skipping it.
   run(s,clock,.5,running);const after=s.stamina;run(s,clock,NEEDS.stamina.regenDelaySeconds-.2);assert.equal(s.stamina,after);
+});
+
+test('reserve: running past an empty ring is paid from the core, at full pace, until that is empty too',()=>{
+  const s=createNeeds(0),clock={now:0},running={running:true,moving:true};
+  s.stamina=0;
+  assert.equal(canRun(s),true,'ring empty, core full: still runs');
+  assert.equal(canRun({stamina:0,staminaCore:0}),false,'ring and core empty: locked');
+  assert.equal(canRun({stamina:0}),false,'no core reported: the old rule');
+  const before=s.staminaCore;run(s,clock,1,running);
+  assert.equal(s.stamina,0);assert.equal(s.exhausted,false);
+  const spent=before-s.staminaCore,expected=NEEDS.stamina.runDrainPerSecond*NEEDS.reserve.staminaCoreCost;
+  assert.ok(Math.abs(spent-expected)<.01,`${spent} core a second on the reserve, expected ${expected}`);
+  const events=run(s,clock,Math.ceil(100/expected)+2,running);
+  assert.equal(s.staminaCore,0);assert.equal(s.exhausted,true);assert.equal(canRun(s),false);
+  assert.equal(events.filter(e=>e.type==='exhausted').length,1,'the lock is reported once, when the core runs out');
+});
+
+test('reserve: the ring is spent first, and only what is left over comes out of the core',()=>{
+  const s=createNeeds(0),clock={now:0};s.stamina=4;
+  run(s,clock,1,{running:true,moving:true});
+  const over=NEEDS.stamina.runDrainPerSecond-4;
+  assert.equal(s.stamina,0);
+  assert.ok(Math.abs(100-s.staminaCore-over*NEEDS.reserve.staminaCoreCost)<.01,`${100-s.staminaCore} for ${over} points past empty`);
+});
+
+test('reserve strain: 0 when comfortable, ramps up as the ring or the core runs low, 1 when spent',()=>{
+  for(const key of ['hp','stamina','hunger','thirst'] as const)assert.equal(reserveStrain(key,100,100),0,`${key} comfortable`);
+  assert.equal(reserveStrain('stamina',0,100),1);assert.equal(reserveStrain('stamina',NEEDS.reserve.strain.stamina.ringBelow/2,100),.5);
+  assert.equal(reserveStrain('stamina',100,0),0,'a low stamina core alone does not strain: it only matters when running past empty');
+  for(const key of ['hp','hunger','thirst'] as const){
+    const {coreBelow}=NEEDS.reserve.strain[key];
+    assert.equal(reserveStrain(key,100,coreBelow),0);assert.equal(reserveStrain(key,100,0),1);
+    assert.ok(Math.abs(reserveStrain(key,100,coreBelow/2)-.5)<1e-9,`${key} halfway into the core`);
+    assert.equal(reserveStrain(key,0,100),1,`${key} with the ring empty`);
+  }
+  let last=0;for(let core=NEEDS.reserve.strain.hp.coreBelow;core>=0;core--){const v=reserveStrain('hp',100,core);assert.ok(v>=last,'monotonic');last=v;}
+  assert.equal(reserveStrain('hp',Number.NaN,Number.NaN),1,'garbage reads as the worst, never NaN');
 });
 
 test('6. hunger and thirst slow stamina gradually (no cliff) and hunger makes running cost more',()=>{

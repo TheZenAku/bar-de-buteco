@@ -1,0 +1,236 @@
+{
+ "descricao": "FARM DE ARMAS (RIBEIRO USINAGEM), setor S07_00. Folhas na pose FECHADA; a colisao dinamica NAO esta no mapa. giratoria: gira so em torno do eixo vertical de angulo_fechada_graus a angulo_aberta_graus; correr/enrolar: desloca a origem pelo eixo_deslize_jogo ate curso_m.",
+ "glb": "farm_armas_dinamicos.glb",
+ "folhas": [
+  {
+   "no": "FA_Portao_Correr",
+   "origem_jogo_xyz": [
+    362.5,
+    0.17,
+    328.0
+   ],
+   "tipo": "correr",
+   "curso_m": 8.4,
+   "descricao": "painel de correr: origem na ponta que fecha; abrir = deslocar +y (Blender) = -z (jogo)",
+   "eixo_deslize_jogo": [
+    0,
+    0,
+    -1
+   ]
+  },
+  {
+   "no": "FA_Portao_Doca",
+   "origem_jogo_xyz": [
+    351.88,
+    0.17,
+    323.8
+   ],
+   "tipo": "enrolar",
+   "curso_m": 4.2,
+   "descricao": "rolo da doca: abrir = subir (z), fechada = pose exportada",
+   "eixo_deslize_jogo": [
+    0,
+    1,
+    0
+   ]
+  },
+  {
+   "no": "FA_Porta_Pedestre",
+   "origem_jogo_xyz": [
+    362.875,
+    0.17,
+    334.3
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 95.0,
+   "descricao": "abre para dentro do patio"
+  },
+  {
+   "no": "FA_Porta_Manutencao",
+   "origem_jogo_xyz": [
+    351.76,
+    0.17,
+    334.0
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 95.0
+  },
+  {
+   "no": "FA_Porta_Entrada",
+   "origem_jogo_xyz": [
+    351.76,
+    0.17,
+    314.5
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 95.0
+  },
+  {
+   "no": "FA_Porta_Expedicao_E",
+   "origem_jogo_xyz": [
+    336.2,
+    0.17,
+    317.925
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": -90.0,
+   "angulo_aberta_graus": -180.0
+  },
+  {
+   "no": "FA_Porta_Expedicao_D",
+   "origem_jogo_xyz": [
+    339.2,
+    0.17,
+    318.075
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 90.0,
+   "angulo_aberta_graus": 180.0
+  },
+  {
+   "no": "FA_Porta_Escritorio",
+   "origem_jogo_xyz": [
+    349.2,
+    0.17,
+    317.94
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": -90.0,
+   "angulo_aberta_graus": 0.0
+  },
+  {
+   "no": "FA_Porta_Deposito",
+   "origem_jogo_xyz": [
+    344.479,
+    0.17,
+    314.9
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 90.0
+  },
+  {
+   "no": "FA_Porta_Banheiro",
+   "origem_jogo_xyz": [
+    349.6,
+    0.17,
+    308.779
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": -90.0,
+   "angulo_aberta_graus": 0.0
+  },
+  {
+   "no": "FA_Porta_Copa",
+   "origem_jogo_xyz": [
+    347.879,
+    0.17,
+    304.1
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -90.0
+  },
+  {
+   "no": "FA_Porta_Blindada",
+   "origem_jogo_xyz": [
+    337.7,
+    0.17,
+    307.15
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 90.0,
+   "angulo_aberta_graus": 0.0
+  },
+  {
+   "no": "FA_Porta_Diretoria",
+   "origem_jogo_xyz": [
+    348.38,
+    4.8,
+    313.5
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -95.0
+  },
+  {
+   "no": "FA_Porta_Reuniao",
+   "origem_jogo_xyz": [
+    348.38,
+    4.8,
+    308.7
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -95.0
+  },
+  {
+   "no": "FA_Porta_CFTV",
+   "origem_jogo_xyz": [
+    348.375,
+    4.8,
+    304.6
+   ],
+   "tipo": "giratoria",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -95.0
+  }
+ ],
+ "colisoes_dinamicas": [
+  {
+   "nome": "COL_Cid_FA_Col_Portao",
+   "min_jogo": [
+    362.45,
+    0.17,
+    319.4
+   ],
+   "max_jogo": [
+    362.55,
+    2.37,
+    328.0
+   ]
+  },
+  {
+   "nome": "COL_Cid_FA_Col_Portao_Doca",
+   "min_jogo": [
+    351.82,
+    0.17,
+    321.9
+   ],
+   "max_jogo": [
+    351.94,
+    4.37,
+    325.7
+   ]
+  },
+  {
+   "nome": "COL_Cid_FA_Col_Porta_Pedestre",
+   "min_jogo": [
+    362.82,
+    0.17,
+    333.1
+   ],
+   "max_jogo": [
+    362.92,
+    2.27,
+    334.3
+   ]
+  },
+  {
+   "nome": "COL_Cid_FA_Col_Porta_Blindada",
+   "min_jogo": [
+    336.6,
+    0.17,
+    306.85
+   ],
+   "max_jogo": [
+    337.7,
+    2.37,
+    307.15
+   ]
+  }
+ ]
+}

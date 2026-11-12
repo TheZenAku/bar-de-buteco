@@ -55,6 +55,7 @@ export * from './highfood.js';
 export * from './garage.js';
 export * from './trade.js';
 export * from './factory/index.js';
+export * from './machine-shop.js';
 export * from './crowd.js';
 import type {JukeboxState} from './jukebox.js';
 import type {JobSlotsView,ServedItemState} from './economy.js';
@@ -130,6 +131,8 @@ export interface PlayerState extends Position, Partial<JumpMotion> { id: string;
   /** Until when (server clock, ms) the stage pass lasts; 0 without one (STAGE_PASS in economy.ts). */ stageUntil?: number;
   /** A worker's tray (a table order taken for a customer), like Tonico's: comma-separated items and the order's id. */
   carrying?: string; carryingOrder?: string;
+  /** A sack from the plant in the arms ('MALTE' | 'MIX'), '' or absent when none. */
+  factoryBag?: string;
   /** On a Highfood shift, and the delivery in hand. */
   courier?: boolean; parcel?: string;horseRearAt?:number;
   /** Has the phone in front of them: standing still, they look at it. */

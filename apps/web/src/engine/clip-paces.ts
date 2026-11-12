@@ -2,6 +2,7 @@
 /** How fast the body must go (m/s) for a foot on the floor to stay put, for each skin's in-place step clips played at 1x. */
 export const CLIP_PACES:Readonly<Record<string,Readonly<Record<string,number>>>>={
   'flavio-hipotetico':{Walk:1.146,Jog:1.511,Run:3.992,DrunkWalk:0.741,FightBack:1.114,FightLeft:1.558,FightRight:1.54},
+  'funcionario-empresa-brasil':{Walk:1.201,Jog:1.558,Run:4.092,DrunkWalk:0.8,FightBack:1.133,FightLeft:1.658,FightRight:1.652},
   'gabriel':{Walk:1.089,Jog:1.366,Run:3.709,DrunkWalk:0.69,FightBack:0.965,FightLeft:1.508,FightRight:1.503},
   'gilmar-gordo':{Walk:1.097,Jog:1.368,Run:3.661,DrunkWalk:0.692,FightBack:0.988,FightLeft:1.499,FightRight:1.498},
   'leandro':{Walk:1.123,Jog:1.407,Run:3.75,DrunkWalk:0.713,FightBack:1.011,FightLeft:1.536,FightRight:1.545},

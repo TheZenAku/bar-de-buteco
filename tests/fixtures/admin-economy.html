@@ -1,0 +1,65 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<!-- The administration console on the Economia hub with made-up API answers (fetch is replaced, no server): ?tab=vault|firm|prices|xp|summary.
+     fixture.writes lists every POST, fixture.sent what the section sent to the world, fixture.vault()/finance() the pretend database. -->
+<div class="modal-backdrop"><section class="modal admin-modal"><header class="modal-header"><h2>Administração do bar</h2></header><div id="modal-content"><div id="admin-console"></div></div></section></div>
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/admin.css';
+const {priceEntries}=await import('../../packages/shared/src/index.ts');
+const DAY=86400000,now=Date.now(),dayKey=t=>new Date(t-3*3600000).toISOString().slice(0,10);
+let balance=18450;
+const finance={palletPrice:27360,taxPercent:20,employeeFee:2000,rawMaltePrice:30000,rawMixPrice:20000,idlePay:500,idleEveryMin:30,ownerUserId:'u-dono',freightBase:400,freightPerKm:1500,freightPerPallet:200,purchaseFreight:600,maxPalletsPerTruck:10,deliveryRadius:14};
+const ledger=[];for(let i=0;i<41;i++)ledger.push({id:`l${i}`,at:new Date(now-i*5400000).toISOString(),amount:i%9===4?-1000:Math.round(600+((i*137)%900)),reason:i%9===4?'Obra da praça':`Imposto da venda ${(0x3f9a1c2d+i*7919).toString(16)}`,actor:i%9===4?'Rafael':null,source:i%9===4?'admin':'tax'});
+let run=balance;for(const row of ledger){row.balanceAfter=run;run-=row.amount;}
+const days=n=>Array.from({length:n},(_,i)=>dayKey(now-(n-1-i)*DAY));
+const trips=[
+ {id:'s1',kind:'sale',status:'loaded',vehicleId:'v1',plate:'FBR1A23',driverId:'u-m',driverName:'Bia',loaderId:'u-f',loaderName:'Caio',material:'PRODUTO',pallets:2,bags:36,destLabel:'Rua das Flores',distanceM:420,gross:0,tax:0,staff:0,owner:0,freight:0,createdAt:new Date(now-120000).toISOString(),departedAt:null,deliveredAt:null},
+ {id:'s2',kind:'sale',status:'delivered',vehicleId:'v2',plate:'KLM4F56',driverId:'u2',driverName:'Davi',loaderId:'u-f',loaderName:'Caio',material:'PRODUTO',pallets:5,bags:90,destLabel:'Av. Ferrovia',distanceM:610,gross:25000,tax:3750,staff:2000,owner:19250,freight:2000,createdAt:new Date(now-900000).toISOString(),departedAt:new Date(now-800000).toISOString(),deliveredAt:new Date(now-300000).toISOString()},
+ {id:'s3',kind:'purchase',status:'delivered',vehicleId:'v1',plate:'FBR1A23',driverId:'u-m',driverName:'Bia',loaderId:'u-f',loaderName:'Caio',material:'MALTE',pallets:1,bags:18,destLabel:'Rua do Comércio',distanceM:300,gross:0,tax:0,staff:0,owner:0,freight:1650,createdAt:new Date(now-7200000).toISOString(),departedAt:null,deliveredAt:new Date(now-6000000).toISOString()}];
+const city=(url)=>{
+  const q=new URL(url,location.href).searchParams,n=Number(q.get('days')||30),page=Number(q.get('page')||0),flow=q.get('flow')||'all';
+  const rows=ledger.filter(r=>flow==='all'||(flow==='in'?r.amount>0:r.amount<0));
+  const series=days(n).map((day,i)=>({day,in:i%3===2?0:2000+i*130%1500,out:i%7===5?1000:0,balance:9000+i*(9000/n)}));
+  return {generatedAt:new Date().toISOString(),days:n,vault:{balance,updatedAt:ledger[0].at,today:{in:2250,out:0,count:3},period:{in:series.reduce((s,d)=>s+d.in,0),out:series.reduce((s,d)=>s+d.out,0),count:60},
+    sources:[{source:'tax',label:'Imposto das vendas da Empresa Brasil',in:52300,out:0,count:51},{source:'admin',label:'Ajustes da administração',in:5000,out:4000,count:5}],series,
+    ledger:{rows:rows.slice(page*15,page*15+15),total:rows.length,page,pageSize:15,flow}},
+   firm:{finance:{...finance},ownerName:'Rafael Dono',today:{sales:3,pallets:7,gross:35000,tax:5250,staff:6000,owner:23750,freight:3650},period:{sales:41,pallets:92,gross:460000,tax:69000,staff:82000,owner:309000,freight:120000},total:{sales:14,pallets:31,gross:155000,tax:23250,staff:28000,owner:103750,freight:61200},
+    series:days(n).map((day,i)=>({day,gross:i%4===0?0:10000+i*1300%30000,pallets:3})),trips:{active:trips.filter(t=>t.status==='loaded'),latest:trips.filter(t=>t.status!=='loaded')}}};
+};
+const economy=(url)=>{const n=Number(new URL(url,location.href).searchParams.get('days')||30);let supply=96000;const series=days(n).map((day,i)=>({day,supply:supply+=i*40,created:3000+i*90%2000,destroyed:2500+i*70%2200}));
+  return {generatedAt:new Date().toISOString(),days:n,supply:{total:supply,wallets:41,holders:35,average:supply/41,median:1500,top10Share:.42,gini:.55},inflation:{periodChange:.04,dailyRate:.0013,created:90000,destroyed:81000,priceIndex:104.2,priceChanges:3},series,
+   sources:[{source:'job',created:50000,destroyed:0,count:300},{source:'item',created:0,destroyed:41000,count:800}],topHolders:[{id:'p1',name:'Bia',balance:12000},{id:'p2',name:'Caio',balance:9100}],velocity:.8,activePlayers:12,purchasingPower:{item:'Copo de chopp',quantity:150}};};
+const writes=[],prices=priceEntries().map(entry=>({...entry,value:entry.key==='item:agua'?13:entry.defaultValue,override:entry.key==='item:agua',updatedAt:null,updatedBy:null}));
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
+window.fetch=async(url,init={})=>{
+  const path=String(url).replace(/^\/api/,'');
+  if(init.method==='POST'){writes.push({path,body:JSON.parse(init.body)});if(path==='/admin/prices'){for(const change of JSON.parse(init.body).changes){const row=prices.find(r=>r.key===change.key);row.value=change.value;row.override=true;}return json({ok:true});}return json({});}
+  if(path.startsWith('/admin/economy/city'))return json(city(path));
+  if(path.startsWith('/admin/economy'))return json(economy(path));
+  if(path==='/admin/prices')return json({rows:prices,changes:[{actorName:'Rafael',createdAt:new Date().toISOString(),reason:'Água mais cara por causa da seca'}]});
+  if(path.startsWith('/admin/reports'))return json({reports:[]});
+  return json({error:`Unexpected request: ${path}`},404);
+};
+const {adminConsole}=await import('../../apps/web/src/admin/console.ts');
+const now0=Date.now();
+const companyState={name:'EMPRESA BRASIL',balance:87450,members:[
+  {userId:'11111111-1111-4111-8111-111111111111',name:'Rafael Dono',role:'owner',hasPassword:true,since:new Date(now0-9*86400000).toISOString()},
+  {userId:'22222222-2222-4222-8222-222222222222',name:'Sócio Mauro',role:'owner',hasPassword:false,since:new Date(now0-3*86400000).toISOString()},
+  {userId:'33333333-3333-4333-8333-333333333333',name:'Bia Gerente',role:'manager',hasPassword:false,since:new Date(now0-86400000).toISOString()}],
+  ledger:Array.from({length:30},(_,i)=>({id:'c'+i,amount:i%6===3?-34500:Math.round(6500+(i*913)%4000),balanceAfter:87450-i*1200,reason:i%6===3?'Compra de 1 palete(s) de MALTE (imposto 4.500)':'Venda de 2 palete(s) de produto (carga 3f9a1c2d)',actorName:i%6===3?'Rafael Dono':'Sistema',at:new Date(now0-i*5400000).toISOString()})),
+  totals:{sales:14,gross:155000,income:103750,spent:69000}};
+const boardState={offers:[],offersBy:'',offersAt:0,active:{id:'op1',productId:'leite-integral',name:'Leite em pó integral',malteBags:8,mixBags:4,batches:4,createdAt:now0-600000,status:'running',approvedBy:'u',approvedByName:'Bia Gerente',approvedAt:now0-500000,startedBy:'u1',startedAt:now0-400000,batchesStarted:2,batchesDone:1,bags:14},
+  history:[{id:'o0',name:'Achocolatado instantâneo',batches:3,batchesDone:3,bags:34,result:'completed',at:now0-86400000,by:'a fábrica'},{id:'o9',name:'Café solúvel',batches:4,batchesDone:0,bags:0,result:'cancelled',at:now0-2*86400000,by:'Bia Gerente'}]};
+const dirtState={required:false,levels:{tank1:.35,tank2:.1,tank3:0,dryer:.62,line:.3,'floor-tanques':.45,'floor-secador':.2,'floor-ensaque':.05,'floor-estoque':.1,'floor-doca':0,'floor-sala':0}};
+const sent=[],snapshot={at:Date.now(),occupancy:3,capacity:40,event:'',walletRetries:0,resultOutbox:0,prices:{},players:[{id:'u-dono',name:'Rafael Dono',connected:true,x:0,y:0,z:0,animation:'idle',interaction:'',job:'',condition:'normal'},{id:'u-m',name:'Bia',connected:true,x:0,y:0,z:0,animation:'idle',interaction:'',job:'',condition:'normal'}],npcs:[],waiter:{phase:'',queue:[]},counterQueue:[],jobs:[],media:[],
+  factory:{revision:1,markerCount:48,activeOperators:0,pausedWithoutOperator:false,emergency:false,slots:[],tanks:[],dryer:{},bagging:{},alarms:[],balance:{},finance:{...finance},company:companyState,board:boardState,dirt:dirtState,treasury:{balance,ledger:[]},summary:{},shipments:trips,dock:[]}};
+const hooks={performance:{},user:()=>({id:'admin',displayName:'Rafael',isOwner:true,role:'admin'}),send:(type,payload)=>{sent.push({type,payload});},position:()=>'0, 0, 0',changedWallet:()=>{},denied:()=>{}};
+const consoleApi=adminConsole(document.querySelector('#admin-console'),hooks);
+const params=new URLSearchParams(location.search);
+document.querySelector('[data-admin-nav="economy"]').click();
+const feed=()=>{snapshot.at=Date.now();consoleApi.world(JSON.parse(JSON.stringify(snapshot)));};
+feed();
+window.fixture={sent,writes,feed,companyState,setBalance(value){balance=value;snapshot.factory.treasury.balance=value;ledger.unshift({id:'new',at:new Date().toISOString(),amount:500,reason:'Imposto da venda novo',actor:null,source:'tax',balanceAfter:value});feed();},setFinance(patch){Object.assign(finance,patch);Object.assign(snapshot.factory.finance,patch);feed();},api:consoleApi,ledger};
+if(params.get('tab'))document.querySelector(`[data-eco-tab="${params.get('tab')}"]`)?.click();
+</script></body></html>

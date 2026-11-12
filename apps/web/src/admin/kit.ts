@@ -1,3 +1,4 @@
+import type {CompanyRole,FactoryDirt,FactoryFinance,FactoryShipmentView,ProductionBoard} from '@bar/shared/factory';
 import type {PublicUser,EnvironmentState,WeatherSample} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
@@ -29,7 +30,18 @@ export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<stri
 
 /** admin.world (apps/server/src/BarRoom.ts adminSnapshot). */
 export interface WorldOrder {id?:string;playerId:string;items:string[];total:number}
-export interface FactoryAdminSnapshot {revision:number;markerCount:number;activeOperators:number;pausedWithoutOperator:boolean;emergency:boolean;slots:Array<{marker:string;material:'MALTE'|'MIX'|'PRODUTO';quantity:number;capacity:number;levelM:number;batchId:string;reservedBy:string;reservedUntil:number}>;tanks:Array<Record<string,unknown>>;dryer:Record<string,unknown>;bagging:Record<string,unknown>;alarms:Array<Record<string,unknown>>;balance:Record<string,unknown>;orders?:Array<Record<string,unknown>>;markers?:Array<{name:string;xyz:[number,number,number]}>;operators?:Array<{id:string;name:string;station:string;ppe:boolean;carrying:string;since:number}>;equipment?:Record<string,{state:string;hours:number;reservedBy:string}>}
+export interface FactoryAdminSnapshot {revision:number;started?:boolean;markerCount:number;activeOperators:number;pausedWithoutOperator:boolean;emergency:boolean;slots:Array<{marker:string;material:'MALTE'|'MIX'|'PRODUTO';quantity:number;capacity:number;levelM:number;batchId:string;reservedBy:string;reservedUntil:number}>;tanks:Array<Record<string,unknown>>;dryer:Record<string,unknown>;bagging:Record<string,unknown>;alarms:Array<Record<string,unknown>>;balance:Record<string,unknown>;orders?:Array<Record<string,unknown>>;markers?:Array<{name:string;xyz:[number,number,number]}>;operators?:Array<{id:string;name:string;station:string;ppe:boolean;carrying:string;since:number}>;equipment?:Record<string,{state:string;hours:number;reservedBy:string}>;
+  /** The plant's money (docs/sistemas/fabrica.md, "Logística e finanças"): settings, the city's vault, the trips and the books' totals. */
+  finance?:FactoryFinance;treasury?:{balance:number;ledger:Array<Record<string,unknown>>};shipments?:FactoryShipmentView[];summary?:Record<string,number>;
+  /** The firm (apps/api/src/company-service.ts adminState; null until the room has read it), the production board and the plant's dirt (docs/sistemas/empresa.md). */
+  company?:AdminCompany|null;board?:ProductionBoard;dirt?:FactoryDirt;dock?:Array<{vehicleId:string;ownerId:string;ownerName:string;plate:string;driverId:string}>}
+/** The firm as the administration sees it. */
+export interface AdminCompany {
+  name:string;balance:number;
+  members:Array<{userId:string;name:string;role:CompanyRole;hasPassword:boolean;since:string|null}>;
+  ledger:Array<{id:string;amount:number;balanceAfter:number;reason:string;actorName:string;at:string}>;
+  totals:{sales:number;gross:number;income:number;spent:number};
+}
 export interface WorldSnapshot {
   environment?:EnvironmentState&{currentHour:number;currentWeather:WeatherSample};
   at:number;occupancy:number;capacity:number;event:string;walletRetries:number;resultOutbox:number;prices:Record<string,number>;pricesLoaded?:boolean;logQueue?:number;
@@ -47,6 +59,21 @@ export interface WorldSnapshot {
   factory?:FactoryAdminSnapshot;
 }
 
+/** GET /admin/economy/city (apps/api/src/admin-city-economy.ts has the same shape): the city's vault and the Empresa Brasil's books. */
+export interface VaultFlow {in:number;out:number;count:number}
+export interface FirmFlow {sales:number;pallets:number;gross:number;tax:number;staff:number;owner:number;freight:number}
+export interface AdminCityEconomy {
+  generatedAt:string;days:number;
+  vault:{balance:number;updatedAt:string|null;today:VaultFlow;period:VaultFlow;
+    sources:Array<{source:'tax'|'admin'|'other';label:string;in:number;out:number;count:number}>;
+    series:Array<{day:string;in:number;out:number;balance:number}>;
+    ledger:{rows:Array<{id:string;at:string;amount:number;balanceAfter:number;source:'tax'|'admin'|'other';reason:string;actor:string|null}>;total:number;page:number;pageSize:number;flow:'all'|'in'|'out'}};
+  firm:{finance:FactoryFinance;ownerName:string|null;today:FirmFlow;period:FirmFlow;total:FirmFlow;series:Array<{day:string;gross:number;pallets:number}>;
+    trips:{active:FactoryShipmentView[];latest:FactoryShipmentView[]}};
+}
+
+/** How a plant trip is told (the Fábrica dock and the Economia books). */
+export const SHIPMENT_LABEL:Record<string,string>={loaded:'carregado na doca',in_transit:'a caminho do cliente',to_supplier:'indo ao fornecedor',returning:'voltando à doca',delivered:'entregue',cancelled:'cancelada'};
 export const n=(value:number,digits=0)=>value.toLocaleString('pt-BR',{maximumFractionDigits:digits});
 export const signed=(value:number)=>`${value>0?'+':value<0?'−':''}${n(Math.abs(value))}`;
 export const pct=(value:number|null|undefined,digits=1)=>value===null||value===undefined||!Number.isFinite(value)?'—':`${value>0?'+':value<0?'−':''}${Math.abs(value*100).toLocaleString('pt-BR',{minimumFractionDigits:digits,maximumFractionDigits:digits})}%`;
@@ -97,6 +124,23 @@ export const meter=(ratio:number,label:string)=>`<div class="admin-meter ${ratio
 export const chips=(name:string,options:ReadonlyArray<readonly [string,string]>,current:string)=>
   `<div class="admin-chips" role="group">${options.map(([value,label])=>`<button type="button" data-admin-chip="${name}" data-value="${e(value)}" aria-pressed="${value===current}">${label}</button>`).join('')}</div>`;
 type Control=HTMLButtonElement|HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement;
+/**
+ * Redraws `root` and puts back what was typed in the forms marked `data-keep` (matched by their `name`), so a refresh that
+ * arrives while an administrator is writing a reason does not erase it. A control the user did not touch takes the new value.
+ */
+export function redraw(root:HTMLElement,render:()=>void):void {
+  const kept=new Map<string,string>(),focus=document.activeElement instanceof HTMLElement&&root.contains(document.activeElement)?document.activeElement.getAttribute('name'):null;
+  for(const control of root.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>('[data-keep] [name]')){
+    const touched=control instanceof HTMLSelectElement?control.selectedIndex!==Math.max(0,[...control.options].findIndex(o=>o.defaultSelected)):control.value!==control.defaultValue;
+    if(touched)kept.set(`${control.closest('[data-keep]')!.getAttribute('data-keep')}/${control.name}`,control.value);
+  }
+  render();
+  for(const control of root.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>('[data-keep] [name]')){
+    const value=kept.get(`${control.closest('[data-keep]')!.getAttribute('data-keep')}/${control.name}`);
+    if(value!==undefined){control.value=value;control.dispatchEvent(new Event('input',{bubbles:true}));}
+  }
+  if(focus)root.querySelector<HTMLElement>(`[name="${CSS.escape(focus)}"]`)?.focus();
+}
 const locks=new WeakMap<HTMLElement,{depth:number;disabled:Set<Control>;observer:MutationObserver}>();
 /**
  * Disables the controls of `root` while a change or a load runs, including those a redraw adds meanwhile (a reload

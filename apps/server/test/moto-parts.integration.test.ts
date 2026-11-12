@@ -137,7 +137,7 @@ test('the engine, the wear, being run over and fixing a part, over real WebSocke
     assert.equal(walker.player().condition,'normal');
     await until(()=>(room as unknown as {deaths:{isDead:(id:string)=>boolean}}).deaths.isDead('walker'),15000);
     assert.equal(walker.player().hp,0);
-    assert.equal(room.state.ragdolls.has('walker'),false,'The death took over from the body');
+    assert.equal(room.state.ragdolls.has('walker'),true,'The fatal fall is kept: the body lies where it fell until the death scene takes it (docs/sistemas/morte.md)');
     await until(()=>rider.player().interactionState==='',20000);await until(()=>next.phase==='down',20000);
     // The wear of a head-on crash: the front goes first.
     await pause(1200);

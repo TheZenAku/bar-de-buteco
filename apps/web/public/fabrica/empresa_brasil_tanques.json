@@ -228,7 +228,13 @@
     3.065,
     -70.3
    ],
-   "fundo_jogo_y": 1.01
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_1_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    337.0,
+    3.07,
+    -70.15
+   ]
   },
   {
    "tanque": 2,
@@ -241,7 +247,13 @@
     3.065,
     -70.3
    ],
-   "fundo_jogo_y": 1.01
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_2_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    340.3,
+    3.07,
+    -70.15
+   ]
   },
   {
    "tanque": 3,
@@ -254,7 +266,24 @@
     3.065,
     -70.3
    ],
-   "fundo_jogo_y": 1.01
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_3_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    343.6,
+    3.07,
+    -70.15
+   ]
   }
- ]
+ ],
+ "tampa": {
+  "descricao": "Metade da frente da boca do tanque (a de tras e fixa no mapa). Origem na linha da dobradica; sem escala nem rotacao aplicada; a pose exportada e a FECHADA. Abrir = girar so em torno do eixo X do jogo (angulo negativo levanta a borda livre).",
+  "material": "EB_Aco_Inox (textura eb_inox)",
+  "espessura_m": 0.025,
+  "fechada_z_jogo": [
+   -70.15,
+   -69.17
+  ],
+  "largura_m": 2.24,
+  "pecas": "chapa, 2 dobradicas na borda de tras, puxador na borda livre"
+ }
 }

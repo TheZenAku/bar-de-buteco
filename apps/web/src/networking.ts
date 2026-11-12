@@ -110,7 +110,18 @@ export interface NetworkHooks {
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
   factory?:(state:unknown)=>void;
   employment?:(state:unknown)=>void;
+  /** The firm's desk (profile → Gerenciar empresa): its state, the result of an action, a name search. */
+  company?:(kind:'state'|'result'|'search',payload:unknown)=>void;
+  /** The job changed from the firm's side (admitted, dismissed, turned down): read it again. */
+  employmentRefresh?:()=>void;
   factoryPpe?:(state:{on:boolean})=>void;
+  factoryResult?:(result:unknown)=>void;
+  factoryPaid?:(paid:unknown)=>void;
+  factoryRoute?:(route:unknown)=>void;
+  /** The plant's open requests for a truck driver (the phone's HighCargo). */
+  freight?:(state:unknown)=>void;
+  /** Ribeiro machine-shop state and action result. */
+  machine?:(kind:'state'|'result'|'game',payload:unknown)=>void;
   adminWorld?:(snapshot:unknown)=>void;
   crowd?:(bytes:ArrayBuffer|Uint8Array)=>void;
   /** The price table (packages/shared/src/prices.ts), on entering and when the administration changes it. */
@@ -289,7 +300,18 @@ export class BarNetwork {
     room.onMessage('job.state',(update:{task?:JobTaskView|null;message?:string})=>this.hooks.job?.(update));
     room.onMessage('factory.state',(state:unknown)=>this.hooks.factory?.(state));
     room.onMessage('employment.state',(state:unknown)=>this.hooks.employment?.(state));
+    room.onMessage('employment.refresh',()=>this.hooks.employmentRefresh?.());
+    room.onMessage('company.state',(state:unknown)=>this.hooks.company?.('state',state));
+    room.onMessage('company.result',(result:unknown)=>this.hooks.company?.('result',result));
+    room.onMessage('company.search',(found:unknown)=>this.hooks.company?.('search',found));
     room.onMessage('factory.ppe',(state:{on:boolean})=>this.hooks.factoryPpe?.(state));
+    room.onMessage('factory.result',(result:unknown)=>this.hooks.factoryResult?.(result));
+    room.onMessage('factory.paid',(paid:unknown)=>this.hooks.factoryPaid?.(paid));
+    room.onMessage('factory.route',(route:unknown)=>this.hooks.factoryRoute?.(route));
+    room.onMessage('freight.state',(state:unknown)=>this.hooks.freight?.(state));
+    room.onMessage('machine.state',(state:unknown)=>this.hooks.machine?.('state',state));
+    room.onMessage('machine.result',(result:unknown)=>this.hooks.machine?.('result',result));
+    room.onMessage('machine.game',(game:unknown)=>this.hooks.machine?.('game',game));
     room.onMessage('admin.world',(snapshot:unknown)=>this.hooks.adminWorld?.(snapshot));
     // The people beyond the avatars, a few times a second, as bytes (packages/shared/src/crowd.ts).
     room.onMessage('crowd',(bytes:ArrayBuffer|Uint8Array)=>this.hooks.crowd?.(bytes));
@@ -423,11 +445,15 @@ export class BarNetwork {
     const position=movePlayer(this.position,swayInput({...input,running:input.running&&!self.oldWalk&&canRun(self)},input.seq,self.drunk??0,self.id),TICK_MS/1000,self.oldWalk,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),this.hooks.gunPace?.(input),this.motion,canJump({...self,animationState:jumpAnimation(this.motion)??(['jump','fall','land'].includes(self.animationState)?'idle':self.animationState)},this.clock.now())&&!input.fight);
     return position;
   }
-  /** Rendering receives the predicted jump phase; the position contract stays x/y/z for all existing callers. */
+  /** Rendering receives the predicted locomotion and jump phase; the position contract stays x/y/z for all existing callers. */
   private predictedPose(self:PlayerState,input?:PlayerInput):Position {
     if(self.interactionState||self.currentTableId||self.animationState?.startsWith('fly'))return this.position;
     const phase=jumpAnimation(this.motion),locomotion=input&&(input.dx||input.dz)?input.running?'run':'walk':'idle';
-    return {...this.position,...this.motion,...(phase?{animation:phase}:['jump','fall','land'].includes(self.animationState)?{animation:locomotion}:{})};
+    // Prediction already moves the local body before the room acknowledges the input. Predict its gait as well,
+    // otherwise it advances in Idle (and can repeatedly begin a cross-fade) while waiting for the next snapshot.
+    // Only locomotion owns this override: seated, fighting and other authored actions remain authoritative.
+    const animation=phase??(['idle','walk','run','jump','fall','land'].includes(self.animationState)?locomotion:undefined);
+    return {...this.position,...this.motion,...(animation?{animation}:{})};
   }
   send(type:string,payload:unknown={}):void {if(this.room&&!this.stopped&&this.transportReady)this.room.send(type,payload);}
   /** Bytes still waiting in the socket (0 if unknown). */

@@ -1,0 +1,48 @@
+/* HighCargo: the truck driver's freight app (apps/cargo.ts). Amber on the phone's own surfaces. */
+#phone .ph-app-highcargo{display:flex;flex-direction:column;height:100%;min-height:0;background:var(--bg);color:var(--fg);padding-top:54px;--cg-ac:#f2a93b;--cg-ink:#2a1a05}
+#phone .cg-top{display:flex;align-items:center;justify-content:space-between;padding:4px 16px 10px}
+#phone .cg-top b{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;letter-spacing:-.3px}
+#phone .cg-top .ui-icon{width:24px;height:24px;color:var(--cg-ac)}
+#phone .cg-pill{padding:4px 10px;border-radius:14px;font-size:12px;font-weight:600;background:var(--fill);color:var(--mu)}
+#phone .cg-pill.on{background:var(--cg-ac);color:var(--cg-ink)}
+#phone .cg-body{display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+#phone .cg-status{display:flex;align-items:center;gap:12px;margin:0 16px;padding:12px 14px;border-radius:16px;background:var(--card);color:var(--mu)}
+#phone .cg-status .ui-icon{width:26px;height:26px;flex:none}
+#phone .cg-status span{display:flex;flex-direction:column;gap:2px}
+#phone .cg-status b{color:var(--fg);font-size:15px}
+#phone .cg-status small{font-size:12.5px;line-height:1.35}
+#phone .cg-status.on{box-shadow:inset 0 0 0 1.5px var(--cg-ac)}
+#phone .cg-status.on .ui-icon{color:var(--cg-ac)}
+#phone .cg-card{background:var(--card);border-radius:18px;margin:0 16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+#phone .cg-card header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+#phone .cg-card header b{font-size:18px}
+#phone .cg-card header small{color:var(--mu);font-size:12.5px;margin-left:auto}
+#phone .cg-mat{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.4px;background:#d6924a;color:#2a1708}
+#phone .cg-mat[data-mat="MIX"]{background:#46a3d6;color:#06202e}
+#phone .cg-mat[data-mat="PRODUTO"]{background:#ebe6bf;color:#2b2916}
+#phone .cg-line{display:flex;gap:10px;align-items:flex-start}
+#phone .cg-line .ui-icon{width:20px;height:20px;flex:none;margin-top:2px;color:var(--mu)}
+#phone .cg-line span{display:flex;flex-direction:column;gap:2px;min-width:0}
+#phone .cg-line b{font-size:14.5px;line-height:1.3}
+#phone .cg-line small{font-size:12px;color:var(--mu);line-height:1.35}
+#phone .cg-go{background:var(--cg-ac);color:var(--cg-ink);border-radius:14px;width:100%}
+#phone .cg-go.off{background:var(--fill);color:var(--mu)}
+#phone .cg-why{font-size:12.5px;color:var(--mu);line-height:1.4;margin:0}
+#phone .cg-actions{display:flex;gap:8px}
+#phone .cg-actions .ph-pill-btn{flex:1;border-radius:14px;font-size:15px}
+#phone .cg-actions .ph-pill-btn.soft{background:var(--fill);color:var(--fg)}
+#phone .cg-notice{margin:0 16px;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.4;background:var(--card)}
+#phone .cg-notice.ok{box-shadow:inset 0 0 0 1.5px #30d158}
+#phone .cg-notice.bad{box-shadow:inset 0 0 0 1.5px #ff453a}
+#phone .cg-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;list-style:none;margin:0;padding:0}
+#phone .cg-steps li{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--mu);text-align:center}
+#phone .cg-steps i{width:100%;height:5px;border-radius:3px;background:var(--fill)}
+#phone .cg-steps li.done i{background:#30d158}
+#phone .cg-steps li.now{color:var(--fg);font-weight:600}
+#phone .cg-steps li.now i{background:var(--cg-ac)}
+#phone .cg-history .ph-row{gap:10px}
+#phone .cg-history .in{color:#30d158}
+#phone .cg-tabs{display:grid;grid-template-columns:repeat(3,1fr);padding:6px 8px 26px;background:var(--bar);border-top:1px solid var(--ln)}
+#phone .cg-tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--mu);padding:4px 0}
+#phone .cg-tabs small{font-size:10px;font-weight:500}
+#phone .cg-tabs button[aria-current="true"]{color:var(--cg-ac)}
