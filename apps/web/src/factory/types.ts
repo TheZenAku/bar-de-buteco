@@ -20,13 +20,13 @@ export interface FactoryView {
   balance:{recipe:{waterL:number;targetC:number;malteBags:number;mixBags:number;litresPerKg:number};timeScale:number;bagKg:number;dissolveS:number;homogenizeS:number;preheatS:number;coolS:number};
   tanks:TankView[];dryer:DryerView;bagging:BaggingView;alarms:AlarmView[];events:EventView[];slots:SlotView[];orders:OrderView[];
   shipments:FactoryShipmentView[];dock:{trucks:DockTruck[]};finance:FinanceView;
-  /** The vehicle gate as the operators set it (`open`), and the visitor ringing the intercom, if any. */
+  /** The vehicle gate as it stands now (`open`), and the visitor calling at the intercom, if any. */
   gate:{open:boolean;ringing:null|{name:string;at:number}};
   /** How dirty each place of the plant is (0 clean .. 1 filthy), and whether a finished production asks for a full cleaning before the next one. */
   dirt:FactoryDirt;
   /** The production order the plant works on (none: nothing can be started) and the last ones. */
   production:{active:ActiveProduction|null;history:ProductionLogEntry[]};
-  me:{ppe:boolean;onShift:boolean;carrying:null|'MALTE'|'MIX';/** The cleaning task in progress (the room finishes it when the time is up). */clean:null|{task:CleanTaskId;startedAt:number;endsAt:number;/** The room's clock when it sent this (the progress runs from there, whatever the browser's clock says). */now?:number}};
+  me:{ppe:boolean;onShift:boolean;carrying:null|'MALTE'|'MIX';/** Pushing the platform cart (the hands are on its handle). */pushing?:boolean;/** The cleaning task in progress (the room finishes it when the time is up). */clean:null|{task:CleanTaskId;startedAt:number;endsAt:number;/** The room's clock when it sent this (the progress runs from there, whatever the browser's clock says). */now?:number}};
 }
 export interface EmploymentView {
   employment:null|{jobId:string;status:'hired'|'resigned'|'dismissed'|'applied';hiredAt:string;cooldownUntil?:string|null};

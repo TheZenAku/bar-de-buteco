@@ -1,5 +1,5 @@
 import type {CompanyRole,FactoryDirt,FactoryFinance,FactoryShipmentView,ProductionBoard} from '@bar/shared/factory';
-import type {PublicUser,EnvironmentState,WeatherSample} from '@bar/shared';
+import type {PublicUser,EnvironmentState,WeatherSample,RibeiroAdminView} from '@bar/shared';
 import {api,escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
 import type {PerformanceMonitor} from '../performance/monitor';
@@ -24,7 +24,7 @@ export interface AdminContext {
   /** The open reports changed (the menu shows how many). */
   reports:(open:number)=>void;
 }
-export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'levels'|'logs'|'world'|'factory'|'environment'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
+export type SectionId='overview'|'players'|'reports'|'economy'|'prices'|'levels'|'logs'|'world'|'factory'|'ribeiro'|'environment'|'vehicles'|'highfood'|'badges'|'collection'|'server'|'performance';
 export interface Section {destroy?():void;world?(snapshot:WorldSnapshot):void}
 export type SectionFactory=(root:HTMLElement,ctx:AdminContext,params:Record<string,string>)=>Section;
 
@@ -57,6 +57,8 @@ export interface WorldSnapshot {
     status?:{walking:number;doing:Array<[string,number]>;rttP95?:number;loopP95?:number;inputs?:number;refusals?:Array<[string,number]>}};
   process?:{uptimeS:number;node:string;pid:number;rss:number;heapUsed:number;tickP95?:number;apiOkAt:number;outboxWritable:boolean};
   factory?:FactoryAdminSnapshot;
+  /** The Ribeiro machine shop (docs/sistemas/ribeiro-usinagem.md), and the verdict of the last admin.ribeiro command this very snapshot answers. */
+  ribeiro?:RibeiroAdminView;ribeiroResult?:{requestId:string;ok:boolean;message:string};
 }
 
 /** GET /admin/economy/city (apps/api/src/admin-city-economy.ts has the same shape): the city's vault and the Empresa Brasil's books. */

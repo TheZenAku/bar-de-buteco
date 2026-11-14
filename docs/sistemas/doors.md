@@ -24,6 +24,10 @@ As folhas deixaram de ser colisores fixos. A física compartilhada (`solidCollid
 
 Os vãos do mapa têm 0,80 m para um corpo de 0,68 m, e a folha aberta a 95° ocupa parte dessa largura. Para ninguém ficar preso no batente, dentro do vão de uma porta aberta o corpo passa de lado: colide com raio de 0,25 m em vez de 0,34 m. Ao empurrar contra o batente, ele desliza para o centro do vão. Porta fechada bloqueia por inteiro. As 15 portas são atravessadas nos dois sentidos, mesmo fora do centro.
 
+## Portas da fábrica
+
+As folhas `manual` da EMPRESA BRASIL (porta e portão de enrolar da oficina, porta de pessoal) usam o mesmo mecanismo: são `INTERACTABLES` do tipo `door` (criados em `world.ts` a partir de `gates-data.json`), o mesmo `player.interact`/`toggleDoor`, a mesma animação a partir do relógio da sala e a mesma regra de não atravessar ninguém; o estado de cada uma vai em `BarState.doors` sob o nome do nó (com `side` para as de vai-e-vem) e a caixa de colisão gira junto (`syncFactoryGates`). Detalhes em [fábrica](fabrica.md).
+
 ## Multiplayer
 
 `BarState.doors` guarda, por porta, `open` e `changedAt`, sincronizados para toda a sala. A interação usa a mensagem existente `player.interact`; o servidor valida a distância e a área varrida e registra `door` no log. O estado é efêmero como o resto do mundo: reiniciar o servidor reabre as portas.

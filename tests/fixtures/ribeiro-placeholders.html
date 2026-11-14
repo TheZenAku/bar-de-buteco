@@ -1,0 +1,22 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Ribeiro placeholders</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="world"></canvas><script type="module">
+// The six authored placeholder GLBs (apps/web/public/farm/placeholders, machine-shop/placeholders.ts) in the real scene, at the plant's real stations:
+//   fixture.show(spotIds)  puts a placeholder on each of those spots (as the guide would); fixture.work(spotIds) also puts an order on them (clip Operate);
+//   fixture.view(eye,target) moves the camera; fixture.quality({animate,shadows}) is the graphics setting (low = false,false);
+//   fixture.state() lists, per placeholder: shown, loaded GLB or procedural stand-in, clip, clip time. fixture.clock(ms) steps the clips deterministically.
+import {BarScene} from '/src/engine/BarScene.ts';
+import {RibeiroPlaceholders} from '/src/machine-shop/placeholders.ts';
+let eye=[341,1.7,321],target=[343,.7,327],quality={animate:true,shadows:true},ph;
+const scene=new BarScene(document.querySelector('canvas'),{serverNow:()=>Date.now(),onMediaFrame:()=>{scene.camera.setPosition(...eye);scene.camera.lookAt(...target);scene.app.autoRender=true;}});
+scene.cityFocus={x:343,z:326};
+const put=(ids,working)=>{ph.set({orders:working.map(id=>({status:'cutting',stationId:id})),stock:{}},ids[0]);for(const [id,item] of ph.items)item.root.enabled=ids.includes(id);};
+window.fixture={scene,ready:false,
+  view:(position,look)=>{eye=position;target=look;},
+  quality:next=>{quality={...quality,...next};},
+  show:ids=>put(ids,[]),
+  work:ids=>put(ids,ids),
+  state:()=>[...ph.items].map(([id,item])=>({id,shown:item.root.enabled,glb:!!item.model,procedural:item.moving.enabled,clip:item.clip??null,time:item.model?.anim?.baseLayer?.activeStateCurrentTime??null,animEnabled:item.model?.anim?.enabled??null,
+    pos:item.root.getPosition().toArray(),shadows:item.model?(item.model.findComponents('render').every(r=>r.castShadows)):null})),
+  ph:()=>ph};
+scene.ready.then(()=>{ph=new RibeiroPlaceholders(scene.app,()=>quality);scene.app.on('update',dt=>ph.frame(dt));setTimeout(()=>{window.fixture.ready=true;document.title='ready';},5000);});
+</script></html>

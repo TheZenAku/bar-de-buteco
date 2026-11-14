@@ -274,16 +274,5 @@
     -70.15
    ]
   }
- ],
- "tampa": {
-  "descricao": "Metade da frente da boca do tanque (a de tras e fixa no mapa). Origem na linha da dobradica; sem escala nem rotacao aplicada; a pose exportada e a FECHADA. Abrir = girar so em torno do eixo X do jogo (angulo negativo levanta a borda livre).",
-  "material": "EB_Aco_Inox (textura eb_inox)",
-  "espessura_m": 0.025,
-  "fechada_z_jogo": [
-   -70.15,
-   -69.17
-  ],
-  "largura_m": 2.24,
-  "pecas": "chapa, 2 dobradicas na borda de tras, puxador na borda livre"
- }
+ ]
 }

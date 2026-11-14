@@ -1,0 +1,21 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><link rel="icon" href="data:,"><title>Ribeiro carry</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="world"></canvas><script type="module">
+import {BarScene} from '/src/engine/BarScene.ts';
+import {DEFAULT_ENVIRONMENT} from '../../packages/shared/src/index.ts';
+let now=Date.now(),since=now,eye=[61,1.8,10],target=[60,1.1,7];
+const scene=new BarScene(document.querySelector('canvas'),{serverNow:()=>now,onMediaFrame:()=>{scene.camera.setPosition(...eye);scene.camera.lookAt(...target);scene.environment.sky.setPosition(...eye);scene.app.autoRender=true;}});
+// Effects must see the same camera the fixture renders, before the end-of-frame preview hook.
+const headLook=scene.applyHeadLooks.bind(scene);scene.applyHeadLooks=dt=>{headLook(dt);scene.camera.setPosition(...eye);scene.camera.lookAt(...target);};
+let players={};const world={players,npcs:{},motos:{},tables:{},event:{id:'',type:'',startedAt:0,durationMs:0},occupancy:0,capacity:32,serverTime:now,environment:{...DEFAULT_ENVIRONMENT,hour:12,paused:true,weather:'clear'}};
+function sync(){world.players=players;world.serverTime=now;scene.setWorld(world,'');scene.setEnabled(false);}
+function actor(id,skin,x){return {ribeiroPart:'raw',animation:'idle',id,skin,displayName:id,color:'#fff',x,y:0,z:7,rotation:0,animationState:'idle',animationStartedAt:since,interactionState:'',currentTableId:'',connected:true,smokingSince:0,smokingStopAt:0};}
+players={a:actor('a','tiao',60)};sync();
+window.fixture={scene,ready:scene.ready,now:()=>now,since,clock:ms=>{now=since+ms;sync();return new Promise(resolve=>scene.app.once('frameend',()=>resolve()));},view:(position,look)=>{eye=position;target=look;},
+patch:patch=>{for(const p of Object.values(players))Object.assign(p,patch);sync();},
+skin:skin=>{players={a:actor('a',skin,60)};sync();},
+all:()=>{players=Object.fromEntries(['nathan','leandro','rafael','rafael-rose','read','gabriel','gilmar-gordo','flavio-hipotetico','tiao','primo'].map((skin,i)=>[skin,actor(skin,skin,55+i*1.1)]));eye=[60,2.7,14];target=[60,1,7];sync();},
+stop:()=>{for(const p of Object.values(players))p.smokingStopAt=now;sync();},
+status:()=>scene.getSmoking(),
+legs:()=>[...scene.actors].map(([id,a])=>({id,clip:a.skin?.clip,order:a.skin?.orderLayer?.weight,feet:a.skin?[a.skin.bones.foot_l.getPosition().toArray(),a.skin.bones.foot_r.getPosition().toArray()]:[]})),
+contacts:()=>[...scene.actors].map(([id,a])=>{const b=a.skin?.bones;return {id,hands:b?[b.hand_l.getPosition().toArray(),b.hand_r.getPosition().toArray()]:[]};})};
+</script></html>

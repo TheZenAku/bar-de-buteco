@@ -96,14 +96,6 @@ export function isInsideWorkWindow(at:Date,window:WorkWindow):boolean {
 }
 
 /** Metres from each station within which an operator can act; the panel reaches everything near the control room. */
-/**
- * The plant's vehicle gate, a sliding double gate in the opening of the east fence (between the piers at z -57.2 and -48.8, outside the fence line).
- * It stands shut. An operator on shift opens and closes it from the control room's computer; whoever is outside rings the intercom (the post
- * on the pavement beside the gate, `intercom`) and the operators on shift hear it and can open. It never shuts on a body in the doorway
- * (`keepClear`), and it shuts by itself when the last operator leaves their shift. `id` is its entry in the synced door states.
- */
-export const FACTORY_GATE={id:'EB_Portao',x:363.45,z:-53,halfWidth:4.2,halfThick:.2,minY:.17,maxY:2.2,keepClear:{x:3,z:6},
-  intercom:{x:364.3,z:-57.6,reach:2.6},ringCooldownS:8,ringTtlS:60} as const;
 export const FACTORY_REACH={entrance:3,panel:4,tank:3,dryer:5,bagging:4,pallet:4,rack:2.5,dock:9,view:90} as const;
 /** Coins paid to the operator for work done (job: wallet reasons, so the daily job cap applies). A truck's sale and freight are the administration's (FactoryFinance). */
 export const FACTORY_PAY={bag:3,pallet:20,batch:12} as const;
@@ -191,3 +183,5 @@ export interface FactoryShipmentView {
 export const FACTORY_DOCK={/** A loaded truck farther than this from the dock has left the plant. */exitDistance:24,/** The truck must be this still (m/s) to be loaded or unloaded or to count as arrived. */parkSpeed:.3} as const;
 
 export * from './company.js';
+export * from './gates.js';
+export * from './cart.js';

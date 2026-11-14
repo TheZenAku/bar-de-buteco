@@ -1,4 +1,4 @@
-import {armedPace,arsenalStats,bodyZones,cleanArsenal,mapRay,normalizeHeading,ownedInOrder,rayBody,type Vec3,type ArsenalView,type GunInput,type PartId,type PartSlot,type PlayerInput,type PlayerState,
+import {armedPace,arsenalStats,bodyZones,cleanArsenal,equippedInOrder,mapRay,normalizeHeading,ownedInOrder,rayBody,type Vec3,type ArsenalView,type GunInput,type PartId,type PartSlot,type PlayerInput,type PlayerState,
   type UpgradeTrack,type WeaponHitEvent,type WeaponId,type WeaponShotEvent} from '@bar/shared';
 import {LocalGun,type GunView} from './local-gun';
 import {AimAssist,wrapped,type InputDevice,type AssistOutput} from './aim-assist';
@@ -210,8 +210,9 @@ export class WeaponsController implements WeaponSceneHooks {
     this.wheelMoved=true;
   }
   /** The wheel's slots round the ring, in order (see wheelChoice). */
-  wheelSlots():WeaponId[] {return ownedInOrder(this.gun.arsenal);}
+  wheelSlots():WeaponId[] {return equippedInOrder(this.gun.arsenal);}
   requestArsenal():void {this.host.send('weapon.arsenal',{});this.arsenalAskedAt=performance.now();}
+  equip(weapon:WeaponId,equipped:boolean):void {this.host.send('weapon.equip',{weapon,equipped});}
   configure(weapon:WeaponId,slot:PartSlot,part:PartId|null):void {this.host.send('weapon.configure',{weapon,slot,part});}
   upgrade(weapon:WeaponId,track:UpgradeTrack):void {this.host.send('weapon.upgrade',{weapon,track});}
   private notify(text:string):void {this.host.notice(text,true);this.emit('notice',text);}
@@ -268,7 +269,7 @@ export class WeaponsController implements WeaponSceneHooks {
     }
     if(repeat)return false;
     const digit=/^Digit(\d)$/.exec(code);
-    if(digit){const id=ownedInOrder(gun.arsenal)[digit[1]==='0'?9:Number(digit[1])-1];if(id)this.select(id);return true;}
+    if(digit){const id=equippedInOrder(gun.arsenal)[digit[1]==='0'?9:Number(digit[1])-1];if(id)this.select(id);return true;}
     return false;
   }
   /**
@@ -441,7 +442,8 @@ export class WeaponsController implements WeaponSceneHooks {
     rig.scope(drawn?(sightView?gun.adsBlend:gun.scopeBlend):0);
     if(!drawn)rig.lookScale=1;
     const blocked=drawn&&gun.blockedAt?scene.project(gun.blockedAt):undefined;
-    this.hud.update({visible:drawn&&playable,view:gun.view(now),fov:camera.fov,width:camera.width,height:camera.height,blocked,locked:!!this.assist.locked,lite:settings.lite,now,device:this.device,reloadKey:keyLabel(settings.keys.reload)});
+    // Choosing the wheel's hand hides the crosshair immediately, without waiting for the holster animation to finish.
+    this.hud.update({visible:drawn&&!!gun.want&&playable,view:gun.view(now),fov:camera.fov,width:camera.width,height:camera.height,blocked,locked:!!this.assist.locked,lite:settings.lite,now,device:this.device,reloadKey:keyLabel(settings.keys.reload)});
     this.track();
     return frame;
   }

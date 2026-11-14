@@ -26,7 +26,7 @@ const xLabels=(days:string[],x:(i:number)=>number,height:number)=>{
 };
 
 /** One series over time (coins in circulation): a 2 px line, a 10% wash and the last value at the end. */
-export function lineChart(points:ReadonlyArray<{day:string;value:number}>,width:number,label:string,height=190):string {
+export function lineChart(points:ReadonlyArray<{day:string;value:number}>,width:number,label:string,height=190,unit='moedas'):string {
   if(!points.length)return '';
   const max=Math.max(...points.map(p=>p.value),1),scale=ticks(max),top=scale[scale.length-1]!;
   const innerW=width-PAD.left-PAD.right,innerH=height-PAD.top-PAD.bottom;
@@ -41,7 +41,7 @@ export function lineChart(points:ReadonlyArray<{day:string;value:number}>,width:
     <circle class="viz-dot" cx="${x(points.length-1)}" cy="${y(last.value)}" r="4"/>
     <text class="viz-value" x="${x(points.length-1)+8}" y="${y(last.value)+4}">${compact(last.value)}</text>
     ${xLabels(points.map(p=>p.day),x,height)}
-    ${points.map((p,i)=>`<rect class="viz-hit" x="${Math.max(PAD.left,x(i)-band/2)}" y="${PAD.top}" width="${Math.max(6,band)}" height="${innerH}" tabindex="-1" data-cross="${x(i)}" data-tip="${e(`${shortDay(p.day)} · ${n(p.value)} moedas`)}"/>`).join('')}
+    ${points.map((p,i)=>`<rect class="viz-hit" x="${Math.max(PAD.left,x(i)-band/2)}" y="${PAD.top}" width="${Math.max(6,band)}" height="${innerH}" tabindex="-1" data-cross="${x(i)}" data-tip="${e(`${shortDay(p.day)} · ${n(p.value)} ${unit}`)}"/>`).join('')}
   </svg>`;
 }
 
@@ -61,6 +61,35 @@ export function flowChart(days:ReadonlyArray<{day:string;created:number;destroye
         <rect class="viz-hit" x="${x(i)-slot/2}" y="${PAD.top}" width="${slot}" height="${innerH}"/>
         <path class="viz-up" d="${bar(left,zero-1-up,w,up,true)}"/><path class="viz-down" d="${bar(left,zero+1,w,down,false)}"/></g>`;}).join('')}
     ${xLabels(days.map(d=>d.day),x,height)}
+  </svg>`;
+}
+
+/** Two series side by side per day (the Ribeiro's orders opened and completed): `a` in the warm colour, `b` in the blue. */
+export function pairedBars(days:ReadonlyArray<{day:string;a:number;b:number}>,width:number,names:readonly [string,string],label:string,height=210):string {
+  if(!days.length)return '';
+  const top=ticks(Math.max(1,...days.map(d=>Math.max(d.a,d.b)))).slice(-1)[0]!,scale=ticks(top);
+  const innerW=width-PAD.left-PAD.right+30,innerH=height-PAD.top-PAD.bottom,slot=innerW/days.length,w=Math.max(3,Math.min(16,(slot-4)/2)),h=(v:number)=>v/top*innerH;
+  const left=PAD.left-10,x=(i:number)=>left+i*slot+slot/2,base=PAD.top+innerH;
+  return `<svg class="admin-chart" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${e(label)}">
+    ${scale.map(t=>`<line class="viz-grid" x1="${left}" x2="${left+innerW}" y1="${base-h(t)}" y2="${base-h(t)}"/><text class="viz-axis" x="${left-6}" y="${base-h(t)+3}" text-anchor="end">${compact(t)}</text>`).join('')}
+    <line class="viz-baseline" x1="${left}" x2="${left+innerW}" y1="${base}" y2="${base}"/>
+    ${days.map((d,i)=>`<g class="viz-bar" tabindex="-1" data-tip="${e(`${shortDay(d.day)} · ${names[0]} ${n(d.a)} · ${names[1]} ${n(d.b)}`)}"><rect class="viz-hit" x="${x(i)-slot/2}" y="${PAD.top}" width="${slot}" height="${innerH}"/>
+      <path class="viz-alt" d="${bar(x(i)-w-1,base-h(d.a),w,h(d.a),true)}"/><path class="viz-up" d="${bar(x(i)+1,base-h(d.b),w,h(d.b),true)}"/></g>`).join('')}
+    ${days.map((d,i)=>days.length<=8||i%2===(days.length-1)%2?`<text x="${x(i)}" y="${height-6}" text-anchor="middle" class="viz-axis">${shortDay(d.day)}</text>`:'').join('')}
+  </svg>`;
+}
+
+/** One horizontal bar per row, the label on the left and the value at the bar's end; `tone` picks the colour (`up` blue, `alt` warm, `down` red, `muted` grey). */
+export function hBars(rows:ReadonlyArray<{label:string;value:number;text?:string;tip?:string;tone?:'up'|'alt'|'down'|'muted'}>,width:number,label:string,labelWidth=168):string {
+  if(!rows.length)return '';
+  const ROW=30,height=rows.length*ROW+6,max=Math.max(1,...rows.map(r=>r.value)),barW=Math.max(40,width-labelWidth-76);
+  return `<svg class="admin-chart" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${e(label)}">
+    ${rows.map((r,i)=>{const y=i*ROW+3,w=r.value/max*barW,shown=r.text??n(r.value),cut=r.label.length>26?`${r.label.slice(0,25)}…`:r.label;
+      return `<g class="viz-bar" tabindex="-1" data-tip="${e(r.tip??`${r.label} · ${shown}`)}"><rect class="viz-hit" x="0" y="${y}" width="${width}" height="${ROW}"/>
+        <text class="viz-label" x="${labelWidth-10}" y="${y+ROW/2+4}" text-anchor="end">${e(cut)}</text>
+        <rect class="viz-track" x="${labelWidth}" y="${y+7}" width="${barW}" height="${ROW-14}"/>
+        ${r.value>0?`<rect class="viz-${r.tone??'up'}" x="${labelWidth}" y="${y+7}" width="${Math.max(2,w)}" height="${ROW-14}"/>`:''}
+        <text class="viz-value" x="${labelWidth+Math.max(2,w)+8}" y="${y+ROW/2+4}">${e(shown)}</text></g>`;}).join('')}
   </svg>`;
 }
 

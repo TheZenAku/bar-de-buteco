@@ -28,7 +28,7 @@ import {PricingService} from './pricing-service.js';
 import {HighfoodService} from './highfood-service.js';
 import {SparringService} from './sparring-service.js';
 import {ArsenalService} from './arsenal-service.js';
-import {PART_IDS,PART_SLOTS,UPGRADE_TRACKS,WEAPON_IDS} from '@bar/shared';
+import {PART_IDS,PART_SLOTS,RIBEIRO_WEAPON_ITEM,UPGRADE_TRACKS,WEAPON_IDS} from '@bar/shared';
 import {FuelPayments} from './fuel-service.js';
 import {TradeService} from './trade-service.js';
 import {DevBots} from './dev-bots.js';
@@ -561,7 +561,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session] = await db.select().from(tables.sessions).where(and(eq(tables.sessions.id, sessionId), eq(tables.sessions.userId, userId), gt(tables.sessions.expiresAt, new Date())));
     const user = session ? await getUser(db, userId) : null;
     const banned=await isBanned(db,userId),valid = !!user?.verified && !banned;
-    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?{...await wardrobe.access(user),...await inventory.access(user.id),...await highfood.access(user.id)}:{}) };
+    return { valid,banned, blocked: valid ? await blockedIds(db, userId) : [], role: user?.role ?? 'user',...(valid&&user?{...await wardrobe.access(user),...await inventory.access(user.id),...await highfood.access(user.id),arsenal:await arsenal.load(user.id)}:{}) };
   });
   app.post('/api/internal/inventory',internalOptions,async request=>{
     const body=z.object({sessionId:uuidSchema,userId:uuidSchema,itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(10),
@@ -569,6 +569,16 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     const [session]=await db.select().from(tables.sessions).where(and(eq(tables.sessions.id,body.sessionId),eq(tables.sessions.userId,body.userId),gt(tables.sessions.expiresAt,new Date())));
     if(!session||await isBanned(db,body.userId))throw new HttpError(401,'Sessão encerrada.');
     return inventory.remove(body.userId,body.itemId,body.quantity,body.reason,body.requestId);
+  });
+  app.post('/api/internal/inventory/grant',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,itemId:z.enum(ITEM_IDS),quantity:z.number().int().min(1).max(100),reason:z.literal('ribeiro'),requestId:uuidSchema.toLowerCase()}).strict().parse(request.body);
+    return inventory.grant(body.userId,body.itemId,body.quantity,body.reason,body.requestId);
+  });
+  app.post('/api/internal/inventory/equip-weapon',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,itemId:z.enum(ITEM_IDS),weapon:z.enum(WEAPON_IDS),requestId:uuidSchema}).strict().parse(request.body);
+    if(RIBEIRO_WEAPON_ITEM[body.weapon]!==body.itemId)throw new HttpError(400,'A arma não corresponde ao item da mochila.');
+    const result=await inventory.equipWeapon(body.userId,body.itemId,body.weapon,body.requestId.toLowerCase());
+    return {...result,arsenal:await arsenal.load(body.userId)};
   });
   // The truck's cargo hold (vehicle-storage-service.ts): the room checks who stands where, the API keeps the quantities.
   app.post('/api/internal/vehicle-storage',internalOptions,async request=>{
@@ -626,7 +636,7 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
       z.object({action:z.literal('treasury.adjust'),amount:z.number().int().min(-1_000_000_000).max(1_000_000_000),reason:z.string().min(3).max(200),actorId:z.string().min(1).max(64),requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('shipment.list'),finished:z.number().int().min(0).max(100).optional()}).strict(),
       z.object({action:z.literal('shipment.summary')}).strict(),
-      z.object({action:z.literal('shipment.load'),vehicleId:truckKeySchema,plate:z.string().max(16).optional(),driverId:z.string().max(64).optional(),loaderId:uuidSchema,pallets:z.number().int().min(1).max(10),dest:destinationSchema,requestId:uuidSchema.toLowerCase()}).strict(),
+      z.object({action:z.literal('shipment.load'),vehicleId:truckKeySchema,plate:z.string().max(16).optional(),driverId:z.string().max(64).optional(),loaderId:uuidSchema,pallets:z.number().int().min(1).max(10),bags:z.number().int().min(1).max(180).optional(),dest:destinationSchema,requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('shipment.accept'),orderId:uuidSchema,vehicleId:truckKeySchema,plate:z.string().max(16).optional(),driverId:uuidSchema,dest:destinationSchema,requestId:uuidSchema.toLowerCase()}).strict(),
       z.object({action:z.literal('shipment.driver'),id:uuidSchema,driverId:z.string().max(64)}).strict(),
       z.object({action:z.literal('shipment.depart'),id:uuidSchema}).strict(),
@@ -760,9 +770,8 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   });
   // The firearms' arsenal (arsenal-service.ts, docs/sistemas/armas.md): /armas loads it (granting the test kit), a part fitted, an upgrade bought.
   app.post('/api/internal/arsenal/load',internalOptions,async request=>{
-    const body=z.object({userId:uuidSchema,testKit:z.boolean().optional()}).strict().parse(request.body);
-    if(body.testKit)await arsenal.grantTestKit(body.userId);
-    return arsenal.load(body.userId,!!body.testKit);
+    const body=z.object({userId:uuidSchema}).strict().parse(request.body);
+    return arsenal.load(body.userId);
   });
   app.post('/api/internal/arsenal/grant',internalOptions,async request=>{
     const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),requestId:uuidSchema}).strict().parse(request.body);
@@ -772,6 +781,10 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
   app.post('/api/internal/arsenal/configure',internalOptions,async request=>{
     const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),slot:z.enum(PART_SLOTS),part:z.enum(PART_IDS).nullable()}).strict().parse(request.body);
     return arsenal.configure(body.userId,body.weapon,body.slot,body.part);
+  });
+  app.post('/api/internal/arsenal/equip',internalOptions,async request=>{
+    const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),equipped:z.boolean(),test:z.boolean()}).strict().parse(request.body);
+    return arsenal.equip(body.userId,body.weapon,body.equipped,body.test);
   });
   app.post('/api/internal/arsenal/upgrade',internalOptions,async request=>{
     const body=z.object({userId:uuidSchema,weapon:z.enum(WEAPON_IDS),track:z.enum(UPGRADE_TRACKS),free:z.boolean(),requestId:uuidSchema}).strict().parse(request.body);

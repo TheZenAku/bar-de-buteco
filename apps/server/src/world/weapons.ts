@@ -88,7 +88,7 @@ export class WeaponDirector {
     const gun=player.gun;
     if(!gun.w)return;
     const owned=arsenalWeapon(view,gun.w);
-    if(!owned){this.holster(player,true);return;}
+    if(!owned?.equipped){this.holster(player,true);return;}
     const stats=weaponStats(owned.id,owned.parts,owned.upgrades);
     armed.stats=stats;gun.kit=encodeKit(owned.parts);
     if(gun.mode>=stats.modes.length)gun.mode=0;
@@ -159,13 +159,14 @@ export class WeaponDirector {
 
   private draw(armed:Armed,w:WeaponId,now:number):void {
     const {player}=armed,gun=player.gun,owned=arsenalWeapon(armed.view,w);
-    const why=!owned?'Você não tem essa arma.':this.host.refusal(player);
+    const why=!owned?'Você não tem essa arma.':!owned.equipped?'Equipe essa arma antes de usá-la.':this.host.refusal(player);
     if(why){armed.latched=w;this.host.refuse(player,why);return;}
     // Another weapon in hand goes away first (a reload on it stops with what is in).
     if(gun.w)this.holster(player,false);
     const stats=weaponStats(owned!.id,owned!.parts,owned!.upgrades);
     armed.stats=stats;
-    gun.assign({w,kit:encodeKit(owned!.parts),drawAt:now,ads:false,mag:Math.min(stats.mag,armed.rounds.get(w)??stats.mag),reloadAt:0,reloadUntil:0,reloadFrom:0,
+    const initialMag=armed.view.infinite?stats.mag:0;
+    gun.assign({w,kit:encodeKit(owned!.parts),drawAt:now,ads:false,mag:Math.min(stats.mag,armed.rounds.get(w)??initialMag),reloadAt:0,reloadUntil:0,reloadFrom:0,
       mode:gun.mode<stats.modes.length?gun.mode:0});
     armed.rounds.set(w,gun.mag);
     this.host.drew?.(player);

@@ -71,7 +71,7 @@ export const TICK_MS = 50;
 export const PATCH_MS = 100;
 export const AOI_RADIUS = 18;
 export const CHAT_RADIUS = 12;
-export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,floorHeight,floorSurface,isWalkable,movePlayer,FLY,flyPlayer,fallPlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
+export {boxContains,WALK_SPEED,RUN_SPEED,OLD_CANE_SPEED,PLAYER_RADIUS,PLAYER_HEIGHT,WORLD,MAP_MARKERS,MAP_EFFECTS,MAP_COLLIDERS,MAP_SURFACES,CAFE_TABLES,tableByNumber,type CafeTable,BLACKJACK_TABLE,BLACKJACK_SEATS,TRUCO_TABLE,TRUCO_SEATS,JUKEBOX,COLLIDERS,INTERACTABLES,COUNTER_FOOTPRINT,TV_SPOTS,STAGE,STAGE_ENTRY,STAGE_AREA,inStageArea,SHOP_SPOT,SHOP_REACH,MUSICIAN_REACH,MUSICIAN_ROLES,musicianRole,onStage,hasStagePass,solidColliders,isDoorOpen,setDoorStates,syncFactoryGates,floorHeight,floorSurface,isWalkable,movePlayer,FLY,flyPlayer,fallPlayer,distance,nearestInteraction,canInteract,interactionReach,findSpawn,standingPosition,cameraFraction,sightBlocked,roadHeight,groundBelow,solidsBetween} from './world.js';
 export {JUMP,jumpMotion,canJump,jumpAnimation,type JumpMotion} from './jump.js';
 export type AnimationState = 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'land' | 'sit' | 'dance' | 'wave' | 'use' | 'wait' | 'toilet'
   | 'horse-idle' | 'horse-walk' | 'horse-gallop' | 'horse-rear'
@@ -133,6 +133,8 @@ export interface PlayerState extends Position, Partial<JumpMotion> { id: string;
   carrying?: string; carryingOrder?: string;
   /** A sack from the plant in the arms ('MALTE' | 'MIX'), '' or absent when none. */
   factoryBag?: string;
+  /** The Ribeiro workpiece in both hands ('raw' | 'cut' | 'machined' | 'finished' | 'assembled'), '' or absent when none. */
+  ribeiroPart?: string;
   /** On a Highfood shift, and the delivery in hand. */
   courier?: boolean; parcel?: string;horseRearAt?:number;
   /** Has the phone in front of them: standing still, they look at it. */
@@ -162,7 +164,7 @@ export interface BlackjackSeat { playerId: string; displayName: string; chair: n
 export interface BlackjackTable { id: string; phase: BlackjackPhase; round: number; move: number; roundId: string; seats: BlackjackSeat[];
   dealerCards: BlackjackCard[]; dealerTotal: number; dealerSoft: boolean; turnPlayerId: string; turnHand: number; deadline: number; minBet: number; maxBet: number }
 export interface ActiveEvent { id: string; type: EventType | ''; startedAt: number; durationMs: number }
-export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number}>; jobs?:Record<string,JobSlotsView>; served?:Record<string,ServedItemState>;
+export interface WorldState { players: Record<string,PlayerState>; npcs: Record<string,NpcState>; tables: Record<string,BlackjackTable>; jukeboxes?:Record<string,JukeboxState>; televisions?:Record<string,JukeboxState>; doors?:Record<string,{id:string;open:boolean;changedAt:number;side?:number}>; jobs?:Record<string,JobSlotsView>; served?:Record<string,ServedItemState>;
   fuelServices?:Record<string,import('./refueling.js').FuelServiceState>;
   environment?:EnvironmentState;
   /** The stage's musicians' spots, by spot id (musicians.ts). */

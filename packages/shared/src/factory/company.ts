@@ -1,3 +1,5 @@
+import {CITY_MARKERS} from '../city.js';
+
 /**
  * The firm behind the plant (docs/sistemas/empresa.md): its owners and managers, its wallet, the raw material it buys, the production orders
  * (OPs) it approves and the cleaning the plant asks for after each one. Pure data and rules, shared by the API, the world, the browser and the
@@ -123,6 +125,9 @@ export interface CleanTask {
   at:CleanSpot;radius:number;
 }
 const spot=(x:number,y:number,z:number):CleanSpot=>({x,y,z});
+/** The truck bay (Ponto_EB_Doca): it moved 3 m east in the v6.7 export, so the dock's floor reads the marker instead of repeating its coordinates. */
+const DOCK=CITY_MARKERS['Ponto_EB_Doca'];
+if(!DOCK)throw new Error('O marcador Ponto_EB_Doca não está nos dados da cidade.');
 /**
  * Every place the plant gets dirty and what cleaning it takes. Positions are the map's markers (empresa_brasil_marcadores.json).
  * The washing of a tank is done from its platform, the dryer by its own cycle, the line at the bagging machine and the floors on foot.
@@ -137,7 +142,7 @@ export const CLEAN_TASKS:readonly CleanTask[]=[
   {id:'floor-secador',kind:'floor',label:'Piso do secador',verb:'Lavar o piso',spots:[spot(352.6,.2,-68.5)],reach:5,durationS:10,pay:12,at:spot(352.6,.2,-68.5),radius:6},
   {id:'floor-ensaque',kind:'floor',label:'Piso do ensaque',verb:'Lavar o piso',spots:[spot(356.5,.3,-62)],reach:5,durationS:10,pay:12,at:spot(356.5,.3,-62),radius:5.5},
   {id:'floor-estoque',kind:'floor',label:'Piso do estoque',verb:'Lavar o piso',spots:[spot(337.5,.3,-61.6)],reach:5,durationS:10,pay:12,at:spot(337.5,.3,-61.6),radius:6},
-  {id:'floor-doca',kind:'floor',label:'Piso da doca',verb:'Lavar o piso',spots:[spot(348.5,.2,-52.6)],reach:5,durationS:10,pay:12,at:spot(348.5,.2,-52.6),radius:6},
+  {id:'floor-doca',kind:'floor',label:'Piso da doca',verb:'Lavar o piso',spots:[spot(DOCK.x,.2,DOCK.z)],reach:5,durationS:10,pay:12,at:spot(DOCK.x,.2,DOCK.z),radius:6},
   {id:'floor-sala',kind:'floor',label:'Sala de controle',verb:'Lavar o piso',spots:[spot(347.5,.2,-66)],reach:5,durationS:10,pay:12,at:spot(347.5,.2,-66),radius:4},
 ];
 export const CLEAN_TASK_IDS=CLEAN_TASKS.map(task=>task.id);

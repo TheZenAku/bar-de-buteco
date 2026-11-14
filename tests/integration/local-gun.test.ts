@@ -8,6 +8,27 @@ const HOLD:GunControls={trigger:true,ads:false,breath:false};
 const IDLE:GunControls={trigger:false,ads:false,breath:false};
 const AIM:GunControls={trigger:false,ads:true,breath:false};
 
+test('only equipped weapons can be selected',()=>{
+  const gun=new LocalGun('eu');
+  gun.setArsenal(testArsenal(false));
+  gun.reconcile({...NO_GUN,on:true},0,0,0);
+  assert.equal(gun.select('pistola'),false);
+  const equipped=testArsenal(false);equipped.weapons.find(item=>item.id==='pistola')!.equipped=true;
+  gun.setArsenal(equipped);
+  assert.equal(gun.select('pistola'),true);
+});
+
+test('a manufactured weapon is shown and drawn with an empty magazine',()=>{
+  const gun=new LocalGun('eu'),arsenal={...testArsenal(),test:false,infinite:false,ammo:{}};
+  gun.setArsenal(arsenal);
+  gun.reconcile({...NO_GUN,on:true},0,0,0);
+  assert.equal(gun.magOf('pistola'),undefined);
+  assert.equal(gun.select('pistola'),true);
+  gun.update(1/60,IDLE,{now:1000,origin:[0,1.6,-2],forward:[0,0,1],feet:[0,0,0],skin:undefined,speed:0,sprinting:false,targets:()=>[],world:OPEN,seen:()=>({seen:0,ago:0}),free:true});
+  assert.equal(gun.mag,0);
+  assert.equal(gun.reserve,0);
+});
+
 /** A gun turned on with the test kit, standing at the origin looking along +Z, a camera just behind the right shoulder. */
 function armed(weapon='pistola',targets:ShotTarget[]=[],world:WorldRay=OPEN){
   const gun=new LocalGun('eu');

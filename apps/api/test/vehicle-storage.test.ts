@@ -54,6 +54,9 @@ test('the truck is sold with a hold; moves are atomic, idempotent, limited and o
   assert.equal((await move(a,'withdraw','refrigerante',10)).statusCode,409);assert.equal((await move(a,'withdraw','agua',1)).statusCode,409);
   const out=await move(a,'withdraw','refrigerante',9);assert.equal(out.statusCode,200,out.body);assert.equal(await bag('refrigerante'),9);assert.equal(await hold('refrigerante'),0);assert.equal(out.json().storage.stacks.length,0);
   assert.equal((await move(a,'deposit','agua',10)).statusCode,200);assert.equal(await bag('agua'),0);
+  // Finished Ribeiro weapons are regular cargo: several units can leave the backpack for the truck in one move.
+  await setBag('arma_pistola',6);assert.equal(storageStackMax('arma_pistola'),100);
+  const weapons=await move(a,'deposit','arma_pistola',6);assert.equal(weapons.statusCode,200,weapons.body);assert.equal(await bag('arma_pistola'),0);assert.equal(await hold('arma_pistola'),6);
   await setBag('agua',5);
   assert.equal((await move(a,'withdraw','agua',6)).statusCode,409);   // 5 + 6 would pass the backpack's stack of 10
   assert.equal((await move(a,'withdraw','agua',5)).statusCode,200);assert.equal(await bag('agua'),10);assert.equal(await hold('agua'),5);

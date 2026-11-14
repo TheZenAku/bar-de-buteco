@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
-import {CLEAN_TASKS,DEFAULT_FACTORY_BALANCE,DIRT_CLEAN,DIRT_PENDING,FACTORY_BAGS,FACTORY_MATERIALS,FACTORY_QUALITY_MIN,OLD_DRYER_FLOW_LPH,addIngredient,batchYield,emptyBagging,emptyDryer,emptyTank,solidsOf,tankVolumeL,tickDryer,tickTank,cleanDirt,cleanTaskOf,drawProductionOffers,emptyProductionBoard,orderWaterL,pendingCleaning,type ActiveProduction,type BaggingRuntime,type CleanTaskId,type DryerRuntime,type FactoryBalance,type FactoryDirt,type FactoryMaterial,type FactoryRecipe,type ProductionBoard,type ProductionLogEntry,type ProductionOrder,type TankRuntime} from '@bar/shared/factory';
+import {CART_CAPACITY,CLEAN_TASKS,DEFAULT_FACTORY_BALANCE,FACTORY_CART,stepCart,DIRT_CLEAN,DIRT_PENDING,FACTORY_BAGS,FACTORY_MATERIALS,FACTORY_QUALITY_MIN,OLD_DRYER_FLOW_LPH,addIngredient,batchYield,emptyBagging,emptyDryer,emptyTank,solidsOf,tankVolumeL,tickDryer,tickTank,cleanDirt,cleanTaskOf,drawProductionOffers,emptyProductionBoard,orderWaterL,pendingCleaning,type ActiveProduction,type BaggingRuntime,type CartBag,type CartView,type CleanTaskId,type DryerRuntime,type FactoryBalance,type FactoryDirt,type FactoryMaterial,type FactoryRecipe,type ProductionBoard,type ProductionLogEntry,type ProductionOrder,type TankRuntime} from '@bar/shared/factory';
 
 interface MarkerFile {n:number;marcadores:Record<string,{xyz_jogo:[number,number,number];rot:number[]|null;extras:Record<string,unknown>}>}
 interface StockFile {vagas:Array<{marcador:string;tipo:FactoryMaterial;capacidade:number;nivel_m:number;jogo_xyz:[number,number,number]}>}
@@ -54,6 +54,8 @@ export class FactoryDirector {
   /** Production orders (OPs): nothing is produced without a running one. */board:ProductionBoard=emptyProductionBoard();
   /** How dirty each place is; `required` after an OP ends, until everything is clean again. */dirt:FactoryDirt={levels:cleanDirt(),required:false};
   /** Set while the automatic test cycle runs: it works without an order. */private bypassOrder=false;
+  /** The platform cart: its pose, the sacks on it (they left the shelves: they count as withdrawn, like the ones in a player's arms) and whoever pushes it. `version` moves with every change, the pose's included (`revision` does not: it would resend and resave the whole plant at every step). */
+  cart:{x:number;y:number;z:number;yaw:number;bags:CartBag[];pusher:string|null;version:number}={...FACTORY_CART.park,bags:[],pusher:null,version:0};
   emergency=false;revision=0;/** The starting stock was put in once (a reset leaves the plant empty on purpose). */seeded=false;lastSimulation:FactorySimulationReport|null=null;private activeOperators=0;private tickAccumulator=0;private eventSeq=0;private alarmClock=0;
   constructor(assets=loadAssets()){
     validateFactoryAssets(assets.markers,assets.stock);this.markers=assets.markers.marcadores;
@@ -236,8 +238,15 @@ export class FactoryDirector {
   private maybeFinishProduction():boolean {
     const order=this.board.active;if(!order||order.status!=='running'||order.batchesStarted<order.batches)return false;
     if(this.tanks.some(tank=>!['VAZIO','SUJO'].includes(tank.state))||this.dryer.state==='PRODUZINDO'||this.dryer.powderKg>.05)return false;
-    if(!['PARADO','AGUARDANDO_SACO'].includes(this.bagging.state)||this.bagging.weightKg>.05)return false;
+    // An empty bag left on the nozzle (nothing in the silo to fill it) does not hold the order open: it goes back to the stack.
+    if(!['PARADO','AGUARDANDO_SACO','SACO_POSICIONADO'].includes(this.bagging.state)||this.bagging.weightKg>.05)return false;
+    this.unseatBag();
     this.finishProduction('completed','a fábrica');return true;
+  }
+  /** An empty bag sitting on the nozzle goes back to the stack of empty bags (the machine is free again). */
+  private unseatBag():boolean {
+    if(this.bagging.state!=='SACO_POSICIONADO')return false;
+    this.bagging={...this.bagging,state:'AGUARDANDO_SACO',emptyBags:this.bagging.emptyBags+1,weightKg:0};return true;
   }
   /** The order ends: the plant is left dirty (every place needs cleaning before the next order starts) and the recipe goes back to the plant's own. */
   private finishProduction(result:'completed'|'closed',by:string):void {
@@ -279,13 +288,14 @@ export class FactoryDirector {
     if(task.kind==='dryer')return 'O secador se lava pelo comando "Lavar o secador" (ele precisa estar parado).';
     if((this.dirt.levels[id]??0)<DIRT_CLEAN&&!(task.kind==='tank'&&this.tanks[Number(id[4])-1]?.state==='SUJO'))return `${task.label} já está limpo.`;
     if(task.kind==='tank'){const tank=this.tanks[Number(id[4])-1]!;if(!['SUJO','VAZIO'].includes(tank.state))return `${tankName(tank.id)} tem lote: só se lava vazio.`;}
-    if(task.kind==='line'&&!['PARADO','AGUARDANDO_SACO'].includes(this.bagging.state))return 'A ensacadeira está ocupada: termine o saco antes de passar água.';
+    if(task.kind==='line'&&!['PARADO','AGUARDANDO_SACO','SACO_POSICIONADO'].includes(this.bagging.state))return 'A ensacadeira está ocupada: termine o saco antes de passar água.';
     return '';
   }
   /** The timed task finished: the place is clean. */
   completeClean(id:CleanTaskId,by:string):void {
     const problem=this.cleanProblem(id);if(problem)throw new Error(problem);
     const task=cleanTaskOf(id)!;
+    if(task.kind==='line')this.unseatBag();
     if(task.kind==='tank'){const tankId=Number(id[4]) as 1|2|3;this.tanks[tankId-1]=emptyTank(tankId);}
     this.dirt.levels[id]=0;this.note('ok',`${task.label} limpo por ${by}.`);this.checkClean();this.revision++;
   }
@@ -314,6 +324,41 @@ export class FactoryDirector {
     const home=this.slots.find(item=>item.marker===marker&&item.material===material&&item.quantity<item.capacity)??this.slots.find(item=>item.material===material&&item.quantity<item.capacity);
     if(!home)throw new Error('Nenhuma vaga pode receber o saco.');
     home.quantity++;this.revision++;
+  }
+  // ---- the platform cart ----
+  /** What the cart looks like to the clients. */
+  cartView():CartView {const {x,y,z,yaw,bags,pusher}=this.cart;return {x,y,z,yaw,bags:bags.map(bag=>bag.material),pusher};}
+  /** A sack from a rack column goes onto the cart (refused, with the shelf untouched, when the cart is full). */
+  takeToCart(marker:string):CartBag {
+    if(this.cart.bags.length>=CART_CAPACITY)throw new Error(`O carrinho está cheio (${CART_CAPACITY}/${CART_CAPACITY}).`);
+    const bag=this.takeFromColumn(marker);this.cart.bags.push(bag);this.cart.version++;return bag;
+  }
+  /** A sack from somebody's arms goes onto the cart. */
+  putOnCart(bag:CartBag):void {
+    if(this.cart.bags.length>=CART_CAPACITY)throw new Error(`O carrinho está cheio (${CART_CAPACITY}/${CART_CAPACITY}).`);
+    this.cart.bags.push({...bag});this.cart.version++;this.revision++;
+  }
+  /** The top sack of the cart (with the shelf it came from) goes to somebody's arms. */
+  unloadFromCart():CartBag {
+    const bag=this.cart.bags.pop();if(!bag)throw new Error('O carrinho está vazio.');
+    this.cart.version++;this.revision++;return bag;
+  }
+  /** Who pushes the cart now (null: nobody; it stays where it is). */
+  setCartPusher(userId:string|null):void {if(this.cart.pusher===userId)return;this.cart.pusher=userId;this.cart.version++;}
+  /** One step of the cart behind its pusher (see stepCart); true when it moved. */
+  moveCart(driver:{x:number;y:number;z:number;rotation:number},dt:number):boolean {
+    const moved=stepCart(this.cart,driver,dt)==='moved';if(moved)this.cart.version++;return moved;
+  }
+  /** The cart goes back to where it parks, empty (its sacks are not given back: this is for a plant that was reset to nothing). */
+  parkCart():void {Object.assign(this.cart,FACTORY_CART.park,{bags:[],pusher:null});this.cart.version++;}
+  /** The stock as it is saved: the cart's sacks count as still on their shelves, because the cart does not survive a restart (it comes back parked and empty). */
+  persistentSlots():FactorySlot[] {
+    const slots=this.slots.map(slot=>({...slot}));
+    for(const bag of this.cart.bags){
+      const home=slots.find(slot=>slot.marker===bag.origin&&slot.material===bag.material&&slot.quantity<slot.capacity)??slots.find(slot=>slot.material===bag.material&&slot.quantity<slot.capacity);
+      if(home)home.quantity++;
+    }
+    return slots;
   }
   /**
    * A bag poured by an operator standing on the platform: the lid is opened and the agitator started first when they are not (the
@@ -377,6 +422,9 @@ export class FactoryDirector {
         if(this.bagging.emptyBags<1)throw new Error('Sem sacos vazios: reponha o fardo.');
         if(this.bagging.state!=='PARADO'&&this.bagging.state!=='AGUARDANDO_SACO')throw new Error('A ensacadeira está ocupada com outro saco.');
         this.bagging={...this.bagging,state:'SACO_POSICIONADO',emptyBags:this.bagging.emptyBags-1,weightKg:0};message='Saco posicionado no bico.';break;
+      case 'bag.remove':
+        if(this.bagging.state!=='SACO_POSICIONADO')throw new Error('Não há saco vazio posicionado no bico para retirar.');
+        this.unseatBag();message='Saco vazio retirado do bico: voltou para o fardo.';break;
       case 'bag.restock':
         if(this.bagging.emptyBags>FACTORY_BAGS.lowAt*4)throw new Error('Ainda há bastante saco vazio no fardo.');
         this.bagging={...this.bagging,emptyBags:this.bagging.emptyBags+FACTORY_BAGS.restock};message=`Fardo reposto: +${FACTORY_BAGS.restock} sacos vazios.`;this.note('info',`Fardo de sacos vazios reposto${who}.`);break;
@@ -415,7 +463,8 @@ export class FactoryDirector {
         if(!out)throw new Error('Não há palete na saída.');
         if(out.quantity)throw new Error('O palete anterior ainda está na saída: armazene-o no estoque primeiro.');
         if(this.bagging.palletBags<1)throw new Error('Não há sacos empilhados no palete da saída.');
-        if(!['PARADO','AGUARDANDO_SACO'].includes(this.bagging.state))throw new Error('Termine o saco que está na ensacadeira antes de fechar o palete.');
+        if(!['PARADO','AGUARDANDO_SACO','SACO_POSICIONADO'].includes(this.bagging.state))throw new Error('Termine o saco que está na ensacadeira antes de fechar o palete.');
+        this.unseatBag();
         const bags=this.bagging.palletBags;out.quantity=bags;out.batchId=this.bagging.lot;this.bagging={...this.bagging,palletBags:0,lot:''};
         message=`Palete fechado com ${bags} sacos (incompleto). Armazene-o no estoque.`;this.note('ok',`Palete incompleto de ${bags} sacos fechado${who}.`);break;}
       case 'pallet.store':{
@@ -489,18 +538,17 @@ export class FactoryDirector {
     }
   }
   /**
-   * Product leaves the racks for a truck: `pallets` x 18 bags, from the emptiest slots first so partial pallets go before full ones. Returns what was
-   * taken per slot (to put back if the truck cannot be loaded). Throws when there is not enough product.
+   * Product leaves the racks for a truck: `pallets` whole pallets, whatever their fill (an incomplete pallet is a pallet too, sold by the bags on it),
+   * the emptiest first so partial pallets go before full ones. Returns the bags taken per slot (to put back if the truck cannot be loaded; their sum is
+   * the cargo's bags). Throws when there are not that many pallets.
    */
   takeProduct(pallets:number):Record<string,number> {
-    const need=pallets*18,have=this.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0);
     if(!Number.isInteger(pallets)||pallets<1)throw new Error('Escolha quantos paletes carregar.');
-    if(have<need)throw new Error(`Só há ${have} sacos de produto (${Math.floor(have/18)} palete(s)) no estoque.`);
-    const taken:Record<string,number>={};let left=need;
-    for(const slot of this.slots.filter(item=>item.material==='PRODUTO'&&item.quantity>0).sort((a,b)=>a.quantity-b.quantity)){
-      const bags=Math.min(left,slot.quantity);slot.quantity-=bags;if(!slot.quantity)slot.batchId='';taken[slot.marker]=bags;left-=bags;if(!left)break;
-    }
-    this.note('info',`${pallets} palete(s) de produto saíram do estoque para um caminhão.`);this.revision++;return taken;
+    const stored=this.slots.filter(item=>item.material==='PRODUTO'&&item.quantity>0).sort((a,b)=>a.quantity-b.quantity);
+    if(stored.length<pallets)throw new Error(`Só há ${stored.length} palete(s) de produto no estoque.`);
+    const taken:Record<string,number>={};
+    for(const slot of stored.slice(0,pallets)){taken[slot.marker]=slot.quantity;slot.quantity=0;slot.batchId='';}
+    this.note('info',`${pallets} palete(s) de produto (${Object.values(taken).reduce((sum,bags)=>sum+bags,0)} sacos) saíram do estoque para um caminhão.`);this.revision++;return taken;
   }
   /** Gives back what takeProduct took (a failed load, or a load cancelled before the truck left). */
   returnProduct(taken:Record<string,number>|number):void {
@@ -527,7 +575,7 @@ export class FactoryDirector {
     this.seeded=true;this.note('ok','Estoque inicial recebido: 36 sacos de MALTE e 18 de MIX.');this.revision++;
   }
   reset():void {
-    this.seeded=true;
+    this.seeded=true;this.parkCart();
     for(const slot of this.slots)Object.assign(slot,{quantity:0,batchId:'',reservedBy:'',reservedUntil:0});
     this.tanks=[emptyTank(1),emptyTank(2),emptyTank(3)];this.dryer=emptyDryer();this.bagging={...emptyBagging(),emptyBags:FACTORY_BAGS.start};this.alarms=[];this.emergency=false;this.lastSimulation=null;this.balance=structuredClone(DEFAULT_FACTORY_BALANCE);this.board=emptyProductionBoard();this.dirt={levels:cleanDirt(),required:false};this.note('warn','Fábrica resetada.');this.revision++;
   }

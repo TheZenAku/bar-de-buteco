@@ -79,9 +79,10 @@ import {WeaponVisuals} from './weapons/visuals';
 import type {GunScenePort,WeaponSceneHooks} from '../weapons/scene-hooks';
 import {MorteScene} from './morte-scene';
 import type {DeathAudio} from '../death/death-audio';
-import {FACTORY_COLOR,FACTORY_SPOTS,distanceToFactory} from '../factory/spots';
+import {CART_SPOT,FACTORY_COLOR,FACTORY_SPOTS,distanceToFactory} from '../factory/spots';
 import {RIBEIRO_COLOR,RIBEIRO_SPOTS} from '../machine-shop/config';
-import {FactoryCarry,localFactoryBag} from '../factory/carry';
+import {FactoryCarry,factoryCartPose,localFactoryBag} from '../factory/carry';
+import {RibeiroCarry,isRibeiroPartStage,localRibeiroPart} from '../machine-shop/carry';
 import {DEATH_GONE_STATE,DEATH_STATE,type DeathPlan} from '@bar/shared';
 
 type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane';
@@ -363,6 +364,7 @@ export class BarScene {
   readonly fuelProps:FuelProps;
   /** The sack a plant operator carries (factory/carry.ts), hugged in both arms over the body's clip. */
   private readonly factoryCarry:FactoryCarry;
+  private readonly ribeiroCarry:RibeiroCarry;
   readonly ready: Promise<void>;
   private televisions=new Map<string,TelevisionSurface>();
   private watchingTv='';
@@ -466,6 +468,7 @@ export class BarScene {
   private factoryRings?: Map<string,Marker>;
   private factoryGuide?: Marker;
   private ribeiroRings?:Map<string,Marker>;
+  private ribeiroGuideId:string|null='computer';
   private highfoodProps?: HighfoodProps;
   private readonly keys = new Set<string>();
   private readonly cleanup: (() => void)[] = [];
@@ -535,6 +538,10 @@ export class BarScene {
   private readonly discoBall: pc.Entity;
   private mapEntity?: pc.Entity;
   private city?: CityStreaming;
+  /** The room's door states of the last snapshot: the plant's automatic gate and door slide towards them (factory/factory-gates.ts). */
+  private doorStates?:Record<string,{open:boolean;changedAt:number;side?:number}>;
+  /** The plant's intercom is being rung (its lamp blinks): kept here so a city that streams in later still gets it. */
+  private intercomRinging=false;
   /** Tests and fixtures: stream around this point instead of the player or the camera. */
   cityFocus?: {x:number;z:number};
   private contactMaterial?: pc.ShaderMaterial;
@@ -671,7 +678,7 @@ export class BarScene {
     this.foosballBalls=new FoosballBalls(this.app,this.material('#f4f1e8',undefined,.35));
     this.poolBalls=new PoolBalls(this.app);
     this.motos=new Motos(this.app,root=>this.contactShadow(root),()=>this.callbacks.motoVolume?.()??1);
-    this.fuelProps=new FuelProps(this.app);this.factoryCarry=new FactoryCarry(this.app);
+    this.fuelProps=new FuelProps(this.app);this.factoryCarry=new FactoryCarry(this.app);this.ribeiroCarry=new RibeiroCarry(this.app);
     this.horseSounds=new HorseSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.footstepSounds=new FootstepSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.blowSounds=new BlowSounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL,()=>{
@@ -907,11 +914,17 @@ export class BarScene {
       const ring=this.buildMarker(`Fábrica ${spot.id}`,FACTORY_COLOR);ring.target={x:spot.x,y:spot.y,z:spot.z};ring.marker.setPosition(spot.x,spot.y,spot.z);ring.marker.enabled=false;return [spot.id,ring];
     }));
     for(const [id,ring] of this.factoryRings){
+      // The cart's ring goes with the cart (the controller moves its spot).
+      if(id===CART_SPOT.id){ring.target={x:CART_SPOT.x,y:CART_SPOT.y,z:CART_SPOT.z};ring.marker.setPosition(CART_SPOT.x,CART_SPOT.y,CART_SPOT.z);}
       const shown=Math.hypot(p.x-ring.target.x,p.z-ring.target.z)<FACTORY_RING_RANGE&&Math.abs(p.y-ring.target.y)<(id.startsWith('rack')?4:2.5);
       ring.marker.enabled=shown;if(shown)this.animateMarker(ring);
     }
     if(this.factoryGuide?.marker.enabled)this.animateMarker(this.factoryGuide);
   }
+  /** Whether a visitor is calling at the plant's intercom (the lamp on the post blinks amber). */
+  setFactoryRinging(on:boolean):void {this.intercomRinging=on;}
+  /** The scene's lighting: the plant's metal models take their reflections from it (EnvironmentLighting.dressMetal). */
+  lightingEnvironment():EnvironmentLighting {return this.environment;}
   /** The next step's ring (null: none). */
   setFactoryGuide(target:{x:number;y:number;z:number}|null):void {
     if(!target){if(this.factoryGuide)this.factoryGuide.marker.enabled=false;return;}
@@ -924,12 +937,14 @@ export class BarScene {
 
   /** One green floor ring for each Ribeiro production station. */
   projectRibeiroSpot(id:string):{x:number;y:number;onScreen:boolean;behind:boolean;distance:number;above:number}|null {return this.projectMarker(this.ribeiroRings?.get(id));}
+  /** Shows only the employee's next sequential Ribeiro task; null hides the guide outside work. */
+  setRibeiroGuide(id:string|null):void {this.ribeiroGuideId=id;}
   private updateRibeiroComputer():void {
     const p=this.actors.get(this.localId)?.root.getPosition();
     const area=!!p&&this.enabled&&!this.watchingTv&&Math.hypot(p.x-RIBEIRO_SPOTS[0].x,p.z-RIBEIRO_SPOTS[0].z)<70;
     if(!area){for(const ring of this.ribeiroRings?.values()??[])ring.marker.enabled=false;return;}
     this.ribeiroRings??=new Map(RIBEIRO_SPOTS.map(at=>{const ring=this.buildMarker(`Ribeiro · ${at.id}`,RIBEIRO_COLOR);ring.target={x:at.x,y:at.y,z:at.z};ring.marker.setPosition(at.x,at.y,at.z);ring.marker.enabled=false;return [at.id,ring];}));
-    for(const ring of this.ribeiroRings.values()){const shown=Math.hypot(p.x-ring.target.x,p.z-ring.target.z)<30&&Math.abs(p.y-ring.target.y)<2.5;ring.marker.enabled=shown;if(shown)this.animateMarker(ring);}
+    for(const [id,ring] of this.ribeiroRings){const shown=id===this.ribeiroGuideId&&Math.abs(p.y-ring.target.y)<2.5;ring.marker.enabled=shown;if(shown)this.animateMarker(ring);}
   }
 
   /** Where the nearest garage is on screen, while its ring shows. */
@@ -1684,6 +1699,7 @@ export class BarScene {
     this.motos.couriers(Object.values(world.players).filter(player=>player.courier).map(player=>player.id));
     this.ragdollStarts=world.ragdolls??{};
     this.showDesk=world.stageShow;
+    this.doorStates=world.doors;
     for(const door of this.doorLeaves){
       const state=world.doors?.[door.leaf.group];if(!state)continue;
       const target=state.open?1:0;
@@ -1827,7 +1843,7 @@ export class BarScene {
       if (!seen.has(id)) {
         avatar.root.destroy();
         this.actors.delete(id);
-        this.barAnimations?.forget(id);this.barOverrides.delete(id);this.factoryCarry.forget(id);
+        this.barAnimations?.forget(id);this.barOverrides.delete(id);this.factoryCarry.forget(id);this.ribeiroCarry.forget(id);
       }
     }
   }
@@ -1982,7 +1998,7 @@ export class BarScene {
     this.morte?.destroy();this.morte=undefined;
     this.damageNumbers.destroy();
     this.weaponVisuals.destroy();
-    this.fuelProps.destroy();this.factoryCarry.destroy();this.motos.destroy();this.speedBlur.destroy();this.filmGrain.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
+    this.fuelProps.destroy();this.factoryCarry.destroy();this.ribeiroCarry.destroy();this.motos.destroy();this.speedBlur.destroy();this.filmGrain.destroy();this.blowSounds.destroy();this.flySounds.destroy();this.blowEffects.destroy();this.smokeBurst.destroy();this.cigarettes.destroy();this.crossedArms.destroy();this.crowd.destroy();this.horseSounds.destroy();
     this.mapEffects?.destroy();this.mapEffects=undefined;
     this.surfaces?.destroy();this.surfaces=undefined;
     this.objective?.marker.destroy();this.objective=undefined;
@@ -2429,7 +2445,7 @@ export class BarScene {
     if (avatar.skin && !bar && (avatar.npc ? actor.role === 'serving' && actor.id !== 'bartender' : !!actor.carrying)) this.carryTray(avatar, avatar.skin, this.serverNow());
     else if (avatar.tray) avatar.tray.entity.enabled = false;
     if (avatar.skin) this.dressCourier(avatar, avatar.skin, !!bar); else if (avatar.parcelProp || avatar.packProp) this.dressCourier(avatar, undefined, true);
-    this.dressFirework(avatar);this.dressFactoryBag(avatar,dt);
+    this.dressFirework(avatar);this.dressFactoryBag(avatar,dt);this.dressRibeiroPart(avatar,dt);
     if(actor.id.startsWith('attendant-')){
       const bones=avatar.skin?.bones,hand=bones?.hand_r??avatar.limbs?.rightArm.findByName('Hand') as pc.Entity|undefined;
       const upper=bones?.upperarm_r??avatar.limbs?.rightArm;
@@ -2476,8 +2492,18 @@ export class BarScene {
   private dressFactoryBag(avatar:Avatar,dt:number):void {
     const actor=avatar.actor,skin=avatar.skin,raw=actor.id===this.localId?localFactoryBag():(actor as {factoryBag?:string}).factoryBag;
     const material=raw==='MALTE'||raw==='MIX'?raw:null,busy=!skin||!!avatar.bar||!!avatar.ragdoll||['ragdoll','ride','sit'].includes(actor.animation??'');
-    const chest=skin&&material&&!busy?(skin.chest??=(skin.model.findByName('spine_02') as pc.Entity|null)??skin.bones.upperarm_r):undefined;
+    const cartPose=factoryCartPose(),pushing=!busy&&!!cartPose&&cartPose.pusher===actor.id;
+    const chest=skin&&(material||pushing)&&!busy?(skin.chest??=(skin.model.findByName('spine_02') as pc.Entity|null)??skin.bones.upperarm_r):undefined;
     this.factoryCarry.pose(actor.id,busy?null:material,skin&&chest?{bones:skin.bones,chest,body:avatar.body}:undefined,dt);
+    this.factoryCarry.push(actor.id,pushing?cartPose:null,skin&&chest?{bones:skin.bones,chest,body:avatar.body}:undefined,dt);
+  }
+
+  /** A Ribeiro workpiece in both hands: the local player's (from the terminal's state) or another player's (synced `ribeiroPart`). */
+  private dressRibeiroPart(avatar:Avatar,dt:number):void {
+    const actor=avatar.actor,skin=avatar.skin,raw=actor.id===this.localId?localRibeiroPart():actor.ribeiroPart,stage=isRibeiroPartStage(raw)?raw:null;
+    const busy=!skin||!!avatar.bar||!!avatar.ragdoll||['ragdoll','ride','sit'].includes(actor.animation??'');
+    const chest=skin&&stage&&!busy?(skin.chest??=(skin.model.findByName('spine_02') as pc.Entity|null)??skin.bones.upperarm_r):undefined;
+    this.ribeiroCarry.pose(actor.id,busy?null:stage,skin&&chest?{bones:skin.bones,chest,body:avatar.body}:undefined,dt);
   }
 
   private dressFirework(avatar:Avatar):void {
@@ -3231,13 +3257,13 @@ export class BarScene {
     for(const avatar of this.actors.values()){
       const {actor,skin}=avatar;if(!skin)continue;
       if(actor.animation==='wait'&&actor.drinkItem)counterRequest(skin,(smokingNow-(actor.animationStartedAt??smokingNow))/1000,avatar.body);
-      const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&!actor.holding&&
+      const armsAvailable=!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&!actor.ribeiroPart&&!actor.holding&&
         (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
         ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','Sit'].includes(skin.clip);
       crossedActors.push({id:actor.id,active:!!actor.armsCrossed,available:armsAvailable,rig:skin});
       if(actor.smokingSince)cigaretteActors.push({id:actor.id,skin:avatar.skinId!,state:actor,rig:skin,
         hidden:!!avatar.deathHidden||['ragdoll','fallen','recover','vomit'].includes(actor.animation??''),
-        armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&
+        armsFree:!avatar.riding&&!avatar.ragdoll&&!actor.musician&&!actor.currentTableId&&!actor.vrArms&&!actor.fireworkEquipped&&!this.weaponVisuals.isArmed(actor)&&!actor.carrying&&!actor.parcel&&!actor.ribeiroPart&&
           (!avatar.bar||avatar.bar.clip==='sentado_loop')&&(skin.orderLayer?.weight??0)<.001&&
           ['Idle','Walk','Jog','Run','DrunkIdle','DrunkWalk','Wait','OldCaneWalk','OldCaneHold','Sit'].includes(skin.clip)});
     }
@@ -3251,7 +3277,8 @@ export class BarScene {
     }):[],this.camera.getPosition(),this.camera.forward,this.camera.up);
     this.updateProfiler.mark('camera');
     const focus = this.cityFocus ?? this.motos.ridden(this.localId)?.entity.getPosition() ?? player?.root.getPosition() ?? this.camera.getPosition();
-    this.city?.update(dt, focus.x, focus.z);
+    this.city?.setIntercomRinging(this.intercomRinging);
+    this.city?.update(dt, focus.x, focus.z, this.doorStates, this.serverNow());
     this.updateProfiler.mark('streaming');
     this.environment.setFocus(player?.root.getPosition());
     this.environment.update(this.serverNow(),dt,this.eventType);

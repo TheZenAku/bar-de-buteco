@@ -1,4 +1,4 @@
-import {GUN,aimDirection,arsenalStats,arsenalWeapon,elevationOf,eyeOf,headingOf,isWeaponId,mapRay,muzzleOf,normalize,ownedInOrder,pelletDirections,reloadDuration,
+import {GUN,aimDirection,arsenalStats,arsenalWeapon,elevationOf,equippedInOrder,eyeOf,headingOf,isWeaponId,mapRay,muzzleOf,normalize,pelletDirections,reloadDuration,
   roundsLoaded,seededRandom,shotFollows,shotSeed,spreadNow,traceShot,
   type ArsenalView,type FireMode,type GunInput,type GunState,type PartId,type PartSlot,type PelletTrace,type ShotCommand,type ShotTarget,type Vec3,type WeaponId,
   type WeaponStats,type WorldRay} from '@bar/shared';
@@ -135,23 +135,23 @@ export class LocalGun {
       const stats=arsenalStats(view,this.drawn);
       if(stats)this.stats=stats;else{this.want='';}
     }
-    if(this.want&&!arsenalWeapon(view,this.want))this.want='';
-    if(view.draw&&arsenalWeapon(view,view.draw)){if(this.on)this.want=view.draw;else this.draw=view.draw;}
+    if(this.want&&!arsenalWeapon(view,this.want)?.equipped)this.want='';
+    if(view.draw&&arsenalWeapon(view,view.draw)?.equipped){if(this.on)this.want=view.draw;else this.draw=view.draw;}
   }
   /** Draw this weapon ('' holsters); a weapon not owned is ignored. */
   select(id:WeaponId|''):boolean {
-    if(!this.on||(id&&!arsenalWeapon(this.arsenal,id)))return false;
+    if(!this.on||(id&&!arsenalWeapon(this.arsenal,id)?.equipped))return false;
     this.want=id;return true;
   }
   /** X: holster, or draw the last weapon back (the first owned when none was drawn yet). */
   holsterToggle():void {
     if(!this.on)return;
     if(this.want)this.want='';
-    else this.select(this.last&&arsenalWeapon(this.arsenal,this.last)?this.last:ownedInOrder(this.arsenal)[0]??'');
+    else this.select(this.last&&arsenalWeapon(this.arsenal,this.last)?.equipped?this.last:equippedInOrder(this.arsenal)[0]??'');
   }
   /** The next or previous owned weapon in the wheel's order (RB, LB tap). */
   step(direction:1|-1):void {
-    const owned=ownedInOrder(this.arsenal);
+    const owned=equippedInOrder(this.arsenal);
     if(!this.on||!owned.length)return;
     const from=owned.indexOf((this.want||this.last) as WeaponId);
     this.select(owned[((from<0?(direction>0?-1:0):from)+direction+owned.length)%owned.length]!);
@@ -190,12 +190,12 @@ export class LocalGun {
   get mode():FireMode|undefined {return this.stats?.modes[this.modeIndex];}
   get mag():number {
     if(!this.drawn)return 0;
-    const stored=this.mags.get(this.drawn)??this.stats?.mag??0;
+    const stored=this.mags.get(this.drawn)??(this.arsenal?.infinite?this.stats?.mag??0:0);
     const reload=this.reload,stats=this.stats;
     if(reload&&stats&&reload.style==='shell')return roundsLoaded(stats,reload.from,this.clock-reload.at,reload.to-reload.from);
     return stored;
   }
-  /** Rounds in a weapon's magazine (undefined: never drawn, so full): the weapon wheel's rings. */
+  /** Rounds in a weapon's magazine (undefined: never drawn; real weapons start empty). */
   magOf(id:WeaponId):number|undefined {return id===this.drawn?this.mag:this.mags.get(id);}
   get reserve():number {
     const stats=this.stats,arsenal=this.arsenal;
@@ -283,7 +283,7 @@ export class LocalGun {
     const stats=arsenalStats(this.arsenal,this.want);
     if(!stats){this.want='';return;}
     this.drawn=this.want;this.last=this.want;this.stats=stats;this.drawAt=now;this.bloom=0;this.adsRaw=0;
-    if(!this.mags.has(this.drawn))this.mags.set(this.drawn,stats.mag);
+    if(!this.mags.has(this.drawn))this.mags.set(this.drawn,this.arsenal?.infinite?stats.mag:0);
     this.events.push('draw');
   }
 
@@ -440,7 +440,7 @@ export class LocalGun {
       if(!this.arsenal)return;
       this.on=true;this.n=((gun.shots??0)+1)&0xffff;
       // Back after a reload of the page with a weapon out: take it as the room has it.
-      if(w&&arsenalWeapon(this.arsenal,w)){this.want=this.drawn=this.last=w;this.stats=arsenalStats(this.arsenal,w);this.drawAt=now-Math.max(0,serverNow-(gun.drawAt??serverNow));this.mags.set(w,gun.mag??0);this.sentW=w;}
+      if(w&&arsenalWeapon(this.arsenal,w)?.equipped){this.want=this.drawn=this.last=w;this.stats=arsenalStats(this.arsenal,w);this.drawAt=now-Math.max(0,serverNow-(gun.drawAt??serverNow));this.mags.set(w,gun.mag??0);this.sentW=w;}
       if(this.draw){this.select(this.draw);this.draw=undefined;}
       return;
     }

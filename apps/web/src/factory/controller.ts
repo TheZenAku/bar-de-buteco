@@ -1,15 +1,16 @@
 import type * as pc from 'playcanvas';
-import {CITY_MARKERS,JOB_DAILY_CAP,type Position} from '@bar/shared';
-import {CLEAN_TASKS,DIRT_CLEAN,DIRT_PENDING,FACTORY_IDLE_PAY,FACTORY_NPC_DELIVERY_MIN,FACTORY_QUALITY_MIN,SHIPMENT_ACTIVE,cleanTaskOf,pendingCleaning,type CleanTask} from '@bar/shared/factory';
+import {CITY_MARKERS,JOB_DAILY_CAP,nearestInteraction,type Position} from '@bar/shared';
+import {CART_CAPACITY,CART_HANDLE_REACH,CLEAN_TASKS,GATE_HOLD_OPEN_S,cartHandle,cartNear,type CartView,gateById,DIRT_CLEAN,DIRT_PENDING,FACTORY_IDLE_PAY,FACTORY_NPC_DELIVERY_MIN,FACTORY_QUALITY_MIN,SHIPMENT_ACTIVE,cleanTaskOf,pendingCleaning,type CleanTask} from '@bar/shared/factory';
 import {floatingWindow,type FloatingWindow} from '../profile/floating-window';
 import {api,escape as e} from '../api';
 import {uiIcon} from '../ui-icons';
 import './factory.css';
+import type {EnvironmentLighting} from '../engine/environment-lighting';
 import {FactoryVisuals} from './visuals';
 import {createFactorySounds} from './sounds';
 import {patchHtml} from './dompatch';
-import {FACTORY_SPOTS,distanceToFactory,type FactorySpot} from './spots';
-import {baggingActions,canReach,dryerActions,fixed,label,nearDock,nextStep,REACH_HINT,tankActions,tankName,tone,volumeOf,type Action,type Station,type Step} from './logic';
+import {CART_SPOT,CART_SPOT_REACH,FACTORY_SPOTS,distanceToFactory,type FactorySpot} from './spots';
+import {baggingActions,canReach,type CartHint,dryerActions,fixed,label,nearDock,nextStep,REACH_HINT,tankActions,tankName,tone,volumeOf,type Action,type Station,type Step} from './logic';
 import type {DockTruck,EmploymentView,FactoryPaid,FactoryResult,FactoryShipmentView,FactoryView,Material,RouteView,TankView} from './types';
 
 export interface FactoryHooks {
@@ -22,6 +23,8 @@ export interface FactoryHooks {
   lowQuality:()=>boolean;
   volume:()=>number;
   userId:()=>string|undefined;
+  /** The scene's lighting, so the metal of the plant's models (the tanks' lids) gets the reflections the rest of the city's metal has. */
+  environment:()=>EnvironmentLighting|undefined;
 }
 
 type Tab='overview'|'tanks'|'dryer'|'bagging'|'stock'|'dock'|'alarms'|'employment';
@@ -31,6 +34,8 @@ const TABS:ReadonlyArray<readonly [Tab,string]>=[['overview','Início'],['tanks'
 const HEAD:Record<Kind,string>={control:'<b>EMPRESA BRASIL</b><small>Sala de controle</small>',bagging:'<b>EMPRESA BRASIL</b><small>Estação de ensaque</small>'};
 /** The panel follows the plant while the player is this close, and lets go beyond the second distance (so it does not flicker at the edge). */
 const WATCH_IN=80,WATCH_OUT=100;
+/** Metres from a manual door's box within which E is the door's, not the station's (the entrance post is 0,7 m from the staff's door). */
+const DOOR_FIRST=.6;
 /** Where the guide's ring shows, from the plant's centre. */
 const GUIDE_RANGE=120;
 const rid=()=>crypto.randomUUID();
@@ -49,6 +54,8 @@ export class FactoryController {
   /** The cleaning task in progress as the room last said, with when it arrived (the progress runs from there). */
   private cleaning:null|{task:string;from:number;duration:number;at:number}=null;
   private nearSpot?:FactorySpot;private guideStep?:Step;private hudAt=0;private reachKey='';private routeView:RouteView|null=null;
+  /** The platform cart as the room last said (its pose is drawn by visuals; this is what E and the guide read). */
+  private cartState?:CartView;
 
   constructor(private hooks:FactoryHooks){this.sounds=createFactorySounds(()=>hooks.volume());}
 
@@ -62,6 +69,11 @@ export class FactoryController {
     if(first&&!this.askedEmployment)this.askEmployment();
     this.render();this.updateHud();
   }
+  /** The platform cart changed (its place, its sacks, who pushes it). */
+  cartMessage(view:CartView):void {
+    this.cartState=view;this.ensureVisuals();this.visuals?.cartMessage(view);this.syncCartSpot();
+    if(this.win)this.render();
+  }
   employmentMessage(view:EmploymentView):void {this.employment=view;this.render();this.updateHud();}
   /** The driver's trip changed (null: none): the GPS follows it (main.ts) and the status line says where to go. */
   routeMessage(route:RouteView|null):void {
@@ -69,6 +81,8 @@ export class FactoryController {
     if(route&&!arrived)this.sounds.stage();
   }
   route():RouteView|null {return this.routeView;}
+  /** Whether a visitor is calling at the vehicle gate's intercom (its lamp blinks amber). */
+  intercomRinging():boolean {return !!this.view?.gate?.ringing;}
   /** The answer to something the player did: it says what happened (or why not), with a sound. */
   resultMessage(result:FactoryResult):void {
     for(const [id,entry] of this.pending)if(id===result.requestId||entry.key.startsWith(`${result.action}|`)&&!result.requestId)this.pending.delete(id);
@@ -77,7 +91,7 @@ export class FactoryController {
       const a=result.action;
       if(a==='ring')this.sounds.doorbell();
       else if(a==='shift'){(this.shiftWanted===false?this.sounds.clockOut():this.sounds.clockIn());}
-      else if(a==='ppe')this.sounds.ppe();else if(a==='take'||a==='drop')this.sounds.pick();else if(a==='pour')this.sounds.pour();
+      else if(a==='ppe')this.sounds.ppe();else if(a==='take'||a==='drop'||a.startsWith('cart.'))this.sounds.pick();else if(a==='pour')this.sounds.pour();
       else if(a==='clean')(/limpo\./.test(result.message)?this.sounds.stack():this.sounds.water());
       else if(/water$/.test(a))this.sounds.water();else if(a==='bag.sew')this.sounds.seam();else if(a==='bag.stack'||a==='pallet.store'||a==='dock.load'||a==='dock.unload')this.sounds.stack();
       else if(a==='emergency')this.sounds.emergency();else if(a.startsWith('dryer.')||/\.(lid|agitator)(\.|$)/.test(a))this.sounds.valve();else this.sounds.ok();
@@ -126,15 +140,19 @@ export class FactoryController {
 
   // ---- the player's own position: following the plant, spots, the guide, the hum ----
   /** Every frame. */
-  frame(self:Position|undefined,dtSeconds:number,gateOpen?:boolean):void {
+  frame(self:Position|undefined,dtSeconds:number):void {
     this.self=self;if(!self){return;}
     const now=performance.now(),distance=distanceToFactory(self.x,self.z);
     if(!this.watching&&distance<=WATCH_IN){this.watching=true;this.watchAt=now;this.hooks.send('factory.watch',{on:true});}
-    else if(this.watching&&!this.win&&distance>WATCH_OUT){this.watching=false;this.hooks.send('factory.watch',{on:false});this.view=undefined;this.visuals?.hide();this.updateHud();}
+    else if(this.watching&&!this.win&&distance>WATCH_OUT){this.watching=false;this.hooks.send('factory.watch',{on:false});this.view=undefined;this.cartState=undefined;this.visuals?.forget();this.visuals?.hide();this.updateHud();}
     // A subscription the room dropped (it restarted): ask again.
     else if(this.watching&&now-this.lastStateAt>4000&&now-this.watchAt>4000){this.watchAt=now;this.hooks.send('factory.watch',{on:true});}
     if(!this.askedEmployment&&distance<=WATCH_IN)this.askEmployment();
-    this.visuals?.tick(Math.min(dtSeconds,.1),self,this.view?.me.carrying??null,this.hooks.localRoot(),gateOpen);
+    // The cart the player pushes is run on the avatar's own (predicted) position, so it does not trail behind.
+    const root=this.hooks.localRoot(),at=root?.getPosition();
+    const driver=this.view?.me.pushing?{x:at?.x??self.x,y:at?.y??self.y??0,z:at?.z??self.z,rotation:(self as Position&{rotation?:number}).rotation??0}:undefined;
+    this.visuals?.tick(Math.min(dtSeconds,.1),self,this.view?.me.carrying??null,root,{driver,myId:this.hooks.userId()});
+    this.syncCartSpot();
     this.nearSpot=this.spotAt(self);
     if(now-this.hum>250){this.hum=now;this.updateHum(self);}
     if(now-this.hudAt>400){
@@ -143,7 +161,7 @@ export class FactoryController {
       const reach=(['panel','tank1','tank2','tank3','dryer','bagging'] as Station[]).map(group=>canReach(group,self)?1:0).join('')+(this.spotAt(self)?.id??'');
       if(reach!==this.reachKey){this.reachKey=reach;if(this.win)this.render();}
     }
-    this.guideStep=this.view&&this.employment!==undefined?nextStep(this.view,this.employment.employment?.status==='hired',this.view.me.carrying):undefined;
+    this.guideStep=this.view&&this.employment!==undefined?nextStep(this.view,this.employment.employment?.status==='hired',this.view.me.carrying,this.cartHint()):undefined;
   }
   /** 0..1 of the cleaning in progress (null: none). */
   private cleanProgress():number|null {
@@ -153,7 +171,7 @@ export class FactoryController {
   /** The dirty place within reach that E washes now (the room checks again): nothing while the hands carry a bag, the shift or the PPE is missing, or a wash is on. */
   private cleanTarget(self:Position|undefined):CleanTask|undefined {
     const view=this.view;
-    if(!self||!view?.dirt||!view.me.onShift||!view.me.ppe||view.me.carrying||this.cleaning)return;
+    if(!self||!view?.dirt||!view.me.onShift||!view.me.ppe||view.me.carrying||view.me.pushing||this.cleaning)return;
     let best:CleanTask|undefined,bestD=Infinity;
     for(const task of CLEAN_TASKS){
       if(task.kind==='dryer')continue;
@@ -184,11 +202,36 @@ export class FactoryController {
   private spotAt(self:Position):FactorySpot|undefined {
     let best:FactorySpot|undefined,bestScore=Infinity;
     for(const spot of FACTORY_SPOTS){
+      if(spot===CART_SPOT)continue;
       const d=Math.hypot(self.x-spot.x,self.z-spot.z);
       if(d>spot.reach||(!spot.id.startsWith('rack')&&Math.abs((self.y??0)-spot.y)>1.8))continue;
       if(d/spot.reach<bestScore){bestScore=d/spot.reach;best=spot;}
     }
     return best;
+  }
+  // ---- the platform cart ----
+  /** The cart's ring and badge sit where the cart is drawn (the label says how full it is). */
+  private syncCartSpot():void {
+    const pose=this.visuals?.cartPose()??this.cartState;
+    if(pose){CART_SPOT.x=pose.x;CART_SPOT.y=pose.y;CART_SPOT.z=pose.z;}
+    const state=this.cartState;CART_SPOT.label=state?`Carrinho ${state.bags.length}/${CART_CAPACITY}`:'Carrinho de plataforma';
+  }
+  private cartHint():CartHint|null {const cart=this.cartState;return cart?{bags:cart.bags,pusher:cart.pusher,mine:!!this.view?.me.pushing}:null;}
+  /**
+   * What E does with the platform cart where the player stands (undefined: the cart is not what E is for here). Pushing, E lets go (except at a shelf, where it loads the
+   * cart). Near a parked cart: a sack in the arms goes onto it; with hands free, a loaded cart gives its top sack, unless the player stands at its handle, where E pushes
+   * (an empty cart is pushed from anywhere). At a shelf E is the shelf's: it loads the cart when the cart is within reach.
+   */
+  private cartAction(self:Position|undefined):{kind:'release'|'push'|'put'|'unload';label:string}|undefined {
+    const view=this.view,cart=this.cartState;
+    if(!self||!view||!cart||!view.me.onShift||!view.me.ppe||distanceToFactory(self.x,self.z)>WATCH_OUT)return;
+    const atRack=this.spotAt(self)?.id.startsWith('rack')??false,n=cart.bags.length,count=`${n}/${CART_CAPACITY}`;
+    if(view.me.pushing)return atRack?undefined:{kind:'release',label:`Soltar o carrinho (${count} sacos)`};
+    if(atRack||cart.pusher||!cartNear(cart,self.x,self.z,self.y??cart.y,CART_SPOT_REACH))return;
+    if(view.me.carrying)return {kind:'put',label:n>=CART_CAPACITY?`Carrinho cheio (${count})`:`Pôr o saco de ${view.me.carrying} no carrinho (${count})`};
+    const handle=cartHandle(cart);
+    if(n>0&&Math.hypot(self.x-handle.x,self.z-handle.z)>CART_HANDLE_REACH)return {kind:'unload',label:`Pegar um saco do carrinho (${count})`};
+    return {kind:'push',label:`Empurrar o carrinho (${count} sacos)`};
   }
   /** The badge to draw at a station: the nearest one within a few metres (the scene projects it). */
   blipSpot(self:Position|undefined):FactorySpot|undefined {
@@ -213,29 +256,43 @@ export class FactoryController {
 
   // ---- the E key ----
   /** What E does where the player stands, as the context bar says it; undefined: nothing here. */
+  /** The staff's emergency door stands by the entrance post: hugging that door E is the door's (the room's door mechanism, main.ts), a step back on the post's ring it is the post's. */
+  private atManualDoor(self:Position|undefined):boolean {
+    if(!self)return false;
+    const near=nearestInteraction(self),gate=near?.type==='door'?gateById(near.id):undefined;
+    if(!gate)return false;
+    const c=gate.collider;
+    return Math.hypot(Math.max(Math.abs(self.x-c.x)-c.hx,0),Math.max(Math.abs(self.z-c.z)-c.hz,0))<=DOOR_FIRST;
+  }
   prompt(self:Position|undefined,truckRear=false):string|undefined {
     // Standing at the back of your own truck, E is the truck's hold (main.ts), wherever in the plant that is.
-    if(truckRear)return;
+    if(truckRear||this.atManualDoor(self))return;
     const progress=this.cleanProgress();
     if(progress!==null)return `Limpando… ${Math.round(progress*100)}% (fique no lugar)`;
     const wash=this.cleanTarget(self);if(wash)return `${wash.verb}: ${wash.label} (${wash.durationS} s)`;
+    const cartDo=this.cartAction(self);if(cartDo)return cartDo.label;
     const spot=self&&distanceToFactory(self.x,self.z)<WATCH_OUT?this.spotAt(self):undefined;if(!spot)return;
     const carrying=this.view?.me.carrying;
     if(spot.id==='interfone')return 'Tocar o interfone da EMPRESA BRASIL';
     if(spot.id==='entrada')return 'Entrada de pessoal: expediente e EPI';
     if(spot.id==='painel')return 'Abrir o painel de controle';
     if(spot.id.startsWith('tanque'))return carrying?`Despejar o saco de ${carrying} no ${tankName(Number(spot.id.slice(6)))} (abre a tampa e liga o agitador)`:`Controles do ${tankName(Number(spot.id.slice(6)))}`;
-    if(spot.id.startsWith('rack'))return carrying?'Devolver o saco à prateleira':`Pegar um saco de ${spot.id==='rack3'?'MIX':'MALTE'}`;
+    if(spot.id.startsWith('rack')){
+      const cart=this.cartState,onCart=!carrying&&!!cart&&!!this.view?.me.onShift&&cartNear(cart,self!.x,self!.z,self!.y??cart.y);
+      return carrying?'Devolver o saco à prateleira':`Pegar um saco de ${spot.id==='rack3'?'MIX':'MALTE'}${onCart?` e pôr no carrinho (${cart!.bags.length}/${CART_CAPACITY})`:''}`;
+    }
     if(spot.id==='secador')return 'Controles do secador';
     if(spot.id==='doca')return 'Doca: caminhões e cargas';
     if(spot.id==='ensaque'||spot.id==='palete')return 'Controles do ensaque';
   }
   interact(self:Position,truckRear=false):boolean {
-    if(truckRear||distanceToFactory(self.x,self.z)>WATCH_OUT)return false;
+    if(truckRear||distanceToFactory(self.x,self.z)>WATCH_OUT||this.atManualDoor(self))return false;
     this.sounds.unlock();
     if(this.cleanProgress()!==null)return true;
     const wash=this.cleanTarget(self);
     if(wash){this.hooks.send('factory.clean',{task:wash.id,requestId:rid()});return true;}
+    const cartDo=this.cartAction(self);
+    if(cartDo){this.hooks.send(`factory.cart.${cartDo.kind}`,{requestId:rid()});return true;}
     const spot=this.spotAt(self);if(!spot)return false;
     const carrying=this.view?.me.carrying;
     if(spot.id==='interfone')this.hooks.send('factory.ring');
@@ -282,10 +339,10 @@ export class FactoryController {
   /** Leaving the game: nothing of the plant stays on screen. */
   reset():void {
     this.win?.close();this.view=undefined;this.employment=undefined;this.watching=false;this.askedEmployment=false;this.seenEvent=undefined;this.alarmsSeen.clear();this.pending.clear();
-    this.routeView=null;this.visuals?.destroy();this.visuals=undefined;this.sounds.hum(0,0,0);this.hud?.classList.remove('show');this.guideStep=undefined;this.nearSpot=undefined;
+    this.routeView=null;this.cartState=undefined;this.visuals?.destroy();this.visuals=undefined;this.sounds.hum(0,0,0);this.hud?.classList.remove('show');this.guideStep=undefined;this.nearSpot=undefined;
   }
   private ensureVisuals():void {
-    const app=this.hooks.app();if(!this.visuals&&app)this.visuals=new FactoryVisuals(app);
+    const app=this.hooks.app();if(!this.visuals&&app){this.visuals=new FactoryVisuals(app,this.hooks.environment());if(this.cartState)this.visuals.cartMessage(this.cartState);}
   }
 
   private click(event:MouseEvent):void {
@@ -340,6 +397,7 @@ export class FactoryController {
       `<span class="fc-chip ${me?.onShift?'on':''}">${me?.onShift?'Em serviço':employed?'Fora de serviço':'Sem emprego'}</span>`,
       `<span class="fc-chip ${me?.ppe?'on':me?.onShift?'warn':''}">EPI ${me?.ppe?'colocado':'não colocado'}</span>`,
       me?.carrying?`<span class="fc-chip on">Carregando saco de ${me.carrying}</span>`:'',
+      me?.pushing?`<span class="fc-chip on">Empurrando o carrinho (${this.cartState?.bags.length??0}/${CART_CAPACITY})</span>`:'',
       view?`<span class="fc-chip ${view.activeOperators?'on':'warn'}">${view.activeOperators} operador(es)</span>`:'',
     ].join('');
     const banner=!view?'<div class="fc-banner">Conectando à fábrica…</div>':view.emergency?'<div class="fc-banner bad">Parada de emergência acionada: a linha está parada. Rearme no painel (aba Alarmes).</div>'
@@ -359,7 +417,7 @@ export class FactoryController {
     const me=this.hooks.userId(),trucks=view.dock.trucks;
     if(view.production?.active?.status==='approved'&&view.me.onShift)out.overview='wait';
     if(view.dirt?.required&&pendingCleaning(view.dirt).length&&view.me.onShift)out.overview='wait';
-    if(view.me.onShift&&trucks.length&&(view.shipments.some(trip=>trip.status==='returning'&&trucks.some(truck=>truck.vehicleId===trip.vehicleId))||(view.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0)>=18&&trucks.some(truck=>!view.shipments.some(trip=>trip.vehicleId===truck.vehicleId&&SHIPMENT_ACTIVE.includes(trip.status))))))out.dock='wait';
+    if(view.me.onShift&&trucks.length&&(view.shipments.some(trip=>trip.status==='returning'&&trucks.some(truck=>truck.vehicleId===trip.vehicleId))||(view.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0)>0&&trucks.some(truck=>!view.shipments.some(trip=>trip.vehicleId===truck.vehicleId&&SHIPMENT_ACTIVE.includes(trip.status))))))out.dock='wait';
     else if(trucks.some(truck=>truck.ownerId===me)&&view.orders.some(order=>order.status==='open'))out.dock='wait';
     return out;
   }
@@ -406,7 +464,7 @@ export class FactoryController {
   }
 
   private overviewTab(view:FactoryView):string {
-    const step=nextStep(view,this.employment?.employment?.status==='hired',view.me.carrying);
+    const step=nextStep(view,this.employment?.employment?.status==='hired',view.me.carrying,this.cartHint());
     const guide=step?`<div class="fc-guide">${uiIcon('flag')}<div><b>${e(step.title)}</b><p>${e(step.detail)}</p>${step.tab==='bagging'?'<p class="fc-why">Os controles do ensaque ficam na estação de ensaque (siga o marcador).</p>':step.tab&&step.tab!==this.tab?`<button type="button" class="fc-btn primary" data-factory="tab" data-tab="${step.tab}">Abrir ${e(TABS.find(([id])=>id===step.tab)?.[1]??'')}</button>`:''}</div></div>`:'';
     const nodes=[
       ...view.tanks.map(tank=>[`TQ-${100+tank.id}`,label(tank.state),tone(tank.state),['DISSOLVENDO','HOMOGENEIZANDO','AQUECENDO','ENCHENDO_AGUA','TRANSFERINDO'].includes(tank.state)] as const),
@@ -451,14 +509,14 @@ export class FactoryController {
       <p class="fc-why">${dirt.required?'A ordem terminou: lave os três tanques (E na plataforma), a câmara do secador (aba Secador), a linha de ensaque e os pisos (E no lugar, fique parado). Só então a próxima ordem começa.':'A fábrica suja com o trabalho. Quando um lugar passa de 25%, aparece o aviso de limpeza; lavar paga uma pequena quantia.'}</p>
       ${mine?`<p class="fc-why">Limpando: ${e(cleanTaskOf(mine.task)?.label??'')}…</p>`:''}${body}</section>`;
   }
-  /** The vehicle gate and the intercom: opening and closing live at the control room's computer, and a visitor's ring waits here. */
+  /** The vehicle gate and the intercom: opening and closing live at the control room's computer, and a visitor's call waits here. */
   private gateCard(view:FactoryView):string {
     const gate=view.gate;if(!gate)return '';
     const why=this.blocked('panel',view),ring=gate.ringing;
     const btn=(label:string,action:string,css='')=>`<button type="button" class="fc-btn ${css}${why?' off':''}" data-factory="gate" data-do="${action}" aria-disabled="${!!why}" data-why="${e(why)}" title="${e(why)}">${label}</button>`;
     const bell=ring?`<div class="fc-guide" data-ring="1">${uiIcon('bell')}<div><b>Interfone tocando</b><p>${e(ring.name)} está no portão. Abra para deixar entrar ou dispense a chamada.</p></div></div>`:'';
     return `${bell}<section class="fc-card" data-tone="${ring?'bad':gate.open?'wait':'idle'}"><h4>${uiIcon('truck')}Portão de veículos<span class="fc-pill" data-tone="${gate.open?'wait':'idle'}">${gate.open?'Aberto':'Fechado'}</span></h4>
-      <p class="fc-why">O portão fica fechado. Quem chega toca o interfone (poste ao lado do portão) e quem está em serviço atende por aqui. Ele fecha sozinho quando o último operador encerra o expediente e nunca fecha em cima de alguém no vão.</p>
+      <p class="fc-why">O portão não abre por aproximação. Dono, gerente e funcionário contratado abrem tocando o interfone (poste ao lado do portão): ele fica aberto ${GATE_HOLD_OPEN_S} s e fecha sozinho com o vão livre. Quem é de fora só chama, e quem está em serviço atende por aqui. Aberto por aqui, fica aberto até alguém fechar ou o último operador encerrar o expediente. Nunca fecha em cima de alguém no vão.</p>
       <div class="fc-actions">${btn(gate.open?'Fechar o portão':'Abrir o portão',gate.open?'close':'open',`primary${ring||!gate.open?' next':''}`)}${ring?btn('Dispensar a chamada','dismiss'):''}</div>${why?`<p class="fc-why">${e(why)}</p>`:''}</section>`;
   }
   private stockBars(view:FactoryView):string {
@@ -533,7 +591,7 @@ export class FactoryController {
   private dockTab(view:FactoryView):string {
     const me=this.hooks.userId(),f=view.finance,trucks=view.dock.trucks,active=view.shipments.filter(trip=>SHIPMENT_ACTIVE.includes(trip.status));
     const tripOf=(truck:DockTruck)=>active.find(trip=>trip.vehicleId===truck.vehicleId);
-    const product=view.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0),pallets=Math.floor(product/18);
+    const product=view.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0),pallets=view.slots.filter(slot=>slot.material==='PRODUTO'&&slot.quantity>0).length;
     // The operator needs a shift, the PPE and to be at the panel or the dock; the driver only needs the truck at the dock.
     const operatorGate=!view.me.onShift?'Entre em expediente na entrada de pessoal.':!view.me.ppe?'Coloque o EPI no armário da entrada.':!(canReach('panel',this.self)||nearDock(this.self))?'Use o painel da sala de controle ou chegue perto da doca.':'';
     const button=(label:string,attrs:string,enabled:boolean,why:string,css='')=>`<button type="button" class="fc-btn ${css}${enabled?'':' off'}" ${attrs} aria-disabled="${!enabled}" data-why="${enabled?'':e(why)}" title="${enabled?'':e(why)}">${label}</button>`;
@@ -541,7 +599,7 @@ export class FactoryController {
       const trip=tripOf(truck),mine=truck.ownerId===me||truck.driverId===me,atDock=nearDock(this.self,6);
       let status='Vazio, esperando carga (qualquer caminhão na doca pode ser carregado)',actions='';
       if(trip?.status==='loaded'){
-        status=`Carregado com ${trip.pallets} palete(s) de produto: a venda é paga quando ele sair da fábrica`;
+        status=`Carregado com ${trip.pallets} palete(s) de produto${trip.bags!==trip.pallets*18?` (${trip.bags} sacos)`:''}: a venda é paga quando ele sair da fábrica`;
         actions=button('Devolver a carga ao estoque',`data-factory="shipment.cancel" data-shipment="${e(trip.id)}" data-sure="Tirar a carga do caminhão e devolvê-la ao estoque?"`,!operatorGate,operatorGate);
       }else if(trip?.status==='returning'){
         status=`Trouxe ${trip.pallets} palete(s) de ${trip.material}: pronto para descarregar`;
@@ -629,7 +687,7 @@ export class FactoryController {
     const live=view!.alarms.filter(alarm=>alarm.active!==false&&!alarm.acknowledged&&alarm.severity!=='info');
     const step=this.guideStep!;
     const sev=view!.emergency||live.some(alarm=>alarm.severity!=='warning')?'bad':live.length?'warn':'ok';
-    const html=`<b>${e(step.title)}</b><span>${view!.me.carrying?`com saco de ${view!.me.carrying} · `:''}${view!.me.ppe?'EPI ✓':'sem EPI'}</span>`;
+    const html=`<b>${e(step.title)}</b><span>${view!.me.carrying?`com saco de ${view!.me.carrying} · `:''}${view!.me.pushing?`carrinho ${this.cartState?.bags.length??0}/${CART_CAPACITY} · `:''}${view!.me.ppe?'EPI ✓':'sem EPI'}</span>`;
     if(this.hud.innerHTML!==html)this.hud.innerHTML=html;
     this.hud.dataset.sev=sev;this.hud.classList.add('show');
   }

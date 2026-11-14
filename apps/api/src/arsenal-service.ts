@@ -1,5 +1,5 @@
 import {and,eq} from 'drizzle-orm';
-import {PART_IDS,WEAPONS,WHEEL_ORDER,cleanArsenal,fitError,nextUpgrade,upgradeError,withPart,withUpgrade,type ArsenalView,type PartId,type PartSlot,type UpgradeTrack,type WeaponId} from '@bar/shared';
+import {WEAPONS,cleanArsenal,fitError,nextUpgrade,upgradeError,withPart,withUpgrade,type ArsenalView,type PartId,type PartSlot,type UpgradeTrack,type WeaponId} from '@bar/shared';
 import type {Database} from './database/index.js';
 import {currencyLedger,users,wallets,weaponAmmo,weaponArsenal,weaponParts} from './database/schema.js';
 import {WalletError} from './wallet-service.js';
@@ -11,7 +11,7 @@ export interface ArsenalGrant {view:ArsenalView;applied:boolean}
 
 /**
  * The firearms' arsenal (docs/sistemas/armas.md): the weapons each player owns with their parts and upgrades, the parts owned, the rounds per
- * calibre. The room asks for it when /armas turns on (granting the test kit first), and keeps here what the player fits and upgrades. Everything is
+ * calibre. The room asks for it when /armas turns on and keeps here what the player fits and upgrades. Everything is
  * checked again with the shared rules (fitError, upgradeError) against what is stored: the room's view may be stale.
  */
 export class ArsenalService {
@@ -31,14 +31,7 @@ export class ArsenalService {
       this.db.select().from(weaponAmmo).where(eq(weaponAmmo.userId,userId)),
     ]);
     return cleanArsenal({test,infinite:test,parts:parts.map(row=>row.partId),ammo:Object.fromEntries(ammo.map(row=>[row.caliber,row.quantity])),
-      weapons:weapons.map(row=>({id:row.weaponId,parts:row.parts,upgrades:row.upgrades}))});
-  }
-
-  /** The test kit (/armas): every weapon with what comes fitted and every part, added when missing; what is already there is never reset. */
-  async grantTestKit(userId:string):Promise<void> {
-    await this.user(userId);
-    await this.db.insert(weaponArsenal).values(WHEEL_ORDER.map(id=>({userId,weaponId:id,parts:{...(WEAPONS[id].defaults??{})},upgrades:{},source:'teste'}))).onConflictDoNothing();
-    await this.db.insert(weaponParts).values(PART_IDS.map(partId=>({userId,partId,source:'teste'}))).onConflictDoNothing();
+      weapons:weapons.map(row=>({id:row.weaponId,equipped:row.equipped,parts:row.parts,upgrades:row.upgrades}))});
   }
 
   /** Transfers one finished Ribeiro weapon to a player. The primary key makes repeated grants harmless. */
@@ -58,6 +51,15 @@ export class ArsenalService {
     return next;
   }
 
+  /** Adds an owned weapon to the wheel, or removes it from the wheel. Ownership is never changed here. */
+  async equip(userId:string,weapon:WeaponId,equipped:boolean,test=false):Promise<ArsenalView> {
+    await this.user(userId);
+    const changed=await this.db.update(weaponArsenal).set({equipped,updatedAt:new Date()})
+      .where(and(eq(weaponArsenal.userId,userId),eq(weaponArsenal.weaponId,weapon))).returning({weaponId:weaponArsenal.weaponId});
+    if(!changed.length)throw new WalletError(409,'VocÃª nÃ£o tem essa arma.');
+    return this.load(userId,test);
+  }
+
   /**
    * One level up on a track. Free in the test kit (`free`, the room says so); otherwise the coins leave the wallet on the ledger
    * (`weapon:<requestId>`, reason weapon:upgrade, once: a retry changes nothing and answers the same), refused (409) without enough.
@@ -75,7 +77,7 @@ export class ArsenalService {
         return {balance:wallet.balance,cost:-previous.amount};
       }
       const [row]=await tx.select().from(weaponArsenal).where(and(eq(weaponArsenal.userId,userId),eq(weaponArsenal.weaponId,weapon))).for('update');
-      const view=cleanArsenal({test:free,weapons:row?[{id:row.weaponId,parts:row.parts,upgrades:row.upgrades}]:[],parts:[],ammo:{}});
+      const view=cleanArsenal({test:free,weapons:row?[{id:row.weaponId,equipped:row.equipped,parts:row.parts,upgrades:row.upgrades}]:[],parts:[],ammo:{}});
       const why=upgradeError(view,weapon,track);
       if(why)throw new WalletError(409,why);
       const cost=nextUpgrade(view,weapon,track)!.cost;

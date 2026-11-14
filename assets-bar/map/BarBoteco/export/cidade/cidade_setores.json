@@ -23,7 +23,7 @@
     "colisao": "cidade_S00_00_colisao.glb"
    },
    "kb": {
-    "visual": 1924,
+    "visual": 1925,
     "lod": 219,
     "colisao": 142
    },
@@ -60,7 +60,7 @@
     "colisao": "cidade_S00_01_colisao.glb"
    },
    "kb": {
-    "visual": 2386,
+    "visual": 2389,
     "lod": 196,
     "colisao": 148
    },
@@ -99,7 +99,7 @@
     "colisao": "cidade_S00_02_colisao.glb"
    },
    "kb": {
-    "visual": 1749,
+    "visual": 1750,
     "lod": 186,
     "colisao": 133
    },
@@ -138,7 +138,7 @@
     "colisao": "cidade_S00_03_colisao.glb"
    },
    "kb": {
-    "visual": 1406,
+    "visual": 1409,
     "lod": 173,
     "colisao": 120
    },
@@ -177,7 +177,7 @@
     "colisao": "cidade_S00_04_colisao.glb"
    },
    "kb": {
-    "visual": 1952,
+    "visual": 1953,
     "lod": 183,
     "colisao": 126
    },
@@ -216,7 +216,7 @@
     "colisao": "cidade_S00_05_colisao.glb"
    },
    "kb": {
-    "visual": 2082,
+    "visual": 2085,
     "lod": 178,
     "colisao": 127
    },
@@ -255,7 +255,7 @@
     "colisao": "cidade_S00_06_colisao.glb"
    },
    "kb": {
-    "visual": 1732,
+    "visual": 1734,
     "lod": 178,
     "colisao": 124
    },
@@ -331,7 +331,7 @@
     "colisao": "cidade_S01_00_colisao.glb"
    },
    "kb": {
-    "visual": 2358,
+    "visual": 2360,
     "lod": 200,
     "colisao": 144
    },
@@ -370,7 +370,7 @@
     "colisao": "cidade_S01_01_colisao.glb"
    },
    "kb": {
-    "visual": 3009,
+    "visual": 3011,
     "lod": 179,
     "colisao": 144
    },
@@ -412,7 +412,7 @@
     "colisao": "cidade_S01_02_colisao.glb"
    },
    "kb": {
-    "visual": 1592,
+    "visual": 1594,
     "lod": 154,
     "colisao": 132
    },
@@ -454,7 +454,7 @@
     "colisao": "cidade_S01_03_colisao.glb"
    },
    "kb": {
-    "visual": 1513,
+    "visual": 1515,
     "lod": 140,
     "colisao": 115
    },
@@ -496,7 +496,7 @@
     "colisao": "cidade_S01_04_colisao.glb"
    },
    "kb": {
-    "visual": 1625,
+    "visual": 1627,
     "lod": 151,
     "colisao": 114
    },
@@ -538,7 +538,7 @@
     "colisao": "cidade_S01_05_colisao.glb"
    },
    "kb": {
-    "visual": 904,
+    "visual": 907,
     "lod": 129,
     "colisao": 108
    },
@@ -580,7 +580,7 @@
     "colisao": "cidade_S01_06_colisao.glb"
    },
    "kb": {
-    "visual": 1662,
+    "visual": 1664,
     "lod": 139,
     "colisao": 115
    },
@@ -622,7 +622,7 @@
     "colisao": "cidade_S01_07_colisao.glb"
    },
    "kb": {
-    "visual": 1907,
+    "visual": 1908,
     "lod": 186,
     "colisao": 125
    },
@@ -661,7 +661,7 @@
     "colisao": "cidade_S02_00_colisao.glb"
    },
    "kb": {
-    "visual": 2286,
+    "visual": 2287,
     "lod": 203,
     "colisao": 146
    },
@@ -700,7 +700,7 @@
     "colisao": "cidade_S02_01_colisao.glb"
    },
    "kb": {
-    "visual": 2020,
+    "visual": 2022,
     "lod": 164,
     "colisao": 131
    },
@@ -742,7 +742,7 @@
     "colisao": "cidade_S02_02_colisao.glb"
    },
    "kb": {
-    "visual": 1764,
+    "visual": 1766,
     "lod": 152,
     "colisao": 119
    },
@@ -784,7 +784,7 @@
     "colisao": "cidade_S02_03_colisao.glb"
    },
    "kb": {
-    "visual": 1420,
+    "visual": 1422,
     "lod": 131,
     "colisao": 107
    },
@@ -826,7 +826,7 @@
     "colisao": "cidade_S02_04_colisao.glb"
    },
    "kb": {
-    "visual": 1174,
+    "visual": 1175,
     "lod": 118,
     "colisao": 101
    },
@@ -868,7 +868,7 @@
     "colisao": "cidade_S02_05_colisao.glb"
    },
    "kb": {
-    "visual": 1287,
+    "visual": 1289,
     "lod": 123,
     "colisao": 103
    },
@@ -910,7 +910,7 @@
     "colisao": "cidade_S02_06_colisao.glb"
    },
    "kb": {
-    "visual": 1822,
+    "visual": 1825,
     "lod": 153,
     "colisao": 115
    },
@@ -952,7 +952,7 @@
     "colisao": "cidade_S02_07_colisao.glb"
    },
    "kb": {
-    "visual": 1360,
+    "visual": 1361,
     "lod": 195,
     "colisao": 122
    },
@@ -991,7 +991,7 @@
     "colisao": "cidade_S03_00_colisao.glb"
    },
    "kb": {
-    "visual": 2201,
+    "visual": 2203,
     "lod": 194,
     "colisao": 142
    },
@@ -1030,7 +1030,7 @@
     "colisao": "cidade_S03_01_colisao.glb"
    },
    "kb": {
-    "visual": 1755,
+    "visual": 1759,
     "lod": 161,
     "colisao": 128
    },
@@ -1072,7 +1072,7 @@
     "colisao": "cidade_S03_02_colisao.glb"
    },
    "kb": {
-    "visual": 1043,
+    "visual": 1046,
     "lod": 132,
     "colisao": 111
    },
@@ -1236,7 +1236,7 @@
     "colisao": "cidade_S03_06_colisao.glb"
    },
    "kb": {
-    "visual": 2016,
+    "visual": 2017,
     "lod": 160,
     "colisao": 119
    },
@@ -1278,7 +1278,7 @@
     "colisao": "cidade_S03_07_colisao.glb"
    },
    "kb": {
-    "visual": 1228,
+    "visual": 1229,
     "lod": 200,
     "colisao": 125
    },
@@ -1317,7 +1317,7 @@
     "colisao": "cidade_S04_00_colisao.glb"
    },
    "kb": {
-    "visual": 2176,
+    "visual": 2178,
     "lod": 195,
     "colisao": 144
    },
@@ -1356,7 +1356,7 @@
     "colisao": "cidade_S04_01_colisao.glb"
    },
    "kb": {
-    "visual": 1693,
+    "visual": 1696,
     "lod": 153,
     "colisao": 127
    },
@@ -1398,7 +1398,7 @@
     "colisao": "cidade_S04_02_colisao.glb"
    },
    "kb": {
-    "visual": 1662,
+    "visual": 1664,
     "lod": 139,
     "colisao": 120
    },
@@ -1562,7 +1562,7 @@
     "colisao": "cidade_S04_06_colisao.glb"
    },
    "kb": {
-    "visual": 2593,
+    "visual": 2595,
     "lod": 161,
     "colisao": 119
    },
@@ -1604,7 +1604,7 @@
     "colisao": "cidade_S04_07_colisao.glb"
    },
    "kb": {
-    "visual": 1591,
+    "visual": 1592,
     "lod": 183,
     "colisao": 119
    },
@@ -1643,7 +1643,7 @@
     "colisao": "cidade_S05_00_colisao.glb"
    },
    "kb": {
-    "visual": 2007,
+    "visual": 2008,
     "lod": 190,
     "colisao": 134
    },
@@ -1682,7 +1682,7 @@
     "colisao": "cidade_S05_01_colisao.glb"
    },
    "kb": {
-    "visual": 2302,
+    "visual": 2304,
     "lod": 165,
     "colisao": 129
    },
@@ -1724,7 +1724,7 @@
     "colisao": "cidade_S05_02_colisao.glb"
    },
    "kb": {
-    "visual": 966,
+    "visual": 969,
     "lod": 131,
     "colisao": 110
    },
@@ -1766,7 +1766,7 @@
     "colisao": "cidade_S05_03_colisao.glb"
    },
    "kb": {
-    "visual": 426,
+    "visual": 428,
     "lod": 87,
     "colisao": 85
    },
@@ -1806,7 +1806,7 @@
     "colisao": "cidade_S05_04_colisao.glb"
    },
    "kb": {
-    "visual": 322,
+    "visual": 324,
     "lod": 85,
     "colisao": 87
    },
@@ -1846,7 +1846,7 @@
     "colisao": "cidade_S05_05_colisao.glb"
    },
    "kb": {
-    "visual": 1231,
+    "visual": 1232,
     "lod": 122,
     "colisao": 99
    },
@@ -1888,7 +1888,7 @@
     "colisao": "cidade_S05_06_colisao.glb"
    },
    "kb": {
-    "visual": 2235,
+    "visual": 2238,
     "lod": 153,
     "colisao": 117
    },
@@ -1930,7 +1930,7 @@
     "colisao": "cidade_S05_07_colisao.glb"
    },
    "kb": {
-    "visual": 1833,
+    "visual": 1835,
     "lod": 186,
     "colisao": 123
    },
@@ -1969,7 +1969,7 @@
     "colisao": "cidade_S06_00_colisao.glb"
    },
    "kb": {
-    "visual": 869,
+    "visual": 871,
     "lod": 144,
     "colisao": 106
    },
@@ -2008,7 +2008,7 @@
     "colisao": "cidade_S06_01_colisao.glb"
    },
    "kb": {
-    "visual": 753,
+    "visual": 754,
     "lod": 115,
     "colisao": 95
    },
@@ -2050,7 +2050,7 @@
     "colisao": "cidade_S06_02_colisao.glb"
    },
    "kb": {
-    "visual": 1074,
+    "visual": 1076,
     "lod": 124,
     "colisao": 100
    },
@@ -2092,7 +2092,7 @@
     "colisao": "cidade_S06_03_colisao.glb"
    },
    "kb": {
-    "visual": 1403,
+    "visual": 1405,
     "lod": 125,
     "colisao": 103
    },
@@ -2134,7 +2134,7 @@
     "colisao": "cidade_S06_04_colisao.glb"
    },
    "kb": {
-    "visual": 641,
+    "visual": 643,
     "lod": 105,
     "colisao": 91
    },
@@ -2176,7 +2176,7 @@
     "colisao": "cidade_S06_05_colisao.glb"
    },
    "kb": {
-    "visual": 505,
+    "visual": 506,
     "lod": 93,
     "colisao": 86
    },
@@ -2217,7 +2217,7 @@
     "colisao": "cidade_S06_06_colisao.glb"
    },
    "kb": {
-    "visual": 652,
+    "visual": 654,
     "lod": 110,
     "colisao": 93
    },
@@ -2259,7 +2259,7 @@
     "colisao": "cidade_S06_07_colisao.glb"
    },
    "kb": {
-    "visual": 1012,
+    "visual": 1014,
     "lod": 152,
     "colisao": 114
    },
@@ -2298,11 +2298,11 @@
     "colisao": "cidade_S07_00_colisao.glb"
    },
    "kb": {
-    "visual": 13148,
+    "visual": 13167,
     "lod": 137,
-    "colisao": 287
+    "colisao": 288
    },
-   "tris_estatico": 254824,
+   "tris_estatico": 255144,
    "tris_instancias": 572702,
    "instancias": 195,
    "malhas_instanciadas": 19,
@@ -2314,7 +2314,7 @@
     "S07_00_Vegetacao_LOD2": 336,
     "S07_00_Chao_LOD2": 7
    },
-   "colisores": 886,
+   "colisores": 887,
    "vizinhos": [
     "S06_00",
     "S06_01",
@@ -2335,7 +2335,7 @@
     "colisao": "cidade_S07_01_colisao.glb"
    },
    "kb": {
-    "visual": 1176,
+    "visual": 1178,
     "lod": 114,
     "colisao": 98
    },
@@ -2374,7 +2374,7 @@
     "colisao": "cidade_S07_02_colisao.glb"
    },
    "kb": {
-    "visual": 781,
+    "visual": 783,
     "lod": 115,
     "colisao": 98
    },
@@ -2413,7 +2413,7 @@
     "colisao": "cidade_S07_03_colisao.glb"
    },
    "kb": {
-    "visual": 1239,
+    "visual": 1241,
     "lod": 120,
     "colisao": 102
    },
@@ -2452,23 +2452,23 @@
     "colisao": "cidade_S07_04_colisao.glb"
    },
    "kb": {
-    "visual": 7759,
+    "visual": 11096,
     "lod": 109,
-    "colisao": 136
+    "colisao": 142
    },
-   "tris_estatico": 139548,
-   "tris_instancias": 46724,
+   "tris_estatico": 201394,
+   "tris_instancias": 48694,
    "instancias": 113,
    "malhas_instanciadas": 8,
-   "primitivas": 82,
-   "materiais": 60,
+   "primitivas": 85,
+   "materiais": 63,
    "tris_lod": {
     "S07_04_Edificios_LOD1": 44,
     "S07_04_Silhueta_LOD2": 38,
     "S07_04_Vegetacao_LOD2": 56,
     "S07_04_Chao_LOD2": 22
    },
-   "colisores": 238,
+   "colisores": 262,
    "vizinhos": [
     "S06_03",
     "S06_04",
@@ -2491,7 +2491,7 @@
     "colisao": "cidade_S07_05_colisao.glb"
    },
    "kb": {
-    "visual": 611,
+    "visual": 612,
     "lod": 103,
     "colisao": 90
    },
@@ -2530,7 +2530,7 @@
     "colisao": "cidade_S07_06_colisao.glb"
    },
    "kb": {
-    "visual": 1155,
+    "visual": 1157,
     "lod": 111,
     "colisao": 96
    },
@@ -2569,7 +2569,7 @@
     "colisao": "cidade_S07_07_colisao.glb"
    },
    "kb": {
-    "visual": 1049,
+    "visual": 1050,
     "lod": 161,
     "colisao": 114
    },
@@ -2601,6 +2601,6 @@
   "kb": 237,
   "tris": 4558
  },
- "texturas_kb": 7415,
- "texturas_arquivos": 100
+ "texturas_kb": 7431,
+ "texturas_arquivos": 47
 }

@@ -131,14 +131,15 @@ export class FactoryLogistics {
 
   // ---- sales: product out ----
   /** The operator loads `pallets` of product into a truck at the dock. The world already took them out of the racks. */
-  async loadSale(input:{vehicleId:string;plate?:string;driverId?:string;loaderId:string;pallets:number;dest:Destination;requestId:string}):Promise<FactoryShipmentView> {
+  async loadSale(input:{vehicleId:string;plate?:string;driverId?:string;loaderId:string;pallets:number;/** Bags really on those pallets (a pallet may be incomplete); a full load when omitted. */bags?:number;dest:Destination;requestId:string}):Promise<FactoryShipmentView> {
     const id=await this.db.transaction(async tx=>{
       const claimed=await tx.insert(factoryLedger).values({requestId:input.requestId,actorId:input.loaderId,action:'ship-load',resource:input.vehicleId,delta:{pallets:input.pallets},result:{}}).onConflictDoNothing().returning({id:factoryLedger.requestId});
       if(!claimed.length){const [again]=await tx.select().from(factoryShipments).where(eq(factoryShipments.requestId,input.requestId));if(again)return again.id;throw new LogisticsError(409,'Pedido já processado.');}
       const vehicle=await this.lockTruck(tx,input.vehicleId),finance=await this.finance(tx),plate=input.plate||vehicle?.plate||'',driverId=input.driverId??vehicle?.userId??'';
       if(input.pallets<1||input.pallets>finance.maxPalletsPerTruck)throw new LogisticsError(400,`Um caminhão leva de 1 a ${finance.maxPalletsPerTruck} paletes.`);
       await this.busy(tx,input.vehicleId);
-      const bags=input.pallets*18,shipmentId=randomUUID();
+      const bags=input.bags??input.pallets*18,shipmentId=randomUUID();
+      if(!Number.isInteger(bags)||bags<(input.pallets-1)*18+1||bags>input.pallets*18)throw new LogisticsError(400,'A quantidade de sacos não bate com os paletes carregados.');
       await this.putInHold(tx,input.vehicleId,driverId,ITEM.PRODUTO,bags,'load',shipmentId);
       await tx.insert(factoryShipments).values({id:shipmentId,kind:'sale',status:'loaded',vehicleId:input.vehicleId,plate,driverId,loaderId:input.loaderId,material:'PRODUTO',pallets:input.pallets,bags,destX:input.dest.x,destZ:input.dest.z,destLabel:input.dest.label,distanceM:input.dest.distanceM,requestId:input.requestId});
       return shipmentId;
@@ -155,11 +156,11 @@ export class FactoryLogistics {
       const [row]=await tx.select().from(factoryShipments).where(eq(factoryShipments.id,id)).for('update');
       if(!row)throw new LogisticsError(404,'Carga não encontrada.');
       if(row.kind!=='sale'||row.status!=='loaded')return;
-      const finance=await this.finance(tx),split=settleSale(row.pallets*finance.palletPrice,finance);
+      const finance=await this.finance(tx),split=settleSale(Math.round(row.bags/18*finance.palletPrice),finance);
       // The operator's fee goes to the player; the owner's share goes to the firm's wallet (the owners decide what to do with it); an operator who cannot be paid (no such account) leaves the fee to the vault.
       let toVault=split.tax;
       const staff=await this.pay(tx,row.loaderId,split.staff,`factory:fee:${id}`,`factory-fee:${id}`);if(staff)payouts.push(staff);else toVault+=split.staff;
-      if(split.owner>0)await postToCompany(tx,split.owner,`Venda de ${row.pallets} palete(s) de produto (carga ${id.slice(0,8)})`,id,null,`company-sale:${id}`);
+      if(split.owner>0)await postToCompany(tx,split.owner,`Venda de ${row.pallets} palete(s) de produto, ${row.bags} saco(s) (carga ${id.slice(0,8)})`,id,null,`company-sale:${id}`);
       if(toVault)await this.toTreasury(tx,toVault,`Imposto da venda ${id.slice(0,8)}`,id,null);
       taxPaid=split.tax;
       await tx.update(factoryShipments).set({status:'in_transit',gross:split.gross,tax:split.tax,staff:split.staff,ownerShare:split.owner,ownerId:COMPANY_ID,freight:freightFor(finance,'sale',row.pallets,row.distanceM),departedAt:new Date()}).where(eq(factoryShipments.id,id));

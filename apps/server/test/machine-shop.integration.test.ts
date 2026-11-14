@@ -31,10 +31,18 @@ test('Ribeiro na sala real: retirar a peça e apertar E no corte abre e conclui 
     const results:Array<{ok:boolean;message:string}>=[],games:Array<{action:string;challenge?:RibeiroGameChallenge;ok?:boolean}>=[];client.onMessage('machine.result',value=>results.push(value));client.onMessage('machine.game',value=>games.push(value));client.onMessage('*',()=>{});
     await eventually(()=>!!authoritative?.state.players.get('machine-player'));await new Promise(resolve=>setTimeout(resolve,80));
     const player=authoritative!.state.players.get('machine-player')!,shop=authoritative!.machineShop;for(const material of ['ACO','ALUMINIO','POLIMERO','MOLAS'] as const)shop.addMaterial(material,100);
-    Object.assign(player,RIBEIRO_COMPUTER);client.send('machine.order.start',{weapon:'pistola',requestId:crypto.randomUUID()});await eventually(()=>results.length===1);assert.equal(results[0]!.ok,true,results[0]!.message);
-    Object.assign(player,RIBEIRO_PREP);client.send('machine.interact',{stationId:'preparation'});await eventually(()=>results.length===2);assert.equal(results[1]!.ok,true,results[1]!.message);
+    Object.assign(player,RIBEIRO_COMPUTER);client.send('machine.order.start',{customer:'Cliente X',items:[{weapon:'pistola',quantity:2}],requestId:crypto.randomUUID()});await eventually(()=>results.length===1);assert.equal(results[0]!.ok,true,results[0]!.message);assert.equal(shop.state.orders.length,2);assert.equal(shop.state.orders[0]!.customer,'Cliente X');
+    // Hands busy (a delivery bag): the part is not handed over.
+    Object.assign(player,RIBEIRO_PREP);player.parcel='bag';client.send('machine.interact',{stationId:'preparation'});await eventually(()=>results.length===2);assert.equal(results[1]!.ok,false);assert.equal(player.ribeiroPart,'');assert.equal(shop.state.orders.filter(order=>order.status==='queued').length,2);
+    // The employee picks the second OP of the lot, not the oldest one.
+    const chosen=shop.state.orders[1]!;player.parcel='';client.send('machine.interact',{stationId:'preparation',orderId:chosen.id});await eventually(()=>results.length===3);assert.equal(results[2]!.ok,true,results[2]!.message);assert.equal(chosen.status,'to-cut');assert.equal(shop.state.orders[0]!.status,'queued');
+    // Everyone's copy of the state shows the part in the hands, and a hand holding a part cannot raise the guard or draw a gun.
+    assert.equal(player.ribeiroPart,'raw');await eventually(()=>client!.state.players.get('machine-player')?.ribeiroPart==='raw');
+    const refusals=authoritative as unknown as {guardRefusal(player:unknown):string;gunRefusal(player:unknown):string};assert.match(refusals.guardRefusal(player),/Largue/);assert.match(refusals.gunRefusal(player),/Largue/);
     Object.assign(player,RIBEIRO_CUTTERS[0]);client.send('machine.interact',{stationId:'cut-1'});await eventually(()=>games.some(game=>game.action==='start'));
     const game=games.find(item=>item.action==='start')!.challenge!;assert.equal(game.kind,'cut');client.send('machine.game.answer',{id:game.id,answer:game.target});await eventually(()=>games.some(item=>item.action==='end'&&item.ok));
     assert.equal(shop.state.jobs.some(job=>job.stationId==='cut-1'&&job.stage==='cut'),true);
+    // Put into the machine: the hands are empty again, for everyone.
+    assert.equal(player.ribeiroPart,'');await eventually(()=>client!.state.players.get('machine-player')?.ribeiroPart==='');
   }finally{if(client)await client.leave();await server.gracefullyShutdown(false);await new Promise<void>(resolve=>internal.close(()=>resolve()));process.env.API_INTERNAL_URL=previous;}
 });

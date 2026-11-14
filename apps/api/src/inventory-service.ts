@@ -1,12 +1,13 @@
 import {and,desc,eq,sql} from 'drizzle-orm';
 import {vehicleName} from '@bar/shared';
-import {INVENTORY_CAPACITY,ITEM_IDS,MOTO_NAME,STARTER_ITEMS,itemById,type InventoryView,type ItemId,type PublicUser} from '@bar/shared';
+import {INVENTORY_CAPACITY,ITEM_IDS,MOTO_NAME,STARTER_ITEMS,WEAPONS,itemById,type InventoryView,type ItemId,type PublicUser,type WeaponId} from '@bar/shared';
 import type {Database} from './database/index.js';
-import {currencyLedger,inventoryLedger,itemInventory,playerVehicles,wallets} from './database/schema.js';
+import {currencyLedger,inventoryLedger,itemInventory,playerVehicles,wallets,weaponArsenal} from './database/schema.js';
 import type {WardrobeService} from './wardrobe.js';
 
 export class InventoryError extends Error {constructor(readonly statusCode:number,message:string){super(message);}}
 export type InventoryReason='use'|'discard'|'faint';
+export interface InventoryGrant {view:InventoryView;applied:boolean}
 
 /** Persistent, transactional inventory. The API owns quantities; the room only requests mutations. */
 export class InventoryService {
@@ -77,6 +78,44 @@ export class InventoryService {
       else await tx.delete(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId)));
     });
     return this.view(userId);
+  }
+
+  /** Adds finished factory goods without charging the player. The receipt makes world retries idempotent. */
+  async grant(userId:string,itemId:ItemId,quantity:number,reason:string,requestId:string):Promise<InventoryGrant>{
+    const item=itemById(itemId);if(!item)throw new InventoryError(400,'Item inválido.');
+    if(!Number.isInteger(quantity)||quantity<1)throw new InventoryError(400,'Quantidade inválida.');
+    await this.initialize(userId);const receipt=`inventory-${reason}:${requestId}`;let applied=false;
+    await this.db.transaction(async tx=>{
+      const claimed=await tx.insert(inventoryLedger).values({id:receipt,userId,itemId,quantity,reason}).onConflictDoNothing().returning({id:inventoryLedger.id});
+      if(!claimed.length)return;
+      const [stack]=await tx.select().from(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId))).for('update');
+      const next=(stack?.quantity??0)+quantity;
+      if(next>item.stackMax)throw new InventoryError(409,`Você só pode carregar ${item.stackMax} unidade(s) de ${item.name} na mochila.`);
+      if(!stack){const slots=await tx.select({itemId:itemInventory.itemId}).from(itemInventory).where(eq(itemInventory.userId,userId));if(slots.length>=INVENTORY_CAPACITY)throw new InventoryError(409,'Sua mochila está cheia.');}
+      if(stack)await tx.update(itemInventory).set({quantity:next,updatedAt:new Date()}).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId)));
+      else await tx.insert(itemInventory).values({userId,itemId,quantity});
+      applied=true;
+    });
+    return {view:await this.view(userId),applied};
+  }
+
+  /** Moves one finished Ribeiro firearm from the backpack into the persistent arsenal, already available on the weapon wheel. */
+  async equipWeapon(userId:string,itemId:ItemId,weapon:WeaponId,requestId:string):Promise<InventoryGrant>{
+    await this.initialize(userId);const receipt=`inventory-equip:${requestId}`;let applied=false;
+    await this.db.transaction(async tx=>{
+      // Claim first: concurrent retries wait on the same unique receipt and only one may move the physical item.
+      const claimed=await tx.insert(inventoryLedger).values({id:receipt,userId,itemId,quantity:-1,reason:'equip'}).onConflictDoNothing().returning({id:inventoryLedger.id});
+      if(!claimed.length){applied=true;return;}
+      const [stack]=await tx.select().from(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId))).for('update');
+      if(!stack||stack.quantity<1)throw new InventoryError(409,'Você não tem esta arma na mochila.');
+      const inserted=await tx.insert(weaponArsenal).values({userId,weaponId:weapon,equipped:true,parts:{...(WEAPONS[weapon].defaults??{})},upgrades:{},source:'ribeiro'}).onConflictDoNothing().returning({weaponId:weaponArsenal.weaponId});
+      if(!inserted.length)throw new InventoryError(409,'Esta arma já está no seu arsenal.');
+      const next=stack.quantity-1;
+      if(next)await tx.update(itemInventory).set({quantity:next,updatedAt:new Date()}).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId)));
+      else await tx.delete(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,itemId)));
+      applied=true;
+    });
+    return {view:await this.view(userId),applied};
   }
 
   async access(userId:string){const view=await this.view(userId);return {inventory:view.stacks,balance:view.balance};}

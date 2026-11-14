@@ -1,0 +1,18 @@
+.rb-gun{position:relative;overflow:hidden}
+.rb-gun .wp-pic{position:relative;display:grid;width:100%;aspect-ratio:2/1}
+.rb-gun .wp-layer,.rb-stock-weapon .wp-layer{grid-area:1/1;display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 5px 5px #0008)}
+.rb-gun>span:last-child{position:absolute;align-self:end;justify-self:start;margin:5px 7px;padding:2px 5px;background:#07100fcc}
+.rb-stock-weapon{width:76px!important;height:44px!important;background:#102a23!important}
+.rb-stock-weapon .wp-pic{position:relative;display:grid;width:72px;aspect-ratio:2/1}
+.rb-stock-row{grid-template-columns:76px minmax(105px,1fr) auto 48px auto!important}
+.rb-main>.rb-card+.rb-card{margin-top:16px}
+.rb-onboarding{padding:26px}.rb-onboarding h3{margin:0 0 8px}.rb-onboarding p{color:#82a39a}.rb-onboarding small{display:block;color:#6b8d84}
+.rb-staff-list article{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #172d28}.rb-staff-list article:last-child{border-bottom:0}
+.rb-staff-list article>span{display:grid;min-width:0}.rb-staff-list article>span b{font-size:12px}.rb-staff-list article>span small{color:#6f9087;font-size:10px}
+.rb-staff-list article>button,.rb-staff-actions{margin-left:auto}.rb-staff-actions{display:flex;gap:6px}
+.rb-pay-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#1d3832;border-top:1px solid #1d3832}
+.rb-pay-grid span{display:grid;gap:3px;padding:10px;background:#0a1513;color:#87a89f;font:600 10px var(--font-mono)}.rb-pay-grid span b{text-transform:uppercase;color:var(--rb);font-size:9px}
+.rb-payroll ul{list-style:none;margin:0;padding:0}.rb-payroll li{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #172d28}
+.rb-payroll li span{display:grid}.rb-payroll li b{font-size:11px}.rb-payroll li small{color:#67887f;font-size:9px}.rb-payroll li strong{color:var(--rb);font:700 11px var(--font-mono)}
+.rb-payroll .rb-policy{align-items:center;margin:14px}.rb-payroll .rb-policy .ui-icon{width:16px;flex:none}
+@media(max-width:760px){.rb-pay-grid{grid-template-columns:1fr 1fr}.rb-staff-list article{align-items:flex-start;flex-wrap:wrap}.rb-staff-actions{width:100%;justify-content:flex-end}}

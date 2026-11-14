@@ -190,7 +190,7 @@ test('arsenal: the test kit has everything, parts are checked, kits round-trip, 
   let up=kit;for(let i=0;i<7;i++)up=withUpgrade(up,'fuzil','dano');
   assert.equal(nextUpgrade(up,'fuzil','dano'),undefined);
   const clean=cleanArsenal({test:false,weapons:[{id:'fuzil',parts:{mira:'acog',boca:'luneta'},upgrades:{dano:9,foo:3}},{id:'bazuca'}],parts:['acog','x'],ammo:{'556':12.7}});
-  assert.deepEqual(clean.weapons,[{id:'fuzil',parts:{mira:'acog'},upgrades:{dano:UPGRADE_MAX}}]);
+  assert.deepEqual(clean.weapons,[{id:'fuzil',equipped:false,parts:{mira:'acog'},upgrades:{dano:UPGRADE_MAX}}]);
   assert.deepEqual(clean.parts,['acog']);assert.deepEqual(clean.ammo,{'556':12});
 });
 

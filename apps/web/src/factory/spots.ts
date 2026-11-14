@@ -1,8 +1,10 @@
 import {CITY_MARKERS,floorHeight} from '@bar/shared';
-import {FACTORY_GATE,FACTORY_REACH} from '@bar/shared/factory';
+import {FACTORY_CART,FACTORY_INTERCOM,FACTORY_REACH} from '@bar/shared/factory';
 
 /** A place of the plant worth marking: its ring on the floor, its badge on screen and (some) its blip on the minimap. */
 export interface FactorySpot {id:string;label:string;x:number;y:number;z:number;reach:number;icon:string;/** Also a blip on the minimap. */map:boolean}
+/** Metres from the cart's middle within which its ring is the player's (E there is the cart's). */
+export const CART_SPOT_REACH=2.2;
 /** The colour of every station's ring and badge (industrial amber); the next step's own is the job green. */
 export const FACTORY_COLOR='#ffb020';
 
@@ -24,9 +26,11 @@ export function buildFactorySpots():FactorySpot[] {
     // The dock: E opens its panel, unless a truck's rear is what you stand at (then E is the truck's own: its hold).
     spot('doca','Doca de carga','Ponto_EB_Doca',6,'truck',true),
   ];
-  // The intercom post on the pavement by the vehicle gate (not a map marker: FACTORY_GATE.intercom): outsiders ring here.
-  const bell=FACTORY_GATE.intercom;
-  spots.push({id:'interfone',label:'Interfone do portão',x:bell.x,y:floorHeight(bell.x,bell.z,.5)??.17,z:bell.z,reach:bell.reach,icon:'bell',map:true});
+  // The platform cart: its ring follows it (the controller moves this spot to wherever the room says the cart is; parked, it stands at Ponto_EB_Carrinho).
+  spots.push({id:'carrinho',label:'Carrinho de plataforma',x:FACTORY_CART.park.x,y:FACTORY_CART.park.y,z:FACTORY_CART.park.z,reach:CART_SPOT_REACH,icon:'package',map:false});
+  // The intercom post on the pavement by the vehicle gate (Ponto_EB_Interfone of the gates' JSON, not a marker of the city): staff ring it to get the gate opened, outsiders only call.
+  const bell=FACTORY_INTERCOM;
+  spots.push({id:'interfone',label:'Interfone do portão',x:bell.x,y:floorHeight(bell.x,bell.z,.5)??bell.y,z:bell.z,reach:bell.reach,icon:'bell',map:true});
   // Each rack column's three levels share one spot on the floor; the shelves are labelled by what they hold.
   for(const [id,label,a,b,map] of [['rack1','MALTE · prateleira','Ponto_EB_Rack_V1N1P1','Ponto_EB_Rack_V1N1P2',false],['rack2','MALTE · prateleira','Ponto_EB_Rack_V2N1P1','Ponto_EB_Rack_V2N1P2',true],['rack3','MIX · prateleira','Ponto_EB_Rack_V3N1P1','Ponto_EB_Rack_V3N1P2',false]] as const){
     const point=middle(a,b);if(point)spots.push({id,label,x:point.x,y:point.y,z:point.z,reach:FACTORY_REACH.rack,icon:'warehouse',map});
@@ -34,6 +38,8 @@ export function buildFactorySpots():FactorySpot[] {
   return spots.filter((each):each is FactorySpot=>!!each);
 }
 export const FACTORY_SPOTS=buildFactorySpots();
+/** The cart's spot, moved by the controller as the cart moves (the scene draws its ring from it). */
+export const CART_SPOT=FACTORY_SPOTS.find(spot=>spot.id==='carrinho')!;
 
 /** The plant's centre (the panel): how far the player is from the plant decides whether the panel follows its state. */
 export const FACTORY_CENTER=at('Ponto_EB_Painel')??{x:0,y:0,z:0};

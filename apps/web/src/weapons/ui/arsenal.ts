@@ -73,12 +73,12 @@ export function createArsenal(root:HTMLElement,weapons:WeaponsController,host:Ar
   function weaponsTab(v:ArsenalView,list:WeaponId[]):string {
     if(!list.length)return '<p class="ar-empty">Nenhuma arma no arsenal.</p>';
     const want=weapons.gun.want;
-    const items=list.map(id=>{const def=WEAPONS[id];return `<button type="button" class="ar-item" data-key="w:${id}" data-ar-weapon="${id}" aria-current="${id===weapon}">
-      ${weaponPicture(id,arsenalWeapon(v,id)?.parts,arsenalWeapon(v,id)?.upgrades)}<span><b>${e(def.name)}</b><small>${e(CATEGORY_NAMES[def.category])} · ${e(caliberText(arsenalStats(v,id)!))}</small></span>${id===want?'<i class="ar-hand" title="Na mão">Na mão</i>':''}</button>`;}).join('');
+    const items=list.map(id=>{const def=WEAPONS[id],equipped=!!arsenalWeapon(v,id)?.equipped,badge=id===want?'Na mão':equipped?'Na roda':'';return `<button type="button" class="ar-item" data-key="w:${id}" data-ar-weapon="${id}" aria-current="${id===weapon}">
+      ${weaponPicture(id,arsenalWeapon(v,id)?.parts,arsenalWeapon(v,id)?.upgrades)}<span><b>${e(def.name)}</b><small>${e(CATEGORY_NAMES[def.category])} · ${e(caliberText(arsenalStats(v,id)!))}</small></span>${badge?`<i class="ar-hand" title="${badge}">${badge}</i>`:''}</button>`;}).join('');
     return `<nav class="ar-list" data-scroll="list" aria-label="Armas">${items}</nav><section class="ar-detail" data-scroll="detail">${weaponDetail(v,weapon!)}</section>`;
   }
   function weaponDetail(v:ArsenalView,id:WeaponId):string {
-    const def=WEAPONS[id],item=arsenalWeapon(v,id)!,stats=arsenalStats(v,id)!,inHand=weapons.gun.want===id;
+    const def=WEAPONS[id],item=arsenalWeapon(v,id)!,stats=arsenalStats(v,id)!,equipped=item.equipped,waitEquip=busy.has(`equip:${id}`);
     const slots=PART_SLOTS.filter(slot=>def.slots[slot]?.length);
     const slotRows=slots.map(slot=>{
       const options=def.slots[slot]!.filter(option=>v.parts.includes(option)),fitted=item.parts[slot],wait=busy.has(`${id}:${slot}`);
@@ -98,7 +98,7 @@ export function createArsenal(root:HTMLElement,weapons:WeaponsController,host:Ar
     }).join('');
     return `<header class="ar-head"><div><small class="ar-eyebrow">${e(CATEGORY_NAMES[def.category])} · ${e(caliberText(stats))}</small><h3>${e(def.name)}</h3>
         <p>${e(def.description)}</p><div class="ar-tags"><span>${e(modesText(stats))}</span><span>${stats.mag} no carregador</span>${stats.scope?`<span>Luneta ${stats.zooms.map(zoom=>`${zoom}x`).join(' / ')}</span>`:''}${stats.suppressed?'<span>Silenciada</span>':''}</div></div>
-        <button type="button" class="ar-draw" data-key="draw" data-ar-draw="${id}"${inHand||!weapons.gun.on?' disabled':''}>${uiIcon(inHand?'check':'gun')}<span>${inHand?'Na mão':'Sacar'}</span></button></header>
+        <button type="button" class="ar-draw" data-key="equip" data-ar-equip="${id}" aria-pressed="${equipped}"${waitEquip?' aria-busy="true"':''}>${uiIcon(equipped?'check':'gun')}<span>${equipped?'Remover da roda':'Equipar'}</span></button></header>
       <div class="ar-cols"><div class="ar-col"><figure class="ar-figure">${weaponPicture(id,item.parts,item.upgrades)}</figure><div class="ar-stats">${statsHtml(stats,undefined)}</div></div>
         <div class="ar-col"><h4 class="ar-group">Equipamentos</h4>${slotRows}<h4 class="ar-group">Melhorias</h4>${upgrades}</div></div>`;
   }
@@ -159,7 +159,7 @@ export function createArsenal(root:HTMLElement,weapons:WeaponsController,host:Ar
     if(d.arTab){setTab(d.arTab as Tab);return;}
     if(d.arWeapon){if(d.arWeapon!==weapon){weapon=d.arWeapon as WeaponId;preview=undefined;host.sounds.move(owned().indexOf(weapon));render();}return;}
     if(d.arPick){if(d.arPick!==part){part=d.arPick as PartId;host.sounds.move(ownedParts().indexOf(part));render();}return;}
-    if(d.arDraw){weapons.select(d.arDraw as WeaponId);host.sounds.select();host.close();return;}
+    if(d.arEquip){const id=d.arEquip as WeaponId,item=arsenalWeapon(view(),id);if(item)send(`equip:${id}`,()=>weapons.equip(id,!item.equipped));return;}
     if(d.arSlot&&weapon){
       const slot=d.arSlot as PartSlot,choice=(d.arPart||null) as PartId|null;
       if((arsenalWeapon(view(),weapon)?.parts[slot]??null)===choice)return;

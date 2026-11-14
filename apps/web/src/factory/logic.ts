@@ -95,7 +95,8 @@ export function baggingActions(view:FactoryView):Action[] {
     {action:'bag.resume',label:'Retomar',enabled:b.state==='PAUSADO',why:'Não está pausado.'},
     {action:'bag.sew',label:'Costurar',enabled:b.state==='AGUARDANDO_COSTURA',why:'O saco ainda não está cheio.',next:b.state==='AGUARDANDO_COSTURA'},
     {action:'bag.stack',label:'Empilhar',enabled:b.state==='AGUARDANDO_EMPILHAR',why:'Não há saco costurado.',next:b.state==='AGUARDANDO_EMPILHAR'},
-    {action:'pallet.close',label:'Fechar palete incompleto',enabled:b.palletBags>0&&(b.state==='PARADO'||b.state==='AGUARDANDO_SACO')&&!(out&&out.quantity>0),why:b.palletBags<1?'Não há sacos empilhados no palete.':out&&out.quantity>0?'Armazene o palete da saída antes.':'Termine o saco que está na ensacadeira.'},
+    {action:'bag.remove',label:'Retirar saco do bico',enabled:b.state==='SACO_POSICIONADO',why:'Só há o que retirar com um saco vazio posicionado.',next:b.state==='SACO_POSICIONADO'&&silo<.05},
+    {action:'pallet.close',label:'Fechar palete incompleto',enabled:b.palletBags>0&&(b.state==='PARADO'||b.state==='AGUARDANDO_SACO'||b.state==='SACO_POSICIONADO')&&!(out&&out.quantity>0),why:b.palletBags<1?'Não há sacos empilhados no palete.':out&&out.quantity>0?'Armazene o palete da saída antes.':'Termine o saco que está na ensacadeira.'},
     {action:'pallet.store',label:'Armazenar palete',enabled:!!out&&out.quantity>0,why:'Não há palete pronto na saída.',next:!!out&&out.quantity>0},
     {action:'bag.restock',label:'Repor sacos vazios',enabled:b.emptyBags<=16,why:'Ainda há bastante saco no fardo.',next:b.emptyBags<1},
   ];
@@ -109,7 +110,9 @@ export function nextCleaning(view:FactoryView):CleanTaskId|undefined {
   const pending=pendingCleaning(view.dirt);
   return CLEAN_TASKS.map(task=>task.id).find(id=>pending.includes(id));
 }
-export function nextStep(view:FactoryView|undefined,employed:boolean,carrying:null|'MALTE'|'MIX'):Step|undefined {
+/** The platform cart as the guide needs it: its sacks, who pushes it, and whether that is the player. */
+export interface CartHint {bags:string[];pusher:string|null;mine:boolean}
+export function nextStep(view:FactoryView|undefined,employed:boolean,carrying:null|'MALTE'|'MIX',cart?:CartHint|null):Step|undefined {
   if(!employed)return {title:'Candidate-se ao cargo',detail:'Abra a aba Emprego e peça a vaga de Operador de Spray Dry.',tab:'employment'};
   if(!view)return;
   const me=view.me;
@@ -124,7 +127,10 @@ export function nextStep(view:FactoryView|undefined,employed:boolean,carrying:nu
     const name=tankName(loading.id);
     const missing=loading.malteBags<need.malteBags?'MALTE':'MIX';
     if(carrying)return {title:`Despeje o ${carrying} no ${name}`,detail:`Suba na plataforma do ${name} e aperte E: a tampa abre e o agitador liga sozinhos. Receita: MALTE ${loading.malteBags}/${need.malteBags}, MIX ${loading.mixBags}/${need.mixBags}.`,spot:`tanque${loading.id}`};
-    return {title:`Pegue um saco de ${missing}`,detail:`Receita: MALTE ${loading.malteBags}/${need.malteBags}, MIX ${loading.mixBags}/${need.mixBags}. Pegue na prateleira (aperte E) e leve ao ${name}; lá, E despeja (tampa e agitador não precisam ser abertos antes).`,spot:missing==='MALTE'?'rack2':'rack3'};
+    const recipe=`Receita: MALTE ${loading.malteBags}/${need.malteBags}, MIX ${loading.mixBags}/${need.mixBags}.`;
+    // A cart already holding the sack the tank asks for: unload it (the pusher lets go first).
+    if(cart?.bags.includes(missing))return cart.mine?{title:'Solte o carrinho',detail:`${recipe} Aperte E para soltá-lo e E de novo para pegar um saco de ${missing} dele.`,spot:'carrinho'}:{title:`Pegue um saco de ${missing} do carrinho`,detail:`${recipe} E perto do carrinho tira o de cima; leve-o ao ${name} e aperte E lá para despejar.`,spot:'carrinho'};
+    return {title:`Pegue um saco de ${missing}`,detail:`${recipe} Pegue na prateleira (aperte E) e leve ao ${name}; lá, E despeja (tampa e agitador não precisam ser abertos antes). Com o carrinho de plataforma (E perto dele empurra) dá para levar até 6 sacos de uma vez.`,spot:missing==='MALTE'?'rack2':'rack3'};
   }
   const dirty=tanks.find(tank=>tank.state==='SUJO');
   const order=view.production?.active;
@@ -138,13 +144,14 @@ export function nextStep(view:FactoryView|undefined,employed:boolean,carrying:nu
   if(returning)return {title:`Descarregue o caminhão ${returning.plate}`,detail:`Ele trouxe ${returning.pallets} palete(s) de ${returning.material}. Aba Doca e cargas, "Descarregar nas prateleiras".`,spot:'doca',tab:'dock'};
   const product=view.slots.filter(slot=>slot.material==='PRODUTO').reduce((sum,slot)=>sum+slot.quantity,0);
   const waiting=view.dock.trucks.find(truck=>!view.shipments.some(trip=>trip.vehicleId===truck.vehicleId&&['loaded','in_transit','to_supplier','returning'].includes(trip.status)));
-  if(waiting&&product>=18)return {title:`Carregue o caminhão ${waiting.plate}`,detail:`Há um caminhão na doca${waiting.plate?` (${waiting.plate})`:''}. Aba Doca e cargas: ele sai, a venda é paga e você recebe a taxa da carga.`,spot:'doca',tab:'dock'};
+  if(waiting&&product>0)return {title:`Carregue o caminhão ${waiting.plate}`,detail:`Há um caminhão na doca${waiting.plate?` (${waiting.plate})`:''}. Aba Doca e cargas: ele sai, a venda é paga e você recebe a taxa da carga.`,spot:'doca',tab:'dock'};
   const out=view.slots.find(slot=>slot.marker==='Ponto_EB_PA_Ensaque');
   if(out&&out.quantity>0)return {title:'Armazene o palete pronto',detail:'O palete completo está na saída do ensaque: armazene-o no estoque.',spot:'palete',tab:'bagging'};
   const bagging=view.bagging;
   if(bagging.state==='AGUARDANDO_COSTURA')return {title:'Costure o saco',detail:'O saco está cheio.',spot:'ensaque',tab:'bagging'};
   if(bagging.state==='AGUARDANDO_EMPILHAR')return {title:'Empilhe o saco',detail:`Palete ${bagging.palletBags}/18.`,spot:'ensaque',tab:'bagging'};
   if(bagging.state==='SACO_POSICIONADO'&&view.dryer.powderKg>=.05)return {title:'Inicie o enchimento',detail:view.dryer.powderKg<view.balance.bagKg?`Só há ${fixed(view.dryer.powderKg,1)} kg no silo: sai um saco leve, pago pelo peso.`:'Saco posicionado e produto no silo.',spot:'ensaque',tab:'bagging'};
+  if(bagging.state==='SACO_POSICIONADO'&&view.dryer.powderKg<.05&&view.dryer.state!=='PRODUZINDO')return {title:'Retire o saco vazio do bico',detail:'Não há produto no silo para encher este saco: aba Ensaque, "Retirar saco do bico" (ele volta para o fardo).',spot:'ensaque',tab:'bagging'};
   if(view.dryer.powderKg>.5&&view.dryer.powderKg<view.balance.bagKg&&view.dryer.state!=='PRODUZINDO'&&['PARADO','AGUARDANDO_SACO'].includes(bagging.state))return bagging.emptyBags>0
     ?{title:'Ensaque o que sobrou no silo',detail:`Restam ${fixed(view.dryer.powderKg,1)} kg: posicione um saco e inicie. O saco sai leve e o pagamento acompanha o peso.`,spot:'ensaque',tab:'bagging'}
     :{title:'Reponha os sacos vazios',detail:'O fardo acabou.',spot:'ensaque',tab:'bagging'};
@@ -160,6 +167,7 @@ export function nextStep(view:FactoryView|undefined,employed:boolean,carrying:nu
       :{title:'Pare e esfrie o secador',detail:`Faltam ${left} lugar(es) para limpar. O secador precisa estar parado para ser lavado: aba Secador, "Parar e esfriar".`,spot:'secador',tab:'dryer'};
     return {title:`Limpe: ${task.label}`,detail:`Faltam ${left} lugar(es) para limpar antes da próxima ordem. Vá até lá e aperte E (${task.durationS} s, fique no lugar).`,at:task.at};
   }
+  if(!order&&bagging.palletBags>0&&view.dryer.powderKg<.05&&['PARADO','AGUARDANDO_SACO','SACO_POSICIONADO'].includes(bagging.state))return {title:'Feche o palete incompleto',detail:`Há ${bagging.palletBags} saco(s) empilhados sem palete completo: aba Ensaque, "Fechar palete incompleto", depois "Armazenar palete".`,spot:'ensaque',tab:'bagging'};
   if(dirty&&!tanks.some(tank=>tank.state==='VAZIO')&&order?.status==='running')return {title:`Lave o ${tankName(dirty.id)}`,detail:'Um tanque sujo precisa de lavagem antes de um novo lote: suba na plataforma e aperte E (10 s).',spot:`tanque${dirty.id}`};
   const empty=tanks.find(tank=>tank.state==='VAZIO');
   const stock=(material:string)=>view.slots.filter(slot=>slot.material===material).reduce((sum,slot)=>sum+slot.quantity,0);

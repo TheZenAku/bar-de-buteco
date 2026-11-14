@@ -13,12 +13,16 @@ async function until(check:()=>boolean,ms=5000):Promise<void>{const deadline=Dat
 
 test('room keeps inventory private and applies full effects at the start, never again on completion or interruption', {timeout:20000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
-  let stacks:InventoryStack[]=[{itemId:'coxinha',quantity:1},{itemId:'agua',quantity:2},{itemId:'curativo',quantity:1}],inventoryCalls=0;
+  let stacks:InventoryStack[]=[{itemId:'coxinha',quantity:1},{itemId:'agua',quantity:2},{itemId:'curativo',quantity:1},{itemId:'arma_pistola',quantity:1}],inventoryCalls=0,equipCalls=0;
   const api=createServer(async(req,res)=>{
     let raw='';for await(const chunk of req)raw+=chunk;
     const body=raw?JSON.parse(raw):{};
     res.setHeader('content-type','application/json');
     if(req.url?.endsWith('/validate'))return void res.end(JSON.stringify({valid:true,blocked:[],role:'user',equippedSkin:'nathan',ownedSkins:['nathan'],inventory:stacks}));
+    if(req.url?.endsWith('/inventory/equip-weapon')){
+      equipCalls++;stacks=stacks.filter(stack=>stack.itemId!=='arma_pistola');
+      return void res.end(JSON.stringify({applied:true,view:{stacks,capacity:INVENTORY_CAPACITY,usedSlots:stacks.length,balance:0,history:[]},arsenal:{test:false,infinite:false,weapons:[{id:'pistola',equipped:true,parts:{},upgrades:{}}],parts:[],ammo:{}}}));
+    }
     if(req.url?.endsWith('/inventory')){
       inventoryCalls++;
       const current=stacks.find(stack=>stack.itemId===body.itemId);
@@ -60,7 +64,7 @@ test('room keeps inventory private and applies full effects at the start, never 
     room.send('inventory.use',{itemId:'coxinha'});await until(()=>errors.some(error=>error.toLowerCase().includes('mochila')));
     assert.equal(inventoryCalls,1,'an absent item is rejected before reaching the API');
     room.send('inventory.discard',{itemId:'agua',quantity:1});await until(()=>results.some(result=>result.action==='discard'));
-    assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1},{itemId:'curativo',quantity:1}]);
+    assert.equal(inventoryCalls,2);assert.deepEqual(states.at(-1).stacks,[{itemId:'agua',quantity:1},{itemId:'curativo',quantity:1},{itemId:'arma_pistola',quantity:1}]);
 
     needs.hungerCore=0;needs.thirstCore=10;needs.bladder=0;
     room.send('inventory.use',{itemId:'agua'});await until(()=>player.holding==='agua');
@@ -77,6 +81,11 @@ test('room keeps inventory private and applies full effects at the start, never 
     assert.equal(needs.hpCore,38,'interruption does not grant another dose');
     presence.interactionEndsAt=Date.now();await until(()=>player.interactionState==='');
     assert.equal(needs.hpCore,38,'completion does not grant another dose');assert.equal(inventoryCalls,4);
+
+    await new Promise(resolve=>setTimeout(resolve,1000));
+    room.send('inventory.use',{itemId:'arma_pistola'});await until(()=>equipCalls===1&&results.some(result=>result.itemId==='arma_pistola'));
+    assert.equal(states.at(-1).stacks.some((stack:any)=>stack.itemId==='arma_pistola'),false,'equipping moves the physical weapon out of the backpack');
+    assert.equal(player.gun.on,true,'equipping a real weapon activates its wheel without the admin-only /armas command');
 
     // The house's shop opens only for someone standing on its blip: the room checks the reach.
     const opened:unknown[]=[];room.onMessage('shop.open',message=>opened.push(message));

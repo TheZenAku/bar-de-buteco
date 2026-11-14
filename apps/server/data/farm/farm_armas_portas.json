@@ -84,7 +84,7 @@
    "origem_jogo_xyz": [
     339.2,
     0.17,
-    318.075
+    317.925
    ],
    "tipo": "giratoria",
    "angulo_fechada_graus": 90.0,
@@ -170,7 +170,7 @@
   {
    "no": "FA_Porta_CFTV",
    "origem_jogo_xyz": [
-    348.375,
+    348.425,
     4.8,
     304.6
    ],

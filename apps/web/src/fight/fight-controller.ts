@@ -45,7 +45,7 @@ export class FightController {
   toggle(self:PlayerState|undefined):string {
     if(this.guard){this.lower();return '';}
     if(!self)return '';
-    const why=self.holding||self.carrying||self.parcel?'Largue o que está na mão antes de levantar a guarda.'
+    const why=self.holding||self.carrying||self.parcel||self.ribeiroPart?'Largue o que está na mão antes de levantar a guarda.'
       :self.fireworkEquipped?'Guarde o fogo de artifício antes de lutar.'
       :(self.interactionState&&self.interactionState!=='stagger')||self.currentTableId?'Termine o que está fazendo antes de levantar a guarda.':'';
     if(why)return why;

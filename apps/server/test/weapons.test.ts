@@ -68,6 +68,25 @@ test('drawing takes the weapon\'s time: a shot before it is dropped, after it la
   assert.equal(a.gun.w,'pistola');
 });
 
+test('an owned weapon must be equipped before the room allows it in hand',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z);
+  const unequipped={...kit,weapons:kit.weapons.map(item=>({...item,equipped:false}))};
+  r.weapons.enable(a,unequipped);
+  r.tick([[a,{w:'pistola'}]]);
+  assert.equal(a.gun.w,'');
+  assert.deepEqual(r.refusals,['Equipe essa arma antes de usá-la.']);
+});
+
+test('a manufactured weapon starts without ammunition in its magazine or reserve',()=>{
+  const r=room(),a=r.add('a',OPEN.x,OPEN.z);
+  r.weapons.enable(a,{...kit,test:false,infinite:false,ammo:{}});
+  r.tick([[a,{w:'pistola'}]]);
+  assert.deepEqual([a.gun.w,a.gun.mag],['pistola',0]);
+  r.wait(stats('pistola').drawMs);
+  r.tick([[a,{w:'pistola',s:[r.shotAt(a,AWAY,1)]}]]);
+  assert.deepEqual([a.gun.mag,a.gun.shots],[0,0]);
+});
+
 test('cadence: a shot claiming less than the interval is dropped, and the room\'s bucket holds a burst to 1+burstAllowance',()=>{
   const r=room(),a=r.add('a',OPEN.x,OPEN.z),b=r.add('b',OPEN.x,OPEN.z+10,Math.PI);
   r.ready(a,'submetralhadora');

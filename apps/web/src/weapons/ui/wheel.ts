@@ -52,7 +52,7 @@ export class WeaponWheel {
     this.root.setAttribute('role','dialog');this.root.setAttribute('aria-label','Roda de armas');
     this.root.innerHTML=`<div class="wp-wheel-scrim" data-wheel="cancel"></div>
       <div class="wp-wheel-dial"><svg class="wp-wheel-ring" viewBox="-100 -100 200 200" aria-hidden="true"></svg><i class="wp-wheel-arrow" hidden></i><div class="wp-wheel-slots"></div>
-        <button type="button" class="wp-wheel-hub" data-weapon="" aria-label="Guardar arma"><span class="wp-hub-icon">${uiIcon('hand')}</span></button></div>
+        <button type="button" class="wp-wheel-hub" data-weapon="" aria-label="Mão, desarmado"><span class="wp-hub-icon">${uiIcon('hand')}</span></button></div>
       <div class="wp-wheel-info" aria-live="polite"></div>`;
     game.append(this.root);
     this.dial=this.root.querySelector('.wp-wheel-dial')!;
@@ -89,12 +89,12 @@ export class WeaponWheel {
   /** Closes keeping the weapon in hand (a tap beside the wheel). */
   private cancel():void {this.weapons.wheelAim(this.weapons.gun.want);this.weapons.wheel(false);}
 
-  /** The slots' buttons for the weapons owned now, each with its picture as fitted (parts, upgrades). */
+  /** The slots' buttons for the weapons equipped now, each with its picture as fitted (parts, upgrades). */
   private fillSlots():void {
     const weapons=this.weapons,arsenal=weapons.gun.arsenal,n=Math.max(1,this.slots.length),step=360/n,want=weapons.gun.want;
     this.arsenalShown=arsenal;
     this.root.querySelector('.wp-wheel-slots')!.innerHTML=this.slots.map((id,i)=>{
-      const def=WEAPONS[id],stats=arsenalStats(arsenal,id),cap=stats?.mag??def.mag,mag=Math.min(cap,weapons.gun.magOf(id)??cap);
+      const def=WEAPONS[id],stats=arsenalStats(arsenal,id),cap=stats?.mag??def.mag,mag=Math.min(cap,weapons.gun.magOf(id)??(arsenal?.infinite?cap:0));
       const at=(-90+i*step)*RAD,item=arsenalWeapon(arsenal,id);
       return `<button type="button" class="wp-slot" data-weapon="${id}" data-i="${i}" style="--x:${Math.cos(at).toFixed(4)};--y:${Math.sin(at).toFixed(4)}"${id===want?' data-hand="on"':''} data-ammo="${mag===0?'empty':mag<=Math.max(1,Math.floor(cap/4))?'low':'ok'}" aria-label="${e(def.name)}">
         <span class="wp-slot-key">${i<10?(i+1)%10:''}</span>${weaponPicture(id,item?.parts,item?.upgrades)}
@@ -158,10 +158,10 @@ export class WeaponWheel {
     const arsenalKey=device==='gamepad'?'D-pad →':weapons.keyName('arsenal');
     const hint=device==='touch'?`<button type="button" class="wp-wheel-arsenal" data-wheel="arsenal">${uiIcon('wrench')}<span>Arsenal</span></button>`
       :arsenalKey?`<span class="wp-wheel-hint"><kbd>${arsenalKey}</kbd>Arsenal</span>`:'';
-    if(!choice)return `<small class="wp-eyebrow">Mãos livres</small><strong>Guardar arma</strong><span class="wp-wheel-facts">${device==='touch'?'Toque no centro para guardar':'Solte no centro para guardar'}</span>${hint}`;
+    if(!choice)return `<small class="wp-eyebrow">Desarmado</small><strong>Mão</strong><span class="wp-wheel-facts">${device==='touch'?'Toque no centro para ficar desarmado':'Solte no centro para ficar desarmado'}</span>${hint}`;
     const arsenal=weapons.gun.arsenal,def=WEAPONS[choice],stats=arsenalStats(arsenal,choice),fitted=arsenalWeapon(arsenal,choice)?.parts??{};
     const parts=PART_SLOTS.flatMap(slot=>{const id=fitted[slot];return id?[partVisual(id)]:[];});
-    const cap=stats?.mag??def.mag,mag=Math.min(cap,weapons.gun.magOf(choice)??cap),reserve=arsenal?.infinite?'∞':String(Math.max(0,arsenal?.ammo[def.caliber]??0));
+    const cap=stats?.mag??def.mag,mag=Math.min(cap,weapons.gun.magOf(choice)??(arsenal?.infinite?cap:0)),reserve=arsenal?.infinite?'∞':String(Math.max(0,arsenal?.ammo[def.caliber]??0));
     return `<small class="wp-eyebrow">${e(CATEGORY_NAMES[def.category])}</small><strong>${e(def.name)}</strong>
       <span class="wp-wheel-facts"><span>${e(stats?caliberText(stats):def.caliber)}</span><span>${e(stats?modesText(stats):'')}</span><span class="wp-wheel-rounds"><b>${mag}</b>/ ${reserve}</span></span>
       ${parts.length?`<span class="wp-wheel-parts">${parts.join('')}</span>`:''}${hint}`;

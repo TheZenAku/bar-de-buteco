@@ -1,0 +1,107 @@
+{
+ "versao": 1,
+ "descricao": "Carrinho de plataforma da EMPRESA BRASIL (capacidade 6 sacos de 25 kg). No GLB: no EB_Carrinho na origem (centro do conves, no chao; frente +x, alca em -x) com 6 filhos Slot_Saco_1..6 (posicao e rotacao LOCAIS onde o jogo pendura os sacos: 2 pilhas de 3 sacos deitados; o saco tem 0,70 x 0,45 x 0,16 m e o comprimento fica ao longo de z local do jogo = largura do carrinho). Coordenadas locais em eixos do jogo (x, y cima, z = -y Blender).",
+ "glb": "empresa_brasil_carrinho.glb",
+ "no": "EB_Carrinho",
+ "capacidade_sacos": 6,
+ "saco_m": [
+  0.7,
+  0.45,
+  0.16
+ ],
+ "slots": [
+  {
+   "no": "Slot_Saco_1",
+   "pos_local_jogo": [
+    -0.225,
+    0.298,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  },
+  {
+   "no": "Slot_Saco_2",
+   "pos_local_jogo": [
+    -0.225,
+    0.458,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  },
+  {
+   "no": "Slot_Saco_3",
+   "pos_local_jogo": [
+    -0.225,
+    0.618,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  },
+  {
+   "no": "Slot_Saco_4",
+   "pos_local_jogo": [
+    0.225,
+    0.298,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  },
+  {
+   "no": "Slot_Saco_5",
+   "pos_local_jogo": [
+    0.225,
+    0.458,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  },
+  {
+   "no": "Slot_Saco_6",
+   "pos_local_jogo": [
+    0.225,
+    0.618,
+    -0.0
+   ],
+   "yaw_graus": 90.0
+  }
+ ],
+ "caixa_local_jogo": {
+  "min": [
+   -0.613,
+   -0.003,
+   -0.406
+  ],
+  "max": [
+   0.476,
+   0.993,
+   0.406
+  ]
+ },
+ "caixa_conves_local_jogo": {
+  "min": [
+   -0.47,
+   0.0,
+   -0.4
+  ],
+  "max": [
+   0.47,
+   0.215,
+   0.4
+  ]
+ },
+ "altura_com_6_sacos_m": 0.7,
+ "alca_local_jogo": [
+  -0.59,
+  0.97,
+  0.0
+ ],
+ "estacionamento": {
+  "marcador": "Ponto_EB_Carrinho",
+  "xyz_jogo": [
+   346.3,
+   0.17,
+   -59.1
+  ],
+  "yaw_graus": 0.0
+ }
+}

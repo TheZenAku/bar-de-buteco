@@ -238,6 +238,27 @@ test('sem ordem de produção não há produção: aprovar, iniciar, lotes conta
   assert.throws(()=>factory.cancelApproved('Gerente'),/aprovada e ainda não iniciada/);factory.closeProduction('Gerente');assert.equal(factory.board.history.at(-1)?.result,'closed');assert.equal(factory.dirt.required,true);
 });
 
+test('paletes incompletos entram na carga como paletes: sai o mais vazio primeiro, com os sacos que tem',()=>{
+  const factory=new FactoryDirector({markers,stock});
+  for(const slot of factory.slots)if(slot.material==='PRODUTO')slot.quantity=0;
+  const product=factory.slots.filter(slot=>slot.material==='PRODUTO'&&slot.marker!=='Ponto_EB_PA_Ensaque');
+  product[0]!.quantity=18;product[1]!.quantity=5;product[2]!.quantity=11;
+  assert.throws(()=>factory.takeProduct(4),/Só há 3 palete/);
+  const taken=factory.takeProduct(2);assert.deepEqual(taken,{[product[1]!.marker]:5,[product[2]!.marker]:11});
+  assert.equal(product[1]!.quantity+product[2]!.quantity,0);assert.equal(product[0]!.quantity,18);
+  factory.returnProduct(taken);assert.equal(product[1]!.quantity,5);assert.equal(product[2]!.quantity,11);
+});
+
+test('um saco vazio no bico não prende a fábrica: sai pelo comando, pela limpeza da linha, ao fechar o palete e ao fim da ordem',()=>{
+  const bagged=()=>{const f=new FactoryDirector({markers,stock});f.setOperators(1);f.bagging={...f.bagging,emptyBags:5,state:'PARADO'};f.command('bag.empty');assert.equal(f.bagging.state,'SACO_POSICIONADO');return f;};
+  const a=bagged();assert.equal(a.bagging.emptyBags,4);a.command('bag.remove');assert.equal(a.bagging.state,'AGUARDANDO_SACO');assert.equal(a.bagging.emptyBags,5);assert.throws(()=>a.command('bag.remove'),/Não há saco vazio/);
+  const b=bagged();b.bagging={...b.bagging,palletBags:7};assert.match(b.command('pallet.close'),/7 sacos/);assert.equal(b.slots.find(slot=>slot.marker==='Ponto_EB_PA_Ensaque')?.quantity,7);assert.equal(b.bagging.state,'AGUARDANDO_SACO');assert.equal(b.bagging.emptyBags,5);
+  const c=bagged();c.soil('line',.8);assert.equal(c.cleanProblem('line'),'');c.completeClean('line','Operador');assert.equal(c.bagging.state,'AGUARDANDO_SACO');assert.equal(c.bagging.emptyBags,5);assert.equal(c.dirt.levels.line,0);
+  const d=new FactoryDirector({markers,stock});d.setOperators(1);runOrder(d,1);d.bagging={...d.bagging,emptyBags:5,state:'SACO_POSICIONADO'};d.dryer={...d.dryer,state:'PARADO',powderKg:0,sourceTank:null};
+  d.tanks=d.tanks.map(tank=>({...tank,state:'VAZIO'}));d.board.active={...d.board.active!,batchesStarted:d.board.active!.batches};d.tick(1);
+  assert.equal(d.board.active,null,'a ordem termina mesmo com o saco vazio no bico');assert.equal(d.bagging.state,'AGUARDANDO_SACO');assert.equal(d.dirt.required,true);
+});
+
 test('o estado das ordens e da sujeira sobrevive ao reinício; o palete incompleto fecha com o que há',()=>{
   const factory=new FactoryDirector({markers,stock});factory.setOperators(1);runOrder(factory,2);factory.soil('floor-doca',.4);
   const saved=JSON.parse(JSON.stringify(factory.snapshot()));

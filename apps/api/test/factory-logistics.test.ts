@@ -55,6 +55,13 @@ test('cargas do caminhão: venda paga imposto ao cofre, taxa ao funcionário e o
   res=await post({action:'shipment.cancel',id:second.id,actorId:'admin'});assert.equal(res.json().applied,true);assert.deepEqual(res.json().cargo,{material:'PRODUTO',bags:18});
   assert.equal((await hold()).length,0);assert.equal(await company(),6500);
 
+  // A pallet that is not full is still a pallet: it is loaded with the bags it has (and the count must agree with the pallets).
+  assert.equal((await post({action:'shipment.load',vehicleId,plate:'FBR1A23',driverId:driver,loaderId:loader,pallets:1,bags:19,dest,requestId:randomUUID()})).statusCode,400);
+  assert.equal((await post({action:'shipment.load',vehicleId,plate:'FBR1A23',driverId:driver,loaderId:loader,pallets:2,bags:18,dest,requestId:randomUUID()})).statusCode,400);
+  res=await post({action:'shipment.load',vehicleId,plate:'FBR1A23',driverId:driver,loaderId:loader,pallets:1,bags:5,dest,requestId:randomUUID()});assert.equal(res.statusCode,200,res.body);
+  const partial=res.json().shipment;assert.equal(partial.pallets,1);assert.equal(partial.bags,5);assert.equal((await hold())[0]?.quantity,5);
+  res=await post({action:'shipment.cancel',id:partial.id,actorId:'admin'});assert.deepEqual(res.json().cargo,{material:'PRODUTO',bags:5});assert.equal((await hold()).length,0);
+
   // A fee larger than the sale takes it all: nothing is left for the firm.
   await post({action:'finance.set',patch:{ownerUserId:'',taxPercent:0,employeeFee:50000,palletPrice:3000},actorId:'admin',requestId:randomUUID()});
   const third=(await post({action:'shipment.load',vehicleId,plate:'FBR1A23',driverId:driver,loaderId:loader,pallets:1,dest,requestId:randomUUID()})).json().shipment;

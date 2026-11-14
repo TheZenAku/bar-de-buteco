@@ -4,6 +4,7 @@ import {CityPlanner,CITY_TUNING,type CityBackend,type CityDetail,type LodMode,ty
 import type {EnvironmentLighting} from './environment-lighting';
 import {pointAtFirstTexture} from './gltf-textures';
 import {FarmGates} from './farm-gates';
+import {FactoryGates,type GateDoorState} from '../factory/factory-gates';
 
 const CITY_URL=`${import.meta.env.BASE_URL}maps/cidade/`;
 /** Beyond this distance a sector's buildings and trees cast no sun shadow (the sun's cascades reach 55 m). */
@@ -11,8 +12,15 @@ const SHADOW_REACH=70;
 const UPDATE_SECONDS=.2;
 /** The factory's ceiling fixtures (instanced in its sector): each gets a light, FACTORY_LAMP_DROP metres below its origin. */
 const FACTORY_LAMP='INST_P_EB_Luminaria',FACTORY_LAMP_DROP=.7,FACTORY_LAMP_INTENSITY=2.4;
-/** The farm's (S07_00) ceiling fixtures: the hall's bells and the offices' LED tubes light the inside the same way. */
-const INDOOR_LAMPS=new Set([FACTORY_LAMP,'INST_P_FA_Luminaria','INST_P_FA_Tubo_LED','INST_P_FA_Tubo_LED_Pendurado']);
+/**
+ * The farm's (S07_00) ceiling fixtures: the hall's bells and the offices' LED tubes light the inside the same way. Each lamp is an additive omni light
+ * (range 11 m, no shadow): the farm has 32 in one 19x38 m hall, so a point sees a dozen of them at once. At the factory's 2.4 each the sum clipped the
+ * whole inside to white; a quarter of that, tried in the real hall, lights it like a workshop with the occlusion still readable.
+ */
+const FARM_LAMP_INTENSITY=.25;
+const INDOOR_LAMPS=new Map<string,number>([[FACTORY_LAMP,FACTORY_LAMP_INTENSITY],['INST_P_FA_Luminaria',FARM_LAMP_INTENSITY],['INST_P_FA_Tubo_LED',FARM_LAMP_INTENSITY],['INST_P_FA_Tubo_LED_Pendurado',FARM_LAMP_INTENSITY]]);
+/** The tree's leaf cards (alphaMode MASK) in every sector, and the bar's own map. */
+const FOLIAGE_MATERIAL='Arv_Folhagem';
 const MANIFEST_ATTEMPTS=3;
 /** Pushes the city's flat far grounds back in the depth buffer: seen from afar they lie too close to the streets to tell apart. */
 const FAR_GROUND_BIAS=6,LOD_GROUND_BIAS=3;
@@ -52,10 +60,12 @@ export class CityStreaming implements CityBackend<LoadedFile> {
   private shadows=true;
   private failedBackdrops=0;
   private readonly farm:FarmGates;
+  private readonly factoryGates:FactoryGates;
   private loaded={x:0,z:0};
   constructor(private readonly app:pc.AppBase,private readonly environment:EnvironmentLighting){
     app.root.addChild(this.root);
     this.farm=new FarmGates(app,this.root,environment);
+    this.factoryGates=new FactoryGates(app,this.root,environment);
     void this.readManifest();
     void this.loadBackdrop('cidade_distante.gltf',file=>this.dressFarBackdrop(file));
     void this.loadBackdrop('cidade_anel.gltf');
@@ -66,9 +76,10 @@ export class CityStreaming implements CityBackend<LoadedFile> {
     this.planner.setTuning(CITY_TUNING[detail]);
     this.environment.setCityLights(CITY_TUNING[detail].lights);
   }
-  /** Each frame, with where the player (or the camera, at the door) is. */
-  update(dt:number,x:number,z:number):void {
+  /** Each frame, with where the player (or the camera, at the door) is, the room's door states and the room's time (the plant's leaves follow them). */
+  update(dt:number,x:number,z:number,doors?:Record<string,GateDoorState>,now=Date.now()):void {
     this.farm.update(dt,x,z);
+    this.factoryGates.update(doors,now);
     this.clock+=dt;
     if(this.clock<UPDATE_SECONDS)return;
     this.clock=0;this.loaded={x,z};
@@ -92,9 +103,12 @@ export class CityStreaming implements CityBackend<LoadedFile> {
     return {...this.planner.metrics(),detail:this.detail,fogEnd:this.fogEnd,backdrops:this.backdrop.length,failedBackdrops:this.failedBackdrops,manifest:!!this.sectors,
       textures:this.textures.size,entitiesShown:entities,assets:this.app.assets.list().length,drawCalls:stats?.drawCalls?.total??0,at:this.loaded};
   }
+  /** Whether a visitor is calling at the plant's intercom (the lamp on its post blinks amber). */
+  setIntercomRinging(on:boolean):void {this.factoryGates.setRinging(on);}
   destroy():void {
     this.destroyed=true;
     this.farm.destroy();
+    this.factoryGates.destroy();
     this.planner.destroy();
     for(const file of this.backdrop.splice(0))this.dispose('','lod',file);
     // Right now, while the app stands: the scene destroys it next, and a load still on its way has nowhere to go (discard).
@@ -197,6 +211,18 @@ export class CityStreaming implements CityBackend<LoadedFile> {
         const resource=asset.resource as pc.ContainerResource;
         const entity=resource.instantiateRenderEntity({castShadows:false,receiveShadows:false});
         entity.name=file;entity.enabled=false;
+        // Every tree card of the city was exported twice, back to back at the same depth (a front and a flipped copy), and the leaf material is two-sided:
+        // both copies drew at the same depth and fought in the depth buffer, the stripes that swim as the camera moves. Drawing only the front faces leaves
+        // each card seen from both sides (the twin faces the other way) and nothing left to fight.
+        // Cut-out leaves (alphaMode MASK) also shimmer as the camera moves: the mip levels of the leaf texture fight the hard alpha test. Alpha-to-coverage (the canvas is multisampled) softens the edge per sample.
+        for(const render of entity.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances){
+          const material=instance.material;
+          if(!(material instanceof pc.StandardMaterial))continue;
+          let changed=false;
+          if(material.name===FOLIAGE_MATERIAL&&material.cull!==pc.CULLFACE_BACK){material.cull=pc.CULLFACE_BACK;changed=true;}
+          if(material.alphaTest>0&&!material.alphaToCoverage){material.alphaToCoverage=true;changed=true;}
+          if(changed)material.update();
+        }
         this.root.addChild(entity);
         resolve({asset,entity,extras,levels:{mid:[],far:[]},props:[],casters:[],casting:false,lights:this.nightLights(entity,extras),entities:countEntities(entity)});
       });
@@ -244,21 +270,21 @@ export class CityStreaming implements CityBackend<LoadedFile> {
         const material=instance.material;
         if(material?.name==='Lampada')instance.material=this.environment.cityLamp(material as pc.StandardMaterial);
         else if(material instanceof pc.StandardMaterial)this.environment.dressMetal(material);
-        if(INDOOR_LAMPS.has(render.entity.name)&&instance.instancingData)this.indoorLamps(file,render.entity,instance);
+        if(INDOOR_LAMPS.has(render.entity.name)&&instance.instancingData)this.indoorLamps(file,render.entity,instance,INDOOR_LAMPS.get(render.entity.name)!);
         if(instance.instancingData)file.props.push(this.instancedProp(instance,Number(file.extras.get(render.entity.name)?.cull_m??0)));
       }
     }
     file.props=file.props.filter(prop=>prop.cullAt>0);
   }
   /** One light under each of the factory's fixtures (INST_P_EB_Luminaria): the sector has no lights of its own, and its inside was lit by the ambient alone. */
-  private indoorLamps(file:LoadedFile,parent:pc.Entity,instance:pc.MeshInstance):void {
+  private indoorLamps(file:LoadedFile,parent:pc.Entity,instance:pc.MeshInstance,intensity:number):void {
     const matrices=new Float32Array(instance.instancingData!.vertexBuffer!.lock() as ArrayBuffer);
     for(let i=0;i+14<matrices.length;i+=16){
       const entity=new pc.Entity('Luz_Interna_EB');
       entity.setPosition(matrices[i+12]!,matrices[i+13]!-FACTORY_LAMP_DROP,matrices[i+14]!);
       entity.addComponent('light',{type:'omni',color:new pc.Color(1,.96,.88),range:15,castShadows:false});
       parent.addChild(entity);
-      this.environment.addIndoorLight(entity.light!,FACTORY_LAMP_INTENSITY);
+      this.environment.addIndoorLight(entity.light!,intensity);
       file.lights.push(entity.light!);
     }
   }

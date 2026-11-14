@@ -42,6 +42,8 @@
     "assets:caminhao": "node tools/assets/import-truck.mjs",
     "assets:fabrica": "node tools/assets/import-factory.mjs",
     "assets:farm": "node tools/assets/import-farm.mjs",
+    "assets:ribeiro": "node tools/assets/import-ribeiro-placeholders.mjs",
+    "assets:ribeiro:check": "node tools/assets/validate-ribeiro-placeholders.mjs",
     "assets:horse": "node tools/assets/import-horse.mjs",
     "assets:horse:sound": "node tools/assets/import-horse-sounds.mjs",
     "assets:caminhao:sound": "node tools/assets/import-truck-sounds.mjs",

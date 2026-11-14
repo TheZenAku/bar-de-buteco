@@ -184,11 +184,11 @@ export const sparringProgress=pgTable('sparring_progress',{
 /** The firearms each player owns (arsenal-service.ts): parts fitted per slot and upgrade levels per track, as JSON; /armas grants them with source 'teste'. */
 export const weaponArsenal=pgTable('weapon_arsenal',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),weaponId:text('weapon_id').notNull(),parts:jsonb('parts').notNull().default({}),
-  upgrades:jsonb('upgrades').notNull().default({}),source:text('source').notNull().default('teste'),createdAt:date('created_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
+  upgrades:jsonb('upgrades').notNull().default({}),equipped:boolean('equipped').notNull().default(false),source:text('source').notNull().default('ribeiro'),createdAt:date('created_at').notNull().defaultNow(),updatedAt:date('updated_at').notNull().defaultNow(),
 },t=>[primaryKey({columns:[t.userId,t.weaponId]})]);
 /** The weapon parts (equipamentos) each player owns: any fits every weapon that takes it. */
 export const weaponParts=pgTable('weapon_parts',{
-  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),partId:text('part_id').notNull(),source:text('source').notNull().default('teste'),createdAt:date('created_at').notNull().defaultNow(),
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),partId:text('part_id').notNull(),source:text('source').notNull().default('ribeiro'),createdAt:date('created_at').notNull().defaultNow(),
 },t=>[primaryKey({columns:[t.userId,t.partId]})]);
 /** Rounds each player has per calibre (the test kit's never run out and are not kept here). */
 export const weaponAmmo=pgTable('weapon_ammo',{

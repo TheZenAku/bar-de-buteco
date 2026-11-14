@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import type {AddressInfo} from 'node:net';
 import {Server} from '@colyseus/core';import {WebSocketTransport} from '@colyseus/ws-transport';import {Client,type Room} from '@colyseus/sdk';
-import {DOORS,PLAYER_RADIUS,inDoorSweep,isDoorOpen,isWalkable,setDoorStates} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
+import {FACTORY_GATES} from '@bar/shared/factory';import {DOORS,PLAYER_RADIUS,inDoorSweep,isDoorOpen,isWalkable,setDoorStates} from '@bar/shared';import {signTicket} from '@bar/shared/tickets';
 import {BarRoom} from '../src/BarRoom.js';
 async function until(check:()=>boolean):Promise<void>{const deadline=Date.now()+4000;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,20));}}
 
@@ -23,9 +23,10 @@ test('doors: synced swing, nobody is crushed, the user steps back, and the order
     const a=await join('door-a'),b=await join('door-b'),errors:string[]=[];a.onMessage('error',m=>errors.push(m.message));
     const door=DOORS.find(d=>d.id==='Porta_WC_Masc')!,player=authoritative!.state.players.get('door-a')!,other=authoritative!.state.players.get('door-b')!;
     await until(()=>b.state.doors?.get(door.id)?.open===true);
-    // The plant's vehicle gate (EB_Portao) rides on the same synced states, shut, beside the map's doors.
-    assert.equal(b.state.doors.size,DOORS.length+1,'Every door is in the shared state, open as authored, and the plant gate');
-    assert.equal(b.state.doors.get('EB_Portao')?.open,false,'the plant gate starts shut');
+    // The plant's dynamic leaves (the vehicle gate, the control room's door, the swing doors, the workshop's and the staff's doors: shared/factory/gates.ts) ride on the same synced states, shut, beside the map's doors.
+    assert.equal(b.state.doors.size,DOORS.length+FACTORY_GATES.length,'Every door is in the shared state, open as authored, and the plant leaves');
+    assert.ok(FACTORY_GATES.length>=9&&FACTORY_GATES.some(gate=>gate.id==='EB_Portao'));
+    for(const gate of FACTORY_GATES){assert.equal(b.state.doors.get(gate.id)?.open,false,`${gate.id} starts shut`);assert.equal(b.state.doors.get(gate.id)?.side,0);}
     // Beside the doorway in the hall, out of the swing.
     player.assign({x:6.05,y:.3,z:-11.2});other.assign({x:12,y:.3,z:-6});
     assert.equal(inDoorSweep(door,player,PLAYER_RADIUS),false);

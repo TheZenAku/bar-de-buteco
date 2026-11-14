@@ -23,9 +23,9 @@ export function decodeKit(kit:string|undefined):Partial<Record<PartSlot,PartId>>
 }
 
 /** The /armas kit: every weapon (with what comes fitted), every part, rounds that never run out, upgrades free. */
-export function testArsenal():ArsenalView {
+export function testArsenal(equipped=true):ArsenalView {
   return {test:true,infinite:true,parts:[...PART_IDS],ammo:{},
-    weapons:WHEEL_ORDER.map(id=>({id,parts:{...(WEAPONS[id].defaults??{})},upgrades:{}}))};
+    weapons:WHEEL_ORDER.map(id=>({id,equipped,parts:{...(WEAPONS[id].defaults??{})},upgrades:{}}))};
 }
 export const arsenalWeapon=(view:ArsenalView|undefined,id:string):ArsenalWeapon|undefined=>view?.weapons.find(weapon=>weapon.id===id);
 /** The stats of a weapon as this arsenal has it fitted and upgraded; undefined when it is not owned. */
@@ -35,6 +35,8 @@ export function arsenalStats(view:ArsenalView|undefined,id:string):WeaponStats|u
 }
 /** The owned weapons in the wheel's order. */
 export const ownedInOrder=(view:ArsenalView|undefined):WeaponId[]=>WHEEL_ORDER.filter(id=>!!arsenalWeapon(view,id));
+/** The weapons explicitly equipped by the player, in the wheel's order. */
+export const equippedInOrder=(view:ArsenalView|undefined):WeaponId[]=>WHEEL_ORDER.filter(id=>!!arsenalWeapon(view,id)?.equipped);
 
 /** Why a part cannot go (or come off) there: '' when it can. `part` null takes the slot's part off. */
 export function fitError(view:ArsenalView|undefined,weapon:WeaponId,slot:PartSlot,part:PartId|null):string {
@@ -82,7 +84,7 @@ export function cleanArsenal(raw:unknown):ArsenalView {
     for(const slot of PART_SLOTS){const part=item.parts?.[slot];if(isPartId(part)&&partFits(item.id,slot,part))fitted[slot]=part;}
     const upgrades:Partial<Record<UpgradeTrack,number>>={};
     for(const track of UPGRADE_TRACKS){const level=upgradeLevel(item.upgrades,track);if(level)upgrades[track]=level;}
-    return [{id:item.id,parts:fitted,upgrades}];
+    return [{id:item.id,equipped:item.equipped===true,parts:fitted,upgrades}];
   });
   const unique=WEAPON_IDS.flatMap(id=>weapons.find(item=>item.id===id)??[]);
   const ammo:ArsenalView['ammo']={};

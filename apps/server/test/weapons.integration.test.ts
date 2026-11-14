@@ -7,12 +7,14 @@ import {TARGETS} from '../src/world/targets.js';
 async function until(check:()=>boolean,ms=8000):Promise<void>{const deadline=Date.now()+ms;while(!check()){if(Date.now()>deadline)throw new Error('Timed out');await new Promise(r=>setTimeout(r,10));}}
 const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 
-test('firearms over real WebSockets: /armas for admins only (and /armas todos), drawing and shooting on the inputs, hits, a knockout, and /alvos dummies that fall and get up',{timeout:120000},async()=>{
+test('firearms over real WebSockets: /armas for admins only, equipping, drawing and shooting on the inputs, hits, a knockout, and /alvos dummies that fall and get up',{timeout:120000},async()=>{
   const previous=process.env.API_INTERNAL_URL;
-  // The API stub knows no arsenal: the room falls back to the test kit in memory.
+  let storedArsenal={...testArsenal(false),test:false,infinite:false};
   const api=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;const body=raw?JSON.parse(raw):{};res.setHeader('content-type','application/json');
     if(req.url?.endsWith('/validate')){res.end(JSON.stringify({valid:true,blocked:[],role:body.userId==='admin'?'admin':'user',equippedSkin:'nathan',ownedSkins:['nathan'],ownedSkills:[],balance:0,inventory:[]}));return;}
     if(req.url?.endsWith('/lease')){res.end(JSON.stringify({controls:[]}));return;}
+    if(req.url?.endsWith('/arsenal/load')){res.end(JSON.stringify(storedArsenal));return;}
+    if(req.url?.endsWith('/arsenal/equip')){storedArsenal={...storedArsenal,weapons:storedArsenal.weapons.map(item=>item.id===body.weapon?{...item,equipped:body.equipped}:item)};res.end(JSON.stringify(storedArsenal));return;}
     res.end('{}');});
   await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));process.env.API_INTERNAL_URL=`http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   const http=createServer(),server=new Server({transport:new WebSocketTransport({server:http}),greet:false,gracefullyShutdown:false});let room!:BarRoom;
@@ -43,17 +45,22 @@ test('firearms over real WebSockets: /armas for admins only (and /armas todos), 
     const place=(who:typeof admin,x:number,z:number,rotation:number)=>who.player().assign({x,y:0,z,rotation,interactionState:'',animationState:'idle',currentTableId:''});
     place(admin,X,Z,0);place(b,X,Z+10,Math.PI);
 
-    // A player who is not of the administration cannot; the admin can, and gets the arsenal with the pistol to draw.
+    // A player who is not of the administration cannot; the admin starts unarmed and equips the weapons used below.
     b.room.send('chat.send',{text:'/armas'});
     await until(()=>b.errors.length===1);
-    assert.match(b.errors[0]!,/só a administração/);
+    assert.match(b.errors[0]!,/exclusivo da administração/);
     assert.equal(b.player().gun.on,false);
     admin.room.send('chat.send',{text:'/armas'});
     await until(()=>admin.arsenals.length===1);
-    assert.equal(admin.arsenals[0]!.draw,'pistola');assert.equal(admin.arsenals[0]!.test,true);assert.equal(admin.arsenals[0]!.weapons.length,10);
+    assert.equal(admin.arsenals[0]!.draw,undefined);assert.equal(admin.arsenals[0]!.test,false);assert.equal(admin.arsenals[0]!.weapons.length,10);
+    assert.equal(admin.arsenals[0]!.weapons.some(item=>item.equipped),false);
     assert.equal(admin.player().gun.on,true);
-    assert.ok(admin.chat.some(text=>text.startsWith('Armas de teste liberadas.')));
+    assert.ok(admin.chat.some(text=>text.startsWith('Arsenal habilitado.')));
     await until(()=>(admin.room.state as {players:Map<string,{gun?:{on?:boolean}}>}).players.get('admin')?.gun?.on===true);
+    admin.room.send('weapon.equip',{weapon:'pistola',equipped:true});
+    await until(()=>admin.arsenals.length===2);
+    admin.room.send('weapon.equip',{weapon:'precisao',equipped:true});
+    await until(()=>admin.arsenals.length===3);
 
     // Drawn on the inputs; the guard is refused with the gun in hand.
     await admin.hold(pistol.drawMs+150,{w:'pistola',r:0});
@@ -83,17 +90,15 @@ test('firearms over real WebSockets: /armas for admins only (and /armas todos), 
     await until(()=>room.state.ragdolls.has('b'));
     assert.equal(b.player().interactionState==='thrown'||b.player().animationState==='ragdoll',true);
 
-    // /armas todos opens them to everyone; closing takes them back from who is not an admin.
+    // The old global-release command no longer exists and cannot give ordinary players access.
     admin.room.send('chat.send',{text:'/armas todos'});
-    await until(()=>admin.chat.some(text=>text.includes('liberou as armas de teste')));
+    await until(()=>admin.errors.some(text=>text.includes('não está disponível')));
     const c=await join('c');
     c.room.send('chat.send',{text:'/armas'});
-    await until(()=>c.arsenals.length===1);
-    assert.equal(c.player().gun.on,true);
-    admin.room.send('chat.send',{text:'/armas todos'});
-    await until(()=>c.chat.includes('As armas de teste foram recolhidas pela administração.'));
+    await until(()=>c.errors.length===1);
     assert.equal(c.player().gun.on,false);
-    assert.equal(admin.player().gun.on,true,'the admin keeps them');
+    assert.equal(c.arsenals.length,0);
+    assert.equal(admin.player().gun.on,true);
 
     // /alvos: dummies in front of the admin, bodies of the room; a hit takes their own lives, a knockout throws them and they get up whole.
     place(admin,X,Z,0);

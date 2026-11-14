@@ -1,0 +1,19 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<!-- The Ribeiro terminal (RF-01) over made-up state, no server: fixture.sent lists what it sent to the room, fixture.show(tab) switches tabs, fixture.push(patch) changes the view. -->
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import {MachineShopController} from '../../apps/web/src/machine-shop/controller.ts';
+import {RIBEIRO_COMPUTER} from '../../packages/shared/src/index.ts';
+const now=Date.now(),MIN=60000,sent=[];
+const order=(n,weapon,status,op,customer,at,stationId='')=>({id:`${String(n).padStart(8,'0')}-0000-4000-8000-000000000000`,weapon,status,operatorId:'a',operatorName:'Rafael Ribeiro',stationId,createdAt:at,updatedAt:at,opId:`op-${op}`,opNumber:op,customer});
+const orders=[
+  ...[1,2,3,4].map(n=>order(n,'pistola','completed',1,'Oficina do Zé',now-90*MIN)),order(5,'pistola','cutting',1,'Oficina do Zé',now-90*MIN,'cut-1'),
+  ...[6,7,8,9,10,11].map(n=>order(n,'pistola','queued',2,'Cliente X',now-12*MIN)),...[12,13,14,15].map(n=>order(n,'revolver','queued',2,'Cliente X',now-12*MIN)),
+];
+let view={revision:1,opCounter:2,materials:{ACO:420,ALUMINIO:180,POLIMERO:150,MOLAS:60},stock:{pistola:4},orders,jobs:[{stationId:'cut-1',orderId:orders[4].id,stage:'cut',operatorId:'a',startedAt:now-3000,endsAt:now+5000}],completed:4,members:[],payroll:[],purchaseOrders:[],candidates:[],busyStations:['cut-1'],me:{userId:'a',carrying:null,role:'owner',canManage:true,canBootstrap:false}};
+const shop=new MachineShopController({userName:()=>'Rafael',send:(type,payload)=>sent.push({type,payload}),notify:()=>{},app:()=>undefined});
+shop.stateMessage(view);
+shop.interact({x:RIBEIRO_COMPUTER.x,y:RIBEIRO_COMPUTER.y,z:RIBEIRO_COMPUTER.z});
+window.fixture={shop,sent,show:tab=>document.querySelector(`[data-rb="tab"][data-tab="${tab}"]`)?.click(),push:patch=>{view={...view,...patch};shop.stateMessage(view);},result:value=>shop.resultMessage(value)};
+</script></body></html>

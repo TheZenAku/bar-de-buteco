@@ -1,0 +1,15 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<!-- The "Qual OP produzir?" picker at the Ribeiro preparation point, with a made-up queue (no server): fixture.picked lists the OP ids chosen. -->
+<script type="module">
+import '../../apps/web/src/neon-ui.css';
+import '../../apps/web/src/assets/fonts/neon-ui.css';
+import '../../apps/web/src/machine-shop/machine-shop.css';
+import '../../apps/web/src/machine-shop/machine-shop-management.css';
+import {RibeiroQueuePicker} from '../../apps/web/src/machine-shop/queue-picker.ts';
+const now=Date.now(),MIN=60000,picked=[];
+const order=(n,weapon,at,by)=>({id:`${String(n).padStart(8,'0')}-0000-4000-8000-000000000000`,weapon,status:'queued',operatorId:by,operatorName:by==='a'?'Rafael Ribeiro':'Bianca Torres',stationId:'',createdAt:at,updatedAt:at,opId:`op-${at}`,opNumber:at===now-14*MIN?7:at===now-6*MIN?8:9,customer:at===now-14*MIN?'Cliente X':at===now-6*MIN?'Oficina do Zé':'Clube de Tiro Alfa'});
+const orders=[...[1,2,3,4,5].map(n=>order(n,'pistola',now-14*MIN,'a')),...[11,12,13].map(n=>order(n,'revolver',now-14*MIN,'a')),...[6,7].map(n=>order(n,'fuzil-ak',now-6*MIN,'b')),order(8,'precisao',now-MIN,'a')];
+const picker=new RibeiroQueuePicker(id=>picked.push(id));
+picker.open({orders});
+window.fixture={picker,picked,view:o=>picker.update({orders:o??orders}),orders};
+</script></body></html>

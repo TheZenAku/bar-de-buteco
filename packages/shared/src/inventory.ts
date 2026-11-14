@@ -3,8 +3,8 @@ import type {VehicleKey} from './garage.js';
 import type {ConsumableEffects} from './needs.js';
 
 export const INVENTORY_CAPACITY=12;
-export type ItemCategory='bebida'|'comida'|'saude'|'peca'|'fogo'|'industrial';
-export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao','malte_saco','mix_saco','produto_saco','saco_vazio','aco_lote','aluminio_lote','polimero_lote','molas_caixa'] as const;
+export type ItemCategory='bebida'|'comida'|'saude'|'peca'|'fogo'|'industrial'|'arma';
+export const ITEM_IDS=['agua','refrigerante','cafe','garrafa','copo','coxinha','pastel','torresmo','curativo','peca_moto','peca_carro','rojao','malte_saco','mix_saco','produto_saco','saco_vazio','aco_lote','aluminio_lote','polimero_lote','molas_caixa','arma_pistola','arma_revolver','arma_submetralhadora','arma_fuzil','arma_fuzil_ak','arma_carabina','arma_escopeta','arma_cano_duplo','arma_dmr','arma_precisao'] as const;
 export type ItemId=typeof ITEM_IDS[number];
 export interface ItemDefinition {
   id:ItemId;name:string;description:string;category:ItemCategory;price:number;stackMax:number;
@@ -37,11 +37,21 @@ export const ITEM_CATALOG=[
   {id:'aluminio_lote',name:'Lote de alumínio 7075',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Lote de alumínio 7075'},loseOnFaint:false},
   {id:'polimero_lote',name:'Lote de polímero técnico',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Lote de polímero técnico'},loseOnFaint:false},
   {id:'molas_caixa',name:'Caixa de conjuntos de mola',description:'Matéria-prima da Ribeiro Usinagem e Ferramentaria.',category:'industrial',icon:'ui/items/produto-saco.svg',price:0,stackMax:18,effects:{name:'Caixa de conjuntos de mola'},loseOnFaint:false},
+  {id:'arma_pistola',name:'Pistola 9mm',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/pistola/base.webp',price:0,stackMax:10,effects:{name:'Pistola 9mm'},loseOnFaint:false},
+  {id:'arma_revolver',name:'Revólver .38',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/revolver/base.webp',price:0,stackMax:10,effects:{name:'Revólver .38'},loseOnFaint:false},
+  {id:'arma_submetralhadora',name:'Submetralhadora',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/submetralhadora/base.webp',price:0,stackMax:10,effects:{name:'Submetralhadora'},loseOnFaint:false},
+  {id:'arma_fuzil',name:'Fuzil 5,56',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/fuzil/base.webp',price:0,stackMax:10,effects:{name:'Fuzil 5,56'},loseOnFaint:false},
+  {id:'arma_fuzil_ak',name:'Fuzil 7,62',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/fuzil-ak/base.webp',price:0,stackMax:10,effects:{name:'Fuzil 7,62'},loseOnFaint:false},
+  {id:'arma_carabina',name:'Carabina de alavanca',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/carabina/base.webp',price:0,stackMax:10,effects:{name:'Carabina de alavanca'},loseOnFaint:false},
+  {id:'arma_escopeta',name:'Escopeta calibre 12',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/escopeta/base.webp',price:0,stackMax:10,effects:{name:'Escopeta calibre 12'},loseOnFaint:false},
+  {id:'arma_cano_duplo',name:'Espingarda de cano duplo',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/cano-duplo/base.webp',price:0,stackMax:10,effects:{name:'Espingarda de cano duplo'},loseOnFaint:false},
+  {id:'arma_dmr',name:'Fuzil DMR',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/dmr/base.webp',price:0,stackMax:10,effects:{name:'Fuzil DMR'},loseOnFaint:false},
+  {id:'arma_precisao',name:'Fuzil de precisão',description:'Produto final da Ribeiro. Pode ser entregue ao cliente ou transportado no baú do caminhão.',category:'arma',icon:'ui/armas/camadas/precisao/base.webp',price:0,stackMax:10,effects:{name:'Fuzil de precisão'},loseOnFaint:false},
 ] as const satisfies readonly ItemDefinition[];
 
 export const itemIdSchema:z.ZodType<ItemId>=z.enum(ITEM_IDS);
 export const itemById=(id:string):ItemDefinition|undefined=>ITEM_CATALOG.find(item=>item.id===id);
-export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0,malte_saco:0,mix_saco:0,produto_saco:0,saco_vazio:0,aco_lote:0,aluminio_lote:0,polimero_lote:0,molas_caixa:0};
+export const STARTER_ITEMS:Readonly<Record<ItemId,number>>={agua:2,refrigerante:0,cafe:0,garrafa:0,copo:0,coxinha:1,pastel:0,torresmo:0,curativo:1,peca_moto:0,peca_carro:0,rojao:0,malte_saco:0,mix_saco:0,produto_saco:0,saco_vazio:0,aco_lote:0,aluminio_lote:0,polimero_lote:0,molas_caixa:0,arma_pistola:0,arma_revolver:0,arma_submetralhadora:0,arma_fuzil:0,arma_fuzil_ak:0,arma_carabina:0,arma_escopeta:0,arma_cano_duplo:0,arma_dmr:0,arma_precisao:0};
 
 export interface InventoryStack {itemId:ItemId;quantity:number}
 export interface InventoryEntry extends InventoryStack {item:ItemDefinition}

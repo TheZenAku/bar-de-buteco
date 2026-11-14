@@ -50,6 +50,8 @@ export interface SceneActor {
   courier?: boolean;
   horseRearAt?:number;
   parcel?: string;
+  /** The Ribeiro workpiece in both hands ('raw' | 'cut' | 'machined' | 'finished' | 'assembled'), '' or absent when none. */
+  ribeiroPart?: string;
   /** With the phone in front of them: standing still they look at it (the Text clip, with a phone in hand). */
   looking?: boolean;
   /** False for an avatar left in the bar by a player who logged out. */

@@ -6,7 +6,7 @@ import {vehicleFuelBusy,type FuelReceipt} from '@bar/shared';
 import {Client,type Room} from '@colyseus/sdk';
 import {isRidingHorse,moveHorse,normalizeHeading} from '@bar/shared';
 import {NO_PUNCH,fightMove,punchCarries,punchThrowable,streamOf,throwPunch,type BlockCommand,type FightHit,type PunchCommand,type PunchStream} from '@bar/shared';
-import {setDoorStates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
+import {setDoorStates,syncFactoryGates,movePlayer,flyPlayer,canRun,swayInput,hasStagePass,isRidingMoto,motoHandling,motoObstacle,stepMoto,NO_MOTO_INTENT,TICK_MS,type MotoBody,type MotoInput,type MotoIntent,type TrucoView,type FoosballFrame,type PoolAimView,type PoolShotView,type PoolTableView,type PhoneCallView,type PhonePing,type PlayerState,type WorldState,type PlayerInput,type Position,type PublicUser,type ChatMessage,type InventoryView,type ItemId,type JobTaskView} from '@bar/shared';
 import type {SparringDialog,SparringResult,SparringState,DeathPlan,DeathScreen,Badge,GarageView,HighfoodDialog,HighfoodLockerView,HighfoodReceipt,HighfoodState,TradeClosed,TradeInvite,TradeView} from '@bar/shared';
 import {api} from './api';
 import {ServerClock} from './server-clock';
@@ -109,6 +109,8 @@ export interface NetworkHooks {
   table?:(update:{status:'ordered'|'delivered'|'cancelled';order:TableOrderView;message?:string})=>void;
   job?:(update:{task?:JobTaskView|null;message?:string})=>void;
   factory?:(state:unknown)=>void;
+  /** The plant's platform cart: its place, its sacks and whoever pushes it. */
+  factoryCart?:(state:unknown)=>void;
   employment?:(state:unknown)=>void;
   /** The firm's desk (profile → Gerenciar empresa): its state, the result of an action, a name search. */
   company?:(kind:'state'|'result'|'search',payload:unknown)=>void;
@@ -225,6 +227,8 @@ export class BarNetwork {
       this.world=world;
       // Prediction must collide with doors exactly where the server has them.
       if(world.doors)setDoorStates(Object.values(world.doors).map(door=>[door.id,door.open] as const));
+      // The plant's leaves are not doors of the map: their boxes follow the leaves, which are a function of the door state and the room's clock, as in the room.
+      this.syncGates();
       this.hooks.state(world);
       const self=world.players?.[this.user!.id];
       if(self){
@@ -307,6 +311,7 @@ export class BarNetwork {
     room.onMessage('factory.ppe',(state:{on:boolean})=>this.hooks.factoryPpe?.(state));
     room.onMessage('factory.result',(result:unknown)=>this.hooks.factoryResult?.(result));
     room.onMessage('factory.paid',(paid:unknown)=>this.hooks.factoryPaid?.(paid));
+    room.onMessage('factory.cart',(state:unknown)=>this.hooks.factoryCart?.(state));
     room.onMessage('factory.route',(route:unknown)=>this.hooks.factoryRoute?.(route));
     room.onMessage('freight.state',(state:unknown)=>this.hooks.freight?.(state));
     room.onMessage('machine.state',(state:unknown)=>this.hooks.machine?.('state',state));
@@ -436,7 +441,10 @@ export class BarNetwork {
   seen():{seen:number;ago:number}{return {seen:this.world?.serverTime??0,ago:this.stateAt?performance.now()-this.stateAt:0};}
   /** Where the local player is, as predicted (the room's position with the unanswered inputs on top). */
   predicted():Position {return this.position;}
+  /** Puts the plant's leaves' collision boxes where the room's state and clock have them (shared/world.ts syncFactoryGates). */
+  private syncGates():void {const doors=this.world?.doors;if(doors)syncFactoryGates(id=>doors[id],this.clock.now());}
   private predict(input:PlayerInput,self:PlayerState,stream:PunchStream=NO_PUNCH,carry=false):Position {
+    this.syncGates();
     if(self.animationState==='fly-fall')return this.position;
     // In the guard: planted or stepping in while a punch holds the feet, else the guard's pace.
     if(input.fight&&this.motion.grounded&&!self.animationState?.startsWith('fly')&&!isRidingHorse(self.interactionState))return fightMove(this.position,stream,input.seq,{...input,running:input.running&&!self.oldWalk&&canRun(self)},TICK_MS/1000,hasStagePass(self),Object.values(this.world?.motos??{}).map(motoObstacle),self.skin,carry);

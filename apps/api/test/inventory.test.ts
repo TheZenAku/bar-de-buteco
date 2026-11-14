@@ -1,11 +1,11 @@
 import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {eq} from 'drizzle-orm';
+import {and,eq} from 'drizzle-orm';
 import {verifyTicket} from '@bar/shared/tickets';
 import {createApi} from '../src/app.js';
 import {readConfig} from '../src/config.js';
-import {currencyLedger,inventoryLedger,itemInventory,wallets} from '../src/database/schema.js';
+import {currencyLedger,inventoryLedger,itemInventory,wallets,weaponArsenal} from '../src/database/schema.js';
 
 test('fireworks purchases persist, respect the stack limit and charge only once on retry',async t=>{
   const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
@@ -65,4 +65,24 @@ test('inventory persists starters and makes purchases and removals atomic and id
   assert.equal(charges.length,1);assert.equal(charges[0]?.amount,-96);
   assert.equal(movements.filter(row=>row.reason==='purchase').length,1);
   assert.equal(movements.filter(row=>row.reason==='use').length,1);
+});
+
+test('Ribeiro grants finished weapons to the backpack and equipping moves one atomically into the wheel',async t=>{
+  const config={...readConfig(),dataPath:'memory://',databaseUrl:undefined,autoVerifyEmail:true};
+  const api=await createApi({config,rateLimit:false,migrate:true});t.after(()=>api.app.close());
+  const register=await api.app.inject({method:'POST',url:'/api/auth/register',payload:{email:'ribeiro-stock@example.com',username:'ribeiro_stock',displayName:'Estoquista',password:'InventarioSeguro2026!'}});
+  assert.equal(register.statusCode,201,register.body);const userId=register.json().user.id as string,requestId=randomUUID();
+  const grant=(quantity:number,id=requestId)=>api.app.inject({method:'POST',url:'/api/internal/inventory/grant',headers:{'x-internal-secret':config.internalSecret},payload:{userId,itemId:'arma_pistola',quantity,reason:'ribeiro',requestId:id}});
+  const first=await grant(4);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().applied,true);assert.equal(first.json().view.stacks.find((stack:any)=>stack.itemId==='arma_pistola').quantity,4);
+  const retry=await grant(4);assert.equal(retry.statusCode,200,retry.body);assert.equal(retry.json().applied,false);assert.equal(retry.json().view.stacks.find((stack:any)=>stack.itemId==='arma_pistola').quantity,4);
+  const tooMany=await grant(7,randomUUID());assert.equal(tooMany.statusCode,409,tooMany.body);
+  let [stored]=await api.db.select().from(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,'arma_pistola')));assert.equal(stored?.quantity,4);
+  const equipId=randomUUID(),equip=()=>api.app.inject({method:'POST',url:'/api/internal/inventory/equip-weapon',headers:{'x-internal-secret':config.internalSecret},payload:{userId,itemId:'arma_pistola',weapon:'pistola',requestId:equipId}});
+  const equippedResponses=await Promise.all([equip(),equip()]);assert.ok(equippedResponses.every(response=>response.statusCode===200));const equipped=equippedResponses[0]!;assert.equal(equipped.json().applied,true);
+  assert.equal(equipped.json().view.stacks.find((stack:any)=>stack.itemId==='arma_pistola').quantity,3);
+  assert.equal(equipped.json().arsenal.weapons.find((weapon:any)=>weapon.id==='pistola').equipped,true);
+  stored=(await api.db.select().from(itemInventory).where(and(eq(itemInventory.userId,userId),eq(itemInventory.itemId,'arma_pistola'))))[0];assert.equal(stored?.quantity,3);
+  const [owned]=await api.db.select().from(weaponArsenal).where(and(eq(weaponArsenal.userId,userId),eq(weaponArsenal.weaponId,'pistola')));assert.equal(owned?.equipped,true);
+  const duplicate=await api.app.inject({method:'POST',url:'/api/internal/inventory/equip-weapon',headers:{'x-internal-secret':config.internalSecret},payload:{userId,itemId:'arma_pistola',weapon:'pistola',requestId:randomUUID()}});
+  assert.equal(duplicate.statusCode,409);assert.equal(duplicate.json().error,'Esta arma já está no seu arsenal.');
 });

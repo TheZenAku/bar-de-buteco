@@ -8,19 +8,19 @@ no celular. **Ainda não está liberado para os jogadores:** só o comando `/arm
 
 | Comando (no chat) | Quem | O que faz |
 | --- | --- | --- |
-| `/armas` | administradores (ou todos, se `/armas todos` estiver ligado) | Liga ou desliga as armas para quem digitou. Ao ligar, o arsenal de teste vem completo (todas as armas, todos os equipamentos, munição infinita, melhorias de graça) e a pistola já sai na mão. |
-| `/armas todos` | administradores | Libera (ou volta a fechar) o `/armas` para qualquer jogador, até o mundo reiniciar. Ao fechar, quem não é admin perde as armas na hora. |
+| `/armas` | somente administradores | Liga ou desliga o sistema para quem digitou. Ao ligar, carrega somente as armas reais que o jogador obteve e equipou; não concede armas. |
 | `/alvos` | administradores | Põe quatro alvos de treino na frente (a 6, 12, 22 e 35 m: parado, andando de lado, correndo para frente e para trás, parado longe). Levam tiro e soco, caem e levantam em 4 s com a vida cheia. `/alvos` de novo tira; saem sozinhos em 20 min ou quando o admin sai. |
 
-O arsenal é por jogador e fica guardado (tabelas `weapon_arsenal`, `weapon_parts`, `weapon_ammo`, migração 028): a arma que o jogador **tem** decide o modelo,
-o tipo, os números e os equipamentos que cabem. Hoje a única forma de ganhar armas é o `/armas` (kit de teste, origem `teste`); a loja, o drop e a troca
-entram depois em cima do mesmo esquema.
+O arsenal é por jogador e fica guardado (tabelas `weapon_arsenal`, `weapon_parts`, `weapon_ammo`, migrações 028, 034 e 035): a arma que o jogador **tem** decide o modelo,
+o tipo, os números e os equipamentos que cabem. As armas vêm da produção da Ribeiro; a migração 035 remove de todas as contas o antigo kit com origem `teste` e impede que `/armas` o recrie. Ter uma arma não a coloca na roda: o campo persistente `equipped` muda pelas ações **Equipar** do Arsenal ou da mochila.
+As armas acabadas retiradas do estoque da Ribeiro chegam primeiro à mochila. O botão **Equipar** da mochila consome uma unidade física, cria a posse no arsenal e já a deixa equipada na roda numa única transação.
+Uma arma real equipada ativa o sistema e a roda automaticamente, inclusive ao entrar novamente no bar. O `/armas` continua exclusivo da administração como alternância de diagnóstico; jogadores comuns não dependem dele para usar armas que possuem.
 
 ## Controles
 
 | Teclado e mouse | Controle (padrão Xbox) | Toque | O que faz |
 | --- | --- | --- | --- |
-| Caps Lock (segurar, ou tocar uma vez para deixar aberta) | LB (segurar) | botão Arma | Roda de armas. Solte em cima da arma; o centro guarda a arma. (Não é Tab: o Tab do navegador passeia pelos botões da página.) |
+| Caps Lock (segurar, ou tocar uma vez para deixar aberta) | LB (segurar) | botão Arma | Roda de armas. Solte em cima de uma arma equipada; o centro **Mão** deixa o jogador desarmado. (Não é Tab: o Tab do navegador passeia pelos botões da página.) |
 | 1 … 0 | RB / LB (toque rápido) | — | Arma seguinte / anterior (no teclado, escolhe direto pela posição na roda). |
 | Clique | RT | Fogo (segurar; arrastar nele também gira a câmera) | Atira. |
 | Botão direito (segurar) | LT (segurar) | Mirar (liga/desliga) | Mira pelo ombro, ou pela luneta. |
@@ -174,9 +174,9 @@ Nas três primeiras vezes que a arma sai (por navegador), um chip sobre o contad
 ### Roda de armas
 
 `weapons/ui/wheel.ts`. Abre por cima da cena, que continua rodando (um degradê radial escurece as bordas; a mira e a linha de derrubada esperam).
-Cada arma do arsenal é um setor, a partir de cima no sentido horário, na ordem `WHEEL_ORDER`: a figura, a sigla e um anel com as balas do carregador
+Cada arma equipada do arsenal é um setor, a partir de cima no sentido horário, na ordem `WHEEL_ORDER`: a figura, a sigla e um anel com as balas do carregador
 (dourado quando está no fim, vermelho vazio); um traço ciano marca a que está na mão e, com mouse, o número da tecla 1 … 0 fica no canto. O setor
-escolhido acende em magenta e uma seta na borda do centro mostra para onde o ponteiro aponta. O centro (guardar a arma) mostra a arma escolhida: categoria,
+escolhido acende em magenta e uma seta na borda do centro mostra para onde o ponteiro aponta. O centro é a opção **Mão / Desarmado**; os detalhes mostram categoria,
 nome, calibre, modos de tiro, balas, os equipamentos instalados e "U · Arsenal" (no controle, "D-pad →").
 
 - **Mouse:** o movimento do mouse (preso ao jogo) move o ponteiro; soltar o Caps Lock ou clicar escolhe. Com o mouse solto, passar por cima escolhe.
@@ -191,8 +191,8 @@ nome, calibre, modos de tiro, balas, os equipamentos instalados e "U · Arsenal"
 `weapons/ui/arsenal.ts`, a janela `showModal('ARSENAL',…,'arsenal')` (classe `arsenal-modal`, destruída ao fechar como a coleção). Abre com **U**
 (U de novo fecha), **D-pad →**, o botão Arsenal da roda no toque, ou o menu Esc › Ações › Arsenal (só aparece com o `/armas` ligado).
 
-- **Armas:** a lista das armas do arsenal à esquerda (a que está na mão tem a marca "Na mão"); à direita a escolhida: categoria e calibre, nome,
-  descrição, modos, capacidade, luneta, e o botão **Sacar** (saca e fecha).
+- **Armas:** a lista das armas do arsenal à esquerda (as equipadas têm a marca "Na roda" e a ativa, "Na mão"); à direita a escolhida: categoria e calibre, nome,
+  descrição, modos, capacidade, luneta, e o botão **Equipar / Remover da roda**. Equipar não saca a arma: ela passa a poder ser escolhida na roda.
 - **Barras** (`weapons/ui/stats-view.ts`), feitas dos números de verdade de `weaponStats` com os equipamentos e melhorias de agora, e o número ao
   lado: Dano (por tiro; na escopeta bagos × dano), Cadência (tiros/min), Alcance (dano cheio até … cai até … m), Precisão (cone mirando, escala
   logarítmica), Controle (coice por tiro), Manuseio (tempo de mira; sacar e recarregar também contam), Mobilidade (passo mirando), Capacidade.
@@ -294,7 +294,7 @@ Modelos, sons e créditos (todos CC0): [docs/assets/armas.md](../assets/armas.md
 - **Regras compartilhadas:** `packages/shared/src/weapons/` (`catalog.ts` armas, equipamentos, melhorias e preços; `stats.ts`; `bodies.ts` + `bodies-data.ts`
   (gerado: `npm run assets:gun-bodies`); `ballistics.ts`; `protocol.ts`; `arsenal.ts`), `world.ts` `bulletWorld`. Testes: `tests/integration/weapons.test.ts`.
 - **Sala:** `apps/server/src/world/weapons.ts` (WeaponDirector), `world/targets.ts` (alvos de treino), `Gun` em `state.ts`, ligações em `BarRoom.ts`
-  (`/armas`, `/armas todos`, `/alvos`, `weapon.arsenal|configure|upgrade`). Testes: `apps/server/test/weapons*.test.ts`.
+  (`/armas`, `/alvos`, `weapon.arsenal|equip|configure|upgrade`). Testes: `apps/server/test/weapons*.test.ts`.
 - **API:** `apps/api/src/arsenal-service.ts`, rotas `/api/internal/arsenal/load|configure|upgrade`, migração `infra/migrations/028_arsenal.sql`.
 - **Navegador:** `apps/web/src/weapons/` (`local-gun.ts` lógica e previsão, `controller.ts`, `aim-assist.ts`, `aim-settings.ts`, `hud.ts`, `ui/` roda,
   Arsenal e ajustes, `contract.ts`, `weapon-meta.ts`/`sound-meta.ts` gerados), `apps/web/src/gamepad/`, `apps/web/src/engine/weapons/` (visual e som).

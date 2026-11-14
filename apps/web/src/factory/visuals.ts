@@ -1,10 +1,12 @@
 import * as pc from 'playcanvas';
 import {CITY_MARKERS,floorHeight,type Position} from '@bar/shared';
-import {CLEAN_S,FACTORY_GATE,interpolateCubicage,type CubicPoint} from '@bar/shared/factory';
+import {CLEAN_S,interpolateCubicage,type CartView,type CubicPoint} from '@bar/shared/factory';
 import type {FactoryView,SlotView,TankView} from './types';
 import {loadBagKit,type BagKit,type BagMaterial} from './bags';
-import {setLocalFactoryBag} from './carry';
+import {setFactoryCartPose,setLocalFactoryBag} from './carry';
 import {PlantDirt} from './dirt';
+import {FactoryCartView,type CartDriver} from './cart-view';
+import type {EnvironmentLighting} from '../engine/environment-lighting';
 
 const BASE=import.meta.env.BASE_URL;
 const TANK_BOTTOM_Y=1.01;
@@ -30,8 +32,6 @@ const GAUGE_R=1.12,GAUGE_BOTTOM=2.12,GAUGE_LENGTH=.82;
 const COLD=new pc.Color(.35,.55,.85),WARM=new pc.Color(.95,.62,.28);
 const KINDS:BagMaterial[]=['MALTE','MIX','PRODUTO'];
 const PALLET_OUT='Ponto_EB_PA_Ensaque';
-/** Seconds the gate takes to slide fully open (and shut). */
-const GATE_SLIDE_S=4.5;
 
 interface TankParts {
   agitator?:pc.Entity;liquid?:pc.Entity;material?:pc.StandardMaterial;level:number;target:number;radius:number;spin:number;rpm:number;temperature:number;hot:boolean;
@@ -69,13 +69,12 @@ export class FactoryVisuals {
   private clock=0;private lastPlayer?:Position;private view?:FactoryView;private lowQuality=false;private dirt?:PlantDirt;
   private disposed=false;private popping=false;
   private owned:Array<{destroy:()=>void}>=[];
-  /** The vehicle gate's two sliding leaves: `open` runs 0 (shut) to 1 (apart), towards `target`. */
-  private gateSeen=false;
-  /** The intercom post's lamp: steady green while quiet, an amber pulse while a visitor rings. */
-  private bellLamp?:pc.StandardMaterial;private ringing=false;private lampAt=-1;
-  private gate:{leaves:Array<{entity:pc.Entity;dir:1|-1}>;open:number;target:number}={leaves:[],open:0,target:0};
+  /** The metal materials given the city's reflections (environment-lighting.ts dressMetal); given back when the plant goes. */
+  private dressed:pc.StandardMaterial[]=[];
+  /** The platform cart (its own model, public/fabrica/empresa_brasil_carrinho.glb). */
+  private cart?:FactoryCartView;
 
-  constructor(private app:pc.Application){
+  constructor(private app:pc.Application,private environment?:EnvironmentLighting){
     app.root.addChild(this.root);
     const light=(name:string,marker:string,lift:number,color:pc.Color,range:number)=>{
       const point=CITY_MARKERS[marker];if(!point)return;
@@ -85,7 +84,7 @@ export class FactoryVisuals {
     this.beacon=light('EB_Giroflex','Ponto_EB_Painel',3,new pc.Color(1,.05,.02),11);
     this.bagLight=light('EB_Giroflex_Ensaque','Ponto_EB_Ensaque',3.2,new pc.Color(1,.05,.02),9);
     this.dryerGlow=light('EB_Secador_Brilho','Ponto_EB_Secador_Base',5.4,new pc.Color(1,.55,.2),7);
-    this.buildGate();this.dirt=new PlantDirt(app);
+    this.dirt=new PlantDirt(app);this.cart=new FactoryCartView(app,this.root);
     void this.loadTanks();void this.loadTable();void this.loadBags();
     for(let i=0;i<14;i++)this.puffs.push(this.makePuff(i));
   }
@@ -97,6 +96,8 @@ export class FactoryVisuals {
     await new Promise<void>(resolve=>{asset.ready(()=>resolve());asset.once('error',()=>resolve());this.app.assets.load(asset);});
     if(this.disposed||!asset.resource)return;
     const model=(asset.resource as pc.ContainerResource).instantiateRenderEntity({castShadows:false});this.root.addChild(model);
+    // EB_Aco_Inox has no metallicFactor (glTF: fully metal) and nothing around the plant for it to reflect, so the lids came out black: it gets the same reflections as the city's metal.
+    for(const render of model.findComponents('render') as pc.RenderComponent[])for(const instance of render.meshInstances)this.dress(instance.material);
     const find=(prefix:string)=>model.find((node:pc.GraphNode)=>node.name.startsWith(prefix))[0] as pc.Entity|undefined;
     let steel:pc.Material|undefined;
     this.tanks.forEach((tank,index)=>{
@@ -150,9 +151,14 @@ export class FactoryVisuals {
     const mesh=new pc.Mesh(device);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setUvs(0,uvs);mesh.setIndices(indices);mesh.update();
     return mesh;
   }
+  private dress(material:pc.Material|null|undefined):void {
+    if(!this.environment||!(material instanceof pc.StandardMaterial)||this.dressed.includes(material))return;
+    this.environment.dressMetal(material);this.dressed.push(material);
+  }
   private buildFittings(steel?:pc.Material):void {
     const lidMesh=this.lidMesh();
     const metal=steel??(()=>{const m=new pc.StandardMaterial();m.diffuse=new pc.Color(.62,.64,.68);m.metalness=.8;m.gloss=.7;m.update();this.owned.push(m);return m;})();
+    this.dress(metal);
     const dark=new pc.StandardMaterial();dark.diffuse=new pc.Color(.07,.08,.1);dark.gloss=.5;dark.update();
     const handleMat=new pc.StandardMaterial();handleMat.diffuse=new pc.Color(.9,.82,.2);handleMat.gloss=.4;handleMat.update();
     this.owned.push(lidMesh,dark,handleMat);
@@ -196,69 +202,6 @@ export class FactoryVisuals {
     tank.lid.setLocalEulerAngles(-tank.lidAngle,0,0);
   }
 
-  /**
-   * The vehicle gate in the east fence's opening: two galvanized leaves (rails and bars) hung outside the piers that slide apart along the fence.
-   * The collision is the room's (FACTORY_GATE, shared world); this is only what it looks like.
-   */
-  private buildGate():void {
-    const G=FACTORY_GATE,length=G.halfWidth-.06,height=G.maxY-G.minY-.25,bottom=G.minY+.22;
-    const steel=new pc.StandardMaterial();steel.diffuse=new pc.Color(.6,.63,.66);steel.metalness=.75;steel.gloss=.55;steel.useMetalness=true;steel.update();
-    const dark=new pc.StandardMaterial();dark.diffuse=new pc.Color(.16,.17,.19);dark.gloss=.4;dark.update();
-    const yellow=new pc.StandardMaterial();yellow.diffuse=new pc.Color(.95,.72,.1);yellow.gloss=.35;yellow.update();
-    this.owned.push(steel,dark,yellow);
-    const box=(parent:pc.Entity,material:pc.Material,size:[number,number,number],at:[number,number,number])=>{
-      const entity=new pc.Entity('EB_Portao_Peca');entity.addComponent('render',{type:'box',material,castShadows:false,receiveShadows:false});
-      entity.setLocalScale(...size);entity.setLocalPosition(...at);parent.addChild(entity);
-    };
-    for(const dir of [-1,1] as const){
-      const entity=new pc.Entity(`EB_Portao_Folha_${dir<0?'A':'B'}`);
-      // Frame: top and bottom rails, two end posts, a mid rail; then vertical bars between them.
-      box(entity,steel,[.07,.08,length],[0,bottom+.04,0]);box(entity,steel,[.07,.08,length],[0,bottom+height-.04,0]);box(entity,steel,[.07,.07,length],[0,bottom+height*.5,0]);
-      box(entity,steel,[.09,height,.09],[0,bottom+height/2,-length/2+.045]);box(entity,steel,[.09,height,.09],[0,bottom+height/2,length/2-.045]);
-      const bars=Math.round(length/.16);
-      for(let i=1;i<bars;i++)box(entity,dark,[.03,height-.12,.03],[0,bottom+height/2,-length/2+length*i/bars]);
-      // Hazard stripe on the leading edge (the edge that meets the other leaf), and a small wheel box at the foot.
-      box(entity,yellow,[.1,height,.06],[0,bottom+height/2,-dir*(length/2-.1)]);
-      box(entity,dark,[.14,.14,.3],[0,bottom-.1,dir*(length/2-.4)]);
-      entity.setPosition(G.x,G.minY,G.z+dir*G.halfWidth/2);this.root.addChild(entity);
-      this.gate.leaves.push({entity,dir});
-    }
-    this.buildIntercom(steel,dark);
-  }
-  /** The intercom: a post on the pavement beside the gate with a speaker grille, a call button and a lamp, facing the street. */
-  private buildIntercom(steel:pc.Material,dark:pc.Material):void {
-    const I=FACTORY_GATE.intercom,ground=floorHeight(I.x,I.z,.5)??FACTORY_GATE.minY;
-    const post=new pc.Entity('EB_Interfone');post.setPosition(I.x,ground,I.z);this.root.addChild(post);
-    const box=(material:pc.Material,size:[number,number,number],at:[number,number,number])=>{
-      const entity=new pc.Entity('EB_Interfone_Peca');entity.addComponent('render',{type:'box',material,castShadows:false,receiveShadows:false});
-      entity.setLocalScale(...size);entity.setLocalPosition(...at);post.addChild(entity);
-    };
-    box(steel,[.16,1.25,.16],[0,.625,0]);box(dark,[.1,.34,.2],[.1,1.22,0]);
-    // The grille (speaker): three slots; the button below it; the lamp on top.
-    for(let i=0;i<3;i++)box(steel,[.012,.012,.1],[.16,1.3-i*.035,0]);
-    const button=new pc.StandardMaterial();button.diffuse=new pc.Color(.95,.95,.9);button.emissive=new pc.Color(.25,.25,.22);button.update();
-    const lamp=new pc.StandardMaterial();lamp.diffuse.set(0,0,0);lamp.emissive=new pc.Color(.1,.8,.25);lamp.useLighting=false;lamp.update();
-    this.owned.push(button,lamp);this.bellLamp=lamp;
-    const knob=new pc.Entity('EB_Interfone_Botao');knob.addComponent('render',{type:'cylinder',material:button,castShadows:false,receiveShadows:false});
-    knob.setLocalScale(.07,.02,.07);knob.setLocalEulerAngles(0,0,90);knob.setLocalPosition(.16,1.13,0);post.addChild(knob);
-    const light=new pc.Entity('EB_Interfone_Lampada');light.addComponent('render',{type:'sphere',material:lamp,castShadows:false,receiveShadows:false});
-    light.setLocalScale(.1,.1,.1);light.setLocalPosition(.1,1.44,0);post.addChild(light);
-  }
-  private placeGate():void {
-    const t=this.gate.open,eased=t*t*(3-2*t),G=FACTORY_GATE,travel=G.halfWidth+.15;
-    for(const leaf of this.gate.leaves)leaf.entity.setPosition(G.x,G.minY,G.z+leaf.dir*(G.halfWidth/2+eased*travel));
-  }
-  /** Slides the leaves towards the room's state (the first state seen snaps, so arriving at an open gate does not replay it); true while they move. */
-  private slideGate(dt:number,open:boolean|undefined):boolean {
-    if(open!==undefined){
-      const target=open?1:0;this.gate.target=target;
-      if(!this.gateSeen){this.gateSeen=true;this.gate.open=target;this.placeGate();return false;}
-    }
-    const gap=this.gate.target-this.gate.open;if(Math.abs(gap)<.0005){if(gap!==0){this.gate.open=this.gate.target;this.placeGate();}return false;}
-    this.gate.open+=Math.sign(gap)*Math.min(Math.abs(gap),dt/GATE_SLIDE_S);this.placeGate();
-    return true;
-  }
-
   /** A soft grey puff that rises, grows and fades; reused forever. */
   private makePuff(index:number):Puff {
     const entity=new pc.Entity(`EB_Vapor_${index}`);
@@ -272,6 +215,10 @@ export class FactoryVisuals {
   update(view:FactoryView,lowQuality:boolean):void {
     this.view=view;this.lowQuality=lowQuality;this.apply(view);
   }
+  /** The room's word on the platform cart. */
+  cartMessage(view:CartView):void {this.cart?.message(view);}
+  /** Where the cart is drawn now (for its ring and the avatar's hands). */
+  cartPose():ReturnType<FactoryCartView['pose']> {return this.cart?.pose();}
   /** The litres in a tank: the water and what the dissolved solids add (the same number the panel shows). */
   private litres(state:TankView,bagKg:number,perKg:number):number {
     const solids=state.solidsKg??(state.malteBags+state.mixBags)*bagKg;
@@ -291,7 +238,6 @@ export class FactoryVisuals {
       else tank.target=0;
     });
     this.dirt?.update(view.dirt,this.lowQuality,{clean:view.me.clean??null,dryerState:view.dryer.state,dryerStepS:view.dryer.stepS,cleanS:CLEAN_S});
-    this.ringing=!!view.gate?.ringing;
     this.dryerHot=view.dryer.inletC>60;this.dryerRunning=['PRE_AQUECENDO','PRODUZINDO','RESFRIANDO'].includes(view.dryer.state);this.baggingRunning=view.bagging.state==='ENCHENDO';
     const live=view.alarms.filter(alarm=>alarm.active!==false&&!alarm.acknowledged);
     this.alarm=view.emergency||live.some(alarm=>alarm.severity==='critical'||alarm.severity==='alarm')?'alarm':live.some(alarm=>alarm.severity==='warning')?'warning':'none';
@@ -355,11 +301,11 @@ export class FactoryVisuals {
   }
 
   /** Every frame: levels glide, agitators turn, lids swing, steam rises, lights pulse. `player` hides what is too far to see. */
-  tick(dt:number,player:Position|undefined,carrying:string|null,_localRoot?:pc.Entity,gateOpen?:boolean):void {
+  tick(dt:number,player:Position|undefined,carrying:string|null,_localRoot?:pc.Entity,cart?:{driver?:CartDriver;myId?:string}):void {
     if(!this.view||this.disposed)return;
     this.clock+=dt;this.lastPlayer=player;
     setLocalFactoryBag(carrying==='MALTE'||carrying==='MIX'?carrying:null);
-    let moving=this.slideGate(dt,gateOpen);
+    let moving=false;
     this.tanks.forEach((tank,index)=>{
       if(tank.liquid){
         const delta=tank.target-tank.level;
@@ -415,12 +361,6 @@ export class FactoryVisuals {
       const p=puff.entity.getPosition();puff.entity.setPosition(p.x+.05*dt,p.y+(sourceIndex<3?.55:1.1)*dt,p.z);
       material.opacity=(1-t)*(t<.15?t/.15:1)*(sourceIndex<3?.22:.3);material.update();moving=true;
     });
-    // The intercom lamp: amber pulse while someone rings, steady green otherwise.
-    if(this.bellLamp&&(this.ringing||this.lampAt!==0)){
-      const on=this.ringing?Math.sin(this.clock*9)>0:false;
-      if(this.ringing)this.bellLamp.emissive.set(on?1:.15,on?.55:.08,on?.05:0);else this.bellLamp.emissive.set(.1,.8,.25);
-      this.bellLamp.update();this.lampAt=this.ringing?1:0;if(this.ringing)moving=true;
-    }
     // Beacons: a red pulse for alarms, a slower amber one for warnings; the dryer's windows glow while it works.
     const pulse=this.alarm==='alarm'?.5+.5*Math.sin(this.clock*9):.5+.5*Math.sin(this.clock*3.5);
     for(const light of [this.beacon,this.bagLight]){
@@ -432,16 +372,20 @@ export class FactoryVisuals {
       this.dryerGlow.enabled=on;if(on){this.dryerGlow.light!.intensity=1.1+Math.sin(this.clock*2.1)*.25+Math.sin(this.clock*5.3)*.1;moving=true;}
     }
     if(this.dirt?.tick(dt))moving=true;
+    this.cart?.tick(dt,cart?.driver,cart?.myId);setFactoryCartPose(this.cart?.pose()??null);
     this.root.enabled=true;
     if(moving||this.baggingRunning)this.app.renderNextFrame=true;
   }
   /** How dirty the floor or machine at a point of the plant looks right now (0..1, the displayed level, not the room's target): for footprints, sounds or prompts. */
   dirtLevelAt(x:number,z:number):number {return this.dirt?.levelAt(x,z)??0;}
   /** Out of range of the plant: nothing of it is drawn or animated. */
-  hide():void {this.view=undefined;this.root.enabled=false;this.dirt?.hide();setLocalFactoryBag(null);}
+  /** The room stopped sending the cart (out of range): the next message starts from its pose. */
+  forget():void {this.cart?.forget();}
+  hide():void {this.view=undefined;this.root.enabled=false;this.dirt?.hide();setLocalFactoryBag(null);setFactoryCartPose(null);}
   destroy():void {
-    this.disposed=true;setLocalFactoryBag(null);this.dirt?.destroy();this.root.destroy();
+    this.disposed=true;setLocalFactoryBag(null);setFactoryCartPose(null);this.dirt?.destroy();this.cart?.destroy();this.root.destroy();
     for(const stack of this.stacks.values())stack.buffer.destroy();this.stacks.clear();
+    for(const material of this.dressed)this.environment?.releaseMetal(material);this.dressed.length=0;
     for(const item of this.owned)item.destroy();this.owned.length=0;
   }
 }

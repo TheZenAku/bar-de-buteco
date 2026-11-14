@@ -3,7 +3,7 @@ import type { Collider, Footprint, Interactable, PlayerInput, Position, Seat } f
 import {JUKEBOX_INTERACTION_SLACK,JUKEBOX_PLACEMENT,STAGE_FRONT,TV_SYSTEMS,TV_LABELS,TELEVISIONS} from './jukebox.js';
 import {LIGHT_DESK,LIGHT_DESK_REACH} from './stage-show.js';
 import {DOORS,DOOR_LEAVES,leafBox} from './doors.js';
-import {FACTORY_GATE} from './factory/index.js';
+import {FACTORY_GATES,gateOpenness,gateSolid,replacesStatic,type GateState} from './factory/gates.js';
 import {FOOSBALL_TABLES} from './foosball.js';
 import {POOL_TABLES} from './pool/table.js';
 import {CITY_FLOORS,CITY_SOLIDS} from './city.js';
@@ -51,9 +51,9 @@ export const COLLIDERS: readonly Collider[] = [...map.colliders,BLACKJACK_COLLID
 // Door state for movement, interactions and the camera. The server owns it; clients mirror the synced state.
 // Doors start open, as authored in the map.
 const openDoors=new Map(DOORS.map(door=>[door.id,true]));
-// The plant's gate is not a door of the map: it is a synced door state of its own, and it starts shut (until the room says otherwise).
-openDoors.set(FACTORY_GATE.id,false);
-const gateBox=():Collider=>({id:FACTORY_GATE.id,x:FACTORY_GATE.x,z:FACTORY_GATE.z,hx:FACTORY_GATE.halfThick,hz:FACTORY_GATE.halfWidth,minY:FACTORY_GATE.minY,maxY:FACTORY_GATE.maxY});
+// The plant's leaves (factory/gates.ts) are not doors of the map: each is a synced door state of its own, and its box follows the leaf (syncFactoryGates).
+// They start shut, until the room says otherwise.
+const dynamicBoxes=new Map<string,Collider>(FACTORY_GATES.map(gate=>[gate.id,gate.collider]));
 let solids:readonly Collider[]=[];
 const COLLISION_CELL=8;
 const solidGrid=new Map<string,Collider[]>();
@@ -76,7 +76,9 @@ for(const surface of [...MAP_SURFACES,...CITY_FLOORS]){
 }
 const indexSolid=(collider:Collider)=>indexArea(solidGrid,collider,collider.x-collider.hx-PLAYER_RADIUS,collider.x+collider.hx+PLAYER_RADIUS,
   collider.z-collider.hz-PLAYER_RADIUS,collider.z+collider.hz+PLAYER_RADIUS);
-for(const collider of [...COLLIDERS,...CITY_SOLIDS])indexSolid(collider);
+// A static solid that is the very box of a plant leaf (the sector still carries it where the leaf is exported shut: the roller shutter's wall piece) is that leaf's: the leaf's own box moves, the static one would stay.
+const STATIC_SOLIDS=[...COLLIDERS,...CITY_SOLIDS].filter(solid=>!FACTORY_GATES.some(gate=>replacesStatic(gate,solid)));
+for(const collider of STATIC_SOLIDS)indexSolid(collider);
 let doorBoxes:Collider[]=[];
 /** Only the door leaves move: they leave the cells they were in and enter new ones, the thousands of static solids stay. */
 function rebuildSolids():void {
@@ -84,10 +86,9 @@ function rebuildSolids():void {
     const items=solidGrid.get(cellKey(x,z));
     if(items)solidGrid.set(cellKey(x,z),items.filter(item=>item!==box));
   }
-  doorBoxes=DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw));
-  if(!openDoors.get(FACTORY_GATE.id))doorBoxes.push(gateBox());
+  doorBoxes=[...DOOR_LEAVES.map(leaf=>leafBox(leaf,openDoors.get(leaf.group)?leaf.openYaw:leaf.closedYaw)),...dynamicBoxes.values()];
   doorBoxes.forEach(indexSolid);
-  solids=[...COLLIDERS,...CITY_SOLIDS,...doorBoxes];
+  solids=[...STATIC_SOLIDS,...doorBoxes];
 }
 rebuildSolids();
 /** Whether a body of this radius reaches into the box. */
@@ -120,6 +121,27 @@ export function rainSurfaceHeight(x:number,z:number):number {
     if(!c.ramp&&boxContains(c,x,z)&&Number.isFinite(c.maxY))height=Math.max(height,c.maxY!);
   }
   return height;
+}
+/** Whether a box is where another already is, to within `tolerance` metres (a turned one also in its turn). */
+function sameBox(a:Collider,b:Collider,tolerance:number):boolean {
+  const close=(p:number|undefined,q:number|undefined)=>p===q||(p!==undefined&&q!==undefined&&Math.abs(p-q)<=tolerance);
+  return close(a.x,b.x)&&close(a.z,b.z)&&close(a.hx,b.hx)&&close(a.hz,b.hz)&&close(a.minY,b.minY)&&close(a.maxY,b.maxY)
+    &&(a.turn===b.turn||(!!a.turn&&!!b.turn&&Math.abs(a.turn.ux-b.turn.ux)<=tolerance&&Math.abs(a.turn.uz-b.turn.uz)<=tolerance));
+}
+/**
+ * Puts the plant's leaves' boxes where their synced state and the clock say (factory/gates.ts, `gateSolid`): the room and the browser's prediction both call this with
+ * the room's door states and the room's time, so they stand the same box. The solids are rebuilt only when a box has moved by more than `tolerance` (a settled leaf
+ * always lands exactly). Returns whether anything changed.
+ */
+export function syncFactoryGates(stateOf:(id:string)=>GateState|undefined,now:number,tolerance=.02):boolean {
+  let changed=false;
+  for(const gate of FACTORY_GATES){
+    const state=stateOf(gate.id)??{open:false,changedAt:0},openness=gateOpenness(gate,state,now),box=gateSolid(gate,state,now),before=dynamicBoxes.get(gate.id);
+    if(before&&sameBox(before,box,openness<=0||openness>=1?0:tolerance))continue;
+    dynamicBoxes.set(gate.id,box);changed=true;
+  }
+  if(changed)rebuildSolids();
+  return changed;
 }
 export function isDoorOpen(id:string):boolean {return openDoors.get(id)??true;}
 /** Applies door states (id → open); unknown ids are ignored. Returns whether anything changed. */
@@ -277,15 +299,16 @@ function inOpenDoorway(x:number,z:number,y:number):boolean {
     return Math.abs(dx*Math.sin(yaw)+dz*Math.cos(yaw))<.6&&Math.abs(dx*Math.cos(yaw)-dz*Math.sin(yaw))<.4*door.leaves.length;
   });
 }
-function obstructed(x:number,z:number,y:number,ignored?:Set<string>,obstacles:readonly Collider[]=[]):boolean {
+/** `step`: how far above the feet a solid's top may be and still be walked onto (airborne: almost none, or a jump that enters a box's footprint just under its top falls through it and ends up inside). */
+function obstructed(x:number,z:number,y:number,ignored?:Set<string>,obstacles:readonly Collider[]=[],step=.26):boolean {
   const body=inOpenDoorway(x,z,y)?DOORWAY_RADIUS:PLAYER_RADIUS;
   if(x<WORLD.minX+PLAYER_RADIUS||x>WORLD.maxX-PLAYER_RADIUS||z<WORLD.minZ+PLAYER_RADIUS||z>WORLD.maxZ-PLAYER_RADIUS)return true;
   const nearby=solidsAt(x,z);
   for(const c of obstacles.length?[...nearby,...obstacles]:nearby){
     if(c.ramp||ignored?.has(c.id))continue;
-    if((c.maxY??Infinity)<=y+.26||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
+    if((c.maxY??Infinity)<=y+step||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
     // Below knee height only the feet collide, so the body may lean over a step edge (the stage's 30 cm treads).
-    const radius=(c.maxY??Infinity)<=y+.5?.15:body;
+    const radius=step>=.1&&(c.maxY??Infinity)<=y+.5?.15:body;
     if(boxContains(c,x,z,radius))return true;
   }
   // Sloped collision boxes are sampled on their real upper face, not their enclosing AABB.
@@ -297,6 +320,29 @@ function obstructed(x:number,z:number,y:number,ignored?:Set<string>,obstacles:re
   return false;
 }
 
+/** Airborne body overlapping a solid whose top is above its feet (it walked off the edge of a box it stood on, its radius still over the box): nudge it out sideways, or it would fall through the solid and land inside it. */
+function pushOut(x:number,z:number,y:number,ignored:Set<string>,obstacles:readonly Collider[]):{x:number;z:number}|undefined {
+  for(const c of obstacles.length?[...solidsAt(x,z),...obstacles]:solidsAt(x,z)){
+    if(c.ramp||c.turn||ignored.has(c.id))continue;
+    if((c.maxY??Infinity)<=y+.02||(c.minY??-Infinity)>=y+PLAYER_HEIGHT-.04)continue;
+    if(!boxContains(c,x,z,PLAYER_RADIUS))continue;
+    const left=x-(c.x-c.hx-PLAYER_RADIUS),right=c.x+c.hx+PLAYER_RADIUS-x,near=z-(c.z-c.hz-PLAYER_RADIUS),far=c.z+c.hz+PLAYER_RADIUS-z,least=Math.min(left,right,near,far);
+    const px=least===left?x-left-.001:least===right?x+right+.001:x,pz=least===near?z-near-.001:least===far?z+far+.001:z;
+    if(!obstructed(px,pz,y,ignored,obstacles,.02))return {x:px,z:pz};
+  }
+}
+/**
+ * Whether a thing of this radius, standing on a floor at `y` and `height` tall, touches no solid (walls, shelves, machines, closed doors).
+ * No floor, ramp or body-size rules: it is for objects that are not a person (the factory's platform cart).
+ */
+export function isClear(x:number,z:number,y:number,radius:number,height:number,step=.26):boolean {
+  for(const c of solidsAt(x,z)){
+    if(c.ramp)continue;
+    if((c.maxY??Infinity)<=y+step||(c.minY??-Infinity)>=y+height)continue;
+    if(boxContains(c,x,z,radius))return false;
+  }
+  return true;
+}
 export function isWalkable(x:number,z:number,y?:number,obstacles:readonly Collider[]=[]):boolean {
   const supported=floorHeight(x,z,y??.3);
   return supported!==undefined&&(y===undefined||Math.abs(supported-y)<.08)&&!obstructed(x,z,supported,undefined,obstacles);
@@ -345,7 +391,7 @@ export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'r
   const trapped=new Set(obstacles.filter(c=>(c.maxY??Infinity)>y+.26&&(c.minY??-Infinity)<y+PLAYER_HEIGHT-.04&&boxContains(c,x,z,PLAYER_RADIUS-.01)).map(c=>c.id));
   // Whoever is already up there (a pass that ran out) may still move about and come down, never back up.
   const gated=!stagePass&&!onStage({x,y,z});
-  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py,trapped,obstacles)&&!(gated&&onStage({x:px,y:motion&&!motion.grounded?STAGE.deck.maxY:py,z:pz}));
+  const allowed=(px:number,pz:number,py:number)=>!obstructed(px,pz,py,trapped,obstacles,motion&&!motion.grounded?.02:.26)&&!(gated&&onStage({x:px,y:motion&&!motion.grounded?STAGE.deck.maxY:py,z:pz}));
   for(let step=0;step<steps;step++){
     const wx=input.dx*scale/steps,wz=input.dz*scale/steps,fromX=x,fromZ=z;
     const nx=x+wx,nz=z+wz;
@@ -360,6 +406,7 @@ export function movePlayer(position:Position,input:Pick<PlayerInput,'dx'|'dz'|'r
       const support=characterGround(x,z,y+JUMP.contact,obstacles);
       if(motion.grounded&&(support===undefined||Math.abs(y-support)>JUMP.contact))motion.grounded=false;
       if(!motion.grounded){
+        const out=pushOut(x,z,y,trapped,obstacles);if(out){x=out.x;z=out.z;}
         const h=seconds/steps,oldY=y,vy=motion.verticalVelocity;
         motion.verticalVelocity=Math.max(-JUMP.terminalSpeed,vy-JUMP.gravity*h);
         let next=y+(vy+motion.verticalVelocity)*.5*h;
@@ -475,6 +522,12 @@ function tvSpot(tv:typeof TELEVISIONS[number]):Required<Position> {
   throw new Error(`Nenhum ponto livre diante de ${tv.id}`);
 }
 for(const tv of TELEVISIONS)TV_SPOTS[tv.id]=tvSpot(tv);
+// The plant's leaves that E opens and shuts (mode 'manual': the workshop's door and roller shutter, the staff's emergency door) use the bar's door mechanism: touching them within
+// the leaf's reach (a footprint grown by it, so the room's reach test is the JSON's raio_m) and E. Their own box is the footprint's id, so it does not block the line of sight to itself.
+(INTERACTABLES as Interactable[]).push(...FACTORY_GATES.filter(gate=>gate.mode==='manual').map(gate=>{
+  const c=gate.collider,grow=Math.max(0,gate.radius-PLAYER_RADIUS-TOUCH_GAP);
+  return {id:gate.id,type:'door' as const,label:gate.label,x:c.x,y:c.minY!,z:c.z,footprint:[{id:gate.id,x:c.x,z:c.z,hx:c.hx+grow,hz:c.hz+grow}]};
+}));
 // One object per screen; every screen of a group controls the group's shared video.
 // The stage screen is used by touching the stage's front edge (STAGE_FRONT), from the backyard or from the deck; its blip
 // marks the middle of that edge on the backyard floor (TV_SPOTS.telao).

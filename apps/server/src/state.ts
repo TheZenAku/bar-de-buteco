@@ -117,6 +117,8 @@ export class Player extends Schema {
   @type('string') carryingOrder = '';
   /** A sack from the plant in the arms ('MALTE' | 'MIX', '' when none): drawn for everyone (client/factory/carry.ts). */
   @type('string') factoryBag = '';
+  /** The Ribeiro workpiece in both hands ('raw' | 'cut' | 'machined' | 'finished' | 'assembled', '' when none): drawn for everyone (client/machine-shop/carry.ts). */
+  @type('string') ribeiroPart = '';
   /** 'call' while on an answered phone call ('' otherwise), so everyone sees who is on the line. */
   @type('string') phone = '';
   /** On a Highfood shift, and the bag in hand ('' or 'bag'): both are drawn for everyone. */
@@ -320,6 +322,8 @@ export class DoorState extends Schema {
   @type('string') id = '';
   @type('boolean') open = true;
   @type('number') changedAt = 0;
+  /** A plant swing door (shared/factory/gates.ts): +1 it opened as authored, -1 the other way (set when it opens, by whoever pushed it). 0 for the bar's doors. */
+  @type('number') side = 0;
 }
 /** One of the stage's musicians' spots (apps/server/src/world/musicians.ts): who plays there and since when. */
 export class MusicianSpot extends Schema {

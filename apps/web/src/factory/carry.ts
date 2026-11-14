@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import {FACTORY_CART,cartPoint,type CartPose} from '@bar/shared/factory';
 import {reach} from '../engine/serving-props';
 import {loadBagKit,type BagKit,type BagMaterial} from './bags';
 
@@ -12,6 +13,10 @@ let localBag:BagMaterial|null=null;
 /** What the local player carries now (the plant's panel feeds it from the room's state each frame). */
 export const setLocalFactoryBag=(material:BagMaterial|null):void=>{localBag=material;};
 export const localFactoryBag=():BagMaterial|null=>localBag;
+/** The platform cart as drawn now, and who pushes it (visuals.ts feeds it every frame): the pusher's hands go on its handle. */
+let cartNow:(CartPose&{pusher:string|null})|null=null;
+export const setFactoryCartPose=(pose:(CartPose&{pusher:string|null})|null):void=>{cartNow=pose;};
+export const factoryCartPose=():(CartPose&{pusher:string|null})|null=>cartNow;
 
 export interface CarryRig {
   bones:Record<'upperarm_l'|'lowerarm_l'|'hand_l'|'upperarm_r'|'lowerarm_r'|'hand_r',pc.Entity>;
@@ -29,6 +34,7 @@ const tmp={front:new pc.Vec3(),side:new pc.Vec3(),up:new pc.Vec3(),x:new pc.Vec3
 export class FactoryCarry {
   private kit?:BagKit|null;
   private props=new Map<string,Prop>();
+  private grips=new Map<string,number>();
   constructor(private app:pc.AppBase){void loadBagKit(app).then(kit=>{this.kit=kit;});}
 
   /** `material` null: this avatar carries nothing (the prop hides). */
@@ -56,6 +62,21 @@ export class FactoryCarry {
       reach(left?b.upperarm_l:b.upperarm_r,left?b.lowerarm_l:b.lowerarm_r,left?b.hand_l:b.hand_r,hand,pole,own.grip);
     }
   }
+  /** Both hands on the cart's handle (a grip on each side of its middle), the elbows down and out; `cart` null: nothing pushed (the arms are the clip's again). */
+  push(id:string,cart:CartPose|null,rig:CarryRig|undefined,dt:number):void {
+    let grip=this.grips.get(id)??0;
+    if(!cart||!rig){if(grip>0)this.grips.set(id,0);return;}
+    grip=Math.min(1,grip+Math.min(dt,.1)*5);this.grips.set(id,grip);
+    const {side,up,hand,pole}=tmp,[hx,hy,hz]=FACTORY_CART.handle,body=rig.body.getPosition();
+    side.copy(rig.body.right);side.y=0;if(side.lengthSq()<1e-6)return;side.normalize();up.copy(pc.Vec3.UP);
+    for(const off of [.2,-.2]){
+      const at=cartPoint(cart,[hx,hy,hz+off]);hand.set(at.x,at.y,at.z);
+      // `right` of the body points to the avatar's left (see pose): the hand that lies on that side is the left one.
+      const left=(hand.x-body.x)*side.x+(hand.z-body.z)*side.z>0,b=rig.bones;
+      pole.copy(up).mulScalar(-.8).add(side.clone().mulScalar(left?.7:-.7));
+      reach(left?b.upperarm_l:b.upperarm_r,left?b.lowerarm_l:b.lowerarm_r,left?b.hand_l:b.hand_r,hand,pole,grip);
+    }
+  }
   private make(id:string,material:BagMaterial):Prop|undefined {
     const kit=this.kit;if(!kit)return;
     this.props.get(id)?.entity.destroy();
@@ -64,6 +85,6 @@ export class FactoryCarry {
     this.app.root.addChild(entity);
     const prop={entity,material,grip:0};this.props.set(id,prop);return prop;
   }
-  forget(id:string):void {const prop=this.props.get(id);if(prop){prop.entity.destroy();this.props.delete(id);}}
+  forget(id:string):void {this.grips.delete(id);const prop=this.props.get(id);if(prop){prop.entity.destroy();this.props.delete(id);}}
   destroy():void {for(const prop of this.props.values())prop.entity.destroy();this.props.clear();}
 }

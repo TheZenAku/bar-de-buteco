@@ -1,0 +1,257 @@
+{
+ "gates": [
+  {
+   "id": "EB_Oficina_Porta",
+   "kind": "giratoria",
+   "mode": "manual",
+   "origin": [
+    337.46,
+    0.17,
+    -56.15
+   ],
+   "radius": 1.6,
+   "seconds": 0.7,
+   "box": {
+    "min": [
+     336.5,
+     0.17,
+     -56.247
+    ],
+    "max": [
+     337.476,
+     2.27,
+     -56.052
+    ]
+   },
+   "angle": 90,
+   "swing": false
+  },
+  {
+   "id": "EB_Oficina_Portao_Enrolar",
+   "kind": "enrolar",
+   "mode": "manual",
+   "origin": [
+    342.538,
+    2.796,
+    -52.2
+   ],
+   "radius": 2.2,
+   "seconds": 2.4,
+   "box": {
+    "min": [
+     342.48,
+     0.174,
+     -53.4
+    ],
+    "max": [
+     342.595,
+     2.796,
+     -51
+    ]
+   },
+   "travel": 2.622,
+   "openScale": 0.04
+  },
+  {
+   "id": "EB_Porta_Auto_Folha",
+   "kind": "correr",
+   "mode": "automatica",
+   "origin": [
+    345.975,
+    0.17,
+    -62.235
+   ],
+   "radius": 3.2,
+   "seconds": 0.9,
+   "box": {
+    "min": [
+     346,
+     0.15,
+     -62.4
+    ],
+    "max": [
+     347,
+     2.3,
+     -62.3
+    ]
+   },
+   "axis": [
+    1,
+    0,
+    0
+   ],
+   "travel": 1.05,
+   "lead": 0.6
+  },
+  {
+   "id": "EB_Porta_Entrada",
+   "kind": "giratoria",
+   "mode": "manual",
+   "origin": [
+    359.915,
+    0.17,
+    -58.235
+   ],
+   "radius": 1.7,
+   "seconds": 0.8,
+   "box": {
+    "min": [
+     359.828,
+     0.195,
+     -59.361
+    ],
+    "max": [
+     359.984,
+     2.27,
+     -58.224
+    ]
+   },
+   "angle": -95,
+   "swing": false
+  },
+  {
+   "id": "EB_Porta_Impacto_Ensaque_D",
+   "kind": "giratoria",
+   "mode": "impacto",
+   "origin": [
+    355.108,
+    0.17,
+    -60.65
+   ],
+   "radius": 1.25,
+   "seconds": 0.5,
+   "box": {
+    "min": [
+     353.904,
+     0.2,
+     -60.709
+    ],
+    "max": [
+     355.13,
+     2.335,
+     -60.591
+    ]
+   },
+   "angle": -80,
+   "swing": true
+  },
+  {
+   "id": "EB_Porta_Impacto_Ensaque_E",
+   "kind": "giratoria",
+   "mode": "impacto",
+   "origin": [
+    352.692,
+    0.17,
+    -60.65
+   ],
+   "radius": 1.25,
+   "seconds": 0.5,
+   "box": {
+    "min": [
+     352.67,
+     0.2,
+     -60.709
+    ],
+    "max": [
+     353.896,
+     2.335,
+     -60.591
+    ]
+   },
+   "angle": 80,
+   "swing": true
+  },
+  {
+   "id": "EB_Porta_Impacto_Preparo_D",
+   "kind": "giratoria",
+   "mode": "impacto",
+   "origin": [
+    344.308,
+    0.17,
+    -62.35
+   ],
+   "radius": 1.25,
+   "seconds": 0.5,
+   "box": {
+    "min": [
+     343.604,
+     0.2,
+     -62.409
+    ],
+    "max": [
+     344.33,
+     2.185,
+     -62.291
+    ]
+   },
+   "angle": -80,
+   "swing": true
+  },
+  {
+   "id": "EB_Porta_Impacto_Preparo_E",
+   "kind": "giratoria",
+   "mode": "impacto",
+   "origin": [
+    342.892,
+    0.17,
+    -62.35
+   ],
+   "radius": 1.25,
+   "seconds": 0.5,
+   "box": {
+    "min": [
+     342.87,
+     0.2,
+     -62.409
+    ],
+    "max": [
+     343.596,
+     2.185,
+     -62.291
+    ]
+   },
+   "angle": 80,
+   "swing": true
+  },
+  {
+   "id": "EB_Portao",
+   "kind": "correr",
+   "mode": "interfone",
+   "origin": [
+    362.42,
+    0.17,
+    -48.6
+   ],
+   "radius": 11,
+   "seconds": 7,
+   "box": {
+    "min": [
+     362.35,
+     0.15,
+     -58.53
+    ],
+    "max": [
+     362.49,
+     2.37,
+     -48.56
+    ]
+   },
+   "axis": [
+    0,
+    0,
+    -1
+   ],
+   "travel": 9,
+   "lead": 4.3
+  }
+ ],
+ "interfone": {
+  "marker": "Ponto_EB_Interfone",
+  "pole": "EB_Interfone",
+  "lamp": "EB_Interfone_Lampada",
+  "x": 364.27,
+  "y": 0.15,
+  "z": -58.72,
+  "reach": 2.6
+ }
+}

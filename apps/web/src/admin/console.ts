@@ -15,6 +15,7 @@ import {highfoodSection} from './highfood';
 import {serverSection} from './server';
 import {performanceSection} from './performance';
 import {factorySection} from './factory';
+import {ribeiroSection} from './ribeiro';
 import type {PerformanceMonitor} from '../performance/monitor';
 
 /** The administration's categories, in the menu's order. */
@@ -26,6 +27,7 @@ const SECTIONS:ReadonlyArray<{id:SectionId;label:string;icon:string;description:
   {id:'logs',label:'Logs',icon:'scroll',description:'Tudo o que aconteceu, filtrado por tipo, jogador, período ou texto.',factory:logsSection},
   {id:'world',label:'Mundo ao vivo',icon:'activity',description:'A sala neste momento: empregos, pedidos, aparelhos, palco, bots e quem está no bar.',factory:worldSection},
   {id:'factory',label:'Fábrica',icon:'warehouse',description:'EMPRESA BRASIL: estado industrial, estoque, máquinas, alarmes e ferramentas de depuração.',factory:factorySection},
+  {id:'ribeiro',label:'Ribeiro Usinagem',icon:'wrench',description:'A Ribeiro Usinagem e Ferramentaria, empresa à parte da EMPRESA BRASIL: ordens e máquinas ao vivo, matéria-prima, armas prontas, equipe e folha de pagamento.',factory:ribeiroSection},
   {id:'vehicles',label:'Veículos',icon:'bike',description:'Gerencie a frota dos jogadores, registre veículos, personalize placas e use o spawn de todos os modelos.',factory:vehiclesSection},
   {id:'environment',label:'Tempo e clima',icon:'sun',description:'Horário do jogo, duração do dia e clima compartilhados por todos nesta sala.',factory:environmentSection},
   {id:'highfood',label:'Highfood',icon:'food',description:'As entregas de agora, o que elas pagam e os clientes: nome, corpo no jogo, falas e foto.',factory:highfoodSection},
@@ -39,7 +41,8 @@ const GROUPS:ReadonlyArray<{label:string;ids:readonly SectionId[]}>=[
   {label:'Painel',ids:['overview','world']},
   {label:'Pessoas',ids:['players','reports','badges','collection']},
   {label:'Dinheiro',ids:['economy']},
-  {label:'Conteúdo do jogo',ids:['vehicles','highfood','factory','environment']},
+  {label:'Empresas',ids:['factory','ribeiro']},
+  {label:'Conteúdo do jogo',ids:['vehicles','highfood','environment']},
   {label:'Sistema',ids:['logs','server','performance']},
 ];
 const groupOf=(id:SectionId)=>GROUPS.find(g=>g.ids.includes(id))!.label;

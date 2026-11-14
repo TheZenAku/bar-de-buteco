@@ -102,7 +102,6 @@ import {FactoryController} from './factory/controller';
 import {createFreightFeed} from './factory/freight-feed';
 import {MachineShopController} from './machine-shop/controller';
 import {RIBEIRO_COLOR,RIBEIRO_COMPUTER,RIBEIRO_SPOTS} from './machine-shop/config';
-import {FACTORY_GATE} from '@bar/shared/factory';
 import {FACTORY_COLOR,FACTORY_SPOTS} from './factory/spots';
 import {BADGE_RARITY_INFO} from '@bar/shared';
 import {createPauseMenu} from './pause-menu/pause-menu';
@@ -560,7 +559,7 @@ const network=new BarNetwork({
   weaponShot:event=>weapons.shot(event),
   weaponHit:event=>weapons.hit(event),
   inventory:view=>{inventory={stacks:view.stacks,capacity:view.capacity,usedSlots:view.usedSlots,balance:view.balance??inventory?.balance??wardrobe?.balance??0,history:view.history??inventory?.history??[],keys:view.keys??inventory?.keys??[]};trade.refresh();if(wardrobe)wardrobe={...wardrobe,balance:inventory.balance};renderBalance();if(activeModal==='inventory')renderInventory();if(activeModal==='moto')renderMotoPanel();if(activeModal==='storage')renderStorage();},
-  inventoryResult:()=>{},
+  inventoryResult:result=>{const item=itemById(result.itemId);if(item?.category==='arma')toast(`${item.name} equipada e adicionada à roda de armas.`);},
   storageState:onStorageState,
   storageClosed:onStorageClosed,
   firework:shot=>scene?.fireworkShot(shot),
@@ -581,6 +580,7 @@ const network=new BarNetwork({
     renderJobCard();
   },
   factory:state=>factoryUi?.stateMessage(state as never),
+  factoryCart:state=>factoryUi?.cartMessage(state as never),
   employment:state=>factoryUi?.employmentMessage(state as never),
   company:(kind,payload)=>profile.companyMessage(kind,payload),
   employmentRefresh:()=>{network.send('employment.view');profile.employmentChanged();},
@@ -626,8 +626,8 @@ const network=new BarNetwork({
     if(isConnected)voice.syncState();
   }
 });
-factoryUi=new FactoryController({send:(type,payload)=>network.send(type,payload),notify:(title,text,warning,id)=>notices.show({variant:warning?'aviso':'acao',title,text,id}),app:()=>scene?.app,localRoot:()=>scene?.localActorRoot(),lowQuality:()=>scene?.getGraphics().preset==='low',volume:()=>settings.get().master,userId:()=>user?.id});
-const machineShop=new MachineShopController({userName:()=>user?.displayName??'',send:(type,payload)=>network.send(type,payload),notify:(title,text,warning)=>notices.show({variant:warning?'aviso':'acao',title,text,id:`ribeiro-${title}`})});
+factoryUi=new FactoryController({send:(type,payload)=>network.send(type,payload),notify:(title,text,warning,id)=>notices.show({variant:warning?'aviso':'acao',title,text,id}),app:()=>scene?.app,localRoot:()=>scene?.localActorRoot(),lowQuality:()=>scene?.getGraphics().preset==='low',volume:()=>settings.get().master,userId:()=>user?.id,environment:()=>scene?.lightingEnvironment()});
+const machineShop=new MachineShopController({userName:()=>user?.displayName??'',send:(type,payload)=>network.send(type,payload),notify:(title,text,warning)=>notices.show({variant:warning?'aviso':'acao',title,text,id:`ribeiro-${title}`}),app:()=>scene?.app,graphics:()=>scene?.getGraphics()});
 minimap.setPois([...FACTORY_SPOTS.filter(spot=>spot.map).map(spot=>({icon:spot.icon,colour:FACTORY_COLOR,x:spot.x,y:spot.y,z:spot.z})),...RIBEIRO_SPOTS.map(spot=>({icon:spot.id==='receiving'?'truck':spot.id==='stock'?'package':spot.id==='computer'?'wrench':'settings',colour:RIBEIRO_COLOR,x:spot.x,y:spot.y,z:spot.z}))]);
 
 const mediaProfiler=new UpdateProfiler();
@@ -1178,7 +1178,7 @@ setInterval(()=>{void refreshAdministration();},5000);
 /** An item's effects on the needs, as "fome +35" (CONSUMABLES come from the same catalogue). */
 const effectList=(item:{effects:object})=>Object.entries(item.effects).filter(([key,value])=>key!=='name'&&typeof value==='number'&&Number(value)!==0)
   .map(([key,value])=>`${({hunger:'fome',thirst:'sede',hp:'vida',drunk:'álcool',bladder:'bexiga'} as Record<string,string>)[key]??key} ${Number(value)>0?'+':''}${value}`);
-const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde',peca:'Peça',fogo:'Fogos de artifício'};
+const CATEGORY_NAMES:Record<string,string>={bebida:'Bebida',comida:'Comida',saude:'Saúde',peca:'Peça',fogo:'Fogos de artifício',industrial:'Carga industrial',arma:'Armamento embalado'};
 /** "1:30" for a duration in milliseconds. */
 const clockText=(ms:number)=>`${Math.floor(ms/60_000)}:${String(Math.round(ms%60_000/1000)).padStart(2,'0')}`;
 // The backpack's chosen slot (its card shows beside the slots).
@@ -1207,10 +1207,10 @@ function renderInventory():void {
       :self?.fireworkEquipped&&item.id!=='rojao'?'Guarde o rojão com R antes de usar outro item.'
       :self?.interactionState||self?.currentTableId?'Levante-se ou termine o que está fazendo para usar itens.'
       :held&&(consumedOverTime(item.id)||item.id==='rojao')?`Ainda na mão: ${itemById(held)?.name??held}. Termine antes de pegar outro.`:'';
-    const lasts=consumedOverTime(item.id)?`dura ${clockText(consumeMs(item.id))}`:'na hora',forBike=item.category==='peca';
+    const lasts=consumedOverTime(item.id)?`dura ${clockText(consumeMs(item.id))}`:'na hora',cargo=item.category==='peca'||item.category==='industrial';
     detail=`<section class="item-detail" aria-label="${e(item.name)}"><header><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><div><small>${e(CATEGORY_NAMES[item.category]??item.category)}</small><h3>${e(item.name)}</h3></div><strong>×${stack.quantity}</strong></header>
-      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${forBike?'':`<span class="item-time">${uiIcon(item.id==='rojao'?'sparkles':'clock')}${item.id==='rojao'?'1 unidade por disparo':lasts}</span>`}</div>
-      ${blocked&&!forBike?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${forBike?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>${item.id==='rojao'?(self?.fireworkEquipped?'Guardar':'Equipar na mão'):'Usar'}</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
+      <p>${e(item.description)}</p><div class="item-effects">${effectList(item).map(effect=>`<span>${e(effect)}</span>`).join('')}${cargo?'':`<span class="item-time">${uiIcon(item.id==='rojao'?'sparkles':'clock')}${item.id==='rojao'?'1 unidade por disparo':lasts}</span>`}</div>
+      ${blocked&&!cargo?`<p class="item-blocked">${e(blocked)}</p>`:''}<div class="item-actions">${cargo?'':`<button class="button primary" data-action="inventory-use" data-item="${e(item.id)}" ${connected&&!blocked?'':'disabled'}>${item.category==='arma'?'Equipar':item.id==='rojao'?(self?.fireworkEquipped?'Guardar':'Equipar na mão'):'Usar'}</button>`}<button class="button secondary" data-action="inventory-discard" data-item="${e(item.id)}">Descartar</button></div></section>`;
   }
   const reason:Record<string,string>={starter:'Kit inicial',purchase:'Compra',use:'Usado',discard:'Descartado',faint:'Perdido ao desmaiar',trade:'Negociação'};
   const history=inventory.history.slice(0,10).map(entry=>{const item=itemById(entry.itemId);return `<li><span>${entry.quantity>0?'+':''}${entry.quantity} ${e(item?.name??entry.itemId)}</span><small>${e(reason[entry.reason]??entry.reason)} · ${new Date(entry.createdAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</small></li>`;}).join('');
@@ -1225,7 +1225,7 @@ function renderInventory():void {
  */
 function shopHtml(view:InventoryView):string {
   const quantities=new Map(view.stacks.map(stack=>[stack.itemId,stack.quantity]));
-  return `<div class="shop-grid">${ITEM_CATALOG.map(item=>{const quantity=quantities.get(item.id)??0,full=quantity>=item.stackMax,cost=itemCost(item.id),poor=view.balance<cost;
+  return `<div class="shop-grid">${ITEM_CATALOG.filter(item=>item.price>0).map(item=>{const quantity=quantities.get(item.id)??0,full=quantity>=item.stackMax,cost=itemCost(item.id),poor=view.balance<cost;
     return `<article class="shop-item"><span class="item-icon" aria-hidden="true">${itemImage(item)}</span><span><b>${e(item.name)}</b><small>${e(item.description)}</small></span><span class="shop-price">${coins(cost)}</span><button class="mini-button" data-action="inventory-buy" data-item="${e(item.id)}" ${full||poor?'disabled':''}>${full?'Pilha cheia':poor?'Sem moedas':'Comprar'}</button></article>`;}).join('')}</div>`;
 }
 /** Standing on the shop's blip, E (the room checked the reach): the house's shop, with the wallet and the backpack's space. */
@@ -1579,7 +1579,7 @@ async function start():Promise<void>{
       media.forEach(m=>m.frame());scene?.setJukeboxDuration(jukebox.duration('jukebox'));scene?.setStageDuration(television.duration('telao'));mediaProfiler.mark('video');
       minimap.render(inGame?()=>scene?.mapView():null);mediaProfiler.mark('minimap');
       objectiveBlip.render(inGame?scene?.projectObjective()??null:null,objectiveTitle());foodBlip.render(inGame&&!courier.state().order?scene?.projectFoodBase()??null:null,courier.state().status==='off'?'Highfood · ficar online':'Highfood');garageBlip.render(inGame?scene?.projectGarage()??null:null,'Garagem');
-      const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');{const factoryNow=performance.now(),factorySelf=inGame?self:undefined,guide=factorySelf?factoryUi?.guide()??null:null;factoryUi?.frame(factorySelf,(factoryNow-factoryFrameAt)/1000,world?.doors?.[FACTORY_GATE.id]?.open);factoryFrameAt=factoryNow;scene?.setFactoryGuide(guide);factoryGuideBlip.render(guide?scene?.projectFactoryGuide()??null:null,guide?.title??'');const spot=factoryUi?.blipSpot(factorySelf);factoryBlip.render(spot?scene?.projectFactorySpot(spot.id)??null:null,spot?.label??'');}{const machineSelf=inGame?self:undefined;machineShop.frame(machineSelf);const spot=machineShop.blipSpot(machineSelf);ribeiroBlip.render(machineSelf?scene?.projectRibeiroSpot(spot.id)??null:null,spot.label);}mediaProfiler.mark('blips');
+      const self=world?.players[user?.id??''];stageBlip.render(inGame&&self?scene?.projectStageBlip()??null:null,self?stageLabel(self):'');telaoBlip.render(inGame&&self?scene?.projectStageBlip('telao')??null:null,telaoLabel());shopBlip.render(inGame&&self?scene?.projectStageBlip('shop')??null:null,'Loja da casa');deskBlip.render(inGame&&self?scene?.projectStageBlip('desk')??null:null,'Mesa de luz');{const factoryNow=performance.now(),factorySelf=inGame?self:undefined,guide=factorySelf?factoryUi?.guide()??null:null;factoryUi?.frame(factorySelf,(factoryNow-factoryFrameAt)/1000);factoryFrameAt=factoryNow;scene?.setFactoryRinging(!!factoryUi?.intercomRinging());scene?.setFactoryGuide(guide);factoryGuideBlip.render(guide?scene?.projectFactoryGuide()??null:null,guide?.title??'');const spot=factoryUi?.blipSpot(factorySelf);factoryBlip.render(spot?scene?.projectFactorySpot(spot.id)??null:null,spot?.label??'');}{const machineSelf=inGame?self:undefined;machineShop.frame(machineSelf);const guide=machineShop.blipSpot(machineSelf);scene?.setRibeiroGuide(machineSelf?guide.spot.id:null);ribeiroBlip.render(machineSelf?scene?.projectRibeiroSpot(guide.spot.id)??null:null,guide.title);}mediaProfiler.mark('blips');
       voice.update(inGame?scene?.getListener():undefined,id=>world?.players[id]);renderVoiceLevel();mediaProfiler.mark('voice');
 
     },

@@ -88,7 +88,7 @@ test('doca na sala real: só caminhão de motorista parado carrega, falha devolv
     truck.x=dockPoint.x+30;
     let result=await send('factory.dock.load',{vehicleId:truckId,pallets:1,requestId:crypto.randomUUID()});assert.equal(result.ok,false);assert.match(result.message,/estacionado/);
     truck.x=dockPoint.x+2;
-    result=await send('factory.dock.load',{vehicleId:truckId,pallets:3,requestId:crypto.randomUUID()});assert.equal(result.ok,false);assert.match(result.message,/Só há 36/);assert.equal(product(),36);
+    result=await send('factory.dock.load',{vehicleId:truckId,pallets:3,requestId:crypto.randomUUID()});assert.equal(result.ok,false);assert.match(result.message,/Só há 2 palete/);assert.equal(product(),36);
 
     // The API refusing the load gives the product back.
     failLoad=true;result=await send('factory.dock.load',{vehicleId:truckId,pallets:2,requestId:crypto.randomUUID()});assert.equal(result.ok,false);assert.match(result.message,/baú/);assert.equal(product(),36);

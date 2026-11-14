@@ -72,8 +72,8 @@ export interface WeaponShotEvent {by:string;w:WeaponId;n:number;at:number;o:Vec3
  */
 export interface WeaponHitEvent {by:string;to:string;w:WeaponId;n:number;zone:HitZone;damage:number;hp:number;ko:boolean;x:number;y:number;z:number;yaw:number;at:number;pellets:number}
 
-/** A weapon owned: its parts in each slot and its upgrade levels. */
-export interface ArsenalWeapon {id:WeaponId;parts:Partial<Record<PartSlot,PartId>>;upgrades:Partial<Record<UpgradeTrack,number>>}
+/** A weapon owned: its parts, upgrade levels, and whether the player put it on the weapon wheel. */
+export interface ArsenalWeapon {id:WeaponId;equipped:boolean;parts:Partial<Record<PartSlot,PartId>>;upgrades:Partial<Record<UpgradeTrack,number>>}
 /**
  * Everything a player owns for shooting (weapon.arsenal, to the player alone): the weapons, the parts (each fits any weapon that takes it), the
  * rounds per calibre; `test`: the /armas kit (everything, upgrades free), `infinite`: rounds never run out. `draw`: draw this one now.
@@ -83,6 +83,8 @@ export interface ArsenalView {test:boolean;infinite:boolean;weapons:ArsenalWeapo
   priceScale?:number;draw?:WeaponId}
 
 export const weaponConfigureSchema=z.object({weapon:z.enum(WEAPON_IDS),slot:z.enum(PART_SLOTS),part:z.enum(PART_IDS).nullable()}).strict();
+export const weaponEquipSchema=z.object({weapon:z.enum(WEAPON_IDS),equipped:z.boolean()}).strict();
 export const weaponUpgradeSchema=z.object({weapon:z.enum(WEAPON_IDS),track:z.enum(UPGRADE_TRACKS)}).strict();
 export type WeaponConfigure=z.infer<typeof weaponConfigureSchema>;
+export type WeaponEquip=z.infer<typeof weaponEquipSchema>;
 export type WeaponUpgrade=z.infer<typeof weaponUpgradeSchema>;

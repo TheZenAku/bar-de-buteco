@@ -79,7 +79,7 @@ test('every sector publishes its visual, LOD and their buffers; URIs stay inside
   }
   check('cidade_anel.gltf');check('cidade_distante.gltf');
   const textures=[...seen].filter(file=>file.startsWith('texturas/'));
-  assert.equal(textures.length,97,'the 97 shared textures, including EMPRESA BRASIL and the farm (RIBEIRO USINAGEM, PBR 512 px)');
+  assert.equal(textures.length,100,'the 100 shared textures, including EMPRESA BRASIL and the farm (RIBEIRO USINAGEM, PBR 512 px)');
   assert.ok(seen.has('texturas/atlas_cidade.jpg'));
 });
 
@@ -183,14 +183,14 @@ test('the 64 collision files reach the shared data: walls as solids, ground as f
     total+=entry.colisores;
     assert.equal((cityData.sectors as any)[name].colliders,entry.colisores,name);
   }
-  assert.equal(total,8398);
-  assert.equal(cityData.boxes.length,8398);
+  assert.equal(total,8417);
+  assert.equal(cityData.boxes.length,8417);
   const ids=CITY_SOLIDS.map(c=>c.id);
   assert.equal(new Set(ids).size,ids.length,'unique ids');
   for(const kind of ['Casa','Muro','Arvore','Poste','Galpao','Limite_Norte'])assert.ok(ids.some(id=>id.startsWith(`COL_Cid_${kind}`)),kind);
   for(const kind of ['Chao','Calcada','Quadra','Canteiro'])assert.equal(ids.some(id=>id.startsWith(`COL_Cid_${kind}`)),false,`${kind} is a floor, no wall`);
   const floorBoxes=CITY_FLOORS.length/2;
-  assert.equal(floorBoxes+ids.filter(id=>/^COL_Cid_(Plato|Plataforma)/.test(id)).length*-1+ids.length,8398,'solids + floors = every box');
+  assert.equal(floorBoxes+ids.filter(id=>/^COL_Cid_(Plato|Plataforma)/.test(id)).length*-1+ids.length,8417,'solids + floors = every box');
   // The bar's own stays apart, whole, without the old limits.
   assert.equal(MAP_COLLIDERS.length,1473);
   assert.equal(MAP_COLLIDERS.some(c=>c.id.startsWith('COL_Rua_Limite')),false);
@@ -300,7 +300,7 @@ test('the new markers come from the export and stand in the city; the old ones h
   const names=Object.keys(CITY_MARKERS);
   for(const id of ['Ponto_Prefeitura','Ponto_Terminal','Ponto_Escola_Conceicao','Ponto_UBS','Ponto_Praca_Conceicao','Ponto_Bosque_Conceicao','Ponto_Lazer_Olaria','Ponto_Campo_Olaria','Ponto_Supermercado','Ponto_Posto','Ponto_Subestacao','Ponto_Transportes','Ponto_Metalurgica','Bairro_Centro','Bairro_Parque_Olaria','Bairro_Jardim_Conceicao','Bairro_Distrito_Industrial'])assert.ok(names.includes(id),id);
   for(let i=1;i<=22;i++)assert.ok(names.includes(`Ponto_Onibus_${String(i).padStart(2,'0')}`),`stop ${i}`);
-  assert.equal(names.length,94);
+  assert.equal(names.length,96);
   for(const id of Object.keys(JSON.parse(readFileSync(path.join(factorySource,'empresa_brasil_marcadores.json'),'utf8')).marcadores))assert.ok(names.includes(id),id);
   for(const [id,at] of Object.entries(CITY_MARKERS))assert.ok(Math.abs(at.x)<400&&Math.abs(at.z)<400,`${id} inside the map`);
   assert.equal(CITY_MARKERS.Bairro_Centro!.label,'Centro');
