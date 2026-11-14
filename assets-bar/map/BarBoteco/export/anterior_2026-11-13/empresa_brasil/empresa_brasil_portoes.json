@@ -1,0 +1,367 @@
+{
+ "versao": 2,
+ "descricao": "EMPRESA BRASIL (setor S07_04): folhas DINAMICAS (portao de correr 9,9 m, porta automatica da sala de controle, 4 folhas de portas de alto impacto, porta da oficina, portao de enrolar da oficina, porta de entrada de pessoal) + lampada do interfone. Folhas exportadas FECHADAS. Coordenadas do jogo = (x, z, -y) do Blender. tipo 'correr': desloca a origem do no pelo eixo_deslize_jogo ate curso_m. tipo 'giratoria': gira o no em torno de +Y (relativo, graus) de angulo_fechada ate angulo_aberta; vai_e_vem=true: abre tambem para o lado oposto (sinal oposto) e o lado e escolhido pelo lado de quem empurra (+angulo abre para +y Blender = -z jogo). tipo 'enrolar': origem do no no TOPO da folha; abrir = escalar Y (jogo) de 1 ate escala_aberta mantendo o topo. modo: 'interfone' (portao: so por interfone/menu), 'automatica' (abre quando alguem chega), 'impacto' (vai-e-vem empurrado), 'manual' (E abre/fecha). A colisao de cada folha e a caixa `colisor` (folha FECHADA, eixos alinhados): o jogo a gira/desloca/encolhe junto com a folha. As partes fixas ja estao no GLB do setor.",
+ "glb": "empresa_brasil_portoes.glb",
+ "folhas": [
+  {
+   "no": "EB_Oficina_Porta",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    337.46,
+    0.17,
+    -56.15
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "manual",
+   "colisor": "COL_Cid_Din_EB_Oficina_Porta",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 90.0,
+   "vai_e_vem": false,
+   "segundos": 0.7,
+   "raio_m": 1.6,
+   "descricao": "porta da oficina mecanica (parede norte x 336,4-337,5): E abre/fecha; +90 abre para dentro (sul)"
+  },
+  {
+   "no": "EB_Oficina_Portao_Enrolar",
+   "tipo": "enrolar",
+   "origem_jogo_xyz": [
+    342.538,
+    2.796,
+    -52.2
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "manual",
+   "colisor": "COL_Cid_Din_EB_Oficina_Portao_Enrolar",
+   "curso_m": 2.622,
+   "escala_aberta": 0.04,
+   "origem_no_topo": true,
+   "segundos": 2.4,
+   "raio_m": 2.2,
+   "descricao": "portao de enrolar da oficina (x 342,5): E abre/fecha; origem no topo; abrir = escala vertical da folha ate escala_aberta (ripas enroladas no cabecote)"
+  },
+  {
+   "no": "EB_Porta_Auto_Folha",
+   "tipo": "correr",
+   "origem_jogo_xyz": [
+    345.975,
+    0.17,
+    -62.235
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "automatica",
+   "colisor": "COL_Cid_Din_EB_Porta_Auto",
+   "curso_m": 1.05,
+   "eixo_deslize_jogo": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "raio_m": 3.2,
+   "segundos": 0.9,
+   "antecipacao_m": 0.6
+  },
+  {
+   "no": "EB_Porta_Entrada",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    359.915,
+    0.17,
+    -58.235
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "manual",
+   "colisor": "COL_Cid_Din_EB_Porta_Entrada",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -95.0,
+   "vai_e_vem": false,
+   "segundos": 0.8,
+   "raio_m": 1.7,
+   "descricao": "porta de entrada de pessoal (saida de emergencia, parede leste x 360,0, vao y 58,2-59,4): E abre/fecha; -95 abre para FORA (+x)"
+  },
+  {
+   "no": "EB_Porta_Impacto_Ensaque_D",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    355.108,
+    0.17,
+    -60.65
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "impacto",
+   "colisor": "COL_Cid_Din_EB_Porta_Impacto_Ensaque_D",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -80.0,
+   "vai_e_vem": true,
+   "segundos": 0.5,
+   "raio_m": 1.25,
+   "descricao": "porta de alto impacto: abre empurrada para o lado oposto ao de quem chega (+angulo = abre para +y Blender = -z jogo)"
+  },
+  {
+   "no": "EB_Porta_Impacto_Ensaque_E",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    352.692,
+    0.17,
+    -60.65
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "impacto",
+   "colisor": "COL_Cid_Din_EB_Porta_Impacto_Ensaque_E",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 80.0,
+   "vai_e_vem": true,
+   "segundos": 0.5,
+   "raio_m": 1.25,
+   "descricao": "porta de alto impacto: abre empurrada para o lado oposto ao de quem chega (+angulo = abre para +y Blender = -z jogo)"
+  },
+  {
+   "no": "EB_Porta_Impacto_Preparo_D",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    344.308,
+    0.17,
+    -62.35
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "impacto",
+   "colisor": "COL_Cid_Din_EB_Porta_Impacto_Preparo_D",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": -80.0,
+   "vai_e_vem": true,
+   "segundos": 0.5,
+   "raio_m": 1.25,
+   "descricao": "porta de alto impacto: abre empurrada para o lado oposto ao de quem chega (+angulo = abre para +y Blender = -z jogo)"
+  },
+  {
+   "no": "EB_Porta_Impacto_Preparo_E",
+   "tipo": "giratoria",
+   "origem_jogo_xyz": [
+    342.892,
+    0.17,
+    -62.35
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "impacto",
+   "colisor": "COL_Cid_Din_EB_Porta_Impacto_Preparo_E",
+   "angulo_fechada_graus": 0.0,
+   "angulo_aberta_graus": 80.0,
+   "vai_e_vem": true,
+   "segundos": 0.5,
+   "raio_m": 1.25,
+   "descricao": "porta de alto impacto: abre empurrada para o lado oposto ao de quem chega (+angulo = abre para +y Blender = -z jogo)"
+  },
+  {
+   "no": "EB_Portao",
+   "tipo": "correr",
+   "origem_jogo_xyz": [
+    362.42,
+    0.17,
+    -48.6
+   ],
+   "posicao_repouso": "FECHADO",
+   "modo": "interfone",
+   "colisor": "COL_Cid_Din_EB_Portao",
+   "curso_m": 9.0,
+   "eixo_deslize_jogo": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "raio_m": 11,
+   "segundos": 7,
+   "antecipacao_m": 4.3
+  }
+ ],
+ "colisoes_dinamicas": [
+  {
+   "nome": "COL_Cid_Din_EB_Oficina_Porta",
+   "min_jogo": [
+    336.5,
+    0.17,
+    -56.247
+   ],
+   "max_jogo": [
+    337.476,
+    2.27,
+    -56.052
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Oficina_Portao_Enrolar",
+   "min_jogo": [
+    342.48,
+    0.174,
+    -53.4
+   ],
+   "max_jogo": [
+    342.595,
+    2.796,
+    -51.0
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Auto",
+   "min_jogo": [
+    346.0,
+    0.15,
+    -62.4
+   ],
+   "max_jogo": [
+    347.0,
+    2.3,
+    -62.3
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Entrada",
+   "min_jogo": [
+    359.828,
+    0.195,
+    -59.361
+   ],
+   "max_jogo": [
+    359.984,
+    2.27,
+    -58.224
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Impacto_Ensaque_D",
+   "min_jogo": [
+    353.904,
+    0.2,
+    -60.709
+   ],
+   "max_jogo": [
+    355.13,
+    2.335,
+    -60.591
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Impacto_Ensaque_E",
+   "min_jogo": [
+    352.67,
+    0.2,
+    -60.709
+   ],
+   "max_jogo": [
+    353.896,
+    2.335,
+    -60.591
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Impacto_Preparo_D",
+   "min_jogo": [
+    343.604,
+    0.2,
+    -62.409
+   ],
+   "max_jogo": [
+    344.33,
+    2.185,
+    -62.291
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Porta_Impacto_Preparo_E",
+   "min_jogo": [
+    342.87,
+    0.2,
+    -62.409
+   ],
+   "max_jogo": [
+    343.596,
+    2.185,
+    -62.291
+   ]
+  },
+  {
+   "nome": "COL_Cid_Din_EB_Portao",
+   "min_jogo": [
+    362.35,
+    0.15,
+    -58.53
+   ],
+   "max_jogo": [
+    362.49,
+    2.37,
+    -48.56
+   ]
+  }
+ ],
+ "marcador": "Ponto_EB_Portao_Sistema",
+ "interfone": {
+  "marcador": "Ponto_EB_Interfone",
+  "no_lampada": "EB_Interfone_Lampada",
+  "no_poste": "EB_Interfone"
+ },
+ "marcadores_novos": {
+  "descricao": "Marcadores novos da v6.7 (fora do empresa_brasil_marcadores.json, que continua com 48 para o import-factory.mjs): sistema do portao e oficina mecanica.",
+  "marcadores": {
+   "Ponto_EB_Portao_Sistema": {
+    "xyz_jogo": [
+     362.42,
+     0.17,
+     -48.6
+    ],
+    "rot": null,
+    "extras": {
+     "funcao": "portao de correr automatico; script do jogo move a folha EB_Portao",
+     "no": "EB_Portao",
+     "curso_m": 9.0,
+     "eixo_deslize_jogo": [
+      0,
+      0,
+      -1
+     ],
+     "colisor_dinamico": "COL_Cid_Din_EB_Portao"
+    }
+   },
+   "Ponto_EB_Oficina": {
+    "xyz_jogo": [
+     338.0,
+     0.17,
+     -52.0
+    ],
+    "rot": null,
+    "extras": {
+     "funcao": "oficina mecanica (manutencao de motores): entrada pela parede norte (x 336,4-337,5), talha 1 t sobre a mesa de teste"
+    }
+   },
+   "Ponto_EB_Interfone": {
+    "xyz_jogo": [
+     364.27,
+     0.15,
+     -58.72
+    ],
+    "rot": null,
+    "extras": {
+     "funcao": "interfone do portao de veiculos: dono/gerente/funcionario toca e o portao abre; visitante so chama",
+     "alcance_m": 2.6,
+     "no_poste": "EB_Interfone",
+     "no_lampada": "EB_Interfone_Lampada"
+    }
+   },
+   "Ponto_EB_Carrinho": {
+    "xyz_jogo": [
+     346.3,
+     0.17,
+     -59.1
+    ],
+    "rot": null,
+    "extras": {
+     "funcao": "carrinho de plataforma estacionado (capacidade 6 sacos de 25 kg); no jogo o jogador o empurra",
+     "no": "EB_Carrinho",
+     "capacidade_sacos": 6,
+     "saco_m": [
+      0.7,
+      0.45,
+      0.16
+     ]
+    }
+   }
+  }
+ }
+}

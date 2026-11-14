@@ -1,0 +1,1521 @@
+{
+ "bar_preservado": {
+  "hash_igual": true,
+  "objetos": 3611,
+  "objetos_original": 3611
+ },
+ "spawn": {
+  "posicao": [
+   12.0,
+   -1.6,
+   0.15
+  ],
+  "colecao": [
+   "Marcadores"
+  ],
+  "dentro_de_colisor": []
+ },
+ "marcadores_originais": 15,
+ "portas_com_pivo": 16,
+ "obsoletos": {
+  "muro invisivel do limite antigo (bloquea": 4,
+  "cavalete/cone fechando saida de rua no l": 120,
+  "fundo distante antigo (predios a 200-360": 4
+ },
+ "vias": {
+  "nos_com_rua": 202,
+  "alcancaveis_a_partir_do_bar": 202,
+  "componentes_isoladas": 0,
+  "ruas_sem_saida": 0,
+  "bocas_no_bairro_original": 24,
+  "arestas_reais": 281,
+  "km_de_vias": 13.49,
+  "quadras_conectadas_por_bairro": {
+   "OLARIA": 39,
+   "INDUSTRIAL": 25,
+   "CONCEICAO": 30,
+   "CENTRO": 38
+  },
+  "rota_mais_curta_m": {
+   "CENTRO-OLARIA": 698.1,
+   "CENTRO-CONCEICAO": 342.5,
+   "CENTRO-INDUSTRIAL": 476.0,
+   "CONCEICAO-OLARIA": 555.1,
+   "CONCEICAO-INDUSTRIAL": 718.1,
+   "INDUSTRIAL-OLARIA": 614.0
+  }
+ },
+ "chao": {
+  "amostras": 40000,
+  "sem_superficie": 1,
+  "exemplos_sem_superficie": [
+   [
+    -382.0,
+    378.0
+   ]
+  ],
+  "pontos_em_calcada_ou_quadra": 18140,
+  "sem_colisor_na_altura_da_calcada": 631,
+  "pct_cobertura_colisao_calcada": 96.5,
+  "exemplos_sem_colisor": [
+   [
+    -394.0,
+    -398.0
+   ],
+   [
+    -394.0,
+    -386.0
+   ],
+   [
+    -394.0,
+    -382.0
+   ],
+   [
+    -394.0,
+    -378.0
+   ],
+   [
+    -394.0,
+    -374.0
+   ],
+   [
+    -394.0,
+    -370.0
+   ],
+   [
+    -394.0,
+    -366.0
+   ],
+   [
+    -394.0,
+    -362.0
+   ],
+   [
+    -394.0,
+    -354.0
+   ],
+   [
+    -394.0,
+    -350.0
+   ]
+  ]
+ },
+ "obstaculos": {
+  "props_sobre_o_leito": {
+   "P_Arvore_A": 22,
+   "P_Arvore_B": 31,
+   "P_Poste_Luz": 82,
+   "P_Arvore_Ipe": 29
+  },
+  "colisores_no_meio_do_leito": {
+   "COL_Cid_Poste": 13
+  },
+  "largura_livre_minima_calcada_m": 1.4,
+  "colisores_novos_dentro_do_bairro_original": []
+ },
+ "setores": {
+  "S00_00": {
+   "colisores": 143,
+   "tris_lod0": 10306,
+   "objetos": 107,
+   "instancias": 101,
+   "tris_lod2": 852,
+   "tris_lod1": 314,
+   "zona": "OLARIA"
+  },
+  "S00_01": {
+   "colisores": 130,
+   "tris_lod0": 10618,
+   "objetos": 86,
+   "instancias": 81,
+   "tris_lod2": 634,
+   "tris_lod1": 378,
+   "zona": "OLARIA"
+  },
+  "S00_02": {
+   "colisores": 118,
+   "tris_lod0": 10719,
+   "objetos": 81,
+   "instancias": 75,
+   "tris_lod2": 573,
+   "tris_lod1": 282,
+   "zona": "OLARIA"
+  },
+  "S00_03": {
+   "colisores": 109,
+   "marcadores": 1,
+   "tris_lod0": 9786,
+   "objetos": 78,
+   "instancias": 72,
+   "tris_lod2": 529,
+   "tris_lod1": 164,
+   "zona": "OLARIA"
+  },
+  "S00_04": {
+   "colisores": 115,
+   "tris_lod0": 12358,
+   "objetos": 78,
+   "instancias": 72,
+   "tris_lod2": 629,
+   "tris_lod1": 232,
+   "zona": "CONCEICAO"
+  },
+  "S00_05": {
+   "colisores": 117,
+   "marcadores": 1,
+   "tris_lod0": 12677,
+   "objetos": 87,
+   "instancias": 81,
+   "tris_lod2": 581,
+   "tris_lod1": 220,
+   "zona": "CONCEICAO"
+  },
+  "S00_06": {
+   "colisores": 113,
+   "tris_lod0": 11554,
+   "objetos": 79,
+   "instancias": 73,
+   "tris_lod2": 574,
+   "tris_lod1": 194,
+   "zona": "CONCEICAO"
+  },
+  "S00_07": {
+   "colisores": 154,
+   "tris_lod0": 28624,
+   "objetos": 127,
+   "instancias": 121,
+   "tris_lod2": 936,
+   "tris_lod1": 166,
+   "zona": "CONCEICAO"
+  },
+  "S01_00": {
+   "colisores": 131,
+   "tris_lod0": 8791,
+   "objetos": 84,
+   "instancias": 78,
+   "tris_lod2": 658,
+   "tris_lod1": 408,
+   "zona": "OLARIA"
+  },
+  "S01_01": {
+   "colisores": 120,
+   "tris_lod0": 11184,
+   "objetos": 67,
+   "instancias": 62,
+   "tris_lod2": 438,
+   "tris_lod1": 416,
+   "zona": "OLARIA"
+  },
+  "S01_02": {
+   "colisores": 105,
+   "tris_lod0": 11859,
+   "objetos": 66,
+   "instancias": 60,
+   "tris_lod2": 334,
+   "tris_lod1": 214,
+   "zona": "OLARIA"
+  },
+  "S01_03": {
+   "colisores": 96,
+   "luzes": 1,
+   "marcadores": 1,
+   "tris_lod0": 13703,
+   "objetos": 71,
+   "instancias": 65,
+   "tris_lod2": 350,
+   "tris_lod1": 126,
+   "zona": "OLARIA"
+  },
+  "S01_04": {
+   "colisores": 85,
+   "tris_lod0": 16404,
+   "objetos": 68,
+   "instancias": 62,
+   "tris_lod2": 398,
+   "tris_lod1": 144,
+   "zona": "CONCEICAO"
+  },
+  "S01_05": {
+   "marcadores": 2,
+   "colisores": 97,
+   "luzes": 1,
+   "tris_lod0": 19265,
+   "objetos": 85,
+   "instancias": 78,
+   "tris_lod2": 361,
+   "tris_lod1": 24,
+   "zona": "CONCEICAO"
+  },
+  "S01_06": {
+   "colisores": 84,
+   "tris_lod0": 12340,
+   "objetos": 66,
+   "instancias": 61,
+   "tris_lod2": 282,
+   "tris_lod1": 142,
+   "zona": "CONCEICAO"
+  },
+  "S01_07": {
+   "colisores": 125,
+   "tris_lod0": 27718,
+   "objetos": 106,
+   "instancias": 100,
+   "tris_lod2": 708,
+   "tris_lod1": 200,
+   "zona": "CONCEICAO"
+  },
+  "S02_00": {
+   "colisores": 139,
+   "tris_lod0": 10478,
+   "objetos": 90,
+   "instancias": 84,
+   "tris_lod2": 691,
+   "tris_lod1": 360,
+   "zona": "OLARIA"
+  },
+  "S02_01": {
+   "colisores": 106,
+   "tris_lod0": 13072,
+   "objetos": 63,
+   "instancias": 58,
+   "tris_lod2": 408,
+   "tris_lod1": 272,
+   "zona": "OLARIA"
+  },
+  "S02_02": {
+   "tris_lod0": 15152,
+   "objetos": 79,
+   "instancias": 69,
+   "tris_lod0_bairro_original": 666,
+   "colisores": 99,
+   "tris_lod2": 468,
+   "tris_lod1": 180,
+   "zona": "OLARIA"
+  },
+  "S02_03": {
+   "tris_lod0": 11761,
+   "objetos": 66,
+   "instancias": 53,
+   "tris_lod0_bairro_original": 3334,
+   "colisores": 76,
+   "tris_lod2": 420,
+   "tris_lod1": 106,
+   "zona": "CENTRO"
+  },
+  "S02_04": {
+   "tris_lod0": 10280,
+   "objetos": 58,
+   "instancias": 41,
+   "tris_lod0_bairro_original": 3376,
+   "colisores": 77,
+   "marcadores": 2,
+   "tris_lod2": 413,
+   "tris_lod1": 54,
+   "zona": "CENTRO"
+  },
+  "S02_05": {
+   "tris_lod0": 13206,
+   "objetos": 76,
+   "instancias": 67,
+   "tris_lod0_bairro_original": 1756,
+   "colisores": 77,
+   "marcadores": 1,
+   "tris_lod2": 374,
+   "tris_lod1": 90,
+   "zona": "CENTRO"
+  },
+  "S02_06": {
+   "colisores": 95,
+   "tris_lod0": 18940,
+   "objetos": 90,
+   "instancias": 85,
+   "tris_lod2": 455,
+   "tris_lod1": 150,
+   "zona": "CENTRO"
+  },
+  "S02_07": {
+   "colisores": 131,
+   "marcadores": 1,
+   "tris_lod0": 32608,
+   "objetos": 122,
+   "instancias": 115,
+   "tris_lod2": 827,
+   "tris_lod1": 124,
+   "zona": "CONCEICAO"
+  },
+  "S03_00": {
+   "colisores": 136,
+   "marcadores": 1,
+   "tris_lod0": 12294,
+   "objetos": 92,
+   "instancias": 86,
+   "tris_lod2": 630,
+   "tris_lod1": 340,
+   "zona": "OLARIA"
+  },
+  "S03_01": {
+   "marcadores": 3,
+   "colisores": 118,
+   "luzes": 1,
+   "tris_lod0": 17981,
+   "objetos": 84,
+   "instancias": 78,
+   "tris_lod2": 422,
+   "tris_lod1": 154,
+   "zona": "OLARIA"
+  },
+  "S03_02": {
+   "colisores": 94,
+   "marcadores": 1,
+   "tris_lod0": 13812,
+   "objetos": 76,
+   "tris_lod0_bairro_original": 728,
+   "instancias": 64,
+   "tris_lod2": 413,
+   "tris_lod1": 84,
+   "zona": "OLARIA"
+  },
+  "S03_03": {
+   "tris_lod0": 34136,
+   "objetos": 197,
+   "instancias": 175,
+   "tris_lod0_bairro_original": 34136,
+   "colisores": 198,
+   "tris_lod2": 602,
+   "zona": "CENTRO"
+  },
+  "S03_04": {
+   "tris_lod0": 38640,
+   "objetos": 211,
+   "instancias": 180,
+   "tris_lod0_bairro_original": 38630,
+   "colisores": 226,
+   "marcadores": 2,
+   "tris_lod2": 706,
+   "zona": "CENTRO"
+  },
+  "S03_05": {
+   "tris_lod0": 13848,
+   "objetos": 95,
+   "instancias": 82,
+   "tris_lod0_bairro_original": 6288,
+   "colisores": 89,
+   "luzes": 1,
+   "marcadores": 1,
+   "tris_lod2": 450,
+   "tris_lod1": 100,
+   "zona": "CENTRO"
+  },
+  "S03_06": {
+   "colisores": 109,
+   "luzes": 1,
+   "marcadores": 1,
+   "tris_lod0": 22414,
+   "objetos": 118,
+   "instancias": 113,
+   "tris_lod2": 484,
+   "tris_lod1": 190,
+   "zona": "CENTRO"
+  },
+  "S03_07": {
+   "colisores": 139,
+   "marcadores": 1,
+   "tris_lod0": 35000,
+   "objetos": 129,
+   "instancias": 123,
+   "tris_lod2": 883,
+   "tris_lod1": 134,
+   "zona": "CONCEICAO"
+  },
+  "S04_00": {
+   "colisores": 138,
+   "tris_lod0": 10227,
+   "objetos": 96,
+   "instancias": 90,
+   "tris_lod2": 648,
+   "tris_lod1": 356,
+   "zona": "OLARIA"
+  },
+  "S04_01": {
+   "colisores": 105,
+   "marcadores": 1,
+   "tris_lod0": 11147,
+   "objetos": 57,
+   "instancias": 51,
+   "tris_lod2": 296,
+   "tris_lod1": 212,
+   "zona": "OLARIA"
+  },
+  "S04_02": {
+   "colisores": 101,
+   "tris_lod0": 12072,
+   "objetos": 74,
+   "tris_lod0_bairro_original": 716,
+   "instancias": 62,
+   "tris_lod2": 403,
+   "tris_lod1": 130,
+   "zona": "OLARIA"
+  },
+  "S04_03": {
+   "tris_lod0": 39182,
+   "objetos": 200,
+   "instancias": 179,
+   "tris_lod0_bairro_original": 39182,
+   "marcadores": 4,
+   "colisores": 212,
+   "tris_lod2": 646,
+   "luzes": 1,
+   "zona": "CENTRO"
+  },
+  "S04_04": {
+   "tris_lod0": 519987,
+   "objetos": 985,
+   "tris_lod0_bairro_original": 519957,
+   "instancias": 865,
+   "marcadores": 72,
+   "colisores": 639,
+   "luzes": 16,
+   "tris_lod2": 664,
+   "zona": "CENTRO"
+  },
+  "S04_05": {
+   "tris_lod0": 17305,
+   "objetos": 100,
+   "instancias": 87,
+   "tris_lod0_bairro_original": 6990,
+   "marcadores": 4,
+   "colisores": 114,
+   "luzes": 2,
+   "tris_lod2": 470,
+   "tris_lod1": 60,
+   "zona": "CENTRO"
+  },
+  "S04_06": {
+   "colisores": 104,
+   "luzes": 1,
+   "marcadores": 1,
+   "tris_lod0": 19145,
+   "objetos": 105,
+   "instancias": 100,
+   "tris_lod2": 414,
+   "tris_lod1": 260,
+   "zona": "CENTRO"
+  },
+  "S04_07": {
+   "colisores": 110,
+   "tris_lod0": 24782,
+   "objetos": 96,
+   "instancias": 90,
+   "tris_lod2": 655,
+   "tris_lod1": 180,
+   "zona": "CONCEICAO"
+  },
+  "S05_00": {
+   "colisores": 120,
+   "tris_lod0": 10055,
+   "objetos": 91,
+   "instancias": 85,
+   "tris_lod2": 604,
+   "tris_lod1": 266,
+   "zona": "OLARIA"
+  },
+  "S05_01": {
+   "colisores": 92,
+   "tris_lod0": 9221,
+   "objetos": 53,
+   "instancias": 48,
+   "tris_lod2": 370,
+   "tris_lod1": 298,
+   "zona": "OLARIA"
+  },
+  "S05_02": {
+   "tris_lod0": 15085,
+   "objetos": 80,
+   "instancias": 68,
+   "tris_lod0_bairro_original": 1356,
+   "colisores": 94,
+   "marcadores": 1,
+   "tris_lod2": 409,
+   "tris_lod1": 72,
+   "zona": "OLARIA"
+  },
+  "S05_03": {
+   "tris_lod0": 16314,
+   "objetos": 101,
+   "instancias": 78,
+   "tris_lod0_bairro_original": 12724,
+   "colisores": 105,
+   "marcadores": 1,
+   "tris_lod2": 394,
+   "zona": "CENTRO"
+  },
+  "S05_04": {
+   "tris_lod0": 19121,
+   "objetos": 112,
+   "instancias": 82,
+   "tris_lod0_bairro_original": 15826,
+   "colisores": 124,
+   "tris_lod2": 496,
+   "zona": "CENTRO"
+  },
+  "S05_05": {
+   "tris_lod0": 13111,
+   "objetos": 84,
+   "instancias": 71,
+   "tris_lod0_bairro_original": 4388,
+   "colisores": 78,
+   "luzes": 1,
+   "tris_lod2": 408,
+   "tris_lod1": 80,
+   "zona": "CENTRO"
+  },
+  "S05_06": {
+   "colisores": 92,
+   "marcadores": 2,
+   "tris_lod0": 16863,
+   "objetos": 102,
+   "instancias": 97,
+   "tris_lod2": 386,
+   "tris_lod1": 182,
+   "zona": "CENTRO"
+  },
+  "S05_07": {
+   "colisores": 127,
+   "tris_lod0": 28127,
+   "objetos": 108,
+   "instancias": 102,
+   "tris_lod2": 705,
+   "tris_lod1": 172,
+   "zona": "CONCEICAO"
+  },
+  "S06_00": {
+   "colisores": 98,
+   "tris_lod0": 6405,
+   "objetos": 62,
+   "instancias": 56,
+   "tris_lod2": 408,
+   "tris_lod1": 78,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_01": {
+   "colisores": 55,
+   "marcadores": 1,
+   "tris_lod0": 5801,
+   "objetos": 28,
+   "instancias": 23,
+   "tris_lod2": 157,
+   "tris_lod1": 52,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_02": {
+   "colisores": 75,
+   "marcadores": 1,
+   "tris_lod0": 11467,
+   "objetos": 49,
+   "instancias": 43,
+   "tris_lod2": 261,
+   "tris_lod1": 52,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_03": {
+   "colisores": 80,
+   "marcadores": 1,
+   "tris_lod0": 6426,
+   "objetos": 29,
+   "instancias": 24,
+   "tris_lod2": 200,
+   "tris_lod1": 104,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_04": {
+   "marcadores": 2,
+   "colisores": 51,
+   "tris_lod0": 6792,
+   "objetos": 33,
+   "instancias": 28,
+   "tris_lod2": 122,
+   "tris_lod1": 26,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_05": {
+   "colisores": 31,
+   "tris_lod0": 6016,
+   "objetos": 26,
+   "instancias": 22,
+   "tris_lod2": 90,
+   "tris_lod1": 2,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_06": {
+   "colisores": 50,
+   "marcadores": 2,
+   "tris_lod0": 6537,
+   "objetos": 32,
+   "instancias": 27,
+   "tris_lod2": 153,
+   "tris_lod1": 28,
+   "zona": "INDUSTRIAL"
+  },
+  "S06_07": {
+   "colisores": 125,
+   "marcadores": 1,
+   "tris_lod0": 22585,
+   "objetos": 98,
+   "instancias": 92,
+   "tris_lod2": 546,
+   "tris_lod1": 80,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_00": {
+   "colisores": 100,
+   "tris_lod0": 6584,
+   "objetos": 58,
+   "instancias": 51,
+   "tris_lod2": 403,
+   "tris_lod1": 78,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_01": {
+   "colisores": 67,
+   "marcadores": 1,
+   "tris_lod0": 6265,
+   "objetos": 28,
+   "instancias": 23,
+   "tris_lod2": 152,
+   "tris_lod1": 78,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_02": {
+   "colisores": 72,
+   "tris_lod0": 9025,
+   "objetos": 42,
+   "instancias": 35,
+   "tris_lod2": 174,
+   "tris_lod1": 52,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_03": {
+   "colisores": 78,
+   "marcadores": 1,
+   "tris_lod0": 7001,
+   "objetos": 28,
+   "instancias": 22,
+   "tris_lod2": 166,
+   "tris_lod1": 78,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_04": {
+   "colisores": 59,
+   "tris_lod0": 6319,
+   "objetos": 27,
+   "instancias": 21,
+   "tris_lod2": 118,
+   "tris_lod1": 52,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_05": {
+   "colisores": 44,
+   "tris_lod0": 5783,
+   "objetos": 25,
+   "instancias": 21,
+   "tris_lod2": 102,
+   "tris_lod1": 28,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_06": {
+   "colisores": 62,
+   "marcadores": 2,
+   "tris_lod0": 7215,
+   "objetos": 31,
+   "instancias": 25,
+   "tris_lod2": 134,
+   "tris_lod1": 52,
+   "zona": "INDUSTRIAL"
+  },
+  "S07_07": {
+   "colisores": 125,
+   "tris_lod0": 23202,
+   "objetos": 91,
+   "instancias": 84,
+   "tris_lod2": 571,
+   "tris_lod1": 64,
+   "zona": "INDUSTRIAL"
+  }
+ },
+ "setores_mais_pesados": [
+  [
+   "S04_04",
+   519987,
+   519957
+  ],
+  [
+   "S04_03",
+   39182,
+   39182
+  ],
+  [
+   "S03_04",
+   38640,
+   38630
+  ],
+  [
+   "S03_07",
+   35000,
+   0
+  ],
+  [
+   "S03_03",
+   34136,
+   34136
+  ],
+  [
+   "S02_07",
+   32608,
+   0
+  ],
+  [
+   "S00_07",
+   28624,
+   0
+  ],
+  [
+   "S05_07",
+   28127,
+   0
+  ]
+ ],
+ "tris_lod0_por_setor": {
+  "media": 22917,
+  "max": 519987,
+  "min": 5783
+ },
+ "anel_externo_tris": 38510,
+ "distante_tris": 4558,
+ "global": {
+  "objetos_total": 13986,
+  "objetos_cidade_nova": 10193,
+  "malhas": 2105,
+  "materiais": 156,
+  "materiais_novos_Cid": 26,
+  "imagens": 100,
+  "luzes": 26,
+  "luzes_novas": 9,
+  "luzes_com_sombra": [
+   "Luz_Bar",
+   "Luz_Cozinha",
+   "Luz_Fundos",
+   "Luz_Jogos",
+   "Luz_Lounge",
+   "Luz_Palco",
+   "Luz_Quintal_1",
+   "Luz_Quintal_2",
+   "Luz_Salao_1",
+   "Luz_Salao_2",
+   "Luz_Terraco",
+   "Luz_Varanda_Oeste",
+   "Luz_Varanda_Sul"
+  ],
+  "colisores_total": 7278,
+  "colisores_novos": 5725,
+  "colecoes_setor": 512,
+  "unidade": [
+   "METRIC",
+   1.0,
+   "METERS"
+  ]
+ },
+ "instanciados_top": [
+  [
+   "P_Arvore_B",
+   758
+  ],
+  [
+   "P_Arvore_A",
+   587
+  ],
+  [
+   "K_Eucalipto",
+   576
+  ],
+  [
+   "P_Poste_Luz",
+   570
+  ],
+  [
+   "P_Caixa_Agua_Casa",
+   414
+  ],
+  [
+   "P_Canteiro",
+   337
+  ],
+  [
+   "P_Arvore_Ipe",
+   227
+  ],
+  [
+   "P_AC",
+   150
+  ],
+  [
+   "A_cadeira-vermelha",
+   142
+  ],
+  [
+   "K_Arbusto",
+   135
+  ],
+  [
+   "P_Poste_Trafo",
+   130
+  ],
+  [
+   "K_Placa_PARE",
+   123
+  ],
+  [
+   "P_Antena",
+   109
+  ],
+  [
+   "Rua_PARE_txt",
+   101
+  ],
+  [
+   "P_Poste",
+   82
+  ],
+  [
+   "P_Placa_Rua_B",
+   77
+  ],
+  [
+   "P_Lixeira",
+   62
+  ],
+  [
+   "P_Placa_Rua_A",
+   60
+  ],
+  [
+   "A_long-neck",
+   59
+  ],
+  [
+   "P_Caixa_Papelao",
+   49
+  ],
+  [
+   "A_copo",
+   46
+  ],
+  [
+   "A_numeracao_mesa",
+   39
+  ],
+  [
+   "P_Engradado_Amarelo",
+   34
+  ],
+  [
+   "P_Luminaria_Tubular",
+   32
+  ],
+  [
+   "A_mesa-vermelha",
+   31
+  ]
+ ],
+ "malhas_duplicadas": [
+  [
+   "K_Placa_40",
+   "K_Placa_Proib_Est"
+  ],
+  [
+   "K_Placa_Escola",
+   "K_Placa_Lombada",
+   "K_Placa_Sentido"
+  ],
+  [
+   "Numero_Mesa_01",
+   "Numero_Mesa_02",
+   "Numero_Mesa_03",
+   "Numero_Mesa_04",
+   "Numero_Mesa_05",
+   "Numero_Mesa_06",
+   "Numero_Mesa_07",
+   "Numero_Mesa_08",
+   "Numero_Mesa_09",
+   "Numero_Mesa_10",
+   "Numero_Mesa_11",
+   "Numero_Mesa_12",
+   "Numero_Mesa_13",
+   "Numero_Mesa_14",
+   "Numero_Mesa_15",
+   "Numero_Mesa_16",
+   "Numero_Mesa_17",
+   "Numero_Mesa_18",
+   "Numero_Mesa_19",
+   "Numero_Mesa_20",
+   "Numero_Mesa_21",
+   "Numero_Mesa_22",
+   "Numero_Mesa_23",
+   "Numero_Mesa_24",
+   "Numero_Mesa_25",
+   "Numero_Mesa_26",
+   "Numero_Mesa_27",
+   "Numero_Mesa_28",
+   "Numero_Mesa_29",
+   "Numero_Mesa_30",
+   "Numero_Mesa_31",
+   "Numero_Mesa_32",
+   "Numero_Mesa_33",
+   "Numero_Mesa_34",
+   "Numero_Mesa_35",
+   "Numero_Mesa_36",
+   "Numero_Mesa_37",
+   "Numero_Mesa_38",
+   "Numero_Mesa_39"
+  ],
+  [
+   "P_Placa_Rua_A",
+   "P_Placa_Rua_B"
+  ],
+  [
+   "Rua_Asfalto_-1_-1",
+   "Rua_Asfalto_-1_-2",
+   "Rua_Asfalto_-1_0",
+   "Rua_Asfalto_-1_1",
+   "Rua_Asfalto_-1_2",
+   "Rua_Asfalto_-2_-1",
+   "Rua_Asfalto_-2_-2",
+   "Rua_Asfalto_-2_0",
+   "Rua_Asfalto_-2_1",
+   "Rua_Asfalto_-2_2",
+   "Rua_Asfalto_0_-1",
+   "Rua_Asfalto_0_-2",
+   "Rua_Asfalto_0_0",
+   "Rua_Asfalto_0_1",
+   "Rua_Asfalto_0_2",
+   "Rua_Asfalto_1_-1",
+   "Rua_Asfalto_1_-2",
+   "Rua_Asfalto_1_0",
+   "Rua_Asfalto_1_1",
+   "Rua_Asfalto_1_2",
+   "Rua_Asfalto_2_-1",
+   "Rua_Asfalto_2_-2",
+   "Rua_Asfalto_2_0",
+   "Rua_Asfalto_2_1",
+   "Rua_Asfalto_2_2"
+  ],
+  [
+   "Rua_Asfalto_-1_-3",
+   "Rua_Asfalto_-2_-3",
+   "Rua_Asfalto_0_-3",
+   "Rua_Asfalto_1_-3",
+   "Rua_Asfalto_2_-3"
+  ],
+  [
+   "Rua_Asfalto_-1_3",
+   "Rua_Asfalto_-2_3",
+   "Rua_Asfalto_0_3",
+   "Rua_Asfalto_1_3",
+   "Rua_Asfalto_2_3"
+  ],
+  [
+   "Rua_Asfalto_-3_-1",
+   "Rua_Asfalto_-3_-2",
+   "Rua_Asfalto_-3_0",
+   "Rua_Asfalto_-3_1",
+   "Rua_Asfalto_-3_2"
+  ],
+  [
+   "Rua_Asfalto_3_-1",
+   "Rua_Asfalto_3_-2",
+   "Rua_Asfalto_3_0",
+   "Rua_Asfalto_3_1",
+   "Rua_Asfalto_3_2"
+  ],
+  [
+   "Rua_Calcada_-1_-1",
+   "Rua_Calcada_-1_-2",
+   "Rua_Calcada_-1_0",
+   "Rua_Calcada_-1_1",
+   "Rua_Calcada_-1_2",
+   "Rua_Calcada_-2_-1",
+   "Rua_Calcada_-2_-2",
+   "Rua_Calcada_-2_0",
+   "Rua_Calcada_-2_1",
+   "Rua_Calcada_-2_2",
+   "Rua_Calcada_0_-1",
+   "Rua_Calcada_0_-2",
+   "Rua_Calcada_0_2",
+   "Rua_Calcada_1_-2",
+   "Rua_Calcada_1_0",
+   "Rua_Calcada_1_1",
+   "Rua_Calcada_1_2",
+   "Rua_Calcada_2_-1",
+   "Rua_Calcada_2_-2",
+   "Rua_Calcada_2_0",
+   "Rua_Calcada_2_1",
+   "Rua_Calcada_2_2"
+  ],
+  [
+   "Rua_Calcada_-1_-3",
+   "Rua_Calcada_-1_3",
+   "Rua_Calcada_-2_-3",
+   "Rua_Calcada_-2_3",
+   "Rua_Calcada_-3_-1",
+   "Rua_Calcada_-3_-2",
+   "Rua_Calcada_-3_0",
+   "Rua_Calcada_-3_1",
+   "Rua_Calcada_-3_2",
+   "Rua_Calcada_0_-3",
+   "Rua_Calcada_0_3",
+   "Rua_Calcada_1_-3",
+   "Rua_Calcada_1_3",
+   "Rua_Calcada_2_-3",
+   "Rua_Calcada_2_3",
+   "Rua_Calcada_3_-1",
+   "Rua_Calcada_3_-2",
+   "Rua_Calcada_3_0",
+   "Rua_Calcada_3_1",
+   "Rua_Calcada_3_2"
+  ],
+  [
+   "Rua_Calcada_-3_-3",
+   "Rua_Calcada_-3_3",
+   "Rua_Calcada_3_-3",
+   "Rua_Calcada_3_3"
+  ],
+  [
+   "Rua_Calcada_0_0",
+   "Rua_Calcada_0_1",
+   "Rua_Calcada_1_-1"
+  ],
+  [
+   "S00_01_Borda",
+   "S00_02_Borda",
+   "S00_03_Borda",
+   "S00_04_Borda",
+   "S00_05_Borda",
+   "S00_06_Borda"
+  ],
+  [
+   "S00_01_Chao_LOD2",
+   "S03_03_Chao_LOD2",
+   "S03_04_Chao_LOD2",
+   "S04_03_Chao_LOD2",
+   "S04_04_Chao_LOD2",
+   "S06_05_Chao_LOD2",
+   "S07_05_Chao_LOD2"
+  ],
+  [
+   "S01_00_Borda",
+   "S03_00_Borda",
+   "S05_00_Borda"
+  ],
+  [
+   "S01_05_Lotes",
+   "S01_05_Terreno"
+  ],
+  [
+   "S01_07_Borda",
+   "S02_07_Borda",
+   "S03_07_Borda",
+   "S04_07_Borda",
+   "S05_07_Borda",
+   "S06_07_Borda",
+   "S07_07_Borda"
+  ],
+  [
+   "S02_00_Borda",
+   "S04_00_Borda"
+  ],
+  [
+   "S02_05_Edificios_LOD1",
+   "S02_05_Silhueta_LOD2"
+  ]
+ ],
+ "materiais_redundantes": [],
+ "texturas_grandes": [
+  [
+   "Image_0.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_0.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_0.003",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_0.004",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_0",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_0.005",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2.003",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2.004",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "Image_2.005",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "letreiro_highland.jpg",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   2
+  ],
+  [
+   "palco_testeira.jpg",
+   [
+    2048,
+    256
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "panorama.jpg",
+   [
+    4096,
+    1024
+   ],
+   "externa",
+   1
+  ],
+  [
+   "placa_highland.jpg",
+   [
+    2048,
+    512
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "telao_highland.jpg",
+   [
+    2048,
+    1152
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0.png.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0.png",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0.png.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.003",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.004",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.005",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.006",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.007",
+   [
+    4096,
+    4096
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_metallic.png.008",
+   [
+    4096,
+    4096
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_normal.png.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_normal.png",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_normal.png.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.001",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.002",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.003",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.004",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.005",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.006",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.007",
+   [
+    4096,
+    4096
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png",
+   [
+    2048,
+    2048
+   ],
+   "embutida",
+   1
+  ],
+  [
+   "texture_0_roughness.png.008",
+   [
+    4096,
+    4096
+   ],
+   "embutida",
+   1
+  ]
+ ],
+ "texturas_cidade": [
+  [
+   "atlas_cidade.jpg",
+   [
+    1024,
+    1024
+   ]
+  ]
+ ]
+}

@@ -1,0 +1,278 @@
+{
+ "descricao": "Tanques de preparo da EMPRESA BRASIL: cubicagem e pecas moveis. Altura h em metros acima do fundo interno.",
+ "glb": "empresa_brasil_tanques.glb",
+ "volume_util_L": 6646.6,
+ "altura_util_m": 2.035,
+ "colunas_tabela": [
+  "altura_m",
+  "raio_superficie_m",
+  "volume_L"
+ ],
+ "tabela": [
+  [
+   0.05,
+   0.2436,
+   4.4
+  ],
+  [
+   0.1,
+   0.383,
+   20.1
+  ],
+  [
+   0.15,
+   0.5224,
+   52.5
+  ],
+  [
+   0.2,
+   0.6618,
+   107.9
+  ],
+  [
+   0.25,
+   0.8012,
+   192.2
+  ],
+  [
+   0.3,
+   0.9406,
+   311.6
+  ],
+  [
+   0.35,
+   1.08,
+   472.2
+  ],
+  [
+   0.4,
+   1.08,
+   655.4
+  ],
+  [
+   0.45,
+   1.08,
+   838.6
+  ],
+  [
+   0.5,
+   1.08,
+   1021.8
+  ],
+  [
+   0.55,
+   1.08,
+   1205.0
+  ],
+  [
+   0.6,
+   1.08,
+   1388.2
+  ],
+  [
+   0.65,
+   1.08,
+   1571.5
+  ],
+  [
+   0.7,
+   1.08,
+   1754.7
+  ],
+  [
+   0.75,
+   1.08,
+   1937.9
+  ],
+  [
+   0.8,
+   1.08,
+   2121.1
+  ],
+  [
+   0.85,
+   1.08,
+   2304.3
+  ],
+  [
+   0.9,
+   1.08,
+   2487.5
+  ],
+  [
+   0.95,
+   1.08,
+   2670.8
+  ],
+  [
+   1.0,
+   1.08,
+   2854.0
+  ],
+  [
+   1.05,
+   1.08,
+   3037.2
+  ],
+  [
+   1.1,
+   1.08,
+   3220.4
+  ],
+  [
+   1.15,
+   1.08,
+   3403.6
+  ],
+  [
+   1.2,
+   1.08,
+   3586.9
+  ],
+  [
+   1.25,
+   1.08,
+   3770.1
+  ],
+  [
+   1.3,
+   1.08,
+   3953.3
+  ],
+  [
+   1.35,
+   1.08,
+   4136.5
+  ],
+  [
+   1.4,
+   1.08,
+   4319.7
+  ],
+  [
+   1.45,
+   1.08,
+   4502.9
+  ],
+  [
+   1.5,
+   1.08,
+   4686.2
+  ],
+  [
+   1.55,
+   1.08,
+   4869.4
+  ],
+  [
+   1.6,
+   1.08,
+   5052.6
+  ],
+  [
+   1.65,
+   1.08,
+   5235.8
+  ],
+  [
+   1.7,
+   1.08,
+   5419.0
+  ],
+  [
+   1.75,
+   1.08,
+   5602.2
+  ],
+  [
+   1.8,
+   1.08,
+   5785.5
+  ],
+  [
+   1.85,
+   1.08,
+   5968.7
+  ],
+  [
+   1.9,
+   1.08,
+   6151.9
+  ],
+  [
+   1.95,
+   1.08,
+   6335.1
+  ],
+  [
+   2.0,
+   1.08,
+   6518.3
+  ],
+  [
+   2.035,
+   1.08,
+   6646.6
+  ]
+ ],
+ "sugestao": "1 saco de 25 kg + agua da receita: some o volume em litros e ache h por interpolacao na tabela",
+ "tanques": [
+  {
+   "tanque": 1,
+   "tag": "TQ-101",
+   "agitador": "EB_Tanque_1_Agitador",
+   "liquido": "EB_Tanque_1_Liquido",
+   "marcador_carga": "Ponto_EB_Tanque_1",
+   "eixo_jogo_xyz": [
+    337.0,
+    3.065,
+    -70.3
+   ],
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_1_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    337.0,
+    3.07,
+    -70.15
+   ]
+  },
+  {
+   "tanque": 2,
+   "tag": "TQ-102",
+   "agitador": "EB_Tanque_2_Agitador",
+   "liquido": "EB_Tanque_2_Liquido",
+   "marcador_carga": "Ponto_EB_Tanque_2",
+   "eixo_jogo_xyz": [
+    340.3,
+    3.065,
+    -70.3
+   ],
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_2_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    340.3,
+    3.07,
+    -70.15
+   ]
+  },
+  {
+   "tanque": 3,
+   "tag": "TQ-103",
+   "agitador": "EB_Tanque_3_Agitador",
+   "liquido": "EB_Tanque_3_Liquido",
+   "marcador_carga": "Ponto_EB_Tanque_3",
+   "eixo_jogo_xyz": [
+    343.6,
+    3.065,
+    -70.3
+   ],
+   "fundo_jogo_y": 1.01,
+   "tampa": "EB_Tanque_3_Tampa",
+   "tampa_dobradica_jogo_xyz": [
+    343.6,
+    3.07,
+    -70.15
+   ]
+  }
+ ]
+}

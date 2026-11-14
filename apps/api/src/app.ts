@@ -719,6 +719,19 @@ export async function createApi(options: { config?: ApiConfig; database?: Databa
     await db.insert(tables.factorySettings).values({key,value:body.state,updatedBy:body.actorId}).onConflictDoUpdate({target:tables.factorySettings.key,set:{value:body.state,updatedBy:body.actorId,updatedAt:new Date()}});
     return {saved:true};
   });
+  // The character's place and needs (player-world.ts): the world loads them on join and saves them in batches; the player never writes them.
+  app.post('/api/internal/player-world',{...internalOptions,bodyLimit:262_144},async request=>{
+    const body=z.discriminatedUnion('action',[
+      z.object({action:z.literal('load'),userId:uuidSchema}).strict(),
+      z.object({action:z.literal('save'),players:z.array(z.object({userId:uuidSchema,state:z.record(z.string(),z.unknown())}).strict()).max(200)}).strict(),
+    ]).parse(request.body);
+    if(body.action==='load'){
+      const [row]=await db.select().from(tables.playerWorldState).where(eq(tables.playerWorldState.userId,body.userId));
+      return {state:row?.state??null};
+    }
+    if(body.players.length)await db.insert(tables.playerWorldState).values(body.players.map(player=>({userId:player.userId,state:player.state,updatedAt:new Date()}))).onConflictDoUpdate({target:tables.playerWorldState.userId,set:{state:sql`excluded.state`,updatedAt:new Date()}});
+    return {saved:body.players.length};
+  });
   // Coins spent or earned in the room (apps/api/src/wallet-service.ts); only the live session's player.
   app.post('/api/internal/wallet',internalOptions,async request=>{
     const body=z.object({sessionId:uuidSchema,userId:uuidSchema,amount:z.number().int().min(-100_000).max(100_000).refine(n=>n!==0),

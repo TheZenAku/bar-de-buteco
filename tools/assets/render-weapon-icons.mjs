@@ -175,14 +175,20 @@ try{
   }else{
     const dir=path.join(root,'apps/web/public/ui/armas');fs.mkdirSync(path.join(dir,'pecas'),{recursive:true});
     const layers=path.join(dir,'camadas');
-    // On the share (Z:) a folder the dev server is watching can stay "delete pending" for a while (ENOTEMPTY/EPERM): retry.
-    fs.rmSync(layers,{recursive:true,force:true,maxRetries:20,retryDelay:1500});
+    // Weapon by weapon, never the whole folder at once: on the share (Z:) a folder the dev server watches can stay "delete pending" for
+    // minutes, and removing camadas/ in one go left the wheel with no pictures (2026-11-13). Old layers a weapon no longer has are removed.
+    let failed=0;
     for(const id of WHEEL_ORDER){
       const pictures=await page.evaluate(([id,meta,partMeta,slots])=>window.layers(id,meta,partMeta,slots),[id,meta,partMeta,WEAPONS[id].slots]);
-      fs.mkdirSync(path.join(layers,id),{recursive:true});
-      for(const [name,url] of Object.entries(pictures))fs.writeFileSync(path.join(layers,id,`${name}.webp`),Buffer.from(url.split(',')[1],'base64'));
-      console.log(`camadas/${id}: ${Object.keys(pictures).join(', ')}`);
+      const folder=path.join(layers,id);
+      try{
+        fs.mkdirSync(folder,{recursive:true});
+        for(const [name,url] of Object.entries(pictures))fs.writeFileSync(path.join(folder,`${name}.webp`),Buffer.from(url.split(',')[1],'base64'));
+        for(const file of fs.readdirSync(folder))if(!(file.replace(/\.webp$/,'') in pictures))fs.rmSync(path.join(folder,file),{force:true});
+        console.log(`camadas/${id}: ${Object.keys(pictures).join(', ')}`);
+      }catch(error){failed++;console.error(`camadas/${id}: não gravou (${error.code??error.message}); rode de novo quando a pasta liberar`);}
     }
+    if(failed)process.exitCode=1;
     for(const id of Object.keys(PART_MODELS)){
       const url=await page.evaluate(([id,meta,partMeta])=>window.icon('part',id,meta,partMeta),[id,meta,partMeta]);
       const file=path.join(dir,'pecas',`${id}.webp`);fs.writeFileSync(file,Buffer.from(url.split(',')[1],'base64'));console.log(`pecas/${id}.webp ${(fs.statSync(file).size/1024).toFixed(0)} KiB`);

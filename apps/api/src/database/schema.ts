@@ -181,6 +181,10 @@ export const sparringProgress=pgTable('sparring_progress',{
   userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),tier:smallint('tier').notNull().default(0),wins:integer('wins').notNull().default(0),
   lastWinAt:date('last_win_at'),updatedAt:date('updated_at').notNull().defaultNow(),
 });
+/** The character's place on the map and its needs (player-world.ts); no row: a new character at the spawn with full needs. */
+export const playerWorldState=pgTable('player_world_state',{
+  userId:text('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),state:jsonb('state').notNull(),updatedAt:date('updated_at').notNull().defaultNow(),
+});
 /** The firearms each player owns (arsenal-service.ts): parts fitted per slot and upgrade levels per track, as JSON; /armas grants them with source 'teste'. */
 export const weaponArsenal=pgTable('weapon_arsenal',{
   userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),weaponId:text('weapon_id').notNull(),parts:jsonb('parts').notNull().default({}),

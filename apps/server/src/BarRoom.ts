@@ -14,7 +14,7 @@ import { ArraySchema, Schema, StateView } from '@colyseus/schema';
 import { z } from 'zod';
 import { AOI_RADIUS, crowdSkinIndex, BLACKJACK_SEATS, CHAT_RADIUS, DEFAULT_SKIN, FACTORY_UNIFORM, skillById, skinBase, WAVE_DURATION_MS, USE_DURATION_MS, RECOVER_DURATION_MS, INTERACTABLES, PATCH_MS, TICK_MS, canInteract, interactionReach, distance, findSpawn, standingPosition, flyPlayer, fallPlayer, groundBelow, floorHeight, inputSchema, movePlayer, skinMessageSchema, skinSchema, type AnimationState, type ChatMessage, type PlayerInput, VOICE, decodeVoicePacket, voiceStateSchema, wrapVoice, DOORS, PLAYER_RADIUS, inDoorSweep, isWalkable, setDoorStates, syncFactoryGates, DRINK_ITEMS, type DrinkItem, ITEM_IDS, itemById, INVENTORY_CAPACITY, type InventoryStack, type InventoryView, type ItemId } from '@bar/shared';
 import { verifyTicket, type GameTicket } from '@bar/shared/tickets';
-import { Access, InternalApiError, internal, validateAccess, type Control } from './internal.js';
+import { Access, InternalApiError, internal, loadPlayerWorld, savePlayerWorld, validateAccess, type Control, type PlayerWorldSave } from './internal.js';
 import { BarState, CardState, DoorState, FoosballSlotState, FoosballState, HandState, JobSlotState, Moto, Npc, Player, RagdollState, SeatState, TableState } from './state.js';
 import { HighfoodDesk, customerLine, type FoodOrder } from './world/highfood.js';
 import { TradeDesk, type Trade } from './world/trades.js';
@@ -38,7 +38,7 @@ import { POOL_TABLES, poolStakes, poolAimSchema, poolChoiceSchema, poolConfigSch
 import { EventDirector, type EventKind } from './world/events.js';
 import { createNpcs, NpcDirector } from './world/npcs.js';
 import { BarService } from './world/bartender.js';
-import { NeedsDirector } from './world/needs.js';
+import { NeedsDirector, restoredNeeds } from './world/needs.js';
 import { NEEDS, MAP_MARKERS, isConscious, swayInput, type NeedsEvent } from '@bar/shared';
 import {JUKEBOX_SYSTEMS,TV_SYSTEMS,initialJukebox,jukeboxCommandSchema,commandJukebox,clearMedia,endMedia,failMedia,liveMedia,mediaEndedSchema,mediaFailedSchema,mediaLiveSchema,mediaGain,jukeboxTime,parseMediaLink,MEDIA_PLATFORMS,type JukeboxState,type MediaProvider} from '@bar/shared';
 import {Jukebox,MediaEntry} from './state.js';
@@ -323,6 +323,9 @@ export class BarRoom extends Room<{ state: BarState }> {
   private logQueue: Array<{ event: string; userId?: string; details: Record<string, unknown>; at: number }> = [];
   /** Development bots stay out of the administration's log. */
   private botIds = new Set<string>();
+  /** The last JSON saved for each character, and the chain of pending writes (player-world saves). */
+  private worldSaved = new Map<string, string>();
+  private worldWrites: Promise<void> = Promise.resolve();
   /** What players did since the last report to the API: goals in it give badges (docs/sistemas/conquistas.md). */
   private achievements = new AchievementTracker();
   /**
@@ -571,6 +574,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     void this.recoverMachineShop();
     this.clock.setInterval(()=>{void this.persistFactory();},5000);
     this.clock.setInterval(()=>{void this.persistMachineShop();},5000);
+    this.clock.setInterval(()=>{void this.persistPlayers();},5000);
     this.clock.setInterval(()=>this.machineShopTick(),500);
     this.clock.setInterval(()=>{void this.syncFactorySchedules();},30_000);
     this.clock.setInterval(()=>{void this.monitorShipments();},1000);
@@ -581,7 +585,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     this.registerMessages();
   }
 
-  async onAuth(_client: Client, options: unknown): Promise<GameTicket & Access> {
+  async onAuth(_client: Client, options: unknown): Promise<GameTicket & Access & { world: PlayerWorldSave | null }> {
     const { ticket: token } = z.object({ ticket: z.string().max(4096) }).parse(options);
     let ticket: GameTicket;
     try { ticket = verifyTicket(token); } catch { throw new ServerError(401, 'Sua entrada expirou. Entre novamente.'); }
@@ -589,10 +593,47 @@ export class BarRoom extends Room<{ state: BarState }> {
     if (!this.sessions.reserveNonce(ticket.nonce, ticket.exp)) throw new ServerError(401, 'Ticket já utilizado.');
     const access = await validateAccess(ticket.sessionId, ticket.userId);
     if (!access.valid) throw new ServerError(401, 'Sessão encerrada ou conta suspensa.');
-    return { ...ticket,...access };
+    const world = await loadPlayerWorld(ticket.userId).catch(() => { throw new ServerError(503, 'Não foi possível carregar seu personagem. Tente de novo.'); });
+    return { ...ticket,...access,world };
   }
 
-  onJoin(client: Client, _options: unknown, auth: GameTicket & Access): void {
+  /** Where a saved character stands (same floor and rotation), or undefined when the save is missing or damaged. */
+  private restoredSpot(saved: PlayerWorldSave | null): { x: number; y: number; z: number; rotation: number } | undefined {
+    if (!saved || ![saved.x, saved.z, saved.rotation].every(Number.isFinite)) return undefined;
+    const y = groundBelow(saved.x, saved.z, saved.y, 0);
+    return y === undefined ? undefined : { x: saved.x, y, z: saved.z, rotation: saved.rotation };
+  }
+
+  /** The character's place and needs as they are now. */
+  private worldOf(player: Player): PlayerWorldSave {
+    return { x: player.x, y: player.y, z: player.z, rotation: player.rotation, needs: { ...this.needs.state(player.id) } };
+  }
+
+  /**
+   * Saves the characters that changed since their last save (all of them, or `only`). Writes go one at a time so an
+   * older snapshot can never overwrite a newer one; a failed write is retried by the next round.
+   */
+  private persistPlayers(only?: Iterable<Player>): Promise<void> {
+    const batch: { userId: string; state: PlayerWorldSave; json: string }[] = [];
+    for (const player of only ?? this.state.players.values()) {
+      if (this.botIds.has(player.id)) continue;
+      const state = this.worldOf(player), json = JSON.stringify(state);
+      if (this.worldSaved.get(player.id) !== json) batch.push({ userId: player.id, state, json });
+    }
+    if (!batch.length) return this.worldWrites;
+    this.worldWrites = this.worldWrites.then(async () => {
+      for (let at = 0; at < batch.length; at += 200) {
+        const part = batch.slice(at, at + 200);
+        try {
+          await savePlayerWorld(part.map(({ userId, state }) => ({ userId, state })));
+          for (const { userId, json } of part) this.worldSaved.set(userId, json);
+        } catch (error) { this.log('player_world_persist_error', { error: error instanceof Error ? error.message : String(error) }); return; }
+      }
+    });
+    return this.worldWrites;
+  }
+
+  onJoin(client: Client, _options: unknown, auth: GameTicket & Access & { world: PlayerWorldSave | null }): void {
     worldMetrics.inc('bar_world_joins_total', 'Joins accepted');
     // A new login takes over at once: from another tab, or from a session still waiting to reconnect.
     const previous = this.sessions.getByUser(auth.userId);
@@ -606,8 +647,10 @@ export class BarRoom extends Room<{ state: BarState }> {
       player.assign({ displayName: auth.displayName, color: auth.color, connected: true, lastProcessedInput: -1 });
       this.setSkin(player,skin);
     } else {
-      player = new Player().assign({ id: auth.userId, slot: this.takeSlot(), displayName: auth.displayName, color: auth.color, skin,...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 });
+      const spot = this.restoredSpot(auth.world) ?? { ...findSpawn([...this.state.players.values()]), rotation: Math.PI / 2 };
+      player = new Player().assign({ id: auth.userId, slot: this.takeSlot(), displayName: auth.displayName, color: auth.color, skin, ...spot });
       this.state.players.set(auth.userId, player);
+      if (auth.world) this.needs.adopt(player, restoredNeeds(auth.world.needs, Date.now()), Date.now());
     }
     this.needs.sync(player, Date.now());
     client.view = new StateView();
@@ -695,6 +738,8 @@ export class BarRoom extends Room<{ state: BarState }> {
     const presence = this.forClient(client);
     if (!presence) return;
     const userId = presence.ticket.userId;
+    // Saved before the avatar is parked or removed, so the place and needs at the moment of leaving are kept.
+    { const leaving = this.state.players.get(userId); if (leaving) void this.persistPlayers([leaving]); }
     this.factoryWatchers.delete(userId);this.companyDesk?.forget(userId);presence.factoryClean=undefined;
     this.machineWatchers.delete(userId);this.clearMachineGame(presence);this.machineShop.release(presence.ribeiroCarry??null);this.setRibeiroCarry(presence,undefined);
     this.dropFactoryBag(presence);presence.factoryPpe=false;this.releaseCart(userId);
@@ -766,7 +811,7 @@ export class BarRoom extends Room<{ state: BarState }> {
     previous.client.leave(4000);
   }
 
-  onDispose(): void { this.cityWeather.stop();this.performanceSampler.destroy();this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) { BarRoom.activeId = undefined; BarRoom.active = undefined; } if (health.roomId === this.roomId) health.roomId = undefined; }
+  onDispose(): void { void this.persistPlayers(); this.cityWeather.stop();this.performanceSampler.destroy();this.keepVehicles(true); void this.saveVehicles().catch(() => {}); clearInterval(this.foosballTimer); this.bots.stop(); if (BarRoom.activeId === this.roomId) { BarRoom.activeId = undefined; BarRoom.active = undefined; } if (health.roomId === this.roomId) health.roomId = undefined; }
 
   private registerMessages(): void {
     // Proximity voice: raw packets, relayed without decoding (see relayVoice).

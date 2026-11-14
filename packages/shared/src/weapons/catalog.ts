@@ -23,7 +23,7 @@ export type WeaponAction='self'|'pump'|'lever'|'bolt'|'double';
 /** A whole magazine, round by round (shotguns, the revolver, the lever gun: firing stops it with what is in), or a break-action's two shells. */
 export type ReloadStyle='mag'|'shell'|'break';
 export type Caliber='9mm'|'38'|'556'|'762'|'308'|'12ga'|'44';
-export const CALIBER_NAMES:Readonly<Record<Caliber,string>>={'9mm':'9 mm','38':'.38','556':'5,56','762':'7,62','308':'.308','12ga':'Calibre 12','44':'.44'};
+export const CALIBER_NAMES:Readonly<Record<Caliber,string>>={'9mm':'9 mm','38':'.357','556':'5,56','762':'7,62','308':'.308','12ga':'Calibre 12','44':'.44'};
 
 export const PART_SLOTS=['mira','boca','trilho','carregador'] as const;
 export type PartSlot=typeof PART_SLOTS[number];
@@ -128,7 +128,7 @@ export const WEAPONS:Readonly<Record<WeaponId,WeaponDef>>={
     spread:{hip:2.2,ads:.55,move:1.3,bloom:.4,bloomMax:2.4,recovery:7},recoil:{v:1.15,h:.35,bias:.1,recover:.75,kick:.04},ads:{ms:170,zoom:1.25,move:.85},
     drawMs:320,reloadMs:{tactical:1450,empty:1850},sway:.25,reach:.5,tier:1,impulse:1.6,
     slots:{mira:SIGHTS_SMALL,boca:MUZZLES,trilho:['laser','lanterna'],carregador:MAGS}},
-  revolver:{id:'revolver',name:'Revólver .38',short:'.38',description:'Seis tiros pesados, mão firme. Recarrega bala por bala; atirar interrompe a recarga.',category:'pistolas',hold:'revolver',caliber:'38',
+  revolver:{id:'revolver',name:'Revólver .357',short:'.357',description:'Seis tiros pesados, mão firme. Recarrega bala por bala; atirar interrompe a recarga.',category:'pistolas',hold:'revolver',caliber:'38',
     modes:['semi'],action:'self',reload:'shell',rpm:160,mag:6,damage:50,pellets:1,head:2.2,legs:.8,range:{start:16,end:45,min:.6,max:120},
     spread:{hip:1.9,ads:.4,move:1.4,bloom:.9,bloomMax:3,recovery:6},recoil:{v:3.4,h:.6,bias:.25,recover:.65,kick:.07},ads:{ms:190,zoom:1.3,move:.85},
     drawMs:360,reloadMs:{start:450,each:380,end:300},sway:.3,reach:.62,tier:1.1,impulse:2.2,

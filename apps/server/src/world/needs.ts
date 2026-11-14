@@ -14,6 +14,22 @@ export interface InventoryPort {
 export const NO_INVENTORY: InventoryPort = { eligibleItems: () => [], remove: () => false };
 
 /**
+ * A saved needs state, checked field by field: a damaged or partial save falls back to the defaults for
+ * whatever is missing. A saved death (or no HP left) is revived, as respawnAfterDeath would do.
+ */
+export function restoredNeeds(saved: unknown, now: number): NeedsState {
+  const state = createNeeds(now), fields = (saved && typeof saved === 'object' ? saved : {}) as Record<string, unknown>, out = state as unknown as Record<string, unknown>;
+  for (const key of Object.keys(state)) {
+    const value = fields[key], fallback = out[key];
+    if (key === 'bonuses') { if (Array.isArray(value)) out[key] = value.filter(b => b && typeof b.amount === 'number' && typeof b.until === 'number'); }
+    else if (typeof fallback === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === typeof fallback) out[key] = value;
+  }
+  if (typeof fields.faintCause === 'string') state.faintCause = fields.faintCause as NeedsState['faintCause'];
+  if (state.dead || state.hp <= 0) reviveNeeds(state);
+  return state;
+}
+
+/**
  * Authoritative needs of every avatar in the room, kept with full precision here and mirrored to the
  * Player schema as whole points (patches only when a point changes).
  */
@@ -27,6 +43,8 @@ export class NeedsDirector {
     return state;
   }
   forget(playerId: string): void { this.states.delete(playerId); }
+  /** Takes over a character's saved needs when it joins (restoredNeeds); the live state is the one the room keeps. */
+  adopt(player: Player, state: NeedsState, now: number): void { this.states.set(player.id, state); this.sync(player, now); }
   canRun(playerId: string): boolean { return canRun(this.state(playerId)); }
 
   tick(player: Player, seconds: number, now: number, activity: { running: boolean; moving: boolean }): NeedsEvent[] {

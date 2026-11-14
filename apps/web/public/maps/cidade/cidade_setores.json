@@ -2298,15 +2298,15 @@
     "colisao": "cidade_S07_00_colisao.glb"
    },
    "kb": {
-    "visual": 13167,
+    "visual": 12512,
     "lod": 137,
     "colisao": 288
    },
-   "tris_estatico": 255144,
-   "tris_instancias": 572702,
-   "instancias": 195,
-   "malhas_instanciadas": 19,
-   "primitivas": 175,
+   "tris_estatico": 251702,
+   "tris_instancias": 508464,
+   "instancias": 196,
+   "malhas_instanciadas": 18,
+   "primitivas": 161,
    "materiais": 84,
    "tris_lod": {
     "S07_00_Edificios_LOD1": 68,
@@ -2452,12 +2452,12 @@
     "colisao": "cidade_S07_04_colisao.glb"
    },
    "kb": {
-    "visual": 11096,
+    "visual": 13169,
     "lod": 109,
     "colisao": 142
    },
-   "tris_estatico": 201394,
-   "tris_instancias": 48694,
+   "tris_estatico": 243824,
+   "tris_instancias": 91830,
    "instancias": 113,
    "malhas_instanciadas": 8,
    "primitivas": 85,
@@ -2601,6 +2601,6 @@
   "kb": 237,
   "tris": 4558
  },
- "texturas_kb": 7431,
- "texturas_arquivos": 47
+ "texturas_kb": 11433,
+ "texturas_arquivos": 102
 }

@@ -79,7 +79,7 @@ Números em `WEAPONS` (`packages/shared/src/weapons/catalog.ts`). Vida a vencer:
 | Arma | Calibre | Modo | Cadência | Pente | Dano (corpo / cabeça) | Tiros p/ derrubar (corpo / cabeça) | Alcance cheio → mínimo | Recarga |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: |
 | Pistola 9mm | 9 mm | Semi | 380 tpm | 15 | 28 / 56 | 8 / 4 | 18 → 40 m (55%) | 1,45 / 1,85 s |
-| Revólver .38 | .38 | Semi | 160 tpm | 6 | 50 / 110 | 4 / 2 | 16 → 45 m (60%) | 0,45 s + 0,38 s por bala |
+| Revólver .357 | .357 | Semi | 160 tpm | 6 | 50 / 110 | 4 / 2 | 16 → 45 m (60%) | 0,45 s + 0,38 s por bala |
 | Submetralhadora | 9 mm | Auto, Semi | 850 tpm | 30 | 17 / 27 | 12 / 8 | 10 → 30 m (50%) | 1,75 / 2,15 s |
 | Fuzil 5,56 | 5,56 | Auto, Semi | 700 tpm | 30 | 24 / 43 | 9 / 5 | 30 → 70 m (60%) | 2,1 / 2,6 s |
 | Fuzil 7,62 | 7,62 | Auto, Semi | 600 tpm | 30 | 31 / 56 | 7 / 4 | 28 → 65 m (60%) | 2,3 / 2,8 s |
@@ -121,7 +121,7 @@ Cada equipamento é do jogador (não da arma): tendo um, ele serve em todas as a
 | Lanterna tática | Trilho | Ilumina para onde a arma aponta quando escurece. | 9MM, SMG, 5.56, 7.62, 12 |
 | Canos serrados | Boca do cano | Modelo serrado, segurado com as duas mãos à frente: chumbo 60% mais aberto, dispersão do quadril +25%, alcance −28%, recarga 22% mais lenta, saque 20% e mira 15% mais rápidos, coice +12%. | 2×12 |
 | Carregador estendido | Carregador | +50% de munição (DMR: o de 20; carabina: o tubo longo de 10; 5,56 e 7,62: tambor; escopeta: o tubo inteiro); recarga 12% e mira 4% mais lentas. | 9MM, SMG, 5.56, 7.62, 12, DMR, .44 |
-| Carregador rápido | Carregador | Recarga 25% mais rápida (revólver: municiador; carabina e rifle de precisão: cada bala mais rápida). Puxador de borracha nos carregadores de caixa. | 9MM, .38, SMG, 5.56, 7.62, .44, DMR, .308 |
+| Carregador rápido | Carregador | Recarga 25% mais rápida (revólver: municiador; carabina e rifle de precisão: cada bala mais rápida). Puxador de borracha nos carregadores de caixa. | 9MM, .357, SMG, 5.56, 7.62, .44, DMR, .308 |
 
 O DMR já vem com a Luneta 4x e o rifle de precisão com a Luneta de precisão.
 

@@ -31,3 +31,15 @@ export async function internal<T>(path: string, body?: unknown): Promise<T> {
 export function validateAccess(sessionId: string, userId: string): Promise<Access> {
   return internal<Access>('validate', { sessionId, userId });
 }
+
+/** A character's place on the map and its needs, as the world saved them (player-world.ts in the API). */
+export interface PlayerWorldSave { x: number; y: number; z: number; rotation: number; needs: Record<string, unknown> }
+
+/** Loads a character's saved place and needs. Rejects when the API is unreachable: the join must wait, never start from defaults. */
+export async function loadPlayerWorld(userId: string): Promise<PlayerWorldSave | null> {
+  return (await internal<{ state: PlayerWorldSave | null }>('player-world', { action: 'load', userId })).state;
+}
+
+export function savePlayerWorld(players: { userId: string; state: PlayerWorldSave }[]): Promise<{ saved: number }> {
+  return internal('player-world', { action: 'save', players });
+}
