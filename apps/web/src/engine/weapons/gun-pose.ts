@@ -412,8 +412,8 @@ export class GunPose {
       const gate=span(u,.02,.14)*(1-span(u,.78,.88));
       moveRole(weapon,'gate',gate);
       once(0,u>.02,()=>events.mech('cylinderOpen',gunPos));
-      once(1,u>.18,()=>{for(let i=0;i<Math.max(1,6-reload.from);i++){weaponPoint(gunPos,gunRot,[0,.07,-.03],port);velocity.set((Math.random()-.5)*.4,-.6,(Math.random()-.5)*.4);events.casing('brass',port,velocity);}});
-      weaponPoint(gunPos,gunRot,[.02,.075,-.02],port);
+      once(1,u>.18,()=>{for(let i=0;i<Math.max(1,6-reload.from);i++){weaponPoint(gunPos,gunRot,meta.reload?.face??[0,.07,-.03],port);velocity.set((Math.random()-.5)*.4,-.6,(Math.random()-.5)*.4);events.casing('brass',port,velocity);}});
+      weaponPoint(gunPos,gunRot,meta.reload?.face??[.02,.075,-.02],port);
       at(belt,span(u,.2,.42)*(1-span(u,.44,.62)));at(port,span(u,.44,.62)*(1-span(u,.8,.95)));
       if(u>.3&&u<.72)this.carrying='loader';
       once(2,u>.66,()=>events.mech('shellIn',port));
@@ -483,7 +483,7 @@ export class GunPose {
     const t=u*reload.duration,rounds=Math.max(1,reload.to-reload.from);
     if(weapon.id==='revolver'){moveRole(weapon,'gate',span(t,0,start*.7)*(1-span(t,reload.duration-(reload.duration-start-each*rounds)*.8,reload.duration)));once(0,t>0,()=>events.mech('cylinderOpen',gunPos));}
     if(weapon.id==='escopeta')weaponPoint(gunPos,gunRot,[0,-.005,-.12],port);
-    else if(weapon.id==='revolver')weaponPoint(gunPos,gunRot,[.02,.075,-.012],port);
+    else if(weapon.id==='revolver')weaponPoint(gunPos,gunRot,meta.reload?.port??[.02,.075,-.012],port);
     else if(input.stats.action==='bolt'&&meta.eject)weaponPoint(gunPos,gunRot,meta.eject,port);
     else weaponPoint(gunPos,gunRot,[.022,.06,-.06],port);
     const round=Math.floor((t-start)/each),inRound=((t-start)-round*each)/each;

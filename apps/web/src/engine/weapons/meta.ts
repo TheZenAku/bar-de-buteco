@@ -14,6 +14,9 @@ export interface WeaponModelMeta {
   mounts:Partial<Record<PartSlot,{p:MetaVec;q:MetaQuat}>>;
   bones:Partial<Record<BoneRole,{name:string;axis:MetaVec;travel:number}>>;
   magExtend?:{axis:MetaVec;scale:number;shift:MetaVec};
+  /** A swing-out cylinder's reload points with the gate (crane) fully open: `port` the mouth of the top chamber, `face` the rear face's centre
+   *  (where the empties fall from and the speed loader goes). Models without it are loaded at the right of the frame. */
+  reload?:{port:MetaVec;face:MetaVec};
   /** What the magazine parts change on the model (tools/assets/import-weapons.mjs WeaponLooks): optional bones shown by the extended or the fast
    *  magazine (the long tube, a drum, the rubber puller), bones the extended hides (the plain magazine), the short magazine's scale, the
    *  bones that follow the magazine (their pivot is its own), and its length below its top. */

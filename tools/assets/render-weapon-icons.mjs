@@ -23,8 +23,14 @@ const page$=`<!doctype html><html><head><meta charset="utf-8">
 <body style="margin:0;background:#000"><script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 const loader=new GLTFLoader(),cache=new Map();
-const load=url=>{if(!cache.has(url))cache.set(url,new Promise((ok,ko)=>loader.load('${HOST}public/'+url,g=>ok(g.scene),undefined,ko)));return cache.get(url).then(s=>{const c=s.clone(true);
+// A real metal (the textured revolver's stainless) shows only what it mirrors: it gets a room to reflect, as the game gives it the sky
+// (EnvironmentLighting.dressMetal). The flat packs have no metal, so their pictures do not change.
+let room;
+const dressMetal=s=>{s.traverse(o=>{if(!o.isMesh)return;for(const m of [].concat(o.material))if(m.metalness>=.5&&!m.envMap){
+  room??=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;m.envMap=room;m.envMapIntensity=.9;m.needsUpdate=true;}});return s;};
+const load=url=>{if(!cache.has(url))cache.set(url,new Promise((ok,ko)=>loader.load('${HOST}public/'+url,g=>ok(dressMetal(g.scene)),undefined,ko)));return cache.get(url).then(s=>{const c=s.clone(true);
   // SkeletonUtils-free clone: re-bind each skinned mesh to the cloned bones by name.
   c.traverse(o=>{if(o.isSkinnedMesh){const bones=o.skeleton.bones.map(b=>c.getObjectByName(b.name));o.bind(new THREE.Skeleton(bones,o.skeleton.boneInverses),o.bindMatrix);}});return c;});};
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
@@ -168,7 +174,9 @@ try{
     fs.writeFileSync(sheet,Buffer.from(url.split(',')[1],'base64'));console.log('folha:',sheet);
   }else{
     const dir=path.join(root,'apps/web/public/ui/armas');fs.mkdirSync(path.join(dir,'pecas'),{recursive:true});
-    const layers=path.join(dir,'camadas');fs.rmSync(layers,{recursive:true,force:true});
+    const layers=path.join(dir,'camadas');
+    // On the share (Z:) a folder the dev server is watching can stay "delete pending" for a while (ENOTEMPTY/EPERM): retry.
+    fs.rmSync(layers,{recursive:true,force:true,maxRetries:20,retryDelay:1500});
     for(const id of WHEEL_ORDER){
       const pictures=await page.evaluate(([id,meta,partMeta,slots])=>window.layers(id,meta,partMeta,slots),[id,meta,partMeta,WEAPONS[id].slots]);
       fs.mkdirSync(path.join(layers,id),{recursive:true});

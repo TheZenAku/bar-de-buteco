@@ -1,6 +1,6 @@
 # Armas: modelos, peças, sons e medidas
 
-Estes são os arquivos das armas de fogo (o sistema está em [docs/sistemas/armas.md](../sistemas/armas.md)): os 10 modelos, as 11 peças (equipamentos), os sons, as fotos da roda e do Arsenal, e as medidas dos corpos que as balas usam. Tudo vem de pacotes **CC0** (domínio público). O CC0 dispensa crédito e permite uso comercial, mas o crédito fica aqui mesmo assim.
+Estes são os arquivos das armas de fogo (o sistema está em [docs/sistemas/armas.md](../sistemas/armas.md)): os 10 modelos, as 11 peças (equipamentos), os sons, as fotos da roda e do Arsenal, e as medidas dos corpos que as balas usam. Tudo vem de pacotes **CC0** (domínio público), menos o revólver, que é modelo próprio. O CC0 dispensa crédito e permite uso comercial, mas o crédito fica aqui mesmo assim.
 
 ## Fontes e licenças
 
@@ -20,7 +20,7 @@ No OpenGameArt, os pacotes da Pichuliru aparecem como "License(s): CC0". Uma das
 | Arma (`WeaponId`) | Modelo de origem |
 | --- | --- |
 | `pistola` | Flat West `Pistol_Full_West` |
-| `revolver` | Anker `Colt Revolver` (rigged) |
+| `revolver` | **Modelo próprio** (13/11/2026): revólver HighGuns .357 de cano 6" em inox, com rib ventilado, underlug, tambor estriado que abre para a esquerda e cabo de nogueira quadriculado. Feito no Blender e texturizado; vem pronto (`assets-bar/armas/highguns/`), ver [Revólver HighGuns](#revólver-highguns-modelo-próprio). Antes era o Anker `Colt Revolver`. |
 | `submetralhadora` | Flat West `SMG_Compact_West` |
 | `fuzil` | Flat West `Rifle_Assault_West` |
 | `fuzil-ak` | Flat East `Rifle_Assault_East` |
@@ -71,6 +71,16 @@ Para o DMR escolhi o SKS: é semiautomático e soa diferente da Tikka do rifle d
 ## Como os modelos são feitos
 
 O comando é `npm run assets:weapons`. Ele roda `tools/assets/import-weapons.mjs` e depois `render-weapon-icons.mjs`.
+
+### Revólver HighGuns (modelo próprio)
+
+O `revolver` não sai de pacote. Ele foi modelado no Blender (cena `ARMAS` do mapa, coleção `HG_REVOLVER`) por scripts guardados fora do repositório, em `C:\Users\rafael\BarBoteco\scripts`: `98_revolver_highguns.py` (geometria), `98a_revolver_mascaras.py` (máscaras das gravações, do quadriculado, do medalhão e dos cartuchos, com PIL), `98_revolver.osl` (as superfícies), `98b_revolver_assar.py` (UV e texturas assadas no Cycles) e `98z_revolver_exportar.py` (malha única, esqueleto, GLB e meta). HighGuns é uma marca fictícia: não há marca real no modelo.
+
+- **O que chega aqui:** `assets-bar/armas/highguns/revolver.glb` e `revolver.json`. O importador (`importPrebuilt`) copia o GLB byte a byte e usa o JSON como meta. Antes, ele confere o GLB: uma malha com um primitivo, um material, os ossos do meta no esqueleto, todos sem rotação, `Body` na origem e o comprimento igual ao do meta.
+- **Malha e material:** ~11,5 mil triângulos, um material (PBR com cor, metal/rugosidade e normal num atlas de texturas WebP). É a única arma com textura e metal de verdade. Por isso o `WeaponVisuals` passa o material pelo `dress` do `WeaponHost`, que o `BarScene` liga ao `EnvironmentLighting.dressMetal`. Sem reflexo, o inox sairia preto.
+- **Ossos:** `Body`, `Hammer` (o cão, arma para trás), `Trigger`, `Gate` e `Cylinder`. Aqui o `Gate` é o braço do tambor (crane): ele gira em volta de um pino paralelo ao cano e abre o tambor para a esquerda, com a vareta do extrator. O `Cylinder` é filho do `Gate` e gira no sentido horário visto de trás, 60° por câmara.
+- **Recarga:** o meta traz `reload.port` (a boca da câmara de cima com o tambor aberto) e `reload.face` (o centro da face de trás). O `gun-pose.ts` usa esses pontos na mão esquerda, nos estojos que caem e no municiador rápido. Arma sem `reload` continua carregando pelo lado direito da armação.
+- **Para mudar o modelo:** rode os scripts no Blender (`HG_GEOMETRIA`, `HG_UV`, `HG_ASSAR(2048)`, `HG_COMPOR`, `HG_MATERIAL_FINAL`, `HG_MONTAR`, `HG_EXPORTAR`). Depois copie `export\revolver.glb` e `export\revolver.json` para `assets-bar/armas/highguns/` e rode o importador.
 
 - **Espaço da arma:** metros, +Y para cima, o cano para −Z, +X para a direita. A origem fica no punho: o centro da palma direita, no meio da seção do punho, mais ou menos um palmo abaixo do gatilho. Nas armas sem punho de pistola (escopeta, cano duplo, carabina), a origem é o pescoço da coronha, a seção mais fina atrás do guarda-mato.
 - **Uma chamada de desenho por arma:** as cores flat viram cores de vértice, com um material só. O vidro das miras é um segundo material, transparente.

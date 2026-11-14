@@ -1,0 +1,93 @@
+{
+ "id": "revolver",
+ "url": "armas/modelos/revolver.glb",
+ "length": 0.2894,
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "trigger": [
+  0.0,
+  0.0219,
+  -0.0587
+ ],
+ "support": null,
+ "muzzle": [
+  0.0,
+  0.0702,
+  -0.2442
+ ],
+ "eject": null,
+ "sight": [
+  0.0,
+  0.0904,
+  -0.0307
+ ],
+ "stock": null,
+ "mounts": {
+  "carregador": {
+   "p": [
+    0.0,
+    0.0576,
+    -0.0719
+   ],
+   "q": [
+    0,
+    0,
+    0,
+    1
+   ]
+  }
+ },
+ "bones": {
+  "hammer": {
+   "name": "Hammer",
+   "axis": [
+    1,
+    0,
+    0
+   ],
+   "travel": 0.6
+  },
+  "trigger": {
+   "name": "Trigger",
+   "axis": [
+    -1,
+    0,
+    0
+   ],
+   "travel": 0.35
+  },
+  "cylinder": {
+   "name": "Cylinder",
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "travel": -1.0472
+  },
+  "gate": {
+   "name": "Gate",
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "travel": 1.4
+  }
+ },
+ "reload": {
+  "port": [
+   -0.0246,
+   0.0646,
+   -0.0502
+  ],
+  "face": [
+   -0.0246,
+   0.052,
+   -0.0492
+  ]
+ }
+}

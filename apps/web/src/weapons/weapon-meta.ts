@@ -14,6 +14,8 @@ export interface WeaponModelMeta {
   bones:Partial<Record<'slide'|'bolt'|'charging'|'pump'|'lever'|'hammer'|'cylinder'|'gate'|'mag'|'barrels'|'trigger',{name:string;axis:MetaVec;travel:number}>>;
   /** The extended magazine: scale the mag bone by `scale` along `axis` and shift it by `shift` (pistols: so the top round stays under the slide). */
   magExtend?:{axis:MetaVec;scale:number;shift:MetaVec};
+  /** A swing-out cylinder's reload points, the crane open: the top chamber's mouth and the rear face's centre. */
+  reload?:{port:MetaVec;face:MetaVec};
   /** What the magazine parts change on the model (see the notes below). */
   looks?:WeaponLooks;
   /** Models of their own that a part swaps in (the sawn-off barrels). */
@@ -60,16 +62,17 @@ export const WEAPON_MODELS:Readonly<Record<WeaponId,WeaponModelMeta>>={
   revolver:{
     id:"revolver",
     url:"armas/modelos/revolver.glb",
-    length:0.3189,
+    length:0.2894,
     grip:[0,0,0],
-    trigger:[0.0002,0.022,-0.0686],
+    trigger:[0,0.0219,-0.0587],
     support:null,
-    muzzle:[0,0.0947,-0.2824],
+    muzzle:[0,0.0702,-0.2442],
     eject:null,
-    sight:[0,0.1067,-0.046],
+    sight:[0,0.0904,-0.0307],
     stock:null,
-    mounts:{carregador:{p:[0.001,0.0776,-0.0972],q:[0,0,0,1]}},
-    bones:{hammer:{name:"Hammer",axis:[1,0,0],travel:0.6},trigger:{name:"Trigger",axis:[-1,0,0],travel:0.35},cylinder:{name:"Cylinder",axis:[0,0,1],travel:1.0472},gate:{name:"Gate",axis:[0,0,1],travel:-1.4}},
+    mounts:{carregador:{p:[0,0.0576,-0.0719],q:[0,0,0,1]}},
+    bones:{hammer:{name:"Hammer",axis:[1,0,0],travel:0.6},trigger:{name:"Trigger",axis:[-1,0,0],travel:0.35},cylinder:{name:"Cylinder",axis:[0,0,1],travel:-1.0472},gate:{name:"Gate",axis:[0,0,1],travel:1.4}},
+    reload:{port:[-0.0246,0.0646,-0.0502],face:[-0.0246,0.052,-0.0492]},
   },
   submetralhadora:{
     id:"submetralhadora",

@@ -691,6 +691,7 @@ export class BarScene {
       localId:()=>this.localId,camera:this.camera,serverNow:()=>this.serverNow(),volume:()=>this.callbacks.motoVolume?.()??1,daylight:()=>this.environment.daylight,
       avatars:()=>this.actors.values(),avatar:id=>this.actors.get(id),damage:(at,text,kind)=>this.damageNumbers.show(at,text,kind,this.elapsed),
       flinch:(id,yaw,degrees)=>{const avatar=this.actors.get(id);if(avatar)(avatar.flinch??=new FlinchPose()).hit(this.elapsed,yaw,degrees);},
+      dress:material=>this.environment.dressMetal(material),
     });
     this.flySounds=new FlySounds(()=>this.callbacks.motoVolume?.()??1,import.meta.env.BASE_URL);
     this.smokeBurst=new SmokeBurst(this.app);

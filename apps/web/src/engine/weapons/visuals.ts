@@ -36,6 +36,8 @@ export interface WeaponHost {
   avatar(id:string):WeaponAvatar|undefined;
   damage(at:{x:number;y:number;z:number},text:string,kind:DamageKind):void;
   flinch(id:string,yaw:number,degrees:number):void;
+  /** Gives a real model's metal (metalness from half up: the textured revolver's stainless) the scene's reflections, or it draws black. */
+  dress?(material:pc.StandardMaterial):void;
 }
 
 interface Armed {
@@ -302,6 +304,8 @@ export class WeaponVisuals implements WeaponVisualsApi {
       if(!state.weapon||state.weapon.destroyed||(!state.weapon.real&&realReady(state.shown as WeaponId,state.parts))){
         dropWeapon(state.weapon);
         state.weapon=makeWeapon(this.app,avatar.root,state.shown as WeaponId,state.parts,state.kit);
+        if(state.weapon.real&&this.host?.dress)for(const render of state.weapon.root.findComponents('render') as pc.RenderComponent[])
+          for(const instance of render.meshInstances)if(instance.material instanceof pc.StandardMaterial)this.host.dress(instance.material);
       }
       const input=this.input(id===localId,avatar,state,stats,now,serverNow);
       const events=state.events??=this.events(state,id===localId);

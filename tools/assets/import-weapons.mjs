@@ -46,11 +46,11 @@ const WEAPONS=[
     moves:{slide:['Slide',Z,.026],hammer:['Hammer',X,.75],trigger:['Trigger',NX,.3],mag:['Magazine','axis',.13]},
     mounts:{mira:'Attach_Scope',boca:'Attach_Muzzle',trilho:'Attach_RailBottom',carregador:'mag'},magExtend:1.5,
     grip:{below:.035},support:'pistol',eject:{bone:'Slide',dz:-.02}},
-  {id:'revolver',pack:'anker',file:'Rigged/Colt Revolver.fbx',scale:.01,
-    bones:{Bone001:'Trigger',Bone002:'Hammer',Bone003:'Cylinder',Bone004:'Gate'},
-    moves:{hammer:['Hammer',X,.6],trigger:['Trigger',NX,.35],cylinder:['Cylinder',Z,Math.PI/3],gate:['Gate',Z,-1.4]},
-    pivotAtCentre:['Cylinder'],
-    mounts:{carregador:'cylinder'},grip:{below:.022,behind:.03},support:null,eject:null},
+  // The HighGuns .357 (2026-11-13, in place of the Anker Colt): a 6" stainless double action with a vent rib and a swing-out cylinder, modelled
+  // in Blender to this weapon space (BarBoteco scripts 98*), textured (colour, metal/roughness and normal in one atlas, one material).
+  // It comes ready: the GLB is copied byte for byte and its meta is the JSON exported with it, checked against the GLB here (importPrebuilt).
+  // Bones: Body, Hammer, Trigger, Gate (the crane: swings the cylinder out to the left) and Cylinder (the crane's child, turns clockwise).
+  {id:'revolver',prebuilt:'highguns/revolver'},
   {id:'submetralhadora',pack:'west',file:'GLB/SMG_Compact_West.glb',bones:FLAT_KEEP,
     moves:{bolt:['Bolt',Z,.045],charging:['ChargingHandle',Z,.05],trigger:['Trigger',NX,.3],mag:['Magazine','axis',.2]},
     mounts:{mira:'Attach_Scope',boca:'Attach_Muzzle',trilho:'Attach_RailBottom',carregador:'mag'},magExtend:1.45,puller:true,
@@ -178,7 +178,43 @@ const centre=box=>box.getCenter(new Vector3());
 const r4=x=>Math.round(x*1e4)/1e4||0;
 const vec=v=>[r4(v.x??v[0]),r4(v.y??v[1]),r4(v.z??v[2])];
 
+/**
+ * A model made to the weapon space elsewhere (assets-bar/armas/<prebuilt>.glb and its meta, <prebuilt>.json): copied as it is. The GLB is
+ * read here only to check that it is what the client expects: one skinned mesh, one primitive, every bone of the meta among the skin's joints
+ * resting unrotated (the client turns them about weapon-space axes), Body the root at the origin, and the meta's length the mesh's.
+ */
+function importPrebuilt(def){
+  const from=path.join(root,'assets-bar/armas',def.prebuilt);
+  const bytes=fs.readFileSync(`${from}.glb`),meta=JSON.parse(fs.readFileSync(`${from}.json`,'utf8'));
+  if(bytes.readUInt32LE(0)!==0x46546c67)throw new Error(`${def.id}: ${from}.glb não é GLB`);
+  const json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString('utf8'));
+  const fail=why=>{throw new Error(`${def.id} (${def.prebuilt}): ${why}`);};
+  if(json.meshes?.length!==1||json.meshes[0].primitives.length!==1)fail('esperava uma malha com um primitivo');
+  if(json.materials?.length!==1)fail('esperava um material');
+  const skin=json.skins?.[0];if(!skin)fail('sem esqueleto');
+  const joints=new Map(skin.joints.map(i=>[json.nodes[i].name,json.nodes[i]]));
+  if(!joints.has('Body'))fail('sem o osso Body');
+  for(const [name,node] of joints){
+    const q=node.rotation??[0,0,0,1];
+    if(Math.abs(q[0])+Math.abs(q[1])+Math.abs(q[2])>1e-4)fail(`o osso ${name} repousa girado (${q})`);
+  }
+  const body=joints.get('Body').translation??[0,0,0];
+  if(Math.hypot(...body)>1e-4)fail(`Body fora da origem (${body})`);
+  for(const bone of Object.values(meta.bones))if(!joints.has(bone.name))fail(`o meta move o osso ${bone.name}, que não está no GLB`);
+  const prim=json.meshes[0].primitives[0],position=json.accessors[prim.attributes.POSITION];
+  const length=position.max[2]-position.min[2];
+  if(Math.abs(length-meta.length)>.002)fail(`comprimento ${length.toFixed(4)} no GLB, ${meta.length} no meta`);
+  if(!prim.attributes.TEXCOORD_0||!prim.attributes.JOINTS_0)fail('faltam UV ou pesos');
+  const file=path.join(outModels,`${def.id}.glb`);
+  fs.writeFileSync(file,bytes);
+  const triangles=json.accessors[prim.indices].count/3;
+  console.log(`${def.id}: pronto (${def.prebuilt}), ${triangles} triângulos, ${position.count} vértices, ${joints.size} ossos, ${meta.length.toFixed(3)} m, `+
+    `${(bytes.length/1024).toFixed(0)} KiB, sha256 ${crypto.createHash('sha256').update(bytes).digest('hex')}`);
+  return {...meta,id:def.id,url:`armas/modelos/${def.id}.glb`};
+}
+
 async function importWeapon(def){
+  if(def.prebuilt)return importPrebuilt(def);
   const src=collect(await loadSource(def.pack,def.file));
   // Bones made here (a tube's front, a drum, a puller): their pivots, set while measuring.
   const pivotsLate={};
@@ -573,6 +609,8 @@ export interface WeaponModelMeta {
   bones:Partial<Record<'slide'|'bolt'|'charging'|'pump'|'lever'|'hammer'|'cylinder'|'gate'|'mag'|'barrels'|'trigger',{name:string;axis:MetaVec;travel:number}>>;
   /** The extended magazine: scale the mag bone by \`scale\` along \`axis\` and shift it by \`shift\` (pistols: so the top round stays under the slide). */
   magExtend?:{axis:MetaVec;scale:number;shift:MetaVec};
+  /** A swing-out cylinder's reload points, the crane open: the top chamber's mouth and the rear face's centre. */
+  reload?:{port:MetaVec;face:MetaVec};
   /** What the magazine parts change on the model (see the notes below). */
   looks?:WeaponLooks;
   /** Models of their own that a part swaps in (the sawn-off barrels). */

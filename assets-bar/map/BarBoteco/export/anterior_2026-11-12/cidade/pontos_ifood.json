@@ -1,0 +1,396 @@
+{
+ "descricao": "Pontos de retirada Highland Bar Delivery (armario de iFood). pos_gltf = centro da base no topo da calcada, metros, Y para cima. frente_gltf = direcao da frente do armario (lado das portas/tela).",
+ "pontos": [
+  {
+   "nome": "Ponto_iFood",
+   "setor": "S04_04",
+   "colecao": "Exterior_Mobiliario",
+   "pos_gltf": [
+    -1.432,
+    0.15,
+    -14.04
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood"
+  },
+  {
+   "nome": "Ponto_iFood_02",
+   "setor": "S04_06",
+   "colecao": "CITY_S04_06_PROPS",
+   "pos_gltf": [
+    34.0,
+    0.15,
+    -282.0
+   ],
+   "frente_gltf": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 180.0,
+   "colisor": "COL_Ponto_iFood_02"
+  },
+  {
+   "nome": "Ponto_iFood_03",
+   "setor": "S04_05",
+   "colecao": "CITY_S04_05_PROPS",
+   "pos_gltf": [
+    57.0,
+    0.15,
+    -168.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    1.0
+   ],
+   "rot_y_graus_gltf": 90.0,
+   "colisor": "COL_Ponto_iFood_03"
+  },
+  {
+   "nome": "Ponto_iFood_04",
+   "setor": "S02_04",
+   "colecao": "CITY_S02_04_PROPS",
+   "pos_gltf": [
+    -142.0,
+    0.15,
+    -98.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_04"
+  },
+  {
+   "nome": "Ponto_iFood_05",
+   "setor": "S02_03",
+   "colecao": "CITY_S02_03_PROPS",
+   "pos_gltf": [
+    -173.0,
+    0.15,
+    38.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    1.0
+   ],
+   "rot_y_graus_gltf": 90.0,
+   "colisor": "COL_Ponto_iFood_05"
+  },
+  {
+   "nome": "Ponto_iFood_06",
+   "setor": "S01_03",
+   "colecao": "CITY_S01_03_PROPS",
+   "pos_gltf": [
+    -300.0,
+    0.15,
+    93.0
+   ],
+   "frente_gltf": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 180.0,
+   "colisor": "COL_Ponto_iFood_06"
+  },
+  {
+   "nome": "Ponto_iFood_07",
+   "setor": "S02_02",
+   "colecao": "CITY_S02_02_PROPS",
+   "pos_gltf": [
+    -140.0,
+    0.15,
+    148.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_07"
+  },
+  {
+   "nome": "Ponto_iFood_08",
+   "setor": "S06_02",
+   "colecao": "CITY_S06_02_PROPS",
+   "pos_gltf": [
+    235.0,
+    0.15,
+    148.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_08"
+  },
+  {
+   "nome": "Ponto_iFood_09",
+   "setor": "S04_02",
+   "colecao": "CITY_S04_02_PROPS",
+   "pos_gltf": [
+    46.0,
+    0.15,
+    162.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_09"
+  },
+  {
+   "nome": "Ponto_iFood_10",
+   "setor": "S05_01",
+   "colecao": "CITY_S05_01_PROPS",
+   "pos_gltf": [
+    149.0,
+    0.15,
+    238.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    1.0
+   ],
+   "rot_y_graus_gltf": 90.0,
+   "colisor": "COL_Ponto_iFood_10"
+  },
+  {
+   "nome": "Ponto_iFood_11",
+   "setor": "S01_06",
+   "colecao": "CITY_S01_06_PROPS",
+   "pos_gltf": [
+    -296.0,
+    0.15,
+    -269.0
+   ],
+   "frente_gltf": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 180.0,
+   "colisor": "COL_Ponto_iFood_11"
+  },
+  {
+   "nome": "Ponto_iFood_12",
+   "setor": "S02_06",
+   "colecao": "CITY_S02_06_PROPS",
+   "pos_gltf": [
+    -176.0,
+    0.15,
+    -261.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_12"
+  },
+  {
+   "nome": "Ponto_iFood_13",
+   "setor": "S01_05",
+   "colecao": "CITY_S01_05_PROPS",
+   "pos_gltf": [
+    -278.0,
+    0.15,
+    -157.5
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_13"
+  },
+  {
+   "nome": "Ponto_iFood_14",
+   "setor": "S01_04",
+   "colecao": "CITY_S01_04_PROPS",
+   "pos_gltf": [
+    -278.0,
+    0.15,
+    -58.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_14"
+  },
+  {
+   "nome": "Ponto_iFood_15",
+   "setor": "S01_01",
+   "colecao": "CITY_S01_01_PROPS",
+   "pos_gltf": [
+    -256.0,
+    0.15,
+    251.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_15"
+  },
+  {
+   "nome": "Ponto_iFood_16",
+   "setor": "S03_01",
+   "colecao": "CITY_S03_01_PROPS",
+   "pos_gltf": [
+    -53.6,
+    0.15,
+    251.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_16"
+  },
+  {
+   "nome": "Ponto_iFood_17",
+   "setor": "S05_07",
+   "colecao": "CITY_S05_07_PROPS",
+   "pos_gltf": [
+    174.0,
+    0.15,
+    -309.0
+   ],
+   "frente_gltf": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 180.0,
+   "colisor": "COL_Ponto_iFood_17"
+  },
+  {
+   "nome": "Ponto_iFood_18",
+   "setor": "S07_06",
+   "colecao": "CITY_S07_06_PROPS",
+   "pos_gltf": [
+    329.0,
+    0.15,
+    -257.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    -1.0
+   ],
+   "rot_y_graus_gltf": -90.0,
+   "colisor": "COL_Ponto_iFood_18"
+  },
+  {
+   "nome": "Ponto_iFood_19",
+   "setor": "S05_06",
+   "colecao": "CITY_S05_06_PROPS",
+   "pos_gltf": [
+    194.0,
+    0.15,
+    -233.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_19"
+  },
+  {
+   "nome": "Ponto_iFood_20",
+   "setor": "S07_04",
+   "colecao": "CITY_S07_04_PROPS",
+   "pos_gltf": [
+    300.0,
+    0.15,
+    -77.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_20"
+  },
+  {
+   "nome": "Ponto_iFood_21",
+   "setor": "S06_03",
+   "colecao": "CITY_S06_03_PROPS",
+   "pos_gltf": [
+    240.0,
+    0.15,
+    39.0
+   ],
+   "frente_gltf": [
+    -0.0,
+    0.0,
+    1.0
+   ],
+   "rot_y_graus_gltf": 90.0,
+   "colisor": "COL_Ponto_iFood_21"
+  },
+  {
+   "nome": "Ponto_iFood_22",
+   "setor": "S07_03",
+   "colecao": "CITY_S07_03_PROPS",
+   "pos_gltf": [
+    364.0,
+    0.15,
+    95.0
+   ],
+   "frente_gltf": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 180.0,
+   "colisor": "COL_Ponto_iFood_22"
+  },
+  {
+   "nome": "Ponto_iFood_23",
+   "setor": "S07_01",
+   "colecao": "CITY_S07_01_PROPS",
+   "pos_gltf": [
+    300.0,
+    0.15,
+    290.0
+   ],
+   "frente_gltf": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "rot_y_graus_gltf": 0.0,
+   "colisor": "COL_Ponto_iFood_23"
+  }
+ ]
+}
